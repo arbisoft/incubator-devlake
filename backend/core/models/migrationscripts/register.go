@@ -146,6 +146,7 @@ func All() []plugin.MigrationScript {
 		new(increaseCqIssuesProjectKeyLength),
 		new(addAuthSessions),
 		new(addAiActivitiesUnifiedSchema),
+		new(addUserActivities),
 		new(addUserProjectMapping),
 	}
 }
