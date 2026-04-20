@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"time"
 
 	corectx "github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/errors"
@@ -49,9 +51,11 @@ func TestConnection(ctx stdctx.Context, br corectx.BasicRes, connection *models.
 		return nil, err
 	}
 
-	// Use GET /v1/models to verify the API key — works for both individual and
-	// organisation accounts without requiring an Admin API key.
-	res, err := apiClient.Get("models", nil, nil)
+	// Validate against the Claude Code analytics endpoint so the test reflects
+	// the same Admin API permission path used by the collector.
+	query := url.Values{}
+	query.Set("starting_at", time.Now().UTC().AddDate(0, 0, -30).Format("2006-01-02"))
+	res, err := apiClient.Get("organizations/usage_report/claude_code", query, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +63,7 @@ func TestConnection(ctx stdctx.Context, br corectx.BasicRes, connection *models.
 
 	switch res.StatusCode {
 	case http.StatusOK:
-		msg := "Successfully connected to Anthropic API"
+		msg := "Successfully connected to Anthropic Claude Code Analytics API"
 		if connection.OrganizationId != "" {
 			msg = fmt.Sprintf("%s (organization: %s)", msg, connection.OrganizationId)
 		}
