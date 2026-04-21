@@ -40,6 +40,7 @@ const RAW_PROJECT_TABLE = "plane_api_projects"
 const RAW_WORK_ITEM_TABLE = "plane_api_work_items"
 const RAW_STATE_TABLE = "plane_api_states"
 const RAW_WORK_ITEM_TYPE_TABLE = "plane_api_work_item_types"
+const RAW_EPIC_TABLE = "plane_api_epics"
 
 // PlaneApiParams holds the identifiers used to scope raw data storage and retrieval.
 type PlaneApiParams struct {

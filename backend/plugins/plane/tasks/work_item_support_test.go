@@ -77,14 +77,17 @@ func TestExtractPlaneWorkItem_AssigneeAndResolvedFields(t *testing.T) {
 			Type:                "type-bug",
 			State:               "state-done",
 			Priority:            "high",
-			Assignees:           []string{"user-1", "user-2"},
-			EstimatePoint:       planeTestFloat64Ptr(5),
-			CreatedAt:           createdAt,
-			UpdatedAt:           updatedAt,
-			CompletedAt:         completedAt,
-			StartDate:           "2024-01-09",
-			TargetDate:          "2024-01-15",
-			Parent:              planeTestStringPtr("parent-1"),
+			Assignees: []planeApiAssignee{
+				{Id: "user-1", Name: "Alice"},
+				{Id: "user-2", Name: "Bob"},
+			},
+			EstimatePoint: planeTestFloat64Ptr(5),
+			CreatedAt:     createdAt,
+			UpdatedAt:     updatedAt,
+			CompletedAt:   completedAt,
+			StartDate:     "2024-01-09",
+			TargetDate:    "2024-01-15",
+			Parent:        planeTestStringPtr("parent-1"),
 		},
 		7,
 		"project-1",
@@ -112,7 +115,7 @@ func TestExtractPlaneWorkItem_AssigneeAndResolvedFields(t *testing.T) {
 	assert.Equal(t, "Ship Phase 4", workItem.Title)
 	assert.Equal(t, "Implement work item sync", workItem.Description)
 	assert.Equal(t, "user-1", workItem.AssigneeId)
-	assert.Equal(t, "", workItem.AssigneeName)
+	assert.Equal(t, "Alice", workItem.AssigneeName)
 	assert.Equal(t, "Done", workItem.StateName)
 	assert.Equal(t, "completed", workItem.StateGroup)
 	assert.Equal(t, "Bug", workItem.TypeName)

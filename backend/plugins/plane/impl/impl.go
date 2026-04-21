@@ -68,6 +68,7 @@ func (p Plane) GetTablesInfo() []dal.Tabler {
 		&models.PlaneProject{},
 		&models.PlaneScopeConfig{},
 		&models.PlaneWorkItem{},
+		&models.PlaneEpic{},
 		&models.PlaneState{},
 		&models.PlaneWorkItemType{},
 	}
@@ -92,7 +93,11 @@ func (p Plane) SubTaskMetas() []plugin.SubTaskMeta {
 		tasks.ExtractWorkItemTypesMeta,
 		tasks.CollectWorkItemsMeta,
 		tasks.ExtractWorkItemsMeta,
+		tasks.CollectEpicsMeta,
+		tasks.ExtractEpicsMeta,
+		// ConvertWorkItems depends on _tool_plane_epics being populated by ExtractEpics for epic parent resolution.
 		tasks.ConvertWorkItemsMeta,
+		tasks.ConvertEpicsMeta,
 	}
 }
 

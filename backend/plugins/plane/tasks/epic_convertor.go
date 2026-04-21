@@ -30,21 +30,20 @@ import (
 	"github.com/apache/incubator-devlake/plugins/plane/models"
 )
 
-var _ plugin.SubTaskEntryPoint = ConvertWorkItems
+var _ plugin.SubTaskEntryPoint = ConvertEpics
 
-var ConvertWorkItemsMeta = plugin.SubTaskMeta{
-	Name:             "convertWorkItems",
-	EntryPoint:       ConvertWorkItems,
+var ConvertEpicsMeta = plugin.SubTaskMeta{
+	Name:             "convertEpics",
+	EntryPoint:       ConvertEpics,
 	EnabledByDefault: true,
-	Description:      "Convert Plane work items into DevLake ticket domain records",
+	Description:      "Convert Plane epics into DevLake ticket domain records",
 	DomainTypes:      []string{plugin.DOMAIN_TYPE_TICKET},
 }
 
-func ConvertWorkItems(taskCtx plugin.SubTaskContext) errors.Error {
+func ConvertEpics(taskCtx plugin.SubTaskContext) errors.Error {
 	data := taskCtx.GetData().(*PlaneTaskData)
 	db := taskCtx.GetDal()
 
-	issueIdGen := didgen.NewDomainIdGenerator(&models.PlaneWorkItem{})
 	epicIdGen := didgen.NewDomainIdGenerator(&models.PlaneEpic{})
 	boardIdGen := didgen.NewDomainIdGenerator(&models.PlaneProject{})
 	boardId := boardIdGen.Generate(data.Options.ConnectionId, data.Options.ProjectId)
@@ -53,10 +52,10 @@ func ConvertWorkItems(taskCtx plugin.SubTaskContext) errors.Error {
 		return err
 	}
 
-	converter, err := api.NewStatefulDataConverter(&api.StatefulDataConverterArgs[models.PlaneWorkItem]{
+	converter, err := api.NewStatefulDataConverter(&api.StatefulDataConverterArgs[models.PlaneEpic]{
 		SubtaskCommonArgs: &api.SubtaskCommonArgs{
 			SubTaskContext: taskCtx,
-			Table:          RAW_WORK_ITEM_TABLE,
+			Table:          RAW_EPIC_TABLE,
 			Params: PlaneApiParams{
 				ConnectionId:  data.Options.ConnectionId,
 				WorkspaceSlug: data.Project.WorkspaceSlug,
@@ -66,7 +65,7 @@ func ConvertWorkItems(taskCtx plugin.SubTaskContext) errors.Error {
 		Input: func(stateManager *api.SubtaskStateManager) (dal.Rows, errors.Error) {
 			clauses := []dal.Clause{
 				dal.Select("*"),
-				dal.From(&models.PlaneWorkItem{}),
+				dal.From(&models.PlaneEpic{}),
 				dal.Where("connection_id = ? AND project_id = ?", data.Options.ConnectionId, data.Options.ProjectId),
 			}
 			if stateManager.IsIncremental() {
@@ -77,41 +76,36 @@ func ConvertWorkItems(taskCtx plugin.SubTaskContext) errors.Error {
 			}
 			return db.Cursor(clauses...)
 		},
-		Convert: func(workItem *models.PlaneWorkItem) ([]any, errors.Error) {
+		Convert: func(epic *models.PlaneEpic) ([]any, errors.Error) {
 			issue := &ticket.Issue{
 				DomainEntity: domainlayer.DomainEntity{
-					Id: issueIdGen.Generate(workItem.ConnectionId, workItem.ProjectId, workItem.WorkItemId),
+					Id: epicIdGen.Generate(epic.ConnectionId, epic.ProjectId, epic.EpicId),
 				},
-				Url:            buildPlaneWorkItemURL(data.Endpoint, data.Project.WorkspaceSlug, data.Project.Identifier, workItem.SequenceId),
-				IssueKey:       fmt.Sprintf("#%d", workItem.SequenceId),
-				Title:          workItem.Title,
-				Description:    workItem.Description,
-				Type:           planeWorkItemTypeToStandardType(workItem.TypeName),
-				OriginalType:   workItem.TypeName,
-				Status:         planeStateGroupToStandardStatus(workItem.StateGroup),
-				OriginalStatus: workItem.StateName,
-				Priority:       workItem.Priority,
-				AssigneeId:     workItem.AssigneeId,
-				AssigneeName:   workItem.AssigneeName,
-				StoryPoint:     workItem.EstimatePoint,
-				CreatedDate:    workItem.CreatedDate,
-				UpdatedDate:    workItem.UpdatedDate,
-				ResolutionDate: workItem.CompletedAt,
+				Url:            buildPlaneEpicURL(data.Endpoint, data.Project.WorkspaceSlug, data.Project.Identifier, epic.SequenceId),
+				IssueKey:       fmt.Sprintf("#%d", epic.SequenceId),
+				Title:          epic.Name,
+				Description:    epic.Description,
+				Type:           "EPIC",
+				OriginalType:   "Epic",
+				Status:         planeStateGroupToStandardStatus(epic.StateGroup),
+				OriginalStatus: epic.StateName,
+				Priority:       epic.Priority,
+				AssigneeId:     epic.AssigneeId,
+				AssigneeName:   epic.AssigneeName,
+				StoryPoint:     planeEpicStoryPoint(epic),
+				CreatedDate:    epic.CreatedDate,
+				UpdatedDate:    epic.UpdatedDate,
+				ResolutionDate: epic.CompletedAt,
 				LeadTimeMinutes: computePlaneLeadTimeMinutes(
-					workItem.CreatedDate,
-					workItem.CompletedAt,
+					epic.CreatedDate,
+					epic.CompletedAt,
 				),
 			}
-			issue.ParentIssueId = resolvePlaneParentIssueId(
-				workItem.ConnectionId,
-				workItem.ProjectId,
-				workItem.ParentId,
-				epicIDSet,
-				issueIdGen,
-				epicIdGen,
-			)
-			if issue.ParentIssueId != "" {
-				issue.IsSubtask = true
+			if epic.ParentId != nil && *epic.ParentId != "" {
+				// Plane epics currently point only to other epics; we intentionally skip cross-entity fallback here.
+				if _, ok := epicIDSet[*epic.ParentId]; ok {
+					issue.ParentIssueId = epicIdGen.Generate(epic.ConnectionId, epic.ProjectId, *epic.ParentId)
+				}
 			}
 			boardIssue := &ticket.BoardIssue{
 				BoardId: boardId,
@@ -124,21 +118,4 @@ func ConvertWorkItems(taskCtx plugin.SubTaskContext) errors.Error {
 		return err
 	}
 	return converter.Execute()
-}
-
-func resolvePlaneParentIssueId(
-	connectionId uint64,
-	projectId string,
-	parentId *string,
-	epicIDSet map[string]struct{},
-	workItemIdGen *didgen.DomainIdGenerator,
-	epicIdGen *didgen.DomainIdGenerator,
-) string {
-	if parentId == nil || *parentId == "" {
-		return ""
-	}
-	if _, ok := epicIDSet[*parentId]; ok {
-		return epicIdGen.Generate(connectionId, projectId, *parentId)
-	}
-	return workItemIdGen.Generate(connectionId, projectId, *parentId)
 }

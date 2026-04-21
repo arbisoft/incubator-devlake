@@ -29,20 +29,18 @@ import (
 	"github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 )
 
-var _ plugin.SubTaskEntryPoint = CollectWorkItems
+var _ plugin.SubTaskEntryPoint = CollectEpics
 
-var CollectWorkItemsMeta = plugin.SubTaskMeta{
-	Name:             "collectWorkItems",
-	EntryPoint:       CollectWorkItems,
+var CollectEpicsMeta = plugin.SubTaskMeta{
+	Name:             "collectEpics",
+	EntryPoint:       CollectEpics,
 	EnabledByDefault: true,
-	Description:      "Collect Plane work items from the remote API",
+	Description:      "Collect Plane epics from the remote API",
 	DomainTypes:      []string{plugin.DOMAIN_TYPE_TICKET},
 }
 
-func CollectWorkItems(taskCtx plugin.SubTaskContext) errors.Error {
+func CollectEpics(taskCtx plugin.SubTaskContext) errors.Error {
 	data := taskCtx.GetData().(*PlaneTaskData)
-
-	taskCtx.GetLogger().Info(planeUpdatedAtOrderingVerificationNote)
 
 	collector, err := api.NewStatefulApiCollector(api.RawDataSubTaskArgs{
 		Ctx: taskCtx,
@@ -51,7 +49,7 @@ func CollectWorkItems(taskCtx plugin.SubTaskContext) errors.Error {
 			WorkspaceSlug: data.Project.WorkspaceSlug,
 			ProjectId:     data.Options.ProjectId,
 		},
-		Table: RAW_WORK_ITEM_TABLE,
+		Table: RAW_EPIC_TABLE,
 	})
 	if err != nil {
 		return err
@@ -59,24 +57,28 @@ func CollectWorkItems(taskCtx plugin.SubTaskContext) errors.Error {
 
 	err = collector.InitCollector(api.ApiCollectorArgs{
 		ApiClient:   data.ApiClient,
-		PageSize:    planeWorkItemPageSize,
-		UrlTemplate: "api/v1/workspaces/{{ .Params.WorkspaceSlug }}/projects/{{ .Params.ProjectId }}/work-items/",
+		PageSize:    planeEpicPageSize,
+		UrlTemplate: "api/v1/workspaces/{{ .Params.WorkspaceSlug }}/projects/{{ .Params.ProjectId }}/epics/",
 		Query: func(reqData *api.RequestData) (url.Values, errors.Error) {
 			query := url.Values{}
-			query.Set("per_page", strconv.Itoa(planeWorkItemPageSize))
-			if cursor, ok := reqData.CustomData.(string); ok && cursor != "" {
-				query.Set("cursor", cursor)
+			query.Set("limit", strconv.Itoa(planeEpicPageSize))
+			if offset, ok := reqData.CustomData.(int); ok && offset > 0 {
+				query.Set("offset", strconv.Itoa(offset))
 			}
 			if since := collector.GetSince(); since != nil {
 				query.Set("updated_at__gte", since.UTC().Format(time.RFC3339))
 			}
 			return query, nil
 		},
-		GetNextPageCustomData: func(_ *api.RequestData, prevPageResponse *http.Response) (interface{}, errors.Error) {
-			return parsePlaneNextCursor(prevPageResponse)
+		GetNextPageCustomData: func(reqData *api.RequestData, prevPageResponse *http.Response) (interface{}, errors.Error) {
+			currentOffset := 0
+			if offset, ok := reqData.CustomData.(int); ok {
+				currentOffset = offset
+			}
+			return parsePlaneEpicNextOffset(prevPageResponse, currentOffset, reqData.Pager.Size)
 		},
 		ResponseParser: func(res *http.Response) ([]json.RawMessage, errors.Error) {
-			return parsePlaneWorkItemResultsForCollector(res, collector.GetSince())
+			return parsePlaneEpicResultsForCollector(res, collector.GetSince())
 		},
 	})
 	if err != nil {

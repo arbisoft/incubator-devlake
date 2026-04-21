@@ -31,8 +31,8 @@ import (
 )
 
 const (
-	planeWorkItemPageSize              = 100
-	planeUpdatedAtOrderingVerification = "Fallback mode stays enabled until a multi-page Plane dataset verifies order_by=-updated_at across page boundaries."
+	planeWorkItemPageSize                  = 100
+	planeUpdatedAtOrderingVerificationNote = "Fallback mode stays enabled until a multi-page Plane dataset verifies order_by=-updated_at across page boundaries."
 
 	planeStatusCancelled = "CANCELLED"
 
@@ -45,22 +45,58 @@ type planePaginatedResults struct {
 	Results    []json.RawMessage `json:"results"`
 }
 
+type planeApiAssignee struct {
+	Id   string
+	Name string
+}
+
+func (a *planeApiAssignee) UnmarshalJSON(data []byte) error {
+	var id string
+	if err := json.Unmarshal(data, &id); err == nil {
+		a.Id = id
+		return nil
+	}
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	decodeStringField := func(keys ...string) string {
+		for _, key := range keys {
+			value, ok := raw[key]
+			if !ok {
+				continue
+			}
+			var decoded string
+			if err := json.Unmarshal(value, &decoded); err == nil {
+				return decoded
+			}
+		}
+		return ""
+	}
+
+	a.Id = decodeStringField("id")
+	a.Name = decodeStringField("display_name", "displayName", "name")
+	return nil
+}
+
 type planeApiWorkItem struct {
-	Id                  string     `json:"id"`
-	SequenceId          int        `json:"sequence_id"`
-	Name                string     `json:"name"`
-	DescriptionStripped string     `json:"description_stripped"`
-	Type                string     `json:"type"`
-	State               string     `json:"state"`
-	Priority            string     `json:"priority"`
-	Assignees           []string   `json:"assignees"`
-	EstimatePoint       *float64   `json:"estimate_point"`
-	CreatedAt           *time.Time `json:"created_at"`
-	UpdatedAt           *time.Time `json:"updated_at"`
-	CompletedAt         *time.Time `json:"completed_at"`
-	StartDate           string     `json:"start_date"`
-	TargetDate          string     `json:"target_date"`
-	Parent              *string    `json:"parent"`
+	Id                  string             `json:"id"`
+	SequenceId          int                `json:"sequence_id"`
+	Name                string             `json:"name"`
+	DescriptionStripped string             `json:"description_stripped"`
+	Type                string             `json:"type"`
+	State               string             `json:"state"`
+	Priority            string             `json:"priority"`
+	Assignees           []planeApiAssignee `json:"assignees"`
+	EstimatePoint       *float64           `json:"estimate_point"`
+	CreatedAt           *time.Time         `json:"created_at"`
+	UpdatedAt           *time.Time         `json:"updated_at"`
+	CompletedAt         *time.Time         `json:"completed_at"`
+	StartDate           string             `json:"start_date"`
+	TargetDate          string             `json:"target_date"`
+	Parent              *string            `json:"parent"`
 }
 
 type planeApiState struct {
@@ -199,7 +235,8 @@ func mapPlaneWorkItem(
 	workItem.StartDate = startDate
 	workItem.DueDate = dueDate
 	if len(apiWorkItem.Assignees) > 0 {
-		workItem.AssigneeId = apiWorkItem.Assignees[0]
+		workItem.AssigneeId = apiWorkItem.Assignees[0].Id
+		workItem.AssigneeName = apiWorkItem.Assignees[0].Name
 	}
 	if state, ok := states[apiWorkItem.State]; ok {
 		workItem.StateName = state.Name
@@ -212,13 +249,13 @@ func mapPlaneWorkItem(
 	return workItem, nil
 }
 
-func parsePlaneDate(value string) (*time.Time, error) {
+func parsePlaneDate(value string) (*time.Time, errors.Error) {
 	if value == "" {
 		return nil, nil
 	}
 	parsed, err := time.Parse("2006-01-02", value)
 	if err != nil {
-		return nil, err
+		return nil, errors.Default.Wrap(err, "error parsing Plane date")
 	}
 	return &parsed, nil
 }

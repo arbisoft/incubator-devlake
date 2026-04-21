@@ -25,5 +25,6 @@ func All() []plugin.MigrationScript {
 		new(addScopeTables20260416),
 		new(addRawDataColumns20260416),
 		new(addWorkItemTables20260417),
+		new(addEpicTable20260420),
 	}
 }
