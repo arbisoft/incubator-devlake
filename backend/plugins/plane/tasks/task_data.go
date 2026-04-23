@@ -41,10 +41,19 @@ const RAW_WORK_ITEM_TABLE = "plane_api_work_items"
 const RAW_STATE_TABLE = "plane_api_states"
 const RAW_WORK_ITEM_TYPE_TABLE = "plane_api_work_item_types"
 const RAW_EPIC_TABLE = "plane_api_epics"
+const RAW_CYCLE_TABLE = "plane_api_cycles"
+const RAW_CYCLE_ITEM_TABLE = "plane_api_cycle_items"
 
 // PlaneApiParams holds the identifiers used to scope raw data storage and retrieval.
 type PlaneApiParams struct {
 	ConnectionId  uint64
 	WorkspaceSlug string
 	ProjectId     string
+}
+
+type PlaneCycleItemApiParams struct {
+	ConnectionId  uint64
+	WorkspaceSlug string
+	ProjectId     string
+	CycleId       string
 }

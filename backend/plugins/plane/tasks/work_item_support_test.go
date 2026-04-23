@@ -81,7 +81,7 @@ func TestExtractPlaneWorkItem_AssigneeAndResolvedFields(t *testing.T) {
 				{Id: "user-1", Name: "Alice"},
 				{Id: "user-2", Name: "Bob"},
 			},
-			EstimatePoint: planeTestFloat64Ptr(5),
+			EstimatePoint: planeApiFloat64{value: planeTestFloat64Ptr(5)},
 			CreatedAt:     createdAt,
 			UpdatedAt:     updatedAt,
 			CompletedAt:   completedAt,
@@ -127,6 +127,55 @@ func TestExtractPlaneWorkItem_AssigneeAndResolvedFields(t *testing.T) {
 	require.NotNil(t, workItem.EstimatePoint)
 	assert.Equal(t, 5.0, *workItem.EstimatePoint)
 	assert.True(t, workItem.IsClosed)
+}
+
+func TestPlaneApiWorkItemEstimatePointAcceptsString(t *testing.T) {
+	var workItem planeApiWorkItem
+
+	err := json.Unmarshal([]byte(`{
+		"id": "work-item-1",
+		"sequence_id": 42,
+		"name": "Ship Phase 4",
+		"estimate_point": "3.5"
+	}`), &workItem)
+
+	require.NoError(t, err)
+	require.NotNil(t, workItem.EstimatePoint.Float64Ptr())
+	assert.Equal(t, 3.5, *workItem.EstimatePoint.Float64Ptr())
+}
+
+func TestPlaneApiWorkItemEstimatePointIgnoresNonNumericString(t *testing.T) {
+	var workItem planeApiWorkItem
+
+	err := json.Unmarshal([]byte(`{
+		"id": "work-item-1",
+		"sequence_id": 42,
+		"name": "Ship Phase 4",
+		"estimate_point": "3d44f7f0-fa5c-4fac-b7b0-d99d504975ed"
+	}`), &workItem)
+
+	require.NoError(t, err)
+	assert.Nil(t, workItem.EstimatePoint.Float64Ptr())
+}
+
+func TestPlaneApiWorkItemEstimatePointMarshalsAsNumberOrNull(t *testing.T) {
+	workItemWithEstimate := planeApiWorkItem{
+		Id:            "work-item-1",
+		EstimatePoint: planeApiFloat64{value: planeTestFloat64Ptr(3.5)},
+	}
+
+	data, err := json.Marshal(workItemWithEstimate)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), `"estimate_point":3.5`)
+
+	workItemWithoutEstimate := planeApiWorkItem{
+		Id:            "work-item-2",
+		EstimatePoint: planeApiFloat64{},
+	}
+
+	data, err = json.Marshal(workItemWithoutEstimate)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), `"estimate_point":null`)
 }
 
 func TestParsePlaneWorkItemResultsForCollectorFullRefresh(t *testing.T) {

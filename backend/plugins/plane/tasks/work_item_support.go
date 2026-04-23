@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	neturl "net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -90,13 +91,60 @@ type planeApiWorkItem struct {
 	State               string             `json:"state"`
 	Priority            string             `json:"priority"`
 	Assignees           []planeApiAssignee `json:"assignees"`
-	EstimatePoint       *float64           `json:"estimate_point"`
+	EstimatePoint       planeApiFloat64    `json:"estimate_point"`
 	CreatedAt           *time.Time         `json:"created_at"`
 	UpdatedAt           *time.Time         `json:"updated_at"`
 	CompletedAt         *time.Time         `json:"completed_at"`
 	StartDate           string             `json:"start_date"`
 	TargetDate          string             `json:"target_date"`
 	Parent              *string            `json:"parent"`
+}
+
+type planeApiFloat64 struct {
+	value *float64
+}
+
+func (f planeApiFloat64) MarshalJSON() ([]byte, error) {
+	if f.value == nil {
+		return json.Marshal(nil)
+	}
+	return json.Marshal(*f.value)
+}
+
+func (f *planeApiFloat64) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		f.value = nil
+		return nil
+	}
+
+	var floatValue float64
+	if err := json.Unmarshal(data, &floatValue); err == nil {
+		f.value = &floatValue
+		return nil
+	}
+
+	var stringValue string
+	if err := json.Unmarshal(data, &stringValue); err != nil {
+		return err
+	}
+	if strings.TrimSpace(stringValue) == "" {
+		f.value = nil
+		return nil
+	}
+
+	parsed, err := strconv.ParseFloat(strings.TrimSpace(stringValue), 64)
+	if err != nil {
+		// Plane may return a non-numeric estimate identifier instead of a score.
+		// Treat that as "no numeric estimate" instead of failing the whole extractor.
+		f.value = nil
+		return nil
+	}
+	f.value = &parsed
+	return nil
+}
+
+func (f planeApiFloat64) Float64Ptr() *float64 {
+	return f.value
 }
 
 type planeApiState struct {
@@ -218,7 +266,7 @@ func mapPlaneWorkItem(
 		TypeId:        apiWorkItem.Type,
 		StateId:       apiWorkItem.State,
 		Priority:      apiWorkItem.Priority,
-		EstimatePoint: apiWorkItem.EstimatePoint,
+		EstimatePoint: apiWorkItem.EstimatePoint.Float64Ptr(),
 		CreatedDate:   apiWorkItem.CreatedAt,
 		UpdatedDate:   apiWorkItem.UpdatedAt,
 		CompletedAt:   apiWorkItem.CompletedAt,

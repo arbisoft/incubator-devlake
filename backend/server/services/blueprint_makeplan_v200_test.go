@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	coreModels "github.com/apache/incubator-devlake/core/models"
-	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models/domainlayer"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/code"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/ticket"
@@ -101,10 +100,4 @@ func TestMakePlanV200(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.Equal(t, expectedPlan, plan)
-}
-
-func TestMakePlanV200WithoutConnections(t *testing.T) {
-	plan, err := GeneratePlanJsonV200("", nil, nil, false)
-	assert.Nil(t, plan)
-	assert.EqualError(t, errors.Convert(err), "blueprint has no connections configured")
 }

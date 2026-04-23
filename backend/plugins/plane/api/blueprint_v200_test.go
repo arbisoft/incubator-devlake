@@ -30,6 +30,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func init() {
+	_ = plugin.RegisterPlugin("plane", planeBlueprintTestPlugin{})
+}
+
+type planeBlueprintTestPlugin struct{}
+
+func (planeBlueprintTestPlugin) Description() string {
+	return "test plugin registration for plane blueprint tests"
+}
+
+func (planeBlueprintTestPlugin) Name() string {
+	return "plane"
+}
+
+func (planeBlueprintTestPlugin) RootPkgPath() string {
+	return "github.com/apache/incubator-devlake/plugins/plane"
+}
+
 var testScopeDetails = []*srvhelper.ScopeDetail[models.PlaneProject, models.PlaneScopeConfig]{
 	{
 		Scope: models.PlaneProject{

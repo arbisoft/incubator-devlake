@@ -15,17 +15,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package migrationscripts
+package tasks
 
 import "github.com/apache/incubator-devlake/core/plugin"
 
-func All() []plugin.MigrationScript {
-	return []plugin.MigrationScript{
-		new(addInitTables20260415),
-		new(addScopeTables20260416),
-		new(addRawDataColumns20260416),
-		new(addWorkItemTables20260417),
-		new(addEpicTable20260420),
-		new(addCycleTables20260421),
-	}
+func init() {
+	_ = plugin.RegisterPlugin("plane", planeTasksTestPlugin{})
+}
+
+type planeTasksTestPlugin struct{}
+
+func (planeTasksTestPlugin) Description() string {
+	return "test plugin registration for plane task tests"
+}
+
+func (planeTasksTestPlugin) Name() string {
+	return "plane"
+}
+
+func (planeTasksTestPlugin) RootPkgPath() string {
+	return "github.com/apache/incubator-devlake/plugins/plane"
 }
