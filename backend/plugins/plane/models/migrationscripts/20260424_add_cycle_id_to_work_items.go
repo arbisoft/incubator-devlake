@@ -17,17 +17,30 @@ limitations under the License.
 
 package migrationscripts
 
-import "github.com/apache/incubator-devlake/core/plugin"
+import (
+	"github.com/apache/incubator-devlake/core/context"
+	"github.com/apache/incubator-devlake/core/errors"
+)
 
-func All() []plugin.MigrationScript {
-	return []plugin.MigrationScript{
-		new(addInitTables20260415),
-		new(addScopeTables20260416),
-		new(addRawDataColumns20260416),
-		new(addWorkItemTables20260417),
-		new(addEpicTable20260420),
-		new(addCycleTables20260421),
-		new(addEstimatePointTable20260422),
-		new(addCycleIdToWorkItems20260424),
-	}
+type addCycleIdToWorkItems20260424 struct{}
+
+type PlaneWorkItem20260424 struct {
+	CycleId string `gorm:"type:varchar(255);index"`
+}
+
+func (PlaneWorkItem20260424) TableName() string {
+	return "_tool_plane_work_items"
+}
+
+func (*addCycleIdToWorkItems20260424) Up(basicRes context.BasicRes) errors.Error {
+	db := basicRes.GetDal()
+	return db.AutoMigrate(&PlaneWorkItem20260424{})
+}
+
+func (*addCycleIdToWorkItems20260424) Version() uint64 {
+	return 20260424000001
+}
+
+func (*addCycleIdToWorkItems20260424) Name() string {
+	return "add cycle_id to plane work items"
 }

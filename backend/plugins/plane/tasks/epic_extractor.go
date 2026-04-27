@@ -68,6 +68,7 @@ func ExtractEpics(taskCtx plugin.SubTaskContext) errors.Error {
 				stateMap,
 				workItemTypeMap,
 				estimateMap,
+				data.AssigneeNameById,
 			)
 			if err != nil {
 				return nil, err

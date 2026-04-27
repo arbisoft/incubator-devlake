@@ -45,6 +45,7 @@ type PlaneWorkItem struct {
 	StartDate     *time.Time `gorm:"type:date"`
 	DueDate       *time.Time `gorm:"type:date"`
 	ParentId      *string    `gorm:"type:varchar(255);index"`
+	CycleId       string     `gorm:"type:varchar(255);index"`
 	IsClosed      bool
 	common.NoPKModel
 }

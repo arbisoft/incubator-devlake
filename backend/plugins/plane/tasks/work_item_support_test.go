@@ -30,6 +30,65 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestPlaneApiAssigneeUnmarshalUUIDString(t *testing.T) {
+	var assignees []planeApiAssignee
+	err := json.Unmarshal([]byte(`["user-uuid-1","user-uuid-2"]`), &assignees)
+	require.NoError(t, err)
+	require.Len(t, assignees, 2)
+	assert.Equal(t, "user-uuid-1", assignees[0].Id)
+	assert.Empty(t, assignees[0].Name)
+	assert.Equal(t, "user-uuid-2", assignees[1].Id)
+}
+
+func TestPlaneApiAssigneeUnmarshalExpandedObject(t *testing.T) {
+	var assignees []planeApiAssignee
+	err := json.Unmarshal([]byte(`[{"id":"user-uuid-1","first_name":"Alice","last_name":"Smith","display_name":"Alice Smith"},{"id":"user-uuid-2","first_name":"Bob","display_name":"Bobby"}]`), &assignees)
+	require.NoError(t, err)
+	require.Len(t, assignees, 2)
+	assert.Equal(t, "user-uuid-1", assignees[0].Id)
+	assert.Equal(t, "Alice", assignees[0].Name)
+	assert.Equal(t, "user-uuid-2", assignees[1].Id)
+	assert.Equal(t, "Bob", assignees[1].Name)
+}
+
+func TestMapPlaneWorkItemUUIDOnlyAssigneeHasEmptyName(t *testing.T) {
+	workItem, err := mapPlaneWorkItem(
+		&planeApiWorkItem{
+			Id:        "work-item-1",
+			Assignees: []planeApiAssignee{{Id: "user-uuid-1"}},
+		},
+		7,
+		"project-1",
+		map[string]models.PlaneState{},
+		map[string]models.PlaneWorkItemType{},
+		map[string]*float64{},
+		map[string]string{},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, workItem)
+	assert.Equal(t, "user-uuid-1", workItem.AssigneeId)
+	assert.Empty(t, workItem.AssigneeName)
+}
+
+func TestMapPlaneWorkItemUUIDOnlyAssigneeResolvesNameFromMemberMap(t *testing.T) {
+	workItem, err := mapPlaneWorkItem(
+		&planeApiWorkItem{
+			Id:        "work-item-1",
+			Assignees: []planeApiAssignee{{Id: "user-uuid-1"}},
+		},
+		7,
+		"project-1",
+		map[string]models.PlaneState{},
+		map[string]models.PlaneWorkItemType{},
+		map[string]*float64{},
+		map[string]string{"user-uuid-1": "Alice"},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, workItem)
+	assert.Equal(t, "user-uuid-1", workItem.AssigneeId)
+	assert.Equal(t, "Alice", workItem.AssigneeName)
+}
+
 func TestParsePlanePaginatedResultsAndCursor(t *testing.T) {
 	response := &http.Response{
 		Body: io.NopCloser(strings.NewReader(`{
@@ -105,6 +164,7 @@ func TestExtractPlaneWorkItem_AssigneeAndResolvedFields(t *testing.T) {
 			},
 		},
 		map[string]*float64{},
+		map[string]string{},
 	)
 	require.NoError(t, err)
 	require.NotNil(t, workItem)
@@ -193,6 +253,7 @@ func TestMapPlaneWorkItemResolvesEstimateUUID(t *testing.T) {
 		map[string]*float64{
 			"point-1": planeTestFloat64Ptr(8),
 		},
+		map[string]string{},
 	)
 	require.NoError(t, err)
 	require.NotNil(t, workItem)
@@ -211,6 +272,7 @@ func TestMapPlaneWorkItemUnknownEstimateUUIDFallsBackToNil(t *testing.T) {
 		map[string]models.PlaneState{},
 		map[string]models.PlaneWorkItemType{},
 		map[string]*float64{},
+		map[string]string{},
 	)
 	require.NoError(t, err)
 	require.NotNil(t, workItem)

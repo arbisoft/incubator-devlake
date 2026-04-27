@@ -153,10 +153,17 @@ func (p Plane) PrepareTaskData(taskCtx plugin.TaskContext, options map[string]in
 	}
 
 	taskData := &tasks.PlaneTaskData{
-		Options:   &op,
-		Project:   project,
-		ApiClient: planeApiClient,
-		Endpoint:  connection.Endpoint,
+		Options:          &op,
+		Project:          project,
+		ApiClient:        planeApiClient,
+		Endpoint:         connection.Endpoint,
+		AssigneeNameById: map[string]string{},
+	}
+	assigneeNameById, memberErr := tasks.FetchPlaneMemberMapForTaskData(planeApiClient, connection.WorkspaceSlug, op.ProjectId)
+	if memberErr != nil {
+		logger.Warn(memberErr, "unable to preload Plane member display names; assignee UUIDs may remain unresolved")
+	} else {
+		taskData.AssigneeNameById = assigneeNameById
 	}
 	return taskData, nil
 }

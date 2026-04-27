@@ -106,6 +106,24 @@ func TestExtractPlaneCycleItem(t *testing.T) {
 	assert.Equal(t, mustParsePlaneTime(t, "2024-02-03T12:00:00Z"), cycleItem.UpdatedDate)
 }
 
+// Plane's cycle-issues endpoint returns full work item objects directly.
+// The top-level "id" is the work item UUID; there is no nested "issue" field.
+func TestExtractPlaneCycleItemDirectWorkItemFormat(t *testing.T) {
+	cycleItem, err := extractPlaneCycleItem([]byte(`{
+		"id": "item-42",
+		"name": "My work item",
+		"state": "state-uuid",
+		"created_at": "2026-04-22T11:58:10.523506Z",
+		"updated_at": "2026-04-22T11:58:10.485257Z"
+	}`), 7, "project-1", "cycle-1")
+	require.NoError(t, err)
+	require.NotNil(t, cycleItem)
+
+	assert.Equal(t, "item-42", cycleItem.ItemId)
+	assert.Equal(t, "cycle-1", cycleItem.CycleId)
+	assert.Equal(t, planeCycleItemTypeWorkItem, cycleItem.ItemType)
+}
+
 func TestExtractPlaneCycleItemSkipsMismatchedCycle(t *testing.T) {
 	cycleItem, err := extractPlaneCycleItem([]byte(`{
 		"id": "membership-1",
@@ -116,8 +134,8 @@ func TestExtractPlaneCycleItemSkipsMismatchedCycle(t *testing.T) {
 	assert.Nil(t, cycleItem)
 }
 
-func TestExtractPlaneCycleItemSkipsEmptyIssue(t *testing.T) {
-	cycleItem, err := extractPlaneCycleItem([]byte(`{"id":"membership-1","cycle":"cycle-1"}`), 7, "project-1", "cycle-1")
+func TestExtractPlaneCycleItemSkipsEmptyId(t *testing.T) {
+	cycleItem, err := extractPlaneCycleItem([]byte(`{"id":"","cycle":"cycle-1"}`), 7, "project-1", "cycle-1")
 	require.NoError(t, err)
 	assert.Nil(t, cycleItem)
 }

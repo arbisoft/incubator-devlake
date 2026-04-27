@@ -64,6 +64,7 @@ func CollectWorkItems(taskCtx plugin.SubTaskContext) errors.Error {
 		Query: func(reqData *api.RequestData) (url.Values, errors.Error) {
 			query := url.Values{}
 			query.Set("per_page", strconv.Itoa(planeWorkItemPageSize))
+			query.Set("expand", "assignees")
 			if cursor, ok := reqData.CustomData.(string); ok && cursor != "" {
 				query.Set("cursor", cursor)
 			}

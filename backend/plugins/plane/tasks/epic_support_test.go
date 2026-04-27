@@ -158,6 +158,7 @@ func TestMapPlaneEpic_AssigneeResolvedFieldsAndIsClosed(t *testing.T) {
 			},
 		},
 		map[string]*float64{},
+		map[string]string{},
 	)
 	require.NoError(t, err)
 	require.NotNil(t, epic)
@@ -176,6 +177,44 @@ func TestMapPlaneEpic_AssigneeResolvedFieldsAndIsClosed(t *testing.T) {
 	assert.Equal(t, 8.0, *epic.EstimatePoint)
 	require.NotNil(t, epic.Point)
 	assert.Equal(t, 13, *epic.Point)
+}
+
+func TestMapPlaneEpicUUIDOnlyAssigneeHasEmptyName(t *testing.T) {
+	epic, err := mapPlaneEpic(
+		&planeApiEpic{
+			Id:        "epic-1",
+			Assignees: []planeApiAssignee{{Id: "user-uuid-1"}},
+		},
+		7,
+		"project-1",
+		map[string]models.PlaneState{},
+		map[string]models.PlaneWorkItemType{},
+		map[string]*float64{},
+		map[string]string{},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, epic)
+	assert.Equal(t, "user-uuid-1", epic.AssigneeId)
+	assert.Empty(t, epic.AssigneeName)
+}
+
+func TestMapPlaneEpicUUIDOnlyAssigneeResolvesNameFromMemberMap(t *testing.T) {
+	epic, err := mapPlaneEpic(
+		&planeApiEpic{
+			Id:        "epic-1",
+			Assignees: []planeApiAssignee{{Id: "user-uuid-1"}},
+		},
+		7,
+		"project-1",
+		map[string]models.PlaneState{},
+		map[string]models.PlaneWorkItemType{},
+		map[string]*float64{},
+		map[string]string{"user-uuid-1": "Alice"},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, epic)
+	assert.Equal(t, "user-uuid-1", epic.AssigneeId)
+	assert.Equal(t, "Alice", epic.AssigneeName)
 }
 
 func TestPlaneApiEpicEstimatePointAcceptsString(t *testing.T) {
@@ -204,6 +243,7 @@ func TestMapPlaneEpicResolvesEstimateUUID(t *testing.T) {
 		map[string]*float64{
 			"point-1": planeTestFloat64Ptr(13),
 		},
+		map[string]string{},
 	)
 	require.NoError(t, err)
 	require.NotNil(t, epic)
@@ -223,6 +263,7 @@ func TestMapPlaneEpicFallsBackToLegacyPointWhenEstimateUUIDUnknown(t *testing.T)
 		map[string]models.PlaneState{},
 		map[string]models.PlaneWorkItemType{},
 		map[string]*float64{},
+		map[string]string{},
 	)
 	require.NoError(t, err)
 	require.NotNil(t, epic)

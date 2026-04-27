@@ -156,6 +156,7 @@ func mapPlaneEpic(
 	states map[string]models.PlaneState,
 	workItemTypes map[string]models.PlaneWorkItemType,
 	estimateMap map[string]*float64,
+	assigneeNameById map[string]string,
 ) (*models.PlaneEpic, errors.Error) {
 	epic := &models.PlaneEpic{
 		ConnectionId:  connectionId,
@@ -180,10 +181,7 @@ func mapPlaneEpic(
 	}
 	epic.StartDate = startDate
 	epic.DueDate = dueDate
-	if len(apiEpic.Assignees) > 0 {
-		epic.AssigneeId = apiEpic.Assignees[0].Id
-		epic.AssigneeName = apiEpic.Assignees[0].Name
-	}
+	epic.AssigneeId, epic.AssigneeName = resolvePlanePrimaryAssignee(apiEpic.Assignees, assigneeNameById)
 	if state, ok := states[apiEpic.State]; ok {
 		epic.StateName = state.Name
 		epic.StateGroup = state.Group

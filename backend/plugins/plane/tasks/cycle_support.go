@@ -44,8 +44,8 @@ type planeApiCycle struct {
 
 type planeApiCycleItem struct {
 	Id        string     `json:"id"`
-	Cycle     string     `json:"cycle"`
-	Issue     string     `json:"issue"`
+	Cycle     planeApiId `json:"cycle"`
+	Issue     planeApiId `json:"issue"`
 	CreatedAt *time.Time `json:"created_at"`
 	UpdatedAt *time.Time `json:"updated_at"`
 }
@@ -87,17 +87,24 @@ func extractPlaneCycleItem(data []byte, connectionId uint64, projectId, cycleId 
 	if err := json.Unmarshal(data, &apiCycleItem); err != nil {
 		return nil, errors.Default.Wrap(err, "error unmarshalling Plane cycle item")
 	}
-	if apiCycleItem.Issue == "" {
+	// Plane's cycle-issues endpoint returns full work item objects directly,
+	// so the issue ID is the top-level "id". Older API versions may nest it
+	// under "issue", so we check that first.
+	issueId := apiCycleItem.Issue.Id
+	if issueId == "" {
+		issueId = apiCycleItem.Id
+	}
+	if issueId == "" {
 		return nil, nil
 	}
-	if apiCycleItem.Cycle != "" && apiCycleItem.Cycle != cycleId {
+	if apiCycleItem.Cycle.Id != "" && apiCycleItem.Cycle.Id != cycleId {
 		return nil, nil
 	}
 	return &models.PlaneCycleItem{
 		ConnectionId: connectionId,
 		ProjectId:    projectId,
 		CycleId:      cycleId,
-		ItemId:       apiCycleItem.Issue,
+		ItemId:       issueId,
 		ItemType:     planeCycleItemTypeWorkItem,
 		CreatedDate:  apiCycleItem.CreatedAt,
 		UpdatedDate:  apiCycleItem.UpdatedAt,

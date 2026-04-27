@@ -62,6 +62,7 @@ func CollectEpics(taskCtx plugin.SubTaskContext) errors.Error {
 		Query: func(reqData *api.RequestData) (url.Values, errors.Error) {
 			query := url.Values{}
 			query.Set("limit", strconv.Itoa(planeEpicPageSize))
+			query.Set("expand", "assignees")
 			if offset, ok := reqData.CustomData.(int); ok && offset > 0 {
 				query.Set("offset", strconv.Itoa(offset))
 			}

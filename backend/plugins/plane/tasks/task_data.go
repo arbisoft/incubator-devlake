@@ -28,10 +28,11 @@ type PlaneOptions struct {
 }
 
 type PlaneTaskData struct {
-	Options   *PlaneOptions
-	Project   *models.PlaneProject
-	ApiClient *helper.ApiAsyncClient
-	Endpoint  string // base URL of the Plane instance, e.g. "https://api.plane.so"
+	Options          *PlaneOptions
+	Project          *models.PlaneProject
+	ApiClient        *helper.ApiAsyncClient
+	Endpoint         string // base URL of the Plane instance, e.g. "https://api.plane.so"
+	AssigneeNameById map[string]string
 }
 
 // RAW_PROJECT_TABLE is the raw data table for Plane project API responses.
