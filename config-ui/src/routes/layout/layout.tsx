@@ -19,12 +19,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useLoaderData, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
-import { Layout as AntdLayout, Menu, Divider, Dropdown, Button } from 'antd';
-import { UserOutlined } from '@ant-design/icons';
+import { Layout as AntdLayout, Menu, Divider, Dropdown, Button, Tooltip } from 'antd';
+import { UserOutlined, SunOutlined, MoonOutlined, DesktopOutlined } from '@ant-design/icons';
 
 import API from '@/api';
 import { PageLoading, Logo, ExternalLink } from '@/components';
-import { init, selectError, selectStatus } from '@/features';
+import { init, selectError, selectStatus, cycleMode, selectThemeMode } from '@/features';
 import { OnboardCard } from '@/routes/onboard/components';
 import { OtelAttention } from '@/routes/otel/attention';
 import { useAppDispatch, useAppSelector } from '@/hooks';
@@ -33,6 +33,18 @@ import { ACCESS_PATH, menuItems, menuItemsMatch, headerItems } from './config';
 import type { AccessCurrent } from '@/api/access';
 import { canManageAccess } from '@/routes/access/guard';
 import { useAccountMenu, useIdentityLinkNotification } from '@/routes/access/use-account-menu';
+
+const themeIcon = {
+  light: <SunOutlined />,
+  dark: <MoonOutlined />,
+  system: <DesktopOutlined />,
+} as const;
+
+const themeLabel = {
+  light: 'Light theme',
+  dark: 'Dark theme',
+  system: 'Follow system',
+} as const;
 
 const { Sider, Header, Content, Footer } = AntdLayout;
 
@@ -76,6 +88,7 @@ export const Layout = () => {
   const dispatch = useAppDispatch();
   const status = useAppSelector(selectStatus);
   const error = useAppSelector(selectError);
+  const themeMode = useAppSelector(selectThemeMode);
 
   useEffect(() => {
     dispatch(init(plugins));
@@ -168,6 +181,15 @@ export const Layout = () => {
                 {i !== arr.length - 1 && <Divider type="vertical" />}
               </span>
             ))}
+          <Divider type="vertical" />
+          <Tooltip title={themeLabel[themeMode]}>
+            <Button
+              type="text"
+              aria-label={themeLabel[themeMode]}
+              icon={themeIcon[themeMode]}
+              onClick={() => dispatch(cycleMode())}
+            />
+          </Tooltip>
           {user?.authenticated && (
             <>
               <Divider type="vertical" />

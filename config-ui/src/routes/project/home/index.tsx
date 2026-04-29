@@ -170,7 +170,7 @@ export const ProjectHomePage = () => {
               <Link
                 to={PATHS.PROJECT(name)}
                 state={{ activeKey: 'configuration' }}
-                style={{ color: '#292b3f' }}
+                style={{ color: 'var(--devlake-color-text)' }}
                 ref={nameRef}
               >
                 {name}
