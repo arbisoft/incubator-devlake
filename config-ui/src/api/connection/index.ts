@@ -55,8 +55,10 @@ export const test = (
       | 'secretKey'
       | 'clientSecret'
       | 'proxy'
+      | 'rateLimitPerHour'
       | 'dbUrl'
       | 'companyId'
+      | 'adminApiKey'
       | 'organization'
       | 'organizationId'
       | 'org'
@@ -64,6 +66,7 @@ export const test = (
       | 'instanceUrl'
       | 'apiVersion'
       | 'workspaceSlug'
+      | 'customHeaders'
     >
   >,
 ): Promise<IConnectionTestResult> =>
@@ -86,7 +89,9 @@ export const testOld = (
     | 'secretKey'
     | 'clientSecret'
     | 'proxy'
+    | 'rateLimitPerHour'
     | 'dbUrl'
+    | 'adminApiKey'
     | 'organization'
     | 'organizationId'
     | 'org'
@@ -94,5 +99,6 @@ export const testOld = (
     | 'instanceUrl'
     | 'apiVersion'
     | 'workspaceSlug'
+    | 'customHeaders'
   >,
 ): Promise<IConnectionOldTestResult> => request(`/plugins/${plugin}/test`, { method: 'post', data: payload });
