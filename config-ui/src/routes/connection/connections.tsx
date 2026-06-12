@@ -96,8 +96,9 @@ export const Connections = () => {
     setPlugin(plugin);
   };
 
-  const handleShowFormDialog = () => {
+  const handleShowFormDialog = (pluginName?: string) => {
     setType('form');
+    if (pluginName) setPlugin(pluginName);
   };
 
   const handleHideDialog = () => {
@@ -241,7 +242,7 @@ export const Connections = () => {
           <ConnectionList plugin={plugin} onCreate={handleShowFormDialog} />
         </Modal>
       )}
-      {type === 'form' && pluginConfig && (
+      {type === 'form' && plugin && pluginConfig && (
         <Modal
           open
           width={820}

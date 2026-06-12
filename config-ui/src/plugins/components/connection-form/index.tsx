@@ -101,13 +101,17 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: Props) => {
   const {
     name,
     connection: { docLink, fields, initialValues },
-  } = getPluginConfig(plugin);
+  } = getPluginConfig(plugin) ?? {};
 
   const disabled = useMemo(() => {
     return Object.values(errors).some((value) => value);
   }, [errors]);
 
   const sanitizedCustomHeaders = useMemo(() => sanitizeCustomHeaders(values.customHeaders), [values.customHeaders]);
+
+  if (!plugin || !name) {
+    return null;
+  }
 
   const handleTest = async () => {
     await operator(
