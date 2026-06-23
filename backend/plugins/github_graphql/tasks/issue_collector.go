@@ -181,6 +181,12 @@ func CollectIssues(taskCtx plugin.SubTaskContext) errors.Error {
 	if err != nil {
 		return err
 	}
+	// issueUpdatedAt is written in BuildQuery and read in ResponseParser for the
+	// same batch. This is safe ONLY because GetPageInfo is nil for this collector
+	// (so no concurrent NextTick goroutines are spawned) and GraphqlAsyncClient.Query
+	// serialises all calls under a mutex.
+	// Do NOT add GetPageInfo to this collector without converting this to a sync.Map
+	// or per-call local, same as requestedIssuesByQuery below.
 	issueUpdatedAt := make(map[int]time.Time)
 	requestedIssuesByQuery := sync.Map{}
 	err = apiCollector.InitGraphQLCollector(api.GraphqlCollectorArgs{
