@@ -69,13 +69,17 @@ RUN for arch in aarch64 x86_64 ; do \
         if [ "$arch" = "aarch64" ] ; then \
             cmake .. -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
                 -DBUILD_SHARED_LIBS=ON -DCMAKE_SYSROOT=/rootfs-arm64 \
+                -DZLIB_LIBRARY=/rootfs-arm64/usr/lib/aarch64-linux-gnu/libz.so.1 \
+                -DZLIB_INCLUDE_DIR=/rootfs-arm64/usr/include \
                 -DCMAKE_INSTALL_PREFIX=/usr/local/deps/${arch} ; \
         elif [ "$arch" = "x86_64" ] ; then \
             cmake .. -DCMAKE_C_COMPILER=x86_64-linux-gnu-gcc \
                 -DBUILD_SHARED_LIBS=ON -DCMAKE_SYSROOT=/rootfs-amd64 \
+                -DZLIB_LIBRARY=/rootfs-amd64/usr/lib/x86_64-linux-gnu/libz.so.1 \
+                -DZLIB_INCLUDE_DIR=/rootfs-amd64/usr/include \
                 -DCMAKE_INSTALL_PREFIX=/usr/local/deps/${arch} ; \
         fi && \
-        make -j install ; \
+        make -j$(nproc) install ; \
     done
 
 
