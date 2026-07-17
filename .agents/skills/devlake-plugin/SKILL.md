@@ -1,6 +1,6 @@
 ---
 name: devlake-plugin
-description: Complete guide for implementing a new datasource plugin in Apache DevLake. Covers architecture, all required interfaces, three-layer data model, subtask patterns, migration scripts, API registration, blueprint planning, and known pitfalls. Use whenever a new DevLake plugin is being added.
+description: Complete guide for implementing a new datasource plugin in Apache DevLake. Covers architecture, all required interfaces, three-layer data model, subtask patterns, migration scripts, API registration, config-ui frontend wiring, blueprint planning, CI/lint/testing requirements, and known pitfalls verified against real plugin code. Use whenever a new DevLake plugin is being added.
 origin: custom
 ---
 
@@ -11,11 +11,30 @@ origin: custom
 - Implementing a new datasource plugin
 - Extending an existing plugin with new entity types
 - Debugging a plugin's data pipeline
-- Reviewing a plugin PR
+- Reviewing a plugin PR before it's proposed upstream
+
+See also `AGENTS.md` at the repo root for a condensed version of this guide aimed at general coding agents. This skill is the deep-dive; keep the two in sync if either changes.
 
 ---
 
-## Repository Layout (backend only)
+## Plugin Categories — the "canonical structure" below is NOT universal
+
+Not every plugin in `backend/plugins/` looks the same. Before following the canonical layout, confirm which category you're building — copying the wrong template produces plugins with dead code or missing interfaces:
+
+| Category | Example | `models/` | `tasks/` | Interfaces beyond `PluginMeta`/`PluginModel`/`PluginMigration` |
+|---|---|---|---|---|
+| **REST datasource plugin** (the common case) | `github`, `gitlab`, `jira`, `taiga` | connection + scope + scope-config + tool-layer entities | collector → extractor → converter per entity | `PluginInit`, `PluginTask`, `CloseablePluginTask`, `PluginSource`, `PluginApi`, `DataSourcePluginBlueprintV200` |
+| **Push/webhook plugin** | `webhook` | connection + scope only, no tool-layer entities | no collector/extractor — API handlers write domain tables directly | `PluginInit`, `PluginApi`, `DataSourcePluginBlueprintV200` (no `PluginSource`, no `CloseablePluginTask`) |
+| **Post-processing / calculator plugin** | `dbt`, `refdiff` | minimal or none — operates on already-collected data | "calculator" tasks, not collector/extractor/converter | `PluginTask`, `PluginApi`; `refdiff` also implements `PluginMetric` |
+| **Cross-plugin metric plugin** | `refdiff` (dora-style) | none | metric calculators reading multiple plugins' domain tables | `PluginMetric` — `RequiredDataEntities()`, project-dependency methods |
+
+**If you're building a normal "collect issues/PRs/pipelines from a SaaS API" plugin, you are in the REST datasource category — everything below applies to you.** If you're building something push-based or purely computational, use `webhook`/`dbt`/`refdiff` as your reference instead of this guide's step-by-step.
+
+There is no scaffolding/generator tool in this repo (checked `backend/Makefile` and scripts) — you hand-write the plugin or copy an existing one as a starting skeleton.
+
+---
+
+## Repository Layout (backend)
 
 ```
 backend/
@@ -27,21 +46,27 @@ backend/
 │   │   ├── devops/                # CicdPipeline, CicdTask, CicdDeployment
 │   │   └── didgen/                # Deterministic domain ID generator
 │   └── dal/                       # Database abstraction layer
-├── helpers/pluginhelper/api/      # Reusable helpers: ApiCollector, ApiExtractor, DataConverter
+├── helpers/pluginhelper/api/      # Reusable helpers: ApiCollector, StatefulApiCollector, ApiExtractor, DataConverter
 ├── plugins/
+│   ├── table_info_test.go         # CI check: every model must be listed in GetTablesInfo()
 │   └── {plugin-name}/             # One directory per plugin (see structure below)
-└── server/                        # HTTP server; plugins auto-discovered via plugin.RegisterPlugin
+├── scripts/build-plugins.sh       # Auto-discovers every dir under backend/plugins/ and builds it as a .so — no manual registry to edit
+└── server/                        # HTTP server; plugins loaded dynamically at runtime via core/runner/loader.go (plug.Lookup("PluginEntry"))
 ```
+
+Plugins are **not** listed in a central Go file. `build-plugins.sh` globs every directory under `backend/plugins/` (excluding `core`/`helper`/`logs`) and the runtime loader (`backend/core/runner/loader.go`) discovers the resulting `.so` files automatically. You don't need to register a new plugin anywhere in the backend beyond writing its directory — but see **Frontend Wiring** below, because the config-ui side is *not* automatic.
+
+**Rule: plugins must be independent — no cross-plugin Go imports.** Share code via `core/` or `helpers/`, never by importing another plugin's package.
 
 ---
 
-## Canonical Plugin Directory Structure
+## Canonical Plugin Directory Structure (REST datasource plugins)
 
 ```
 backend/plugins/{plugin}/
 ├── {plugin}.go                          # Entrypoint: calls plugin.Register at init()
 ├── impl/
-│   └── impl.go                          # Main struct, implements ALL plugin interfaces
+│   └── impl.go                          # Main struct, implements ALL required plugin interfaces
 ├── models/
 │   ├── connection.go                    # Connection + auth model
 │   ├── {scope}.go                       # Scope model (e.g. project, repo, board)
@@ -51,9 +76,10 @@ backend/plugins/{plugin}/
 │       ├── register.go                  # All() returns []MigrationScript
 │       └── {timestamp}_{description}.go # Individual migration
 ├── tasks/
+│   ├── register.go                      # (recommended for plugins with many subtasks) SubTaskMetaList + RegisterSubtaskMeta()
 │   ├── task_data.go                     # Options + TaskData structs; DecodeAndValidate
-│   ├── api_client.go                    # NewXxxApiClient factory
-│   ├── {entity}_collector.go           # RAW collection: API → _raw_*
+│   ├── api_client.go                    # NewXxxApiClient factory + rate limiter
+│   ├── {entity}_collector.go           # RAW collection: API → _raw_*, calls RegisterSubtaskMeta in init()
 │   ├── {entity}_extractor.go           # Extraction: _raw_* → _tool_*
 │   └── {entity}_convertor.go          # Conversion: _tool_* → domain tables
 └── api/
@@ -65,13 +91,17 @@ backend/plugins/{plugin}/
     └── blueprint_v200.go               # Pipeline plan generation
 ```
 
-> **Reference plugin**: `backend/plugins/taiga/` — a full, working plugin with all layers.
+> **Reference plugins**: `backend/plugins/gitlab/` and `backend/plugins/github/` are the mature, battle-tested references — use them for pagination, incremental sync, and rate-limiting patterns. `backend/plugins/taiga/` is a smaller, easier-to-read example of the same directory shape, but it has known, *currently unfixed* bugs (see Known Pitfalls below) — don't copy its collector or converter logic verbatim.
+
+**Two valid ways to register subtasks in `SubTaskMetas()`:**
+1. **Manual list** (taiga's approach) — `impl.go` returns a hand-written `[]plugin.SubTaskMeta{...}`. Simple, but easy to forget an entry as the plugin grows.
+2. **`tasks/register.go` + `init()`** (gitlab's approach, recommended for plugins with more than ~5 subtasks) — each `*_collector.go`/`*_extractor.go`/`*_convertor.go` calls `RegisterSubtaskMeta(&XyzMeta)` in its own `init()`; `impl.go`'s `SubTaskMetas()` just returns `tasks.SubTaskMetaList`. New subtasks can't be forgotten because they self-register.
 
 ---
 
 ## Interface Checklist — impl/impl.go
 
-Every full datasource plugin implements all of these. Use a compile-time assertion:
+A REST datasource plugin implements all of these. Use a compile-time assertion:
 
 ```go
 var _ interface {
@@ -87,6 +117,8 @@ var _ interface {
 } = (*MyPlugin)(nil)
 ```
 
+**This full list applies to scoped, connection-based datasource plugins only.** Push/webhook plugins skip `PluginSource` and `CloseablePluginTask`; calculator plugins (`dbt`) may implement just `PluginMeta` + `PluginTask` + `PluginModel`; cross-plugin metric plugins add `PluginMetric` instead of the datasource interfaces. Verified by inspecting `webhook/impl/impl.go`, `dbt/impl/impl.go`, and `refdiff/impl/impl.go`.
+
 ### Interface Definitions
 
 | Interface | Methods Required |
@@ -95,11 +127,12 @@ var _ interface {
 | `PluginInit` | `Init(basicRes context.BasicRes) errors.Error` |
 | `PluginTask` | `SubTaskMetas() []SubTaskMeta`, `PrepareTaskData(...)` |
 | `CloseablePluginTask` | `Close(taskCtx plugin.TaskContext) errors.Error` |
-| `PluginModel` | `GetTablesInfo() []dal.Tabler` |
+| `PluginModel` | `GetTablesInfo() []dal.Tabler` — **must list every model or `plugins/table_info_test.go` fails CI** |
 | `PluginMigration` | `MigrationScripts() []MigrationScript` |
 | `PluginSource` | `Connection() dal.Tabler`, `Scope() ToolLayerScope`, `ScopeConfig() dal.Tabler` |
 | `PluginApi` | `ApiResources() map[string]map[string]ApiResourceHandler` |
 | `DataSourcePluginBlueprintV200` | `MakeDataSourcePipelinePlanV200(...)` |
+| `PluginMetric` (cross-plugin metric plugins only, e.g. `refdiff`) | `RequiredDataEntities() ([]map[string]interface{}, errors.Error)`, plus a project-dependency method |
 
 ### RootPkgPath
 
@@ -238,13 +271,15 @@ func (MyScopeConfig) TableName() string { return "_tool_myplugin_scope_configs" 
 
 ### Step 4 — Tool-layer Entity Model
 
+> **Primary key consistency matters.** Whatever fields you tag `gorm:"primaryKey"` here is *exactly* the argument list (in struct-declaration order) you must pass to `didgen.Generate(...)` in the converter (Step 9). A mismatch panics at runtime with "primary key values do not match". Decide up front whether `ProjectId` is part of the domain ID (multi-project cross-referencing) or just a filter column (`gorm:"index"`) — see Taiga's real model (`taiga/models/issue.go`) for the "index only" choice, which keeps issue IDs stable even if a project is re-scoped.
+
 ```go
 // models/my_issue.go
 type MyIssue struct {
     common.NoPKModel                          // CreatedAt, UpdatedAt, RawDataOrigin
     ConnectionId   uint64    `gorm:"primaryKey"`
-    ProjectId      string    `gorm:"primaryKey"`
     IssueId        string    `gorm:"primaryKey"`
+    ProjectId      string    `gorm:"index"`     // filter column, NOT part of the domain ID
     Title          string
     Description    string
     Status         string
@@ -283,64 +318,97 @@ type MyTaskData struct {
 }
 ```
 
-### Step 6 — API Client Factory
+### Step 6 — API Client Factory (with real rate limiting)
+
+Every mature plugin builds an `ApiRateLimitCalculator` — passing `nil` means unlimited concurrency, which will get your plugin rate-limited or IP-banned by the remote API on large syncs. Prefer a `DynamicRateLimit` callback that reads the API's own rate-limit headers when available (pattern from `gitlab/tasks/api_client.go`):
 
 ```go
 // tasks/api_client.go
+func CreateMyAsyncApiClient(
+    taskCtx plugin.TaskContext,
+    apiClient *api.ApiClient,
+    connection *models.MyConnection,
+) (*api.ApiAsyncClient, errors.Error) {
+    rateLimiter := &api.ApiRateLimitCalculator{
+        UserRateLimitPerHour: connection.RateLimitPerHour,
+        DynamicRateLimit: func(res *http.Response) (int, time.Duration, errors.Error) {
+            remaining := res.Header.Get("X-RateLimit-Remaining")
+            if remaining == "" {
+                return 0, 0, nil // fall back to UserRateLimitPerHour / plugin default
+            }
+            limit, err := strconv.Atoi(res.Header.Get("X-RateLimit-Limit"))
+            if err != nil {
+                return 0, 0, errors.Default.Wrap(err, "failed to parse rate limit header")
+            }
+            return limit, 1 * time.Hour, nil
+        },
+    }
+    return api.CreateAsyncApiClient(taskCtx, apiClient, rateLimiter)
+}
+
 func NewMyApiClient(taskCtx plugin.TaskContext, connection *models.MyConnection) (*api.ApiAsyncClient, errors.Error) {
-    syncApiClient, err := api.NewApiClientFromConnection(context.TODO(), taskCtx, connection)
+    apiClient, err := api.NewApiClientFromConnection(taskCtx.GetContext(), taskCtx, connection)
     if err != nil {
         return nil, err
     }
-    asyncApiClient, err := api.CreateAsyncApiClient(taskCtx, syncApiClient, nil)
-    if err != nil {
-        return nil, err
-    }
-    return asyncApiClient, nil
+    return CreateMyAsyncApiClient(taskCtx, apiClient, connection)
 }
 ```
 
-### Step 7 — Collector (API → Raw)
+### Step 7 — Collector (API → Raw, with real pagination and incremental sync)
+
+Use `helper.NewStatefulApiCollector` (not the plain `NewApiCollector`) so the collector supports incremental "since" syncs out of the box — the pattern used by `gitlab`/`github`, not by Taiga (Taiga's collector does a full re-collect every run):
 
 ```go
 // tasks/issue_collector.go
+func init() {
+    RegisterSubtaskMeta(&CollectIssuesMeta)
+}
+
 const RAW_ISSUE_TABLE = "myplugin_api_issues"
 
 var CollectIssuesMeta = plugin.SubTaskMeta{
     Name:             "collectIssues",
     EntryPoint:       CollectIssues,
     EnabledByDefault: true,
-    Description:      "collect MyPlugin issues from remote API",
+    Description:      "collect MyPlugin issues from remote API, supports incremental sync",
     DomainTypes:      []string{plugin.DOMAIN_TYPE_TICKET},
 }
 
 func CollectIssues(taskCtx plugin.SubTaskContext) errors.Error {
     data := taskCtx.GetData().(*MyTaskData)
-
-    collector, err := api.NewApiCollector(api.ApiCollectorArgs{
-        RawDataSubTaskArgs: api.RawDataSubTaskArgs{
-            Ctx: taskCtx,
-            Params: MyApiParams{
-                ConnectionId: data.Options.ConnectionId,
-                ProjectId:    data.Options.ProjectId,
-            },
-            Table: RAW_ISSUE_TABLE,
+    rawDataSubTaskArgs := &api.RawDataSubTaskArgs{
+        Ctx: taskCtx,
+        Params: MyApiParams{
+            ConnectionId: data.Options.ConnectionId,
+            ProjectId:    data.Options.ProjectId,
         },
-        ApiClient:   data.ApiClient,
-        PageSize:    100,
-        // IMPORTANT: Implement real pagination. Do NOT rely on large page sizes.
-        // For cursor-based APIs:
+        Table: RAW_ISSUE_TABLE,
+    }
+
+    collector, err := api.NewStatefulApiCollector(*rawDataSubTaskArgs)
+    if err != nil {
+        return err
+    }
+
+    err = collector.InitCollector(api.ApiCollectorArgs{
+        ApiClient: data.ApiClient,
+        PageSize:  100,
         UrlTemplate: "api/v1/workspaces/{{ .Params.WorkspaceSlug }}/projects/{{ .Params.ProjectId }}/issues/",
         Query: func(reqData *api.RequestData) (url.Values, errors.Error) {
             query := url.Values{}
+            if collector.GetSince() != nil {
+                query.Set("updated_after", collector.GetSince().Format(time.RFC3339))
+            }
             query.Set("per_page", strconv.Itoa(reqData.Pager.Size))
             query.Set("page", strconv.Itoa(reqData.Pager.Page))
             return query, nil
         },
         GetTotalPages: func(res *http.Response, args *api.ApiCollectorArgs) (int, errors.Error) {
-            // Parse total from response headers or body
             body := &struct{ Count int `json:"count"` }{}
-            api.UnmarshalResponse(res, body)
+            if err := api.UnmarshalResponse(res, body); err != nil {
+                return 0, err
+            }
             return int(math.Ceil(float64(body.Count) / float64(args.PageSize))), nil
         },
         ResponseParser: func(res *http.Response) ([]json.RawMessage, errors.Error) {
@@ -360,6 +428,10 @@ func CollectIssues(taskCtx plugin.SubTaskContext) errors.Error {
 
 ```go
 // tasks/issue_extractor.go
+func init() {
+    RegisterSubtaskMeta(&ExtractIssuesMeta)
+}
+
 var ExtractIssuesMeta = plugin.SubTaskMeta{
     Name:             "extractIssues",
     EntryPoint:       ExtractIssues,
@@ -434,6 +506,10 @@ func ExtractIssues(taskCtx plugin.SubTaskContext) errors.Error {
 
 ```go
 // tasks/issue_convertor.go
+func init() {
+    RegisterSubtaskMeta(&ConvertIssuesMeta)
+}
+
 var ConvertIssuesMeta = plugin.SubTaskMeta{
     Name:             "convertIssues",
     EntryPoint:       ConvertIssues,
@@ -446,6 +522,8 @@ func ConvertIssues(subtaskCtx plugin.SubTaskContext) errors.Error {
     data := subtaskCtx.GetData().(*MyTaskData)
     db := subtaskCtx.GetDal()
 
+    // NOTE: arg count/order to Generate() must exactly match the gorm:"primaryKey"
+    // fields declared on the model in Step 4 (ConnectionId, IssueId — 2 args, ProjectId excluded).
     issueIdGen := didgen.NewDomainIdGenerator(&models.MyIssue{})
     boardIdGen := didgen.NewDomainIdGenerator(&models.MyProject{})
     boardId := boardIdGen.Generate(data.Options.ConnectionId, data.Options.ProjectId)
@@ -576,8 +654,6 @@ func (p MyPlugin) PrepareTaskData(taskCtx plugin.TaskContext, options map[string
         db := taskCtx.GetDal()
         err = db.First(&scope, dal.Where("connection_id = ? AND project_id = ?", op.ConnectionId, op.ProjectId))
         if err != nil && db.IsErrorNotFound(err) {
-            // Best practice: fetch and save missing scope from remote rather than erroring.
-            // Taiga left a TODO here — avoid that gap.
             return nil, errors.Default.Wrap(err, fmt.Sprintf("project %s not found; import it first", op.ProjectId))
         }
         if err != nil {
@@ -707,6 +783,8 @@ func (p MyPlugin) ApiResources() map[string]map[string]plugin.ApiResourceHandler
 }
 ```
 
+If this API surface changes, run `make swag` (from `backend/`) to regenerate Swagger docs — CI checks that the generated docs are up to date.
+
 ### Step 15 — Blueprint V200
 
 ```go
@@ -766,6 +844,41 @@ func MakeDataSourcePipelinePlanV200(
 
 ---
 
+## Frontend Wiring (config-ui) — required for the plugin to be usable at all
+
+**A plugin that only has backend code is invisible in the DevLake UI.** Unlike the backend (which auto-discovers plugin directories), `config-ui/` requires explicit registration. `taiga` itself has no config-ui entry — don't assume "backend done" means "shippable."
+
+1. **`config-ui/src/plugins/register/{plugin}/config.tsx`** — new file exporting an `IPluginConfig`:
+   ```tsx
+   import { DOC_URL } from '@/release';
+   import { IPluginConfig } from '@/types';
+   import Icon from './assets/icon.svg?react';
+   import { Auth } from './connection-fields';
+
+   export const MyPluginConfig: IPluginConfig = {
+     plugin: 'myplugin',
+     name: 'MyPlugin',
+     icon: ({ color }) => <Icon fill={color} />,
+     sort: 20,
+     connection: {
+       docLink: DOC_URL.PLUGIN.MYPLUGIN.BASIS,
+       fields: ['name', /* Auth component */ 'proxy', 'rateLimitPerHour'],
+     },
+     dataScope: { title: 'Projects' },
+     scopeConfig: {
+       entities: ['TICKET'],
+       transformation: { typeMappings: {} },
+     },
+   };
+   ```
+2. **`config-ui/src/plugins/register/{plugin}/assets/icon.svg`** — icon asset (imported via `?react`).
+3. **`config-ui/src/plugins/register/{plugin}/connection-fields/`** and **`transformation-fields/`** — form components for the connection dialog and scope-config transformation UI (copy an existing plugin's shape, e.g. `jira/connection-fields`).
+4. **`config-ui/src/plugins/register/index.ts`** — add the import and append the config object to the exported `pluginConfigs: IPluginConfig[]` array. Forgetting this step is the single most common reason a fully-working backend plugin "doesn't show up."
+
+Documentation for end users does **not** live in this repository — `incubator-devlake` has no `docs/` folder. Per-plugin setup docs (and the `DOC_URL.PLUGIN.*` links referenced in `config.tsx`) belong in the separate `apache/incubator-devlake-website` repository.
+
+---
+
 ## Domain ID Generation
 
 Domain IDs must be deterministic and stable across syncs.
@@ -782,10 +895,9 @@ boardId := boardIdGen.Generate(connectionId, projectId)
 // Result: "myplugin:MyProject:1:proj-456"
 ```
 
-**Rules:**
-- Always pass `connectionId` as the first argument
-- Use the native source ID (string or numeric) as the second argument
-- The generator derives the plugin name from the type's package path
+**Rules (verified against `core/models/domainlayer/didgen/domain_id_generator.go`):**
+- The ID prefix is `"<pluginName>:<StructName>"`, derived from the type's package path — you don't set this manually
+- The number and order of arguments to `.Generate(...)` must exactly match the number and declaration order of fields tagged `gorm:"primaryKey"` on the model — passing the wrong count panics at runtime ("primary key values do not match, expected N, got M")
 - IDs are stable — same inputs always produce the same output
 
 ---
@@ -796,6 +908,7 @@ boardId := boardIdGen.Generate(connectionId, projectId)
 var CollectIssuesMeta = plugin.SubTaskMeta{
     Name:             "collectIssues",          // camelCase, unique within plugin
     EntryPoint:       CollectIssues,            // matches var _ plugin.SubTaskEntryPoint = CollectIssues
+    Required:         false,                    // true = always runs regardless of user's entity selection
     EnabledByDefault: true,
     Description:      "collect issues from remote API",
     DomainTypes:      []string{plugin.DOMAIN_TYPE_TICKET},
@@ -803,55 +916,74 @@ var CollectIssuesMeta = plugin.SubTaskMeta{
     Dependencies:     []*plugin.SubTaskMeta{&ExtractIssuesMeta},
     DependencyTables: []string{RAW_ISSUE_TABLE},
     ProductTables:    []string{"_tool_myplugin_issues"},
+    ForceRunOnResume: false,                     // true = re-run even if it finished before a resumed pipeline
 }
 ```
 
-Register all metas in `SubTaskMetas()` in `impl.go`. Order matters — collectors before extractors before converters.
+Register all metas in `SubTaskMetas()` in `impl.go` (directly, or via `tasks.SubTaskMetaList` if using the `register.go` pattern). Order matters — collectors before extractors before converters.
 
 ---
 
-## Known Pitfalls (Lessons from Taiga plugin)
+## Known Pitfalls (verified against real plugin code, not hypothetical)
 
-### 1. Cross-project data leakage — CRITICAL
+### 1. Cross-project data leakage — CRITICAL, currently live in Taiga
 
 ```go
-// WRONG: Only filters connection_id — leaks rows from other projects
+// WRONG — this is what Taiga's real issue_convertor.go does today:
 dal.Where("connection_id = ?", data.Options.ConnectionId)
 
-// CORRECT: Always filter BOTH
+// CORRECT — what GitHub's issue_convertor.go does:
 dal.Where("connection_id = ? AND project_id = ?",
     data.Options.ConnectionId, data.Options.ProjectId)
 ```
+Don't copy Taiga's converter WHERE clause. Copy GitHub's or GitLab's.
 
-### 2. Weak pagination
+### 2. Weak pagination — currently live in Taiga
 
 ```go
-// WRONG: Large page size is not pagination
-PageSize: 1000 // Will break for large projects
-
-// CORRECT: Implement GetTotalPages + proper Query
-GetTotalPages: func(res *http.Response, args *api.ApiCollectorArgs) (int, errors.Error) { ... }
+// WRONG — Taiga's real collector: PageSize: 1000, no GetTotalPages, no page query param
+// CORRECT — GitLab/GitHub: NewStatefulApiCollector + GetTotalPages + page/per_page query params
 ```
 
-### 3. Scope config mappings must be implemented, not stubbed
+### 3. Full re-collection every run instead of incremental sync
+
+Use `helper.NewStatefulApiCollector` and check `collector.GetSince()` in your `Query` function (see Step 7). Plain `NewApiCollector` has no state and re-fetches everything on every pipeline run — fine for a first draft, unacceptable for production on large data sources.
+
+### 4. Missing or unset rate limiting
+
+Passing `nil` for the rate limiter in `CreateAsyncApiClient` means unbounded concurrency against the remote API. Always construct an `ApiRateLimitCalculator`, and prefer a `DynamicRateLimit` callback that reads the API's actual rate-limit response headers (see Step 6).
+
+### 5. Scope config mappings must be implemented, not stubbed
 
 If you define `TypeMappings` on `ScopeConfig`, you must apply them in converters. Unused config fields mislead users.
 
-### 4. Partial field mapping
+### 6. Partial field mapping
 
 Map every extracted field to the domain model. Fields extracted but not converted are silently lost and will confuse users.
 
-### 5. Inconsistent status normalisation
+### 7. Inconsistent status normalisation
 
 All entity types in the same plugin should normalise status using the same helper function. Mixing closed/open for some types and raw status for others breaks dashboard queries.
 
-### 6. Missing secret preservation in PATCH
+### 8. Missing secret preservation in PATCH
 
 If `MergeFromRequest` is not implemented on the connection model, a PATCH request that omits the token/password will clear the stored credential.
 
-### 7. Table naming
+### 9. Table naming
 
 All `_tool_*` tables must match `TableName()` on the model struct. Mismatches cause silent runtime errors.
+
+### 10. Forgetting `GetTablesInfo()`
+
+Every tool-layer model must be listed in `GetTablesInfo()`, or `backend/plugins/table_info_test.go` fails in CI.
+
+### 11. Forgetting config-ui registration
+
+A backend-complete plugin with no entry in `config-ui/src/plugins/register/index.ts` is invisible in the UI — see Frontend Wiring above.
+
+### 12. Cross-plugin Go imports
+
+Plugins must be independent. Never import one plugin's package from another; share code via `core/` or `helpers/pluginhelper/`.
 
 ---
 
@@ -875,11 +1007,11 @@ func TestExtractIssues(t *testing.T) {
 
 ### E2E Snapshot Tests (full pipeline)
 
-Located in `{plugin}/e2e/`. These are the most valuable tests:
+Located in `{plugin}/e2e/`. These are the most valuable tests. Verified accurate against `backend/helpers/e2ehelper/data_flow_tester.go` and `taiga/e2e/issue_test.go`:
 
-1. Import CSV fixture into `_raw_*` table
-2. Run extractor subtask
-3. Compare `_tool_*` against golden snapshot
+1. Import CSV fixture into `_raw_*` table via `NewDataFlowTester(t, pluginName, pluginMeta)` + `ImportCsvIntoRawTable`
+2. Run extractor subtask via `Subtask(...)`
+3. Compare `_tool_*` against golden snapshot via `VerifyTableWithOptions(..., TableOptions{CSVRelPath, IgnoreTypes: []interface{}{common.NoPKModel{}}})`
 4. Run converter subtask
 5. Compare domain tables against golden snapshot
 
@@ -903,25 +1035,60 @@ Write snapshot E2E tests for every entity before shipping.
 
 ---
 
+## Local Verification Before Opening a PR
+
+Run these from the repo (verified against `.github/workflows/*.yml` and `backend/Makefile`):
+
+```bash
+cp env.example .env                          # once, if not already done
+
+cd backend
+make mock                                    # regenerate mocks — required before lint
+make lint                                    # golangci-lint run (backend/.golangci.yaml)
+make unit-test                               # make build-python && unit tests
+make swag                                    # ONLY if you changed ApiResources()/API shapes — regenerates Swagger docs, checked in CI
+
+# from repo root, needs Postgres / E2E_DB_URL configured:
+make e2e-test-go-plugins
+make e2e-test
+```
+
+**Lint gotchas** (from `backend/.golangci.yaml`): `revive` runs at error severity and enforces `unhandled-error`, `error-strings` (error strings must be lowercase, no trailing punctuation), `context-as-argument`, `modifies-parameter`. `revive` is *not* enforced in `models/`, `api/`, `migration/`, `errors/`, `logger/` — but it is enforced in `tasks/`.
+
+**License header enforcement**: not Apache Rat — CI uses `apache/skywalking-eyes` (`.github/workflows/asf-header-check.yml`). There's no local Makefile target to dry-run it; visually match the header below exactly, character for character.
+
+**Commit message format**: `.github/workflows/commit-msg.yml` enforces conventional-commit style — `feat|fix|build|chore|docs|style|refactor|perf|test|ci: description`. Non-conforming commit messages fail CI on the PR.
+
+There is no DCO `Signed-off-by` requirement in this repo; standard ASF contribution norms apply (see the PR template checkboxes).
+
+---
+
 ## Checklist Before Submitting a Plugin PR
 
-- [ ] All plugin interfaces implemented with compile-time assertion in `impl.go`
+- [ ] Confirmed plugin category (REST datasource vs. webhook vs. calculator) and followed the matching template, not a mismatched one
+- [ ] All required plugin interfaces implemented with compile-time assertion in `impl.go`
 - [ ] `RootPkgPath()` matches actual Go module path
 - [ ] `TableName()` defined on every model
 - [ ] Every tool-layer model has `NoPKModel` or `Model` embedded (for timestamps + raw data origin)
 - [ ] Connection sanitises secrets before returning (API/GET never leaks credentials)
 - [ ] `MergeFromRequest` preserves existing secrets on PATCH
-- [ ] Collectors implement real pagination (not just large page sizes)
+- [ ] Collectors use `NewStatefulApiCollector` with real pagination and `GetSince()`-driven incremental queries
+- [ ] API client has a real `ApiRateLimitCalculator` (not `nil`)
 - [ ] Converters filter on both `connection_id` AND `project_id` (or equivalent scope ID)
+- [ ] `didgen.Generate(...)` argument count/order matches the model's `gorm:"primaryKey"` fields exactly
 - [ ] Status normalisation is consistent across all entity types
 - [ ] All extracted fields are mapped to domain models (no silent data loss)
-- [ ] Domain IDs generated via `didgen` (not hand-crafted strings)
 - [ ] Migration scripts added for every new table; `All()` updated
-- [ ] `GetTablesInfo()` lists every model
+- [ ] `GetTablesInfo()` lists every model — verify `backend/plugins/table_info_test.go` passes
 - [ ] `SubTaskMetas()` lists every subtask in collect → extract → convert order
 - [ ] E2E snapshot tests written for every entity
 - [ ] `Close()` releases the async API client
-- [ ] Apache license header in every `.go` file
+- [ ] Apache license header in every `.go` file (byte-exact — see below)
+- [ ] **`config-ui/src/plugins/register/{plugin}/config.tsx`** created and registered in **`config-ui/src/plugins/register/index.ts`** — plugin is visible and connectable in the UI
+- [ ] `make swag` re-run if `ApiResources()` changed
+- [ ] `make lint`, `make unit-test` pass locally
+- [ ] Commit messages follow conventional-commit format (CI-enforced)
+- [ ] No cross-plugin Go imports
 
 ---
 
@@ -951,7 +1118,7 @@ Import paths:
 
 ## Apache License Header
 
-Every `.go` file must start with:
+Every `.go` file (and `config-ui` `.ts`/`.tsx` file, in `/* ... */` or `// ...` form) must start with, byte-for-byte:
 
 ```go
 /*
