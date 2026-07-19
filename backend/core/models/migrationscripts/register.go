@@ -163,5 +163,6 @@ func All() []plugin.MigrationScript {
 		new(addAiPromptToolsAndSessionHooks),
 		new(addAiCommits),
 		new(addDashboardDateIndexes),
+		new(changeCqIssueCodeBlocksComponentToText),
 	}
 }
