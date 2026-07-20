@@ -24,9 +24,9 @@ import (
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models/domainlayer"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/ai"
-	"github.com/apache/incubator-devlake/core/models/domainlayer/crossdomain"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/didgen"
 	"github.com/apache/incubator-devlake/core/plugin"
+	"github.com/apache/incubator-devlake/helpers/identityhelper"
 	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/plugins/cursor/models"
 )
@@ -86,6 +86,11 @@ func ConvertDailyUsage(taskCtx plugin.SubTaskContext) errors.Error {
 	db := taskCtx.GetDal()
 	connectionId := data.Options.ConnectionId
 
+	resolver, err := identityhelper.NewAccountResolver(db)
+	if err != nil {
+		return err
+	}
+
 	idGen := didgen.NewDomainIdGenerator(&models.CursorDailyUsage{})
 
 	cursor, err := db.Cursor(
@@ -111,7 +116,7 @@ func ConvertDailyUsage(taskCtx plugin.SubTaskContext) errors.Error {
 		Input:        cursor,
 		Convert: func(inputRow interface{}) ([]interface{}, errors.Error) {
 			u := inputRow.(*models.CursorDailyUsage)
-			accountId := resolveAccountId(db, u.UserEmail)
+			accountId := resolver.ByEmail(u.UserEmail)
 			return []interface{}{buildCursorDailyActivity(idGen, connectionId, accountId, u)}, nil
 		},
 	})
@@ -119,17 +124,4 @@ func ConvertDailyUsage(taskCtx plugin.SubTaskContext) errors.Error {
 		return err
 	}
 	return converter.Execute()
-}
-
-// resolveAccountId looks up the global DevLake AccountId for a given email.
-// It queries the crossdomain accounts table. Returns an empty string when not found.
-func resolveAccountId(db dal.Dal, email string) string {
-	if email == "" {
-		return ""
-	}
-	var account crossdomain.Account
-	if err := db.First(&account, dal.Where("email = ?", email)); err != nil {
-		return ""
-	}
-	return account.Id
 }

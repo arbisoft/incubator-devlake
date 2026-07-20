@@ -24,9 +24,9 @@ import (
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models/domainlayer"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/ai"
-	"github.com/apache/incubator-devlake/core/models/domainlayer/crossdomain"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/didgen"
 	"github.com/apache/incubator-devlake/core/plugin"
+	"github.com/apache/incubator-devlake/helpers/identityhelper"
 	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/plugins/codex/models"
 )
@@ -79,6 +79,11 @@ func ConvertUsage(taskCtx plugin.SubTaskContext) errors.Error {
 	}
 
 	db := taskCtx.GetDal()
+
+	resolver, err := identityhelper.NewAccountResolver(db)
+	if err != nil {
+		return err
+	}
 	connectionId := data.Options.ConnectionId
 
 	idGen := didgen.NewDomainIdGenerator(&models.CodexUsage{})
@@ -106,7 +111,7 @@ func ConvertUsage(taskCtx plugin.SubTaskContext) errors.Error {
 		Input:        cursor,
 		Convert: func(inputRow interface{}) ([]interface{}, errors.Error) {
 			u := inputRow.(*models.CodexUsage)
-			accountId := resolveCodexAccountId(db, u.UserEmail)
+			accountId := resolver.ByEmail(u.UserEmail)
 			return []interface{}{buildCodexActivity(idGen, connectionId, accountId, u)}, nil
 		},
 	})
@@ -114,17 +119,4 @@ func ConvertUsage(taskCtx plugin.SubTaskContext) errors.Error {
 		return err
 	}
 	return converter.Execute()
-}
-
-// resolveCodexAccountId looks up the global DevLake AccountId for a given email.
-// It queries the crossdomain accounts table. Returns an empty string when not found.
-func resolveCodexAccountId(db dal.Dal, email string) string {
-	if email == "" {
-		return ""
-	}
-	var account crossdomain.Account
-	if err := db.First(&account, dal.Where("email = ?", email)); err != nil {
-		return ""
-	}
-	return account.Id
 }

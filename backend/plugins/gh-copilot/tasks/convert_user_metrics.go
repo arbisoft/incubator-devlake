@@ -24,9 +24,9 @@ import (
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models/domainlayer"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/ai"
-	"github.com/apache/incubator-devlake/core/models/domainlayer/crossdomain"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/didgen"
 	"github.com/apache/incubator-devlake/core/plugin"
+	"github.com/apache/incubator-devlake/helpers/identityhelper"
 	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/plugins/gh-copilot/models"
 )
@@ -56,6 +56,11 @@ func ConvertUserMetrics(taskCtx plugin.SubTaskContext) errors.Error {
 	}
 
 	db := taskCtx.GetDal()
+
+	resolver, err := identityhelper.NewAccountResolver(db)
+	if err != nil {
+		return err
+	}
 	connectionId := data.Options.ConnectionId
 
 	idGen := didgen.NewDomainIdGenerator(&models.GhCopilotUserDailyMetrics{})
@@ -87,7 +92,7 @@ func ConvertUserMetrics(taskCtx plugin.SubTaskContext) errors.Error {
 
 			// Resolve UserLogin → global AccountId via crossdomain accounts (email match).
 			// Copilot reports logins, not emails, so resolution may not succeed — that is acceptable.
-			accountId := resolveAccountByLogin(db, m.UserLogin)
+			accountId := resolver.ByUserName(m.UserLogin)
 
 			activity := &ai.AiActivity{
 				DomainEntity: domainlayer.DomainEntity{
@@ -112,18 +117,4 @@ func ConvertUserMetrics(taskCtx plugin.SubTaskContext) errors.Error {
 		return err
 	}
 	return converter.Execute()
-}
-
-// resolveAccountByLogin looks up a global DevLake AccountId for a given GitHub login.
-// It queries the crossdomain accounts table matching on the Name field.
-// Returns an empty string when not found.
-func resolveAccountByLogin(db dal.Dal, login string) string {
-	if login == "" {
-		return ""
-	}
-	var account crossdomain.Account
-	if err := db.First(&account, dal.Where("name = ?", login)); err != nil {
-		return ""
-	}
-	return account.Id
 }
