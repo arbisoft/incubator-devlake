@@ -1,0 +1,22 @@
+{
+  "data": [
+    {
+      "starting_at": "2026-01-05T00:00:00Z",
+      "ending_at": "2026-01-06T00:00:00Z",
+      "data_refreshed_at": "2026-01-06T04:00:00Z",
+      "organization_id": "org_synthetic_001",
+      "user": {
+        "id": "user_synthetic_001",
+        "email": "developer@example.invalid"
+      },
+      "product": "claude_code",
+      "model": "claude-sonnet-4",
+      "input_tokens": 12345,
+      "output_tokens": 6789,
+      "cache_read_tokens": 111,
+      "cache_creation_tokens": 222,
+      "request_count": 9
+    }
+  ],
+  "next_page": "cursor_synthetic_usage_2"
+}

@@ -1,0 +1,25 @@
+{
+  "data": [
+    {
+      "date": "2026-01-05",
+      "grain": "daily",
+      "connector_id": "connector_synthetic_001",
+      "connector_name": "Google Drive",
+      "connector_type": "mcp",
+      "status": "active",
+      "active_users": 9,
+      "usage_count": 54
+    },
+    {
+      "date": "2026-01-05",
+      "grain": "daily",
+      "connector_id": "connector_synthetic_002",
+      "connector_name": "Jira",
+      "connector_type": "mcp",
+      "status": "active",
+      "active_users": 4,
+      "usage_count": 21
+    }
+  ],
+  "next_page": "cursor_synthetic_connectors_2"
+}

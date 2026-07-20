@@ -1,0 +1,32 @@
+{
+  "data": [
+    {
+      "date": "2026-01-05",
+      "grain": "daily",
+      "user": {
+        "id": "user_synthetic_001",
+        "email": "developer@example.invalid"
+      },
+      "product": "claude_code",
+      "num_sessions": 4,
+      "lines_added": 120,
+      "lines_removed": 40,
+      "commits_created": 2,
+      "prs_created": 1,
+      "tool_actions": 25,
+      "tool_acceptances": 20
+    },
+    {
+      "date": "2026-01-05",
+      "grain": "daily",
+      "user": {
+        "id": "user_synthetic_002",
+        "email": "analyst@example.invalid"
+      },
+      "product": "chat",
+      "messages": 33,
+      "conversations": 7
+    }
+  ],
+  "next_page": "cursor_synthetic_users_2"
+}

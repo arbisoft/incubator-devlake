@@ -1,0 +1,29 @@
+{
+  "data": [
+    {
+      "date": "2026-01-05",
+      "grain": "daily",
+      "project_id": "project_synthetic_001",
+      "project_name": "Q1 Launch Planning",
+      "creator": {
+        "id": "user_synthetic_001",
+        "email": "developer@example.invalid"
+      },
+      "members_count": 5,
+      "conversations_count": 27
+    },
+    {
+      "date": "2026-01-05",
+      "grain": "daily",
+      "project_id": "project_synthetic_002",
+      "project_name": "Support Escalations",
+      "creator": {
+        "id": "user_synthetic_002",
+        "email": "analyst@example.invalid"
+      },
+      "members_count": 3,
+      "conversations_count": 14
+    }
+  ],
+  "next_page": "cursor_synthetic_chat_projects_2"
+}

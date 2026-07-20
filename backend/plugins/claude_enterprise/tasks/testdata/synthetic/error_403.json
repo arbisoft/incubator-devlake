@@ -1,0 +1,8 @@
+{
+  "type": "error",
+  "request_id": "req_synthetic_403",
+  "error": {
+    "type": "permission_error",
+    "message": "Synthetic missing read:analytics scope or unsupported subscription"
+  }
+}

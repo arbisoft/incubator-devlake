@@ -1,0 +1,15 @@
+{
+  "data": [
+    {
+      "date": "2026-01-06",
+      "grain": "daily",
+      "connector_id": "connector_synthetic_003",
+      "connector_name": "Slack",
+      "connector_type": "mcp",
+      "status": "inactive",
+      "active_users": 1,
+      "usage_count": 2
+    }
+  ],
+  "next_page": null
+}

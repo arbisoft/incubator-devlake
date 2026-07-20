@@ -1,0 +1,8 @@
+{
+  "type": "error",
+  "request_id": "req_synthetic_429",
+  "error": {
+    "type": "rate_limit_error",
+    "message": "Synthetic rate limit exceeded"
+  }
+}

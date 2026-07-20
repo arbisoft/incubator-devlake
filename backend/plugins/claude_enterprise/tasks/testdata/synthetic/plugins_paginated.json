@@ -1,0 +1,15 @@
+{
+  "data": [
+    {
+      "date": "2026-01-06",
+      "grain": "daily",
+      "plugin_id": "plugin_synthetic_003",
+      "plugin_name": "PagerDuty Alerts",
+      "plugin_type": "integration",
+      "publisher": "Example Publisher",
+      "active_users": 2,
+      "install_count": 4
+    }
+  ],
+  "next_page": null
+}

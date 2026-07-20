@@ -1,0 +1,17 @@
+{
+  "data": [
+    {
+      "date": "2026-01-06",
+      "grain": "daily",
+      "project_id": "project_synthetic_003",
+      "project_name": "Design Review",
+      "creator": {
+        "id": "user_synthetic_003",
+        "email": "reviewer@example.invalid"
+      },
+      "members_count": 2,
+      "conversations_count": 6
+    }
+  ],
+  "next_page": null
+}

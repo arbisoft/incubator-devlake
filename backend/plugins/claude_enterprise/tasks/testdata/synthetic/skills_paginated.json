@@ -1,0 +1,18 @@
+{
+  "data": [
+    {
+      "date": "2026-01-06",
+      "grain": "daily",
+      "skill_id": "skill_synthetic_003",
+      "skill_name": "Meeting Notes Summarizer",
+      "skill_type": "custom",
+      "creator": {
+        "id": "user_synthetic_003",
+        "email": "reviewer@example.invalid"
+      },
+      "active_users": 3,
+      "usage_count": 15
+    }
+  ],
+  "next_page": null
+}

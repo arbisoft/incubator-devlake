@@ -1,0 +1,31 @@
+{
+  "data": [
+    {
+      "date": "2026-01-05",
+      "grain": "daily",
+      "skill_id": "skill_synthetic_001",
+      "skill_name": "Code Review Assistant",
+      "skill_type": "custom",
+      "creator": {
+        "id": "user_synthetic_001",
+        "email": "developer@example.invalid"
+      },
+      "active_users": 6,
+      "usage_count": 42
+    },
+    {
+      "date": "2026-01-05",
+      "grain": "daily",
+      "skill_id": "skill_synthetic_002",
+      "skill_name": "Spreadsheet Formulas",
+      "skill_type": "built_in",
+      "creator": {
+        "id": "user_synthetic_002",
+        "email": "analyst@example.invalid"
+      },
+      "active_users": 11,
+      "usage_count": 89
+    }
+  ],
+  "next_page": "cursor_synthetic_skills_2"
+}

@@ -1,0 +1,13 @@
+{
+  "data": [
+    {
+      "date": "2026-01-05",
+      "grain": "daily",
+      "assigned_seats": 42,
+      "pending_invites": 3,
+      "dau": 18,
+      "wau": 31,
+      "mau": 39
+    }
+  ]
+}
