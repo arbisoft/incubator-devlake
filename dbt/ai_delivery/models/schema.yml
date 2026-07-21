@@ -1,0 +1,31 @@
+version: 2
+
+models:
+  - name: mart_ai_person_accounts
+    description: >
+      Identity map: every DevLake account belonging to each AI user's email.
+      One row per (email, account_id). Consumed by the AIDeliveryCorrelation
+      dashboard to sum delivery across all of a person's accounts.
+    columns:
+      - name: email
+        description: Lower-cased AI user email (the person key).
+        tests:
+          - not_null
+      - name: account_id
+        description: A DevLake accounts.id belonging to that person.
+        tests:
+          - not_null
+
+  - name: mart_ai_project_members
+    description: >
+      Membership map: AI users who authored a PR in a project's repos.
+      One row per (project_name, email). Consumed by the project-scoped panels.
+    columns:
+      - name: project_name
+        description: DevLake project name (from project_mapping).
+        tests:
+          - not_null
+      - name: email
+        description: Lower-cased AI user email who is a member of that project.
+        tests:
+          - not_null

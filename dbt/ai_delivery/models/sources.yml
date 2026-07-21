@@ -1,0 +1,17 @@
+version: 2
+
+# DevLake domain-layer tables these marts read from. Declared as sources so dbt
+# renders them fully-qualified as `lake.<table>` — the dbt-mysql adapter connects
+# without selecting a default database, so unqualified refs fail with
+# "1046 (3D000): No database selected". Schema is the DevLake DB (override via
+# MYSQL_DATABASE for non-default deployments).
+sources:
+  - name: devlake
+    schema: "{{ env_var('MYSQL_DATABASE', 'lake') }}"
+    tables:
+      - name: ai_activities
+      - name: accounts
+      - name: users
+      - name: user_accounts
+      - name: pull_requests
+      - name: project_mapping

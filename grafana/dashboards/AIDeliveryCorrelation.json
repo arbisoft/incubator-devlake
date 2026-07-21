@@ -474,7 +474,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH member_emails AS (\n  SELECT DISTINCT LOWER(ai.user_email) AS email\n  FROM ai_activities ai\n  LEFT JOIN accounts acc     ON LOWER(acc.email) = LOWER(ai.user_email)\n  LEFT JOIN users u          ON LOWER(u.email)   = LOWER(ai.user_email)\n  LEFT JOIN user_accounts ua ON ua.user_id = u.id\n  JOIN pull_requests pr\n    ON pr.author_id IN (ai.account_id, acc.id, ua.account_id)\n  JOIN project_mapping pm\n    ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\n  WHERE pm.project_name IN ($project)\n),\nai AS (\n  SELECT DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY) AS week_start,\n         COUNT(DISTINCT user_email) AS ai_users,\n         SUM(lines_added)           AS ai_lines,\n         SUM(num_sessions)          AS ai_sessions,\n         SUM(estimated_cost_usd)    AS ai_cost\n  FROM ai_activities\n  WHERE $__timeFilter(date)\n    AND provider IN ($provider)\n    AND user_email <> ''\n    AND LOWER(user_email) IN (SELECT email FROM member_emails)\n  GROUP BY 1\n),\ndelivery AS (\n  SELECT DATE_SUB(DATE(pr_merged_date), INTERVAL WEEKDAY(pr_merged_date) DAY) AS week_start,\n         COUNT(*) AS prs_merged,\n         AVG(pr_cycle_time) / 60.0 AS avg_cycle_hours\n  FROM project_pr_metrics\n  WHERE $__timeFilter(pr_merged_date)\n    AND project_name IN ($project)\n  GROUP BY 1\n)\nSELECT ai.week_start                   AS \"Week\",\n       ai.ai_users                     AS \"AI Active Users\",\n       ai.ai_lines                     AS \"AI Lines Added\",\n       ai.ai_sessions                  AS \"AI Sessions\",\n       ROUND(ai.ai_cost, 2)            AS \"AI Cost (USD)\",\n       d.prs_merged                    AS \"PRs Merged\",\n       ROUND(d.avg_cycle_hours, 1)     AS \"Avg PR Cycle Time (h)\"\nFROM ai\nINNER JOIN delivery d ON d.week_start = ai.week_start\nORDER BY 1 DESC",
+          "rawSql": "WITH member_emails AS (\n  -- Precomputed by dbt (mart_ai_project_members). Emails are already lower-cased.\n  SELECT DISTINCT email\n  FROM mart_ai_project_members\n  WHERE project_name IN ($project)\n),\nai AS (\n  SELECT DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY) AS week_start,\n         COUNT(DISTINCT user_email) AS ai_users,\n         SUM(lines_added)           AS ai_lines,\n         SUM(num_sessions)          AS ai_sessions,\n         SUM(estimated_cost_usd)    AS ai_cost\n  FROM ai_activities\n  WHERE $__timeFilter(date)\n    AND provider IN ($provider)\n    AND user_email <> ''\n    AND LOWER(user_email) IN (SELECT email FROM member_emails)\n  GROUP BY 1\n),\ndelivery AS (\n  SELECT DATE_SUB(DATE(pr_merged_date), INTERVAL WEEKDAY(pr_merged_date) DAY) AS week_start,\n         COUNT(*) AS prs_merged,\n         AVG(pr_cycle_time) / 60.0 AS avg_cycle_hours\n  FROM project_pr_metrics\n  WHERE $__timeFilter(pr_merged_date)\n    AND project_name IN ($project)\n  GROUP BY 1\n)\nSELECT ai.week_start                   AS \"Week\",\n       ai.ai_users                     AS \"AI Active Users\",\n       ai.ai_lines                     AS \"AI Lines Added\",\n       ai.ai_sessions                  AS \"AI Sessions\",\n       ROUND(ai.ai_cost, 2)            AS \"AI Cost (USD)\",\n       d.prs_merged                    AS \"PRs Merged\",\n       ROUND(d.avg_cycle_hours, 1)     AS \"Avg PR Cycle Time (h)\"\nFROM ai\nINNER JOIN delivery d ON d.week_start = ai.week_start\nORDER BY 1 DESC",
           "refId": "A"
         }
       ],
@@ -580,7 +580,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH member_emails AS (\n  SELECT DISTINCT LOWER(ai.user_email) AS email\n  FROM ai_activities ai\n  LEFT JOIN accounts acc     ON LOWER(acc.email) = LOWER(ai.user_email)\n  LEFT JOIN users u          ON LOWER(u.email)   = LOWER(ai.user_email)\n  LEFT JOIN user_accounts ua ON ua.user_id = u.id\n  JOIN pull_requests pr\n    ON pr.author_id IN (ai.account_id, acc.id, ua.account_id)\n  JOIN project_mapping pm\n    ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\n  WHERE pm.project_name IN ($project)\n),\nai_agg AS (\n  SELECT LOWER(user_email)             AS email,\n         MAX(NULLIF(account_id, ''))   AS direct_account_id,\n         SUM(lines_added)              AS ai_lines,\n         SUM(num_sessions)             AS ai_sessions,\n         SUM(estimated_cost_usd)       AS ai_cost,\n         GROUP_CONCAT(DISTINCT provider ORDER BY provider) AS providers\n  FROM ai_activities\n  WHERE $__timeFilter(date)\n    AND provider IN ($provider)\n    AND user_email <> ''\n    AND LOWER(user_email) IN (SELECT email FROM member_emails)\n  GROUP BY 1\n),\n-- Identity: collect EVERY account belonging to this person, then\n-- aggregate delivery across all of them.\n--\n-- Sources, any of which may contribute an account:\n--   1. ai_activities.account_id, pre-resolved at convert time. It holds\n--      only ONE id, so it can never represent someone with several\n--      accounts \u2014 it is treated as one candidate, not the answer.\n--   2. case-insensitive match on accounts.email. Contributes nothing for\n--      private GitHub profiles, where accounts.email is ''.\n--   3. org-plugin identity: users.email -> user_accounts -> accounts.id.\n--      The only source that survives re-collection and the only one that\n--      works when emails are absent.\n--\n-- Why union rather than pick-one: a person routinely owns several rows in\n-- `accounts`. Some are duplicates that author nothing (gitextractor mints\n-- one keyed by commit email); others are genuinely active accounts on\n-- different platforms, each with real PRs. Selecting a single 'best'\n-- account handles the first case but silently discards delivery from the\n-- second \u2014 a developer with 2 GitLab and 4 GitHub PRs would report 4.\n-- Summing over every account is correct for both: empty duplicates\n-- contribute zero and drop out on their own.\naccts AS (\n  SELECT DISTINCT a.email AS email, acc.id AS account_id\n  FROM ai_agg a\n  JOIN accounts acc\n    ON acc.id = a.direct_account_id\n    OR LOWER(acc.email) = a.email\n    OR acc.id IN (SELECT ua.account_id FROM users u\n                    JOIN user_accounts ua ON ua.user_id = u.id\n                   WHERE LOWER(u.email) = a.email)\n),\nidentity AS (\n  SELECT a.email,\n         COUNT(ac.account_id) AS account_count,\n         CASE WHEN COUNT(ac.account_id) = 0 THEN 'UNMATCHED'\n              ELSE 'matched' END AS match_state\n  FROM ai_agg a\n  LEFT JOIN accts ac ON ac.email = a.email\n  GROUP BY 1\n),\npr_agg AS (\n  SELECT ac.email,\n         COUNT(DISTINCT pr.id) AS prs_opened,\n         COUNT(DISTINCT CASE WHEN pr.merged_date IS NOT NULL\n                             THEN pr.id END) AS prs_merged\n  FROM accts ac\n  JOIN pull_requests pr ON pr.author_id = ac.account_id\n  LEFT JOIN project_mapping pm\n         ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\n  WHERE $__timeFilter(pr.created_date)\n    AND pm.project_name IN ($project)\n  GROUP BY 1\n),\ncycle_agg AS (\n  SELECT ac.email,\n         AVG(ppm.pr_cycle_time) / 60.0 AS avg_cycle_hours\n  FROM accts ac\n  JOIN pull_requests pr ON pr.author_id = ac.account_id\n  JOIN project_pr_metrics ppm ON ppm.id = pr.id\n  WHERE $__timeFilter(ppm.pr_merged_date)\n    AND ppm.project_name IN ($project)\n    AND ppm.pr_cycle_time IS NOT NULL\n  GROUP BY 1\n)\nSELECT a.email                           AS \"Developer\",\n       a.providers                       AS \"AI Providers\",\n       i.match_state                     AS \"Identity\",\n       i.account_count                   AS \"Accounts Merged\",\n       a.ai_lines                        AS \"AI Lines Added\",\n       a.ai_sessions                     AS \"AI Sessions\",\n       ROUND(a.ai_cost, 2)               AS \"AI Cost (USD)\",\n       p.prs_opened                      AS \"PRs Opened\",\n       p.prs_merged                      AS \"PRs Merged\",\n       ROUND(c.avg_cycle_hours, 1)       AS \"Avg PR Cycle Time (h)\"\nFROM ai_agg a\nJOIN identity  i ON i.email = a.email\nLEFT JOIN pr_agg    p ON p.email = a.email\nLEFT JOIN cycle_agg c ON c.email = a.email\nORDER BY a.ai_lines DESC",
+          "rawSql": "WITH member_emails AS (\n  -- Precomputed by dbt (mart_ai_project_members). Emails are already lower-cased.\n  SELECT DISTINCT email\n  FROM mart_ai_project_members\n  WHERE project_name IN ($project)\n),\nai_agg AS (\n  SELECT LOWER(user_email)             AS email,\n         MAX(NULLIF(account_id, ''))   AS direct_account_id,\n         SUM(lines_added)              AS ai_lines,\n         SUM(num_sessions)             AS ai_sessions,\n         SUM(estimated_cost_usd)       AS ai_cost,\n         GROUP_CONCAT(DISTINCT provider ORDER BY provider) AS providers\n  FROM ai_activities\n  WHERE $__timeFilter(date)\n    AND provider IN ($provider)\n    AND user_email <> ''\n    AND LOWER(user_email) IN (SELECT email FROM member_emails)\n  GROUP BY 1\n),\n-- Identity: collect EVERY account belonging to this person, then\n-- aggregate delivery across all of them.\n--\n-- Sources, any of which may contribute an account:\n--   1. ai_activities.account_id, pre-resolved at convert time. It holds\n--      only ONE id, so it can never represent someone with several\n--      accounts \u2014 it is treated as one candidate, not the answer.\n--   2. case-insensitive match on accounts.email. Contributes nothing for\n--      private GitHub profiles, where accounts.email is ''.\n--   3. org-plugin identity: users.email -> user_accounts -> accounts.id.\n--      The only source that survives re-collection and the only one that\n--      works when emails are absent.\n--\n-- Why union rather than pick-one: a person routinely owns several rows in\n-- `accounts`. Some are duplicates that author nothing (gitextractor mints\n-- one keyed by commit email); others are genuinely active accounts on\n-- different platforms, each with real PRs. Selecting a single 'best'\n-- account handles the first case but silently discards delivery from the\n-- second \u2014 a developer with 2 GitLab and 4 GitHub PRs would report 4.\n-- Summing over every account is correct for both: empty duplicates\n-- contribute zero and drop out on their own.\naccts AS (\n  -- Precomputed by dbt (mart_ai_person_accounts): every account belonging to a\n  -- person, resolved once per sync. Scoped here to the emails in ai_agg.\n  SELECT DISTINCT a.email AS email, m.account_id\n  FROM ai_agg a\n  JOIN mart_ai_person_accounts m ON m.email = a.email\n),\nidentity AS (\n  SELECT a.email,\n         COUNT(ac.account_id) AS account_count,\n         CASE WHEN COUNT(ac.account_id) = 0 THEN 'UNMATCHED'\n              ELSE 'matched' END AS match_state\n  FROM ai_agg a\n  LEFT JOIN accts ac ON ac.email = a.email\n  GROUP BY 1\n),\npr_agg AS (\n  SELECT ac.email,\n         COUNT(DISTINCT pr.id) AS prs_opened,\n         COUNT(DISTINCT CASE WHEN pr.merged_date IS NOT NULL\n                             THEN pr.id END) AS prs_merged\n  FROM accts ac\n  JOIN pull_requests pr ON pr.author_id = ac.account_id\n  LEFT JOIN project_mapping pm\n         ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\n  WHERE $__timeFilter(pr.created_date)\n    AND pm.project_name IN ($project)\n  GROUP BY 1\n),\ncycle_agg AS (\n  SELECT ac.email,\n         AVG(ppm.pr_cycle_time) / 60.0 AS avg_cycle_hours\n  FROM accts ac\n  JOIN pull_requests pr ON pr.author_id = ac.account_id\n  JOIN project_pr_metrics ppm ON ppm.id = pr.id\n  WHERE $__timeFilter(ppm.pr_merged_date)\n    AND ppm.project_name IN ($project)\n    AND ppm.pr_cycle_time IS NOT NULL\n  GROUP BY 1\n)\nSELECT a.email                           AS \"Developer\",\n       a.providers                       AS \"AI Providers\",\n       i.match_state                     AS \"Identity\",\n       i.account_count                   AS \"Accounts Merged\",\n       a.ai_lines                        AS \"AI Lines Added\",\n       a.ai_sessions                     AS \"AI Sessions\",\n       ROUND(a.ai_cost, 2)               AS \"AI Cost (USD)\",\n       p.prs_opened                      AS \"PRs Opened\",\n       p.prs_merged                      AS \"PRs Merged\",\n       ROUND(c.avg_cycle_hours, 1)       AS \"Avg PR Cycle Time (h)\"\nFROM ai_agg a\nJOIN identity  i ON i.email = a.email\nLEFT JOIN pr_agg    p ON p.email = a.email\nLEFT JOIN cycle_agg c ON c.email = a.email\nORDER BY a.ai_lines DESC",
           "refId": "A"
         }
       ],
@@ -594,6 +594,282 @@
         "w": 24,
         "x": 0,
         "y": 36
+      },
+      "id": 104,
+      "panels": [],
+      "title": "Project rollup \u2014 membership-scoped AI next to project delivery",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "AI columns are the usage of this project's members (people who authored PRs in the project), summed across all AI tools. AI is person-scoped, not attributed to a repo \u2014 someone active on multiple projects shows full AI usage in each, so AI totals across projects can exceed the global total. Delivery columns are the project's real merged-PR metrics.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI Cost (USD)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Avg PR Cycle Time (h)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "h"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 37
+      },
+      "id": 40,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH\n-- Members of each project = AI users who authored a PR in that project.\n-- Same account-resolution join used by the Developer/Weekly panels above,\n-- but keyed by project instead of filtered to one.\nproject_members AS (\n  -- Precomputed by dbt (mart_ai_project_members): AI users who authored a PR\n  -- in each project's repos. Replaces the per-query identity+membership join.\n  SELECT project_name, email\n  FROM mart_ai_project_members\n  WHERE project_name IN ($project)\n),\n-- AI usage per project = SUM over that project's members. Person-scoped and\n-- intentionally NOT split across projects: a member of 3 projects contributes\n-- full usage to each, so AI totals across projects can exceed the global total.\n-- Disjoint metric columns => SUM each is safe; never COUNT(*) on ai_activities.\nai_by_project AS (\n  SELECT m.project_name,\n         COUNT(DISTINCT m.email)   AS ai_users,\n         SUM(a.lines_added)        AS ai_lines,\n         SUM(a.num_sessions)       AS ai_sessions,\n         SUM(a.estimated_cost_usd) AS ai_cost,\n         GROUP_CONCAT(DISTINCT a.provider ORDER BY a.provider) AS providers\n  FROM project_members m\n  JOIN ai_activities a\n    ON LOWER(a.user_email) = m.email\n   AND a.provider IN ($provider)\n   AND $__timeFilter(a.date)\n  GROUP BY m.project_name\n),\ndelivery_by_project AS (\n  SELECT project_name,\n         COUNT(*)                  AS prs_merged,\n         AVG(pr_cycle_time) / 60.0 AS avg_cycle_hours\n  FROM project_pr_metrics\n  WHERE $__timeFilter(pr_merged_date)\n    AND project_name IN ($project)\n  GROUP BY project_name\n),\n-- Union of project keys so a project with activity on EITHER side is not\n-- dropped (MySQL has no FULL OUTER JOIN).\nproject_keys AS (\n  SELECT project_name FROM ai_by_project\n  UNION\n  SELECT project_name FROM delivery_by_project\n)\nSELECT k.project_name                 AS \"Project\",\n       a.ai_users                     AS \"AI Active Users\",\n       a.providers                    AS \"AI Providers\",\n       a.ai_lines                     AS \"AI Lines Added\",\n       a.ai_sessions                  AS \"AI Sessions\",\n       ROUND(a.ai_cost, 2)            AS \"AI Cost (USD)\",\n       d.prs_merged                   AS \"PRs Merged\",\n       ROUND(d.avg_cycle_hours, 1)    AS \"Avg PR Cycle Time (h)\"\nFROM project_keys k\nLEFT JOIN ai_by_project       a ON a.project_name = k.project_name\nLEFT JOIN delivery_by_project d ON d.project_name = k.project_name\nORDER BY a.ai_lines DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Project Fact Table",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "AI columns are the usage of this project's members (people who authored PRs in the project), summed across all AI tools. AI is person-scoped, not attributed to a repo \u2014 someone active on multiple projects shows full AI usage in each, so AI totals across projects can exceed the global total. Delivery columns are the project's real merged-PR metrics. Grouped by calendar week within each project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI Cost (USD)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Avg PR Cycle Time (h)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "h"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 47
+      },
+      "id": 41,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH\nproject_members AS (\n  -- Precomputed by dbt (mart_ai_project_members): AI users who authored a PR\n  -- in each project's repos. Replaces the per-query identity+membership join.\n  SELECT project_name, email\n  FROM mart_ai_project_members\n  WHERE project_name IN ($project)\n),\n-- Same membership scoping as the Project Fact Table, additionally bucketed\n-- by calendar week (Monday start), matching the Weekly Fact Table above.\nai_by_project_week AS (\n  SELECT m.project_name,\n         DATE_SUB(DATE(a.date), INTERVAL WEEKDAY(a.date) DAY) AS week_start,\n         COUNT(DISTINCT m.email)   AS ai_users,\n         SUM(a.lines_added)        AS ai_lines,\n         SUM(a.estimated_cost_usd) AS ai_cost\n  FROM project_members m\n  JOIN ai_activities a\n    ON LOWER(a.user_email) = m.email\n   AND a.provider IN ($provider)\n   AND $__timeFilter(a.date)\n  GROUP BY m.project_name, week_start\n),\ndelivery_by_project_week AS (\n  SELECT project_name,\n         DATE_SUB(DATE(pr_merged_date), INTERVAL WEEKDAY(pr_merged_date) DAY) AS week_start,\n         COUNT(*)                  AS prs_merged,\n         AVG(pr_cycle_time) / 60.0 AS avg_cycle_hours\n  FROM project_pr_metrics\n  WHERE $__timeFilter(pr_merged_date)\n    AND project_name IN ($project)\n  GROUP BY project_name, week_start\n),\npw_keys AS (\n  SELECT project_name, week_start FROM ai_by_project_week\n  UNION\n  SELECT project_name, week_start FROM delivery_by_project_week\n)\nSELECT k.project_name                 AS \"Project\",\n       k.week_start                   AS \"Week\",\n       a.ai_users                     AS \"AI Active Users\",\n       a.ai_lines                     AS \"AI Lines Added\",\n       ROUND(a.ai_cost, 2)            AS \"AI Cost (USD)\",\n       d.prs_merged                   AS \"PRs Merged\",\n       ROUND(d.avg_cycle_hours, 1)    AS \"Avg PR Cycle Time (h)\"\nFROM pw_keys k\nLEFT JOIN ai_by_project_week      a ON a.project_name = k.project_name AND a.week_start = k.week_start\nLEFT JOIN delivery_by_project_week d ON d.project_name = k.project_name AND d.week_start = k.week_start\nORDER BY k.project_name, k.week_start DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Project \u00d7 Week Fact Table",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Same project-membership scope as the Project Fact Table, but each AI tool is its own row instead of being merged into one total. 'AI Active Users' is per provider \u2014 someone using two tools counts once in each row. Delivery is intentionally omitted here (delivery has no provider dimension); see the Project Fact Table for delivery next to combined AI usage.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI Cost (USD)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 57
+      },
+      "id": 42,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH\n-- Same membership scoping as the Project Fact Table above: a project's\n-- members are people who authored a PR in that project's repo(s).\nproject_members AS (\n  -- Precomputed by dbt (mart_ai_project_members): AI users who authored a PR\n  -- in each project's repos. Replaces the per-query identity+membership join.\n  SELECT project_name, email\n  FROM mart_ai_project_members\n  WHERE project_name IN ($project)\n),\n-- Unlike the Project Fact Table (which merges all tools into one row via\n-- GROUP_CONCAT), this keeps provider as its own grouping key, so each AI\n-- tool's usage for a project is its own row rather than a summed total.\nai_by_project_provider AS (\n  SELECT m.project_name,\n         a.provider,\n         COUNT(DISTINCT m.email)   AS ai_users,\n         SUM(a.lines_added)        AS ai_lines,\n         SUM(a.num_sessions)       AS ai_sessions,\n         SUM(a.estimated_cost_usd) AS ai_cost\n  FROM project_members m\n  JOIN ai_activities a\n    ON LOWER(a.user_email) = m.email\n   AND a.provider IN ($provider)\n   AND $__timeFilter(a.date)\n  GROUP BY m.project_name, a.provider\n)\nSELECT project_name              AS \"Project\",\n       provider                  AS \"AI Provider\",\n       ai_users                  AS \"AI Active Users\",\n       ai_lines                  AS \"AI Lines Added\",\n       ai_sessions               AS \"AI Sessions\",\n       ROUND(ai_cost, 2)         AS \"AI Cost (USD)\"\nFROM ai_by_project_provider\nORDER BY project_name, provider",
+          "refId": "A"
+        }
+      ],
+      "title": "Project \u00d7 AI Provider Breakdown",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 66
       },
       "id": 103,
       "panels": [],
@@ -624,7 +900,7 @@
         "h": 5,
         "w": 6,
         "x": 0,
-        "y": 37
+        "y": 67
       },
       "id": 30,
       "options": {
@@ -703,7 +979,7 @@
         "h": 5,
         "w": 18,
         "x": 6,
-        "y": 37
+        "y": 67
       },
       "id": 31,
       "options": {
@@ -804,6 +1080,6 @@
   "timezone": "utc",
   "title": "AI Usage + Delivery Correlation",
   "uid": "ai_delivery_correlation",
-  "version": 1,
+  "version": 5,
   "weekStart": "monday"
 }
