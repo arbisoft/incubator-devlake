@@ -15,3 +15,12 @@ sources:
       - name: user_accounts
       - name: pull_requests
       - name: project_mapping
+      # Bugs (mart_project_bugs_weekly): issues -> board_issues -> project_mapping(boards)
+      - name: issues
+      - name: board_issues
+      # Churn (mart_project_churn_weekly): commits -> repo_commits -> project_mapping(repos)
+      - name: commits
+      - name: repo_commits
+      # Real technical debt (mart_project_sonar_debt): cq_file_metrics -> cq_projects -> project_mapping(cq_projects)
+      - name: cq_file_metrics
+      - name: cq_projects

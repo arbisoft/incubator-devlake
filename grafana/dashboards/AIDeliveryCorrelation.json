@@ -1006,6 +1006,331 @@
       ],
       "title": "Identity Gaps \u2014 AI users with no matching account (all projects)",
       "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 72
+      },
+      "id": 105,
+      "panels": [],
+      "title": "Quality & Technical Debt \u2014 AI usage next to bugs, churn, and debt",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Membership-scoped, not attribution: AI columns are the usage of this project's members (people who authored PRs in the project's repos), summed across all AI tools. AI is person-scoped \u2014 someone active on several projects shows full usage in each, so AI totals can exceed the global total. No claim is made that any specific commit or line was AI-written. Bugs are issues of standardized type BUG/INCIDENT on the project's boards, from ANY issue tracker connected to DevLake (Jira, GitHub Issues, GitLab, TAPD, Zentao, PagerDuty, \u2026) \u2014 read from the domain layer, so no tracker is special-cased. Counted by the week they were opened and the week they were resolved. This shows co-movement of AI-usage intensity and bug volume \u2014 correlation, not causation. Empty until an issue tracker's board is connected and mapped to the project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 73
+      },
+      "id": 50,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH project_members AS (\n  SELECT project_name, email FROM mart_ai_project_members WHERE project_name IN ($project)\n),\nai_pw AS (\n  SELECT m.project_name,\n         DATE_SUB(DATE(a.date), INTERVAL WEEKDAY(a.date) DAY) AS week,\n         COUNT(DISTINCT m.email) AS ai_users,\n         SUM(a.lines_added)      AS ai_lines,\n         SUM(a.num_sessions)     AS ai_sessions\n  FROM project_members m\n  JOIN ai_activities a\n    ON LOWER(a.user_email) = m.email\n   AND a.provider IN ($provider)\n   AND $__timeFilter(a.date)\n  GROUP BY m.project_name, week\n),\nbugs AS (\n  SELECT project_name, week, bugs_opened, bugs_opened_high_sev, bugs_resolved, net_bug_delta\n  FROM mart_project_bugs_weekly\n  WHERE project_name IN ($project) AND $__timeFilter(week)\n),\nk AS (\n  SELECT project_name, week FROM ai_pw\n  UNION\n  SELECT project_name, week FROM bugs\n)\nSELECT k.project_name             AS \"Project\",\n       k.week                     AS \"Week\",\n       a.ai_users                 AS \"AI Active Users\",\n       a.ai_lines                 AS \"AI Lines Added\",\n       a.ai_sessions              AS \"AI Sessions\",\n       b.bugs_opened              AS \"Bugs Opened\",\n       b.bugs_opened_high_sev     AS \"Bugs Opened (High Sev)\",\n       b.bugs_resolved            AS \"Bugs Resolved\",\n       b.net_bug_delta            AS \"Net Bug \u0394\"\nFROM k\nLEFT JOIN ai_pw a ON a.project_name = k.project_name AND a.week = k.week\nLEFT JOIN bugs  b ON b.project_name = k.project_name AND b.week = k.week\nORDER BY k.project_name, k.week DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Bug Correlation \u2014 Project \u00d7 Week",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "AI Lines Added (left) and Bugs Opened (right) over time, summed across the selected projects' members. A visual read on whether weeks of heavier AI usage track with more bugs subsequently logged. Bugs line is empty until any issue tracker is connected.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "left",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 6,
+            "showPoints": "auto",
+            "spanNulls": true
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Bugs Opened"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 82
+      },
+      "id": 51,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH project_members AS (\n  SELECT project_name, email FROM mart_ai_project_members WHERE project_name IN ($project)\n),\nai_w AS (\n  SELECT DATE_SUB(DATE(a.date), INTERVAL WEEKDAY(a.date) DAY) AS week,\n         SUM(a.lines_added) AS ai_lines\n  FROM project_members m\n  JOIN ai_activities a\n    ON LOWER(a.user_email) = m.email\n   AND a.provider IN ($provider)\n   AND $__timeFilter(a.date)\n  GROUP BY week\n),\nbugs_w AS (\n  SELECT week, SUM(bugs_opened) AS bugs_opened\n  FROM mart_project_bugs_weekly\n  WHERE project_name IN ($project) AND $__timeFilter(week)\n  GROUP BY week\n),\nk AS (SELECT week FROM ai_w UNION SELECT week FROM bugs_w)\nSELECT k.week            AS time,\n       a.ai_lines        AS \"AI Lines Added\",\n       b.bugs_opened     AS \"Bugs Opened\"\nFROM k\nLEFT JOIN ai_w   a ON a.week = k.week\nLEFT JOIN bugs_w b ON b.week = k.week\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "title": "Bug Correlation \u2014 AI Lines vs Bugs Opened (weekly)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Within each project\u00d7week, commits are split by whether the AUTHOR had any AI activity that week (adopter) or not. Compares code churn and rework (deletions as a share of churn) between the two groups. \"AI-augmented author\" flags a person who used an AI tool that week \u2014 it does NOT mean the code was AI-written.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Adopter Rework %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Non-Adopter Rework %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 90
+      },
+      "id": 52,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT project_name AS \"Project\",\n       week         AS \"Week\",\n       SUM(CASE WHEN is_ai_adopter=1 THEN commits ELSE 0 END) AS \"Adopter Commits\",\n       SUM(CASE WHEN is_ai_adopter=1 THEN churn   ELSE 0 END) AS \"Adopter Churn\",\n       ROUND(100 * SUM(CASE WHEN is_ai_adopter=1 THEN deletions ELSE 0 END)\n             / NULLIF(SUM(CASE WHEN is_ai_adopter=1 THEN churn ELSE 0 END),0), 1) AS \"Adopter Rework %\",\n       SUM(CASE WHEN is_ai_adopter=0 THEN commits ELSE 0 END) AS \"Non-Adopter Commits\",\n       SUM(CASE WHEN is_ai_adopter=0 THEN churn   ELSE 0 END) AS \"Non-Adopter Churn\",\n       ROUND(100 * SUM(CASE WHEN is_ai_adopter=0 THEN deletions ELSE 0 END)\n             / NULLIF(SUM(CASE WHEN is_ai_adopter=0 THEN churn ELSE 0 END),0), 1) AS \"Non-Adopter Rework %\"\nFROM mart_project_churn_weekly\nWHERE project_name IN ($project) AND $__timeFilter(week)\nGROUP BY project_name, week\nORDER BY project_name, week DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Quality Variance \u2014 AI-Adopters vs Non-Adopters",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Membership-scoped, not attribution: AI columns are the usage of this project's members (people who authored PRs in the project's repos), summed across all AI tools. AI is person-scoped \u2014 someone active on several projects shows full usage in each, so AI totals can exceed the global total. No claim is made that any specific commit or line was AI-written. Technical debt is taken SOLELY from SonarQube (sqale_index = estimated remediation effort, plus code smells, bugs, and reliability rating) \u2014 no derived proxy. DevLake keeps only SonarQube's latest analysis, so this is a current per-project snapshot, not a time series; correlate the debt figures against each project's AI-usage intensity over the selected window. Empty until SonarQube is connected and its project mapped to a DevLake project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SQALE Debt (h)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "h"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 99
+      },
+      "id": 53,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH project_members AS (\n  SELECT project_name, email FROM mart_ai_project_members WHERE project_name IN ($project)\n),\nai_p AS (\n  SELECT m.project_name,\n         COUNT(DISTINCT m.email) AS ai_users,\n         SUM(a.lines_added)      AS ai_lines\n  FROM project_members m\n  JOIN ai_activities a\n    ON LOWER(a.user_email) = m.email\n   AND a.provider IN ($provider)\n   AND $__timeFilter(a.date)\n  GROUP BY m.project_name\n)\nSELECT s.project_name              AS \"Project\",\n       s.sqale_index_hours         AS \"SQALE Debt (h)\",\n       s.code_smells               AS \"Code Smells\",\n       s.sonar_bugs                AS \"Sonar Bugs\",\n       s.worst_reliability_rating  AS \"Reliability\",\n       s.files_analyzed            AS \"Files Analyzed\",\n       s.last_analysis_date        AS \"Last Analysis\",\n       a.ai_users                  AS \"AI Active Users\",\n       a.ai_lines                  AS \"AI Lines Added\"\nFROM mart_project_sonar_debt s\nLEFT JOIN ai_p a ON a.project_name = s.project_name\nWHERE s.project_name IN ($project)\nORDER BY s.sqale_index_minutes DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Technical Debt (SonarQube) vs AI Usage \u2014 per Project",
+      "type": "table"
     }
   ],
   "refresh": "",

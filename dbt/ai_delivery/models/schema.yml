@@ -29,3 +29,38 @@ models:
         description: Lower-cased AI user email who is a member of that project.
         tests:
           - not_null
+
+  - name: mart_project_bugs_weekly
+    description: >
+      Bug volume per (project, week): issues of type BUG/INCIDENT reaching a project
+      through its boards. bugs_opened by created_date, bugs_resolved by resolution_date.
+      Context the dashboard correlates AI-usage intensity against; no AI attribution.
+    columns:
+      - name: project_name
+        tests: [not_null]
+      - name: week
+        tests: [not_null]
+
+  - name: mart_project_churn_weekly
+    description: >
+      Quality-variance engine. One row per (project, week, author, is_ai_adopter):
+      commit churn split by whether the author had any AI activity that week.
+      "AI-augmented author" flags a person, not AI-written code.
+    columns:
+      - name: project_name
+        tests: [not_null]
+      - name: week
+        tests: [not_null]
+      - name: is_ai_adopter
+        description: 1 if the author had any ai_activities that week, else 0.
+        tests: [not_null]
+
+  - name: mart_project_sonar_debt
+    description: >
+      Technical-debt snapshot per project from SonarQube (sqale_index, code_smells,
+      bugs, reliability). This is the SOLE technical-debt source — no derived proxy.
+      Point-in-time (DevLake keeps only the latest analysis, so there is no weekly
+      history). Empty until SonarQube is connected and its project mapped.
+    columns:
+      - name: project_name
+        tests: [not_null]
