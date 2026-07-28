@@ -1,0 +1,69 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.157.0
+    container_name: otel-collector-prod
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./collector-config-production.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      # OTLP ingest - exposed so clients (e.g. Claude Code) can send telemetry.
+      # Restrict via firewall/security group to trusted sources in production.
+      - "4317:4317"
+      - "4318:4318"
+      # Prometheus scrape endpoint - internal only, not needed outside the host.
+      - "127.0.0.1:8889:8889"
+    environment:
+      - GOGC=80
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1024M
+        reservations:
+          cpus: '1'
+          memory: 512M
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:13133/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  prometheus:
+    image: prom/prometheus:v3.13.1
+    container_name: prometheus-prod
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    ports:
+      # Bound to localhost only - access the UI via SSH tunnel or put a
+      # reverse proxy with auth in front if remote access is required.
+      - "127.0.0.1:9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2048M
+        reservations:
+          cpus: '1'
+          memory: 1024M
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  prometheus-data:
+    driver: local

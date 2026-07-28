@@ -64,6 +64,12 @@ services:
       context: grafana/
     ports:
       - 3002:3000
+    # host.docker.internal is a Docker Desktop-only DNS alias; this makes it
+    # resolve on Linux hosts too, so the Prometheus datasource (which points
+    # at http://host.docker.internal:9090, see grafana/provisioning/datasources/prometheus.yml)
+    # can reach the otel-collector stack running directly on the host.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./grafana/dashboards:/etc/grafana/dashboards
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards

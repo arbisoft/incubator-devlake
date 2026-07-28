@@ -1,0 +1,630 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "datasource", "uid": "grafana" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "description": "Number of distinct users active with Claude Code in the selected time range",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "count(count by (user_account_uuid) (max_over_time(claude_code_session_count_total[$__range])))",
+          "legendFormat": "Active Users",
+          "refId": "A"
+        }
+      ],
+      "title": "Daily Active Users (Period)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "description": "Total lines of code added by Claude Code sessions",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum(max_over_time(claude_code_lines_of_code_count_total{type=\"added\"}[$__range]))",
+          "legendFormat": "Lines Added",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Lines Added",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "description": "PRs attributed to Claude Code in the selected time range",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum(max_over_time(claude_code_pull_request_count_total[$__range]))",
+          "legendFormat": "PRs by Claude",
+          "refId": "A"
+        }
+      ],
+      "title": "PRs Created by Claude",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "description": "Total estimated API spend for the selected time range",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "unit": "currencyUSD",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 500 },
+              { "color": "red", "value": 2000 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum(max_over_time(claude_code_cost_usage_USD_total[$__range]))",
+          "legendFormat": "Estimated Cost (USD)",
+          "refId": "A"
+        }
+      ],
+      "title": "Estimated Cost (USD)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "description": "Daily count of distinct users who used Claude Code",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "id": 5,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "count(count by (user_account_uuid) (increase(claude_code_session_count_total[$__interval]) > 0))",
+          "legendFormat": "Daily Active Users",
+          "refId": "A"
+        }
+      ],
+      "title": "Claude Adoption – Daily Active Users",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "description": "Commits and PRs attributed to Claude over time",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "id": 6,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum(increase(claude_code_pull_request_count_total[$__interval]))",
+          "legendFormat": "PRs by Claude",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum(increase(claude_code_commit_count_total[$__interval]))",
+          "legendFormat": "Commits by Claude",
+          "refId": "B"
+        }
+      ],
+      "title": "Coding Velocity – PRs & Commits by Claude",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "description": "Estimated spend per model over time – shows Sonnet vs Opus cost allocation",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "stacking": { "group": "A", "mode": "normal" }
+          },
+          "unit": "currencyUSD",
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "id": 7,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum by (model_group) (label_replace(label_replace(label_replace(label_replace(increase(claude_code_cost_usage_USD_total[$__interval]), \"model_group\", \"$1\", \"model\", \"(.*)\"), \"model_group\", \"Opus\", \"model\", \"(?i).*opus.*\"), \"model_group\", \"Sonnet\", \"model\", \"(?i).*sonnet.*\"), \"model_group\", \"Haiku\", \"model\", \"(?i).*haiku.*\"))",
+          "legendFormat": "{{model_group}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Cost Efficiency – Model Spend Breakdown",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "description": "Ratio of lines removed (refactoring) vs lines added (new feature work) over time. Higher removal ratio signals active code cleanup.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "id": 8,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum(increase(claude_code_lines_of_code_count_total{type=\"added\"}[$__interval]))",
+          "legendFormat": "Lines Added (Features)",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum(increase(claude_code_lines_of_code_count_total{type=\"removed\"}[$__interval]))",
+          "legendFormat": "Lines Removed (Refactoring)",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum(increase(claude_code_lines_of_code_count_total{type=\"removed\"}[$__interval])) / sum(increase(claude_code_lines_of_code_count_total{type=\"added\"}[$__interval]))",
+          "legendFormat": "Refactor Ratio",
+          "refId": "C"
+        }
+      ],
+      "title": "Quality Signal – Lines Added vs Removed",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "description": "Top developers ranked by Claude Code usage (lines added + PRs)",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "id": 9,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "reducer": ["sum"], "show": false },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "count by (user_account_uuid) (max_over_time(claude_code_session_count_total[$__range]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "Sessions",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum by (user_account_uuid) (max_over_time(claude_code_cost_usage_USD_total[$__range]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "Cost (USD)",
+          "refId": "B"
+        }
+      ],
+      "transformations": [
+        { "id": "merge", "options": {} },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "user_account_uuid": "User",
+              "Value #A": "Sessions",
+              "Value #B": "Cost (USD)"
+            }
+          }
+        }
+      ],
+      "title": "Top Developers by Claude Usage",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "description": "Cost per model with lines-of-code context for ROI analysis",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "id": 10,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "reducer": ["sum"], "show": false },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum by (model) (max_over_time(claude_code_token_usage_tokens_total{type=\"input\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "Input Tokens",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum by (model) (max_over_time(claude_code_token_usage_tokens_total{type=\"output\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "Output Tokens",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum by (model) (max_over_time(claude_code_cost_usage_USD_total[$__range]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "Total Cost (USD)",
+          "refId": "C"
+        }
+      ],
+      "transformations": [
+        { "id": "merge", "options": {} },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "model": "Model",
+              "Value #A": "Input Tokens",
+              "Value #B": "Output Tokens",
+              "Value #C": "Total Cost (USD)"
+            }
+          }
+        }
+      ],
+      "title": "Cost Efficiency – Model ROI Breakdown",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "description": "Per-tool accepted vs rejected action counts from _tool_claude_usage. Shows which Claude tool types get the most approval.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "lineWidth": 0,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+      "id": 11,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{tool=\"edit\", decision=\"accept\"}[$__interval]))",
+          "legendFormat": "Edit Accepted",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{tool=\"edit\", decision=\"reject\"}[$__interval]))",
+          "legendFormat": "Edit Rejected",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{tool=\"multi_edit\", decision=\"accept\"}[$__interval]))",
+          "legendFormat": "Multi-Edit Accepted",
+          "refId": "C"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{tool=\"multi_edit\", decision=\"reject\"}[$__interval]))",
+          "legendFormat": "Multi-Edit Rejected",
+          "refId": "D"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{tool=\"write\", decision=\"accept\"}[$__interval]))",
+          "legendFormat": "Write Accepted",
+          "refId": "E"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{tool=\"write\", decision=\"reject\"}[$__interval]))",
+          "legendFormat": "Write Rejected",
+          "refId": "F"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{tool=\"notebook_edit\", decision=\"accept\"}[$__interval]))",
+          "legendFormat": "Notebook Accepted",
+          "refId": "G"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{tool=\"notebook_edit\", decision=\"reject\"}[$__interval]))",
+          "legendFormat": "Notebook Rejected",
+          "refId": "H"
+        }
+      ],
+      "title": "Tool-Type Acceptance – Edit / Multi-Edit / Write / Notebook",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "description": "Anthropic prompt-cache token breakdown. High cache_read_tokens relative to cache_creation_tokens means effective prompt reuse and lower cost.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+      "id": 12,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum(increase(claude_code_token_usage_tokens_total{type=\"cacheRead\"}[$__interval]))",
+          "legendFormat": "Cache Read Tokens",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum(increase(claude_code_token_usage_tokens_total{type=\"cacheCreation\"}[$__interval]))",
+          "legendFormat": "Cache Creation Tokens",
+          "refId": "B"
+        }
+      ],
+      "title": "Cache Token Efficiency – Read vs Creation",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "description": "Acceptance rates per Claude model across all tool types, plus cache hit rate for cost efficiency.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 36 },
+      "id": 13,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "reducer": ["sum"], "show": false },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum by (tool) (max_over_time(claude_code_code_edit_tool_decision_total{decision=\"accept\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "Accepted",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum by (tool) (max_over_time(claude_code_code_edit_tool_decision_total{decision=\"reject\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "Rejected",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "sum by (model) (max_over_time(claude_code_token_usage_tokens_total{type=\"cacheRead\"}[$__range])) / (sum by (model) (max_over_time(claude_code_token_usage_tokens_total{type=\"cacheRead\"}[$__range])) + sum by (model) (max_over_time(claude_code_token_usage_tokens_total{type=\"cacheCreation\"}[$__range]))) * 100",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "Cache Hit %",
+          "refId": "C"
+        }
+      ],
+      "transformations": [
+        { "id": "merge", "options": {} },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "tool": "Tool",
+              "model": "Model",
+              "Value #A": "Accepted",
+              "Value #B": "Rejected",
+              "Value #C": "Cache Hit %"
+            }
+          }
+        }
+      ],
+      "title": "Tool-Type Acceptance Rate by Model",
+      "type": "table"
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 38,
+  "tags": ["claude", "anthropic", "devlake", "ai", "prometheus"],
+  "templating": { "list": [] },
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "Claude - Prometheus",
+  "uid": "claude_adoption_prometheus",
+  "version": 1,
+  "weekStart": ""
+}

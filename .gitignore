@@ -170,3 +170,6 @@ venv
 /backend/plugins/gitextractor/parser/demo_repo/
 
 __debug_bin*
+
+# compiled Go test binaries (produced by `go test -c`)
+*.test
