@@ -38,6 +38,7 @@ import { ArgoCDTransformation } from '@/plugins/register/argocd';
 import { GhCopilotTransformation } from '@/plugins/register/gh-copilot';
 import { AsanaTransformation } from '@/plugins/register/asana';
 import { SalesforceTransformation } from '@/plugins/register/salesforce';
+import { ClickUpTransformation } from '@/plugins/register/clickup';
 import { DOC_URL } from '@/release';
 import { operator } from '@/utils';
 
@@ -203,6 +204,15 @@ export const ScopeConfigForm = ({
               {plugin === 'argocd' && (
                 <ArgoCDTransformation
                   entities={entities}
+                  transformation={transformation}
+                  setTransformation={setTransformation}
+                />
+              )}
+
+              {plugin === 'clickup' && (
+                <ClickUpTransformation
+                  entities={entities}
+                  connectionId={connectionId}
                   transformation={transformation}
                   setTransformation={setTransformation}
                 />

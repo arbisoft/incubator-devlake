@@ -26,6 +26,7 @@ import { BitbucketConfig } from './bitbucket';
 import { BitbucketServerConfig } from './bitbucket-server';
 import { CircleCIConfig } from './circleci';
 import { ClaudeCodeConfig } from './claude-code';
+import { ClickUpConfig } from './clickup';
 import { GitHubConfig } from './github';
 import { CodexConfig } from './codex';
 import { CursorConfig } from './cursor';
@@ -61,6 +62,7 @@ export const pluginConfigs: IPluginConfig[] = [
   BitbucketServerConfig,
   CircleCIConfig,
   ClaudeCodeConfig,
+  ClickUpConfig,
   GitHubConfig,
   CodexConfig,
   CursorConfig,
