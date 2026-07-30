@@ -16,14 +16,24 @@
  *
  */
 
-module.exports = {
-  extends: ['react-app', 'react-app/jest', 'prettier'],
-  plugins: ['header', 'prettier'],
-  rules: {
-    'prettier/prettier': 'warn',
-    'header/header': ['error', '.file-headerrc'],
-    'react-hooks/exhaustive-deps': 'off',
-    'no-console': 'warn',
-  },
-};
+import path from 'path';
+import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
 
+export default defineConfig({
+  plugins: [react()],
+
+  resolve: {
+    alias: {
+      '@': path.join(__dirname, './src'),
+    },
+  },
+
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    css: false,
+    setupFiles: ['./vitest.setup.ts'],
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+  },
+});

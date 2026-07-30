@@ -16,13 +16,9 @@
  *
  */
 
+import { afterEach } from 'vitest';
+import { cleanup } from '@testing-library/react';
 
-// Playwright specs are not React Testing Library or Jest tests.
-module.exports = {
-  rules: {
-    'testing-library/prefer-screen-queries': 'off',
-    'jest/valid-title': 'off',
-    'jest/valid-expect': 'off',
-    'jest/no-conditional-expect': 'off',
-  },
-};
+afterEach(() => {
+  cleanup();
+});

@@ -68,7 +68,7 @@ export const AwsCredentials = ({ type, initialValues, values, setValues, setErro
 
   useEffect(() => {
     if (values.secretAccessKey === undefined) {
-      setValues({ secretAccessKey: type === 'create' ? initialValues.secretAccessKey ?? '' : '' });
+      setValues({ secretAccessKey: type === 'create' ? (initialValues.secretAccessKey ?? '') : '' });
     }
   }, [type, initialValues.secretAccessKey, values.secretAccessKey, setValues]);
 
@@ -110,9 +110,9 @@ export const AwsCredentials = ({ type, initialValues, values, setValues, setErro
     return '';
   }, [region]);
 
-  const accessKeyErrorRef = useRef<string>();
-  const secretKeyErrorRef = useRef<string>();
-  const regionErrorRef = useRef<string>();
+  const accessKeyErrorRef = useRef<string>(undefined);
+  const secretKeyErrorRef = useRef<string>(undefined);
+  const regionErrorRef = useRef<string>(undefined);
 
   useEffect(() => {
     syncError('accessKeyId', accessKeyError, setErrors, accessKeyErrorRef);

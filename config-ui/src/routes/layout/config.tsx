@@ -81,18 +81,21 @@ export const menuItems: MenuItem[] = [
 ];
 
 const getMenuMatchs = (items: MenuItem[], parentKey?: string) => {
-  return items.reduce((pre, cur) => {
-    pre[cur.key] = {
-      ...cur,
-      parentKey,
-    };
+  return items.reduce(
+    (pre, cur) => {
+      pre[cur.key] = {
+        ...cur,
+        parentKey,
+      };
 
-    if (cur.children) {
-      pre = { ...pre, ...getMenuMatchs(cur.children, cur.key) };
-    }
+      if (cur.children) {
+        pre = { ...pre, ...getMenuMatchs(cur.children, cur.key) };
+      }
 
-    return pre;
-  }, {} as Record<string, MenuItem & { parentKey?: string }>);
+      return pre;
+    },
+    {} as Record<string, MenuItem & { parentKey?: string }>,
+  );
 };
 
 export const menuItemsMatch = getMenuMatchs(menuItems);
