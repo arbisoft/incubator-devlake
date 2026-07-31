@@ -131,15 +131,23 @@ export const Otel = () => {
           {
             title: 'Credentials',
             width: 220,
-            render: (_, record) => (
-              <Space wrap>
-                {record.credentials.map((credential) => (
-                  <Tag key={credential.id} color={credential.status === 'active' ? 'green' : 'orange'}>
-                    {credential.status}
-                  </Tag>
-                ))}
-              </Space>
-            ),
+            render: (_, record) => {
+              const currentCredentials = record.credentials.filter((credential) => credential.status !== 'revoked');
+
+              return (
+                <Space wrap>
+                  {currentCredentials.length > 0 ? (
+                    currentCredentials.map((credential) => (
+                      <Tag key={credential.id} color={credential.status === 'active' ? 'green' : 'orange'}>
+                        {credential.status}
+                      </Tag>
+                    ))
+                  ) : (
+                    <Tag>revoked</Tag>
+                  )}
+                </Space>
+              );
+            },
           },
           {
             title: 'Updated',
