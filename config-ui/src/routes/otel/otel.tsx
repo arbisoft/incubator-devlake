@@ -146,19 +146,33 @@ export const Otel = () => {
           },
           {
             title: '',
-            width: 260,
+            width: 330,
             render: (_, record) => (
-              <Space>
+              <Space wrap>
                 <Button
                   size="small"
                   icon={<ReloadOutlined />}
-                  disabled={record.connection.status !== 'active'}
+                  disabled={
+                    record.connection.status !== 'active' || record.credentials.some((it) => it.status === 'retiring')
+                  }
                   onClick={() => {
                     setCurrent(record);
                     setModal('rotate');
                   }}
                 >
                   Rotate
+                </Button>
+                <Button
+                  size="small"
+                  danger
+                  icon={<ReloadOutlined />}
+                  disabled={record.connection.status !== 'active' || !record.recoveryRequired}
+                  onClick={() => {
+                    setCurrent(record);
+                    setModal('rotate');
+                  }}
+                >
+                  Recover
                 </Button>
                 <Button
                   size="small"
@@ -227,8 +241,9 @@ export const Otel = () => {
                   <ExternalLink link="https://claude.ai/admin-settings/claude-code">Claude Code managed settings</ExternalLink>.
                 </span>
                 {current?.restartRequired && (
-                  <Message content="Telemetry settings were generated, but endpoint activation needs support attention." />
+                  <Message content={current.restartHint || 'Telemetry settings were generated, but endpoint activation needs support attention.'} />
                 )}
+                {current?.notice && <Message content={current.notice} />}
               </Space>
               <CopyToClipboard text={managedSettings} onCopy={() => message.success('Copy successfully.')}>
                 <Button icon={<CopyOutlined />}>Copy</Button>
@@ -249,7 +264,13 @@ export const Otel = () => {
           onCancel={closeModal}
           onOk={() => handleAction('rotate')}
         >
-          <Message content="The old credential will stay valid as retiring until you finalize rotation." />
+          <Message
+            content={
+              current?.recoveryRequired
+                ? 'The verifier file is unavailable. Existing credentials will be revoked and replaced.'
+                : 'The old credential will stay valid as retiring until you finalize rotation.'
+            }
+          />
         </Modal>
       )}
 

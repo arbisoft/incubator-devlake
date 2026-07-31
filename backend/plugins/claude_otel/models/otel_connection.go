@@ -68,9 +68,11 @@ type OtelManagedSettings struct {
 }
 
 type OtelConnectionWithCredentials struct {
-	Connection      *OtelConnection      `json:"connection"`
-	Credentials     []*OtelCredential    `json:"credentials"`
-	ManagedSettings *OtelManagedSettings `json:"managedSettings,omitempty"`
-	RestartRequired bool                 `json:"restartRequired"`
-	RestartHint     string               `json:"restartHint,omitempty"`
+	Connection       *OtelConnection      `json:"connection"`
+	Credentials      []*OtelCredential    `json:"credentials"`
+	ManagedSettings  *OtelManagedSettings `json:"managedSettings,omitempty"`
+	RestartRequired  bool                 `json:"restartRequired"`
+	RestartHint      string               `json:"restartHint,omitempty"`
+	RecoveryRequired bool                 `json:"recoveryRequired"`
+	Notice           string               `json:"notice,omitempty"`
 }
