@@ -21,6 +21,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import {
   DBMigrate,
   Onboard,
+  Otel,
   Error,
   Layout,
   layoutLoader,
@@ -115,6 +116,10 @@ export const router = createBrowserRouter([
       {
         path: 'keys',
         element: <ApiKeys />,
+      },
+      {
+        path: 'otel',
+        element: <Otel />,
       },
     ],
   },

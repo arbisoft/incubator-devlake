@@ -1,10 +1,18 @@
 services:
+  otel-auth-init:
+    image: busybox:1.36
+    command: ["sh", "-c", "chown -R 1010:1010 /auth && touch /auth/.htpasswd && chmod 755 /auth && chmod 644 /auth/.htpasswd"]
+    volumes:
+      - otel-auth:/auth
+    restart: "no"
+
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.157.0
     container_name: otel-collector-prod
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     volumes:
       - ./collector-config-production.yaml:/etc/otelcol-contrib/config.yaml
+      - otel-auth:/etc/otelcol-contrib/auth:ro
     ports:
       # OTLP ingest - exposed so clients (e.g. Claude Code) can send telemetry.
       # Restrict via firewall/security group to trusted sources in production.
@@ -23,6 +31,9 @@ services:
           cpus: '1'
           memory: 512M
     restart: unless-stopped
+    depends_on:
+      otel-auth-init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:13133/healthz"]
       interval: 30s
@@ -64,6 +75,27 @@ services:
       retries: 3
       start_period: 10s
 
+  otel-restart-helper:
+    build:
+      context: ./restart-helper
+    container_name: otel-restart-helper-prod
+    environment:
+      OTEL_RESTART_HELPER_TOKEN: "${OTEL_RESTART_HELPER_TOKEN:?set OTEL_RESTART_HELPER_TOKEN}"
+      OTEL_RESTART_CONTAINER: "${OTEL_RESTART_CONTAINER:-otel-collector-prod}"
+      OTEL_COLLECTOR_HEALTH_URL: "${OTEL_COLLECTOR_HEALTH_URL:-http://otel-collector-prod:13133/healthz}"
+      OTEL_RESTART_TIMEOUT_SECONDS: "${OTEL_RESTART_TIMEOUT_SECONDS:-45}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "127.0.0.1:9199:9199"
+    restart: unless-stopped
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+
 volumes:
+  otel-auth:
+    name: devlake-otel-auth
+    driver: local
   prometheus-data:
     driver: local

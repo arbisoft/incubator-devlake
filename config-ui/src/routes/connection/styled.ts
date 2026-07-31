@@ -87,6 +87,18 @@ export const Wrapper = styled.div<{ theme: string }>`
         width: 100%;
         height: 100%;
       }
+
+      &.ant-icon-logo {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: ${({ theme }) => theme};
+        font-size: 52px;
+
+        & > .anticon {
+          line-height: 1;
+        }
+      }
     }
 
     & > .name {

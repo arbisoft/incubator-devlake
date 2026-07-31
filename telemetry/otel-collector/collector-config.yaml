@@ -3,8 +3,12 @@ receivers:
     protocols:
       grpc:
         endpoint: 0.0.0.0:4317
+        auth:
+          authenticator: basicauth/server
       http:
         endpoint: 0.0.0.0:4318
+        auth:
+          authenticator: basicauth/server
 
 processors:
   deltatocumulative: {}
@@ -25,9 +29,12 @@ exporters:
 extensions:
   health_check:
     endpoint: 0.0.0.0:13133
+  basicauth/server:
+    htpasswd:
+      file: /etc/otelcol-contrib/auth/.htpasswd
 
 service:
-  extensions: [health_check]
+  extensions: [health_check, basicauth/server]
   pipelines:
     metrics:
       receivers: [otlp]
