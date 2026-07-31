@@ -95,6 +95,9 @@ export const Otel = () => {
           Generate Claude Settings
         </Button>
       </Flex>
+      {dataSource.some((connection) => connection.recoveryRequired) && (
+        <Message content="The Collector credential verifier is unavailable. Revoke the affected connection, then generate new Claude settings to restore telemetry." />
+      )}
       <Table
         rowKey={(record) => record.connection.id}
         size="middle"
@@ -146,7 +149,7 @@ export const Otel = () => {
           },
           {
             title: '',
-            width: 330,
+            width: 250,
             render: (_, record) => (
               <Space wrap>
                 <Button
@@ -161,18 +164,6 @@ export const Otel = () => {
                   }}
                 >
                   Rotate
-                </Button>
-                <Button
-                  size="small"
-                  danger
-                  icon={<ReloadOutlined />}
-                  disabled={record.connection.status !== 'active' || !record.recoveryRequired}
-                  onClick={() => {
-                    setCurrent(record);
-                    setModal('rotate');
-                  }}
-                >
-                  Recover
                 </Button>
                 <Button
                   size="small"
@@ -243,7 +234,6 @@ export const Otel = () => {
                 {current?.restartRequired && (
                   <Message content={current.restartHint || 'Telemetry settings were generated, but endpoint activation needs support attention.'} />
                 )}
-                {current?.notice && <Message content={current.notice} />}
               </Space>
               <CopyToClipboard text={managedSettings} onCopy={() => message.success('Copy successfully.')}>
                 <Button icon={<CopyOutlined />}>Copy</Button>
@@ -264,13 +254,7 @@ export const Otel = () => {
           onCancel={closeModal}
           onOk={() => handleAction('rotate')}
         >
-          <Message
-            content={
-              current?.recoveryRequired
-                ? 'The verifier file is unavailable. Existing credentials will be revoked and replaced.'
-                : 'The old credential will stay valid as retiring until you finalize rotation.'
-            }
-          />
+          <Message content="The old credential will stay valid as retiring until you finalize rotation." />
         </Modal>
       )}
 

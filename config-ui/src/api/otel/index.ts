@@ -50,7 +50,6 @@ export type OtelConnectionResponse = {
   restartRequired: boolean;
   restartHint?: string;
   recoveryRequired: boolean;
-  notice?: string;
 };
 
 const basePath = '/plugins/claude_otel/connections';

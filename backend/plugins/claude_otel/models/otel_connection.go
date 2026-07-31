@@ -74,5 +74,4 @@ type OtelConnectionWithCredentials struct {
 	RestartRequired  bool                 `json:"restartRequired"`
 	RestartHint      string               `json:"restartHint,omitempty"`
 	RecoveryRequired bool                 `json:"recoveryRequired"`
-	Notice           string               `json:"notice,omitempty"`
 }

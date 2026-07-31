@@ -48,7 +48,6 @@ const (
 	defaultOtelProtocol         = "grpc"
 	defaultOtelConnectionName   = "Claude Code OTel"
 	collectorRestartHint        = "Telemetry endpoint is applying credential changes"
-	credentialRecoveryNotice    = "The credential verifier file was reset. Previous credentials were revoked; copy the new settings."
 	defaultOtelRestartTimeout   = 45
 )
 
@@ -150,7 +149,7 @@ func CreateOtelConnection(user *common.User, input *OtelConnectionInput) (*model
 	if err := db.Update(credential); err != nil {
 		return nil, errors.Default.Wrap(err, "error recording otel credential activation")
 	}
-	return responseWithSettings(connection, credentials, credential, password, ""), nil
+	return responseWithSettings(connection, credentials, credential, password), nil
 }
 
 func RotateOtelConnection(user *common.User, id uint64) (*models.OtelConnectionWithCredentials, errors.Error) {
@@ -173,22 +172,19 @@ func RotateOtelConnection(user *common.User, id uint64) (*models.OtelConnectionW
 	if err != nil {
 		return nil, err
 	}
-	// Reissue safely when the mounted verifier file was lost.
-	recovering, err := missingHtpasswdHashes(activeCredentials)
+	missingVerifier, err := missingHtpasswdHashes(activeCredentials)
 	if err != nil {
 		return nil, err
 	}
-	if !recovering && hasRetiringCredential(activeCredentials) {
+	if missingVerifier {
+		return nil, errors.BadInput.New("credential verifier is unavailable; revoke this connection and create a new one")
+	}
+	if hasRetiringCredential(activeCredentials) {
 		return nil, errors.BadInput.New("finalize the current credential rotation before starting another")
 	}
 	for _, credential := range activeCredentials {
 		credential.PendingCollectorRestart = true
 		credential.LastCollectorRestartHint = collectorRestartHint
-		if recovering {
-			credential.Status = models.OtelCredentialStatusRevoked
-			credential.RevokedAt = &now
-			continue
-		}
 		credential.Status = models.OtelCredentialStatusRetiring
 		credential.RotatedAt = &now
 	}
@@ -198,9 +194,6 @@ func RotateOtelConnection(user *common.User, id uint64) (*models.OtelConnectionW
 		return nil, err
 	}
 	nextCredentials := append(activeCredentials, newCredential)
-	if recovering {
-		nextCredentials = []*models.OtelCredential{newCredential}
-	}
 	affectedCredentials := append(activeCredentials, newCredential)
 	for _, credential := range activeCredentials {
 		if err := db.Update(credential); err != nil {
@@ -226,11 +219,7 @@ func RotateOtelConnection(user *common.User, id uint64) (*models.OtelConnectionW
 	if err := db.Update(connection); err != nil {
 		return nil, errors.Default.Wrap(err, "error updating otel connection")
 	}
-	notice := ""
-	if recovering {
-		notice = credentialRecoveryNotice
-	}
-	return responseWithSettings(connection, affectedCredentials, newCredential, password, notice), nil
+	return responseWithSettings(connection, affectedCredentials, newCredential, password), nil
 }
 
 func RevokeOtelConnection(user *common.User, id uint64) (*models.OtelConnectionWithCredentials, errors.Error) {
@@ -454,7 +443,7 @@ func createOtelCredential(connectionId uint64) (*models.OtelCredential, string, 
 	return credential, password, nil
 }
 
-func responseWithSettings(connection *models.OtelConnection, credentials []*models.OtelCredential, credential *models.OtelCredential, password, notice string) *models.OtelConnectionWithCredentials {
+func responseWithSettings(connection *models.OtelConnection, credentials []*models.OtelCredential, credential *models.OtelCredential, password string) *models.OtelConnectionWithCredentials {
 	header := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", credential.Username, password)))
 	return &models.OtelConnectionWithCredentials{
 		Connection:  connection,
@@ -472,7 +461,6 @@ func responseWithSettings(connection *models.OtelConnection, credentials []*mode
 		}},
 		RestartRequired: hasPendingCollectorRestart(credentials),
 		RestartHint:     restartHint(credentials),
-		Notice:          notice,
 	}
 }
 
