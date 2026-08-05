@@ -11,6 +11,19 @@ receivers:
           authenticator: basicauth/server
 
 processors:
+  attributes/team:
+    actions:
+      # Stamp the verified credential's team slug instead of trusting client input.
+      - key: devlake_team
+        action: delete
+      - key: devlake_auth_username
+        from_context: auth.username
+        action: upsert
+      - key: devlake_auth_username
+        pattern: "^otel_(?P<devlake_team>[a-z0-9]+(?:-[a-z0-9]+)*)_[a-z0-9]+$"
+        action: extract
+      - key: devlake_auth_username
+        action: delete
   memory_limiter:
     check_interval: 1s
     limit_percentage: 80
@@ -41,5 +54,5 @@ service:
   pipelines:
     metrics:
       receivers: [otlp]
-      processors: [memory_limiter, deltatocumulative, batch]
+      processors: [memory_limiter, attributes/team, deltatocumulative, batch]
       exporters: [prometheus]

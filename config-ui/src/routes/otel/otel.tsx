@@ -26,7 +26,7 @@ import {
   SyncOutlined,
 } from '@ant-design/icons';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
-import { Button, Flex, message, Modal, Space, Table, Tag } from 'antd';
+import { Button, Flex, Input, message, Modal, Space, Table, Tag } from 'antd';
 
 import API from '@/api';
 import type { OtelConnectionResponse } from '@/api/otel';
@@ -35,13 +35,14 @@ import { PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
 import { formatTime, operator } from '@/utils';
 
-type ModalState = 'snippet' | 'rotate' | 'revoke' | 'finalize' | 'apply';
+type ModalState = 'create' | 'snippet' | 'rotate' | 'revoke' | 'finalize' | 'apply';
 
 export const Otel = () => {
   const [version, setVersion] = useState(1);
   const [operating, setOperating] = useState(false);
   const [modal, setModal] = useState<ModalState>();
   const [current, setCurrent] = useState<OtelConnectionResponse>();
+  const [teamName, setTeamName] = useState('');
 
   const { data, ready } = useRefreshData(() => API.otel.list(), [version]);
   const dataSource = useMemo(() => data ?? [], [data]);
@@ -54,9 +55,10 @@ export const Otel = () => {
   const closeModal = () => setModal(undefined);
 
   const handleCreate = async () => {
-    const [success, res] = await operator(() => API.otel.create({ name: 'Claude Code OTel' }), { setOperating });
+    const [success, res] = await operator(() => API.otel.create({ teamName }), { setOperating });
     if (success) {
       setCurrent(res);
+      setTeamName('');
       setModal('snippet');
       refresh();
     }
@@ -89,8 +91,7 @@ export const Otel = () => {
           type="primary"
           icon={<PlusOutlined />}
           loading={operating}
-          disabled={dataSource.some((connection) => connection.connection.status === 'active')}
-          onClick={handleCreate}
+          onClick={() => setModal('create')}
         >
           Generate Claude Settings
         </Button>
@@ -105,8 +106,13 @@ export const Otel = () => {
         dataSource={dataSource}
         columns={[
           {
-            title: 'Name',
-            dataIndex: ['connection', 'name'],
+            title: 'Team',
+            dataIndex: ['connection', 'teamName'],
+            width: 220,
+          },
+          {
+            title: 'Team slug',
+            dataIndex: ['connection', 'teamSlug'],
             width: 220,
           },
           {
@@ -212,6 +218,30 @@ export const Otel = () => {
           },
         ]}
       />
+
+      {modal === 'create' && (
+        <Modal
+          open
+          centered
+          title="Generate Claude Settings"
+          okText="Generate"
+          okButtonProps={{ loading: operating, disabled: !teamName.trim() }}
+          onCancel={closeModal}
+          onOk={handleCreate}
+        >
+          <Space direction="vertical" size={8} style={{ width: '100%' }}>
+            <span>Team name</span>
+            <Input
+              autoFocus
+              maxLength={255}
+              placeholder="Platform Engineering"
+              value={teamName}
+              onChange={(event) => setTeamName(event.target.value)}
+            />
+            <Message content="The team name and its derived reporting slug cannot be changed later." />
+          </Space>
+        </Modal>
+      )}
 
       {modal === 'snippet' && (
         <Modal open width={900} centered title="Claude managed settings" footer={null} onCancel={closeModal}>

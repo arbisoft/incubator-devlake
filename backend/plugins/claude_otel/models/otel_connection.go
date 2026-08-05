@@ -35,6 +35,8 @@ const (
 type OtelConnection struct {
 	common.Model
 	Name              string `json:"name" gorm:"type:varchar(255)"`
+	TeamName          string `json:"teamName" gorm:"type:varchar(255)"`
+	TeamSlug          string `json:"teamSlug" gorm:"type:varchar(63);uniqueIndex"`
 	CollectorEndpoint string `json:"collectorEndpoint" gorm:"type:varchar(255)"`
 	Protocol          string `json:"protocol" gorm:"type:varchar(32)"`
 	Status            string `json:"status" gorm:"type:varchar(32);index"`

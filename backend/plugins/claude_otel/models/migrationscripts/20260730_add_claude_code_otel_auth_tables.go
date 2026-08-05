@@ -34,6 +34,8 @@ type addClaudeCodeOtelAuthTables struct{}
 type otelConnection20260730 struct {
 	archived.Model
 	Name              string `gorm:"type:varchar(255)"`
+	TeamName          string `gorm:"type:varchar(255)"`
+	TeamSlug          string `gorm:"type:varchar(63);uniqueIndex"`
 	CollectorEndpoint string `gorm:"type:varchar(255)"`
 	Protocol          string `gorm:"type:varchar(32)"`
 	Status            string `gorm:"type:varchar(32);index"`

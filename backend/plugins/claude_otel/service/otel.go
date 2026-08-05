@@ -47,6 +47,8 @@ const (
 	defaultOtelPublicEndpoint   = "https://otel.customer.example.com:4317"
 	defaultOtelProtocol         = "grpc"
 	defaultOtelConnectionName   = "Claude Code OTel"
+	maxOtelTeamNameLength       = 255
+	maxOtelTeamSlugLength       = 63
 	collectorRestartHint        = "Telemetry endpoint is applying credential changes"
 	defaultOtelRestartTimeout   = 45
 )
@@ -64,7 +66,7 @@ func Init(basicRes corecontext.BasicRes) {
 }
 
 type OtelConnectionInput struct {
-	Name string `json:"name"`
+	TeamName string `json:"teamName"`
 }
 
 func ListOtelConnections() ([]*models.OtelConnectionWithCredentials, errors.Error) {
@@ -107,18 +109,24 @@ func CreateOtelConnection(user *common.User, input *OtelConnectionInput) (*model
 	if err := validateOtelSettings(endpoint, protocol); err != nil {
 		return nil, err
 	}
-	activeCount, err := db.Count(
+	teamName, teamSlug, err := normalizeOtelTeam(input.TeamName)
+	if err != nil {
+		return nil, err
+	}
+	connectionCount, err := db.Count(
 		dal.From(&models.OtelConnection{}),
-		dal.Where("status = ?", models.OtelConnectionStatusActive),
+		dal.Where("team_slug = ?", teamSlug),
 	)
 	if err != nil {
-		return nil, errors.Default.Wrap(err, "error checking active otel connections")
+		return nil, errors.Default.Wrap(err, "error checking otel team connection")
 	}
-	if activeCount > 0 {
-		return nil, errors.BadInput.New("an active Claude Code OTel connection already exists")
+	if connectionCount > 0 {
+		return nil, errors.BadInput.New("a Claude Code OTel connection already exists for this team")
 	}
 	connection := &models.OtelConnection{
-		Name:              firstNonEmpty(input.Name, defaultOtelConnectionName),
+		Name:              fmt.Sprintf("%s: %s", defaultOtelConnectionName, teamName),
+		TeamName:          teamName,
+		TeamSlug:          teamSlug,
 		CollectorEndpoint: endpoint,
 		Protocol:          protocol,
 		Status:            models.OtelConnectionStatusActive,
@@ -130,7 +138,7 @@ func CreateOtelConnection(user *common.User, input *OtelConnectionInput) (*model
 		return nil, errors.Default.Wrap(err, "error creating otel connection")
 	}
 
-	credential, password, err := createOtelCredential(connection.ID)
+	credential, password, err := createOtelCredential(connection.ID, connection.TeamSlug)
 	if err != nil {
 		_ = db.Delete(connection)
 		return nil, err
@@ -140,7 +148,7 @@ func CreateOtelConnection(user *common.User, input *OtelConnectionInput) (*model
 		_ = db.Delete(connection)
 		return nil, errors.Default.Wrap(err, "error saving otel credential")
 	}
-	if err := writeHtpasswd(credentials, map[string]string{credential.Username: password}); err != nil {
+	if err := writeHtpasswd(map[string]string{credential.Username: password}); err != nil {
 		_ = db.Delete(credential)
 		_ = db.Delete(connection)
 		return nil, err
@@ -189,11 +197,10 @@ func RotateOtelConnection(user *common.User, id uint64) (*models.OtelConnectionW
 		credential.RotatedAt = &now
 	}
 
-	newCredential, password, err := createOtelCredential(id)
+	newCredential, password, err := createOtelCredential(id, connection.TeamSlug)
 	if err != nil {
 		return nil, err
 	}
-	nextCredentials := append(activeCredentials, newCredential)
 	affectedCredentials := append(activeCredentials, newCredential)
 	for _, credential := range activeCredentials {
 		if err := db.Update(credential); err != nil {
@@ -204,7 +211,7 @@ func RotateOtelConnection(user *common.User, id uint64) (*models.OtelConnectionW
 		restoreActiveCredentials(activeCredentials)
 		return nil, errors.Default.Wrap(err, "error saving rotated otel credential")
 	}
-	if err := writeHtpasswd(nextCredentials, map[string]string{newCredential.Username: password}); err != nil {
+	if err := writeHtpasswd(map[string]string{newCredential.Username: password}); err != nil {
 		_ = db.Delete(newCredential)
 		restoreActiveCredentials(activeCredentials)
 		return nil, err
@@ -251,7 +258,7 @@ func RevokeOtelConnection(user *common.User, id uint64) (*models.OtelConnectionW
 	if err := db.Update(connection); err != nil {
 		return nil, errors.Default.Wrap(err, "error revoking otel connection")
 	}
-	if err := writeHtpasswd([]*models.OtelCredential{}, nil); err != nil {
+	if err := writeHtpasswd(nil); err != nil {
 		return nil, err
 	}
 	applyErr := applyOtelCredentialChanges(credentials)
@@ -285,15 +292,12 @@ func FinalizeOtelRotation(user *common.User, id uint64) (*models.OtelConnectionW
 	if err != nil {
 		return nil, err
 	}
-	activeOnly := make([]*models.OtelCredential, 0)
 	for _, credential := range credentials {
 		if credential.Status == models.OtelCredentialStatusRetiring {
 			credential.Status = models.OtelCredentialStatusRevoked
 			credential.RevokedAt = &now
 			credential.PendingCollectorRestart = true
 			credential.LastCollectorRestartHint = collectorRestartHint
-		} else {
-			activeOnly = append(activeOnly, credential)
 		}
 	}
 	for _, credential := range credentials {
@@ -305,7 +309,7 @@ func FinalizeOtelRotation(user *common.User, id uint64) (*models.OtelConnectionW
 	if err := db.Update(connection); err != nil {
 		return nil, errors.Default.Wrap(err, "error updating otel connection")
 	}
-	if err := writeHtpasswd(activeOnly, nil); err != nil {
+	if err := writeHtpasswd(nil); err != nil {
 		return nil, err
 	}
 	applyErr := applyOtelCredentialChanges(credentials)
@@ -335,11 +339,7 @@ func ApplyOtelConnection(user *common.User, id uint64) (*models.OtelConnectionWi
 	if err != nil {
 		return nil, err
 	}
-	credentials, err := getOtelCredentialsByStatuses(id, models.OtelCredentialStatusActive, models.OtelCredentialStatusRetiring)
-	if err != nil {
-		return nil, err
-	}
-	if err := writeHtpasswd(credentials, nil); err != nil {
+	if err := writeHtpasswd(nil); err != nil {
 		return nil, err
 	}
 	allCredentials, err := getOtelCredentials(id)
@@ -424,7 +424,7 @@ func getOtelCredentialsByStatuses(connectionId uint64, statuses ...string) ([]*m
 	return credentials, nil
 }
 
-func createOtelCredential(connectionId uint64) (*models.OtelCredential, string, errors.Error) {
+func createOtelCredential(connectionId uint64, teamSlug string) (*models.OtelCredential, string, errors.Error) {
 	idPart, err := utils.RandLetterBytes(14)
 	if err != nil {
 		return nil, "", err
@@ -435,7 +435,7 @@ func createOtelCredential(connectionId uint64) (*models.OtelCredential, string, 
 	}
 	credential := &models.OtelCredential{
 		ConnectionId:             connectionId,
-		Username:                 fmt.Sprintf("otel_%s", strings.ToLower(idPart)),
+		Username:                 fmt.Sprintf("otel_%s_%s", teamSlug, strings.ToLower(idPart)),
 		Status:                   models.OtelCredentialStatusActive,
 		PendingCollectorRestart:  true,
 		LastCollectorRestartHint: collectorRestartHint,
@@ -515,13 +515,17 @@ func callOtelRestartHelper() errors.Error {
 	return errors.Default.New(fmt.Sprintf("otel restart helper failed with status %d: %s", res.StatusCode, strings.TrimSpace(string(body))))
 }
 
-func writeHtpasswd(credentials []*models.OtelCredential, newPasswords map[string]string) errors.Error {
+func writeHtpasswd(newPasswords map[string]string) errors.Error {
 	path := firstNonEmpty(cfg.GetString("OTEL_AUTH_HTPASSWD_PATH"), defaultOtelAuthHtpasswdPath)
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return errors.Default.Wrap(err, "error creating otel auth directory")
 	}
 
 	existing, err := readHtpasswd(path)
+	if err != nil {
+		return err
+	}
+	credentials, err := getAllActiveOtelCredentials()
 	if err != nil {
 		return err
 	}
@@ -549,6 +553,52 @@ func writeHtpasswd(credentials []*models.OtelCredential, newPasswords map[string
 		content = strings.Join(lines, "\n") + "\n"
 	}
 	return writeFileAtomic(path, content)
+}
+
+// getAllActiveOtelCredentials rebuilds the shared verifier from every active team.
+func getAllActiveOtelCredentials() ([]*models.OtelCredential, errors.Error) {
+	credentials := make([]*models.OtelCredential, 0)
+	err := db.All(
+		&credentials,
+		dal.Where("status IN ?", []string{models.OtelCredentialStatusActive, models.OtelCredentialStatusRetiring}),
+		dal.Orderby("created_at ASC"),
+	)
+	if err != nil {
+		return nil, errors.Default.Wrap(err, "error getting active otel credentials")
+	}
+	return credentials, nil
+}
+
+func normalizeOtelTeam(raw string) (string, string, errors.Error) {
+	teamName := strings.TrimSpace(raw)
+	if teamName == "" {
+		return "", "", errors.BadInput.New("team name is required")
+	}
+	if len(teamName) > maxOtelTeamNameLength {
+		return "", "", errors.BadInput.New("team name must be 255 characters or fewer")
+	}
+
+	var slug strings.Builder
+	needsDash := false
+	for _, char := range strings.ToLower(teamName) {
+		if (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') {
+			if needsDash && slug.Len() > 0 {
+				slug.WriteByte('-')
+			}
+			slug.WriteRune(char)
+			needsDash = false
+			continue
+		}
+		needsDash = slug.Len() > 0
+	}
+	teamSlug := slug.String()
+	if teamSlug == "" {
+		return "", "", errors.BadInput.New("team name must contain letters or numbers")
+	}
+	if len(teamSlug) > maxOtelTeamSlugLength {
+		return "", "", errors.BadInput.New("team name produces a slug longer than 63 characters")
+	}
+	return teamName, teamSlug, nil
 }
 
 func missingHtpasswdHashes(credentials []*models.OtelCredential) (bool, errors.Error) {

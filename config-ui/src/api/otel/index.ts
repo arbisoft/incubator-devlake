@@ -21,6 +21,8 @@ import { request } from '@/utils';
 export type OtelConnection = {
   id: ID;
   name: string;
+  teamName: string;
+  teamSlug: string;
   collectorEndpoint: string;
   protocol: string;
   status: string;
@@ -56,7 +58,7 @@ const basePath = '/plugins/claude_otel/connections';
 
 export const list = (): Promise<OtelConnectionResponse[]> => request(basePath);
 
-export const create = (data: { name?: string }) =>
+export const create = (data: { teamName: string }) =>
   request(basePath, {
     method: 'POST',
     data,
