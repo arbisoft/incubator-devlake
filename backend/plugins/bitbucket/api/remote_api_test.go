@@ -77,6 +77,8 @@ func TestListBitbucketWorkspaces_ReturnsNextPage(t *testing.T) {
 	children, nextPage, err := listBitbucketWorkspaces(client, BitbucketRemotePagination{Page: 1, PageLen: 1})
 	assert.Nil(t, err)
 	assert.Len(t, children, 1)
+	assert.Equal(t, "ws-a", children[0].Name)
+	assert.Equal(t, "ws-a", children[0].FullName)
 	if assert.NotNil(t, nextPage) {
 		assert.Equal(t, 2, nextPage.Page)
 	}

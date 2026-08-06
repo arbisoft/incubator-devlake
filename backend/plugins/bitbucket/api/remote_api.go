@@ -101,10 +101,11 @@ func listBitbucketWorkspaces(
 	}
 	for _, r := range resBody.Values {
 		children = append(children, dsmodels.DsRemoteApiScopeListEntry[models.BitbucketRepo]{
-			Type:     api.RAS_ENTRY_TYPE_GROUP,
-			Id:       r.GroupId(),
-			Name:     r.GroupName(),
-			FullName: r.GroupName(),
+			Type: api.RAS_ENTRY_TYPE_GROUP,
+			Id:   r.GroupId(),
+			// Slug is always present while the workspace name can be empty.
+			Name:     r.GroupId(),
+			FullName: r.GroupId(),
 		})
 	}
 	if resBody.Next != "" {
