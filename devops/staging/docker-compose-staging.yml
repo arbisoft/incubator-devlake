@@ -106,9 +106,13 @@ services:
 
   devlake:
     image: arbisoft/devlake:${APP_VERSION:?APP_VERSION must be set in .env}
+    # linux/amd64 only — stock backend/Dockerfile also builds an arm64 stage
+    # that fails with "exec format error" on this single-arch staging VM.
+    platform: linux/amd64
     build:
       context: ../../backend
-      dockerfile: Dockerfile
+      # Path is relative to context (backend/), not this compose file.
+      dockerfile: ../devops/staging/Dockerfile.devlake
       args:
         TAG: ${APP_VERSION}
         SHA: ${GIT_SHA:-unknown}

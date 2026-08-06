@@ -83,7 +83,8 @@ Confirm it is there and yours:
 ls -ld /opt/devlake/incubator-devlake/devops/staging
 ls /opt/devlake/incubator-devlake/backend/Dockerfile \
    /opt/devlake/incubator-devlake/config-ui/Dockerfile \
-   /opt/devlake/incubator-devlake/grafana/Dockerfile
+   /opt/devlake/incubator-devlake/grafana/Dockerfile \
+   /opt/devlake/incubator-devlake/devops/staging/Dockerfile.devlake
 ```
 
 If the clone is missing:
@@ -156,6 +157,7 @@ volume root. The first image build also needs several GB of BuildKit cache
 ```bash
 cd /opt/devlake/incubator-devlake/devops/staging
 # first build is slow; later rebuilds reuse local BuildKit layers
+# devlake uses Dockerfile.devlake (amd64-only); config-ui/grafana use their stock Dockerfiles
 DOCKER_BUILDKIT=1 docker compose -f docker-compose-staging.yml build
 docker compose -f docker-compose-staging.yml up -d
 docker compose -f docker-compose-staging.yml ps
@@ -339,10 +341,12 @@ back to `service_healthy`.
 
 Deliberate, and tracked rather than fixed here:
 
-- **First build is heavy.** `backend/Dockerfile` compiles libgit2 and the full
-  Go plugin set; `config-ui` runs yarn; `grafana` installs plugins. Expect a
-  long first `compose build` on a 4 vCPU / 8 GB VM. Subsequent builds reuse
-  local BuildKit layers. The CI workflow in `build-and-push.yml` splits
+- **First build is heavy.** Staging uses `Dockerfile.devlake` (amd64-only
+  override of `backend/Dockerfile`) so the build does not need QEMU for the
+  upstream arm64 stage. It still compiles libgit2 and the full Go plugin set;
+  `config-ui` runs yarn; `grafana` installs plugins. Expect a long first
+  `compose build` on a 4 vCPU / 8 GB VM. Subsequent builds reuse local
+  BuildKit layers. The CI workflow in `build-and-push.yml` splits
   `builder` / `base` / `build` stages across ECR for ephemeral runners — that
   split is unnecessary on this long-lived host.
 - **No backups.** With `--skip-log-bin` there is no point-in-time recovery, so
