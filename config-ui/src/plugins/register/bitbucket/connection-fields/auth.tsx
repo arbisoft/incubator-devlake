@@ -45,10 +45,10 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
   useEffect(() => {
     const required = (values.username && values.password) || type === 'update';
     setErrors({
-      endpoint: !values.endpoint ? 'endpoint is required' : '',
+      endpoint: !(values.endpoint ?? initialValues.endpoint) ? 'endpoint is required' : '',
       auth: required ? '' : 'auth is required',
     });
-  }, [values]);
+  }, [values, type, initialValues.endpoint]);
 
   const handleChangeEndpoint = (e: React.ChangeEvent<HTMLInputElement>) => {
     setValues({
