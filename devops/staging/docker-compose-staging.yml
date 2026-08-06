@@ -1,0 +1,338 @@
+# Apache DevLake - staging deployment (single VM, 4 vCPU / 8 GB).
+#
+# Run from this directory so that ./nginx.conf, ./allowed-emails.txt, ./mysql
+# and .env resolve:
+#   docker compose -f docker-compose-staging.yml up -d
+#
+# See README.md for the one-time host setup this file depends on.
+#
+# ---------------------------------------------------------------------------
+# Images
+#
+# Built locally from this checkout (same pattern as docker-compose-dev.yml and
+# the contexts in devops/staging/build-and-push.yml). Run compose from
+# devops/staging/ so relative contexts resolve:
+#   ../../backend   -> repo-root/backend
+#   ../../config-ui -> repo-root/config-ui
+#   ../../grafana   -> repo-root/grafana
+#
+# On the staging host that means the full clone lives at e.g.
+#   /opt/devlake/incubator-devlake
+# and this file at
+#   /opt/devlake/incubator-devlake/devops/staging/docker-compose-staging.yml
+#
+# APP_VERSION / GRAFANA_VERSION are local image tags only (not Docker Hub
+# pins). Keep them equal unless you have a reason not to. Optional GIT_SHA is
+# baked into the lake binary via the Dockerfile's TAG/SHA build-args.
+#
+# First build is slow (Go + libgit2 + yarn + Grafana plugins). Later rebuilds
+# reuse the host's BuildKit layer cache - no CI-style builder/base job split
+# is needed on a long-lived VM.
+#
+#   docker compose -f docker-compose-staging.yml build
+#   docker compose -f docker-compose-staging.yml up -d
+# ---------------------------------------------------------------------------
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+services:
+  mysql:
+    image: mysql:8.0.43
+    container_name: devlake-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD must be set in .env}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?MYSQL_DATABASE must be set in .env}
+      MYSQL_USER: ${MYSQL_USER:?MYSQL_USER must be set in .env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD must be set in .env}
+      # Consumed by mysql/initdb/01-grafana-ro.sh on first initialisation.
+      GRAFANA_DB_USER: ${GRAFANA_DB_USER:?GRAFANA_DB_USER must be set in .env}
+      GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD:?GRAFANA_DB_PASSWORD must be set in .env}
+      TZ: UTC
+    # utf8mb4_bin matches every upstream DevLake compose and is REQUIRED: the
+    # MySQL 8.0 default (utf8mb4_0900_ai_ci) is case- and accent-insensitive,
+    # and DevLake's didgen domain IDs are case-sensitive composite strings that
+    # can then collide on unique keys. Must be set before first initialisation;
+    # changing it later means converting every table.
+    #
+    # --default-authentication-plugin is deliberately absent: go-sql-driver
+    # has handled caching_sha2_password since v1.5, the option is deprecated in
+    # 8.0.34 and REMOVED in 8.4, and no upstream DevLake compose sets it.
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_bin
+      - --skip-log-bin
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - type: bind
+        source: ./mysql/devlake.cnf
+        target: /etc/mysql/conf.d/devlake.cnf
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./mysql/initdb
+        target: /docker-entrypoint-initdb.d
+        read_only: true
+        bind:
+          create_host_path: false
+      # Scratch volume for MySQL's filesort / temp-table spill, which is also
+      # MySQL's default tmpdir - so no config override is needed.
+      #
+      # /tmp specifically: an empty named volume inherits the ownership and
+      # mode of the image directory it is mounted over, and /tmp is 1777 in the
+      # mysql image, so mysqld (uid 999) can write to it with no chown. A
+      # volume over a path absent from the image would be created root:root and
+      # unwritable. Docker creates this on first `up`; no host setup.
+      - mysql_tmp:/tmp
+    mem_limit: 3g
+    cpus: 2.0
+    networks:
+      - backend
+    logging: *default-logging
+    # No credentials in the probe: they would sit in `docker inspect` output and
+    # trigger a mysqladmin warning every interval. `ping` reports success even
+    # when auth is rejected, which still proves the daemon is accepting TCP.
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  devlake:
+    image: arbisoft/devlake:${APP_VERSION:?APP_VERSION must be set in .env}
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+      args:
+        TAG: ${APP_VERSION}
+        SHA: ${GIT_SHA:-unknown}
+    container_name: devlake-app
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    # Compose already treats a missing env_file as a hard error, and every
+    # variable it must supply is ${VAR:?}-guarded below.
+    env_file:
+      - .env
+    environment:
+      DB_URL: mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}?charset=utf8mb4&parseTime=True&loc=UTC
+      ENCRYPTION_SECRET: ${ENCRYPTION_SECRET:?ENCRYPTION_SECRET must be set in .env}
+      LOGGING_DIR: /app/logs
+      TZ: UTC
+    # NOT published to the host. DevLake's API-key middleware guards /rest
+    # paths only and AUTH_ENABLED defaults to false, so a published 8080 is an
+    # unauthenticated admin API on the VM's interface. Ingress is nginx's
+    # /api/ location, which gates on oauth2-proxy. For host-local debugging
+    # use `ports: ["127.0.0.1:8080:8080"]`, never a bare 8080:8080.
+    expose:
+      - "8080"
+    volumes:
+      # backend/Dockerfile declares VOLUME /app/logs, so without a named volume
+      # here every container recreate leaks an anonymous one that nothing
+      # garbage-collects - and the logs vanish exactly when you want them.
+      - devlake_logs:/app/logs
+    networks:
+      - backend
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      # Schema migrations on first boot can take a while.
+      start_period: 120s
+
+  config-ui:
+    image: arbisoft/devlake-config-ui:${APP_VERSION:?APP_VERSION must be set in .env}
+    build:
+      context: ../../config-ui
+      dockerfile: Dockerfile
+    container_name: devlake-config-ui
+    restart: unless-stopped
+    depends_on:
+      devlake:
+        condition: service_healthy
+    # Compose already treats a missing env_file as a hard error, and every
+    # variable it must supply is ${VAR:?}-guarded below.
+    env_file:
+      - .env
+    # host:port ONLY, no scheme. The image supplies the protocol separately via
+    # DEVLAKE_ENDPOINT_PROTO (default http) and concatenates the two, so a
+    # value of http://devlake:8080 renders proxy_pass http://http://devlake:8080
+    # and fails every request. nginx currently intercepts /api/ and /grafana/
+    # before config-ui sees them, so this is latent rather than active - but it
+    # is a landmine for anyone who later simplifies the nginx routing.
+    environment:
+      DEVLAKE_ENDPOINT: devlake:8080
+      GRAFANA_ENDPOINT: grafana:3000
+      TZ: UTC
+    expose:
+      - "4000"
+    networks:
+      - backend
+    logging: *default-logging
+    # No healthcheck: this image is built on nginxinc/nginx-unprivileged and
+    # installs only apache2-utils and iproute2 (config-ui/Dockerfile:44), so it
+    # has no curl or wget to probe /health with. A probe that can never pass is
+    # worse than none - it would block every depends_on gate behind it.
+
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+    container_name: devlake-oauth2-proxy
+    restart: unless-stopped
+    depends_on:
+      # service_started, not service_healthy: config-ui has no healthcheck (see
+      # above). oauth2-proxy resolves its upstream per request anyway, so it
+      # recovers on its own once config-ui is serving.
+      config-ui:
+        condition: service_started
+    volumes:
+      - type: bind
+        source: ./allowed-emails.txt
+        target: /etc/oauth2-proxy/allowed-emails.txt
+        read_only: true
+        # Without this, Docker silently creates a DIRECTORY when the source
+        # file is missing, and oauth2-proxy crash-loops instead of failing.
+        bind:
+          create_host_path: false
+    command:
+      - --provider=google
+      - --upstream=http://config-ui:4000
+      - --http-address=0.0.0.0:4180
+      - --authenticated-emails-file=/etc/oauth2-proxy/allowed-emails.txt
+      - --cookie-secure=true
+      - --cookie-samesite=lax
+      - --reverse-proxy=true
+      - --skip-provider-button=true
+      # Emits the X-Auth-Request-User / -Email headers that nginx's
+      # auth_request gate reads back via auth_request_set.
+      - --set-xauthrequest=true
+      # Pinned rather than derived from forwarded headers. Derivation depends
+      # on the upstream nginx sending X-Forwarded-Proto: https; if it does not,
+      # oauth2-proxy builds an http:// callback and Google rejects it with
+      # redirect_uri_mismatch. This value must also be registered as an
+      # authorised redirect URI on the Google OAuth client.
+      - --redirect-url=https://aperture.arbisoft.com/oauth2/callback
+      - --cookie-domain=aperture.arbisoft.com
+      - --whitelist-domain=aperture.arbisoft.com
+      - --real-client-ip-header=X-Forwarded-For
+    environment:
+      OAUTH2_PROXY_CLIENT_ID: ${GOOGLE_CLIENT_ID:?GOOGLE_CLIENT_ID must be set in .env}
+      OAUTH2_PROXY_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?GOOGLE_CLIENT_SECRET must be set in .env}
+      OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH2_COOKIE_SECRET:?OAUTH2_COOKIE_SECRET must be set in .env}
+      TZ: UTC
+    expose:
+      - "4180"
+    networks:
+      - backend
+    logging: *default-logging
+    # No healthcheck: the oauth2-proxy v7 images are distroless, so there is no
+    # shell and no HTTP client to run a probe with. Its /ping endpoint is
+    # reachable from nginx, which is where it should be monitored from.
+
+  grafana:
+    image: arbisoft/devlake-dashboard:${GRAFANA_VERSION:?GRAFANA_VERSION must be set in .env}
+    build:
+      context: ../../grafana
+      dockerfile: Dockerfile
+    container_name: devlake-grafana
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    # Compose already treats a missing env_file as a hard error, and every
+    # variable it must supply is ${VAR:?}-guarded below.
+    env_file:
+      - .env
+    environment:
+      GF_SERVER_ROOT_URL: "https://aperture.arbisoft.com/grafana"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_USERS_DEFAULT_THEME: light
+      # Read-only account, not the DevLake ETL user. Also the account the
+      # init_connect query governor in mysql/devlake.cnf targets by name.
+      MYSQL_URL: mysql:3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${GRAFANA_DB_USER}
+      MYSQL_PASSWORD: ${GRAFANA_DB_PASSWORD}
+      # Grafana's own login form is the second gate; nginx's auth_request on
+      # /grafana/ is the first. Without an explicit password Grafana boots with
+      # admin/admin, which is why this is mandatory rather than optional.
+      GF_SECURITY_ADMIN_USER: ${GF_SECURITY_ADMIN_USER:?GF_SECURITY_ADMIN_USER must be set in .env}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:?GF_SECURITY_ADMIN_PASSWORD must be set in .env}
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_AUTH_GOOGLE_ENABLED: "false"
+      GF_AUTH_PROXY_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_AUTO_ASSIGN_ORG_ROLE: "Editor"
+      TZ: UTC
+    volumes:
+      - grafana_data:/var/lib/grafana
+    expose:
+      - "3000"
+    networks:
+      - backend
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  nginx:
+    image: nginx:stable
+    container_name: devlake-nginx
+    restart: unless-stopped
+    ports:
+      # TLS terminates on the upstream nginx, which forwards here over plain
+      # HTTP. nginx.conf trusts its X-Forwarded-Proto.
+      - "80:80"
+    volumes:
+      - type: bind
+        source: ./nginx.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+        bind:
+          create_host_path: false
+    depends_on:
+      # oauth2-proxy is what `location /` proxies to and what the auth_request
+      # gate calls, so it belongs here; omitting it was the original bug.
+      # nginx.conf resolves every backend at request time via the Docker
+      # resolver, so a name missing at boot no longer kills nginx - this
+      # ordering just avoids serving 502s during startup.
+      oauth2-proxy:
+        condition: service_started
+      devlake:
+        condition: service_healthy
+      grafana:
+        condition: service_healthy
+    networks:
+      - backend
+    logging: *default-logging
+    # No healthcheck: the nginx image has neither curl/wget nor the `service`
+    # command. Monitor this tier from the upstream nginx or an external prober,
+    # which is also the only place that can see the whole request path.
+
+volumes:
+  # Both non-external and explicitly named. Previously grafana_data was
+  # external (aborting `up` on a fresh VM) while mysql_data - the only
+  # irreplaceable data here - was not protected at all.
+  mysql_data:
+    name: devlake_staging_mysql_data
+  grafana_data:
+    name: devlake_staging_grafana_data
+  devlake_logs:
+    name: devlake_staging_devlake_logs
+  mysql_tmp:
+    name: devlake_staging_mysql_tmp
+
+networks:
+  backend:
