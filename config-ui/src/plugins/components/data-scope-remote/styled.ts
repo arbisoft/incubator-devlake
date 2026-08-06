@@ -25,6 +25,19 @@ export const ColumnTitle = styled.div`
   font-weight: 600;
 `;
 
+export const SelectedScopes = styled.div`
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  background: #fafafa;
+  color: #8c8c8c;
+
+  .ant-tag {
+    margin-inline-end: 0;
+  }
+`;
+
 export const JobLoad = styled.div`
   display: flex;
   align-items: center;
