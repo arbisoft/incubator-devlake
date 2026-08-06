@@ -113,6 +113,9 @@ services:
       context: ../../backend
       # Path is relative to context (backend/), not this compose file.
       dockerfile: ../devops/staging/Dockerfile.devlake
+      # Staging VM: Docker bridge cannot reach deb.debian.org:80; host network can.
+      # Runtime still uses the compose `backend` network — this is build-only.
+      network: host
       args:
         TAG: ${APP_VERSION}
         SHA: ${GIT_SHA:-unknown}
@@ -158,6 +161,7 @@ services:
     build:
       context: ../../config-ui
       dockerfile: Dockerfile
+      network: host
     container_name: devlake-config-ui
     restart: unless-stopped
     depends_on:
@@ -246,6 +250,7 @@ services:
     build:
       context: ../../grafana
       dockerfile: Dockerfile
+      network: host
     container_name: devlake-grafana
     restart: unless-stopped
     depends_on:

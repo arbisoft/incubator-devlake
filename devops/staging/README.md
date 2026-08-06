@@ -349,6 +349,12 @@ Deliberate, and tracked rather than fixed here:
   BuildKit layers. The CI workflow in `build-and-push.yml` splits
   `builder` / `base` / `build` stages across ECR for ephemeral runners — that
   split is unnecessary on this long-lived host.
+- **Docker bridge has no outbound HTTP.** On this host, containers on the
+  default bridge time out reaching `deb.debian.org:80`, while `--network=host`
+  works. Compose sets `build.network: host` for `devlake` / `config-ui` /
+  `grafana` so apt/yarn succeed. Fixing `ip_forward` / iptables / UFW so the
+  bridge can egress is still the proper host fix; until then, any other
+  container that needs apt on the bridge will fail the same way.
 - **No backups.** With `--skip-log-bin` there is no point-in-time recovery, so
   a nightly `mysqldump` plus a *tested* restore is the entire recovery story.
 - **No resource limits on `devlake`.** A large collection run can consume
