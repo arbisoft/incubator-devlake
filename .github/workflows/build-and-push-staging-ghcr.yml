@@ -19,9 +19,6 @@
 # Job graph mirrors upstream .github/workflows/build.yml:
 # builder + base cache → build cache → final devlake + config-ui + dashboard.
 #
-# Push trigger is temporarily add-staging-docker-compose for validation;
-# switch back to main-arbisoft after build/push is confirmed.
-#
 # Required secrets for the deploy trigger (same App-token pattern as
 # trigger-build-and-push.yml):
 #   GH_APP_ID, GH_PRIVATE_KEY
@@ -32,8 +29,7 @@ name: Build and Push Staging GHCR
 on:
   push:
     branches:
-      # Temporary: test build/push from this branch; switch to main-arbisoft after validation.
-      - add-staging-docker-compose
+      - main-arbisoft
   workflow_dispatch:
     inputs:
       deploy:
