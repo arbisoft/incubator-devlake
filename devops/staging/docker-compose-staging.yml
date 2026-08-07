@@ -2,35 +2,26 @@
 #
 # Run from this directory so that ./nginx.conf, ./allowed-emails.txt, ./mysql
 # and .env resolve:
+#   docker compose -f docker-compose-staging.yml pull
 #   docker compose -f docker-compose-staging.yml up -d
 #
-# See README.md for the one-time host setup this file depends on.
+# See README.md for host setup and the GHCR build/deploy pipeline.
 #
 # ---------------------------------------------------------------------------
 # Images
 #
-# Built locally from this checkout (same pattern as docker-compose-dev.yml and
-# the contexts in devops/staging/build-and-push.yml). Run compose from
-# devops/staging/ so relative contexts resolve:
-#   ../../backend   -> repo-root/backend
-#   ../../config-ui -> repo-root/config-ui
-#   ../../grafana   -> repo-root/grafana
+# App images are pulled from GHCR (not built on this VM). Set full refs in .env:
+#   DEVLAKE_IMAGE=ghcr.io/<owner>/devlake:<tag>
+#   CONFIG_UI_IMAGE=ghcr.io/<owner>/devlake-config-ui:<tag>
+#   GRAFANA_IMAGE=ghcr.io/<owner>/devlake-dashboard:<tag>
 #
-# On the staging host that means the full clone lives at e.g.
-#   /opt/devlake/incubator-devlake
-# and this file at
-#   /opt/devlake/incubator-devlake/devops/staging/docker-compose-staging.yml
+# Built by .github/workflows/build-and-push-staging-ghcr.yml (push branch is
+# temporary during validation; production trigger will be main-arbisoft). A
+# separate deploy-repo workflow on a self-hosted runner updates those vars and
+# runs compose pull/up.
 #
-# APP_VERSION / GRAFANA_VERSION are local image tags only (not Docker Hub
-# pins). Keep them equal unless you have a reason not to. Optional GIT_SHA is
-# baked into the lake binary via the Dockerfile's TAG/SHA build-args.
-#
-# First build is slow (Go + libgit2 + yarn + Grafana plugins). Later rebuilds
-# reuse the host's BuildKit layer cache - no CI-style builder/base job split
-# is needed on a long-lived VM.
-#
-#   docker compose -f docker-compose-staging.yml build
-#   docker compose -f docker-compose-staging.yml up -d
+# Third-party images (mysql, nginx, oauth2-proxy) still come from public
+# registries.
 # ---------------------------------------------------------------------------
 
 x-logging: &default-logging
@@ -105,20 +96,8 @@ services:
       start_period: 60s
 
   devlake:
-    image: arbisoft/devlake:${APP_VERSION:?APP_VERSION must be set in .env}
-    # linux/amd64 only — stock backend/Dockerfile also builds an arm64 stage
-    # that fails with "exec format error" on this single-arch staging VM.
+    image: ${DEVLAKE_IMAGE:?DEVLAKE_IMAGE must be set in .env}
     platform: linux/amd64
-    build:
-      context: ../../backend
-      # Path is relative to context (backend/), not this compose file.
-      dockerfile: ../devops/staging/Dockerfile.devlake
-      # Staging VM: Docker bridge cannot reach deb.debian.org:80; host network can.
-      # Runtime still uses the compose `backend` network — this is build-only.
-      network: host
-      args:
-        TAG: ${APP_VERSION}
-        SHA: ${GIT_SHA:-unknown}
     container_name: devlake-app
     restart: unless-stopped
     depends_on:
@@ -157,11 +136,8 @@ services:
       start_period: 120s
 
   config-ui:
-    image: arbisoft/devlake-config-ui:${APP_VERSION:?APP_VERSION must be set in .env}
-    build:
-      context: ../../config-ui
-      dockerfile: Dockerfile
-      network: host
+    image: ${CONFIG_UI_IMAGE:?CONFIG_UI_IMAGE must be set in .env}
+    platform: linux/amd64
     container_name: devlake-config-ui
     restart: unless-stopped
     depends_on:
@@ -246,11 +222,8 @@ services:
     # reachable from nginx, which is where it should be monitored from.
 
   grafana:
-    image: arbisoft/devlake-dashboard:${GRAFANA_VERSION:?GRAFANA_VERSION must be set in .env}
-    build:
-      context: ../../grafana
-      dockerfile: Dockerfile
-      network: host
+    image: ${GRAFANA_IMAGE:?GRAFANA_IMAGE must be set in .env}
+    platform: linux/amd64
     container_name: devlake-grafana
     restart: unless-stopped
     depends_on:

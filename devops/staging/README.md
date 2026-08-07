@@ -20,6 +20,84 @@ limitations under the License.
 Single-VM Docker Compose deployment for `https://aperture.arbisoft.com`, sized
 for **4 vCPU / 8 GB**.
 
+App images are **pulled from GHCR** (built in CI). This host does not build
+`devlake` / `config-ui` / `grafana`.
+
+## CI / CD pipeline
+
+```mermaid
+sequenceDiagram
+  participant Dev as Developer
+  participant Lake as incubator-devlake
+  participant GHCR as GHCR
+  participant Deploy as deploy_workflows_repo
+  participant Runner as staging_self_hosted_runner
+
+  Dev->>Lake: push feature branch (temp) / main-arbisoft
+  Lake->>Lake: build-and-push-staging-ghcr.yml
+  Lake->>GHCR: push tagged images
+  Lake->>Deploy: workflow_dispatch(image_tag, registry)
+  Deploy->>Runner: job on staging VM runner
+  Runner->>GHCR: docker login and compose pull
+  Runner->>Runner: compose up -d
+```
+
+| Piece | Location |
+| --- | --- |
+| Build + push | [`.github/workflows/build-and-push-staging-ghcr.yml`](../../.github/workflows/build-and-push-staging-ghcr.yml) in this repo (push trigger temporarily on `add-staging-docker-compose`; switch to `main-arbisoft` after validation) |
+| Deploy | Separate workflows-only repo; runs on a **self-hosted runner on this VM** |
+| Compose | This directory (`docker-compose-staging.yml`) |
+
+### Images and tags
+
+| Image | GHCR name |
+| --- | --- |
+| DevLake API | `ghcr.io/<owner>/devlake:<tag>` |
+| Config UI | `ghcr.io/<owner>/devlake-config-ui:<tag>` |
+| Grafana dashboards | `ghcr.io/<owner>/devlake-dashboard:<tag>` |
+| Build caches | `ghcr.io/<owner>/devlake-ci-cache:amd64-builder` / `:base` |
+
+Tag rules (from the build workflow):
+
+- Ref matches `^v` → use the version tag as-is
+- Otherwise → `{ref}_{yyMMdd_HHmm}_{shortsha}` (e.g. `main-arbisoft_260806_1830_abc1234`)
+
+All three app images share the same `<tag>` for a given build.
+
+### Build workflow secrets (this repo)
+
+| Secret | Purpose |
+| --- | --- |
+| `GH_APP_ID` / `GH_PRIVATE_KEY` | GitHub App token to dispatch the deploy repo |
+| `GH_STAGING_DEPLOY_OWNER` | Deploy repo owner |
+| `GH_STAGING_DEPLOY_REPO` | Deploy repo name |
+| `GH_STAGING_DEPLOY_WORKFLOW_ID` | Workflow file name or numeric id in the deploy repo |
+
+`GITHUB_TOKEN` with `packages: write` is enough to push to GHCR from this repo.
+
+### Deploy-repo contract
+
+The deploy workflow must accept `workflow_dispatch` inputs:
+
+| Input | Required | Meaning |
+| --- | --- | --- |
+| `image_tag` | yes | Tag produced by the build (not a full image ref) |
+| `registry` | no | Default `ghcr.io/<owner>`; build passes `ghcr.io/${{ github.repository_owner }}` |
+
+Expected behaviour on the **self-hosted staging runner**:
+
+1. `docker login ghcr.io` with a token that has `read:packages`
+2. Update `/opt/devlake/incubator-devlake/devops/staging/.env`:
+   - `DEVLAKE_IMAGE=${registry}/devlake:${image_tag}`
+   - `CONFIG_UI_IMAGE=${registry}/devlake-config-ui:${image_tag}`
+   - `GRAFANA_IMAGE=${registry}/devlake-dashboard:${image_tag}`
+3. Optionally `git pull` the compose tree if compose files change on `main-arbisoft`
+4. `docker compose -f docker-compose-staging.yml pull`
+5. `docker compose -f docker-compose-staging.yml up -d`
+6. Health-check `http://127.0.0.1` via nginx / `devlake` `/ping` as appropriate
+
+See [deploy-workflow.example.yml](deploy-workflow.example.yml) for a copy-paste starter to place in the deploy repo (adjust runner labels and paths).
+
 ## Architecture
 
 TLS terminates on an **upstream** nginx outside this stack, which forwards to
@@ -66,25 +144,17 @@ Run these **before** the first `docker compose up`.
 
 ### 1. Verify the deployment directory
 
-Images are built from this fork's source (`backend/`, `config-ui/`, `grafana/`),
-so the host needs a **full clone**, not just `devops/staging/`. Expected layout:
+Compose and nginx config live under `devops/staging/`. A full clone is still
+useful for `git pull` of compose changes; images themselves come from GHCR.
 
 ```text
 /opt/devlake/incubator-devlake/          # git clone of this fork
-├── backend/
-├── config-ui/
-├── grafana/
 └── devops/staging/                      # compose, nginx.conf, .env, …
 ```
 
-Confirm it is there and yours:
-
 ```bash
 ls -ld /opt/devlake/incubator-devlake/devops/staging
-ls /opt/devlake/incubator-devlake/backend/Dockerfile \
-   /opt/devlake/incubator-devlake/config-ui/Dockerfile \
-   /opt/devlake/incubator-devlake/grafana/Dockerfile \
-   /opt/devlake/incubator-devlake/devops/staging/Dockerfile.devlake
+ls /opt/devlake/incubator-devlake/devops/staging/docker-compose-staging.yml
 ```
 
 If the clone is missing:
@@ -94,7 +164,7 @@ sudo mkdir -p /opt/devlake && sudo chown "$USER": /opt/devlake
 cd /opt/devlake
 git clone <this-fork-url> incubator-devlake
 cd incubator-devlake
-git checkout <desired-branch-or-tag>
+git checkout main-arbisoft
 ```
 
 That `sudo mkdir` / `chown` is the only privileged command in this runbook —
@@ -113,18 +183,28 @@ first `up` with the image's own `1777` permissions.
 cd /opt/devlake/incubator-devlake/devops/staging
 cp env.staging.example .env
 chmod 600 .env
-$EDITOR .env    # fill in every REQUIRED value
-# optional: bake the checkout into the lake binary
-# GIT_SHA=$(git -C ../.. rev-parse --short HEAD)
+$EDITOR .env    # fill in every REQUIRED value, including *_IMAGE once known
 ```
 
 Compose reads `.env` from the directory containing the compose file, so it must
-sit beside `docker-compose-staging.yml` — moving the compose file without
-moving `.env` silently breaks interpolation. Every required variable is guarded
+sit beside `docker-compose-staging.yml`. Every required variable is guarded
 with `${VAR:?}`, so a missing value aborts with a named error rather than a
 half-started stack.
 
-### 3. Register the OAuth redirect URI
+### 3. GHCR login on the staging host / runner
+
+Private packages need a token with `read:packages` (PAT or GitHub App
+installation token). The self-hosted deploy job should log in before `compose
+pull`:
+
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u USERNAME --password-stdin
+```
+
+Confirm Docker can reach GHCR on `:443` from this VM (`docker pull` a small
+public image from `ghcr.io` if needed).
+
+### 4. Register the OAuth redirect URI
 
 Add exactly this to the Google OAuth web client's authorised redirect URIs:
 
@@ -136,7 +216,7 @@ It is pinned with `--redirect-url` rather than derived from forwarded headers,
 because derivation silently produces an `http://` callback (which Google
 rejects) whenever `X-Forwarded-Proto` is missing.
 
-### 4. Confirm the upstream nginx behaviour
+### 5. Confirm the upstream nginx behaviour
 
 The upstream must:
 
@@ -145,38 +225,30 @@ The upstream must:
   DevLake trusts those headers verbatim for its audit identity. This stack
   blanks them at ingress, but the upstream should not be forwarding them either.
 
-### 5. Check disk capacity
+### 6. Check disk capacity
 
 The benchmark environment measured ~11 GB of DevLake data across ~510 tables.
 With binary logging disabled, budget **at least 40 GB free** on the Docker
-volume root. The first image build also needs several GB of BuildKit cache
-(Go toolchain, yarn, Grafana plugins) — budget headroom for that as well.
+volume root. Pulled images also need several GB of local Docker storage.
 
 ## Deploy
 
+Automated path: push to the workflow’s configured branch (currently
+`add-staging-docker-compose`, later `main-arbisoft`) → GHCR build → deploy-repo
+workflow on the self-hosted runner.
+
+Manual / first-time (after `.env` has valid `*_IMAGE` refs and GHCR login):
+
 ```bash
 cd /opt/devlake/incubator-devlake/devops/staging
-# first build is slow; later rebuilds reuse local BuildKit layers
-# devlake uses Dockerfile.devlake (amd64-only); config-ui/grafana use their stock Dockerfiles
-DOCKER_BUILDKIT=1 docker compose -f docker-compose-staging.yml build
+docker compose -f docker-compose-staging.yml pull
 docker compose -f docker-compose-staging.yml up -d
 docker compose -f docker-compose-staging.yml ps
 ```
 
-After pulling new commits in the clone, rebuild before `up`:
-
-```bash
-cd /opt/devlake/incubator-devlake
-git pull
-cd devops/staging
-# optional: refresh GIT_SHA in .env
-DOCKER_BUILDKIT=1 docker compose -f docker-compose-staging.yml build
-docker compose -f docker-compose-staging.yml up -d
-```
-
-`docker compose pull` is **not** used for `devlake` / `config-ui` / `grafana` —
-those are local builds tagged `arbisoft/devlake*`. It would only affect the
-third-party images (`mysql`, `nginx`, `oauth2-proxy`).
+Do **not** run `docker compose build` for the app services — there are no
+`build:` blocks. `pull` fetches GHCR app images plus third-party bases
+(`mysql`, `nginx`, `oauth2-proxy`).
 
 ### Migrating from an earlier revision of this stack
 
@@ -293,12 +365,13 @@ literal warning in [mysql/devlake.cnf](mysql/devlake.cnf).
 
 | File | Purpose |
 | --- | --- |
-| `docker-compose-staging.yml` | Service definitions |
+| `docker-compose-staging.yml` | Service definitions (pull-only app images) |
 | `nginx.conf` | Edge routing and the `auth_request` gates |
 | `allowed-emails.txt` | oauth2-proxy allowlist, one lowercase address per line |
 | `mysql/devlake.cnf` | MySQL tuning, sized for a 3 GiB container |
 | `mysql/initdb/01-grafana-ro.sh` | Creates the read-only Grafana account |
 | `env.staging.example` | Template for `.env` |
+| `deploy-workflow.example.yml` | Starter for the deploy-repo workflow |
 
 ## Memory budget
 
@@ -341,20 +414,6 @@ back to `service_healthy`.
 
 Deliberate, and tracked rather than fixed here:
 
-- **First build is heavy.** Staging uses `Dockerfile.devlake` (amd64-only
-  override of `backend/Dockerfile`) so the build does not need QEMU for the
-  upstream arm64 stage. It still compiles libgit2 and the full Go plugin set;
-  `config-ui` runs yarn; `grafana` installs plugins. Expect a long first
-  `compose build` on a 4 vCPU / 8 GB VM. Subsequent builds reuse local
-  BuildKit layers. The CI workflow in `build-and-push.yml` splits
-  `builder` / `base` / `build` stages across ECR for ephemeral runners — that
-  split is unnecessary on this long-lived host.
-- **Docker bridge has no outbound HTTP.** On this host, containers on the
-  default bridge time out reaching `deb.debian.org:80`, while `--network=host`
-  works. Compose sets `build.network: host` for `devlake` / `config-ui` /
-  `grafana` so apt/yarn succeed. Fixing `ip_forward` / iptables / UFW so the
-  bridge can egress is still the proper host fix; until then, any other
-  container that needs apt on the bridge will fail the same way.
 - **No backups.** With `--skip-log-bin` there is no point-in-time recovery, so
   a nightly `mysqldump` plus a *tested* restore is the entire recovery story.
 - **No resource limits on `devlake`.** A large collection run can consume
@@ -371,3 +430,7 @@ Deliberate, and tracked rather than fixed here:
   on `innodb_temp_data_file_path`, and the 30s `init_connect` governor on the
   Grafana account). If those prove insufficient, point the volume at a
   dedicated disk with `driver_opts` — no service definition changes.
+- **Docker bridge egress.** Historically this VM could not reach Debian mirrors
+  from bridge-network containers. That no longer blocks staging deploys (images
+  are built on GitHub-hosted runners), but any future on-box `docker build` may
+  still need host-network or a fixed `ip_forward` / iptables / UFW setup.
