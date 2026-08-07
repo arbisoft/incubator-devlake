@@ -171,25 +171,29 @@ export const SearchRemote = ({ mode, plugin, connectionId, config, disabledScope
   return (
     <>
       <Block title={config.title} required>
-        <Space wrap>
-          {selectedScope.length ? (
-            selectedScope.map((sc) => (
-              <Tag
-                key={sc.id}
-                color="blue"
-                closable
-                onClose={() => onChange(selectedScope.filter((it) => it.id !== sc.id))}
-              >
-                {getPluginScopeName(plugin, sc) || sc.fullName || sc.name || sc.id}
-              </Tag>
-            ))
-          ) : (
-            <span>Please select scope...</span>
-          )}
-        </Space>
+        {/* Keep selected scopes in a fixed area. */}
+        <S.SelectedScopes>
+          <Space wrap>
+            {selectedScope.length ? (
+              selectedScope.map((sc) => (
+                <Tag
+                  key={sc.id}
+                  color="blue"
+                  closable
+                  onClose={() => onChange(selectedScope.filter((it) => it.id !== sc.id))}
+                >
+                  {getPluginScopeName(plugin, sc) || sc.fullName || sc.name || sc.id}
+                </Tag>
+              ))
+            ) : (
+              <span>Please select scope...</span>
+            )}
+          </Space>
+        </S.SelectedScopes>
       </Block>
       <Block>
         <Input
+          style={{ marginBottom: 12 }}
           prefix={<SearchOutlined />}
           placeholder={config.searchPlaceholder ?? 'Search'}
           value={search.query}

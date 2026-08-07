@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/plugin"
@@ -30,9 +31,36 @@ import (
 	"github.com/apache/incubator-devlake/plugins/bitbucket/models"
 )
 
+const (
+	maxErrorBodySize       = 1 << 20
+	bitbucketWorkspacesAPI = "/user/workspaces"
+)
+
 type BitbucketRemotePagination struct {
 	Page    int `json:"page" validate:"required"`
 	PageLen int `json:"pagelen" validate:"required"`
+}
+
+func nextBitbucketRemotePage(next string, page BitbucketRemotePagination) *BitbucketRemotePagination {
+	if next == "" {
+		return nil
+	}
+	return &BitbucketRemotePagination{
+		Page:    page.Page + 1,
+		PageLen: page.PageLen,
+	}
+}
+
+func validateBitbucketOKResponse(res *http.Response) errors.Error {
+	if res.StatusCode == http.StatusOK {
+		return nil
+	}
+
+	body, err := io.ReadAll(io.LimitReader(res.Body, maxErrorBodySize))
+	if err != nil {
+		return errors.BadInput.Wrap(err, "failed to read response body")
+	}
+	return errors.HttpStatus(res.StatusCode).New(string(body))
 }
 
 func listBitbucketRemoteScopes(
@@ -67,17 +95,25 @@ func listBitbucketWorkspaces(
 	err errors.Error,
 ) {
 	var res *http.Response
+	// /user/permissions/workspaces was removed and /workspaces deprecated by
+	// Bitbucket CHANGE-2770; /user/workspaces lists the current user's workspaces
+	// and is the supported replacement.
 	res, err = apiClient.Get(
-		"/user/permissions/workspaces",
+		bitbucketWorkspacesAPI,
 		url.Values{
-			"sort":    {"workspace.slug"},
-			"fields":  {"values.workspace.slug,values.workspace.name,pagelen,page,size"},
+			// No sort/fields: /user/workspaces rejects sort=workspace.slug with
+			// HTTP 400 "Invalid field name". The bare call returns the nested
+			// workspace objects we need; WorkspaceResponse ignores extra fields.
 			"page":    {fmt.Sprintf("%v", page.Page)},
 			"pagelen": {fmt.Sprintf("%v", page.PageLen)},
 		},
 		nil,
 	)
 	if err != nil {
+		return
+	}
+	defer res.Body.Close()
+	if err = validateBitbucketOKResponse(res); err != nil {
 		return
 	}
 
@@ -88,12 +124,14 @@ func listBitbucketWorkspaces(
 	}
 	for _, r := range resBody.Values {
 		children = append(children, dsmodels.DsRemoteApiScopeListEntry[models.BitbucketRepo]{
-			Type:     api.RAS_ENTRY_TYPE_GROUP,
-			Id:       r.Workspace.Slug,
-			Name:     r.Workspace.Name,
-			FullName: r.Workspace.Name,
+			Type: api.RAS_ENTRY_TYPE_GROUP,
+			Id:   r.GroupId(),
+			// Slug is always present while the workspace name can be empty.
+			Name:     r.GroupId(),
+			FullName: r.GroupId(),
 		})
 	}
+	nextPage = nextBitbucketRemotePage(resBody.Next, page)
 	return
 }
 
@@ -110,19 +148,16 @@ func listBitbucketRepos(
 	var res *http.Response
 	// list projects part
 	res, err = apiClient.Get(fmt.Sprintf("/repositories/%s", workspace), url.Values{
-		"fields":  {"values.name,values.full_name,values.language,values.description,values.owner.display_name,values.created_on,values.updated_on,values.links.clone,values.links.html,pagelen,page,size"},
+		"fields":  {"values.name,values.full_name,values.language,values.description,values.owner.display_name,values.created_on,values.updated_on,values.links.clone,values.links.html,pagelen,page,size,next"},
 		"page":    {fmt.Sprintf("%v", page.Page)},
 		"pagelen": {fmt.Sprintf("%v", page.PageLen)},
 	}, nil)
 	if err != nil {
 		return
 	}
-	if res.StatusCode > 299 {
-		body, e := io.ReadAll(res.Body)
-		if e != nil {
-			return nil, nil, errors.BadInput.Wrap(e, "failed to read response body")
-		}
-		return nil, nil, errors.BadInput.New(string(body))
+	defer res.Body.Close()
+	if err = validateBitbucketOKResponse(res); err != nil {
+		return
 	}
 	var resBody models.ReposResponse
 	err = api.UnmarshalResponse(res, &resBody)
@@ -140,9 +175,14 @@ func listBitbucketRepos(
 			Data:     r.ConvertApiScope(),
 		})
 	}
+	nextPage = nextBitbucketRemotePage(resBody.Next, page)
 	return
 }
 
+// searchBitbucketRepos searches repositories by name across the user's workspaces.
+// The cross-workspace GET /repositories?role=member was removed by Bitbucket
+// CHANGE-2770, so we enumerate workspaces and query the workspace-scoped
+// GET /repositories/{workspace} endpoint for each, aggregating up to PageSize hits.
 func searchBitbucketRepos(
 	apiClient plugin.ApiClient,
 	params *dsmodels.DsRemoteApiScopeSearchParams,
@@ -150,37 +190,82 @@ func searchBitbucketRepos(
 	children []dsmodels.DsRemoteApiScopeListEntry[models.BitbucketRepo],
 	err errors.Error,
 ) {
-	var res *http.Response
-	res, err = apiClient.Get(
-		"/repositories",
-		url.Values{
-			"sort":    {"name"},
-			"fields":  {"values.name,values.full_name,values.language,values.description,values.owner.display_name,values.created_on,values.updated_on,values.links.clone,values.links.html,pagelen,page,size"},
-			"role":    {"member"},
-			"q":       {fmt.Sprintf(`full_name~"%s"`, params.Search)},
-			"page":    {fmt.Sprintf("%v", params.Page)},
-			"pagelen": {fmt.Sprintf("%v", params.PageSize)},
-		},
-		nil,
-	)
+	pageSize := params.PageSize
+	if pageSize == 0 {
+		pageSize = 100
+	}
+
+	workspaces, err := listAllBitbucketWorkspaces(apiClient)
 	if err != nil {
 		return nil, err
 	}
-	var resBody models.ReposResponse
-	err = api.UnmarshalResponse(res, &resBody)
-	if err != nil {
-		return
-	}
-	for _, r := range resBody.Values {
-		children = append(children, dsmodels.DsRemoteApiScopeListEntry[models.BitbucketRepo]{
-			Type:     api.RAS_ENTRY_TYPE_SCOPE,
-			Id:       r.FullName,
-			Name:     r.Name,
-			FullName: r.FullName,
-			Data:     r.ConvertApiScope(),
-		})
+
+	for _, workspace := range workspaces {
+		if len(children) >= pageSize {
+			break
+		}
+		var res *http.Response
+		res, err = apiClient.Get(
+			fmt.Sprintf("/repositories/%s", workspace),
+			url.Values{
+				"sort":    {"name"},
+				"fields":  {"values.name,values.full_name,values.language,values.description,values.owner.display_name,values.created_on,values.updated_on,values.links.clone,values.links.html,pagelen,page,size"},
+				"q":       {fmt.Sprintf(`name~"%s"`, params.Search)},
+				"pagelen": {fmt.Sprintf("%v", pageSize)},
+			},
+			nil,
+		)
+		if err != nil {
+			return nil, err
+		}
+		var resBody models.ReposResponse
+		err = api.UnmarshalResponse(res, &resBody)
+		if err != nil {
+			return
+		}
+		for _, r := range resBody.Values {
+			children = append(children, dsmodels.DsRemoteApiScopeListEntry[models.BitbucketRepo]{
+				Type:     api.RAS_ENTRY_TYPE_SCOPE,
+				Id:       r.FullName,
+				Name:     r.Name,
+				FullName: r.FullName,
+				Data:     r.ConvertApiScope(),
+			})
+		}
 	}
 	return
+}
+
+// listAllBitbucketWorkspaces returns every workspace slug accessible to the
+// authenticated user, following pagination of GET /2.0/user/workspaces.
+func listAllBitbucketWorkspaces(apiClient plugin.ApiClient) ([]string, errors.Error) {
+	var slugs []string
+	for page := 1; ; page++ {
+		res, err := apiClient.Get(
+			bitbucketWorkspacesAPI,
+			url.Values{
+				// No sort/fields (see listBitbucketWorkspaces): /user/workspaces
+				// returns 400 on sort=workspace.slug.
+				"page":    {strconv.Itoa(page)},
+				"pagelen": {"100"},
+			},
+			nil,
+		)
+		if err != nil {
+			return nil, err
+		}
+		var resBody models.WorkspaceResponse
+		if err = api.UnmarshalResponse(res, &resBody); err != nil {
+			return nil, err
+		}
+		for _, w := range resBody.Values {
+			slugs = append(slugs, w.GroupId())
+		}
+		if len(resBody.Values) == 0 || page*resBody.Pagelen >= resBody.Size {
+			break
+		}
+	}
+	return slugs, nil
 }
 
 // RemoteScopes list all available scopes on the remote server
