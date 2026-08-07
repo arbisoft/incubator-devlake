@@ -84,7 +84,7 @@ func listBitbucketWorkspaces(
 	if err != nil {
 		return
 	}
-	if res.StatusCode > 299 {
+	if res.StatusCode != http.StatusOK {
 		body, e := io.ReadAll(res.Body)
 		if e != nil {
 			err = errors.BadInput.Wrap(e, "failed to read response body")
@@ -137,7 +137,8 @@ func listBitbucketRepos(
 	if err != nil {
 		return
 	}
-	if res.StatusCode > 299 {
+	// These GET endpoints require a JSON response body, so only 200 is successful.
+	if res.StatusCode != http.StatusOK {
 		body, e := io.ReadAll(res.Body)
 		if e != nil {
 			return nil, nil, errors.BadInput.Wrap(e, "failed to read response body")
