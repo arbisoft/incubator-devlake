@@ -27,8 +27,9 @@
 name: Build and Push Staging GHCR
 
 on:
-  # push: to main-arbisoft intentionally omitted until the first staging cutover
-  # (port 80 + host prep) is done by hand. Re-enable after aperture is live.
+  push:
+    branches:
+      - main-arbisoft
   workflow_dispatch:
     inputs:
       deploy:
