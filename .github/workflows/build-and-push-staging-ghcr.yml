@@ -375,22 +375,23 @@ jobs:
       REPO: ${{ vars.GH_STAGING_DEPLOY_REPO || secrets.GH_STAGING_DEPLOY_REPO }}
       WORKFLOW_ID: ${{ vars.GH_STAGING_DEPLOY_WORKFLOW_ID || secrets.GH_STAGING_DEPLOY_WORKFLOW_ID }}
       IMAGE_TAG: ${{ needs.build-and-push-devlake.outputs.image_tag }}
-      REGISTRY: ${{ env.REGISTRY }}
+      # REGISTRY is already set at workflow level; do not re-alias via ${{ env.REGISTRY }}
+      # here — the env context is illegal in jobs.<id>.env and rejects the whole file.
     steps:
       - name: Assert deploy target
         run: |
           set -euo pipefail
           missing=0
-          for v in OWNER REPO WORKFLOW_ID IMAGE_TAG; do
+          for v in OWNER REPO WORKFLOW_ID IMAGE_TAG REGISTRY; do
             if [ -z "${!v}" ]; then
-              echo "::error::${v} is empty. Set repository variable (preferred) or secret GH_STAGING_DEPLOY_* / ensure the build produced image_tag."
+              echo "::error::${v} is empty. Set repository variable (preferred) or secret GH_STAGING_DEPLOY_* / ensure the build produced image_tag / REGISTRY."
               missing=1
             fi
           done
           if [ "${missing}" -ne 0 ]; then
             exit 1
           fi
-          echo "Will dispatch workflow_id=${WORKFLOW_ID} on ${OWNER}/${REPO}@main tag=${IMAGE_TAG}"
+          echo "Will dispatch workflow_id=${WORKFLOW_ID} on ${OWNER}/${REPO}@main tag=${IMAGE_TAG} registry=${REGISTRY}"
 
       - name: Create Temporary Deployment Token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
