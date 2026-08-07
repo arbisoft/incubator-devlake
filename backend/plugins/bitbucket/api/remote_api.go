@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/plugin"
@@ -31,7 +32,7 @@ import (
 )
 
 const (
-	maxErrorBodySize       = 1 << 20 
+	maxErrorBodySize       = 1 << 20
 	bitbucketWorkspacesAPI = "/user/workspaces"
 )
 
@@ -243,7 +244,7 @@ func listAllBitbucketWorkspaces(apiClient plugin.ApiClient) ([]string, errors.Er
 			url.Values{
 				// No sort/fields (see listBitbucketWorkspaces): /user/workspaces
 				// returns 400 on sort=workspace.slug.
-				"page":    {fmt.Sprintf("%v", page)},
+				"page":    {strconv.Itoa(page)},
 				"pagelen": {"100"},
 			},
 			nil,
