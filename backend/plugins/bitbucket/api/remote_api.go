@@ -51,6 +51,18 @@ func nextBitbucketRemotePage(next string, page BitbucketRemotePagination) *Bitbu
 	}
 }
 
+func validateBitbucketOKResponse(res *http.Response) errors.Error {
+	if res.StatusCode == http.StatusOK {
+		return nil
+	}
+
+	body, err := io.ReadAll(io.LimitReader(res.Body, maxErrorBodySize))
+	if err != nil {
+		return errors.BadInput.Wrap(err, "failed to read response body")
+	}
+	return errors.HttpStatus(res.StatusCode).New(string(body))
+}
+
 func listBitbucketRemoteScopes(
 	connection *models.BitbucketConnection,
 	apiClient plugin.ApiClient,
@@ -101,13 +113,7 @@ func listBitbucketWorkspaces(
 		return
 	}
 	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		body, e := io.ReadAll(io.LimitReader(res.Body, maxErrorBodySize))
-		if e != nil {
-			err = errors.BadInput.Wrap(e, "failed to read response body")
-			return
-		}
-		err = errors.HttpStatus(res.StatusCode).New(string(body))
+	if err = validateBitbucketOKResponse(res); err != nil {
 		return
 	}
 
@@ -150,12 +156,8 @@ func listBitbucketRepos(
 		return
 	}
 	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		body, e := io.ReadAll(io.LimitReader(res.Body, maxErrorBodySize))
-		if e != nil {
-			return nil, nil, errors.BadInput.Wrap(e, "failed to read response body")
-		}
-		return nil, nil, errors.BadInput.New(string(body))
+	if err = validateBitbucketOKResponse(res); err != nil {
+		return
 	}
 	var resBody models.ReposResponse
 	err = api.UnmarshalResponse(res, &resBody)
