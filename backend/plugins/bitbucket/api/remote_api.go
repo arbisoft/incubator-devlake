@@ -30,7 +30,10 @@ import (
 	"github.com/apache/incubator-devlake/plugins/bitbucket/models"
 )
 
-const maxErrorBodySize = 1 << 20 // 1 MiB
+const (
+	maxErrorBodySize       = 1 << 20 
+	bitbucketWorkspacesAPI = "/user/workspaces"
+)
 
 type BitbucketRemotePagination struct {
 	Page    int `json:"page" validate:"required"`
@@ -83,7 +86,7 @@ func listBitbucketWorkspaces(
 	// Bitbucket CHANGE-2770; /user/workspaces lists the current user's workspaces
 	// and is the supported replacement.
 	res, err = apiClient.Get(
-		"/user/workspaces",
+		bitbucketWorkspacesAPI,
 		url.Values{
 			// No sort/fields: /user/workspaces rejects sort=workspace.slug with
 			// HTTP 400 "Invalid field name". The bare call returns the nested
@@ -236,7 +239,7 @@ func listAllBitbucketWorkspaces(apiClient plugin.ApiClient) ([]string, errors.Er
 	var slugs []string
 	for page := 1; ; page++ {
 		res, err := apiClient.Get(
-			"/user/workspaces",
+			bitbucketWorkspacesAPI,
 			url.Values{
 				// No sort/fields (see listBitbucketWorkspaces): /user/workspaces
 				// returns 400 on sort=workspace.slug.
