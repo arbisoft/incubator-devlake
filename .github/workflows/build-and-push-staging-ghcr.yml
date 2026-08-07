@@ -15,26 +15,26 @@
 # limitations under the License.
 #
 
-# Build staging images (amd64), push to GHCR, then dispatch the deploy repo.
+# Build staging images (amd64), push to GHCR, then dispatch the deploy workflows repo.
 # Job graph mirrors upstream .github/workflows/build.yml:
 # builder + base cache → build cache → final devlake + config-ui + dashboard.
 #
-# Merge order: land arbisoft/devlake-actions-pipelines#7 (or equivalent) on
-# `main` first — trigger-staging-deploy dispatches that repo at ref `main`.
-# Before the first push to main-arbisoft, complete host cutover (free port 80,
-# staging.env present, GHCR_READ_TOKEN on the deploy environment).
+# Sequencing: merge the deploy workflows repo to its default branch first so
+# createWorkflowDispatch(ref: main) finds the staging deploy workflow. Complete
+# host cutover (free port 80, staging.env, allowed-emails.txt) and run one
+# successful manual workflow_dispatch before re-enabling push: below.
 #
-# Required secrets for the deploy trigger (same App-token pattern as
-# trigger-build-and-push.yml):
-#   GH_APP_ID, GH_PRIVATE_KEY
+# App credentials (secrets): GH_APP_ID, GH_PRIVATE_KEY
+# Deploy target (prefer repository Variables; secrets still accepted as fallback):
 #   GH_STAGING_DEPLOY_OWNER, GH_STAGING_DEPLOY_REPO, GH_STAGING_DEPLOY_WORKFLOW_ID
 
 name: Build and Push Staging GHCR
 
 on:
-  push:
-    branches:
-      - main-arbisoft
+  # Re-enable after the first successful manual staging deploy:
+  # push:
+  #   branches:
+  #     - main-arbisoft
   workflow_dispatch:
     inputs:
       deploy:
@@ -369,35 +369,84 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      # Prefer vars (visible in logs) for non-secret routing; secrets as fallback
+      OWNER: ${{ vars.GH_STAGING_DEPLOY_OWNER || secrets.GH_STAGING_DEPLOY_OWNER }}
+      REPO: ${{ vars.GH_STAGING_DEPLOY_REPO || secrets.GH_STAGING_DEPLOY_REPO }}
+      WORKFLOW_ID: ${{ vars.GH_STAGING_DEPLOY_WORKFLOW_ID || secrets.GH_STAGING_DEPLOY_WORKFLOW_ID }}
+      IMAGE_TAG: ${{ needs.build-and-push-devlake.outputs.image_tag }}
+      REGISTRY: ${{ env.REGISTRY }}
     steps:
+      - name: Assert deploy target
+        run: |
+          set -euo pipefail
+          missing=0
+          for v in OWNER REPO WORKFLOW_ID IMAGE_TAG; do
+            if [ -z "${!v}" ]; then
+              echo "::error::${v} is empty. Set repository variable (preferred) or secret GH_STAGING_DEPLOY_* / ensure the build produced image_tag."
+              missing=1
+            fi
+          done
+          if [ "${missing}" -ne 0 ]; then
+            exit 1
+          fi
+          echo "Will dispatch workflow_id=${WORKFLOW_ID} on ${OWNER}/${REPO}@main tag=${IMAGE_TAG}"
+
       - name: Create Temporary Deployment Token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
         id: app-token
         with:
           app-id: ${{ secrets.GH_APP_ID }}
           private-key: ${{ secrets.GH_PRIVATE_KEY }}
-          owner: ${{ secrets.GH_STAGING_DEPLOY_OWNER }}
+          owner: ${{ env.OWNER }}
           repositories: |
-            ${{ secrets.GH_STAGING_DEPLOY_REPO }}
+            ${{ env.REPO }}
 
       - name: Trigger deploy workflow
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
         env:
-          OWNER: ${{ secrets.GH_STAGING_DEPLOY_OWNER }}
-          REPO: ${{ secrets.GH_STAGING_DEPLOY_REPO }}
-          WORKFLOW_ID: ${{ secrets.GH_STAGING_DEPLOY_WORKFLOW_ID }}
-          IMAGE_TAG: ${{ needs.build-and-push-devlake.outputs.image_tag }}
+          OWNER: ${{ env.OWNER }}
+          REPO: ${{ env.REPO }}
+          WORKFLOW_ID: ${{ env.WORKFLOW_ID }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
           REGISTRY: ${{ env.REGISTRY }}
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
-            await github.rest.actions.createWorkflowDispatch({
-              owner: process.env.OWNER,
-              repo: process.env.REPO,
-              workflow_id: process.env.WORKFLOW_ID,
-              ref: 'main',
-              inputs: {
-                image_tag: process.env.IMAGE_TAG,
-                registry: process.env.REGISTRY,
+            const owner = process.env.OWNER;
+            const repo = process.env.REPO;
+            const workflow_id = process.env.WORKFLOW_ID;
+            const maxAttempts = 3;
+            let lastErr;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+              try {
+                await github.rest.actions.createWorkflowDispatch({
+                  owner,
+                  repo,
+                  workflow_id,
+                  ref: 'main',
+                  inputs: {
+                    image_tag: process.env.IMAGE_TAG,
+                    registry: process.env.REGISTRY,
+                  }
+                });
+                core.info(`Dispatched ${workflow_id} on ${owner}/${repo}@main (attempt ${attempt})`);
+                return;
+              } catch (err) {
+                lastErr = err;
+                const status = err.status || err.response?.status;
+                core.warning(`Dispatch attempt ${attempt}/${maxAttempts} failed: ${status || ''} ${err.message}`);
+                if (status === 404) {
+                  core.error(
+                    `404 creating workflow dispatch for ${owner}/${repo} workflow_id=${workflow_id} ref=main. ` +
+                    `Check: (1) deploy workflow exists on that repo's main branch, ` +
+                    `(2) WORKFLOW_ID is the filename (e.g. deploy-devlake-staging.yml) or numeric id, ` +
+                    `(3) the GitHub App is installed on the deploy repo with actions: write.`
+                  );
+                }
+                if (attempt < maxAttempts) {
+                  await new Promise((r) => setTimeout(r, 2000 * attempt));
+                }
               }
-            });
+            }
+            throw lastErr;
