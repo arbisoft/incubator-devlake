@@ -86,6 +86,7 @@ func listBitbucketWorkspaces(
 	if err != nil {
 		return
 	}
+	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
 		body, e := io.ReadAll(io.LimitReader(res.Body, maxErrorBodySize))
 		if e != nil {
@@ -139,7 +140,7 @@ func listBitbucketRepos(
 	if err != nil {
 		return
 	}
-	// These GET endpoints require a JSON response body, so only 200 is successful.
+	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
 		body, e := io.ReadAll(io.LimitReader(res.Body, maxErrorBodySize))
 		if e != nil {
