@@ -37,6 +37,16 @@ type BitbucketRemotePagination struct {
 	PageLen int `json:"pagelen" validate:"required"`
 }
 
+func nextBitbucketRemotePage(next string, page BitbucketRemotePagination) *BitbucketRemotePagination {
+	if next == "" {
+		return nil
+	}
+	return &BitbucketRemotePagination{
+		Page:    page.Page + 1,
+		PageLen: page.PageLen,
+	}
+}
+
 func listBitbucketRemoteScopes(
 	connection *models.BitbucketConnection,
 	apiClient plugin.ApiClient,
@@ -111,12 +121,7 @@ func listBitbucketWorkspaces(
 			FullName: r.GroupId(),
 		})
 	}
-	if resBody.Next != "" {
-		nextPage = &BitbucketRemotePagination{
-			Page:    page.Page + 1,
-			PageLen: page.PageLen,
-		}
-	}
+	nextPage = nextBitbucketRemotePage(resBody.Next, page)
 	return
 }
 
@@ -164,12 +169,7 @@ func listBitbucketRepos(
 			Data:     r.ConvertApiScope(),
 		})
 	}
-	if resBody.Next != "" {
-		nextPage = &BitbucketRemotePagination{
-			Page:    page.Page + 1,
-			PageLen: page.PageLen,
-		}
-	}
+	nextPage = nextBitbucketRemotePage(resBody.Next, page)
 	return
 }
 
