@@ -19,6 +19,11 @@
 # Job graph mirrors upstream .github/workflows/build.yml:
 # builder + base cache → build cache → final devlake + config-ui + dashboard.
 #
+# Merge order: land arbisoft/devlake-actions-pipelines#7 (or equivalent) on
+# `main` first — trigger-staging-deploy dispatches that repo at ref `main`.
+# Before the first push to main-arbisoft, complete host cutover (free port 80,
+# staging.env present, GHCR_READ_TOKEN on the deploy environment).
+#
 # Required secrets for the deploy trigger (same App-token pattern as
 # trigger-build-and-push.yml):
 #   GH_APP_ID, GH_PRIVATE_KEY
