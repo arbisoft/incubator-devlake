@@ -30,6 +30,8 @@ import (
 	"github.com/apache/incubator-devlake/plugins/bitbucket/models"
 )
 
+const maxErrorBodySize = 1 << 20 // 1 MiB
+
 type BitbucketRemotePagination struct {
 	Page    int `json:"page" validate:"required"`
 	PageLen int `json:"pagelen" validate:"required"`
@@ -85,7 +87,7 @@ func listBitbucketWorkspaces(
 		return
 	}
 	if res.StatusCode != http.StatusOK {
-		body, e := io.ReadAll(res.Body)
+		body, e := io.ReadAll(io.LimitReader(res.Body, maxErrorBodySize))
 		if e != nil {
 			err = errors.BadInput.Wrap(e, "failed to read response body")
 			return
@@ -139,7 +141,7 @@ func listBitbucketRepos(
 	}
 	// These GET endpoints require a JSON response body, so only 200 is successful.
 	if res.StatusCode != http.StatusOK {
-		body, e := io.ReadAll(res.Body)
+		body, e := io.ReadAll(io.LimitReader(res.Body, maxErrorBodySize))
 		if e != nil {
 			return nil, nil, errors.BadInput.Wrap(e, "failed to read response body")
 		}
