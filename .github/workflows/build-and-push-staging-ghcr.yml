@@ -60,7 +60,10 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Free Disk Space
+      # Anchor defined here, aliased as `- *free-disk-space` in the other build jobs below —
+      # keeps the cleanup command list in one place instead of 5 copies drifting out of sync.
+      - &free-disk-space
+        name: Free Disk Space
         run: |
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /usr/local/lib/android
@@ -103,14 +106,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Free Disk Space
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          docker system prune -af
-          docker volume prune -f
+      - *free-disk-space
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -150,14 +146,7 @@ jobs:
       matrix:
         platform: ["amd64"]
     steps:
-      - name: Free Disk Space
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          docker system prune -af
-          docker volume prune -f
+      - *free-disk-space
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -219,14 +208,7 @@ jobs:
     outputs:
       image_tag: ${{ steps.get_push_tags.outputs.TAG }}
     steps:
-      - name: Free Disk Space
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          docker system prune -af
-          docker volume prune -f
+      - *free-disk-space
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -257,10 +239,12 @@ jobs:
         id: get_push_tags
         run: |
           image_name="${{ env.REGISTRY }}/devlake"
-          if printf '%s' "${{ github.ref_name }}" | grep -Pq '^v'; then
-            tag="${{ github.ref_name }}"
+          # Docker tags can't contain "/" (branches like feature/foo can) — sanitize before use.
+          safe_ref="$(printf '%s' "${{ github.ref_name }}" | tr '/' '-')"
+          if printf '%s' "${safe_ref}" | grep -Pq '^v'; then
+            tag="${safe_ref}"
           else
-            tag="${{ github.ref_name }}_${{ needs.get-timestamp.outputs.timestamp }}_${{ steps.get_short_sha.outputs.SHORT_SHA }}"
+            tag="${safe_ref}_${{ needs.get-timestamp.outputs.timestamp }}_${{ steps.get_short_sha.outputs.SHORT_SHA }}"
           fi
           echo "TAG=${tag}" >> "$GITHUB_OUTPUT"
           echo "TAGS=${image_name}:${tag}" >> "$GITHUB_OUTPUT"
@@ -315,14 +299,7 @@ jobs:
             image: devlake-dashboard
             context: grafana
     steps:
-      - name: Free Disk Space
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          docker system prune -af
-          docker volume prune -f
+      - *free-disk-space
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -348,10 +325,12 @@ jobs:
         id: get_push_tags
         run: |
           image_name="${{ env.REGISTRY }}/${{ matrix.build.image }}"
-          if printf '%s' "${{ github.ref_name }}" | grep -Pq '^v'; then
-            echo "TAGS=${image_name}:${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          # Docker tags can't contain "/" (branches like feature/foo can) — sanitize before use.
+          safe_ref="$(printf '%s' "${{ github.ref_name }}" | tr '/' '-')"
+          if printf '%s' "${safe_ref}" | grep -Pq '^v'; then
+            echo "TAGS=${image_name}:${safe_ref}" >> "$GITHUB_OUTPUT"
           else
-            echo "TAGS=${image_name}:${{ github.ref_name }}_${{ needs.get-timestamp.outputs.timestamp }}_${{ steps.get_short_sha.outputs.SHORT_SHA }}" >> "$GITHUB_OUTPUT"
+            echo "TAGS=${image_name}:${safe_ref}_${{ needs.get-timestamp.outputs.timestamp }}_${{ steps.get_short_sha.outputs.SHORT_SHA }}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build and push ${{ matrix.build.name }} image
