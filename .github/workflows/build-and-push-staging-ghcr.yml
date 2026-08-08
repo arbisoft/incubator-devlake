@@ -1,0 +1,432 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# Build staging images (amd64), push to GHCR, then dispatch the deploy workflows repo.
+# Job graph mirrors upstream .github/workflows/build.yml:
+# builder + base cache → build cache → final devlake + config-ui + dashboard.
+#
+# Sequencing: merge the deploy workflows repo to its default branch first so
+# createWorkflowDispatch(ref: main) finds the staging deploy workflow. Complete
+# host cutover (free port 80, staging.env, allowed-emails.txt) and run one
+# successful manual workflow_dispatch before re-enabling push: below.
+#
+# App credentials (secrets): GH_APP_ID, GH_PRIVATE_KEY
+# Deploy target (prefer repository Variables; secrets still accepted as fallback):
+#   GH_STAGING_DEPLOY_OWNER, GH_STAGING_DEPLOY_REPO, GH_STAGING_DEPLOY_WORKFLOW_ID
+
+name: Build and Push Staging GHCR
+
+on:
+  # Re-enable after the first successful manual staging deploy:
+  # push:
+  #   branches:
+  #     - main-arbisoft
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Dispatch the staging deploy workflow after a successful build"
+        type: boolean
+        default: true
+        required: false
+
+concurrency:
+  group: build-and-push-staging-ghcr-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # GHCR requires lowercase owner/image names
+  GHCR_OWNER: ${{ github.repository_owner }}
+  REGISTRY: ghcr.io/${{ github.repository_owner }}
+
+jobs:
+  build-and-push-builder:
+    name: Build and Push devlake builder
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      # Anchor defined here, aliased as `- *free-disk-space` in the other build jobs below —
+      # keeps the cleanup command list in one place instead of 5 copies drifting out of sync.
+      - &free-disk-space
+        name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          docker system prune -af
+          docker volume prune -f
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8  # v4.2.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c  # v4.2.0
+
+      - name: Login to GHCR
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push builder cache
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
+        with:
+          context: ./backend
+          push: true
+          target: builder
+          tags: ${{ env.REGISTRY }}/devlake-ci-cache:amd64-builder
+          platforms: linux/amd64
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/devlake-ci-cache:amd64-builder
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/devlake-ci-cache:amd64-builder,mode=max,image-manifest=true,oci-mediatypes=true
+
+  build-and-push-base:
+    name: Build and Push devlake base
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - *free-disk-space
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8  # v4.2.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c  # v4.2.0
+
+      - name: Login to GHCR
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push base cache
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
+        with:
+          context: ./backend
+          push: true
+          target: base
+          tags: ${{ env.REGISTRY }}/devlake-ci-cache:base
+          platforms: linux/amd64
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/devlake-ci-cache:base
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/devlake-ci-cache:base,mode=max,image-manifest=true,oci-mediatypes=true
+
+  build-devlake:
+    needs: build-and-push-builder
+    name: Build and cache devlake
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        platform: ["amd64"]
+    steps:
+      - *free-disk-space
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Get short sha
+        id: get_short_sha
+        run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8  # v4.2.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c  # v4.2.0
+
+      - name: Login to GHCR
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: /tmp/devlake-build-cache-${{ matrix.platform }}
+          key: buildx-devlake-build-cache-${{ github.run_id }}-${{ matrix.platform }}
+
+      - name: Build and cache lake build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
+        with:
+          context: ./backend
+          push: false
+          target: build
+          tags: ${{ env.REGISTRY }}/devlake-ci-cache:build-cache-${{ matrix.platform }}
+          platforms: linux/${{ matrix.platform }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/devlake-ci-cache:amd64-builder
+          cache-to: type=local,mode=min,dest=/tmp/devlake-build-cache-${{ matrix.platform }}
+          build-args: |
+            TAG=${{ github.ref_name }}
+            SHA=${{ steps.get_short_sha.outputs.SHORT_SHA }}
+
+  get-timestamp:
+    name: Get build timestamp
+    runs-on: ubuntu-latest
+    outputs:
+      timestamp: ${{ steps.ts.outputs.timestamp }}
+    steps:
+      - name: Get build timestamp
+        id: ts
+        run: echo "timestamp=$(date '+%y%m%d_%H%M')" >> "$GITHUB_OUTPUT"
+
+  build-and-push-devlake:
+    needs: [build-devlake, build-and-push-base, get-timestamp]
+    name: Build and Push devlake image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      actions: write
+    outputs:
+      image_tag: ${{ steps.get_push_tags.outputs.TAG }}
+    steps:
+      - *free-disk-space
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Get short sha
+        id: get_short_sha
+        run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8  # v4.2.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c  # v4.2.0
+
+      - name: Login to GHCR
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: /tmp/devlake-build-cache-amd64
+          key: buildx-devlake-build-cache-${{ github.run_id }}-amd64
+
+      - name: Get push tags
+        id: get_push_tags
+        run: |
+          image_name="${{ env.REGISTRY }}/devlake"
+          # Docker tags can't contain "/" (branches like feature/foo can) — sanitize before use.
+          safe_ref="$(printf '%s' "${{ github.ref_name }}" | tr '/' '-')"
+          if printf '%s' "${safe_ref}" | grep -Pq '^v'; then
+            tag="${safe_ref}"
+          else
+            tag="${safe_ref}_${{ needs.get-timestamp.outputs.timestamp }}_${{ steps.get_short_sha.outputs.SHORT_SHA }}"
+          fi
+          echo "TAG=${tag}" >> "$GITHUB_OUTPUT"
+          echo "TAGS=${image_name}:${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push lake image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.get_push_tags.outputs.TAGS }}
+          platforms: linux/amd64
+          cache-from: |
+            type=registry,ref=${{ env.REGISTRY }}/devlake-ci-cache:amd64-builder
+            type=registry,ref=${{ env.REGISTRY }}/devlake-ci-cache:base
+            type=local,src=/tmp/devlake-build-cache-amd64
+          build-args: |
+            TAG=${{ github.ref_name }}
+            SHA=${{ steps.get_short_sha.outputs.SHORT_SHA }}
+
+      - name: Clear cache
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
+        if: always()
+        with:
+          script: |
+            for (const arch of ['amd64']) {
+              try {
+                await github.rest.actions.deleteActionsCacheByKey({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  key: `buildx-devlake-build-cache-${context.runId}-${arch}`,
+                })
+                console.log(`Clear cache buildx-devlake-build-cache-${context.runId}-${arch}`)
+              } catch (e) {
+                console.warn(`Error clear cache buildx-devlake-build-cache-${context.runId}-${arch}: ${e}`)
+              }
+            }
+
+  build-and-push-other-image:
+    needs: [get-timestamp]
+    name: Build and Push ${{ matrix.build.name }} image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        build:
+          - name: config-ui
+            image: devlake-config-ui
+            context: config-ui
+          - name: grafana
+            image: devlake-dashboard
+            context: grafana
+    steps:
+      - *free-disk-space
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Get short sha
+        id: get_short_sha
+        run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8  # v4.2.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c  # v4.2.0
+
+      - name: Login to GHCR
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get push tags
+        id: get_push_tags
+        run: |
+          image_name="${{ env.REGISTRY }}/${{ matrix.build.image }}"
+          # Docker tags can't contain "/" (branches like feature/foo can) — sanitize before use.
+          safe_ref="$(printf '%s' "${{ github.ref_name }}" | tr '/' '-')"
+          if printf '%s' "${safe_ref}" | grep -Pq '^v'; then
+            echo "TAGS=${image_name}:${safe_ref}" >> "$GITHUB_OUTPUT"
+          else
+            echo "TAGS=${image_name}:${safe_ref}_${{ needs.get-timestamp.outputs.timestamp }}_${{ steps.get_short_sha.outputs.SHORT_SHA }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and push ${{ matrix.build.name }} image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
+        with:
+          context: ${{ matrix.build.context }}
+          push: true
+          tags: ${{ steps.get_push_tags.outputs.TAGS }}
+          platforms: linux/amd64
+
+  trigger-staging-deploy:
+    name: Trigger staging deploy
+    needs: [build-and-push-devlake, build-and-push-other-image]
+    if: ${{ github.event_name == 'push' || inputs.deploy != false }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      # Prefer vars (visible in logs) for non-secret routing; secrets as fallback
+      OWNER: ${{ vars.GH_STAGING_DEPLOY_OWNER || secrets.GH_STAGING_DEPLOY_OWNER }}
+      REPO: ${{ vars.GH_STAGING_DEPLOY_REPO || secrets.GH_STAGING_DEPLOY_REPO }}
+      WORKFLOW_ID: ${{ vars.GH_STAGING_DEPLOY_WORKFLOW_ID || secrets.GH_STAGING_DEPLOY_WORKFLOW_ID }}
+      IMAGE_TAG: ${{ needs.build-and-push-devlake.outputs.image_tag }}
+      # REGISTRY is already set at workflow level; do not re-alias via ${{ env.REGISTRY }}
+      # here — the env context is illegal in jobs.<id>.env and rejects the whole file.
+    steps:
+      - name: Assert deploy target
+        run: |
+          set -euo pipefail
+          missing=0
+          for v in OWNER REPO WORKFLOW_ID IMAGE_TAG REGISTRY; do
+            if [ -z "${!v}" ]; then
+              echo "::error::${v} is empty. Set repository variable (preferred) or secret GH_STAGING_DEPLOY_* / ensure the build produced image_tag / REGISTRY."
+              missing=1
+            fi
+          done
+          if [ "${missing}" -ne 0 ]; then
+            exit 1
+          fi
+          echo "Will dispatch workflow_id=${WORKFLOW_ID} on ${OWNER}/${REPO}@main tag=${IMAGE_TAG} registry=${REGISTRY}"
+
+      - name: Create Temporary Deployment Token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
+        id: app-token
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_PRIVATE_KEY }}
+          owner: ${{ env.OWNER }}
+          repositories: |
+            ${{ env.REPO }}
+
+      - name: Trigger deploy workflow
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
+        env:
+          OWNER: ${{ env.OWNER }}
+          REPO: ${{ env.REPO }}
+          WORKFLOW_ID: ${{ env.WORKFLOW_ID }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+          REGISTRY: ${{ env.REGISTRY }}
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const owner = process.env.OWNER;
+            const repo = process.env.REPO;
+            const workflow_id = process.env.WORKFLOW_ID;
+            const maxAttempts = 3;
+            let lastErr;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+              try {
+                await github.rest.actions.createWorkflowDispatch({
+                  owner,
+                  repo,
+                  workflow_id,
+                  ref: 'main',
+                  inputs: {
+                    image_tag: process.env.IMAGE_TAG,
+                    registry: process.env.REGISTRY,
+                  }
+                });
+                core.info(`Dispatched ${workflow_id} on ${owner}/${repo}@main (attempt ${attempt})`);
+                return;
+              } catch (err) {
+                lastErr = err;
+                const status = err.status || err.response?.status;
+                core.warning(`Dispatch attempt ${attempt}/${maxAttempts} failed: ${status || ''} ${err.message}`);
+                if (status === 404) {
+                  core.error(
+                    `404 creating workflow dispatch for ${owner}/${repo} workflow_id=${workflow_id} ref=main. ` +
+                    `Check: (1) deploy workflow exists on that repo's main branch, ` +
+                    `(2) WORKFLOW_ID is the filename (e.g. deploy-devlake-staging.yml) or numeric id, ` +
+                    `(3) the GitHub App is installed on the deploy repo with actions: write.`
+                  );
+                }
+                if (attempt < maxAttempts) {
+                  await new Promise((r) => setTimeout(r, 2000 * attempt));
+                }
+              }
+            }
+            throw lastErr;
