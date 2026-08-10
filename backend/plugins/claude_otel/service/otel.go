@@ -115,7 +115,7 @@ func CreateOtelConnection(user *common.User, input *OtelConnectionInput) (*model
 	}
 	connectionCount, err := db.Count(
 		dal.From(&models.OtelConnection{}),
-		dal.Where("team_slug = ?", teamSlug),
+		dal.Where("team_slug = ? AND status != ?", teamSlug, models.OtelConnectionStatusRevoked),
 	)
 	if err != nil {
 		return nil, errors.Default.Wrap(err, "error checking otel team connection")

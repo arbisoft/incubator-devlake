@@ -26,7 +26,7 @@ import {
   SyncOutlined,
 } from '@ant-design/icons';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
-import { Button, Flex, Input, message, Modal, Space, Table, Tag } from 'antd';
+import { Alert, Button, Flex, Input, message, Modal, Space, Table, Tag } from 'antd';
 
 import API from '@/api';
 import type { OtelConnectionResponse } from '@/api/otel';
@@ -43,6 +43,7 @@ export const Otel = () => {
   const [modal, setModal] = useState<ModalState>();
   const [current, setCurrent] = useState<OtelConnectionResponse>();
   const [teamName, setTeamName] = useState('');
+  const [createError, setCreateError] = useState<string>();
 
   const { data, ready } = useRefreshData(() => API.otel.list(), [version]);
   const dataSource = useMemo(() => data ?? [], [data]);
@@ -55,13 +56,23 @@ export const Otel = () => {
   const closeModal = () => setModal(undefined);
 
   const handleCreate = async () => {
-    const [success, res] = await operator(() => API.otel.create({ teamName }), { setOperating });
+    setCreateError(undefined);
+    const [success, res] = await operator(() => API.otel.create({ teamName }), { hideToast: true, setOperating });
     if (success) {
       setCurrent(res);
       setTeamName('');
       setModal('snippet');
       refresh();
+      return;
     }
+
+    // Keep API failures actionable instead of showing an unformatted response.
+    const reason = String((res as { response?: { data?: { message?: unknown } } })?.response?.data?.message ?? '');
+    setCreateError(
+      reason.includes('a Claude Code OTel connection already exists for this team')
+        ? 'Claude Code OTel credentials already exist for this team. Revoke them before generating new settings.'
+        : 'Unable to generate Claude settings. Please try again or contact support.',
+    );
   };
 
   const handleAction = async (action: 'rotate' | 'revoke' | 'finalize' | 'apply') => {
@@ -87,12 +98,7 @@ export const Otel = () => {
       description="Generate and manage the Basic Auth credential used by Claude Code telemetry."
     >
       <Flex style={{ marginBottom: 16 }} justify="flex-end">
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          loading={operating}
-          onClick={() => setModal('create')}
-        >
+        <Button type="primary" icon={<PlusOutlined />} loading={operating} onClick={() => setModal('create')}>
           Generate Claude Settings
         </Button>
       </Flex>
@@ -226,7 +232,10 @@ export const Otel = () => {
           title="Generate Claude Settings"
           okText="Generate"
           okButtonProps={{ loading: operating, disabled: !teamName.trim() }}
-          onCancel={closeModal}
+          onCancel={() => {
+            setCreateError(undefined);
+            closeModal();
+          }}
           onOk={handleCreate}
         >
           <Space direction="vertical" size={8} style={{ width: '100%' }}>
@@ -236,8 +245,13 @@ export const Otel = () => {
               maxLength={255}
               placeholder="Platform Engineering"
               value={teamName}
-              onChange={(event) => setTeamName(event.target.value)}
+              status={createError ? 'error' : undefined}
+              onChange={(event) => {
+                setTeamName(event.target.value);
+                setCreateError(undefined);
+              }}
             />
+            {createError && <Alert type="error" showIcon message={createError} />}
             <Message content="The team name and its derived reporting slug cannot be changed later." />
           </Space>
         </Modal>
@@ -267,10 +281,18 @@ export const Otel = () => {
               <Space direction="vertical" size={4}>
                 <span>
                   Add this JSON in{' '}
-                  <ExternalLink link="https://claude.ai/admin-settings/claude-code">Claude Code managed settings</ExternalLink>.
+                  <ExternalLink link="https://claude.ai/admin-settings/claude-code">
+                    Claude Code managed settings
+                  </ExternalLink>
+                  .
                 </span>
                 {current?.restartRequired && (
-                  <Message content={current.restartHint || 'Telemetry settings were generated, but endpoint activation needs support attention.'} />
+                  <Message
+                    content={
+                      current.restartHint ||
+                      'Telemetry settings were generated, but endpoint activation needs support attention.'
+                    }
+                  />
                 )}
               </Space>
               <CopyToClipboard text={managedSettings} onCopy={() => message.success('Copy successfully.')}>
