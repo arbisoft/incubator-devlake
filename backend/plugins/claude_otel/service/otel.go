@@ -485,7 +485,10 @@ func callOtelRestartHelper() errors.Error {
 	if helperUrl == "" {
 		return errors.Default.New("otel restart helper is not configured")
 	}
-	token := cfg.GetString("OTEL_RESTART_HELPER_TOKEN")
+	token := strings.TrimSpace(cfg.GetString("OTEL_RESTART_HELPER_TOKEN"))
+	if token == "" {
+		return errors.Default.New("otel restart helper token is not configured")
+	}
 	timeout := cfg.GetInt("OTEL_RESTART_HELPER_TIMEOUT_SECONDS")
 	if timeout <= 0 {
 		timeout = defaultOtelRestartTimeout
@@ -499,9 +502,7 @@ func callOtelRestartHelper() errors.Error {
 		return errors.Default.Wrap(err, "error creating otel restart helper request")
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
+	req.Header.Set("Authorization", "Bearer "+token)
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
