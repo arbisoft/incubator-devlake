@@ -261,38 +261,17 @@ func RevokeOtelConnection(user *common.User, id uint64) (*models.OtelConnectionW
 		return nil, err
 	}
 	for _, credential := range credentials {
-		credential.Status = models.OtelCredentialStatusRevoked
-		credential.RevokedAt = &now
-		credential.PendingCollectorRestart = true
-		credential.LastCollectorRestartHint = collectorRestartHint
+		markOtelCredentialRevoked(credential, now)
 	}
-	for _, credential := range credentials {
-		if err := db.Update(credential); err != nil {
-			return nil, errors.Default.Wrap(err, "error revoking otel credential")
-		}
+	if err := updateOtelCredentials(credentials, "error revoking otel credential"); err != nil {
+		return nil, err
 	}
 	connection.Status = models.OtelConnectionStatusRevoked
 	setOtelActor(user, connection, false)
 	if err := db.Update(connection); err != nil {
 		return nil, errors.Default.Wrap(err, "error revoking otel connection")
 	}
-	if err := writeHtpasswd(nil); err != nil {
-		return nil, err
-	}
-	applyErr, err := applyAndRecordOtelCredentialChanges(credentials)
-	if err != nil {
-		return nil, errors.Default.Wrap(err, "error recording otel credential revocation")
-	}
-	allCredentials, err := getOtelCredentials(id)
-	if err != nil {
-		return nil, err
-	}
-	return &models.OtelConnectionWithCredentials{
-		Connection:      connection,
-		Credentials:     allCredentials,
-		RestartRequired: applyErr != nil,
-		RestartHint:     restartHint(allCredentials),
-	}, nil
+	return applyOtelLifecycleUpdate(connection, credentials, "error recording otel credential revocation")
 }
 
 func FinalizeOtelRotation(user *common.User, id uint64) (*models.OtelConnectionWithCredentials, errors.Error) {
@@ -310,29 +289,44 @@ func FinalizeOtelRotation(user *common.User, id uint64) (*models.OtelConnectionW
 	}
 	for _, credential := range credentials {
 		if credential.Status == models.OtelCredentialStatusRetiring {
-			credential.Status = models.OtelCredentialStatusRevoked
-			credential.RevokedAt = &now
-			credential.PendingCollectorRestart = true
-			credential.LastCollectorRestartHint = collectorRestartHint
+			markOtelCredentialRevoked(credential, now)
 		}
 	}
-	for _, credential := range credentials {
-		if err := db.Update(credential); err != nil {
-			return nil, errors.Default.Wrap(err, "error finalizing otel rotation")
-		}
+	if err := updateOtelCredentials(credentials, "error finalizing otel rotation"); err != nil {
+		return nil, err
 	}
 	setOtelActor(user, connection, false)
 	if err := db.Update(connection); err != nil {
 		return nil, errors.Default.Wrap(err, "error updating otel connection")
 	}
+	return applyOtelLifecycleUpdate(connection, credentials, "error recording finalized otel credential activation")
+}
+
+func markOtelCredentialRevoked(credential *models.OtelCredential, revokedAt time.Time) {
+	credential.Status = models.OtelCredentialStatusRevoked
+	credential.RevokedAt = &revokedAt
+	credential.PendingCollectorRestart = true
+	credential.LastCollectorRestartHint = collectorRestartHint
+}
+
+func updateOtelCredentials(credentials []*models.OtelCredential, message string) errors.Error {
+	for _, credential := range credentials {
+		if err := db.Update(credential); err != nil {
+			return errors.Default.Wrap(err, message)
+		}
+	}
+	return nil
+}
+
+func applyOtelLifecycleUpdate(connection *models.OtelConnection, credentials []*models.OtelCredential, message string) (*models.OtelConnectionWithCredentials, errors.Error) {
 	if err := writeHtpasswd(nil); err != nil {
 		return nil, err
 	}
 	applyErr, err := applyAndRecordOtelCredentialChanges(credentials)
 	if err != nil {
-		return nil, errors.Default.Wrap(err, "error recording finalized otel credential activation")
+		return nil, errors.Default.Wrap(err, message)
 	}
-	allCredentials, err := getOtelCredentials(id)
+	allCredentials, err := getOtelCredentials(connection.ID)
 	if err != nil {
 		return nil, err
 	}
