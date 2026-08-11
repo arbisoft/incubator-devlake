@@ -24,6 +24,9 @@ import (
 )
 
 const (
+	OtelConnectionTable = "_tool_claude_code_otel_connections"
+	OtelCredentialTable = "_tool_claude_code_otel_credentials"
+
 	OtelConnectionStatusActive  = "active"
 	OtelConnectionStatusRevoked = "revoked"
 
@@ -47,7 +50,7 @@ type OtelConnection struct {
 }
 
 func (c OtelConnection) TableName() string {
-	return "_tool_claude_code_otel_connections"
+	return OtelConnectionTable
 }
 
 type OtelCredential struct {
@@ -62,7 +65,7 @@ type OtelCredential struct {
 }
 
 func (c OtelCredential) TableName() string {
-	return "_tool_claude_code_otel_credentials"
+	return OtelCredentialTable
 }
 
 type OtelManagedSettings struct {
