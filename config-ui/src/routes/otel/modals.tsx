@@ -23,6 +23,7 @@ import { Alert, Button, Flex, Input, message, Modal, Space } from 'antd';
 
 import type { OtelConnectionResponse } from '@/api/otel';
 import { ExternalLink, Message } from '@/components';
+import { ManagedSettings } from './styled';
 
 export const OTEL_MODAL = {
   CREATE: 'create',
@@ -94,21 +95,7 @@ const SnippetModal = ({ current, managedSettings, onClose }: OtelModalProps) => 
     <Space direction="vertical" style={{ width: '100%' }} size={16}>
       <Message content="Copy this now. DevLake does not store the generated password or Basic Auth header." />
       <Message content="Pasting this JSON replaces existing managed env settings, including any console exporter flags." />
-      <pre
-        style={{
-          minHeight: 320,
-          maxHeight: 520,
-          overflow: 'auto',
-          margin: 0,
-          padding: 16,
-          border: '1px solid #d9d9d9',
-          borderRadius: 6,
-          background: '#f7f8fa',
-          whiteSpace: 'pre',
-        }}
-      >
-        {managedSettings}
-      </pre>
+      <ManagedSettings>{managedSettings}</ManagedSettings>
       <Flex justify="space-between" align="center">
         <Space direction="vertical" size={4}>
           <span>
