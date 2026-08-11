@@ -27,6 +27,7 @@ import {
 } from '@ant-design/icons';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
 import { Alert, Button, Flex, Input, message, Modal, Space, Table, Tag } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 
 import API from '@/api';
 import type { OtelConnectionResponse } from '@/api/otel';
@@ -39,6 +40,118 @@ type ModalState = 'create' | 'snippet' | 'rotate' | 'revoke' | 'finalize' | 'app
 
 const BREADCRUMBS = [{ name: 'Claude Code OTel', path: PATHS.OTEL() }];
 
+// Keep table presentation separate while leaving page-specific actions in this route.
+const getColumns = (
+  setCurrent: (connection: OtelConnectionResponse) => void,
+  setModal: (modal: ModalState) => void,
+): ColumnsType<OtelConnectionResponse> => [
+  {
+    title: 'Team',
+    dataIndex: ['connection', 'teamName'],
+    width: 220,
+  },
+  {
+    title: 'Team slug',
+    dataIndex: ['connection', 'teamSlug'],
+    width: 220,
+  },
+  {
+    title: 'Endpoint',
+    dataIndex: ['connection', 'collectorEndpoint'],
+  },
+  {
+    title: 'Status',
+    width: 180,
+    render: (_, record) => (
+      <Space>
+        <Tag color={record.connection.status === 'active' && !record.restartRequired ? 'green' : 'default'}>
+          {record.connection.status === 'revoked' ? 'Revoked' : record.restartRequired ? 'Action required' : 'Ready'}
+        </Tag>
+      </Space>
+    ),
+  },
+  {
+    title: 'Credentials',
+    width: 220,
+    render: (_, record) => {
+      const currentCredentials = record.credentials.filter((credential) => credential.status !== 'revoked');
+
+      return (
+        <Space wrap>
+          {currentCredentials.length > 0 ? (
+            currentCredentials.map((credential) => (
+              <Tag key={credential.id} color={credential.status === 'active' ? 'green' : 'orange'}>
+                {credential.status}
+              </Tag>
+            ))
+          ) : (
+            <Tag>revoked</Tag>
+          )}
+        </Space>
+      );
+    },
+  },
+  {
+    title: 'Updated',
+    dataIndex: ['connection', 'updatedAt'],
+    width: 180,
+    render: (value) => formatTime(value),
+  },
+  {
+    title: '',
+    width: 250,
+    render: (_, record) => (
+      <Space wrap>
+        <Button
+          size="small"
+          icon={<ReloadOutlined />}
+          disabled={record.connection.status !== 'active' || record.credentials.some((it) => it.status === 'retiring')}
+          onClick={() => {
+            setCurrent(record);
+            setModal('rotate');
+          }}
+        >
+          Rotate
+        </Button>
+        <Button
+          size="small"
+          icon={<SyncOutlined />}
+          disabled={!record.restartRequired}
+          onClick={() => {
+            setCurrent(record);
+            setModal('apply');
+          }}
+        >
+          Apply
+        </Button>
+        <Button
+          size="small"
+          icon={<CheckOutlined />}
+          disabled={!record.credentials.some((it) => it.status === 'retiring')}
+          onClick={() => {
+            setCurrent(record);
+            setModal('finalize');
+          }}
+        >
+          Finalize
+        </Button>
+        <Button
+          size="small"
+          danger
+          icon={<StopOutlined />}
+          disabled={record.connection.status !== 'active'}
+          onClick={() => {
+            setCurrent(record);
+            setModal('revoke');
+          }}
+        >
+          Revoke
+        </Button>
+      </Space>
+    ),
+  },
+];
+
 export const Otel = () => {
   const [version, setVersion] = useState(1);
   const [operating, setOperating] = useState(false);
@@ -49,6 +162,7 @@ export const Otel = () => {
 
   const { data, ready } = useRefreshData(() => API.otel.list(), [version]);
   const dataSource = useMemo(() => data ?? [], [data]);
+  const columns = useMemo(() => getColumns(setCurrent, setModal), []);
   const managedSettings = useMemo(
     () => (current?.managedSettings ? JSON.stringify(current.managedSettings, null, 2) : ''),
     [current],
@@ -112,119 +226,7 @@ export const Otel = () => {
         size="middle"
         loading={!ready}
         dataSource={dataSource}
-        columns={[
-          {
-            title: 'Team',
-            dataIndex: ['connection', 'teamName'],
-            width: 220,
-          },
-          {
-            title: 'Team slug',
-            dataIndex: ['connection', 'teamSlug'],
-            width: 220,
-          },
-          {
-            title: 'Endpoint',
-            dataIndex: ['connection', 'collectorEndpoint'],
-          },
-          {
-            title: 'Status',
-            width: 180,
-            render: (_, record) => (
-              <Space>
-                <Tag color={record.connection.status === 'active' && !record.restartRequired ? 'green' : 'default'}>
-                  {record.connection.status === 'revoked'
-                    ? 'Revoked'
-                    : record.restartRequired
-                    ? 'Action required'
-                    : 'Ready'}
-                </Tag>
-              </Space>
-            ),
-          },
-          {
-            title: 'Credentials',
-            width: 220,
-            render: (_, record) => {
-              const currentCredentials = record.credentials.filter((credential) => credential.status !== 'revoked');
-
-              return (
-                <Space wrap>
-                  {currentCredentials.length > 0 ? (
-                    currentCredentials.map((credential) => (
-                      <Tag key={credential.id} color={credential.status === 'active' ? 'green' : 'orange'}>
-                        {credential.status}
-                      </Tag>
-                    ))
-                  ) : (
-                    <Tag>revoked</Tag>
-                  )}
-                </Space>
-              );
-            },
-          },
-          {
-            title: 'Updated',
-            dataIndex: ['connection', 'updatedAt'],
-            width: 180,
-            render: (value) => formatTime(value),
-          },
-          {
-            title: '',
-            width: 250,
-            render: (_, record) => (
-              <Space wrap>
-                <Button
-                  size="small"
-                  icon={<ReloadOutlined />}
-                  disabled={
-                    record.connection.status !== 'active' || record.credentials.some((it) => it.status === 'retiring')
-                  }
-                  onClick={() => {
-                    setCurrent(record);
-                    setModal('rotate');
-                  }}
-                >
-                  Rotate
-                </Button>
-                <Button
-                  size="small"
-                  icon={<SyncOutlined />}
-                  disabled={!record.restartRequired}
-                  onClick={() => {
-                    setCurrent(record);
-                    setModal('apply');
-                  }}
-                >
-                  Apply
-                </Button>
-                <Button
-                  size="small"
-                  icon={<CheckOutlined />}
-                  disabled={!record.credentials.some((it) => it.status === 'retiring')}
-                  onClick={() => {
-                    setCurrent(record);
-                    setModal('finalize');
-                  }}
-                >
-                  Finalize
-                </Button>
-                <Button
-                  size="small"
-                  danger
-                  icon={<StopOutlined />}
-                  disabled={record.connection.status !== 'active'}
-                  onClick={() => {
-                    setCurrent(record);
-                    setModal('revoke');
-                  }}
-                >
-                  Revoke
-                </Button>
-              </Space>
-            ),
-          },
-        ]}
+        columns={columns}
       />
 
       {modal === 'create' && (
