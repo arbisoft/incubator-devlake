@@ -24,12 +24,13 @@ const (
 )
 
 type config struct {
-	address       string
-	token         string
-	dockerSocket  string
-	containerName string
-	healthURL     string
-	timeout       time.Duration
+	address          string
+	token            string
+	dockerSocket     string
+	containerName    string
+	healthURL        string
+	timeout          time.Duration
+	dockerHTTPClient *http.Client
 }
 
 func main() {
@@ -58,7 +59,7 @@ func loadConfig() config {
 			log.Fatalf("invalid OTEL_RESTART_TIMEOUT_SECONDS %q: use a duration like 45s or a whole number of seconds", raw)
 		}
 	}
-	return config{
+	cfg := config{
 		address:       firstNonEmpty(os.Getenv("OTEL_RESTART_HELPER_ADDRESS"), defaultAddress),
 		token:         os.Getenv("OTEL_RESTART_HELPER_TOKEN"),
 		dockerSocket:  firstNonEmpty(os.Getenv("OTEL_RESTART_DOCKER_SOCKET"), defaultDockerSocket),
@@ -66,6 +67,8 @@ func loadConfig() config {
 		healthURL:     firstNonEmpty(os.Getenv("OTEL_COLLECTOR_HEALTH_URL"), defaultHealthURL),
 		timeout:       timeout,
 	}
+	cfg.dockerHTTPClient = newDockerClient(cfg.dockerSocket)
+	return cfg
 }
 
 func healthHandler(w http.ResponseWriter, _ *http.Request) {
@@ -115,7 +118,7 @@ func (cfg config) restartCollector(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	res, err := cfg.dockerClient().Do(req)
+	res, err := cfg.dockerHTTPClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("restart request failed: %w", err)
 	}
@@ -127,11 +130,11 @@ func (cfg config) restartCollector(ctx context.Context) error {
 	return fmt.Errorf("docker restart failed with status %d: %s", res.StatusCode, strings.TrimSpace(string(body)))
 }
 
-func (cfg config) dockerClient() *http.Client {
+func newDockerClient(dockerSocket string) *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-				return (&net.Dialer{}).DialContext(ctx, "unix", cfg.dockerSocket)
+				return (&net.Dialer{}).DialContext(ctx, "unix", dockerSocket)
 			},
 		},
 	}
