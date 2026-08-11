@@ -36,6 +36,7 @@ import (
 	corecontext "github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/core/log"
 	"github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/core/utils"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
@@ -54,8 +55,9 @@ const (
 )
 
 var (
-	cfg config.ConfigReader
-	db  dal.Dal
+	cfg    config.ConfigReader
+	db     dal.Dal
+	logger log.Logger
 	// lifecycleMu serializes file and collector updates for a single backend instance.
 	lifecycleMu sync.Mutex
 )
@@ -63,6 +65,7 @@ var (
 func Init(basicRes corecontext.BasicRes) {
 	cfg = basicRes.GetConfigReader()
 	db = basicRes.GetDal()
+	logger = basicRes.GetLogger()
 }
 
 type OtelConnectionInput struct {
@@ -142,17 +145,17 @@ func CreateOtelConnection(user *common.User, input *OtelConnectionInput) (*model
 
 	credential, password, err := createOtelCredential(connection.ID, connection.TeamSlug)
 	if err != nil {
-		_ = db.Delete(connection)
+		deleteOtelConnectionAfterFailedCreate(connection)
 		return nil, err
 	}
 	credentials := []*models.OtelCredential{credential}
 	if err := db.Create(credential); err != nil {
-		_ = db.Delete(connection)
+		deleteOtelConnectionAfterFailedCreate(connection)
 		return nil, errors.Default.Wrap(err, "error saving otel credential")
 	}
 	if err := writeHtpasswd(map[string]string{credential.Username: password}); err != nil {
-		_ = db.Delete(credential)
-		_ = db.Delete(connection)
+		deleteOtelCredentialAfterFailedCreate(credential)
+		deleteOtelConnectionAfterFailedCreate(connection)
 		return nil, err
 	}
 	_ = applyOtelCredentialChanges(credentials)
@@ -160,6 +163,20 @@ func CreateOtelConnection(user *common.User, input *OtelConnectionInput) (*model
 		return nil, errors.Default.Wrap(err, "error recording otel credential activation")
 	}
 	return responseWithSettings(connection, credentials, credential, password), nil
+}
+
+// deleteOtelConnectionAfterFailedCreate keeps failed-create cleanup best-effort without hiding the original error.
+func deleteOtelConnectionAfterFailedCreate(connection *models.OtelConnection) {
+	if err := db.Delete(connection); err != nil && logger != nil {
+		logger.Warn(err, "failed to clean up OTel connection %d after create failure", connection.ID)
+	}
+}
+
+// deleteOtelCredentialAfterFailedCreate keeps failed-create cleanup best-effort without logging credential material.
+func deleteOtelCredentialAfterFailedCreate(credential *models.OtelCredential) {
+	if err := db.Delete(credential); err != nil && logger != nil {
+		logger.Warn(err, "failed to clean up OTel credential %d after create failure", credential.ID)
+	}
 }
 
 func RotateOtelConnection(user *common.User, id uint64) (*models.OtelConnectionWithCredentials, errors.Error) {
