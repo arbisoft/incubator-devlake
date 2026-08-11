@@ -17,37 +17,24 @@
  */
 
 import { useMemo, useState } from 'react';
-import {
-  CopyOutlined,
-  PlusOutlined,
-  ReloadOutlined,
-  StopOutlined,
-  CheckOutlined,
-  SyncOutlined,
-} from '@ant-design/icons';
-import { CopyToClipboard } from 'react-copy-to-clipboard';
-import { Alert, Button, Flex, Input, message, Modal, Space, Table, Tag } from 'antd';
+import { PlusOutlined, ReloadOutlined, StopOutlined, CheckOutlined, SyncOutlined } from '@ant-design/icons';
+import { Button, Flex, Space, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 
 import API from '@/api';
-import {
-  OTEL_CONNECTION_STATUS,
-  OTEL_CREDENTIAL_STATUS,
-  type OtelConnectionResponse,
-} from '@/api/otel';
-import { ExternalLink, Message, PageHeader } from '@/components';
+import { OTEL_CONNECTION_STATUS, OTEL_CREDENTIAL_STATUS, type OtelConnectionResponse } from '@/api/otel';
+import { Message, PageHeader } from '@/components';
 import { PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
 import { formatTime, operator } from '@/utils';
-
-type ModalState = 'create' | 'snippet' | 'rotate' | 'revoke' | 'finalize' | 'apply';
+import { OTEL_MODAL, OtelModals, type OtelLifecycleAction, type OtelModalState } from './modals';
 
 const BREADCRUMBS = [{ name: 'Claude Code OTel', path: PATHS.OTEL() }];
 
 // Keep table presentation separate while leaving page-specific actions in this route.
 const getColumns = (
   setCurrent: (connection: OtelConnectionResponse) => void,
-  setModal: (modal: ModalState) => void,
+  setModal: (modal: OtelModalState) => void,
 ): ColumnsType<OtelConnectionResponse> => [
   {
     title: 'Team',
@@ -76,8 +63,8 @@ const getColumns = (
           {record.connection.status === OTEL_CONNECTION_STATUS.REVOKED
             ? 'Revoked'
             : record.restartRequired
-              ? 'Action required'
-              : 'Ready'}
+            ? 'Action required'
+            : 'Ready'}
         </Tag>
       </Space>
     ),
@@ -125,7 +112,7 @@ const getColumns = (
           }
           onClick={() => {
             setCurrent(record);
-            setModal('rotate');
+            setModal(OTEL_MODAL.ROTATE);
           }}
         >
           Rotate
@@ -136,7 +123,7 @@ const getColumns = (
           disabled={!record.restartRequired}
           onClick={() => {
             setCurrent(record);
-            setModal('apply');
+            setModal(OTEL_MODAL.APPLY);
           }}
         >
           Apply
@@ -147,7 +134,7 @@ const getColumns = (
           disabled={!record.credentials.some((it) => it.status === OTEL_CREDENTIAL_STATUS.RETIRING)}
           onClick={() => {
             setCurrent(record);
-            setModal('finalize');
+            setModal(OTEL_MODAL.FINALIZE);
           }}
         >
           Finalize
@@ -159,7 +146,7 @@ const getColumns = (
           disabled={record.connection.status !== OTEL_CONNECTION_STATUS.ACTIVE}
           onClick={() => {
             setCurrent(record);
-            setModal('revoke');
+            setModal(OTEL_MODAL.REVOKE);
           }}
         >
           Revoke
@@ -172,7 +159,7 @@ const getColumns = (
 export const Otel = () => {
   const [version, setVersion] = useState(1);
   const [operating, setOperating] = useState(false);
-  const [modal, setModal] = useState<ModalState>();
+  const [modal, setModal] = useState<OtelModalState>();
   const [current, setCurrent] = useState<OtelConnectionResponse>();
   const [teamName, setTeamName] = useState('');
   const [createError, setCreateError] = useState<string>();
@@ -194,7 +181,7 @@ export const Otel = () => {
     if (success) {
       setCurrent(res);
       setTeamName('');
-      setModal('snippet');
+      setModal(OTEL_MODAL.SNIPPET);
       refresh();
       return;
     }
@@ -208,7 +195,7 @@ export const Otel = () => {
     );
   };
 
-  const handleAction = async (action: 'rotate' | 'revoke' | 'finalize' | 'apply') => {
+  const handleAction = async (action: OtelLifecycleAction) => {
     if (!current?.connection.id) return;
     const apiCall = {
       rotate: () => API.otel.rotate(current.connection.id),
@@ -220,7 +207,7 @@ export const Otel = () => {
     const [success, res] = await operator(apiCall, { setOperating });
     if (success) {
       setCurrent(res);
-      setModal(res.managedSettings ? 'snippet' : undefined);
+      setModal(res.managedSettings ? OTEL_MODAL.SNIPPET : undefined);
       refresh();
     }
   };
@@ -231,7 +218,7 @@ export const Otel = () => {
       description="Generate and manage the Basic Auth credential used by Claude Code telemetry."
     >
       <Flex style={{ marginBottom: 16 }} justify="flex-end">
-        <Button type="primary" icon={<PlusOutlined />} loading={operating} onClick={() => setModal('create')}>
+        <Button type="primary" icon={<PlusOutlined />} loading={operating} onClick={() => setModal(OTEL_MODAL.CREATE)}>
           Generate Claude Settings
         </Button>
       </Flex>
@@ -246,143 +233,19 @@ export const Otel = () => {
         columns={columns}
       />
 
-      {modal === 'create' && (
-        <Modal
-          open
-          centered
-          title="Generate Claude Settings"
-          okText="Generate"
-          okButtonProps={{ loading: operating, disabled: !teamName.trim() }}
-          onCancel={() => {
-            setCreateError(undefined);
-            closeModal();
-          }}
-          onOk={handleCreate}
-        >
-          <Space direction="vertical" size={8} style={{ width: '100%' }}>
-            <span>Team name</span>
-            <Input
-              autoFocus
-              maxLength={255}
-              placeholder="Platform Engineering"
-              value={teamName}
-              status={createError ? 'error' : undefined}
-              onChange={(event) => {
-                setTeamName(event.target.value);
-                setCreateError(undefined);
-              }}
-            />
-            {createError && <Alert type="error" showIcon message={createError} />}
-            <Message content="The team name and its derived reporting slug cannot be changed later." />
-          </Space>
-        </Modal>
-      )}
-
-      {modal === 'snippet' && (
-        <Modal open width={900} centered title="Claude managed settings" footer={null} onCancel={closeModal}>
-          <Space direction="vertical" style={{ width: '100%' }} size={16}>
-            <Message content="Copy this now. DevLake does not store the generated password or Basic Auth header." />
-            <Message content="Pasting this JSON replaces existing managed env settings, including any console exporter flags." />
-            <pre
-              style={{
-                minHeight: 320,
-                maxHeight: 520,
-                overflow: 'auto',
-                margin: 0,
-                padding: 16,
-                border: '1px solid #d9d9d9',
-                borderRadius: 6,
-                background: '#f7f8fa',
-                whiteSpace: 'pre',
-              }}
-            >
-              {managedSettings}
-            </pre>
-            <Flex justify="space-between" align="center">
-              <Space direction="vertical" size={4}>
-                <span>
-                  Add this JSON in{' '}
-                  <ExternalLink link="https://claude.ai/admin-settings/claude-code">
-                    Claude Code managed settings
-                  </ExternalLink>
-                  .
-                </span>
-                {current?.restartRequired && (
-                  <Message
-                    content={
-                      current.restartHint ||
-                      'Telemetry settings were generated, but endpoint activation needs support attention.'
-                    }
-                  />
-                )}
-              </Space>
-              <CopyToClipboard text={managedSettings} onCopy={() => message.success('Copy successfully.')}>
-                <Button icon={<CopyOutlined />}>Copy</Button>
-              </CopyToClipboard>
-            </Flex>
-          </Space>
-        </Modal>
-      )}
-
-      {modal === 'rotate' && (
-        <Modal
-          open
-          width={720}
-          centered
-          title="Rotate Claude Code OTel Credential"
-          okText="Rotate"
-          okButtonProps={{ loading: operating }}
-          onCancel={closeModal}
-          onOk={() => handleAction('rotate')}
-        >
-          <Message content="The old credential will stay valid as retiring until you finalize rotation." />
-        </Modal>
-      )}
-
-      {modal === 'finalize' && (
-        <Modal
-          open
-          width={720}
-          centered
-          title="Finalize Rotation"
-          okText="Finalize"
-          okButtonProps={{ loading: operating }}
-          onCancel={closeModal}
-          onOk={() => handleAction('finalize')}
-        >
-          <Message content="Retiring credentials will be removed after the telemetry endpoint applies the update." />
-        </Modal>
-      )}
-
-      {modal === 'apply' && (
-        <Modal
-          open
-          width={720}
-          centered
-          title="Apply Credential Changes"
-          okText="Apply"
-          okButtonProps={{ loading: operating }}
-          onCancel={closeModal}
-          onOk={() => handleAction('apply')}
-        >
-          <Message content="Retry applying the current credential state to the telemetry endpoint." />
-        </Modal>
-      )}
-
-      {modal === 'revoke' && (
-        <Modal
-          open
-          width={720}
-          centered
-          title="Revoke Claude Code OTel Credential"
-          okText="Revoke"
-          okButtonProps={{ loading: operating, danger: true }}
-          onCancel={closeModal}
-          onOk={() => handleAction('revoke')}
-        >
-          <Message content="All active Claude Code telemetry credentials for this connection will be rejected after the telemetry endpoint applies the update." />
-        </Modal>
-      )}
+      <OtelModals
+        modal={modal}
+        current={current}
+        teamName={teamName}
+        createError={createError}
+        operating={operating}
+        managedSettings={managedSettings}
+        onClose={closeModal}
+        onCreate={handleCreate}
+        onTeamNameChange={setTeamName}
+        onClearCreateError={() => setCreateError(undefined)}
+        onAction={handleAction}
+      />
     </PageHeader>
   );
 };

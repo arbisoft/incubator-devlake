@@ -80,10 +80,12 @@ export const create = (data: { teamName: string }) =>
   }) as Promise<OtelConnectionResponse>;
 
 // Keep credential lifecycle requests consistent across the management actions.
-const otelAction = (action: string) => (id: ID): Promise<OtelConnectionResponse> =>
-  request(`${basePath}/${id}/${action}`, {
-    method: 'POST',
-  });
+const otelAction =
+  (action: string) =>
+  (id: ID): Promise<OtelConnectionResponse> =>
+    request(`${basePath}/${id}/${action}`, {
+      method: 'POST',
+    });
 
 export const rotate = otelAction('rotate');
 export const revoke = otelAction('revoke');
