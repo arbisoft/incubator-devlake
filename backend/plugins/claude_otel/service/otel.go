@@ -162,7 +162,7 @@ func CreateOtelConnection(user *common.User, input *OtelConnectionInput) (*model
 		// Keep the credential usable after the next successful apply, while recording the helper outage for operators.
 		logger.Warn(applyErr, "OTel collector activation is pending for connection %d", connection.ID)
 	}
-	if err := db.Update(credential); err != nil {
+	if err := updateOtelCredentialRestartState(credentials); err != nil {
 		return nil, errors.Default.Wrap(err, "error recording otel credential activation")
 	}
 	return responseWithSettings(connection, credentials, credential, password), nil
@@ -239,10 +239,8 @@ func RotateOtelConnection(user *common.User, id uint64) (*models.OtelConnectionW
 		return nil, err
 	}
 	_ = applyOtelCredentialChanges(affectedCredentials)
-	for _, credential := range affectedCredentials {
-		if err := db.Update(credential); err != nil {
-			return nil, errors.Default.Wrap(err, "error recording otel credential activation")
-		}
+	if err := updateOtelCredentialRestartState(affectedCredentials); err != nil {
+		return nil, errors.Default.Wrap(err, "error recording otel credential activation")
 	}
 	setOtelActor(user, connection, false)
 	if err := db.Update(connection); err != nil {
@@ -284,10 +282,8 @@ func RevokeOtelConnection(user *common.User, id uint64) (*models.OtelConnectionW
 		return nil, err
 	}
 	applyErr := applyOtelCredentialChanges(credentials)
-	for _, credential := range credentials {
-		if err := db.Update(credential); err != nil {
-			return nil, errors.Default.Wrap(err, "error recording otel credential revocation")
-		}
+	if err := updateOtelCredentialRestartState(credentials); err != nil {
+		return nil, errors.Default.Wrap(err, "error recording otel credential revocation")
 	}
 	allCredentials, err := getOtelCredentials(id)
 	if err != nil {
@@ -335,10 +331,8 @@ func FinalizeOtelRotation(user *common.User, id uint64) (*models.OtelConnectionW
 		return nil, err
 	}
 	applyErr := applyOtelCredentialChanges(credentials)
-	for _, credential := range credentials {
-		if err := db.Update(credential); err != nil {
-			return nil, errors.Default.Wrap(err, "error recording finalized otel credential activation")
-		}
+	if err := updateOtelCredentialRestartState(credentials); err != nil {
+		return nil, errors.Default.Wrap(err, "error recording finalized otel credential activation")
 	}
 	allCredentials, err := getOtelCredentials(id)
 	if err != nil {
@@ -369,10 +363,8 @@ func ApplyOtelConnection(user *common.User, id uint64) (*models.OtelConnectionWi
 		return nil, err
 	}
 	applyErr := applyOtelCredentialChanges(allCredentials)
-	for _, credential := range allCredentials {
-		if err := db.Update(credential); err != nil {
-			return nil, errors.Default.Wrap(err, "error recording otel credential activation")
-		}
+	if err := updateOtelCredentialRestartState(allCredentials); err != nil {
+		return nil, errors.Default.Wrap(err, "error recording otel credential activation")
 	}
 	setOtelActor(user, connection, false)
 	if err := db.Update(connection); err != nil {
@@ -500,6 +492,26 @@ func applyOtelCredentialChanges(credentials []*models.OtelCredential) errors.Err
 		credential.LastCollectorRestartHint = ""
 	}
 	return nil
+}
+
+func updateOtelCredentialRestartState(credentials []*models.OtelCredential) errors.Error {
+	if len(credentials) == 0 {
+		return nil
+	}
+	ids := make([]uint64, 0, len(credentials))
+	pending := credentials[0].PendingCollectorRestart
+	hint := credentials[0].LastCollectorRestartHint
+	for _, credential := range credentials {
+		ids = append(ids, credential.ID)
+	}
+	return db.UpdateColumns(
+		&models.OtelCredential{},
+		[]dal.DalSet{
+			{ColumnName: "pending_collector_restart", Value: pending},
+			{ColumnName: "last_collector_restart_hint", Value: hint},
+		},
+		dal.Where("id IN ?", ids),
+	)
 }
 
 func callOtelRestartHelper() errors.Error {
