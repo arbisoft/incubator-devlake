@@ -77,7 +77,7 @@
         },
         "update": {
           "method": "POST",
-          "url": "https://aperture.arbisoft.com/api/user-project-mappings/${userLogin}",
+          "url": "/api/user-project-mappings/${userLogin}",
           "header": [
             {
               "name": "Content-Type",
@@ -141,7 +141,7 @@
         },
         "update": {
           "method": "DELETE",
-          "url": "https://aperture.arbisoft.com/api/user-project-mappings/${userLogin}/${project}",
+          "url": "/api/user-project-mappings/${userLogin}/${project}",
           "header": [],
           "contentType": "application/json",
           "confirm": false,
