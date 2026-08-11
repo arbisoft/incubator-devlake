@@ -76,6 +76,8 @@ func ListOtelConnections() ([]*models.OtelConnectionWithCredentials, errors.Erro
 		return nil, errors.Default.Wrap(err, "error getting otel connections")
 	}
 
+	// Enrich each connection with its credential records and UI state: pending collector restarts,
+	// the related activation hint, and whether an active or retiring credential lacks its htpasswd verifier.
 	output := make([]*models.OtelConnectionWithCredentials, 0, len(connections))
 	for _, connection := range connections {
 		credentials, err := getOtelCredentials(connection.ID)
