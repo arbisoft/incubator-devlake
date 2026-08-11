@@ -158,7 +158,10 @@ func CreateOtelConnection(user *common.User, input *OtelConnectionInput) (*model
 		deleteOtelConnectionAfterFailedCreate(connection)
 		return nil, err
 	}
-	_ = applyOtelCredentialChanges(credentials)
+	if applyErr := applyOtelCredentialChanges(credentials); applyErr != nil && logger != nil {
+		// Keep the credential usable after the next successful apply, while recording the helper outage for operators.
+		logger.Warn(applyErr, "OTel collector activation is pending for connection %d", connection.ID)
+	}
 	if err := db.Update(credential); err != nil {
 		return nil, errors.Default.Wrap(err, "error recording otel credential activation")
 	}
