@@ -158,12 +158,11 @@ func CreateOtelConnection(user *common.User, input *OtelConnectionInput) (*model
 		deleteOtelConnectionAfterFailedCreate(connection)
 		return nil, err
 	}
-	if applyErr := applyOtelCredentialChanges(credentials); applyErr != nil && logger != nil {
+	if applyErr, err := applyAndRecordOtelCredentialChanges(credentials); err != nil {
+		return nil, errors.Default.Wrap(err, "error recording otel credential activation")
+	} else if applyErr != nil && logger != nil {
 		// Keep the credential usable after the next successful apply, while recording the helper outage for operators.
 		logger.Warn(applyErr, "OTel collector activation is pending for connection %d", connection.ID)
-	}
-	if err := updateOtelCredentialRestartState(credentials); err != nil {
-		return nil, errors.Default.Wrap(err, "error recording otel credential activation")
 	}
 	return responseWithSettings(connection, credentials, credential, password), nil
 }
@@ -238,8 +237,7 @@ func RotateOtelConnection(user *common.User, id uint64) (*models.OtelConnectionW
 		restoreActiveCredentials(activeCredentials)
 		return nil, err
 	}
-	_ = applyOtelCredentialChanges(affectedCredentials)
-	if err := updateOtelCredentialRestartState(affectedCredentials); err != nil {
+	if _, err := applyAndRecordOtelCredentialChanges(affectedCredentials); err != nil {
 		return nil, errors.Default.Wrap(err, "error recording otel credential activation")
 	}
 	setOtelActor(user, connection, false)
@@ -281,8 +279,8 @@ func RevokeOtelConnection(user *common.User, id uint64) (*models.OtelConnectionW
 	if err := writeHtpasswd(nil); err != nil {
 		return nil, err
 	}
-	applyErr := applyOtelCredentialChanges(credentials)
-	if err := updateOtelCredentialRestartState(credentials); err != nil {
+	applyErr, err := applyAndRecordOtelCredentialChanges(credentials)
+	if err != nil {
 		return nil, errors.Default.Wrap(err, "error recording otel credential revocation")
 	}
 	allCredentials, err := getOtelCredentials(id)
@@ -330,8 +328,8 @@ func FinalizeOtelRotation(user *common.User, id uint64) (*models.OtelConnectionW
 	if err := writeHtpasswd(nil); err != nil {
 		return nil, err
 	}
-	applyErr := applyOtelCredentialChanges(credentials)
-	if err := updateOtelCredentialRestartState(credentials); err != nil {
+	applyErr, err := applyAndRecordOtelCredentialChanges(credentials)
+	if err != nil {
 		return nil, errors.Default.Wrap(err, "error recording finalized otel credential activation")
 	}
 	allCredentials, err := getOtelCredentials(id)
@@ -362,8 +360,8 @@ func ApplyOtelConnection(user *common.User, id uint64) (*models.OtelConnectionWi
 	if err != nil {
 		return nil, err
 	}
-	applyErr := applyOtelCredentialChanges(allCredentials)
-	if err := updateOtelCredentialRestartState(allCredentials); err != nil {
+	applyErr, err := applyAndRecordOtelCredentialChanges(allCredentials)
+	if err != nil {
 		return nil, errors.Default.Wrap(err, "error recording otel credential activation")
 	}
 	setOtelActor(user, connection, false)
@@ -492,6 +490,14 @@ func applyOtelCredentialChanges(credentials []*models.OtelCredential) errors.Err
 		credential.LastCollectorRestartHint = ""
 	}
 	return nil
+}
+
+func applyAndRecordOtelCredentialChanges(credentials []*models.OtelCredential) (errors.Error, errors.Error) {
+	applyErr := applyOtelCredentialChanges(credentials)
+	if err := updateOtelCredentialRestartState(credentials); err != nil {
+		return applyErr, err
+	}
+	return applyErr, nil
 }
 
 func updateOtelCredentialRestartState(credentials []*models.OtelCredential) errors.Error {
