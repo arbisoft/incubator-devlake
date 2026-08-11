@@ -1,8 +1,8 @@
 package main
 
 import (
-	"crypto/subtle"
 	"context"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"io"
@@ -54,6 +54,8 @@ func loadConfig() config {
 			timeout = parsed
 		} else if parsed, err := time.ParseDuration(raw + "s"); err == nil {
 			timeout = parsed
+		} else {
+			log.Fatalf("invalid OTEL_RESTART_TIMEOUT_SECONDS %q: use a duration like 45s or a whole number of seconds", raw)
 		}
 	}
 	return config{
