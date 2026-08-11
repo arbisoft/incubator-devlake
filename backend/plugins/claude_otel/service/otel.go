@@ -229,12 +229,19 @@ func RotateOtelConnection(user *common.User, id uint64) (*models.OtelConnectionW
 		}
 	}
 	if err := db.Create(newCredential); err != nil {
-		restoreActiveCredentials(activeCredentials)
+		if restoreErr := restoreActiveCredentials(activeCredentials); restoreErr != nil {
+			return nil, errors.Default.Combine([]error{
+				errors.Default.Wrap(err, "error saving rotated otel credential"),
+				restoreErr,
+			})
+		}
 		return nil, errors.Default.Wrap(err, "error saving rotated otel credential")
 	}
 	if err := writeHtpasswd(map[string]string{newCredential.Username: password}); err != nil {
 		_ = db.Delete(newCredential)
-		restoreActiveCredentials(activeCredentials)
+		if restoreErr := restoreActiveCredentials(activeCredentials); restoreErr != nil {
+			return nil, errors.Default.Combine([]error{err, restoreErr})
+		}
 		return nil, err
 	}
 	if _, err := applyAndRecordOtelCredentialChanges(affectedCredentials); err != nil {
@@ -370,15 +377,25 @@ func ApplyOtelConnection(user *common.User, id uint64) (*models.OtelConnectionWi
 	}, nil
 }
 
-func restoreActiveCredentials(credentials []*models.OtelCredential) {
+func restoreActiveCredentials(credentials []*models.OtelCredential) errors.Error {
+	restoreErrors := make([]error, 0)
 	for _, credential := range credentials {
 		credential.Status = models.OtelCredentialStatusActive
 		credential.RotatedAt = nil
 		credential.RevokedAt = nil
 		credential.PendingCollectorRestart = false
 		credential.LastCollectorRestartHint = ""
-		_ = db.Update(credential)
+		if err := db.Update(credential); err != nil {
+			if logger != nil {
+				logger.Warn(err, "failed to restore OTel credential %d after rotation failure", credential.ID)
+			}
+			restoreErrors = append(restoreErrors, errors.Default.Wrap(err, fmt.Sprintf("error restoring otel credential %d", credential.ID)))
+		}
 	}
+	if len(restoreErrors) > 0 {
+		return errors.Default.Combine(restoreErrors)
+	}
+	return nil
 }
 
 func validateOtelSettings(endpoint, protocol string) errors.Error {
