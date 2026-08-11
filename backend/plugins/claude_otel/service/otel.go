@@ -52,6 +52,13 @@ const (
 	maxOtelTeamSlugLength       = 63
 	collectorRestartHint        = "Telemetry endpoint is applying credential changes"
 	defaultOtelRestartTimeout   = 45
+	otelRestartHelperUrlKey     = "OTEL_RESTART_HELPER_URL"
+	otelRestartHelperTokenKey   = "OTEL_RESTART_HELPER_TOKEN"
+	otelRestartHelperTimeoutKey = "OTEL_RESTART_HELPER_TIMEOUT_SECONDS"
+	otelRestartHelperApplyPath  = "/apply"
+	otelAuthHeader              = "Authorization"
+	otelContentTypeHeader       = "Content-Type"
+	otelJsonContentType         = "application/json"
 )
 
 var (
@@ -535,15 +542,15 @@ func updateOtelCredentialRestartState(credentials []*models.OtelCredential) erro
 }
 
 func callOtelRestartHelper() errors.Error {
-	helperUrl := strings.TrimRight(cfg.GetString("OTEL_RESTART_HELPER_URL"), "/")
+	helperUrl := strings.TrimRight(cfg.GetString(otelRestartHelperUrlKey), "/")
 	if helperUrl == "" {
 		return errors.Default.New("otel restart helper is not configured")
 	}
-	token := strings.TrimSpace(cfg.GetString("OTEL_RESTART_HELPER_TOKEN"))
+	token := strings.TrimSpace(cfg.GetString(otelRestartHelperTokenKey))
 	if token == "" {
 		return errors.Default.New("otel restart helper token is not configured")
 	}
-	timeout := cfg.GetInt("OTEL_RESTART_HELPER_TIMEOUT_SECONDS")
+	timeout := cfg.GetInt(otelRestartHelperTimeoutKey)
 	if timeout <= 0 {
 		timeout = defaultOtelRestartTimeout
 	}
@@ -551,12 +558,12 @@ func callOtelRestartHelper() errors.Error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, helperUrl+"/apply", bytes.NewReader([]byte("{}")))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, helperUrl+otelRestartHelperApplyPath, bytes.NewReader([]byte("{}")))
 	if err != nil {
 		return errors.Default.Wrap(err, "error creating otel restart helper request")
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set(otelContentTypeHeader, otelJsonContentType)
+	req.Header.Set(otelAuthHeader, "Bearer "+token)
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
