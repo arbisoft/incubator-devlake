@@ -37,6 +37,8 @@ import { formatTime, operator } from '@/utils';
 
 type ModalState = 'create' | 'snippet' | 'rotate' | 'revoke' | 'finalize' | 'apply';
 
+const BREADCRUMBS = [{ name: 'Claude Code OTel', path: PATHS.OTEL() }];
+
 export const Otel = () => {
   const [version, setVersion] = useState(1);
   const [operating, setOperating] = useState(false);
@@ -94,7 +96,7 @@ export const Otel = () => {
 
   return (
     <PageHeader
-      breadcrumbs={[{ name: 'Claude Code OTel', path: PATHS.OTEL() }]}
+      breadcrumbs={BREADCRUMBS}
       description="Generate and manage the Basic Auth credential used by Claude Code telemetry."
     >
       <Flex style={{ marginBottom: 16 }} justify="flex-end">
