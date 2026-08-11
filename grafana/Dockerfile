@@ -35,7 +35,12 @@ ENV GF_DASHBOARDS_JSON_ENABLED=true
 ENV GF_LIVE_ALLOWED_ORIGINS='*'
 ENV GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/dashboards/Homepage.json
 USER root
-RUN grafana-cli plugins install grafana-piechart-panel
+# volkovlabs-form-panel (Business Forms) backs the Add/Remove panels in
+# dashboards/admin/AdminUserProjectAccess.json. Version is pinned: the dashboard
+# JSON targets the v6 panel schema, so an unpinned install would silently break
+# those panels on the next image build.
+RUN grafana-cli plugins install grafana-piechart-panel && \
+    grafana-cli plugins install volkovlabs-form-panel 6.3.5
 RUN chgrp -R 0 /etc/grafana /usr/share/grafana /var/lib/grafana && \
     chmod -R g=u /etc/grafana /usr/share/grafana /var/lib/grafana
 USER 101
