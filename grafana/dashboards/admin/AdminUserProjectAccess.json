@@ -77,7 +77,7 @@
         },
         "update": {
           "method": "POST",
-          "url": "/api/user-project-mappings/${userLogin}",
+          "url": "${apiBaseUrl}/api/user-project-mappings/${userLogin}",
           "header": [
             {
               "name": "Content-Type",
@@ -141,7 +141,7 @@
         },
         "update": {
           "method": "DELETE",
-          "url": "/api/user-project-mappings/${userLogin}/${project}",
+          "url": "${apiBaseUrl}/api/user-project-mappings/${userLogin}/${project}",
           "header": [],
           "contentType": "application/json",
           "confirm": false,
@@ -234,6 +234,21 @@
   ],
   "templating": {
     "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "label": "API Base URL",
+        "name": "apiBaseUrl",
+        "options": [],
+        "query": "",
+        "skipUrlSync": false,
+        "type": "textbox",
+        "description": "Origin the Add/Remove Mapping buttons send requests to, e.g. https://config-ui-host.example.com. Leave empty only if Grafana and the DevLake API are served from the same origin (e.g. local dev through config-ui's nginx) - Grafana's own server does not proxy /api/* to the backend."
+      },
       {
         "current": {
           "selected": false,
