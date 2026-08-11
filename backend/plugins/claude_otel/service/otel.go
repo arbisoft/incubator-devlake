@@ -416,6 +416,9 @@ func getOtelConnection(id uint64) (*models.OtelConnection, errors.Error) {
 	connection := &models.OtelConnection{}
 	err := db.First(connection, dal.Where("id = ?", id))
 	if err != nil {
+		if db.IsErrorNotFound(err) {
+			return nil, errors.NotFound.New(fmt.Sprintf("otel connection %d not found", id))
+		}
 		return nil, errors.Default.Wrap(err, "error getting otel connection")
 	}
 	return connection, nil
