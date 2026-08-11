@@ -101,6 +101,9 @@ func (cfg config) applyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg config) authorized(r *http.Request) bool {
+	if strings.TrimSpace(cfg.token) == "" {
+		return false
+	}
 	auth := strings.TrimSpace(r.Header.Get("Authorization"))
 	presented := strings.TrimPrefix(auth, "Bearer ")
 	return subtle.ConstantTimeCompare([]byte(presented), []byte(cfg.token)) == 1
