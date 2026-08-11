@@ -18,6 +18,21 @@
 
 import { request } from '@/utils';
 
+export const OTEL_CONNECTION_STATUS = {
+  ACTIVE: 'active',
+  REVOKED: 'revoked',
+} as const;
+
+export type OtelConnectionStatus = (typeof OTEL_CONNECTION_STATUS)[keyof typeof OTEL_CONNECTION_STATUS];
+
+export const OTEL_CREDENTIAL_STATUS = {
+  ACTIVE: 'active',
+  RETIRING: 'retiring',
+  REVOKED: 'revoked',
+} as const;
+
+export type OtelCredentialStatus = (typeof OTEL_CREDENTIAL_STATUS)[keyof typeof OTEL_CREDENTIAL_STATUS];
+
 export type OtelConnection = {
   id: ID;
   name: string;
@@ -25,7 +40,7 @@ export type OtelConnection = {
   teamSlug: string;
   collectorEndpoint: string;
   protocol: string;
-  status: string;
+  status: OtelConnectionStatus;
   createdAt: string;
   updatedAt: string;
 };
@@ -34,7 +49,7 @@ export type OtelCredential = {
   id: ID;
   connectionId: ID;
   username: string;
-  status: string;
+  status: OtelCredentialStatus;
   createdAt: string;
   updatedAt: string;
   rotatedAt?: string;

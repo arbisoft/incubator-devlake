@@ -30,7 +30,11 @@ import { Alert, Button, Flex, Input, message, Modal, Space, Table, Tag } from 'a
 import type { ColumnsType } from 'antd/es/table';
 
 import API from '@/api';
-import type { OtelConnectionResponse } from '@/api/otel';
+import {
+  OTEL_CONNECTION_STATUS,
+  OTEL_CREDENTIAL_STATUS,
+  type OtelConnectionResponse,
+} from '@/api/otel';
 import { ExternalLink, Message, PageHeader } from '@/components';
 import { PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
@@ -64,8 +68,16 @@ const getColumns = (
     width: 180,
     render: (_, record) => (
       <Space>
-        <Tag color={record.connection.status === 'active' && !record.restartRequired ? 'green' : 'default'}>
-          {record.connection.status === 'revoked' ? 'Revoked' : record.restartRequired ? 'Action required' : 'Ready'}
+        <Tag
+          color={
+            record.connection.status === OTEL_CONNECTION_STATUS.ACTIVE && !record.restartRequired ? 'green' : 'default'
+          }
+        >
+          {record.connection.status === OTEL_CONNECTION_STATUS.REVOKED
+            ? 'Revoked'
+            : record.restartRequired
+              ? 'Action required'
+              : 'Ready'}
         </Tag>
       </Space>
     ),
@@ -74,13 +86,15 @@ const getColumns = (
     title: 'Credentials',
     width: 220,
     render: (_, record) => {
-      const currentCredentials = record.credentials.filter((credential) => credential.status !== 'revoked');
+      const currentCredentials = record.credentials.filter(
+        (credential) => credential.status !== OTEL_CREDENTIAL_STATUS.REVOKED,
+      );
 
       return (
         <Space wrap>
           {currentCredentials.length > 0 ? (
             currentCredentials.map((credential) => (
-              <Tag key={credential.id} color={credential.status === 'active' ? 'green' : 'orange'}>
+              <Tag key={credential.id} color={credential.status === OTEL_CREDENTIAL_STATUS.ACTIVE ? 'green' : 'orange'}>
                 {credential.status}
               </Tag>
             ))
@@ -105,7 +119,10 @@ const getColumns = (
         <Button
           size="small"
           icon={<ReloadOutlined />}
-          disabled={record.connection.status !== 'active' || record.credentials.some((it) => it.status === 'retiring')}
+          disabled={
+            record.connection.status !== OTEL_CONNECTION_STATUS.ACTIVE ||
+            record.credentials.some((it) => it.status === OTEL_CREDENTIAL_STATUS.RETIRING)
+          }
           onClick={() => {
             setCurrent(record);
             setModal('rotate');
@@ -127,7 +144,7 @@ const getColumns = (
         <Button
           size="small"
           icon={<CheckOutlined />}
-          disabled={!record.credentials.some((it) => it.status === 'retiring')}
+          disabled={!record.credentials.some((it) => it.status === OTEL_CREDENTIAL_STATUS.RETIRING)}
           onClick={() => {
             setCurrent(record);
             setModal('finalize');
@@ -139,7 +156,7 @@ const getColumns = (
           size="small"
           danger
           icon={<StopOutlined />}
-          disabled={record.connection.status !== 'active'}
+          disabled={record.connection.status !== OTEL_CONNECTION_STATUS.ACTIVE}
           onClick={() => {
             setCurrent(record);
             setModal('revoke');
