@@ -24,12 +24,12 @@ import type { ColumnsType } from 'antd/es/table';
 import API from '@/api';
 import { OTEL_CONNECTION_STATUS, OTEL_CREDENTIAL_STATUS, type OtelConnectionResponse } from '@/api/otel';
 import { Message, PageHeader } from '@/components';
-import { PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
 import { formatTime, operator } from '@/utils';
 import { OTEL_MODAL, OtelModals, type OtelLifecycleAction, type OtelModalState } from './modals';
 
-const BREADCRUMBS = [{ name: 'Claude Code OTel', path: PATHS.OTEL() }];
+const OTEL_PATH = `${import.meta.env.DEVLAKE_PATH_PREFIX ?? ''}/otel`;
+const BREADCRUMBS = [{ name: 'Claude Code OTel', path: OTEL_PATH }];
 
 // Keep table presentation separate while leaving page-specific actions in this route.
 const getColumns = (
