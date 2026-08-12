@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -21,6 +22,7 @@ const (
 	defaultContainerName = "otel-collector"
 	defaultHealthURL     = "http://otel-collector:13133/healthz"
 	defaultTimeout       = 45 * time.Second
+	defaultCooldown      = 30 * time.Second
 )
 
 type config struct {
@@ -30,7 +32,15 @@ type config struct {
 	containerName    string
 	healthURL        string
 	timeout          time.Duration
+	cooldown         time.Duration
 	dockerHTTPClient *http.Client
+	restartState     *restartState
+}
+
+type restartState struct {
+	mu            sync.Mutex
+	inProgress    bool
+	lastSucceeded time.Time
 }
 
 func main() {
@@ -49,23 +59,15 @@ func main() {
 }
 
 func loadConfig() config {
-	timeout := defaultTimeout
-	if raw := strings.TrimSpace(os.Getenv("OTEL_RESTART_TIMEOUT_SECONDS")); raw != "" {
-		if parsed, err := time.ParseDuration(raw); err == nil {
-			timeout = parsed
-		} else if parsed, err := time.ParseDuration(raw + "s"); err == nil {
-			timeout = parsed
-		} else {
-			log.Fatalf("invalid OTEL_RESTART_TIMEOUT_SECONDS %q: use a duration like 45s or a whole number of seconds", raw)
-		}
-	}
 	cfg := config{
 		address:       firstNonEmpty(os.Getenv("OTEL_RESTART_HELPER_ADDRESS"), defaultAddress),
 		token:         os.Getenv("OTEL_RESTART_HELPER_TOKEN"),
 		dockerSocket:  firstNonEmpty(os.Getenv("OTEL_RESTART_DOCKER_SOCKET"), defaultDockerSocket),
 		containerName: firstNonEmpty(os.Getenv("OTEL_RESTART_CONTAINER"), defaultContainerName),
 		healthURL:     firstNonEmpty(os.Getenv("OTEL_COLLECTOR_HEALTH_URL"), defaultHealthURL),
-		timeout:       timeout,
+		timeout:       durationFromEnv("OTEL_RESTART_TIMEOUT_SECONDS", defaultTimeout),
+		cooldown:      durationFromEnv("OTEL_RESTART_COOLDOWN_SECONDS", defaultCooldown),
+		restartState:  &restartState{},
 	}
 	cfg.dockerHTTPClient = newDockerClient(cfg.dockerSocket)
 	return cfg
@@ -85,6 +87,17 @@ func (cfg config) applyHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
+	if retryAfter, inProgress := cfg.beginRestart(); inProgress {
+		http.Error(w, "collector restart already in progress", http.StatusConflict)
+		return
+	} else if retryAfter > 0 {
+		w.Header().Set("Retry-After", fmt.Sprintf("%d", int(retryAfter.Seconds())+1))
+		http.Error(w, "collector restart is cooling down", http.StatusTooManyRequests)
+		return
+	}
+
+	succeeded := false
+	defer func() { cfg.finishRestart(succeeded) }()
 
 	ctx, cancel := context.WithTimeout(r.Context(), cfg.timeout)
 	defer cancel()
@@ -97,10 +110,38 @@ func (cfg config) applyHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusGatewayTimeout)
 		return
 	}
+	succeeded = true
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`{"status":"ready"}`))
+}
+
+func (cfg config) beginRestart() (time.Duration, bool) {
+	cfg.restartState.mu.Lock()
+	defer cfg.restartState.mu.Unlock()
+
+	if cfg.restartState.inProgress {
+		return 0, true
+	}
+	// Reject overlapping or rapid successful restarts to avoid collector restart loops.
+	if !cfg.restartState.lastSucceeded.IsZero() {
+		if remaining := cfg.cooldown - time.Since(cfg.restartState.lastSucceeded); remaining > 0 {
+			return remaining, false
+		}
+	}
+	cfg.restartState.inProgress = true
+	return 0, false
+}
+
+func (cfg config) finishRestart(succeeded bool) {
+	cfg.restartState.mu.Lock()
+	defer cfg.restartState.mu.Unlock()
+
+	cfg.restartState.inProgress = false
+	if succeeded {
+		cfg.restartState.lastSucceeded = time.Now()
+	}
 }
 
 func (cfg config) authorized(r *http.Request) bool {
@@ -174,4 +215,19 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func durationFromEnv(name string, fallback time.Duration) time.Duration {
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return fallback
+	}
+	if parsed, err := time.ParseDuration(raw); err == nil && parsed >= 0 {
+		return parsed
+	}
+	if parsed, err := time.ParseDuration(raw + "s"); err == nil && parsed >= 0 {
+		return parsed
+	}
+	log.Fatalf("invalid %s %q: use a duration like 30s or a whole number of seconds", name, raw)
+	return fallback
 }

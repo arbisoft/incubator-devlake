@@ -40,6 +40,7 @@ services:
       OTEL_RESTART_CONTAINER: "${OTEL_RESTART_CONTAINER:-otel-collector}"
       OTEL_COLLECTOR_HEALTH_URL: "${OTEL_COLLECTOR_HEALTH_URL:-http://otel-collector:13133/healthz}"
       OTEL_RESTART_TIMEOUT_SECONDS: "${OTEL_RESTART_TIMEOUT_SECONDS:-45}"
+      OTEL_RESTART_COOLDOWN_SECONDS: "${OTEL_RESTART_COOLDOWN_SECONDS:-30}"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     ports:

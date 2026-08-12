@@ -78,6 +78,8 @@ Create, rotate, finalize, revoke, and retry actions are initiated in DevLake Con
 
 If the helper cannot complete a restart, DevLake records that the change still needs applying. Restore Collector health, inspect the helper and Collector logs, then use Apply in Config UI. If the auth volume was lost, revoke the affected connection and create a new one.
 
+The helper accepts one restart at a time. While a restart is underway it returns `409 Conflict`; after a successful restart it returns `429 Too Many Requests` for the configured `OTEL_RESTART_COOLDOWN_SECONDS` period (30 seconds by default). Failed restarts are not cooled down and can be retried immediately.
+
 ## Operations
 
 ```bash
