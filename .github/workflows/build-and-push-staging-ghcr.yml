@@ -32,9 +32,9 @@ name: Build and Push Staging GHCR
 
 on:
   # Re-enable after the first successful manual staging deploy:
-  # push:
-  #   branches:
-  #     - main-arbisoft
+  push:
+    branches:
+      - main-arbisoft
   workflow_dispatch:
     inputs:
       deploy:
