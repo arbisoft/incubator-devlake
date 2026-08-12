@@ -20,6 +20,7 @@ import { useMemo, useState } from 'react';
 import { PlusOutlined, ReloadOutlined, StopOutlined, CheckOutlined, SyncOutlined } from '@ant-design/icons';
 import { Button, Flex, Space, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import axios from 'axios';
 
 import API from '@/api';
 import { OTEL_CONNECTION_STATUS, OTEL_CREDENTIAL_STATUS, type OtelConnectionResponse } from '@/api/otel';
@@ -30,6 +31,18 @@ import { OTEL_MODAL, OtelModals, type OtelLifecycleAction, type OtelModalState }
 
 const OTEL_PATH = `${import.meta.env.DEVLAKE_PATH_PREFIX ?? ''}/otel`;
 const BREADCRUMBS = [{ name: 'Claude Code OTel', path: OTEL_PATH }];
+const duplicateTeamMessage = 'Claude Code OTel credentials already exist for this team. Revoke them before generating new settings.';
+const genericCreateError = 'Unable to generate Claude settings. Please try again or contact support.';
+
+// Surface only explicit validation messages; unexpected backend failures remain generic.
+const getCreateError = (error: unknown) => {
+  if (!axios.isAxiosError<{ message?: unknown }>(error) || error.response?.status !== 400) return genericCreateError;
+
+  const message = typeof error.response.data?.message === 'string' ? error.response.data.message : '';
+  if (message.includes('a Claude Code OTel connection already exists for this team')) return duplicateTeamMessage;
+
+  return message || genericCreateError;
+};
 
 // Keep table presentation separate while leaving page-specific actions in this route.
 const getColumns = (
@@ -186,13 +199,7 @@ export const Otel = () => {
       return;
     }
 
-    // Keep API failures actionable instead of showing an unformatted response.
-    const reason = String((res as { response?: { data?: { message?: unknown } } })?.response?.data?.message ?? '');
-    setCreateError(
-      reason.includes('a Claude Code OTel connection already exists for this team')
-        ? 'Claude Code OTel credentials already exist for this team. Revoke them before generating new settings.'
-        : 'Unable to generate Claude settings. Please try again or contact support.',
-    );
+    setCreateError(getCreateError(res));
   };
 
   const handleAction = async (action: OtelLifecycleAction) => {
