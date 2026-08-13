@@ -33,5 +33,6 @@ export const PATHS = {
   BLUEPRINT_CONNECTION: (bid: ID, plugin: string, connectionId: ID) =>
     `${PATH_PREFIX}/advanced/blueprints/${bid}/${plugin}-${connectionId}`,
   PIPELINES: () => `${PATH_PREFIX}/advanced/pipelines`,
+  OTEL: () => `${PATH_PREFIX}/otel`,
   APIKEYS: () => `${PATH_PREFIX}/keys`,
 };

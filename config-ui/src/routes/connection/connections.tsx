@@ -16,8 +16,9 @@
  *
  */
 
-import { useState, useMemo } from 'react';
+import { Fragment, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { CloudServerOutlined } from '@ant-design/icons';
 import { theme, Badge, Modal } from 'antd';
 import { chunk } from 'lodash';
 
@@ -29,6 +30,7 @@ import { getPluginConfig, ConnectionList, ConnectionForm } from '@/plugins';
 import * as S from './styled';
 
 const SORT_START_WITH = ['o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'];
+const CLAUDE_PLUGIN = 'claude';
 
 export const Connections = () => {
   const [type, setType] = useState<'list' | 'form'>();
@@ -74,6 +76,16 @@ export const Connections = () => {
     navigate(PATHS.CONNECTION(plugin, id));
   };
 
+  const renderOtelConnection = () => (
+    <li key="claude-code-otel" onClick={() => navigate(PATHS.OTEL())}>
+      <span className="logo ant-icon-logo">
+        <CloudServerOutlined />
+      </span>
+      <span className="name">Claude Code OTel</span>
+      <span className="count">Manage credentials</span>
+    </li>
+  );
+
   return (
     <S.Wrapper theme={colorPrimary}>
       <h1>Connections</h1>
@@ -89,20 +101,24 @@ export const Connections = () => {
           const pluginConfig = getPluginConfig(plugin);
           const connectionCount = connections.filter((cs) => cs.plugin === plugin).length;
           return (
-            <li key={plugin} onClick={() => handleShowListDialog(plugin)}>
-              {pluginConfig.isBeta && <span className="beta">Beta</span>}
-              <span className="logo">{pluginConfig.icon({ color: colorPrimary })}</span>
-              <span className="name">{pluginConfig.name}</span>
-              <span className="count">
-                {connectionCount ? (
-                  <Badge color={colorPrimary} text={`${connectionCount} connections`} />
-                ) : (
-                  'No connection'
-                )}
-              </span>
-            </li>
+            <Fragment key={plugin}>
+              <li onClick={() => handleShowListDialog(plugin)}>
+                {pluginConfig.isBeta && <span className="beta">Beta</span>}
+                <span className="logo">{pluginConfig.icon({ color: colorPrimary })}</span>
+                <span className="name">{pluginConfig.name}</span>
+                <span className="count">
+                  {connectionCount ? (
+                    <Badge color={colorPrimary} text={`${connectionCount} connections`} />
+                  ) : (
+                    'No connection'
+                  )}
+                </span>
+              </li>
+              {plugin === CLAUDE_PLUGIN && renderOtelConnection()}
+            </Fragment>
           );
         })}
+        {!firstPlugins.includes(CLAUDE_PLUGIN) && renderOtelConnection()}
       </ul>
       <h4>O-Z</h4>
       <ul>

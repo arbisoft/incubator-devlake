@@ -3,10 +3,27 @@ receivers:
     protocols:
       grpc:
         endpoint: 0.0.0.0:4317
+        auth:
+          authenticator: basicauth/server
       http:
         endpoint: 0.0.0.0:4318
+        auth:
+          authenticator: basicauth/server
 
 processors:
+  attributes/team:
+    actions:
+      # Stamp the verified credential's team slug instead of trusting client input.
+      - key: devlake_team
+        action: delete
+      - key: devlake_auth_username
+        from_context: auth.username
+        action: upsert
+      - key: devlake_auth_username
+        pattern: "^otel_(?P<devlake_team>[a-z0-9]+(?:-[a-z0-9]+)*)_[a-z0-9]+$"
+        action: extract
+      - key: devlake_auth_username
+        action: delete
   memory_limiter:
     check_interval: 1s
     limit_percentage: 80
@@ -28,11 +45,14 @@ exporters:
 extensions:
   health_check:
     endpoint: 0.0.0.0:13133
+  basicauth/server:
+    htpasswd:
+      file: /etc/otelcol-contrib/auth/.htpasswd
 
 service:
-  extensions: [health_check]
+  extensions: [health_check, basicauth/server]
   pipelines:
     metrics:
       receivers: [otlp]
-      processors: [memory_limiter, deltatocumulative, batch]
+      processors: [memory_limiter, attributes/team, deltatocumulative, batch]
       exporters: [prometheus]
