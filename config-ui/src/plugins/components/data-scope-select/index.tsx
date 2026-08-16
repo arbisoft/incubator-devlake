@@ -172,7 +172,7 @@ export const DataScopeSelect = ({
         const res = await API.scope.list(plugin, connectionId, { page, pageSize }, abortController.signal);
         if (requestVersion !== requestVersionRef.current) return;
 
-        mergeItems(res.scopes.map(toDataScopeItem));
+        mergeItems((res.scopes ?? []).map(toDataScopeItem));
         setTotal(res.count);
       } catch (err: any) {
         if (axios.isCancel(err)) return;
@@ -221,7 +221,7 @@ export const DataScopeSelect = ({
         );
         if (searchVersion !== searchVersionRef.current) return;
 
-        const scopeItems = res.scopes.map(toDataScopeItem);
+        const scopeItems = (res.scopes ?? []).map(toDataScopeItem);
         mergeItems(scopeItems);
         setSearchOptions(scopeItems.map((item) => ({ label: item.title, value: item.id })));
       } catch (err: any) {
@@ -283,7 +283,7 @@ export const DataScopeSelect = ({
         );
         if (requestVersion !== requestVersionRef.current) return;
 
-        const loadedPageItems = res.scopes.map(toDataScopeItem);
+        const loadedPageItems = (res.scopes ?? []).map(toDataScopeItem);
         loadedPageItems.forEach((item) => {
           allItems.set(item.id, item);
         });
