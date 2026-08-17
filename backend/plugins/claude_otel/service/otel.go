@@ -33,7 +33,7 @@ import (
 
 const (
 	defaultOtelAuthHtpasswdPath = "/var/lib/devlake/otel-auth/.htpasswd"
-	defaultOtelPublicEndpoint   = "https://otel.customer.example.com:4317"
+	defaultOtelPublicEndpoint   = "https://otel-aperture.arbisoft.com"
 	defaultOtelProtocol         = "grpc"
 	defaultOtelConnectionName   = "Claude Code OTel"
 	maxOtelTeamNameLength       = 255
