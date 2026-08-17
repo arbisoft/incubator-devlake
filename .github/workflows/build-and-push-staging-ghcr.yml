@@ -298,6 +298,9 @@ jobs:
           - name: grafana
             image: devlake-dashboard
             context: grafana
+          - name: otel-restart-helper
+            image: devlake-otel-restart-helper
+            context: telemetry/otel-collector/restart-helper
     steps:
       - *free-disk-space
 
