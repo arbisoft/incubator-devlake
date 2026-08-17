@@ -47,6 +47,7 @@ const (
 	otelAuthHeader              = "Authorization"
 	otelContentTypeHeader       = "Content-Type"
 	otelJsonContentType         = "application/json"
+	otelCredentialStorageHint   = "telemetry credential storage is temporarily unavailable"
 )
 
 var (
@@ -191,7 +192,7 @@ func rollbackOtelCreate(connection *models.OtelConnection, credential *models.Ot
 	}
 	if err := writeHtpasswd(nil); err != nil {
 		cleanupErr = combineOtelLifecycleErrors(cleanupErr, err)
-	} else if err := callOtelRestartHelper(); err != nil {
+	} else if _, err := callOtelRestartHelper(); err != nil {
 		cleanupErr = combineOtelLifecycleErrors(cleanupErr, err)
 	}
 	return cleanupErr
@@ -209,7 +210,7 @@ func rollbackOtelRotation(activeCredentials []*models.OtelCredential, newCredent
 	if err := writeHtpasswd(nil); err != nil {
 		return combineOtelLifecycleErrors(cleanupErr, err)
 	}
-	if err := callOtelRestartHelper(); err != nil {
+	if _, err := callOtelRestartHelper(); err != nil {
 		return combineOtelLifecycleErrors(cleanupErr, err)
 	}
 	return cleanupErr
@@ -258,6 +259,9 @@ func combineOtelLifecycleErrors(errs ...error) errors.Error {
 	}
 	if len(combined) == 0 {
 		return nil
+	}
+	if len(combined) == 1 {
+		return errors.Convert(combined[0])
 	}
 	return errors.Default.Combine(combined)
 }
@@ -319,11 +323,14 @@ func RotateOtelConnection(user *common.User, id uint64) (*models.OtelConnectionW
 		return nil, errors.Default.Wrap(err, "error saving rotated otel credential")
 	}
 	if err := writeHtpasswd(map[string]string{newCredential.Username: password}); err != nil {
-		_ = db.Delete(newCredential)
-		if restoreErr := restoreActiveCredentials(activeCredentials); restoreErr != nil {
-			return nil, errors.Default.Combine([]error{err, restoreErr})
+		_, cleanupErr := removeOtelCredentialForRollback(newCredential)
+		if cleanupErr != nil && logger != nil {
+			logger.Warn(cleanupErr, "failed to clean up OTel credential %d after htpasswd write failure", newCredential.ID)
 		}
-		return nil, err
+		if restoreErr := restoreActiveCredentials(activeCredentials); restoreErr != nil {
+			return nil, combineOtelLifecycleErrors(err, cleanupErr, restoreErr)
+		}
+		return nil, combineOtelLifecycleErrors(err, cleanupErr)
 	}
 	if applyErr, err := applyAndRecordOtelCredentialChanges(affectedCredentials); err != nil {
 		rollbackErr := rollbackOtelRotation(activeCredentials, newCredential)

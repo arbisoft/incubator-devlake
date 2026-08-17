@@ -18,7 +18,7 @@
 
 import { useMemo, useState } from 'react';
 import { PlusOutlined, ReloadOutlined, StopOutlined, CheckOutlined, SyncOutlined } from '@ant-design/icons';
-import { Button, Flex, Space, Table, Tag } from 'antd';
+import { Button, Flex, message, Space, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import axios from 'axios';
 
@@ -33,15 +33,32 @@ const OTEL_PATH = `${import.meta.env.DEVLAKE_PATH_PREFIX ?? ''}/otel`;
 const BREADCRUMBS = [{ name: 'Claude Code OTel', path: OTEL_PATH }];
 const duplicateTeamMessage = 'Claude Code OTel credentials already exist for this team. Revoke them before generating new settings.';
 const genericCreateError = 'Unable to generate Claude settings. Please try again or contact support.';
+const genericApplyError = 'Credential changes were saved, but the telemetry endpoint could not apply them. Retry Apply shortly.';
+const credentialStorageError = 'Telemetry credential storage is temporarily unavailable. Please retry shortly.';
+const genericLifecycleError = 'Unable to update Claude Code OTel credentials. Please try again or contact support.';
 
 // Surface only explicit validation messages; unexpected backend failures remain generic.
 const getCreateError = (error: unknown) => {
+  if (axios.isAxiosError(error) && error.response?.status === 503) return credentialStorageError;
   if (!axios.isAxiosError<{ message?: unknown }>(error) || error.response?.status !== 400) return genericCreateError;
 
   const message = typeof error.response.data?.message === 'string' ? error.response.data.message : '';
   if (message.includes('a Claude Code OTel connection already exists for this team')) return duplicateTeamMessage;
 
   return message || genericCreateError;
+};
+
+// Surface only known operational responses; filesystem details and stack traces stay server-side.
+const getLifecycleError = (error: unknown) => {
+  if (!axios.isAxiosError<{ message?: unknown }>(error)) return genericLifecycleError;
+
+  const { status, data } = error.response ?? {};
+  if (status === 503) return credentialStorageError;
+
+  const message = typeof data?.message === 'string' ? data.message : '';
+  if (status === 400 || status === 409 || status === 429) return message || genericLifecycleError;
+
+  return genericLifecycleError;
 };
 
 // Keep table presentation separate while leaving page-specific actions in this route.
@@ -121,6 +138,7 @@ const getColumns = (
           icon={<ReloadOutlined />}
           disabled={
             record.connection.status !== OTEL_CONNECTION_STATUS.ACTIVE ||
+            record.recoveryRequired ||
             record.credentials.some((it) => it.status === OTEL_CREDENTIAL_STATUS.RETIRING)
           }
           onClick={() => {
@@ -176,6 +194,7 @@ export const Otel = () => {
   const [current, setCurrent] = useState<OtelConnectionResponse>();
   const [teamName, setTeamName] = useState('');
   const [createError, setCreateError] = useState<string>();
+  const [lifecycleError, setLifecycleError] = useState<string>();
 
   const { data, ready } = useRefreshData(() => API.otel.list(), [version]);
   const dataSource = useMemo(() => data ?? [], [data]);
@@ -186,7 +205,10 @@ export const Otel = () => {
   );
 
   const refresh = () => setVersion((v) => v + 1);
-  const closeModal = () => setModal(undefined);
+  const closeModal = () => {
+    setLifecycleError(undefined);
+    setModal(undefined);
+  };
 
   const handleCreate = async () => {
     setCreateError(undefined);
@@ -204,6 +226,7 @@ export const Otel = () => {
 
   const handleAction = async (action: OtelLifecycleAction) => {
     if (!current?.connection.id) return;
+    setLifecycleError(undefined);
     const apiCall = {
       rotate: () => API.otel.rotate(current.connection.id),
       revoke: () => API.otel.revoke(current.connection.id),
@@ -211,12 +234,22 @@ export const Otel = () => {
       apply: () => API.otel.apply(current.connection.id),
     }[action];
 
-    const [success, res] = await operator(apiCall, { setOperating });
-    if (success) {
-      setCurrent(res);
-      setModal(res.managedSettings ? OTEL_MODAL.SNIPPET : undefined);
-      refresh();
+    const [success, res] = await operator(apiCall, { hideToast: true, setOperating });
+    if (!success) {
+      setLifecycleError(getLifecycleError(res));
+      return;
     }
+
+    setCurrent(res);
+    refresh();
+    if (action === 'apply') {
+      if (res.restartRequired) {
+        setLifecycleError(res.restartHint || genericApplyError);
+        return;
+      }
+      message.success('Credential changes applied.');
+    }
+    setModal(res.managedSettings ? OTEL_MODAL.SNIPPET : undefined);
   };
 
   return (
@@ -245,6 +278,7 @@ export const Otel = () => {
         current={current}
         teamName={teamName}
         createError={createError}
+        lifecycleError={lifecycleError}
         operating={operating}
         managedSettings={managedSettings}
         onClose={closeModal}

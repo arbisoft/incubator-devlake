@@ -41,6 +41,7 @@ type OtelModalProps = {
   current?: OtelConnectionResponse;
   teamName: string;
   createError?: string;
+  lifecycleError?: string;
   operating: boolean;
   managedSettings: string;
   onClose: () => void;
@@ -127,9 +128,10 @@ type LifecycleModalProps = OtelModalProps & {
   title: string;
   content: string;
   danger?: boolean;
+  error?: string;
 };
 
-const LifecycleModal = ({ action, title, content, danger, operating, onClose, onAction }: LifecycleModalProps) => (
+const LifecycleModal = ({ action, title, content, danger, error, operating, onClose, onAction }: LifecycleModalProps) => (
   <Modal
     open
     width={720}
@@ -140,44 +142,51 @@ const LifecycleModal = ({ action, title, content, danger, operating, onClose, on
     onCancel={onClose}
     onOk={() => onAction(action)}
   >
-    <Message content={content} />
+    <Space direction="vertical" size={12} style={{ width: '100%' }}>
+      <Message content={content} />
+      {error && <Alert type="error" showIcon message={error} />}
+    </Space>
   </Modal>
 );
 
-const RotateModal = (props: OtelModalProps) => (
+const RotateModal = ({ lifecycleError, ...props }: OtelModalProps) => (
   <LifecycleModal
     {...props}
     action="rotate"
     title="Rotate Claude Code OTel Credential"
     content="The old credential will stay valid as retiring until you finalize rotation."
+    error={lifecycleError}
   />
 );
 
-const FinalizeModal = (props: OtelModalProps) => (
+const FinalizeModal = ({ lifecycleError, ...props }: OtelModalProps) => (
   <LifecycleModal
     {...props}
     action="finalize"
     title="Finalize Rotation"
     content="Retiring credentials will be removed after the telemetry endpoint applies the update."
+    error={lifecycleError}
   />
 );
 
-const ApplyModal = (props: OtelModalProps) => (
+const ApplyModal = ({ lifecycleError, ...props }: OtelModalProps) => (
   <LifecycleModal
     {...props}
     action="apply"
     title="Apply Credential Changes"
     content="Retry applying the current credential state to the telemetry endpoint."
+    error={lifecycleError}
   />
 );
 
-const RevokeModal = (props: OtelModalProps) => (
+const RevokeModal = ({ lifecycleError, ...props }: OtelModalProps) => (
   <LifecycleModal
     {...props}
     action="revoke"
     title="Revoke Claude Code OTel Credential"
     content="All active Claude Code telemetry credentials for this connection will be rejected after the telemetry endpoint applies the update."
     danger
+    error={lifecycleError}
   />
 );
 
