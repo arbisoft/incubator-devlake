@@ -171,25 +171,26 @@ services:
       - 4180:4180
     env_file:
       - ./.env
-    environment:
-      # Reuse the local Google test client without duplicating its credentials.
-      OAUTH2_PROXY_PROVIDER: google
-      OAUTH2_PROXY_CLIENT_ID: ${OIDC_GOOGLE_CLIENT_ID}
-      OAUTH2_PROXY_CLIENT_SECRET: ${OIDC_GOOGLE_CLIENT_SECRET}
-      OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH2_PROXY_COOKIE_SECRET}
-      OAUTH2_PROXY_UPSTREAMS: http://config-ui:4000
-      OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
-      OAUTH2_PROXY_REDIRECT_URL: http://localhost:4180/oauth2/callback
-      OAUTH2_PROXY_EMAIL_DOMAINS: arbisoft.com
-      OAUTH2_PROXY_COOKIE_SECURE: "false"
-      OAUTH2_PROXY_COOKIE_SAMESITE: lax
-      OAUTH2_PROXY_REVERSE_PROXY: "true"
-      OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
-      OAUTH2_PROXY_WHITELIST_DOMAINS: localhost:4180
-      # DevLake trusts these proxy-provided identity headers when native auth is disabled.
-      OAUTH2_PROXY_PASS_USER_HEADERS: "true"
-      # Allow only the static post-logout page to bypass Google authentication.
-      OAUTH2_PROXY_SKIP_AUTH_ROUTES: "^/signed-out$"
+    # environment:
+      # Reuse the local Google test client without duplicating its credentials. 
+      # Enter these values in .env
+      # OAUTH2_PROXY_PROVIDER: google
+      # OAUTH2_PROXY_CLIENT_ID: ${OIDC_GOOGLE_CLIENT_ID}
+      # OAUTH2_PROXY_CLIENT_SECRET: ${OIDC_GOOGLE_CLIENT_SECRET}
+      # OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH2_PROXY_COOKIE_SECRET}
+      # OAUTH2_PROXY_UPSTREAMS: http://config-ui:4000
+      # OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
+      # OAUTH2_PROXY_REDIRECT_URL: http://localhost:4180/oauth2/callback
+      # OAUTH2_PROXY_EMAIL_DOMAINS: arbisoft.com
+      # OAUTH2_PROXY_COOKIE_SECURE: "false"
+      # OAUTH2_PROXY_COOKIE_SAMESITE: lax
+      # OAUTH2_PROXY_REVERSE_PROXY: "true"
+      # OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
+      # OAUTH2_PROXY_WHITELIST_DOMAINS: localhost:4180
+      # # DevLake trusts these proxy-provided identity headers when native auth is disabled.
+      # OAUTH2_PROXY_PASS_USER_HEADERS: "true"
+      # # Allow only the static post-logout page to bypass Google authentication.
+      # OAUTH2_PROXY_SKIP_AUTH_ROUTES: "^/signed-out$"
 
 volumes:
   mysql-storage:
