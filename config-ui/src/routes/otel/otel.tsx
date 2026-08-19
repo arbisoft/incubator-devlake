@@ -17,15 +17,15 @@
  */
 
 import { useMemo, useState } from 'react';
-import { PlusOutlined, ReloadOutlined, StopOutlined, CheckOutlined, SyncOutlined, DeleteOutlined } from '@ant-design/icons';
-import { Button, Flex, message, Space, Table, Tag } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import { PlusOutlined } from '@ant-design/icons';
+import { Button, Flex, message, Table } from 'antd';
 
 import API from '@/api';
-import { OTEL_CONNECTION_STATUS, OTEL_CREDENTIAL_STATUS, type OtelConnectionResponse } from '@/api/otel';
+import { type OtelConnectionResponse } from '@/api/otel';
 import { Message, PageHeader } from '@/components';
 import { useRefreshData } from '@/hooks';
-import { formatTime, operator, type OperateConfig } from '@/utils';
+import { operator, type OperateConfig } from '@/utils';
+import { getOtelColumns } from './columns';
 import { OTEL_ERROR, OTEL_LIFECYCLE_ACTION } from './constants';
 import { OTEL_MODAL, OtelModals, type OtelLifecycleAction, type OtelModalState } from './modals';
 import { getOtelCreateError, getOtelLifecycleError } from './utils';
@@ -48,144 +48,6 @@ const operateOtel = async (
     : { success: false, error: result };
 };
 
-// Keep table presentation separate while leaving page-specific actions in this route.
-const getColumns = (
-  setCurrent: (connection: OtelConnectionResponse) => void,
-  setModal: (modal: OtelModalState) => void,
-): ColumnsType<OtelConnectionResponse> => [
-  {
-    title: 'Team',
-    dataIndex: ['connection', 'teamName'],
-    width: 220,
-  },
-  {
-    title: 'Team slug',
-    dataIndex: ['connection', 'teamSlug'],
-    width: 220,
-  },
-  {
-    title: 'Endpoint',
-    dataIndex: ['connection', 'collectorEndpoint'],
-  },
-  {
-    title: 'Status',
-    width: 180,
-    render: (_, record) => (
-      <Space>
-        <Tag
-          color={
-            record.connection.status === OTEL_CONNECTION_STATUS.ACTIVE && !record.restartRequired ? 'green' : 'default'
-          }
-        >
-          {record.connection.status === OTEL_CONNECTION_STATUS.REVOKED
-            ? 'Revoked'
-            : record.restartRequired
-            ? 'Action required'
-            : 'Ready'}
-        </Tag>
-      </Space>
-    ),
-  },
-  {
-    title: 'Credentials',
-    width: 220,
-    render: (_, record) => {
-      const currentCredentials = record.credentials.filter(
-        (credential) => credential.status !== OTEL_CREDENTIAL_STATUS.REVOKED,
-      );
-
-      return (
-        <Space wrap>
-          {currentCredentials.length > 0 ? (
-            currentCredentials.map((credential) => (
-              <Tag key={credential.id} color={credential.status === OTEL_CREDENTIAL_STATUS.ACTIVE ? 'green' : 'orange'}>
-                {credential.status}
-              </Tag>
-            ))
-          ) : (
-            <Tag>revoked</Tag>
-          )}
-        </Space>
-      );
-    },
-  },
-  {
-    title: 'Updated',
-    dataIndex: ['connection', 'updatedAt'],
-    width: 180,
-    render: (value) => formatTime(value),
-  },
-  {
-    title: '',
-    width: 250,
-    render: (_, record) => (
-      <Space wrap>
-        <Button
-          size="small"
-          icon={<ReloadOutlined />}
-          disabled={
-            record.connection.status !== OTEL_CONNECTION_STATUS.ACTIVE ||
-            record.recoveryRequired ||
-            record.credentials.some((it) => it.status === OTEL_CREDENTIAL_STATUS.RETIRING)
-          }
-          onClick={() => {
-            setCurrent(record);
-            setModal(OTEL_MODAL.ROTATE);
-          }}
-        >
-          Rotate
-        </Button>
-        <Button
-          size="small"
-          icon={<SyncOutlined />}
-          disabled={!record.restartRequired}
-          onClick={() => {
-            setCurrent(record);
-            setModal(OTEL_MODAL.APPLY);
-          }}
-        >
-          Apply
-        </Button>
-        <Button
-          size="small"
-          icon={<CheckOutlined />}
-          disabled={!record.credentials.some((it) => it.status === OTEL_CREDENTIAL_STATUS.RETIRING)}
-          onClick={() => {
-            setCurrent(record);
-            setModal(OTEL_MODAL.FINALIZE);
-          }}
-        >
-          Finalize
-        </Button>
-        <Button
-          size="small"
-          danger
-          icon={<StopOutlined />}
-          disabled={record.connection.status !== OTEL_CONNECTION_STATUS.ACTIVE}
-          onClick={() => {
-            setCurrent(record);
-            setModal(OTEL_MODAL.REVOKE);
-          }}
-        >
-          Revoke
-        </Button>
-        <Button
-          size="small"
-          danger
-          icon={<DeleteOutlined />}
-          disabled={record.connection.status !== OTEL_CONNECTION_STATUS.REVOKED}
-          onClick={() => {
-            setCurrent(record);
-            setModal(OTEL_MODAL.HIDE);
-          }}
-        >
-          Remove
-        </Button>
-      </Space>
-    ),
-  },
-];
-
 export const Otel = () => {
   const [version, setVersion] = useState(1);
   const [operating, setOperating] = useState(false);
@@ -197,7 +59,7 @@ export const Otel = () => {
 
   const { data, ready } = useRefreshData(() => API.otel.list(), [version]);
   const dataSource = useMemo(() => data ?? [], [data]);
-  const columns = useMemo(() => getColumns(setCurrent, setModal), []);
+  const columns = useMemo(() => getOtelColumns(setCurrent, setModal), []);
   const managedSettings = useMemo(
     () => (current?.managedSettings ? JSON.stringify(current.managedSettings, null, 2) : ''),
     [current],
