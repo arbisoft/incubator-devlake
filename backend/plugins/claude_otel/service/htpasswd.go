@@ -19,25 +19,33 @@ package service
 
 import (
 	"bufio"
+	stderrors "errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
 	"golang.org/x/crypto/bcrypt"
 )
 
+const (
+	htpasswdCreateDirectoryOperation = "create credential storage directory"
+	htpasswdReadOperation            = "read credential storage"
+	htpasswdWriteOperation           = "write credential storage"
+)
+
 func writeHtpasswd(newPasswords map[string]string) errors.Error {
 	path := firstNonEmpty(cfg.GetString("OTEL_AUTH_HTPASSWD_PATH"), defaultOtelAuthHtpasswdPath)
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return otelCredentialStorageUnavailable(err)
+		return otelCredentialStorageError(htpasswdCreateDirectoryOperation, err)
 	}
 
 	existing, err := readHtpasswd(path)
 	if err != nil {
-		return otelCredentialStorageUnavailable(err)
+		return otelCredentialStorageError(htpasswdReadOperation, err)
 	}
 	credentials, err := getAllActiveOtelCredentials()
 	if err != nil {
@@ -67,7 +75,7 @@ func writeHtpasswd(newPasswords map[string]string) errors.Error {
 		content = strings.Join(lines, "\n") + "\n"
 	}
 	if err := writeFileAtomic(path, content); err != nil {
-		return otelCredentialStorageUnavailable(err)
+		return otelCredentialStorageError(htpasswdWriteOperation, err)
 	}
 	return nil
 }
@@ -76,7 +84,7 @@ func missingHtpasswdHashes(credentials []*models.OtelCredential) (bool, errors.E
 	path := firstNonEmpty(cfg.GetString("OTEL_AUTH_HTPASSWD_PATH"), defaultOtelAuthHtpasswdPath)
 	existing, err := readHtpasswd(path)
 	if err != nil {
-		return false, otelCredentialStorageUnavailable(err)
+		return false, otelCredentialStorageError(htpasswdReadOperation, err)
 	}
 	for _, credential := range credentials {
 		if credential.Status != models.OtelCredentialStatusActive && credential.Status != models.OtelCredentialStatusRetiring {
@@ -89,10 +97,13 @@ func missingHtpasswdHashes(credentials []*models.OtelCredential) (bool, errors.E
 	return false, nil
 }
 
-// otelCredentialStorageUnavailable keeps filesystem details in backend logs, not API responses.
-func otelCredentialStorageUnavailable(err error) errors.Error {
+// otelCredentialStorageError keeps filesystem details in backend logs, not API responses.
+func otelCredentialStorageError(operation string, err error) errors.Error {
 	if logger != nil {
-		logger.Error(err, "OTel credential storage is unavailable")
+		logger.Error(err, "failed to %s", operation)
+	}
+	if os.IsPermission(err) || stderrors.Is(err, syscall.EROFS) {
+		return errors.Default.New("telemetry credential storage is misconfigured")
 	}
 	return errors.Unavailable.New(otelCredentialStorageHint)
 }
