@@ -80,4 +80,7 @@ type OtelConnectionWithCredentials struct {
 	RestartRequired  bool                 `json:"restartRequired"`
 	RestartHint      string               `json:"restartHint,omitempty"`
 	RecoveryRequired bool                 `json:"recoveryRequired"`
+	// StorageNeedsApplying means the shared htpasswd file differs from the active DB credentials.
+	// Apply safely rebuilds the file from the database and reloads the Collector.
+	StorageNeedsApplying bool `json:"storageNeedsApplying"`
 }

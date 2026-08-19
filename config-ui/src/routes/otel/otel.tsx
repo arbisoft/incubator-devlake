@@ -137,6 +137,9 @@ export const Otel = () => {
       {dataSource.some((connection) => connection.recoveryRequired) && (
         <Message content="The Collector credential verifier is unavailable. Revoke the affected connection, then generate new Claude settings to restore telemetry." />
       )}
+      {dataSource.some((connection) => connection.storageNeedsApplying) && (
+        <Message content="Credential storage differs from the registered credentials. Select Apply to reconcile the telemetry endpoint." />
+      )}
       <Table
         rowKey={(record) => record.connection.id}
         size="middle"

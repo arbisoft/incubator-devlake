@@ -97,6 +97,31 @@ func missingHtpasswdHashes(credentials []*models.OtelCredential) (bool, errors.E
 	return false, nil
 }
 
+// htpasswdHasUnexpectedUsernames detects verifiers with no active or retiring DB credential.
+// Missing verifiers are handled separately as per-connection recovery requirements because
+// their password hashes cannot be recreated without issuing a new credential.
+func htpasswdHasUnexpectedUsernames() (bool, errors.Error) {
+	path := firstNonEmpty(cfg.GetString("OTEL_AUTH_HTPASSWD_PATH"), defaultOtelAuthHtpasswdPath)
+	existing, err := readHtpasswd(path)
+	if err != nil {
+		return false, otelCredentialStorageError(htpasswdReadOperation, err)
+	}
+	credentials, err := getAllActiveOtelCredentials()
+	if err != nil {
+		return false, err
+	}
+	expectedUsernames := make(map[string]struct{}, len(credentials))
+	for _, credential := range credentials {
+		expectedUsernames[credential.Username] = struct{}{}
+	}
+	for username := range existing {
+		if _, ok := expectedUsernames[username]; !ok {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // otelCredentialStorageError keeps filesystem details in backend logs, not API responses.
 func otelCredentialStorageError(operation string, err error) errors.Error {
 	if logger != nil {
