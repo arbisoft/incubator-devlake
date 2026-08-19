@@ -52,10 +52,28 @@ func applyOtelCredentialChanges(credentials []*models.OtelCredential) errors.Err
 
 func applyAndRecordOtelCredentialChanges(credentials []*models.OtelCredential) (errors.Error, errors.Error) {
 	applyErr := applyOtelCredentialChanges(credentials)
+	if applyErr == nil {
+		if err := clearPendingOtelCredentialRestartState(); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
 	if err := updateOtelCredentialRestartState(credentials); err != nil {
 		return applyErr, err
 	}
 	return applyErr, nil
+}
+
+// clearPendingOtelCredentialRestartState confirms the global auth file was loaded after a healthy Collector restart.
+func clearPendingOtelCredentialRestartState() errors.Error {
+	return db.UpdateColumns(
+		&models.OtelCredential{},
+		[]dal.DalSet{
+			{ColumnName: "pending_collector_restart", Value: false},
+			{ColumnName: "last_collector_restart_hint", Value: ""},
+		},
+		dal.Where("pending_collector_restart = ?", true),
+	)
 }
 
 func updateOtelCredentialRestartState(credentials []*models.OtelCredential) errors.Error {
