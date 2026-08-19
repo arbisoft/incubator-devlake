@@ -70,7 +70,11 @@ type OtelConnectionInput struct {
 
 func ListOtelConnections() ([]*models.OtelConnectionWithCredentials, errors.Error) {
 	connections := make([]*models.OtelConnection, 0)
-	err := db.All(&connections, dal.Orderby("created_at DESC"))
+	err := db.All(
+		&connections,
+		dal.Where("hidden_at IS NULL"),
+		dal.Orderby("created_at DESC"),
+	)
 	if err != nil {
 		return nil, errors.Default.Wrap(err, "error getting otel connections")
 	}
@@ -96,6 +100,34 @@ func ListOtelConnections() ([]*models.OtelConnectionWithCredentials, errors.Erro
 		})
 	}
 	return output, nil
+}
+
+// HideOtelConnection removes a revoked connection from the management UI while retaining its audit record.
+func HideOtelConnection(user *common.User, id uint64) (*models.OtelConnectionWithCredentials, errors.Error) {
+	lifecycleMu.Lock()
+	defer lifecycleMu.Unlock()
+
+	connection, err := getOtelConnection(id)
+	if err != nil {
+		return nil, err
+	}
+	if connection.Status != models.OtelConnectionStatusRevoked {
+		return nil, errors.BadInput.New("only revoked Claude Code OTel connections can be removed")
+	}
+	if connection.HiddenAt == nil {
+		now := time.Now()
+		connection.HiddenAt = &now
+		setOtelActor(user, connection, false)
+		if err := db.Update(connection); err != nil {
+			return nil, errors.Default.Wrap(err, "error hiding revoked otel connection")
+		}
+	}
+
+	credentials, err := getOtelCredentials(connection.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &models.OtelConnectionWithCredentials{Connection: connection, Credentials: credentials}, nil
 }
 
 func CreateOtelConnection(user *common.User, input *OtelConnectionInput) (*models.OtelConnectionWithCredentials, errors.Error) {

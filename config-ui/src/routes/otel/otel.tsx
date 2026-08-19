@@ -17,7 +17,7 @@
  */
 
 import { useMemo, useState } from 'react';
-import { PlusOutlined, ReloadOutlined, StopOutlined, CheckOutlined, SyncOutlined } from '@ant-design/icons';
+import { PlusOutlined, ReloadOutlined, StopOutlined, CheckOutlined, SyncOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Button, Flex, message, Space, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import axios from 'axios';
@@ -182,6 +182,18 @@ const getColumns = (
         >
           Revoke
         </Button>
+        <Button
+          size="small"
+          danger
+          icon={<DeleteOutlined />}
+          disabled={record.connection.status !== OTEL_CONNECTION_STATUS.REVOKED}
+          onClick={() => {
+            setCurrent(record);
+            setModal(OTEL_MODAL.HIDE);
+          }}
+        >
+          Remove
+        </Button>
       </Space>
     ),
   },
@@ -230,6 +242,7 @@ export const Otel = () => {
     const apiCall = {
       rotate: () => API.otel.rotate(current.connection.id),
       revoke: () => API.otel.revoke(current.connection.id),
+      hide: () => API.otel.hide(current.connection.id),
       finalize: () => API.otel.finalizeRotation(current.connection.id),
       apply: () => API.otel.apply(current.connection.id),
     }[action];
@@ -242,6 +255,10 @@ export const Otel = () => {
 
     setCurrent(res);
     refresh();
+    if (action === 'hide') {
+      setModal(undefined);
+      return;
+    }
     if (action === 'apply') {
       if (res.restartRequired) {
         setLifecycleError(res.restartHint || genericApplyError);

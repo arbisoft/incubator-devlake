@@ -71,6 +71,18 @@ func RevokeConnection(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput
 	return &plugin.ApiResourceOutput{Body: connection, Status: http.StatusOK}, nil
 }
 
+func HideConnection(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	id, err := parseId(input.Params["connectionId"])
+	if err != nil {
+		return nil, err
+	}
+	connection, err := service.HideOtelConnection(input.User, id)
+	if err != nil {
+		return nil, err
+	}
+	return &plugin.ApiResourceOutput{Body: connection, Status: http.StatusOK}, nil
+}
+
 func FinalizeRotation(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
 	id, err := parseId(input.Params["connectionId"])
 	if err != nil {

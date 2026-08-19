@@ -30,12 +30,13 @@ export const OTEL_MODAL = {
   SNIPPET: 'snippet',
   ROTATE: 'rotate',
   REVOKE: 'revoke',
+  HIDE: 'hide',
   FINALIZE: 'finalize',
   APPLY: 'apply',
 } as const;
 
 export type OtelModalState = (typeof OTEL_MODAL)[keyof typeof OTEL_MODAL];
-export type OtelLifecycleAction = 'rotate' | 'revoke' | 'finalize' | 'apply';
+export type OtelLifecycleAction = 'rotate' | 'revoke' | 'hide' | 'finalize' | 'apply';
 
 type OtelModalProps = {
   current?: OtelConnectionResponse;
@@ -190,12 +191,24 @@ const RevokeModal = ({ lifecycleError, ...props }: OtelModalProps) => (
   />
 );
 
+const HideModal = ({ lifecycleError, ...props }: OtelModalProps) => (
+  <LifecycleModal
+    {...props}
+    action="hide"
+    title="Remove Revoked Connection"
+    content="This removes the revoked connection from this page. Its credential history remains retained in DevLake for audit purposes."
+    danger
+    error={lifecycleError}
+  />
+);
+
 // Select only the active modal so each lifecycle flow stays independently editable.
 const MODAL_COMPONENTS: Record<OtelModalState, ComponentType<OtelModalProps>> = {
   [OTEL_MODAL.CREATE]: CreateModal,
   [OTEL_MODAL.SNIPPET]: SnippetModal,
   [OTEL_MODAL.ROTATE]: RotateModal,
   [OTEL_MODAL.REVOKE]: RevokeModal,
+  [OTEL_MODAL.HIDE]: HideModal,
   [OTEL_MODAL.FINALIZE]: FinalizeModal,
   [OTEL_MODAL.APPLY]: ApplyModal,
 };
