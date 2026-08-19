@@ -255,6 +255,9 @@ func removeOtelCredentialForRollback(credential *models.OtelCredential) (bool, e
 		deleteErr := errors.Default.Wrap(err, fmt.Sprintf("error removing otel credential %d during rollback", credential.ID))
 		markOtelCredentialRevoked(credential, time.Now())
 		if updateErr := db.Update(credential); updateErr == nil {
+			if logger != nil {
+				logger.Warn(deleteErr, "OTel credential %d could not be deleted during rollback and was marked revoked instead", credential.ID)
+			}
 			return true, nil
 		} else {
 			return false, errors.Default.Combine([]error{
@@ -282,20 +285,28 @@ func removeOtelConnectionForRollback(connection *models.OtelConnection) errors.E
 	}
 }
 
-func combineOtelLifecycleErrors(errs ...error) errors.Error {
-	combined := make([]error, 0, len(errs))
-	for _, err := range errs {
-		if err != nil {
-			combined = append(combined, err)
+// combineOtelLifecycleErrors preserves the primary error's API classification and logs
+// secondary cleanup failures for operators. A cleanup failure must not turn a safe,
+// actionable error such as credential storage unavailability into a generic 500 response.
+func combineOtelLifecycleErrors(primary error, secondary ...error) errors.Error {
+	primaryFound := primary != nil
+	for _, err := range secondary {
+		if err == nil {
+			continue
+		}
+		if !primaryFound {
+			primary = err
+			primaryFound = true
+			continue
+		}
+		if logger != nil {
+			logger.Warn(err, "additional OTel credential lifecycle cleanup failure")
 		}
 	}
-	if len(combined) == 0 {
+	if !primaryFound {
 		return nil
 	}
-	if len(combined) == 1 {
-		return errors.Convert(combined[0])
-	}
-	return errors.Default.Combine(combined)
+	return errors.Convert(primary)
 }
 
 func RotateOtelConnection(user *common.User, id uint64) (*models.OtelConnectionWithCredentials, errors.Error) {
