@@ -26,7 +26,7 @@ import API from '@/api';
 import { OTEL_CONNECTION_STATUS, OTEL_CREDENTIAL_STATUS, type OtelConnectionResponse } from '@/api/otel';
 import { Message, PageHeader } from '@/components';
 import { useRefreshData } from '@/hooks';
-import { formatTime, operator } from '@/utils';
+import { formatTime, operator, type OperateConfig } from '@/utils';
 import { OTEL_MODAL, OtelModals, type OtelLifecycleAction, type OtelModalState } from './modals';
 
 const OTEL_PATH = `${import.meta.env.DEVLAKE_PATH_PREFIX ?? ''}/otel`;
@@ -36,6 +36,21 @@ const genericCreateError = 'Unable to generate Claude settings. Please try again
 const genericApplyError = 'Credential changes were saved, but the telemetry endpoint could not apply them. Retry Apply shortly.';
 const credentialStorageError = 'Telemetry credential storage is temporarily unavailable. Please retry shortly.';
 const genericLifecycleError = 'Unable to update Claude Code OTel credentials. Please try again or contact support.';
+
+type OtelOperationResult =
+  | { success: true; data: OtelConnectionResponse }
+  | { success: false; error: unknown };
+
+// Keep OTel lifecycle responses typed without changing the shared legacy operator contract.
+const operateOtel = async (
+  request: () => Promise<OtelConnectionResponse>,
+  config?: OperateConfig,
+): Promise<OtelOperationResult> => {
+  const [success, result] = await operator(request, config);
+  return success
+    ? { success: true, data: result as OtelConnectionResponse }
+    : { success: false, error: result };
+};
 
 // Surface only explicit validation messages; unexpected backend failures remain generic.
 const getCreateError = (error: unknown) => {
@@ -224,16 +239,16 @@ export const Otel = () => {
 
   const handleCreate = async () => {
     setCreateError(undefined);
-    const [success, res] = await operator(() => API.otel.create({ teamName }), { hideToast: true, setOperating });
-    if (success) {
-      setCurrent(res);
+    const result = await operateOtel(() => API.otel.create({ teamName }), { hideToast: true, setOperating });
+    if (result.success) {
+      setCurrent(result.data);
       setTeamName('');
       setModal(OTEL_MODAL.SNIPPET);
       refresh();
       return;
     }
 
-    setCreateError(getCreateError(res));
+    setCreateError(getCreateError(result.error));
   };
 
   const handleAction = async (action: OtelLifecycleAction) => {
@@ -247,26 +262,27 @@ export const Otel = () => {
       apply: () => API.otel.apply(current.connection.id),
     }[action];
 
-    const [success, res] = await operator(apiCall, { hideToast: true, setOperating });
-    if (!success) {
-      setLifecycleError(getLifecycleError(res));
+    const result = await operateOtel(apiCall, { hideToast: true, setOperating });
+    if (!result.success) {
+      setLifecycleError(getLifecycleError(result.error));
       return;
     }
 
-    setCurrent(res);
+    const response = result.data;
+    setCurrent(response);
     refresh();
     if (action === 'hide') {
       setModal(undefined);
       return;
     }
     if (action === 'apply') {
-      if (res.restartRequired) {
-        setLifecycleError(res.restartHint || genericApplyError);
+      if (response.restartRequired) {
+        setLifecycleError(response.restartHint || genericApplyError);
         return;
       }
       message.success('Credential changes applied.');
     }
-    setModal(res.managedSettings ? OTEL_MODAL.SNIPPET : undefined);
+    setModal(response.managedSettings ? OTEL_MODAL.SNIPPET : undefined);
   };
 
   return (
