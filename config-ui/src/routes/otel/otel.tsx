@@ -57,10 +57,10 @@ const getCreateError = (error: unknown) => {
   if (axios.isAxiosError(error) && error.response?.status === 503) return credentialStorageError;
   if (!axios.isAxiosError<{ message?: unknown }>(error) || error.response?.status !== 400) return genericCreateError;
 
-  const message = typeof error.response.data?.message === 'string' ? error.response.data.message : '';
-  if (message.includes('a Claude Code OTel connection already exists for this team')) return duplicateTeamMessage;
+  const serverMessage = typeof error.response.data?.message === 'string' ? error.response.data.message : '';
+  if (serverMessage.includes('a Claude Code OTel connection already exists for this team')) return duplicateTeamMessage;
 
-  return message || genericCreateError;
+  return serverMessage || genericCreateError;
 };
 
 // Surface only known operational responses; filesystem details and stack traces stay server-side.
@@ -70,8 +70,8 @@ const getLifecycleError = (error: unknown) => {
   const { status, data } = error.response ?? {};
   if (status === 503) return credentialStorageError;
 
-  const message = typeof data?.message === 'string' ? data.message : '';
-  if (status === 400 || status === 409 || status === 429) return message || genericLifecycleError;
+  const serverMessage = typeof data?.message === 'string' ? data.message : '';
+  if (status === 400 || status === 409 || status === 429) return serverMessage || genericLifecycleError;
 
   return genericLifecycleError;
 };
