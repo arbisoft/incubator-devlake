@@ -26,12 +26,12 @@ import { OTEL_CONNECTION_STATUS, OTEL_CREDENTIAL_STATUS, type OtelConnectionResp
 import { Message, PageHeader } from '@/components';
 import { useRefreshData } from '@/hooks';
 import { formatTime, operator, type OperateConfig } from '@/utils';
+import { OTEL_ERROR } from './constants';
 import { OTEL_MODAL, OtelModals, type OtelLifecycleAction, type OtelModalState } from './modals';
 import { getOtelCreateError, getOtelLifecycleError } from './utils';
 
 const OTEL_PATH = `${import.meta.env.DEVLAKE_PATH_PREFIX ?? ''}/otel`;
 const BREADCRUMBS = [{ name: 'Claude Code OTel', path: OTEL_PATH }];
-const genericApplyError = 'Credential changes were saved, but the telemetry endpoint could not apply them. Retry Apply shortly.';
 
 type OtelOperationResult =
   | { success: true; data: OtelConnectionResponse }
@@ -249,7 +249,7 @@ export const Otel = () => {
     }
     if (action === 'apply') {
       if (response.restartRequired) {
-        setLifecycleError(response.restartHint || genericApplyError);
+        setLifecycleError(response.restartHint || OTEL_ERROR.APPLY);
         return;
       }
       message.success('Credential changes applied.');
