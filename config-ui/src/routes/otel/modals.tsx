@@ -151,68 +151,67 @@ const LifecycleModal = ({ action, title, content, danger, error, operating, onCl
   </Modal>
 );
 
-const RotateModal = ({ lifecycleError, ...props }: OtelModalProps) => (
-  <LifecycleModal
-    {...props}
-    action="rotate"
-    title="Rotate Claude Code OTel Credential"
-    content="The old credential will stay valid as retiring until you finalize rotation."
-    error={lifecycleError}
-  />
-);
+const MODAL_KIND = {
+  CUSTOM: 'custom',
+  LIFECYCLE: 'lifecycle',
+} as const;
 
-const FinalizeModal = ({ lifecycleError, ...props }: OtelModalProps) => (
-  <LifecycleModal
-    {...props}
-    action="finalize"
-    title="Finalize Rotation"
-    content="Retiring credentials will be removed after the telemetry endpoint applies the update."
-    error={lifecycleError}
-  />
-);
+type OtelModalConfig =
+  | {
+      kind: typeof MODAL_KIND.CUSTOM;
+      component: ComponentType<OtelModalProps>;
+    }
+  | {
+      kind: typeof MODAL_KIND.LIFECYCLE;
+      action: OtelLifecycleAction;
+      title: string;
+      content: string;
+      danger?: boolean;
+    };
 
-const ApplyModal = ({ lifecycleError, ...props }: OtelModalProps) => (
-  <LifecycleModal
-    {...props}
-    action="apply"
-    title="Apply Credential Changes"
-    content="Retry applying the current credential state to the telemetry endpoint."
-    error={lifecycleError}
-  />
-);
-
-const RevokeModal = ({ lifecycleError, ...props }: OtelModalProps) => (
-  <LifecycleModal
-    {...props}
-    action="revoke"
-    title="Revoke Claude Code OTel Credential"
-    content="All active Claude Code telemetry credentials for this connection will be rejected after the telemetry endpoint applies the update."
-    danger
-    error={lifecycleError}
-  />
-);
-
-const HideModal = ({ lifecycleError, ...props }: OtelModalProps) => (
-  <LifecycleModal
-    {...props}
-    action="hide"
-    title="Remove Revoked Connection"
-    content="This removes the revoked connection from this page. Its credential history remains retained in DevLake for audit purposes."
-    danger
-    error={lifecycleError}
-  />
-);
-
-// Select only the active modal so each lifecycle flow stays independently editable.
-const MODAL_COMPONENTS: Record<OtelModalState, ComponentType<OtelModalProps>> = {
-  [OTEL_MODAL.CREATE]: CreateModal,
-  [OTEL_MODAL.SNIPPET]: SnippetModal,
-  [OTEL_MODAL.ROTATE]: RotateModal,
-  [OTEL_MODAL.REVOKE]: RevokeModal,
-  [OTEL_MODAL.HIDE]: HideModal,
-  [OTEL_MODAL.FINALIZE]: FinalizeModal,
-  [OTEL_MODAL.APPLY]: ApplyModal,
-};
+const OTEL_MODALS = {
+  [OTEL_MODAL.CREATE]: {
+    kind: MODAL_KIND.CUSTOM,
+    component: CreateModal,
+  },
+  [OTEL_MODAL.SNIPPET]: {
+    kind: MODAL_KIND.CUSTOM,
+    component: SnippetModal,
+  },
+  [OTEL_MODAL.ROTATE]: {
+    kind: MODAL_KIND.LIFECYCLE,
+    action: OTEL_LIFECYCLE_ACTION.ROTATE,
+    title: 'Rotate Claude Code OTel Credential',
+    content: 'The old credential will stay valid as retiring until you finalize rotation.',
+  },
+  [OTEL_MODAL.FINALIZE]: {
+    kind: MODAL_KIND.LIFECYCLE,
+    action: OTEL_LIFECYCLE_ACTION.FINALIZE,
+    title: 'Finalize Rotation',
+    content: 'Retiring credentials will be removed after the telemetry endpoint applies the update.',
+  },
+  [OTEL_MODAL.APPLY]: {
+    kind: MODAL_KIND.LIFECYCLE,
+    action: OTEL_LIFECYCLE_ACTION.APPLY,
+    title: 'Apply Credential Changes',
+    content: 'Retry applying the current credential state to the telemetry endpoint.',
+  },
+  [OTEL_MODAL.REVOKE]: {
+    kind: MODAL_KIND.LIFECYCLE,
+    action: OTEL_LIFECYCLE_ACTION.REVOKE,
+    title: 'Revoke Claude Code OTel Credential',
+    content:
+      'All active Claude Code telemetry credentials for this connection will be rejected after the telemetry endpoint applies the update.',
+    danger: true,
+  },
+  [OTEL_MODAL.HIDE]: {
+    kind: MODAL_KIND.LIFECYCLE,
+    action: OTEL_LIFECYCLE_ACTION.HIDE,
+    title: 'Remove Revoked Connection',
+    content: 'This removes the revoked connection from this page. Its credential history remains retained in DevLake for audit purposes.',
+    danger: true,
+  },
+} satisfies Record<OtelModalState, OtelModalConfig>;
 
 type OtelModalsProps = OtelModalProps & {
   modal?: OtelModalState;
@@ -221,6 +220,20 @@ type OtelModalsProps = OtelModalProps & {
 export const OtelModals = ({ modal, ...props }: OtelModalsProps) => {
   if (!modal) return null;
 
-  const ActiveModal = MODAL_COMPONENTS[modal];
-  return <ActiveModal {...props} />;
+  const config = OTEL_MODALS[modal];
+  if (config.kind === MODAL_KIND.LIFECYCLE) {
+    return (
+      <LifecycleModal
+        {...props}
+        action={config.action}
+        title={config.title}
+        content={config.content}
+        danger={config.danger}
+        error={props.lifecycleError}
+      />
+    );
+  }
+
+  const CustomModal = config.component;
+  return <CustomModal {...props} />;
 };
