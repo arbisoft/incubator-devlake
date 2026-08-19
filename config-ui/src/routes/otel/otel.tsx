@@ -20,7 +20,6 @@ import { useMemo, useState } from 'react';
 import { PlusOutlined, ReloadOutlined, StopOutlined, CheckOutlined, SyncOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Button, Flex, message, Space, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import axios from 'axios';
 
 import API from '@/api';
 import { OTEL_CONNECTION_STATUS, OTEL_CREDENTIAL_STATUS, type OtelConnectionResponse } from '@/api/otel';
@@ -28,14 +27,11 @@ import { Message, PageHeader } from '@/components';
 import { useRefreshData } from '@/hooks';
 import { formatTime, operator, type OperateConfig } from '@/utils';
 import { OTEL_MODAL, OtelModals, type OtelLifecycleAction, type OtelModalState } from './modals';
+import { getOtelCreateError, getOtelLifecycleError } from './utils';
 
 const OTEL_PATH = `${import.meta.env.DEVLAKE_PATH_PREFIX ?? ''}/otel`;
 const BREADCRUMBS = [{ name: 'Claude Code OTel', path: OTEL_PATH }];
-const duplicateTeamMessage = 'Claude Code OTel credentials already exist for this team. Revoke them before generating new settings.';
-const genericCreateError = 'Unable to generate Claude settings. Please try again or contact support.';
 const genericApplyError = 'Credential changes were saved, but the telemetry endpoint could not apply them. Retry Apply shortly.';
-const credentialStorageError = 'Telemetry credential storage is temporarily unavailable. Please retry shortly.';
-const genericLifecycleError = 'Unable to update Claude Code OTel credentials. Please try again or contact support.';
 
 type OtelOperationResult =
   | { success: true; data: OtelConnectionResponse }
@@ -50,30 +46,6 @@ const operateOtel = async (
   return success
     ? { success: true, data: result as OtelConnectionResponse }
     : { success: false, error: result };
-};
-
-// Surface only explicit validation messages; unexpected backend failures remain generic.
-const getCreateError = (error: unknown) => {
-  if (axios.isAxiosError(error) && error.response?.status === 503) return credentialStorageError;
-  if (!axios.isAxiosError<{ message?: unknown }>(error) || error.response?.status !== 400) return genericCreateError;
-
-  const serverMessage = typeof error.response.data?.message === 'string' ? error.response.data.message : '';
-  if (serverMessage.includes('a Claude Code OTel connection already exists for this team')) return duplicateTeamMessage;
-
-  return serverMessage || genericCreateError;
-};
-
-// Surface only known operational responses; filesystem details and stack traces stay server-side.
-const getLifecycleError = (error: unknown) => {
-  if (!axios.isAxiosError<{ message?: unknown }>(error)) return genericLifecycleError;
-
-  const { status, data } = error.response ?? {};
-  if (status === 503) return credentialStorageError;
-
-  const serverMessage = typeof data?.message === 'string' ? data.message : '';
-  if (status === 400 || status === 409 || status === 429) return serverMessage || genericLifecycleError;
-
-  return genericLifecycleError;
 };
 
 // Keep table presentation separate while leaving page-specific actions in this route.
@@ -248,7 +220,7 @@ export const Otel = () => {
       return;
     }
 
-    setCreateError(getCreateError(result.error));
+    setCreateError(getOtelCreateError(result.error));
   };
 
   const handleAction = async (action: OtelLifecycleAction) => {
@@ -264,7 +236,7 @@ export const Otel = () => {
 
     const result = await operateOtel(apiCall, { hideToast: true, setOperating });
     if (!result.success) {
-      setLifecycleError(getLifecycleError(result.error));
+      setLifecycleError(getOtelLifecycleError(result.error));
       return;
     }
 
