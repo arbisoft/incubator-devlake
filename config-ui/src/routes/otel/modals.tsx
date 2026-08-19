@@ -23,6 +23,7 @@ import { Alert, Button, Flex, Input, message, Modal, Space } from 'antd';
 
 import type { OtelConnectionResponse } from '@/api/otel';
 import { ExternalLink, Message } from '@/components';
+import { OTEL_LIFECYCLE_ACTION } from './constants';
 import { ManagedSettings } from './styled';
 
 export const OTEL_MODAL = {
@@ -36,7 +37,7 @@ export const OTEL_MODAL = {
 } as const;
 
 export type OtelModalState = (typeof OTEL_MODAL)[keyof typeof OTEL_MODAL];
-export type OtelLifecycleAction = 'rotate' | 'revoke' | 'hide' | 'finalize' | 'apply';
+export type OtelLifecycleAction = (typeof OTEL_LIFECYCLE_ACTION)[keyof typeof OTEL_LIFECYCLE_ACTION];
 
 type OtelModalProps = {
   current?: OtelConnectionResponse;

@@ -23,3 +23,11 @@ export const OTEL_ERROR = {
   LIFECYCLE: 'Unable to update Claude Code OTel credentials. Please try again or contact support.',
   APPLY: 'Credential changes were saved, but the telemetry endpoint could not apply them. Retry Apply shortly.',
 } as const;
+
+export const OTEL_LIFECYCLE_ACTION = {
+  ROTATE: 'rotate',
+  REVOKE: 'revoke',
+  HIDE: 'hide',
+  FINALIZE: 'finalize',
+  APPLY: 'apply',
+} as const;

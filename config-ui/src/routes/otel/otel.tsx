@@ -26,7 +26,7 @@ import { OTEL_CONNECTION_STATUS, OTEL_CREDENTIAL_STATUS, type OtelConnectionResp
 import { Message, PageHeader } from '@/components';
 import { useRefreshData } from '@/hooks';
 import { formatTime, operator, type OperateConfig } from '@/utils';
-import { OTEL_ERROR } from './constants';
+import { OTEL_ERROR, OTEL_LIFECYCLE_ACTION } from './constants';
 import { OTEL_MODAL, OtelModals, type OtelLifecycleAction, type OtelModalState } from './modals';
 import { getOtelCreateError, getOtelLifecycleError } from './utils';
 
@@ -226,15 +226,15 @@ export const Otel = () => {
   const handleAction = async (action: OtelLifecycleAction) => {
     if (!current?.connection.id) return;
     setLifecycleError(undefined);
-    const apiCall = {
-      rotate: () => API.otel.rotate(current.connection.id),
-      revoke: () => API.otel.revoke(current.connection.id),
-      hide: () => API.otel.hide(current.connection.id),
-      finalize: () => API.otel.finalizeRotation(current.connection.id),
-      apply: () => API.otel.apply(current.connection.id),
-    }[action];
+    const apiCalls: Record<OtelLifecycleAction, () => Promise<OtelConnectionResponse>> = {
+      [OTEL_LIFECYCLE_ACTION.ROTATE]: () => API.otel.rotate(current.connection.id),
+      [OTEL_LIFECYCLE_ACTION.REVOKE]: () => API.otel.revoke(current.connection.id),
+      [OTEL_LIFECYCLE_ACTION.HIDE]: () => API.otel.hide(current.connection.id),
+      [OTEL_LIFECYCLE_ACTION.FINALIZE]: () => API.otel.finalizeRotation(current.connection.id),
+      [OTEL_LIFECYCLE_ACTION.APPLY]: () => API.otel.apply(current.connection.id),
+    };
 
-    const result = await operateOtel(apiCall, { hideToast: true, setOperating });
+    const result = await operateOtel(apiCalls[action], { hideToast: true, setOperating });
     if (!result.success) {
       setLifecycleError(getOtelLifecycleError(result.error));
       return;
@@ -243,17 +243,22 @@ export const Otel = () => {
     const response = result.data;
     setCurrent(response);
     refresh();
-    if (action === 'hide') {
-      setModal(undefined);
-      return;
-    }
-    if (action === 'apply') {
-      if (response.restartRequired) {
-        setLifecycleError(response.restartHint || OTEL_ERROR.APPLY);
-        return;
-      }
-      message.success('Credential changes applied.');
-    }
+    const postActionHandlers: Partial<Record<OtelLifecycleAction, (response: OtelConnectionResponse) => boolean>> = {
+      [OTEL_LIFECYCLE_ACTION.HIDE]: () => {
+        setModal(undefined);
+        return true;
+      },
+      [OTEL_LIFECYCLE_ACTION.APPLY]: (response) => {
+        if (response.restartRequired) {
+          setLifecycleError(response.restartHint || OTEL_ERROR.APPLY);
+          return true;
+        }
+        message.success('Credential changes applied.');
+        return false;
+      },
+    };
+    if (postActionHandlers[action]?.(response)) return;
+
     setModal(response.managedSettings ? OTEL_MODAL.SNIPPET : undefined);
   };
 
