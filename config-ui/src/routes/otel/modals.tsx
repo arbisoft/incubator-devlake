@@ -23,6 +23,7 @@ import { Alert, Button, Flex, Input, message, Modal, Space } from 'antd';
 
 import type { OtelConnectionResponse } from '@/api/otel';
 import { ExternalLink, Message } from '@/components';
+import { OTEL_LIFECYCLE_ACTION } from './constants';
 import { ManagedSettings } from './styled';
 
 export const OTEL_MODAL = {
@@ -30,17 +31,19 @@ export const OTEL_MODAL = {
   SNIPPET: 'snippet',
   ROTATE: 'rotate',
   REVOKE: 'revoke',
+  HIDE: 'hide',
   FINALIZE: 'finalize',
   APPLY: 'apply',
 } as const;
 
 export type OtelModalState = (typeof OTEL_MODAL)[keyof typeof OTEL_MODAL];
-export type OtelLifecycleAction = 'rotate' | 'revoke' | 'finalize' | 'apply';
+export type OtelLifecycleAction = (typeof OTEL_LIFECYCLE_ACTION)[keyof typeof OTEL_LIFECYCLE_ACTION];
 
 type OtelModalProps = {
   current?: OtelConnectionResponse;
   teamName: string;
   createError?: string;
+  lifecycleError?: string;
   operating: boolean;
   managedSettings: string;
   onClose: () => void;
@@ -127,9 +130,10 @@ type LifecycleModalProps = OtelModalProps & {
   title: string;
   content: string;
   danger?: boolean;
+  error?: string;
 };
 
-const LifecycleModal = ({ action, title, content, danger, operating, onClose, onAction }: LifecycleModalProps) => (
+const LifecycleModal = ({ action, title, content, danger, error, operating, onClose, onAction }: LifecycleModalProps) => (
   <Modal
     open
     width={720}
@@ -140,56 +144,74 @@ const LifecycleModal = ({ action, title, content, danger, operating, onClose, on
     onCancel={onClose}
     onOk={() => onAction(action)}
   >
-    <Message content={content} />
+    <Space direction="vertical" size={12} style={{ width: '100%' }}>
+      <Message content={content} />
+      {error && <Alert type="error" showIcon message={error} />}
+    </Space>
   </Modal>
 );
 
-const RotateModal = (props: OtelModalProps) => (
-  <LifecycleModal
-    {...props}
-    action="rotate"
-    title="Rotate Claude Code OTel Credential"
-    content="The old credential will stay valid as retiring until you finalize rotation."
-  />
-);
+const MODAL_KIND = {
+  CUSTOM: 'custom',
+  LIFECYCLE: 'lifecycle',
+} as const;
 
-const FinalizeModal = (props: OtelModalProps) => (
-  <LifecycleModal
-    {...props}
-    action="finalize"
-    title="Finalize Rotation"
-    content="Retiring credentials will be removed after the telemetry endpoint applies the update."
-  />
-);
+type OtelModalConfig =
+  | {
+      kind: typeof MODAL_KIND.CUSTOM;
+      component: ComponentType<OtelModalProps>;
+    }
+  | {
+      kind: typeof MODAL_KIND.LIFECYCLE;
+      action: OtelLifecycleAction;
+      title: string;
+      content: string;
+      danger?: boolean;
+    };
 
-const ApplyModal = (props: OtelModalProps) => (
-  <LifecycleModal
-    {...props}
-    action="apply"
-    title="Apply Credential Changes"
-    content="Retry applying the current credential state to the telemetry endpoint."
-  />
-);
-
-const RevokeModal = (props: OtelModalProps) => (
-  <LifecycleModal
-    {...props}
-    action="revoke"
-    title="Revoke Claude Code OTel Credential"
-    content="All active Claude Code telemetry credentials for this connection will be rejected after the telemetry endpoint applies the update."
-    danger
-  />
-);
-
-// Select only the active modal so each lifecycle flow stays independently editable.
-const MODAL_COMPONENTS: Record<OtelModalState, ComponentType<OtelModalProps>> = {
-  [OTEL_MODAL.CREATE]: CreateModal,
-  [OTEL_MODAL.SNIPPET]: SnippetModal,
-  [OTEL_MODAL.ROTATE]: RotateModal,
-  [OTEL_MODAL.REVOKE]: RevokeModal,
-  [OTEL_MODAL.FINALIZE]: FinalizeModal,
-  [OTEL_MODAL.APPLY]: ApplyModal,
-};
+const OTEL_MODALS = {
+  [OTEL_MODAL.CREATE]: {
+    kind: MODAL_KIND.CUSTOM,
+    component: CreateModal,
+  },
+  [OTEL_MODAL.SNIPPET]: {
+    kind: MODAL_KIND.CUSTOM,
+    component: SnippetModal,
+  },
+  [OTEL_MODAL.ROTATE]: {
+    kind: MODAL_KIND.LIFECYCLE,
+    action: OTEL_LIFECYCLE_ACTION.ROTATE,
+    title: 'Rotate Claude Code OTel Credential',
+    content: 'The old credential will stay valid as retiring until you finalize rotation.',
+  },
+  [OTEL_MODAL.FINALIZE]: {
+    kind: MODAL_KIND.LIFECYCLE,
+    action: OTEL_LIFECYCLE_ACTION.FINALIZE,
+    title: 'Finalize Rotation',
+    content: 'Retiring credentials will be removed after the telemetry endpoint applies the update.',
+  },
+  [OTEL_MODAL.APPLY]: {
+    kind: MODAL_KIND.LIFECYCLE,
+    action: OTEL_LIFECYCLE_ACTION.APPLY,
+    title: 'Apply Credential Changes',
+    content: 'Retry applying the current credential state to the telemetry endpoint.',
+  },
+  [OTEL_MODAL.REVOKE]: {
+    kind: MODAL_KIND.LIFECYCLE,
+    action: OTEL_LIFECYCLE_ACTION.REVOKE,
+    title: 'Revoke Claude Code OTel Credential',
+    content:
+      'All active Claude Code telemetry credentials for this connection will be rejected after the telemetry endpoint applies the update.',
+    danger: true,
+  },
+  [OTEL_MODAL.HIDE]: {
+    kind: MODAL_KIND.LIFECYCLE,
+    action: OTEL_LIFECYCLE_ACTION.HIDE,
+    title: 'Remove Revoked Connection',
+    content: 'This removes the revoked connection from this page. Its credential history remains retained in DevLake for audit purposes.',
+    danger: true,
+  },
+} satisfies Record<OtelModalState, OtelModalConfig>;
 
 type OtelModalsProps = OtelModalProps & {
   modal?: OtelModalState;
@@ -198,6 +220,20 @@ type OtelModalsProps = OtelModalProps & {
 export const OtelModals = ({ modal, ...props }: OtelModalsProps) => {
   if (!modal) return null;
 
-  const ActiveModal = MODAL_COMPONENTS[modal];
-  return <ActiveModal {...props} />;
+  const config = OTEL_MODALS[modal];
+  if (config.kind === MODAL_KIND.LIFECYCLE) {
+    return (
+      <LifecycleModal
+        {...props}
+        action={config.action}
+        title={config.title}
+        content={config.content}
+        danger={config.danger}
+        error={props.lifecycleError}
+      />
+    );
+  }
+
+  const CustomModal = config.component;
+  return <CustomModal {...props} />;
 };

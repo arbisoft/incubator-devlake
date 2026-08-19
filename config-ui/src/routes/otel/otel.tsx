@@ -17,157 +17,36 @@
  */
 
 import { useMemo, useState } from 'react';
-import { PlusOutlined, ReloadOutlined, StopOutlined, CheckOutlined, SyncOutlined } from '@ant-design/icons';
-import { Button, Flex, Space, Table, Tag } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import axios from 'axios';
+import { PlusOutlined } from '@ant-design/icons';
+import { Button, Flex, message, Table } from 'antd';
 
 import API from '@/api';
-import { OTEL_CONNECTION_STATUS, OTEL_CREDENTIAL_STATUS, type OtelConnectionResponse } from '@/api/otel';
+import { type OtelConnectionResponse } from '@/api/otel';
 import { Message, PageHeader } from '@/components';
 import { useRefreshData } from '@/hooks';
-import { formatTime, operator } from '@/utils';
+import { operator, type OperateConfig } from '@/utils';
+import { getOtelColumns } from './columns';
+import { OTEL_ERROR, OTEL_LIFECYCLE_ACTION } from './constants';
 import { OTEL_MODAL, OtelModals, type OtelLifecycleAction, type OtelModalState } from './modals';
+import { getOtelCreateError, getOtelLifecycleError } from './utils';
 
 const OTEL_PATH = `${import.meta.env.DEVLAKE_PATH_PREFIX ?? ''}/otel`;
 const BREADCRUMBS = [{ name: 'Claude Code OTel', path: OTEL_PATH }];
-const duplicateTeamMessage = 'Claude Code OTel credentials already exist for this team. Revoke them before generating new settings.';
-const genericCreateError = 'Unable to generate Claude settings. Please try again or contact support.';
 
-// Surface only explicit validation messages; unexpected backend failures remain generic.
-const getCreateError = (error: unknown) => {
-  if (!axios.isAxiosError<{ message?: unknown }>(error) || error.response?.status !== 400) return genericCreateError;
+type OtelOperationResult =
+  | { success: true; data: OtelConnectionResponse }
+  | { success: false; error: unknown };
 
-  const message = typeof error.response.data?.message === 'string' ? error.response.data.message : '';
-  if (message.includes('a Claude Code OTel connection already exists for this team')) return duplicateTeamMessage;
-
-  return message || genericCreateError;
+// Keep OTel lifecycle responses typed without changing the shared legacy operator contract.
+const operateOtel = async (
+  request: () => Promise<OtelConnectionResponse>,
+  config?: OperateConfig,
+): Promise<OtelOperationResult> => {
+  const [success, result] = await operator(request, config);
+  return success
+    ? { success: true, data: result as OtelConnectionResponse }
+    : { success: false, error: result };
 };
-
-// Keep table presentation separate while leaving page-specific actions in this route.
-const getColumns = (
-  setCurrent: (connection: OtelConnectionResponse) => void,
-  setModal: (modal: OtelModalState) => void,
-): ColumnsType<OtelConnectionResponse> => [
-  {
-    title: 'Team',
-    dataIndex: ['connection', 'teamName'],
-    width: 220,
-  },
-  {
-    title: 'Team slug',
-    dataIndex: ['connection', 'teamSlug'],
-    width: 220,
-  },
-  {
-    title: 'Endpoint',
-    dataIndex: ['connection', 'collectorEndpoint'],
-  },
-  {
-    title: 'Status',
-    width: 180,
-    render: (_, record) => (
-      <Space>
-        <Tag
-          color={
-            record.connection.status === OTEL_CONNECTION_STATUS.ACTIVE && !record.restartRequired ? 'green' : 'default'
-          }
-        >
-          {record.connection.status === OTEL_CONNECTION_STATUS.REVOKED
-            ? 'Revoked'
-            : record.restartRequired
-            ? 'Action required'
-            : 'Ready'}
-        </Tag>
-      </Space>
-    ),
-  },
-  {
-    title: 'Credentials',
-    width: 220,
-    render: (_, record) => {
-      const currentCredentials = record.credentials.filter(
-        (credential) => credential.status !== OTEL_CREDENTIAL_STATUS.REVOKED,
-      );
-
-      return (
-        <Space wrap>
-          {currentCredentials.length > 0 ? (
-            currentCredentials.map((credential) => (
-              <Tag key={credential.id} color={credential.status === OTEL_CREDENTIAL_STATUS.ACTIVE ? 'green' : 'orange'}>
-                {credential.status}
-              </Tag>
-            ))
-          ) : (
-            <Tag>revoked</Tag>
-          )}
-        </Space>
-      );
-    },
-  },
-  {
-    title: 'Updated',
-    dataIndex: ['connection', 'updatedAt'],
-    width: 180,
-    render: (value) => formatTime(value),
-  },
-  {
-    title: '',
-    width: 250,
-    render: (_, record) => (
-      <Space wrap>
-        <Button
-          size="small"
-          icon={<ReloadOutlined />}
-          disabled={
-            record.connection.status !== OTEL_CONNECTION_STATUS.ACTIVE ||
-            record.credentials.some((it) => it.status === OTEL_CREDENTIAL_STATUS.RETIRING)
-          }
-          onClick={() => {
-            setCurrent(record);
-            setModal(OTEL_MODAL.ROTATE);
-          }}
-        >
-          Rotate
-        </Button>
-        <Button
-          size="small"
-          icon={<SyncOutlined />}
-          disabled={!record.restartRequired}
-          onClick={() => {
-            setCurrent(record);
-            setModal(OTEL_MODAL.APPLY);
-          }}
-        >
-          Apply
-        </Button>
-        <Button
-          size="small"
-          icon={<CheckOutlined />}
-          disabled={!record.credentials.some((it) => it.status === OTEL_CREDENTIAL_STATUS.RETIRING)}
-          onClick={() => {
-            setCurrent(record);
-            setModal(OTEL_MODAL.FINALIZE);
-          }}
-        >
-          Finalize
-        </Button>
-        <Button
-          size="small"
-          danger
-          icon={<StopOutlined />}
-          disabled={record.connection.status !== OTEL_CONNECTION_STATUS.ACTIVE}
-          onClick={() => {
-            setCurrent(record);
-            setModal(OTEL_MODAL.REVOKE);
-          }}
-        >
-          Revoke
-        </Button>
-      </Space>
-    ),
-  },
-];
 
 export const Otel = () => {
   const [version, setVersion] = useState(1);
@@ -176,47 +55,73 @@ export const Otel = () => {
   const [current, setCurrent] = useState<OtelConnectionResponse>();
   const [teamName, setTeamName] = useState('');
   const [createError, setCreateError] = useState<string>();
+  const [lifecycleError, setLifecycleError] = useState<string>();
 
   const { data, ready } = useRefreshData(() => API.otel.list(), [version]);
   const dataSource = useMemo(() => data ?? [], [data]);
-  const columns = useMemo(() => getColumns(setCurrent, setModal), []);
+  const columns = useMemo(() => getOtelColumns(setCurrent, setModal), []);
   const managedSettings = useMemo(
     () => (current?.managedSettings ? JSON.stringify(current.managedSettings, null, 2) : ''),
     [current],
   );
 
   const refresh = () => setVersion((v) => v + 1);
-  const closeModal = () => setModal(undefined);
+  const closeModal = () => {
+    setLifecycleError(undefined);
+    setModal(undefined);
+  };
 
   const handleCreate = async () => {
     setCreateError(undefined);
-    const [success, res] = await operator(() => API.otel.create({ teamName }), { hideToast: true, setOperating });
-    if (success) {
-      setCurrent(res);
+    const result = await operateOtel(() => API.otel.create({ teamName }), { hideToast: true, setOperating });
+    if (result.success) {
+      setCurrent(result.data);
       setTeamName('');
       setModal(OTEL_MODAL.SNIPPET);
       refresh();
       return;
     }
 
-    setCreateError(getCreateError(res));
+    setCreateError(getOtelCreateError(result.error));
   };
 
   const handleAction = async (action: OtelLifecycleAction) => {
     if (!current?.connection.id) return;
-    const apiCall = {
-      rotate: () => API.otel.rotate(current.connection.id),
-      revoke: () => API.otel.revoke(current.connection.id),
-      finalize: () => API.otel.finalizeRotation(current.connection.id),
-      apply: () => API.otel.apply(current.connection.id),
-    }[action];
+    setLifecycleError(undefined);
+    const apiCalls: Record<OtelLifecycleAction, () => Promise<OtelConnectionResponse>> = {
+      [OTEL_LIFECYCLE_ACTION.ROTATE]: () => API.otel.rotate(current.connection.id),
+      [OTEL_LIFECYCLE_ACTION.REVOKE]: () => API.otel.revoke(current.connection.id),
+      [OTEL_LIFECYCLE_ACTION.HIDE]: () => API.otel.hide(current.connection.id),
+      [OTEL_LIFECYCLE_ACTION.FINALIZE]: () => API.otel.finalizeRotation(current.connection.id),
+      [OTEL_LIFECYCLE_ACTION.APPLY]: () => API.otel.apply(current.connection.id),
+    };
 
-    const [success, res] = await operator(apiCall, { setOperating });
-    if (success) {
-      setCurrent(res);
-      setModal(res.managedSettings ? OTEL_MODAL.SNIPPET : undefined);
-      refresh();
+    const result = await operateOtel(apiCalls[action], { hideToast: true, setOperating });
+    if (!result.success) {
+      setLifecycleError(getOtelLifecycleError(result.error));
+      return;
     }
+
+    const response = result.data;
+    setCurrent(response);
+    refresh();
+    const postActionHandlers: Partial<Record<OtelLifecycleAction, (response: OtelConnectionResponse) => boolean>> = {
+      [OTEL_LIFECYCLE_ACTION.HIDE]: () => {
+        setModal(undefined);
+        return true;
+      },
+      [OTEL_LIFECYCLE_ACTION.APPLY]: (response) => {
+        if (response.restartRequired) {
+          setLifecycleError(response.restartHint || OTEL_ERROR.APPLY);
+          return true;
+        }
+        message.success('Credential changes applied.');
+        return false;
+      },
+    };
+    if (postActionHandlers[action]?.(response)) return;
+
+    setModal(response.managedSettings ? OTEL_MODAL.SNIPPET : undefined);
   };
 
   return (
@@ -245,6 +150,7 @@ export const Otel = () => {
         current={current}
         teamName={teamName}
         createError={createError}
+        lifecycleError={lifecycleError}
         operating={operating}
         managedSettings={managedSettings}
         onClose={closeModal}

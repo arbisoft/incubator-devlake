@@ -32,12 +32,12 @@ import (
 func writeHtpasswd(newPasswords map[string]string) errors.Error {
 	path := firstNonEmpty(cfg.GetString("OTEL_AUTH_HTPASSWD_PATH"), defaultOtelAuthHtpasswdPath)
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return errors.Default.Wrap(err, "error creating otel auth directory")
+		return otelCredentialStorageUnavailable(err)
 	}
 
 	existing, err := readHtpasswd(path)
 	if err != nil {
-		return err
+		return otelCredentialStorageUnavailable(err)
 	}
 	credentials, err := getAllActiveOtelCredentials()
 	if err != nil {
@@ -66,14 +66,17 @@ func writeHtpasswd(newPasswords map[string]string) errors.Error {
 	if len(lines) > 0 {
 		content = strings.Join(lines, "\n") + "\n"
 	}
-	return writeFileAtomic(path, content)
+	if err := writeFileAtomic(path, content); err != nil {
+		return otelCredentialStorageUnavailable(err)
+	}
+	return nil
 }
 
 func missingHtpasswdHashes(credentials []*models.OtelCredential) (bool, errors.Error) {
 	path := firstNonEmpty(cfg.GetString("OTEL_AUTH_HTPASSWD_PATH"), defaultOtelAuthHtpasswdPath)
 	existing, err := readHtpasswd(path)
 	if err != nil {
-		return false, err
+		return false, otelCredentialStorageUnavailable(err)
 	}
 	for _, credential := range credentials {
 		if credential.Status != models.OtelCredentialStatusActive && credential.Status != models.OtelCredentialStatusRetiring {
@@ -84,6 +87,14 @@ func missingHtpasswdHashes(credentials []*models.OtelCredential) (bool, errors.E
 		}
 	}
 	return false, nil
+}
+
+// otelCredentialStorageUnavailable keeps filesystem details in backend logs, not API responses.
+func otelCredentialStorageUnavailable(err error) errors.Error {
+	if logger != nil {
+		logger.Error(err, "OTel credential storage is unavailable")
+	}
+	return errors.Unavailable.New(otelCredentialStorageHint)
 }
 
 func readHtpasswd(path string) (map[string]string, errors.Error) {

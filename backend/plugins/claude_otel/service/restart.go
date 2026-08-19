@@ -21,8 +21,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,11 +32,14 @@ import (
 )
 
 func applyOtelCredentialChanges(credentials []*models.OtelCredential) errors.Error {
-	err := callOtelRestartHelper()
+	hint, err := callOtelRestartHelper()
 	if err != nil {
+		if hint == "" {
+			hint = collectorRestartHint
+		}
 		for _, credential := range credentials {
 			credential.PendingCollectorRestart = true
-			credential.LastCollectorRestartHint = collectorRestartHint
+			credential.LastCollectorRestartHint = hint
 		}
 		return err
 	}
@@ -49,10 +52,28 @@ func applyOtelCredentialChanges(credentials []*models.OtelCredential) errors.Err
 
 func applyAndRecordOtelCredentialChanges(credentials []*models.OtelCredential) (errors.Error, errors.Error) {
 	applyErr := applyOtelCredentialChanges(credentials)
+	if applyErr == nil {
+		if err := clearPendingOtelCredentialRestartState(); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
 	if err := updateOtelCredentialRestartState(credentials); err != nil {
 		return applyErr, err
 	}
 	return applyErr, nil
+}
+
+// clearPendingOtelCredentialRestartState confirms the global auth file was loaded after a healthy Collector restart.
+func clearPendingOtelCredentialRestartState() errors.Error {
+	return db.UpdateColumns(
+		&models.OtelCredential{},
+		[]dal.DalSet{
+			{ColumnName: "pending_collector_restart", Value: false},
+			{ColumnName: "last_collector_restart_hint", Value: ""},
+		},
+		dal.Where("pending_collector_restart = ?", true),
+	)
 }
 
 func updateOtelCredentialRestartState(credentials []*models.OtelCredential) errors.Error {
@@ -75,14 +96,14 @@ func updateOtelCredentialRestartState(credentials []*models.OtelCredential) erro
 	)
 }
 
-func callOtelRestartHelper() errors.Error {
+func callOtelRestartHelper() (string, errors.Error) {
 	helperUrl := strings.TrimRight(cfg.GetString(otelRestartHelperUrlKey), "/")
 	if helperUrl == "" {
-		return errors.Default.New("otel restart helper is not configured")
+		return "", errors.Default.New("otel restart helper is not configured")
 	}
 	token := strings.TrimSpace(cfg.GetString(otelRestartHelperTokenKey))
 	if token == "" {
-		return errors.Default.New("otel restart helper token is not configured")
+		return "", errors.Default.New("otel restart helper token is not configured")
 	}
 	timeout := cfg.GetInt(otelRestartHelperTimeoutKey)
 	if timeout <= 0 {
@@ -94,21 +115,34 @@ func callOtelRestartHelper() errors.Error {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, helperUrl+otelRestartHelperApplyPath, bytes.NewReader([]byte("{}")))
 	if err != nil {
-		return errors.Default.Wrap(err, "error creating otel restart helper request")
+		return "", errors.Default.Wrap(err, "error creating otel restart helper request")
 	}
 	req.Header.Set(otelContentTypeHeader, otelJsonContentType)
 	req.Header.Set(otelAuthHeader, "Bearer "+token)
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return errors.Default.Wrap(err, "error calling otel restart helper")
+		return "", errors.Default.Wrap(err, "error calling otel restart helper")
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusMultipleChoices {
-		return nil
+		return "", nil
 	}
-	body, _ := io.ReadAll(io.LimitReader(res.Body, 1024))
-	return errors.Default.New(fmt.Sprintf("otel restart helper failed with status %d: %s", res.StatusCode, strings.TrimSpace(string(body))))
+	return restartHintForStatus(res), errors.Default.New(fmt.Sprintf("otel restart helper failed with status %d", res.StatusCode))
+}
+
+func restartHintForStatus(res *http.Response) string {
+	switch res.StatusCode {
+	case http.StatusConflict:
+		return "Collector restart is already in progress. Retry Apply shortly."
+	case http.StatusTooManyRequests:
+		if retryAfter, err := strconv.Atoi(strings.TrimSpace(res.Header.Get("Retry-After"))); err == nil && retryAfter > 0 {
+			return fmt.Sprintf("Collector is cooling down. Retry Apply in about %d seconds.", retryAfter)
+		}
+		return "Collector is cooling down. Retry Apply shortly."
+	default:
+		return ""
+	}
 }
 
 func hasPendingCollectorRestart(credentials []*models.OtelCredential) bool {

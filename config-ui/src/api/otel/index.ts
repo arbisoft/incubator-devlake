@@ -89,5 +89,6 @@ const otelAction =
 
 export const rotate = otelAction('rotate');
 export const revoke = otelAction('revoke');
+export const hide = otelAction('hide');
 export const finalizeRotation = otelAction('finalize-rotation');
 export const apply = otelAction('apply');

@@ -68,6 +68,9 @@ func (p ClaudeOtel) ApiResources() map[string]map[string]plugin.ApiResourceHandl
 		"connections/:connectionId/revoke": {
 			"POST": api.RevokeConnection,
 		},
+		"connections/:connectionId/hide": {
+			"POST": api.HideConnection,
+		},
 		"connections/:connectionId/finalize-rotation": {
 			"POST": api.FinalizeRotation,
 		},

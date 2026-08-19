@@ -133,7 +133,7 @@ services:
     environment:
       LOGGING_DIR: /app/logs
       OTEL_AUTH_HTPASSWD_PATH: /var/lib/devlake/otel-auth/.htpasswd
-      OTEL_PUBLIC_ENDPOINT: "${OTEL_PUBLIC_ENDPOINT:-https://otel.customer.example.com:4317}"
+      OTEL_PUBLIC_ENDPOINT: "${OTEL_PUBLIC_ENDPOINT:-https://otel-aperture.arbisoft.com}"
       OTEL_DEFAULT_PROTOCOL: "${OTEL_DEFAULT_PROTOCOL:-grpc}"
       OTEL_RESTART_HELPER_URL: "${OTEL_RESTART_HELPER_URL:-http://host.docker.internal:9199}"
       OTEL_RESTART_HELPER_TOKEN: "${OTEL_RESTART_HELPER_TOKEN:-devlake-local-otel-restart-token}"
