@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -30,6 +31,8 @@ import (
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
 )
+
+const maxRestartHelperResponseBodySize = 1024
 
 func applyOtelCredentialChanges(credentials []*models.OtelCredential) errors.Error {
 	hint, err := callOtelRestartHelper()
@@ -124,11 +127,17 @@ func callOtelRestartHelper() (string, errors.Error) {
 	if err != nil {
 		return "", errors.Default.Wrap(err, "error calling otel restart helper")
 	}
-	defer res.Body.Close()
+	defer drainAndCloseRestartHelperResponse(res.Body)
 	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusMultipleChoices {
 		return "", nil
 	}
 	return restartHintForStatus(res), errors.Default.New(fmt.Sprintf("otel restart helper failed with status %d", res.StatusCode))
+}
+
+// Drain the helper's small response before closing so the default HTTP transport can reuse its connection.
+func drainAndCloseRestartHelperResponse(body io.ReadCloser) {
+	_, _ = io.Copy(io.Discard, io.LimitReader(body, maxRestartHelperResponseBodySize))
+	_ = body.Close()
 }
 
 func restartHintForStatus(res *http.Response) string {

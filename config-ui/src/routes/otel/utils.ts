@@ -19,10 +19,8 @@
 import axios, { HttpStatusCode } from 'axios';
 import { OTEL_ERROR } from './constants';
 
-const RETRYABLE_LIFECYCLE_STATUSES: readonly number[] = [
+const SAFE_LIFECYCLE_MESSAGE_STATUSES: readonly number[] = [
   HttpStatusCode.BadRequest,
-  HttpStatusCode.Conflict,
-  HttpStatusCode.TooManyRequests,
 ];
 
 type OtelErrorResponse = { message?: unknown };
@@ -50,7 +48,7 @@ export const getOtelLifecycleError = (error: unknown) => {
   if (status === HttpStatusCode.ServiceUnavailable) return OTEL_ERROR.CREDENTIAL_STORAGE;
 
   const serverMessage = typeof data?.message === 'string' ? data.message : '';
-  if (status !== undefined && RETRYABLE_LIFECYCLE_STATUSES.includes(status)) {
+  if (status !== undefined && SAFE_LIFECYCLE_MESSAGE_STATUSES.includes(status)) {
     return serverMessage || OTEL_ERROR.LIFECYCLE;
   }
 
