@@ -352,7 +352,11 @@ func Logout(c *gin.Context) { defaultService.Logout(c) }
 // @Router /auth/logout [post]
 func (s *Service) Logout(c *gin.Context) {
 	if s.cfg == nil || !s.cfg.AuthEnabled {
-		shared.ApiOutputSuccess(c, logoutResponse{OK: true}, http.StatusOK)
+		out := logoutResponse{OK: true}
+		if s.cfg != nil {
+			out.LogoutURL = s.cfg.AuthProxyLogoutURL
+		}
+		shared.ApiOutputSuccess(c, out, http.StatusOK)
 		return
 	}
 
