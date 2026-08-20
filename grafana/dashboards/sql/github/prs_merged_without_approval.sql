@@ -10,8 +10,15 @@ SELECT * FROM (
     ) AS has_been_reviewed
     FROM pull_requests pr
     JOIN repos r ON pr.base_repo_id = r.id
-    WHERE pr.status = 'MERGED'
+    WHERE pr.status = 'MERGED' 
+    AND pr.id LIKE 'github:%'
+    AND $__timeFilter(pr.created_date)
+    AND pr.base_repo_id IN ( ${repo_id} )
+    AND EXISTS (SELECT 1 FROM project_mapping pm
+            WHERE pm.row_id = pr.base_repo_id
+              AND pm.`table` = 'repos'
+              AND pm.project_name IN ( ${project} ))
   ) base
   GROUP BY base.Repository
 ) base2
-ORDER BY base2.`Unapproved PR Count` DESC;
+ORDER BY base2.`Unapproved PR Count` DESC

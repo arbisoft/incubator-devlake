@@ -17,7 +17,7 @@ WITH first_touch AS (
   GROUP BY pr.id, pr.created_date
 ),
 d AS (
-  SELECT $__timeGroup(created_date, '1w')                              AS bucket,
+  SELECT $__timeGroup(created_date, ${interval})                              AS bucket,
          TIMESTAMPDIFF(MINUTE, created_date, first_response) / 60.0    AS hours
   FROM first_touch
 ),
