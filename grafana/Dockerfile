@@ -34,6 +34,12 @@ ENV GF_SERVER_SERVE_FROM_SUB_PATH=true
 ENV GF_DASHBOARDS_JSON_ENABLED=true
 ENV GF_LIVE_ALLOWED_ORIGINS='*'
 ENV GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/dashboards/Homepage.json
+# Grafana interpolates $PROMETHEUS_URL in provisioning/datasources/prometheus.yml.
+# Default matches the previous hardcoded URL so local compose and prod (which
+# do not set this var) keep today's behavior. Staging overrides to the Compose
+# service name (http://prometheus:9090). An unset var would provision an empty
+# URL and wipe the datasource on boot.
+ENV PROMETHEUS_URL=http://host.docker.internal:9090
 USER root
 # volkovlabs-form-panel (Business Forms) backs the Add/Remove panels in
 # dashboards/admin/AdminUserProjectAccess.json. Version is pinned: the dashboard
