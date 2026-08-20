@@ -17,17 +17,18 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import axios from 'axios';
 import { Alert, Button } from 'antd';
 import { useNavigate } from 'react-router-dom';
 
 import API from '@/api';
 import type { OtelConnectionResponse } from '@/api/otel';
+import { OTEL_ATTENTION_CHANGED_EVENT } from './constants';
 
 const OTEL_PATH = `${import.meta.env.DEVLAKE_PATH_PREFIX ?? ''}/otel`;
 const REFRESH_INTERVAL_MS = 30_000;
-export const OTEL_ATTENTION_CHANGED_EVENT = 'devlake:otel-attention-changed';
-
 type OtelAttentionState = {
+  connectionCount: number;
   restartRequired: number;
   recoveryRequired: number;
 };
@@ -35,41 +36,68 @@ type OtelAttentionState = {
 const getAttentionState = (connections: OtelConnectionResponse[]): OtelAttentionState =>
   connections.reduce(
     (state, connection) => ({
-      restartRequired: state.restartRequired + Number(connection.restartRequired),
-      recoveryRequired: state.recoveryRequired + Number(connection.recoveryRequired),
+      connectionCount: state.connectionCount + (connection.restartRequired || connection.recoveryRequired ? 1 : 0),
+      restartRequired: state.restartRequired + (connection.restartRequired ? 1 : 0),
+      recoveryRequired: state.recoveryRequired + (connection.recoveryRequired ? 1 : 0),
     }),
-    { restartRequired: 0, recoveryRequired: 0 },
+    { connectionCount: 0, restartRequired: 0, recoveryRequired: 0 },
   );
 
-export const notifyOtelAttentionChanged = () => {
-  window.dispatchEvent(new Event(OTEL_ATTENTION_CHANGED_EVENT));
-};
-
 const formatConnectionCount = (count: number) => `${count} connection${count === 1 ? '' : 's'}`;
+const withVerb = (count: number, singular: string, plural: string) =>
+  `${formatConnectionCount(count)} ${count === 1 ? singular : plural}`;
+
+const isSameAttentionState = (left?: OtelAttentionState, right?: OtelAttentionState) =>
+  left?.connectionCount === right?.connectionCount &&
+  left?.restartRequired === right?.restartRequired &&
+  left?.recoveryRequired === right?.recoveryRequired;
 
 // Surface credential activation problems globally without changing DevLake's core pipeline UX.
 export const OtelAttention = () => {
   const [attention, setAttention] = useState<OtelAttentionState>();
   const mounted = useRef(false);
+  const abortController = useRef<AbortController>();
+  const loggedRequestFailure = useRef(false);
   const navigate = useNavigate();
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (force = false) => {
+    if (!force && document.visibilityState === 'hidden') return;
+
+    abortController.current?.abort();
+    abortController.current = new AbortController();
     try {
-      const connections = await API.otel.list();
-      if (mounted.current) setAttention(getAttentionState(connections));
-    } catch {
-      // Do not interrupt normal navigation when the custom plugin is temporarily unavailable.
+      const connections = await API.otel.list(abortController.current.signal);
+      loggedRequestFailure.current = false;
+      const nextAttention = getAttentionState(connections);
+      if (mounted.current) {
+        setAttention((currentAttention) =>
+          isSameAttentionState(currentAttention, nextAttention) ? currentAttention : nextAttention,
+        );
+      }
+    } catch (error) {
+      if (!axios.isCancel(error) && !loggedRequestFailure.current) {
+        loggedRequestFailure.current = true;
+        // Keep the global alert non-disruptive while leaving a browser diagnostic for support.
+        console.warn('Unable to refresh Claude Code OTel attention state.', error);
+      }
     }
   }, []);
 
   useEffect(() => {
     mounted.current = true;
-    void refresh();
+    void refresh(true);
     const timer = window.setInterval(() => void refresh(), REFRESH_INTERVAL_MS);
-    window.addEventListener(OTEL_ATTENTION_CHANGED_EVENT, refresh);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void refresh(true);
+    };
+    const handleAttentionChange = () => void refresh(true);
+    window.addEventListener(OTEL_ATTENTION_CHANGED_EVENT, handleAttentionChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       mounted.current = false;
+      abortController.current?.abort();
       window.clearInterval(timer);
-      window.removeEventListener(OTEL_ATTENTION_CHANGED_EVENT, refresh);
+      window.removeEventListener(OTEL_ATTENTION_CHANGED_EVENT, handleAttentionChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [refresh]);
 
@@ -78,11 +106,18 @@ export const OtelAttention = () => {
   const storageRecovery = attention.recoveryRequired > 0;
   const pendingRestart = attention.restartRequired > 0;
   const details = [
-    storageRecovery && `${formatConnectionCount(attention.recoveryRequired)} need credential storage recovery`,
-    pendingRestart && `${formatConnectionCount(attention.restartRequired)} have credential changes waiting to be applied`,
+    storageRecovery &&
+      withVerb(attention.recoveryRequired, 'needs credential storage recovery', 'need credential storage recovery'),
+    pendingRestart &&
+      withVerb(
+        attention.restartRequired,
+        'has credential changes waiting to be applied',
+        'have credential changes waiting to be applied',
+      ),
   ].filter(Boolean);
   const description = [
-    `${details.join('. ')}.`,
+    `${withVerb(attention.connectionCount, 'needs attention', 'need attention')}: ${details.join('; ')}.`,
+    storageRecovery && pendingRestart && 'A connection can appear in both categories.',
     storageRecovery && 'Revoke affected connections and generate new Claude settings to restore telemetry.',
     pendingRestart && 'Open Claude Code OTel to apply pending credential changes.',
   ]

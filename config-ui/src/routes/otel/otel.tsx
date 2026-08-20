@@ -28,15 +28,12 @@ import { operator, type OperateConfig } from '@/utils';
 import { getOtelColumns } from './columns';
 import { OTEL_ERROR, OTEL_LIFECYCLE_ACTION } from './constants';
 import { OTEL_MODAL, OtelModals, type OtelLifecycleAction, type OtelModalState } from './modals';
-import { notifyOtelAttentionChanged } from './attention';
-import { getOtelCreateError, getOtelLifecycleError } from './utils';
+import { getOtelCreateError, getOtelLifecycleError, notifyOtelAttentionChanged } from './utils';
 
 const OTEL_PATH = `${import.meta.env.DEVLAKE_PATH_PREFIX ?? ''}/otel`;
 const BREADCRUMBS = [{ name: 'Claude Code OTel', path: OTEL_PATH }];
 
-type OtelOperationResult =
-  | { success: true; data: OtelConnectionResponse }
-  | { success: false; error: unknown };
+type OtelOperationResult = { success: true; data: OtelConnectionResponse } | { success: false; error: unknown };
 
 // Keep OTel lifecycle responses typed without changing the shared legacy operator contract.
 const operateOtel = async (
@@ -44,9 +41,7 @@ const operateOtel = async (
   config?: OperateConfig,
 ): Promise<OtelOperationResult> => {
   const [success, result] = await operator(request, config);
-  return success
-    ? { success: true, data: result as OtelConnectionResponse }
-    : { success: false, error: result };
+  return success ? { success: true, data: result as OtelConnectionResponse } : { success: false, error: result };
 };
 
 export const Otel = () => {

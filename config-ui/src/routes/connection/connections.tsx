@@ -49,24 +49,23 @@ export const Connections = () => {
   const plugins = useAppSelector(selectPlugins);
   const connections = useAppSelector(selectAllConnections);
   const webhooks = useAppSelector(selectWebhooks);
-  // Separate ready credentials from those waiting for an auth-file update to be applied.
+  // Separate ready credentials from connections that need auth-file recovery or application.
   const { data: otelConnections } = useRefreshData(() => API.otel.list(), []);
   const otelCredentialSummary = useMemo(
     () =>
       otelConnections?.reduce(
         (summary, connection) => {
-          const activeCredentials = connection.credentials.filter(
-            (credential) => credential.status === OTEL_CREDENTIAL_STATUS.ACTIVE,
-          ).length;
-          if (connection.restartRequired || connection.recoveryRequired) {
-            summary.requiringAction += activeCredentials;
-          } else {
-            summary.active += activeCredentials;
+          if (connection.recoveryRequired) summary.recoveryRequired += 1;
+          if (connection.restartRequired) summary.restartRequired += 1;
+          if (!connection.restartRequired && !connection.recoveryRequired) {
+            summary.active += connection.credentials.filter(
+              (credential) => credential.status === OTEL_CREDENTIAL_STATUS.ACTIVE,
+            ).length;
           }
           return summary;
         },
-        { active: 0, requiringAction: 0 },
-      ) ?? { active: 0, requiringAction: 0 },
+        { active: 0, restartRequired: 0, recoveryRequired: 0 },
+      ) ?? { active: 0, restartRequired: 0, recoveryRequired: 0 },
     [otelConnections],
   );
 
@@ -105,16 +104,33 @@ export const Connections = () => {
       </span>
       <span className="name">Claude Code OTel</span>
       <span className="count">
-        {otelCredentialSummary.active || otelCredentialSummary.requiringAction ? (
+        {otelCredentialSummary.active ||
+        otelCredentialSummary.restartRequired ||
+        otelCredentialSummary.recoveryRequired ? (
           <span className="otel-credential-summary">
             {otelCredentialSummary.active > 0 && (
               <Badge
                 color={colorPrimary}
-                text={`${otelCredentialSummary.active} active credential${otelCredentialSummary.active === 1 ? '' : 's'}`}
+                text={`${otelCredentialSummary.active} active credential${
+                  otelCredentialSummary.active === 1 ? '' : 's'
+                }`}
               />
             )}
-            {otelCredentialSummary.requiringAction > 0 && (
-              <Badge color="#ff4d4f" text={`${otelCredentialSummary.requiringAction} requiring action`} />
+            {otelCredentialSummary.recoveryRequired > 0 && (
+              <Badge
+                color="#ff4d4f"
+                text={`${otelCredentialSummary.recoveryRequired} connection${
+                  otelCredentialSummary.recoveryRequired === 1 ? '' : 's'
+                } needing storage recovery`}
+              />
+            )}
+            {otelCredentialSummary.restartRequired > 0 && (
+              <Badge
+                color="#faad14"
+                text={`${otelCredentialSummary.restartRequired} connection${
+                  otelCredentialSummary.restartRequired === 1 ? '' : 's'
+                } requiring action`}
+              />
             )}
           </span>
         ) : (

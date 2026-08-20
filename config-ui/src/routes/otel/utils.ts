@@ -17,13 +17,15 @@
  */
 
 import axios, { HttpStatusCode } from 'axios';
-import { OTEL_ERROR } from './constants';
+import { OTEL_ATTENTION_CHANGED_EVENT, OTEL_ERROR } from './constants';
 
-const SAFE_LIFECYCLE_MESSAGE_STATUSES: readonly number[] = [
-  HttpStatusCode.BadRequest,
-];
+const SAFE_LIFECYCLE_MESSAGE_STATUSES: readonly number[] = [HttpStatusCode.BadRequest];
 
 type OtelErrorResponse = { message?: unknown };
+
+export const notifyOtelAttentionChanged = () => {
+  window.dispatchEvent(new Event(OTEL_ATTENTION_CHANGED_EVENT));
+};
 
 // Surface only explicit validation messages; unexpected backend failures remain generic.
 export const getOtelCreateError = (error: unknown) => {
@@ -35,7 +37,8 @@ export const getOtelCreateError = (error: unknown) => {
   }
 
   const serverMessage = typeof error.response.data?.message === 'string' ? error.response.data.message : '';
-  if (serverMessage.includes('a Claude Code OTel connection already exists for this team')) return OTEL_ERROR.DUPLICATE_TEAM;
+  if (serverMessage.includes('a Claude Code OTel connection already exists for this team'))
+    return OTEL_ERROR.DUPLICATE_TEAM;
 
   return serverMessage || OTEL_ERROR.CREATE;
 };

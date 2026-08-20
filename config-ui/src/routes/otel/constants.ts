@@ -17,7 +17,8 @@
  */
 
 export const OTEL_ERROR = {
-  DUPLICATE_TEAM: 'Claude Code OTel credentials already exist for this team. Revoke them before generating new settings.',
+  DUPLICATE_TEAM:
+    'Claude Code OTel credentials already exist for this team. Revoke them before generating new settings.',
   CREATE: 'Unable to generate Claude settings. Please try again or contact support.',
   CREDENTIAL_STORAGE: 'Telemetry credential storage is temporarily unavailable. Please retry shortly.',
   LIFECYCLE: 'Unable to update Claude Code OTel credentials. Please try again or contact support.',
@@ -31,3 +32,5 @@ export const OTEL_LIFECYCLE_ACTION = {
   FINALIZE: 'finalize',
   APPLY: 'apply',
 } as const;
+
+export const OTEL_ATTENTION_CHANGED_EVENT = 'devlake:otel-attention-changed';

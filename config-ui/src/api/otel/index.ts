@@ -72,7 +72,7 @@ export type OtelConnectionResponse = {
 
 const basePath = '/plugins/claude_otel/connections';
 
-export const list = (): Promise<OtelConnectionResponse[]> => request(basePath);
+export const list = (signal?: AbortSignal): Promise<OtelConnectionResponse[]> => request(basePath, { signal });
 
 export const create = (data: { teamName: string }) =>
   request(basePath, {
