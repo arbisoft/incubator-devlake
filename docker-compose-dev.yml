@@ -65,8 +65,8 @@ services:
     ports:
       - 3002:3000
     # host.docker.internal is a Docker Desktop-only DNS alias; this makes it
-    # resolve on Linux hosts too, so the Prometheus datasource (which points
-    # at http://host.docker.internal:9090, see grafana/provisioning/datasources/prometheus.yml)
+    # resolve on Linux hosts too, so the Prometheus datasource (url from
+    # $PROMETHEUS_URL, see grafana/provisioning/datasources/prometheus.yml)
     # can reach the otel-collector stack running directly on the host.
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -101,6 +101,10 @@ services:
       MYSQL_DATABASE: lake
       MYSQL_USER: merico
       MYSQL_PASSWORD: merico
+      # Bind-mounts ./grafana/provisioning/datasources, so this must be set even
+      # before a Grafana image rebuild — Grafana expands $PROMETHEUS_URL to empty
+      # if the var is missing.
+      PROMETHEUS_URL: ${PROMETHEUS_URL:-http://host.docker.internal:9090}
       TZ: UTC
     restart: always
     depends_on:
