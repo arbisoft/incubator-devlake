@@ -49,13 +49,24 @@ export const Connections = () => {
   const plugins = useAppSelector(selectPlugins);
   const connections = useAppSelector(selectAllConnections);
   const webhooks = useAppSelector(selectWebhooks);
-  // Fetch active OTel credentials so the custom card follows the standard connection-count display.
+  // Separate ready credentials from those waiting for an auth-file update to be applied.
   const { data: otelConnections } = useRefreshData(() => API.otel.list(), []);
-  const activeOtelCredentialCount = useMemo(
+  const otelCredentialSummary = useMemo(
     () =>
-      otelConnections?.flatMap((connection) => connection.credentials).filter(
-        (credential) => credential.status === OTEL_CREDENTIAL_STATUS.ACTIVE,
-      ).length ?? 0,
+      otelConnections?.reduce(
+        (summary, connection) => {
+          const activeCredentials = connection.credentials.filter(
+            (credential) => credential.status === OTEL_CREDENTIAL_STATUS.ACTIVE,
+          ).length;
+          if (connection.restartRequired || connection.recoveryRequired) {
+            summary.requiringAction += activeCredentials;
+          } else {
+            summary.active += activeCredentials;
+          }
+          return summary;
+        },
+        { active: 0, requiringAction: 0 },
+      ) ?? { active: 0, requiringAction: 0 },
     [otelConnections],
   );
 
@@ -94,8 +105,18 @@ export const Connections = () => {
       </span>
       <span className="name">Claude Code OTel</span>
       <span className="count">
-        {activeOtelCredentialCount ? (
-          <Badge color={colorPrimary} text={`${activeOtelCredentialCount} active credentials`} />
+        {otelCredentialSummary.active || otelCredentialSummary.requiringAction ? (
+          <span className="otel-credential-summary">
+            {otelCredentialSummary.active > 0 && (
+              <Badge
+                color={colorPrimary}
+                text={`${otelCredentialSummary.active} active credential${otelCredentialSummary.active === 1 ? '' : 's'}`}
+              />
+            )}
+            {otelCredentialSummary.requiringAction > 0 && (
+              <Badge color="#ff4d4f" text={`${otelCredentialSummary.requiringAction} requiring action`} />
+            )}
+          </span>
         ) : (
           'No connection'
         )}

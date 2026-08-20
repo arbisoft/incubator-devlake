@@ -120,6 +120,13 @@ export const Wrapper = styled.div<{ theme: string }>`
 
     & > .count {
       color: #70727f;
+
+      .otel-credential-summary {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+      }
     }
   }
 `;

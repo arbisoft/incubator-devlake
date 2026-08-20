@@ -28,6 +28,7 @@ import { operator, type OperateConfig } from '@/utils';
 import { getOtelColumns } from './columns';
 import { OTEL_ERROR, OTEL_LIFECYCLE_ACTION } from './constants';
 import { OTEL_MODAL, OtelModals, type OtelLifecycleAction, type OtelModalState } from './modals';
+import { notifyOtelAttentionChanged } from './attention';
 import { getOtelCreateError, getOtelLifecycleError } from './utils';
 
 const OTEL_PATH = `${import.meta.env.DEVLAKE_PATH_PREFIX ?? ''}/otel`;
@@ -79,6 +80,7 @@ export const Otel = () => {
       setTeamName('');
       setModal(OTEL_MODAL.SNIPPET);
       refresh();
+      notifyOtelAttentionChanged();
       return;
     }
 
@@ -105,6 +107,7 @@ export const Otel = () => {
     const response = result.data;
     setCurrent(response);
     refresh();
+    notifyOtelAttentionChanged();
     const postActionHandlers: Partial<Record<OtelLifecycleAction, (response: OtelConnectionResponse) => boolean>> = {
       [OTEL_LIFECYCLE_ACTION.HIDE]: () => {
         setModal(undefined);
