@@ -16,8 +16,10 @@ LEFT JOIN (
     FROM user_accounts GROUP BY account_id
 ) ua ON ua.account_id = a.id
 LEFT JOIN users u ON u.id = ua.user_id
+LEFT JOIN issue_commits ic ON ic.issue_id = i.id
+LEFT JOIN repo_commits  rc ON rc.commit_sha = ic.commit_sha
 WHERE i.id LIKE 'github:%'
   AND $__timeFilter(i.created_date)
-  AND i.assignee_id IN ( $developer_id )
+  AND i.assignee_id IN ( ${developer_id} )
 GROUP BY developer
 ORDER BY COUNT(*) DESC, developer;

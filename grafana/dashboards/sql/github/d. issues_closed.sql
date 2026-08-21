@@ -17,6 +17,7 @@ LEFT JOIN users u ON u.id = ua.user_id
 WHERE i.status = 'DONE'
   AND i.resolution_date IS NOT NULL
   AND i.id LIKE 'github:%'
+  AND i.assignee_id IN ( $developer_id )
   AND $__timeFilter(i.resolution_date)
 GROUP BY time, metric
 ORDER BY time;

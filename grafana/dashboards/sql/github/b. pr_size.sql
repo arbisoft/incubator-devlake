@@ -6,6 +6,11 @@ WITH pr_size AS (
   JOIN commits c                ON c.sha = prc.commit_sha
   WHERE pr.id LIKE 'github:%'
     AND $__timeFilter(pr.created_date)
+    AND pr.base_repo_id IN ( ${repo_id} )
+    AND EXISTS (SELECT 1 FROM project_mapping pm
+          WHERE pm.row_id = pr.base_repo_id
+            AND pm.`table` = 'repos'
+            AND pm.project_name IN ( ${project} ))
   GROUP BY pr.id
 ),
 bucketed AS (
