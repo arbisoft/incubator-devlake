@@ -11,12 +11,19 @@ WITH dedup AS (
       from project_mapping pm 
       where pm.table = 'repos' 
       AND pm.project_name in (${project}))
-  LEFT JOIN user_accounts ua ON ua.account_id = c.author_id
-  LEFT JOIN users u          ON u.id = ua.user_id
-  LEFT JOIN accounts a       ON a.id = ua.account_id
-  WHERE 
-  $__timeFilter(c.authored_date)
-    AND COALESCE(u.name, c.author_name) IS NOT NULL
+  LEFT JOIN accounts a ON a.id = c.author_id 
+  LEFT JOIN (
+      SELECT account_id, MIN(user_id) AS user_id
+      FROM user_accounts
+      GROUP BY account_id
+  ) ua ON ua.account_id = a.id
+  LEFT JOIN users u ON u.id = ua.user_id
+  WHERE $__timeFilter(c.authored_date)
+  AND NOT EXISTS (
+      SELECT 1 FROM commit_parents cp
+      WHERE cp.commit_sha = c.sha
+      GROUP BY cp.commit_sha HAVING COUNT(*) > 1
+    )
 )
 SELECT
   contributor,

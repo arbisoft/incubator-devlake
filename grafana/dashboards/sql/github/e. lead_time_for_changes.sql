@@ -9,6 +9,7 @@ WITH d AS (
       AND pr.status = 'MERGED'
       AND $__timeFilter(pr.merged_date)
       AND pr.id LIKE 'github:%'
+      AND pr.base_repo_id IN ( ${repo_id} )
   ),
   ranked AS (
     SELECT bucket, days,
@@ -16,7 +17,7 @@ WITH d AS (
     FROM d
   )
   SELECT bucket                                              AS time,
-         ROUND(MAX(CASE WHEN pct <= 0.50 THEN days END), 2)  AS P50,
+         ROUND(MAX(CASE WHEN pct <= 0.50 THEN days END), 2)  AS Median,
          ROUND(MAX(CASE WHEN pct <= 0.75 THEN days END), 2)  AS P75
   FROM ranked
   GROUP BY bucket

@@ -42,6 +42,10 @@ FROM
   order by (approved + change_requests) desc
   limit 20
 ) base2
-LEFT JOIN accounts      a  ON a.id = base2.author_id
-LEFT JOIN user_accounts ua ON ua.account_id = a.id
-LEFT JOIN users         u  ON u.id = ua.user_id;
+LEFT JOIN accounts a ON a.id = base2.author_id
+LEFT JOIN (
+    SELECT account_id, MIN(user_id) AS user_id
+    FROM user_accounts
+    GROUP BY account_id
+) ua ON ua.account_id = a.id
+LEFT JOIN users u ON u.id = ua.user_id

@@ -18,9 +18,13 @@ SELECT * FROM
             AND prc.account_id <> pr.author_id) AS Reviewers, pr.url as URL
   FROM pull_requests pr
   JOIN accounts a ON a.id = pr.author_id 
-  JOIN repos r ON pr.base_repo_id = r.id
-  LEFT JOIN user_accounts ua ON ua.account_id = a.id
-  LEFT JOIN users         u  ON u.id = ua.user_id
+  JOIN repos r ON pr.base_repo_id = r.id 
+  LEFT JOIN (
+      SELECT account_id, MIN(user_id) AS user_id
+      FROM user_accounts
+      GROUP BY account_id
+  ) ua ON ua.account_id = a.id
+  LEFT JOIN users u ON u.id = ua.user_id
   WHERE pr.id LIKE 'github:%' 
     AND pr.status = 'OPEN'
     AND pr.author_id IN ( $developer_id )

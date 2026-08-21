@@ -43,6 +43,7 @@ LEFT JOIN (
 ) ua ON ua.account_id = a.id
 LEFT JOIN users u ON u.id = ua.user_id
 WHERE i.id LIKE 'github:%'
-AND i.assignee_id IN ( $developer_id )
+  AND i.assignee_id IN ( $developer_id )
+  AND $__timeFilter(i.created_date) 
 GROUP BY Developer 
 ORDER BY Developer ASC

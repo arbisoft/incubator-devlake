@@ -33,9 +33,13 @@ FROM (
       COALESCE(cl.landed, 0) AS _landed,
       COALESCE(cl.closed_unmerged, 0) AS _closed
     FROM _commit_logs cl
-    LEFT JOIN accounts      a  ON a.id = cl.author_id
-    LEFT JOIN user_accounts ua ON ua.account_id = a.id
-    LEFT JOIN users         u  ON u.id = ua.user_id
+    LEFT JOIN accounts a ON a.id = cl.author_id 
+    LEFT JOIN (
+        SELECT account_id, MIN(user_id) AS user_id
+        FROM user_accounts
+        GROUP BY account_id
+    ) ua ON ua.account_id = a.id
+    LEFT JOIN users u ON u.id = ua.user_id
 ) base
 GROUP BY developer
 ORDER BY (Abandoned + Landed) desc
