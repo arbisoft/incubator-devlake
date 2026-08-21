@@ -15,13 +15,13 @@ WITH d AS (
 ),
 ranked AS (
   SELECT bucket, days,
-         PERCENT_RANK() OVER (PARTITION BY bucket ORDER BY days) AS pct
+         CUME_DIST() OVER (PARTITION BY bucket ORDER BY days) AS cd
   FROM d
 )
 SELECT bucket                                              AS time,
-       ROUND(MAX(CASE WHEN pct <= 0.50 THEN days END), 2)  AS Median,
-       ROUND(MAX(CASE WHEN pct <= 0.75 THEN days END), 2)  AS P75,
-       ROUND(MAX(CASE WHEN pct <= 0.90 THEN days END), 2)  AS P90
+       ROUND(MIN(CASE WHEN cd >= 0.50 THEN days END), 2)   AS Median,
+       ROUND(MIN(CASE WHEN cd >= 0.75 THEN days END), 2)   AS P75,
+       ROUND(MIN(CASE WHEN cd >= 0.90 THEN days END), 2)   AS P90
 FROM ranked
 GROUP BY bucket
 ORDER BY bucket;

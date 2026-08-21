@@ -29,14 +29,14 @@ d AS (
 ),
 ranked AS (
   SELECT type, priority, days,
-         PERCENT_RANK() OVER (PARTITION BY type, priority ORDER BY days) AS pct
+         CUME_DIST() OVER (PARTITION BY type, priority ORDER BY days) AS cd
   FROM d
 )
 SELECT type AS Type,
        priority AS Priority,
        COUNT(*)                                            AS `Total Issues`,
-       ROUND(MAX(CASE WHEN pct <= 0.50 THEN days END), 1)  AS `Median Days`,
-       ROUND(MAX(CASE WHEN pct <= 0.75 THEN days END), 1)  AS `P75 Days`
+       ROUND(MIN(CASE WHEN cd >= 0.50 THEN days END), 1)  AS `Median Days`,
+       ROUND(MIN(CASE WHEN cd >= 0.75 THEN days END), 1)  AS `P75 Days`
 FROM ranked
 GROUP BY type, priority
 HAVING `Total Issues` >= 3
