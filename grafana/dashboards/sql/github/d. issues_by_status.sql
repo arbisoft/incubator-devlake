@@ -18,5 +18,6 @@ LEFT JOIN (
 LEFT JOIN users u ON u.id = ua.user_id
 WHERE i.id LIKE 'github:%'
   AND $__timeFilter(i.created_date)
+  AND i.assignee_id IN ( $developer_id )
 GROUP BY developer
 ORDER BY COUNT(*) DESC, developer;

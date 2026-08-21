@@ -33,6 +33,7 @@ FROM
   WHERE prc.commit_sha is not null 
         AND prc.commit_sha <> '' 
         AND $__timeFilter(prc.created_date)
+        AND prc.account_id IN ( ${developer_id} )
   GROUP BY prc.account_id
   ORDER BY (change_request + pr_approved + comment + prs) DESC
   LIMIT 20

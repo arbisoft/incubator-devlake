@@ -36,6 +36,7 @@ FROM
         WHERE pm.table = 'repos'
         AND pm.project_name in ( $project )
       )
+      AND pr.author_id IN ( ${developer_id} )
   ) base1
   group by base1.author_id, base1. author_name
   order by (approved + change_requests) desc

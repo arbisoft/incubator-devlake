@@ -12,7 +12,7 @@ FROM (
             SUM(CASE WHEN pr.status = 'MERGED' THEN 1 ELSE 0 END) AS Merged,
             SUM(CASE WHEN pr.status = 'CLOSED' THEN 1 ELSE 0 END) AS Closed
       FROM pull_requests pr
-      LEFT JOIN accounts a ON a.id = pr.author_id
+      LEFT JOIN accounts a ON a.id = pr.author_id 
       LEFT JOIN (
           SELECT account_id, MIN(user_id) AS user_id
           FROM user_accounts
@@ -21,6 +21,7 @@ FROM (
       LEFT JOIN users u ON u.id = ua.user_id
       WHERE pr.id LIKE 'github:%'
         AND $__timeFilter(pr.created_date)
+        AND a.id IN ( $developer_id )
         AND pr.base_repo_id IN ( ${repo_id} )
         AND EXISTS (SELECT 1 FROM project_mapping pm
                WHERE pm.row_id = pr.base_repo_id

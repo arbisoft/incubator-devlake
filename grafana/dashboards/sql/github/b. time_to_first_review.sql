@@ -27,7 +27,7 @@ ranked AS (
   FROM d
 )
 SELECT bucket                                               AS time,
-       ROUND(MAX(CASE WHEN pct <= 0.50 THEN hours END), 2)  AS P50,
+       ROUND(MAX(CASE WHEN pct <= 0.50 THEN hours END), 2)  AS Median,
        ROUND(MAX(CASE WHEN pct <= 0.90 THEN hours END), 2)  AS P90
 FROM ranked
 GROUP BY bucket

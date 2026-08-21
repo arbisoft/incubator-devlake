@@ -1,5 +1,5 @@
 WITH d AS (
-  SELECT $__timeGroup(pr.merged_date, '1w')                              AS bucket,
+  SELECT $__timeGroup(pr.merged_date, $interval)                              AS bucket,
          TIMESTAMPDIFF(MINUTE, pr.created_date, pr.merged_date) / 1440.0 AS days
   FROM pull_requests pr
   WHERE pr.status      = 'MERGED'
@@ -19,7 +19,7 @@ ranked AS (
   FROM d
 )
 SELECT bucket                                              AS time,
-       ROUND(MAX(CASE WHEN pct <= 0.50 THEN days END), 2)  AS P50,
+       ROUND(MAX(CASE WHEN pct <= 0.50 THEN days END), 2)  AS Median,
        ROUND(MAX(CASE WHEN pct <= 0.75 THEN days END), 2)  AS P75,
        ROUND(MAX(CASE WHEN pct <= 0.90 THEN days END), 2)  AS P90
 FROM ranked

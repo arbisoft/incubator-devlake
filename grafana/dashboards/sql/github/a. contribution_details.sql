@@ -13,6 +13,7 @@ scoped_prs AS (
   SELECT pr.id, pr.author_id, pr.status, pr.created_date
   FROM pull_requests pr
   JOIN scoped_repos sr ON sr.id = pr.base_repo_id
+  WHERE pr.author_id IN ( ${developer_id} )
 ),
 
 code_volume AS (
@@ -24,6 +25,7 @@ code_volume AS (
   JOIN repo_commits rc ON rc.commit_sha = c.sha
   JOIN scoped_repos sr ON sr.id = rc.repo_id
   WHERE $__timeFilter(c.authored_date)
+  AND c.author_id IN ( ${developer_id} )
   GROUP BY c.author_id
 ),
 
@@ -35,6 +37,7 @@ contributed AS (
   JOIN pull_request_commits prc ON prc.pull_request_id = pr.id
   JOIN commits c                ON c.sha = prc.commit_sha
   WHERE $__timeFilter(pr.created_date)
+  AND c.author_id IN ( ${developer_id} )
   GROUP BY c.author_id
 ),
 
@@ -47,6 +50,7 @@ reviewed AS (
   FROM pull_request_comments cmt
   JOIN scoped_prs pr ON pr.id = cmt.pull_request_id
   WHERE $__timeFilter(cmt.created_date)
+  AND cmt.account_id IN ( $developer_id )
   GROUP BY cmt.account_id
 ),
 
@@ -62,6 +66,7 @@ authored AS (
         AND cmt.status     = 'CHANGES_REQUESTED'
         AND cmt.account_id <> pr.author_id
   WHERE $__timeFilter(pr.created_date)
+  AND pr.author_id IN ( $developer_id )
   GROUP BY pr.author_id
 ),
 
@@ -74,7 +79,9 @@ spine AS (
 
 acct_user AS (
   SELECT account_id, MIN(user_id) AS user_id
-  FROM user_accounts GROUP BY account_id
+  FROM user_accounts 
+  WHERE account_id IN ( $developer_id )
+  GROUP BY account_id
 )
 
 SELECT REPLACE(COALESCE(
