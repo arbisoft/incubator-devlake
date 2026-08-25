@@ -70,12 +70,6 @@ type authAccessBootstrapClaim20260825 struct {
 
 func (authAccessBootstrapClaim20260825) TableName() string { return "auth_access_bootstrap_claims" }
 
-type authSessionProvider20260825 struct {
-	Provider string `gorm:"type:varchar(64);index"`
-}
-
-func (authSessionProvider20260825) TableName() string { return "auth_sessions" }
-
 type addAuthAccessDirectory struct{}
 
 func (*addAuthAccessDirectory) Up(basicRes context.BasicRes) errors.Error {
