@@ -21,6 +21,7 @@ import {
   ProjectOutlined,
   ExperimentOutlined,
   KeyOutlined,
+  SafetyCertificateOutlined,
   DashboardOutlined,
   FileSearchOutlined,
   ApiOutlined,
@@ -31,6 +32,7 @@ import {
 import { DOC_URL } from '@/release';
 
 const PATH_PREFIX = import.meta.env.DEVLAKE_PATH_PREFIX ?? '';
+export const ACCESS_PATH = `${PATH_PREFIX}/access`;
 
 type MenuItem = {
   key: string;
@@ -70,6 +72,11 @@ export const menuItems: MenuItem[] = [
     label: 'API Keys',
     icon: <KeyOutlined />,
   },
+  {
+    key: ACCESS_PATH,
+    label: 'User Management',
+    icon: <SafetyCertificateOutlined />,
+  },
 ];
 
 const getMenuMatchs = (items: MenuItem[], parentKey?: string) => {
@@ -91,7 +98,9 @@ export const menuItemsMatch = getMenuMatchs(menuItems);
 
 export const headerItems = [
   {
-    link: import.meta.env.DEV ? `${window.location.protocol}//${window.location.hostname}:3002` : `/grafana`,
+    // The deployment edge resolves this stable route to Grafana's public OAuth
+    // entry point. It preserves local accounts for people who visit Grafana directly.
+    link: '/grafana/login/generic_oauth',
     label: 'Dashboards',
     icon: <DashboardOutlined />,
   },

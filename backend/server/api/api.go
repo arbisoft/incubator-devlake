@@ -35,6 +35,7 @@ import (
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/impls/logruslog"
+	"github.com/apache/incubator-devlake/server/api/access"
 	"github.com/apache/incubator-devlake/server/api/auth"
 	_ "github.com/apache/incubator-devlake/server/api/docs"
 	"github.com/apache/incubator-devlake/server/api/ping"
@@ -56,6 +57,7 @@ var basicRes context.BasicRes
 func Init() {
 	services.Init()
 	basicRes = services.GetBasicRes()
+	access.Init(basicRes)
 	auth.Init(basicRes)
 }
 

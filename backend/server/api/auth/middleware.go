@@ -24,8 +24,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/helpers/oidchelper"
+	"github.com/apache/incubator-devlake/server/api/access"
 	"github.com/apache/incubator-devlake/server/api/shared"
 )
 
@@ -87,9 +89,33 @@ func (s *Service) OIDCAuthentication() gin.HandlerFunc {
 			Name:  claims.Name,
 			Email: claims.Email,
 		})
+		if provider := s.cfg.Providers[claims.Provider]; provider != nil {
+			access.SetIdentity(c, access.Identity{
+				Issuer: provider.IssuerURL, Subject: claims.Subject, Email: claims.Email, DisplayName: claims.Name,
+			})
+		}
 		s.bumpLastSeen(claims.ID)
 		c.Next()
 	}
+}
+
+func (s *Service) revokeIdentitySessions(issuer, subject string) errors.Error {
+	for providerName, provider := range s.cfg.Providers {
+		if provider == nil || provider.IssuerURL != issuer {
+			continue
+		}
+		ids, err := ListActiveSessionIDsForIdentity(s.db, providerName, subject)
+		if err != nil {
+			return err
+		}
+		if err := RevokeSessionsForIdentity(s.db, providerName, subject); err != nil {
+			return err
+		}
+		for _, id := range ids {
+			s.revoked.Add(id)
+		}
+	}
+	return nil
 }
 
 // RequireAuth is the terminal gate. No-op when AUTH_ENABLED=false so existing

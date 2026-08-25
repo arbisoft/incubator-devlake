@@ -39,10 +39,11 @@ export const layoutLoader = async ({ request }: Props) => {
     fePlugins = fePlugins.filter((plugin) => !envPlugins.length || envPlugins.includes(plugin));
   } catch (err) {}
 
-  const [bePlugins, res, user] = await Promise.all([
+  const [bePlugins, res, user, access] = await Promise.all([
     API.plugin.list(),
     API.version(request.signal),
     API.auth.userinfo().catch(() => null),
+    API.access.current().catch(() => null),
   ]);
 
   return {
@@ -52,5 +53,6 @@ export const layoutLoader = async ({ request }: Props) => {
       bePlugins.map((it) => it.plugin),
     ),
     user,
+    access,
   };
 };

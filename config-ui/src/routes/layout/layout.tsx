@@ -28,7 +28,8 @@ import { init, selectError, selectStatus } from '@/features';
 import { OnboardCard } from '@/routes/onboard/components';
 import { useAppDispatch, useAppSelector } from '@/hooks';
 
-import { menuItems, menuItemsMatch, headerItems } from './config';
+import { ACCESS_PATH, menuItems, menuItemsMatch, headerItems } from './config';
+import { ACCESS_ROLE, type AccessCurrent } from '@/api/access';
 
 const { Sider, Header, Content, Footer } = AntdLayout;
 
@@ -38,11 +39,17 @@ export const Layout = () => {
   const [openKeys, setOpenKeys] = useState<string[]>([]);
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
 
-  const { version, plugins, user } = useLoaderData() as {
+  const { version, plugins, user, access } = useLoaderData() as {
     version: string;
     plugins: string[];
     user: { authenticated: boolean; name: string; email: string } | null;
+    access: AccessCurrent | null;
   };
+
+  const visibleMenuItems = useMemo(
+    () => menuItems.filter((item) => item.key !== ACCESS_PATH || access?.role === ACCESS_ROLE.CUSTOMER_ADMIN),
+    [access?.role],
+  );
 
   const handleLogout = async () => {
     try {
@@ -121,7 +128,7 @@ export const Layout = () => {
         <Menu
           mode="inline"
           theme="dark"
-          items={menuItems}
+          items={visibleMenuItems}
           openKeys={openKeys}
           selectedKeys={selectedKeys}
           onClick={({ key }) => navigate(key)}

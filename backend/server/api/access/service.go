@@ -1,0 +1,385 @@
+/*
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package access
+
+import (
+	"fmt"
+	"net/mail"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/gin-gonic/gin"
+
+	"github.com/apache/incubator-devlake/core/context"
+	"github.com/apache/incubator-devlake/core/dal"
+	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/core/log"
+)
+
+const identityContextKey = "devlake_access_identity"
+const invitationSubjectPrefix = "email:"
+
+type Config struct {
+	Enabled             bool
+	BootstrapAdminEmail string
+}
+
+type SessionRevoker func(issuer, subject string) errors.Error
+
+type Service struct {
+	cfg            Config
+	db             dal.Dal
+	logger         log.Logger
+	sessionRevoker SessionRevoker
+}
+
+var (
+	defaultService *Service
+	initOnce       sync.Once
+)
+
+func Init(basicRes context.BasicRes) {
+	initOnce.Do(func() {
+		cfg := basicRes.GetConfigReader()
+		defaultService = &Service{
+			cfg: Config{
+				Enabled:             cfg.GetBool("AUTH_ACCESS_ENABLED"),
+				BootstrapAdminEmail: normalizeEmail(cfg.GetString("AUTH_BOOTSTRAP_ADMIN_EMAIL")),
+			},
+			db:     basicRes.GetDal(),
+			logger: basicRes.GetLogger(),
+		}
+	})
+}
+
+func Default() *Service { return defaultService }
+
+func SetSessionRevoker(revoker SessionRevoker) {
+	if defaultService != nil {
+		defaultService.sessionRevoker = revoker
+	}
+}
+
+func (s *Service) Enabled() bool { return s != nil && s.cfg.Enabled }
+
+func SetIdentity(c *gin.Context, identity Identity) { c.Set(identityContextKey, identity) }
+
+func GetIdentity(c *gin.Context) (Identity, bool) {
+	value, ok := c.Get(identityContextKey)
+	if !ok {
+		return Identity{}, false
+	}
+	identity, ok := value.(Identity)
+	return identity, ok
+}
+
+// Authorize accepts only a verified OIDC identity. It is invoked before a
+// DevLake session is issued, so denied identities never receive a cookie.
+func (s *Service) Authorize(identity Identity) (*Principal, errors.Error) {
+	if !s.Enabled() {
+		return &Principal{}, nil
+	}
+	identity.Email = normalizeEmail(identity.Email)
+	if identity.Issuer == "" || identity.Subject == "" || identity.Email == "" {
+		return nil, errors.Unauthorized.New("verified OIDC identity is incomplete")
+	}
+
+	user := &AccessUser{}
+	err := s.db.First(user, dal.Where("issuer = ? AND subject = ?", identity.Issuer, identity.Subject))
+	if err == nil {
+		return s.authorizeExistingUser(user, identity)
+	}
+	if !s.db.IsErrorNotFound(err) {
+		return nil, errors.Default.Wrap(err, "error looking up access user")
+	}
+	invitation := &AccessUser{}
+	err = s.db.First(invitation, dal.Where("issuer = ? AND subject = ?", "", invitationSubject(identity.Email)))
+	if err == nil {
+		invitation.Issuer = identity.Issuer
+		invitation.Subject = identity.Subject
+		invitation.Email = identity.Email
+		invitation.DisplayName = identity.DisplayName
+		if updateErr := s.db.Update(invitation); updateErr != nil {
+			return nil, errors.Default.Wrap(updateErr, "error claiming invited access user")
+		}
+		s.audit("", "user.invitation_claimed", invitation, "")
+		return s.authorizeExistingUser(invitation, identity)
+	}
+	if !s.db.IsErrorNotFound(err) {
+		return nil, errors.Default.Wrap(err, "error looking up invited access user")
+	}
+
+	if principal, bootstrapErr := s.bootstrap(identity); bootstrapErr != nil || principal != nil {
+		return principal, bootstrapErr
+	}
+
+	domain, ok := emailDomain(identity.Email)
+	if !ok {
+		return nil, errors.Unauthorized.New("verified email is invalid")
+	}
+	accessDomain := &AccessDomain{}
+	err = s.db.First(accessDomain, dal.Where("domain = ?", domain))
+	if err == nil && accessDomain.Status == StatusActive {
+		user = &AccessUser{
+			Issuer: identity.Issuer, Subject: identity.Subject, Email: identity.Email,
+			DisplayName: identity.DisplayName, Role: accessDomain.DefaultRole, Status: StatusActive,
+		}
+		if createErr := s.db.Create(user); createErr != nil {
+			if s.db.IsDuplicationError(createErr) {
+				return s.Authorize(identity)
+			}
+			return nil, errors.Default.Wrap(createErr, "error creating domain-authorized user")
+		}
+		s.audit("", "user.domain_provisioned", user, "")
+		return &Principal{UserID: user.ID, Role: user.Role}, nil
+	}
+	if err != nil && !s.db.IsErrorNotFound(err) {
+		return nil, errors.Default.Wrap(err, "error looking up access domain")
+	}
+	return nil, errors.Unauthorized.New("this account is not allowed to access DevLake")
+}
+
+func (s *Service) bootstrap(identity Identity) (*Principal, errors.Error) {
+	if s.cfg.BootstrapAdminEmail == "" || identity.Email != s.cfg.BootstrapAdminEmail {
+		return nil, nil
+	}
+	count, err := s.db.Count(dal.From(&AccessUser{}))
+	if err != nil {
+		return nil, errors.Default.Wrap(err, "error checking access bootstrap state")
+	}
+	if count != 0 {
+		return nil, nil
+	}
+	now := time.Now()
+	user := &AccessUser{
+		Issuer: identity.Issuer, Subject: identity.Subject, Email: identity.Email,
+		DisplayName: identity.DisplayName, Role: RoleCustomerAdmin, Status: StatusActive, LastLoginAt: &now,
+	}
+	if err := s.db.Create(user); err != nil {
+		if s.db.IsDuplicationError(err) {
+			return s.Authorize(identity)
+		}
+		return nil, errors.Default.Wrap(err, "error creating bootstrap administrator")
+	}
+	s.audit(identity.Email, "bootstrap.consumed", user, "")
+	s.logger.Info("access: bootstrap administrator provisioned email=%s", identity.Email)
+	return &Principal{UserID: user.ID, Role: user.Role}, nil
+}
+
+func (s *Service) authorizeExistingUser(user *AccessUser, identity Identity) (*Principal, errors.Error) {
+	if user.Status != StatusActive {
+		return nil, errors.Unauthorized.New("this account is disabled")
+	}
+	now := time.Now()
+	user.Email = identity.Email
+	user.DisplayName = identity.DisplayName
+	user.LastLoginAt = &now
+	if err := s.db.Update(user); err != nil {
+		return nil, errors.Default.Wrap(err, "error recording access user login")
+	}
+	return &Principal{UserID: user.ID, Role: user.Role}, nil
+}
+
+func (s *Service) CurrentPrincipal(c *gin.Context) (*Principal, errors.Error) {
+	if !s.Enabled() {
+		return nil, errors.HttpStatus(404).New("access management is not enabled")
+	}
+	identity, ok := GetIdentity(c)
+	if !ok {
+		return nil, errors.Unauthorized.New("native OIDC authentication is required")
+	}
+	user := &AccessUser{}
+	err := s.db.First(user, dal.Where("issuer = ? AND subject = ?", identity.Issuer, identity.Subject))
+	if err != nil {
+		if s.db.IsErrorNotFound(err) {
+			return nil, errors.Unauthorized.New("this account is not allowed to access DevLake")
+		}
+		return nil, errors.Default.Wrap(err, "error looking up current access user")
+	}
+	if user.Status != StatusActive {
+		return nil, errors.Unauthorized.New("this account is disabled")
+	}
+	return &Principal{UserID: user.ID, Role: user.Role}, nil
+}
+
+func (s *Service) RequireAdmin(c *gin.Context) (*Principal, errors.Error) {
+	principal, err := s.CurrentPrincipal(c)
+	if err != nil {
+		return nil, err
+	}
+	if principal.Role != RoleCustomerAdmin {
+		return nil, errors.Forbidden.New("customer administrator access is required")
+	}
+	return principal, nil
+}
+
+func (s *Service) ListUsers() ([]AccessUser, errors.Error) {
+	users := make([]AccessUser, 0)
+	if err := s.db.All(&users, dal.Orderby("email ASC")); err != nil {
+		return nil, errors.Default.Wrap(err, "error listing access users")
+	}
+	return users, nil
+}
+
+func (s *Service) ListDomains() ([]AccessDomain, errors.Error) {
+	domains := make([]AccessDomain, 0)
+	if err := s.db.All(&domains, dal.Orderby("domain ASC")); err != nil {
+		return nil, errors.Default.Wrap(err, "error listing access domains")
+	}
+	return domains, nil
+}
+
+func (s *Service) ListAuditEvents() ([]AuditEvent, errors.Error) {
+	events := make([]AuditEvent, 0)
+	if err := s.db.All(&events, dal.Orderby("created_at DESC"), dal.Limit(100)); err != nil {
+		return nil, errors.Default.Wrap(err, "error listing access audit events")
+	}
+	return events, nil
+}
+
+func (s *Service) CreateDomain(actor string, input AccessDomain) (*AccessDomain, errors.Error) {
+	domain := normalizeDomain(input.Domain)
+	if domain == "" || !validRole(input.DefaultRole) {
+		return nil, errors.BadInput.New("provide a valid domain and default role")
+	}
+	input.Domain = domain
+	input.Status = StatusActive
+	if err := s.db.Create(&input); err != nil {
+		if s.db.IsDuplicationError(err) {
+			return nil, errors.BadInput.New("this domain already has a DevLake access policy")
+		}
+		return nil, errors.Default.Wrap(err, "error creating access domain")
+	}
+	s.audit(actor, "domain.created", nil, input.Domain)
+	return &input, nil
+}
+
+func (s *Service) CreateUser(actor, email, role string) (*AccessUser, errors.Error) {
+	email = normalizeEmail(email)
+	if _, ok := emailDomain(email); !ok || !validRole(role) {
+		return nil, errors.BadInput.New("provide a valid email and role")
+	}
+	user := &AccessUser{
+		Email: email, Role: role, Status: StatusActive,
+		Subject: invitationSubject(email),
+	}
+	if err := s.db.Create(user); err != nil {
+		if s.db.IsDuplicationError(err) {
+			return nil, errors.BadInput.New("this email already has a DevLake access entry")
+		}
+		return nil, errors.Default.Wrap(err, "error creating access user")
+	}
+	s.audit(actor, "user.invited", user, "")
+	return user, nil
+}
+
+func (s *Service) UpdateDomain(actor string, id uint64, role, status string) (*AccessDomain, errors.Error) {
+	if !validRole(role) || !validStatus(status) {
+		return nil, errors.BadInput.New("provide a valid default role and status")
+	}
+	domain := &AccessDomain{}
+	if err := s.db.First(domain, dal.Where("id = ?", id)); err != nil {
+		if s.db.IsErrorNotFound(err) {
+			return nil, errors.NotFound.New("access domain not found")
+		}
+		return nil, errors.Default.Wrap(err, "error looking up access domain")
+	}
+	domain.DefaultRole = role
+	domain.Status = status
+	if err := s.db.Update(domain); err != nil {
+		return nil, errors.Default.Wrap(err, "error updating access domain")
+	}
+	s.audit(actor, "domain.updated", nil, fmt.Sprintf("domain=%s role=%s status=%s", domain.Domain, role, status))
+	return domain, nil
+}
+
+func (s *Service) UpdateUser(actor string, id uint64, role, status string) (*AccessUser, errors.Error) {
+	if !validRole(role) || !validStatus(status) {
+		return nil, errors.BadInput.New("provide a valid role and status")
+	}
+	user := &AccessUser{}
+	if err := s.db.First(user, dal.Where("id = ?", id)); err != nil {
+		if s.db.IsErrorNotFound(err) {
+			return nil, errors.NotFound.New("access user not found")
+		}
+		return nil, errors.Default.Wrap(err, "error looking up access user")
+	}
+	removesActiveAdmin := user.Role == RoleCustomerAdmin && user.Status == StatusActive && (status == StatusDisabled || role != RoleCustomerAdmin)
+	if removesActiveAdmin {
+		activeAdmins, err := s.db.Count(dal.From(&AccessUser{}), dal.Where("role = ? AND status = ?", RoleCustomerAdmin, StatusActive))
+		if err != nil {
+			return nil, errors.Default.Wrap(err, "error checking customer administrators")
+		}
+		if activeAdmins <= 1 {
+			return nil, errors.BadInput.New("keep at least one active customer administrator")
+		}
+	}
+	user.Role = role
+	user.Status = status
+	if status == StatusDisabled {
+		now := time.Now()
+		user.DisabledAt = &now
+	} else {
+		user.DisabledAt = nil
+	}
+	if err := s.db.Update(user); err != nil {
+		return nil, errors.Default.Wrap(err, "error updating access user")
+	}
+	if status == StatusDisabled && s.sessionRevoker != nil {
+		if err := s.sessionRevoker(user.Issuer, user.Subject); err != nil {
+			s.logger.Error(err, "access: revoke sessions for disabled user id=%d", user.ID)
+			return nil, errors.Default.Wrap(err, "access user was disabled but session revocation failed")
+		}
+	}
+	s.audit(actor, "user.updated", user, fmt.Sprintf("role=%s status=%s", role, status))
+	return user, nil
+}
+
+func (s *Service) audit(actor, action string, user *AccessUser, detail string) {
+	targetID, targetEmail := uint64(0), ""
+	if user != nil {
+		targetID, targetEmail = user.ID, user.Email
+	}
+	if err := s.db.Create(&AuditEvent{ActorEmail: actor, Action: action, TargetID: targetID, TargetEmail: targetEmail, Detail: detail}); err != nil {
+		s.logger.Error(err, "access: record audit event action=%s target=%s", action, targetEmail)
+	}
+}
+
+func normalizeEmail(raw string) string { return strings.ToLower(strings.TrimSpace(raw)) }
+
+func invitationSubject(email string) string { return invitationSubjectPrefix + email }
+
+func normalizeDomain(raw string) string {
+	return strings.ToLower(strings.TrimPrefix(strings.TrimSpace(raw), "@"))
+}
+
+func emailDomain(email string) (string, bool) {
+	parsed, err := mail.ParseAddress(email)
+	if err != nil || normalizeEmail(parsed.Address) != email {
+		return "", false
+	}
+	parts := strings.Split(email, "@")
+	if len(parts) != 2 || parts[1] == "" {
+		return "", false
+	}
+	return normalizeDomain(parts[1]), true
+}
+
+func validRole(role string) bool     { return role == RoleCustomerAdmin || role == RoleMember }
+func validStatus(status string) bool { return status == StatusActive || status == StatusDisabled }

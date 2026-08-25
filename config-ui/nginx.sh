@@ -45,7 +45,10 @@ export DNS=$(awk 'BEGIN{ORS=" "} $1=="nameserver" {if ($2 ~ ":") {print "["$2"]"
 export DNS_VALID=${DNS_VALID:-300s}
 export DEVLAKE_ENDPOINT_PROTO=${DEVLAKE_ENDPOINT_PROTO:-http}
 export GRAFANA_ENDPOINT_PROTO=${GRAFANA_ENDPOINT_PROTO:-http}
-envsubst '${LISTENER} ${DEVLAKE_ENDPOINT} ${DEVLAKE_ENDPOINT_PROTO} ${GRAFANA_ENDPOINT} ${GRAFANA_ENDPOINT_PROTO} ${USE_EXTERNAL_GRAFANA} ${SERVER_CONF} ${DNS} ${DNS_VALID}' \
+# This is a browser-facing URL. Fall back to the external Grafana endpoint so
+# existing deployments retain a working OAuth entry point until configured explicitly.
+export GRAFANA_OIDC_LOGIN_URL=${GRAFANA_OIDC_LOGIN_URL:-${GRAFANA_ENDPOINT%/}/login/generic_oauth}
+envsubst '${LISTENER} ${DEVLAKE_ENDPOINT} ${DEVLAKE_ENDPOINT_PROTO} ${GRAFANA_ENDPOINT} ${GRAFANA_ENDPOINT_PROTO} ${GRAFANA_OIDC_LOGIN_URL} ${USE_EXTERNAL_GRAFANA} ${SERVER_CONF} ${DNS} ${DNS_VALID}' \
     < /etc/nginx/conf.d/default.conf.tpl \
     > /etc/nginx/conf.d/default.conf
 nginx -g 'daemon off;'

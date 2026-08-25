@@ -44,6 +44,7 @@ import (
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/log"
 	"github.com/apache/incubator-devlake/helpers/oidchelper"
+	"github.com/apache/incubator-devlake/server/api/access"
 	"github.com/apache/incubator-devlake/server/api/shared"
 )
 
@@ -113,6 +114,7 @@ func NewService(ctx stdctx.Context, basicRes corectx.BasicRes) (*Service, error)
 	if cfg.AuthEnabled {
 		startRefresher(ctx, s.revoked, s.db, s.logger)
 		startSessionCleanup(ctx, s.db, s.logger)
+		access.SetSessionRevoker(s.revokeIdentitySessions)
 	}
 	if cfg.OIDCEnabled {
 		for name, pc := range cfg.Providers {
@@ -308,12 +310,23 @@ func (s *Service) Callback(c *gin.Context) {
 		fail(c, http.StatusBadGateway, "extract claims", err)
 		return
 	}
-
-	if !s.cfg.IsUserAllowed(email) {
+	if accessService := access.Default(); accessService != nil && accessService.Enabled() {
+		issuer := s.cfg.Providers[state.Provider].IssuerURL
+		if _, accessErr := accessService.Authorize(access.Identity{
+			Issuer: issuer, Subject: sub, Email: email, DisplayName: name,
+		}); accessErr != nil {
+			if accessErr.GetType() == errors.Unauthorized || accessErr.GetType() == errors.Forbidden {
+				s.logger.Info("oidc login denied: provider=%s email=%s", state.Provider, email)
+				c.Redirect(http.StatusSeeOther, "/login?error=access_denied")
+				return
+			}
+			shared.ApiOutputError(c, accessErr)
+			return
+		}
+	} else if !s.cfg.IsUserAllowed(email) {
 		fail(c, http.StatusForbidden, "user is not allowed", nil)
 		return
 	}
-
 	jti := uuid.NewString()
 	jwt, expiresAt, err := oidchelper.IssueSession(s.cfg, jti, state.Provider, sub, email, name)
 	if err != nil {
@@ -323,6 +336,7 @@ func (s *Service) Callback(c *gin.Context) {
 	now := time.Now()
 	if dbErr := CreateSession(s.db, &AuthSession{
 		Jti:        jti,
+		Provider:   state.Provider,
 		Sub:        sub,
 		Email:      email,
 		Name:       name,

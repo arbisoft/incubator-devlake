@@ -148,5 +148,6 @@ func All() []plugin.MigrationScript {
 		new(addAiActivitiesUnifiedSchema),
 		new(addUserActivities),
 		new(addUserProjectMapping),
+		new(addAuthAccessDirectory),
 	}
 }
