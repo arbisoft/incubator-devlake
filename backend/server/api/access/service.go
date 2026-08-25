@@ -40,7 +40,13 @@ type Config struct {
 	BootstrapAdminEmail string
 }
 
-type SessionRevoker func(issuer, subject string) errors.Error
+// SessionRevoker persists revocations in the same transaction as an access-user
+// disable. It returns the affected session IDs so the auth service can update its
+// in-memory cache only after the transaction commits.
+type SessionRevoker interface {
+	RevokePersistentSessions(tx dal.Transaction, issuer, subject string) ([]string, errors.Error)
+	CacheRevokedSessions(ids []string)
+}
 
 type Service struct {
 	cfg            Config
@@ -204,6 +210,18 @@ func (s *Service) CurrentPrincipal(c *gin.Context) (*Principal, errors.Error) {
 	if !ok {
 		return nil, errors.Unauthorized.New("native OIDC authentication is required")
 	}
+	return s.AuthorizeSession(identity)
+}
+
+// AuthorizeSession validates a previously issued native OIDC session against the
+// current access directory without updating login metadata on every request.
+func (s *Service) AuthorizeSession(identity Identity) (*Principal, errors.Error) {
+	if !s.Enabled() {
+		return &Principal{}, nil
+	}
+	if identity.Issuer == "" || identity.Subject == "" {
+		return nil, errors.Unauthorized.New("native session identity is incomplete")
+	}
 	user := &AccessUser{}
 	err := s.db.First(user, dal.Where("issuer = ? AND subject = ?", identity.Issuer, identity.Subject))
 	if err != nil {
@@ -313,16 +331,26 @@ func (s *Service) UpdateUser(actor string, id uint64, role, status string) (*Acc
 	if !validRole(role) || !validStatus(status) {
 		return nil, errors.BadInput.New("provide a valid role and status")
 	}
+	tx := s.db.Begin()
+	committed := false
+	defer func() {
+		if !committed {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				s.logger.Error(rollbackErr, "access: rollback user update id=%d", id)
+			}
+		}
+	}()
+
 	user := &AccessUser{}
-	if err := s.db.First(user, dal.Where("id = ?", id)); err != nil {
-		if s.db.IsErrorNotFound(err) {
+	if err := tx.First(user, dal.Where("id = ?", id)); err != nil {
+		if tx.IsErrorNotFound(err) {
 			return nil, errors.NotFound.New("access user not found")
 		}
 		return nil, errors.Default.Wrap(err, "error looking up access user")
 	}
 	removesActiveAdmin := user.Role == RoleCustomerAdmin && user.Status == StatusActive && (status == StatusDisabled || role != RoleCustomerAdmin)
 	if removesActiveAdmin {
-		activeAdmins, err := s.db.Count(dal.From(&AccessUser{}), dal.Where("role = ? AND status = ?", RoleCustomerAdmin, StatusActive))
+		activeAdmins, err := tx.Count(dal.From(&AccessUser{}), dal.Where("role = ? AND status = ?", RoleCustomerAdmin, StatusActive))
 		if err != nil {
 			return nil, errors.Default.Wrap(err, "error checking customer administrators")
 		}
@@ -338,14 +366,24 @@ func (s *Service) UpdateUser(actor string, id uint64, role, status string) (*Acc
 	} else {
 		user.DisabledAt = nil
 	}
-	if err := s.db.Update(user); err != nil {
+	if err := tx.Update(user); err != nil {
 		return nil, errors.Default.Wrap(err, "error updating access user")
 	}
+	var revokedSessionIDs []string
 	if status == StatusDisabled && s.sessionRevoker != nil {
-		if err := s.sessionRevoker(user.Issuer, user.Subject); err != nil {
-			s.logger.Error(err, "access: revoke sessions for disabled user id=%d", user.ID)
-			return nil, errors.Default.Wrap(err, "access user was disabled but session revocation failed")
+		ids, err := s.sessionRevoker.RevokePersistentSessions(tx, user.Issuer, user.Subject)
+		if err != nil {
+			s.logger.Error(err, "access: revoke sessions for disabled user id=%d email=%s", user.ID, user.Email)
+			return nil, errors.Default.Wrap(err, "error revoking sessions for disabled access user")
 		}
+		revokedSessionIDs = ids
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, errors.Default.Wrap(err, "error committing access user update")
+	}
+	committed = true
+	if s.sessionRevoker != nil && len(revokedSessionIDs) > 0 {
+		s.sessionRevoker.CacheRevokedSessions(revokedSessionIDs)
 	}
 	s.audit(actor, "user.updated", user, fmt.Sprintf("role=%s status=%s", role, status))
 	return user, nil
@@ -357,7 +395,7 @@ func (s *Service) audit(actor, action string, user *AccessUser, detail string) {
 		targetID, targetEmail = user.ID, user.Email
 	}
 	if err := s.db.Create(&AuditEvent{ActorEmail: actor, Action: action, TargetID: targetID, TargetEmail: targetEmail, Detail: detail}); err != nil {
-		s.logger.Error(err, "access: record audit event action=%s target=%s", action, targetEmail)
+		s.logger.Error(err, "access: record audit event actor=%s action=%s target_id=%d target_email=%s", actor, action, targetID, targetEmail)
 	}
 }
 

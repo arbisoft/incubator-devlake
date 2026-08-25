@@ -71,9 +71,16 @@ type Service struct {
 	logger    log.Logger
 	db        dal.Dal
 	revoked   *revocationCache
+	access    accessAuthorizer
 
 	lastSeenMu sync.Mutex
 	lastSeen   map[string]time.Time
+}
+
+type accessAuthorizer interface {
+	Enabled() bool
+	Authorize(identity access.Identity) (*access.Principal, errors.Error)
+	AuthorizeSession(identity access.Identity) (*access.Principal, errors.Error)
 }
 
 // defaultService is populated by Init and backs the package-level handler /
@@ -110,11 +117,12 @@ func NewService(ctx stdctx.Context, basicRes corectx.BasicRes) (*Service, error)
 		db:        basicRes.GetDal(),
 		revoked:   newRevocationCache(),
 		lastSeen:  map[string]time.Time{},
+		access:    access.Default(),
 	}
 	if cfg.AuthEnabled {
 		startRefresher(ctx, s.revoked, s.db, s.logger)
 		startSessionCleanup(ctx, s.db, s.logger)
-		access.SetSessionRevoker(s.revokeIdentitySessions)
+		access.SetSessionRevoker(s)
 	}
 	if cfg.OIDCEnabled {
 		for name, pc := range cfg.Providers {
@@ -310,7 +318,7 @@ func (s *Service) Callback(c *gin.Context) {
 		fail(c, http.StatusBadGateway, "extract claims", err)
 		return
 	}
-	if accessService := access.Default(); accessService != nil && accessService.Enabled() {
+	if accessService := s.access; accessService != nil && accessService.Enabled() {
 		issuer := s.cfg.Providers[state.Provider].IssuerURL
 		if _, accessErr := accessService.Authorize(access.Identity{
 			Issuer: issuer, Subject: sub, Email: email, DisplayName: name,
