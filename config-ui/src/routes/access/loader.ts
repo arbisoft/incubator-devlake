@@ -16,5 +16,16 @@
  *
  */
 
-export * from './access';
-export * from './loader';
+import { redirect } from 'react-router-dom';
+
+import API from '@/api';
+import { PATH_PREFIX } from './constants';
+import { canManageAccess } from './guard';
+
+export const accessLoader = async () => {
+  const access = await API.access.current().catch(() => null);
+  if (canManageAccess(access)) {
+    return null;
+  }
+  return redirect(PATH_PREFIX || '/');
+};

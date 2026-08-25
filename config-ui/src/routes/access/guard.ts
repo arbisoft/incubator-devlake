@@ -16,5 +16,7 @@
  *
  */
 
-export * from './access';
-export * from './loader';
+import { ACCESS_ROLE, type AccessCurrent } from '../../api/access';
+
+export const canManageAccess = (access: AccessCurrent | null) =>
+  access?.enabled === true && access.role === ACCESS_ROLE.CUSTOMER_ADMIN;

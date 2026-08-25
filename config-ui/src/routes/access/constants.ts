@@ -16,5 +16,12 @@
  *
  */
 
-export * from './access';
-export * from './loader';
+export const PATH_PREFIX = import.meta.env.DEVLAKE_PATH_PREFIX ?? '';
+export const ACCESS_PATH = `${PATH_PREFIX}/access`;
+export const PAGE_SIZE_OPTIONS: Array<10 | 25 | 50> = [10, 25, 50];
+export const DEFAULT_PAGE_SIZE = PAGE_SIZE_OPTIONS[0];
+
+export const ACCESS_STATUS_COLOR = {
+  active: 'green',
+  disabled: 'default',
+} as const;

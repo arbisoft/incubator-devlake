@@ -37,6 +37,7 @@ import {
   Pipeline,
   ApiKeys,
   Access,
+  accessLoader,
   NotFound,
 } from '@/routes';
 
@@ -121,6 +122,7 @@ export const router = createBrowserRouter([
       {
         path: 'access',
         element: <Access />,
+        loader: accessLoader,
       },
       {
         path: 'otel',

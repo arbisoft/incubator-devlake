@@ -34,6 +34,12 @@ const (
 	StatusDisabled = "disabled"
 
 	bootstrapClaimKey = "default"
+
+	DefaultPageSize = 10
+	MediumPageSize  = 25
+	LargePageSize   = 50
+
+	invalidPageSizeMessage = "pageSize must be 10, 25, or 50"
 )
 
 type AccessUser struct {
@@ -90,4 +96,60 @@ type Identity struct {
 type Principal struct {
 	UserID uint64
 	Role   string
+}
+
+// PageQuery is the bounded, page-number query accepted by access-directory
+// list endpoints. The UI deliberately exposes only the supported sizes.
+type PageQuery struct {
+	Page     int `form:"page"`
+	PageSize int `form:"pageSize"`
+}
+
+func (query PageQuery) Normalize() (PageQuery, bool) {
+	if query.Page < 1 {
+		query.Page = 1
+	}
+	if query.PageSize == 0 {
+		query.PageSize = DefaultPageSize
+	}
+	if query.PageSize != DefaultPageSize && query.PageSize != MediumPageSize && query.PageSize != LargePageSize {
+		return PageQuery{}, false
+	}
+	return query, true
+}
+
+func (query PageQuery) Offset() int { return (query.Page - 1) * query.PageSize }
+
+type PaginatedUsers struct {
+	Users    []AccessUser `json:"users"`
+	Count    int64        `json:"count"`
+	Page     int          `json:"page"`
+	PageSize int          `json:"pageSize"`
+}
+
+type PaginatedDomains struct {
+	Domains  []AccessDomain `json:"domains"`
+	Count    int64          `json:"count"`
+	Page     int            `json:"page"`
+	PageSize int            `json:"pageSize"`
+}
+
+type CreateUserInput struct {
+	Email string `json:"email"`
+	Role  string `json:"role"`
+}
+
+type UpdateUserInput struct {
+	Role   string `json:"role"`
+	Status string `json:"status"`
+}
+
+type CreateDomainInput struct {
+	Domain      string `json:"domain"`
+	DefaultRole string `json:"defaultRole"`
+}
+
+type UpdateDomainInput struct {
+	DefaultRole string `json:"defaultRole"`
+	Status      string `json:"status"`
 }

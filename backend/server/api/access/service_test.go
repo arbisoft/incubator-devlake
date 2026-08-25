@@ -48,3 +48,57 @@ func TestAccessConstants(t *testing.T) {
 		t.Fatal("status validation does not match the supported access statuses")
 	}
 }
+
+func TestPageQueryNormalize(t *testing.T) {
+	testCases := []struct {
+		name     string
+		query    PageQuery
+		want     PageQuery
+		isValid  bool
+		wantSkip int
+	}{
+		{name: "defaults", want: PageQuery{Page: 1, PageSize: DefaultPageSize}, isValid: true, wantSkip: 0},
+		{name: "first page", query: PageQuery{Page: 1, PageSize: MediumPageSize}, want: PageQuery{Page: 1, PageSize: MediumPageSize}, isValid: true, wantSkip: 0},
+		{name: "later page", query: PageQuery{Page: 3, PageSize: LargePageSize}, want: PageQuery{Page: 3, PageSize: LargePageSize}, isValid: true, wantSkip: 100},
+		{name: "invalid size", query: PageQuery{Page: 1, PageSize: 20}, isValid: false},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			actual, valid := testCase.query.Normalize()
+			if valid != testCase.isValid {
+				t.Fatalf("Normalize() validity = %t, want %t", valid, testCase.isValid)
+			}
+			if !valid {
+				return
+			}
+			if actual != testCase.want {
+				t.Fatalf("Normalize() = %+v, want %+v", actual, testCase.want)
+			}
+			if actual.Offset() != testCase.wantSkip {
+				t.Fatalf("Offset() = %d, want %d", actual.Offset(), testCase.wantSkip)
+			}
+		})
+	}
+}
+
+func TestValidDomain(t *testing.T) {
+	testCases := []struct {
+		domain string
+		valid  bool
+	}{
+		{domain: "example.com", valid: true},
+		{domain: "example", valid: true},
+		{domain: "", valid: false},
+		{domain: "@example.com", valid: false},
+		{domain: "example.com ", valid: false},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.domain, func(t *testing.T) {
+			if actual := validDomain(testCase.domain); actual != testCase.valid {
+				t.Fatalf("validDomain(%q) = %t, want %t", testCase.domain, actual, testCase.valid)
+			}
+		})
+	}
+}

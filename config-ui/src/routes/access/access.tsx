@@ -17,7 +17,7 @@
  */
 
 import { useState } from 'react';
-import { Button, Flex, Input, Modal, Select, Table, Tag } from 'antd';
+import { Button, Input, Modal, Select, Table, Tag } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 
 import API from '@/api';
@@ -34,8 +34,10 @@ import {
   type AccessUser,
 } from '@/api/access';
 
-const PATH_PREFIX = import.meta.env.DEVLAKE_PATH_PREFIX ?? '';
-const accessPath = `${PATH_PREFIX}/access`;
+import { ACCESS_PATH, ACCESS_STATUS_COLOR, DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from './constants';
+import { SectionHeader, SectionTitle } from './styled';
+import { isValidDomain, normalizeDomain } from './utils';
+
 const roleOptions = [
   { value: ACCESS_ROLE.MEMBER, label: 'Member' },
   { value: ACCESS_ROLE.CUSTOMER_ADMIN, label: 'Customer administrator' },
@@ -45,16 +47,28 @@ type ModalState = 'user' | 'domain' | undefined;
 
 export const Access = () => {
   const [version, setVersion] = useState(0);
+  const [userPage, setUserPage] = useState(1);
+  const [userPageSize, setUserPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(DEFAULT_PAGE_SIZE);
+  const [domainPage, setDomainPage] = useState(1);
+  const [domainPageSize, setDomainPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(DEFAULT_PAGE_SIZE);
   const [modal, setModal] = useState<ModalState>();
   const [operating, setOperating] = useState(false);
   const [email, setEmail] = useState('');
   const [domain, setDomain] = useState('');
   const [role, setRole] = useState<AccessRole>(ACCESS_ROLE.MEMBER);
   const { data, ready } = useRefreshData(
-    () => Promise.all([API.access.listUsers(), API.access.listDomains(), API.access.listAuditEvents()]),
-    [version],
+    () =>
+      Promise.all([
+        API.access.listUsers({ page: userPage, pageSize: userPageSize }),
+        API.access.listDomains({ page: domainPage, pageSize: domainPageSize }),
+        API.access.listAuditEvents(),
+      ]),
+    [version, userPage, userPageSize, domainPage, domainPageSize],
   );
-  const [users, domains, auditEvents] = data ?? [[], [], []];
+  const [users, domains, auditEvents] = data ?? [undefined, undefined, []];
+  const normalizedDomain = normalizeDomain(domain);
+  const domainError =
+    domain.length > 0 && !isValidDomain(domain) ? 'Enter a valid email domain, such as example.com.' : '';
 
   const refresh = () => setVersion((current) => current + 1);
   const closeModal = () => {
@@ -73,7 +87,9 @@ export const Access = () => {
   };
 
   const createDomain = async () => {
-    const [success] = await operator(() => API.access.createDomain({ domain, defaultRole: role }), { setOperating });
+    const [success] = await operator(() => API.access.createDomain({ domain: normalizedDomain, defaultRole: role }), {
+      setOperating,
+    });
     if (success) {
       closeModal();
       refresh();
@@ -106,21 +122,35 @@ export const Access = () => {
 
   return (
     <PageHeader
-      breadcrumbs={[{ name: 'Access', path: accessPath }]}
+      breadcrumbs={[{ name: 'User Management', path: ACCESS_PATH }]}
       description="Manage who can access DevLake. Grafana access remains independently managed in Grafana."
     >
-      <Flex justify="space-between" align="center" style={{ marginBottom: 16 }}>
-        <h3 style={{ margin: 0 }}>People</h3>
+      <SectionHeader>
+        <SectionTitle>People</SectionTitle>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setModal('user')}>
           Add person
         </Button>
-      </Flex>
+      </SectionHeader>
       <Table
         rowKey="id"
         size="middle"
         loading={!ready}
-        dataSource={users}
-        pagination={false}
+        dataSource={users?.users ?? []}
+        pagination={{
+          current: userPage,
+          pageSize: userPageSize,
+          total: users?.count ?? 0,
+          pageSizeOptions: PAGE_SIZE_OPTIONS,
+          showSizeChanger: true,
+          onChange: (nextPage, nextPageSize) => {
+            if (nextPageSize && nextPageSize !== userPageSize) {
+              setUserPageSize(nextPageSize as (typeof PAGE_SIZE_OPTIONS)[number]);
+              setUserPage(1);
+              return;
+            }
+            setUserPage(nextPage);
+          },
+        }}
         columns={[
           { title: 'Email', dataIndex: 'email', key: 'email' },
           {
@@ -146,9 +176,7 @@ export const Access = () => {
             title: 'Status',
             dataIndex: 'status',
             key: 'status',
-            render: (value: AccessStatus) => (
-              <Tag color={value === ACCESS_STATUS.ACTIVE ? 'green' : 'default'}>{value}</Tag>
-            ),
+            render: (value: AccessStatus) => <Tag color={ACCESS_STATUS_COLOR[value]}>{value}</Tag>,
           },
           {
             title: '',
@@ -169,18 +197,32 @@ export const Access = () => {
         ]}
       />
 
-      <Flex justify="space-between" align="center" style={{ margin: '32px 0 16px' }}>
-        <h3 style={{ margin: 0 }}>Allowed domains</h3>
+      <SectionHeader $spaced>
+        <SectionTitle>Allowed domains</SectionTitle>
         <Button icon={<PlusOutlined />} onClick={() => setModal('domain')}>
           Add domain
         </Button>
-      </Flex>
+      </SectionHeader>
       <Table
         rowKey="id"
         size="middle"
         loading={!ready}
-        dataSource={domains}
-        pagination={false}
+        dataSource={domains?.domains ?? []}
+        pagination={{
+          current: domainPage,
+          pageSize: domainPageSize,
+          total: domains?.count ?? 0,
+          pageSizeOptions: PAGE_SIZE_OPTIONS,
+          showSizeChanger: true,
+          onChange: (nextPage, nextPageSize) => {
+            if (nextPageSize && nextPageSize !== domainPageSize) {
+              setDomainPageSize(nextPageSize as (typeof PAGE_SIZE_OPTIONS)[number]);
+              setDomainPage(1);
+              return;
+            }
+            setDomainPage(nextPage);
+          },
+        }}
         columns={[
           { title: 'Domain', dataIndex: 'domain', key: 'domain' },
           {
@@ -200,9 +242,7 @@ export const Access = () => {
             title: 'Status',
             dataIndex: 'status',
             key: 'status',
-            render: (value: AccessStatus) => (
-              <Tag color={value === ACCESS_STATUS.ACTIVE ? 'green' : 'default'}>{value}</Tag>
-            ),
+            render: (value: AccessStatus) => <Tag color={ACCESS_STATUS_COLOR[value]}>{value}</Tag>,
           },
           {
             title: '',
@@ -226,7 +266,9 @@ export const Access = () => {
         ]}
       />
 
-      <h3 style={{ margin: '32px 0 16px' }}>Recent access activity</h3>
+      <SectionHeader $spaced>
+        <SectionTitle>Recent access activity</SectionTitle>
+      </SectionHeader>
       <Table
         rowKey="id"
         size="middle"
@@ -277,11 +319,17 @@ export const Access = () => {
           onCancel={closeModal}
           onOk={createDomain}
           okText="Allow"
-          okButtonProps={{ loading: operating, disabled: !domain }}
+          okButtonProps={{ loading: operating, disabled: !isValidDomain(domain) }}
         >
           <Block title="Domain" required>
-            <Input value={domain} placeholder="example.com" onChange={(event) => setDomain(event.target.value)} />
+            <Input
+              value={domain}
+              placeholder="example.com"
+              status={domainError ? 'error' : undefined}
+              onChange={(event) => setDomain(event.target.value)}
+            />
           </Block>
+          {domainError && <Message content={domainError} />}
           <Block title="Default role" required>
             <Select value={role} options={roleOptions} onChange={setRole} style={{ width: '100%' }} />
           </Block>

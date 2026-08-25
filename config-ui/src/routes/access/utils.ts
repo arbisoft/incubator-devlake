@@ -16,5 +16,15 @@
  *
  */
 
-export * from './access';
-export * from './loader';
+export const normalizeDomain = (value: string) => value.trim().replace(/^@/, '').toLowerCase();
+
+export const isValidDomain = (value: string) => {
+  const domain = normalizeDomain(value);
+  return (
+    domain.length > 0 &&
+    !/[\s@]/.test(domain) &&
+    !domain.startsWith('.') &&
+    !domain.endsWith('.') &&
+    !domain.includes('..')
+  );
+};

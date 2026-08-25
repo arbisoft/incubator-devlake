@@ -65,15 +65,36 @@ export type AccessAuditEvent = {
   createdAt: string;
 };
 
+export type AccessPagination = {
+  page: number;
+  pageSize: 10 | 25 | 50;
+};
+
+export type PaginatedAccessUsers = {
+  users: AccessUser[];
+  count: number;
+  page: number;
+  pageSize: number;
+};
+
+export type PaginatedAccessDomains = {
+  domains: AccessDomain[];
+  count: number;
+  page: number;
+  pageSize: number;
+};
+
 const basePath = '/access';
 
 export const current = (): Promise<AccessCurrent> => request(`${basePath}/me`);
-export const listUsers = (): Promise<AccessUser[]> => request(`${basePath}/users`);
+export const listUsers = (params: AccessPagination): Promise<PaginatedAccessUsers> =>
+  request(`${basePath}/users`, { data: params });
 export const createUser = (data: { email: string; role: AccessRole }): Promise<AccessUser> =>
   request(`${basePath}/users`, { method: 'POST', data });
 export const updateUser = (id: ID, data: { role: AccessRole; status: AccessStatus }): Promise<AccessUser> =>
   request(`${basePath}/users/${id}`, { method: 'PATCH', data });
-export const listDomains = (): Promise<AccessDomain[]> => request(`${basePath}/domains`);
+export const listDomains = (params: AccessPagination): Promise<PaginatedAccessDomains> =>
+  request(`${basePath}/domains`, { data: params });
 export const createDomain = (data: { domain: string; defaultRole: AccessRole }): Promise<AccessDomain> =>
   request(`${basePath}/domains`, { method: 'POST', data });
 export const updateDomain = (id: ID, data: { defaultRole: AccessRole; status: AccessStatus }): Promise<AccessDomain> =>

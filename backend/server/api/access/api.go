@@ -50,7 +50,11 @@ func ListUsers(c *gin.Context) {
 	if _, ok := requireAdmin(c); !ok {
 		return
 	}
-	users, err := Default().ListUsers()
+	query, ok := listQuery(c)
+	if !ok {
+		return
+	}
+	users, err := Default().ListUsers(query)
 	if err != nil {
 		shared.ApiOutputError(c, err)
 		return
@@ -62,10 +66,7 @@ func PostUser(c *gin.Context) {
 	if _, ok := requireAdmin(c); !ok {
 		return
 	}
-	input := struct {
-		Email string `json:"email"`
-		Role  string `json:"role"`
-	}{}
+	input := CreateUserInput{}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		shared.ApiOutputError(c, errors.BadInput.Wrap(err, "invalid access user"))
 		return
@@ -83,7 +84,11 @@ func ListDomains(c *gin.Context) {
 	if _, ok := requireAdmin(c); !ok {
 		return
 	}
-	domains, err := Default().ListDomains()
+	query, ok := listQuery(c)
+	if !ok {
+		return
+	}
+	domains, err := Default().ListDomains(query)
 	if err != nil {
 		shared.ApiOutputError(c, err)
 		return
@@ -107,13 +112,13 @@ func PostDomain(c *gin.Context) {
 	if _, ok := requireAdmin(c); !ok {
 		return
 	}
-	input := AccessDomain{}
+	input := CreateDomainInput{}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		shared.ApiOutputError(c, errors.BadInput.Wrap(err, "invalid access domain"))
 		return
 	}
 	actor, _ := GetIdentity(c)
-	domain, err := Default().CreateDomain(actor.Email, input)
+	domain, err := Default().CreateDomain(actor.Email, AccessDomain{Domain: input.Domain, DefaultRole: input.DefaultRole})
 	if err != nil {
 		shared.ApiOutputError(c, err)
 		return
@@ -130,10 +135,7 @@ func PatchDomain(c *gin.Context) {
 		shared.ApiOutputError(c, errors.BadInput.New("invalid access domain id"))
 		return
 	}
-	input := struct {
-		DefaultRole string `json:"defaultRole"`
-		Status      string `json:"status"`
-	}{}
+	input := UpdateDomainInput{}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		shared.ApiOutputError(c, errors.BadInput.Wrap(err, "invalid access domain update"))
 		return
@@ -156,10 +158,7 @@ func PatchUser(c *gin.Context) {
 		shared.ApiOutputError(c, errors.BadInput.New("invalid access user id"))
 		return
 	}
-	input := struct {
-		Role   string `json:"role"`
-		Status string `json:"status"`
-	}{}
+	input := UpdateUserInput{}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		shared.ApiOutputError(c, errors.BadInput.Wrap(err, "invalid access user update"))
 		return
@@ -180,4 +179,18 @@ func requireAdmin(c *gin.Context) (*Principal, bool) {
 		return nil, false
 	}
 	return principal, true
+}
+
+func listQuery(c *gin.Context) (PageQuery, bool) {
+	query := PageQuery{}
+	if err := c.ShouldBindQuery(&query); err != nil {
+		shared.ApiOutputError(c, errors.BadInput.Wrap(err, "invalid access list query"))
+		return PageQuery{}, false
+	}
+	query, valid := query.Normalize()
+	if !valid {
+		shared.ApiOutputError(c, errors.BadInput.New(invalidPageSizeMessage))
+		return PageQuery{}, false
+	}
+	return query, true
 }

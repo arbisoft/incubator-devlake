@@ -16,5 +16,19 @@
  *
  */
 
-export * from './access';
-export * from './loader';
+import { equal } from 'node:assert/strict';
+import { test } from 'node:test';
+
+import { isValidDomain, normalizeDomain } from './utils';
+
+test('normalizes allowed-domain input before it is submitted', () => {
+  equal(normalizeDomain(' @Example.COM '), 'example.com');
+});
+
+test('rejects invalid allowed-domain input locally', () => {
+  equal(isValidDomain('example.com'), true);
+  equal(isValidDomain('example'), true);
+  equal(isValidDomain(''), false);
+  equal(isValidDomain('example..com'), false);
+  equal(isValidDomain('person@example.com'), false);
+});

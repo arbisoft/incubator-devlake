@@ -30,9 +30,10 @@ import {
 } from '@ant-design/icons';
 
 import { DOC_URL } from '@/release';
+import { ACCESS_PATH } from '@/routes/access/constants';
 
 const PATH_PREFIX = import.meta.env.DEVLAKE_PATH_PREFIX ?? '';
-export const ACCESS_PATH = `${PATH_PREFIX}/access`;
+export { ACCESS_PATH };
 
 type MenuItem = {
   key: string;

@@ -327,20 +327,36 @@ func (s *Service) RequireAdmin(c *gin.Context) (*Principal, errors.Error) {
 	return principal, nil
 }
 
-func (s *Service) ListUsers() ([]AccessUser, errors.Error) {
+func (s *Service) ListUsers(query PageQuery) (*PaginatedUsers, errors.Error) {
+	query, valid := query.Normalize()
+	if !valid {
+		return nil, errors.BadInput.New(invalidPageSizeMessage)
+	}
+	count, err := s.db.Count(dal.From(&AccessUser{}))
+	if err != nil {
+		return nil, errors.Default.Wrap(err, "error counting access users")
+	}
 	users := make([]AccessUser, 0)
-	if err := s.db.All(&users, dal.Orderby("email ASC")); err != nil {
+	if err := s.db.All(&users, dal.Orderby("email ASC"), dal.Offset(query.Offset()), dal.Limit(query.PageSize)); err != nil {
 		return nil, errors.Default.Wrap(err, "error listing access users")
 	}
-	return users, nil
+	return &PaginatedUsers{Users: users, Count: count, Page: query.Page, PageSize: query.PageSize}, nil
 }
 
-func (s *Service) ListDomains() ([]AccessDomain, errors.Error) {
+func (s *Service) ListDomains(query PageQuery) (*PaginatedDomains, errors.Error) {
+	query, valid := query.Normalize()
+	if !valid {
+		return nil, errors.BadInput.New(invalidPageSizeMessage)
+	}
+	count, err := s.db.Count(dal.From(&AccessDomain{}))
+	if err != nil {
+		return nil, errors.Default.Wrap(err, "error counting access domains")
+	}
 	domains := make([]AccessDomain, 0)
-	if err := s.db.All(&domains, dal.Orderby("domain ASC")); err != nil {
+	if err := s.db.All(&domains, dal.Orderby("domain ASC"), dal.Offset(query.Offset()), dal.Limit(query.PageSize)); err != nil {
 		return nil, errors.Default.Wrap(err, "error listing access domains")
 	}
-	return domains, nil
+	return &PaginatedDomains{Domains: domains, Count: count, Page: query.Page, PageSize: query.PageSize}, nil
 }
 
 func (s *Service) ListAuditEvents() ([]AuditEvent, errors.Error) {
@@ -353,7 +369,7 @@ func (s *Service) ListAuditEvents() ([]AuditEvent, errors.Error) {
 
 func (s *Service) CreateDomain(actor string, input AccessDomain) (*AccessDomain, errors.Error) {
 	domain := normalizeDomain(input.Domain)
-	if domain == "" || !validRole(input.DefaultRole) {
+	if !validDomain(domain) || !validRole(input.DefaultRole) {
 		return nil, errors.BadInput.New("provide a valid domain and default role")
 	}
 	input.Domain = domain
@@ -485,6 +501,11 @@ func invitationSubject(email string) string { return invitationSubjectPrefix + e
 
 func normalizeDomain(raw string) string {
 	return strings.ToLower(strings.TrimPrefix(strings.TrimSpace(raw), "@"))
+}
+
+func validDomain(domain string) bool {
+	parsed, ok := emailDomain("access@" + domain)
+	return ok && parsed == domain
 }
 
 func emailDomain(email string) (string, bool) {

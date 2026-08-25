@@ -16,5 +16,15 @@
  *
  */
 
-export * from './access';
-export * from './loader';
+import styled from 'styled-components';
+
+export const SectionHeader = styled.div<{ $spaced?: boolean }>`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: ${({ $spaced }) => ($spaced ? '32px 0 16px' : '0 0 16px')};
+`;
+
+export const SectionTitle = styled.h3`
+  margin: 0;
+`;

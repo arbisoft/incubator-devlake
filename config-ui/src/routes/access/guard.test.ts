@@ -16,5 +16,16 @@
  *
  */
 
-export * from './access';
-export * from './loader';
+import { equal } from 'node:assert/strict';
+import { test } from 'node:test';
+
+import { ACCESS_ROLE } from '../../api/access';
+
+import { canManageAccess } from './guard';
+
+test('allows only enabled customer administrators into access management', () => {
+  equal(canManageAccess({ enabled: true, role: ACCESS_ROLE.CUSTOMER_ADMIN }), true);
+  equal(canManageAccess({ enabled: true, role: ACCESS_ROLE.MEMBER }), false);
+  equal(canManageAccess({ enabled: false }), false);
+  equal(canManageAccess(null), false);
+});
