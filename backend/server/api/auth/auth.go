@@ -110,6 +110,11 @@ func NewService(ctx stdctx.Context, basicRes corectx.BasicRes) (*Service, error)
 	if err != nil {
 		return nil, err
 	}
+	if access.Default() != nil && access.Default().Enabled() {
+		if err := access.ValidateConfiguration(basicRes.GetConfigReader().GetString("FORWARDED_USER_SECRET")); err != nil {
+			return nil, err
+		}
+	}
 	s := &Service{
 		cfg:       cfg,
 		providers: map[string]*oidchelper.Provider{},

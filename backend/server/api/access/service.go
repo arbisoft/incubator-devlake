@@ -84,6 +84,16 @@ func SetSessionRevoker(revoker SessionRevoker) {
 
 func (s *Service) Enabled() bool { return s != nil && s.cfg.Enabled }
 
+// ValidateConfiguration rejects the legacy trusted-proxy identity path when
+// the access directory is enabled, because that path does not consult the
+// directory before authenticating a request.
+func ValidateConfiguration(forwardedUserSecret string) error {
+	if strings.TrimSpace(forwardedUserSecret) == "" {
+		return nil
+	}
+	return fmt.Errorf("AUTH_ACCESS_ENABLED=true cannot be combined with FORWARDED_USER_SECRET; remove trusted oauth2-proxy forwarded identity authentication before enabling the access directory")
+}
+
 func SetIdentity(c *gin.Context, identity Identity) { c.Set(identityContextKey, identity) }
 
 func GetIdentity(c *gin.Context) (Identity, bool) {
@@ -114,21 +124,13 @@ func (s *Service) Authorize(identity Identity) (*Principal, errors.Error) {
 	if !s.db.IsErrorNotFound(err) {
 		return nil, errors.Default.Wrap(err, "error looking up access user")
 	}
-	invitation := &AccessUser{}
-	err = s.db.First(invitation, dal.Where("issuer = ? AND subject = ?", "", invitationSubject(identity.Email)))
-	if err == nil {
-		invitation.Issuer = identity.Issuer
-		invitation.Subject = identity.Subject
-		invitation.Email = identity.Email
-		invitation.DisplayName = identity.DisplayName
-		if updateErr := s.db.Update(invitation); updateErr != nil {
-			return nil, errors.Default.Wrap(updateErr, "error claiming invited access user")
-		}
+	invitation, invitationFound, invitationErr := s.claimInvitation(identity)
+	if invitationErr != nil {
+		return nil, invitationErr
+	}
+	if invitationFound {
 		s.audit("", "user.invitation_claimed", invitation, "")
 		return s.authorizeExistingUser(invitation, identity)
-	}
-	if !s.db.IsErrorNotFound(err) {
-		return nil, errors.Default.Wrap(err, "error looking up invited access user")
 	}
 
 	if principal, bootstrapErr := s.bootstrap(identity); bootstrapErr != nil || principal != nil {
@@ -165,27 +167,105 @@ func (s *Service) bootstrap(identity Identity) (*Principal, errors.Error) {
 	if s.cfg.BootstrapAdminEmail == "" || identity.Email != s.cfg.BootstrapAdminEmail {
 		return nil, nil
 	}
-	count, err := s.db.Count(dal.From(&AccessUser{}))
+	tx := s.db.Begin()
+	finished := false
+	defer func() {
+		if !finished {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				s.logger.Error(rollbackErr, "access: rollback bootstrap administrator claim")
+			}
+		}
+	}()
+
+	count, err := tx.Count(dal.From(&AccessUser{}))
 	if err != nil {
 		return nil, errors.Default.Wrap(err, "error checking access bootstrap state")
 	}
 	if count != 0 {
 		return nil, nil
 	}
+	if err := tx.Create(&BootstrapClaim{Key: bootstrapClaimKey}); err != nil {
+		if tx.IsDuplicationError(err) {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				return nil, errors.Default.Wrap(rollbackErr, "error rolling back bootstrap administrator claim")
+			}
+			finished = true
+			existing := &AccessUser{}
+			if lookupErr := s.db.First(existing, dal.Where("issuer = ? AND subject = ?", identity.Issuer, identity.Subject)); lookupErr == nil {
+				return s.authorizeExistingUser(existing, identity)
+			} else if !s.db.IsErrorNotFound(lookupErr) {
+				return nil, errors.Default.Wrap(lookupErr, "error reading bootstrap administrator")
+			}
+			return nil, errors.Unauthorized.New("the bootstrap administrator has already been claimed")
+		}
+		return nil, errors.Default.Wrap(err, "error claiming bootstrap administrator")
+	}
 	now := time.Now()
 	user := &AccessUser{
 		Issuer: identity.Issuer, Subject: identity.Subject, Email: identity.Email,
 		DisplayName: identity.DisplayName, Role: RoleCustomerAdmin, Status: StatusActive, LastLoginAt: &now,
 	}
-	if err := s.db.Create(user); err != nil {
-		if s.db.IsDuplicationError(err) {
-			return s.Authorize(identity)
-		}
+	if err := tx.Create(user); err != nil {
 		return nil, errors.Default.Wrap(err, "error creating bootstrap administrator")
 	}
+	if err := tx.Commit(); err != nil {
+		return nil, errors.Default.Wrap(err, "error committing bootstrap administrator")
+	}
+	finished = true
 	s.audit(identity.Email, "bootstrap.consumed", user, "")
 	s.logger.Info("access: bootstrap administrator provisioned email=%s", identity.Email)
 	return &Principal{UserID: user.ID, Role: user.Role}, nil
+}
+
+// claimInvitation conditionally binds an email invitation to the verified OIDC
+// identity. A concurrent claimant can update only an unclaimed row; the final
+// read authorizes the winner and rejects every other identity.
+func (s *Service) claimInvitation(identity Identity) (*AccessUser, bool, errors.Error) {
+	tx := s.db.Begin()
+	finished := false
+	defer func() {
+		if !finished {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				s.logger.Error(rollbackErr, "access: rollback invitation claim email=%s", identity.Email)
+			}
+		}
+	}()
+
+	invitation := &AccessUser{}
+	err := tx.First(invitation, dal.Where("issuer = ? AND subject = ?", "", invitationSubject(identity.Email)))
+	if err != nil {
+		if tx.IsErrorNotFound(err) {
+			return nil, false, nil
+		}
+		return nil, false, errors.Default.Wrap(err, "error looking up invited access user")
+	}
+	now := time.Now()
+	if err := tx.UpdateColumns(
+		&AccessUser{},
+		[]dal.DalSet{
+			{ColumnName: "issuer", Value: identity.Issuer},
+			{ColumnName: "subject", Value: identity.Subject},
+			{ColumnName: "email", Value: identity.Email},
+			{ColumnName: "display_name", Value: identity.DisplayName},
+			{ColumnName: "last_login_at", Value: now},
+		},
+		dal.Where("id = ? AND issuer = ? AND subject = ?", invitation.ID, "", invitationSubject(identity.Email)),
+	); err != nil {
+		return nil, false, errors.Default.Wrap(err, "error claiming invited access user")
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, false, errors.Default.Wrap(err, "error committing invited access user claim")
+	}
+	finished = true
+
+	claimed := &AccessUser{}
+	if err := s.db.First(claimed, dal.Where("id = ?", invitation.ID)); err != nil {
+		return nil, false, errors.Default.Wrap(err, "error reading claimed access user")
+	}
+	if claimed.Issuer != identity.Issuer || claimed.Subject != identity.Subject {
+		return nil, false, errors.Unauthorized.New("this invitation has already been claimed")
+	}
+	return claimed, true, nil
 }
 
 func (s *Service) authorizeExistingUser(user *AccessUser, identity Identity) (*Principal, errors.Error) {

@@ -63,6 +63,13 @@ type authAccessAuditEvent20260825 struct {
 
 func (authAccessAuditEvent20260825) TableName() string { return "auth_access_audit_events" }
 
+type authAccessBootstrapClaim20260825 struct {
+	archived.Model
+	Key string `gorm:"type:varchar(64);uniqueIndex"`
+}
+
+func (authAccessBootstrapClaim20260825) TableName() string { return "auth_access_bootstrap_claims" }
+
 type authSessionProvider20260825 struct {
 	Provider string `gorm:"type:varchar(64);index"`
 }
@@ -77,6 +84,7 @@ func (*addAuthAccessDirectory) Up(basicRes context.BasicRes) errors.Error {
 		new(authAccessUser20260825),
 		new(authAccessDomain20260825),
 		new(authAccessAuditEvent20260825),
+		new(authAccessBootstrapClaim20260825),
 	); err != nil {
 		return err
 	}

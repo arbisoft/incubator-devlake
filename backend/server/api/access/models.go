@@ -32,6 +32,8 @@ const (
 
 	StatusActive   = "active"
 	StatusDisabled = "disabled"
+
+	bootstrapClaimKey = "default"
 )
 
 type AccessUser struct {
@@ -47,6 +49,16 @@ type AccessUser struct {
 }
 
 func (AccessUser) TableName() string { return "auth_access_users" }
+
+// BootstrapClaim records that the configured bootstrap administrator has been
+// consumed. Its unique key makes the first-admin transition safe across API
+// processes and OIDC providers.
+type BootstrapClaim struct {
+	common.Model
+	Key string `gorm:"type:varchar(64);uniqueIndex"`
+}
+
+func (BootstrapClaim) TableName() string { return "auth_access_bootstrap_claims" }
 
 type AccessDomain struct {
 	common.Model
