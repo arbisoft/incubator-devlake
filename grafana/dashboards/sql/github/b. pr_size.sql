@@ -1,3 +1,4 @@
+-- Buckets PRs by total lines changed summed across their commits into four size bands, reporting PR count and share of total.
 WITH pr_size AS (
   SELECT pr.id,
          SUM(c.additions + c.deletions) AS lines_changed

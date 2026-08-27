@@ -1,3 +1,4 @@
+-- Time series counting DONE issues per assignee, bucketed by resolution date.
 SELECT $__timeGroup(i.resolution_date, ${interval})                     AS time,
        REPLACE(COALESCE(
          NULLIF(TRIM(u.name),          ''),

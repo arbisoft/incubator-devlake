@@ -1,3 +1,4 @@
+-- Buckets merged PRs by created-to-merged elapsed time into five ranges, reporting PR count and share of total.
 SELECT CASE
          WHEN mins <    240 THEN '1. under 4h'
          WHEN mins <   1440 THEN '2. 4-24h'

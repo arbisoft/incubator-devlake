@@ -1,3 +1,4 @@
+-- Per time bucket, derives median and P75 of the precomputed pr_cycle_time (project_pr_metrics) in days for merged PRs.
 WITH d AS (
     SELECT $__timeGroup(pr.merged_date, $interval)  AS bucket,
            m.pr_cycle_time / 1440.0            AS days

@@ -1,3 +1,4 @@
+-- Per-developer scorecard that joins four independent aggregates on account id: commit volume, PR-commit contributions, reviews given, and PRs authored.
 WITH scoped_repos AS (
   SELECT r.id
   FROM repos r

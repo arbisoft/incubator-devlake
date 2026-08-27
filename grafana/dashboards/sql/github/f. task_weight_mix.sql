@@ -1,3 +1,4 @@
+-- Per author, classifies merged PRs as Light/Standard/Heavy by total lines changed (merge commits excluded) and reports counts and percentages for authors with at least 3 PRs.
 WITH pr_size AS (
   SELECT pr.id,
          pr.author_id,

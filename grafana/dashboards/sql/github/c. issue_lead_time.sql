@@ -1,3 +1,4 @@
+-- Per mapped issue type and priority, derives median and P75 of lead_time_minutes in days for DONE issues, keeping groups with at least 3 issues.
 WITH type_map AS (
   SELECT original_type,
          CASE

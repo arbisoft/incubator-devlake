@@ -1,3 +1,4 @@
+-- Per time bucket, counts issues created by category after mapping original_type into fixed buckets via keyword matching.
 WITH type_map AS (
   SELECT original_type,
          CASE

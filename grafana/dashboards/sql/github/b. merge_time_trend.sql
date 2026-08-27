@@ -1,3 +1,4 @@
+-- Per time bucket, derives median/P75/P90 of created-to-merged time in days using CUME_DIST over merged PRs.
 WITH d AS (
   SELECT $__timeGroup(pr.merged_date, $interval)                              AS bucket,
          TIMESTAMPDIFF(MINUTE, pr.created_date, pr.merged_date) / 1440.0 AS days

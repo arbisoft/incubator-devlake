@@ -1,3 +1,4 @@
+-- Per author, divides merged PRs by merged plus closed PRs created in the window (closed floored at 1), top 20 by rate.
 SELECT developer, Merged / (Merged + (CASE WHEN Closed = 0 THEN 1 ELSE Closed END)) AS `Acceptance Rate`
 FROM (
       SELECT REPLACE(

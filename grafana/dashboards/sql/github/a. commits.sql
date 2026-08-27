@@ -1,3 +1,4 @@
+-- Counts each PR commit once per author, marking it Landed if any of its PRs merged and Abandoned if the PR closed unmerged, top 20 developers.
 WITH _commit_logs AS (
     SELECT prc.commit_sha,
            MAX(CASE WHEN pr.status = 'MERGED'

@@ -1,5 +1,6 @@
+-- Counts approvals, change requests, comments and distinct PRs touched per reviewer from pull_request_comments tied to a commit SHA, top 20 reviewers.
 SELECT
-  REPLACE(
+  REPLACE(  
   COALESCE(
     NULLIF(TRIM(a.full_name), ''),
     NULLIF(TRIM(a.user_name), ''),

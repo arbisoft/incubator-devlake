@@ -1,3 +1,4 @@
+-- Lists open issues not updated in over 14 days with their assignee and days since the last update.
 SELECT REPLACE(COALESCE(
          NULLIF(TRIM(u.name),          ''),
          NULLIF(TRIM(a.full_name),     ''),

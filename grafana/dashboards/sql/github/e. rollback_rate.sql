@@ -1,4 +1,4 @@
-
+-- Per time bucket, the share of successful production deployments followed within 24h by a revert PR or by a deployment named rollback/revert.
 WITH deploys AS (
   SELECT cicd_deployment_id AS id,
          MIN(finished_date)  AS ts

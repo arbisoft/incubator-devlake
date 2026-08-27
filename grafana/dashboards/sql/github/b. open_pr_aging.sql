@@ -1,3 +1,4 @@
+-- Lists open PRs with days since creation, author and comma-joined reviewer names, keeping PRs the selected developer either authored or reviewed.
 WITH _names AS (
   SELECT a.id AS id, REPLACE(
         COALESCE(

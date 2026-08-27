@@ -1,3 +1,4 @@
+-- Per assignee, counts issues created in the window split by status into To Do, In Progress and Done.
 SELECT REPLACE(COALESCE(
          NULLIF(TRIM(a.full_name), ''),
          NULLIF(TRIM(u.name),      ''),

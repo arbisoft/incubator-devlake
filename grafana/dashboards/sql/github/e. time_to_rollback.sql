@@ -1,3 +1,4 @@
+-- Per time bucket, counts deployments reverted within 7 days and derives median and P90 hours from deploy to the first revert PR merge.
 WITH deploys AS (
   SELECT cicd_deployment_id AS id,
          MIN(finished_date)  AS ts

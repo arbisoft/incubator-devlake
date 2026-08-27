@@ -1,3 +1,4 @@
+-- Per time bucket, unions issue creation events (by creator) and DONE resolution events (by assignee) and counts each side.
 WITH ev AS (
   SELECT i.created_date AS ts, 1 AS opened, 0 AS closed
   FROM issues i

@@ -1,3 +1,4 @@
+-- For deployments followed within 24h by a revert or hotfix PR, classifies each by its earliest signal and reports rollback versus fixed-forward counts.
 WITH deploys AS (
   SELECT cicd_deployment_id AS id, MIN(finished_date) AS ts
   FROM cicd_deployment_commits

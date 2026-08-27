@@ -1,3 +1,4 @@
+-- Counts issues currently in OPEN original_status per assignee, with no time window applied.
 SELECT REPLACE(COALESCE(
          NULLIF(TRIM(u.name),          ''),
          NULLIF(TRIM(a.full_name),     ''),

@@ -1,3 +1,4 @@
+-- Per assignee, counts issues by mapped type category and splits them into Planned versus Adhoc based on whether their sprint has a start date.
 WITH type_map AS (
   SELECT original_type,
          CASE

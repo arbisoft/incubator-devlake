@@ -1,3 +1,4 @@
+-- Per repo, averages over PRs the lines changed after the first CHANGES_REQUESTED comment as a percentage of the lines changed before it.
 WITH first_comment_dates AS (SELECT pr.id AS pull_request_id, 
   COALESCE((
     SELECT created_date 
@@ -26,7 +27,7 @@ GROUP BY prc.pull_request_id)
 
 SELECT * FROM 
 (
-  SELECT pm.project_name AS Project, r.name AS Repository, AVG(100 * rework_changes / CASE WHEN base_changes = 0 THEN 1 ELSE base_changes END) AS `Rework Percentage`
+  SELECT r.name AS Repository, pm.project_name AS Project, AVG(100 * rework_changes / CASE WHEN base_changes = 0 THEN 1 ELSE base_changes END) AS `Rework Percentage`
       FROM per_pr_calculations ppc
     JOIN pull_requests pr ON ppc.pull_request_id = pr.id
     LEFT JOIN repos r ON pr.base_repo_id = r.id

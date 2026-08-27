@@ -1,3 +1,4 @@
+-- Counts distinct successful production deployments per time bucket.
 SELECT $__timeGroup(cdc.finished_date, $interval)   AS time,
        COUNT(DISTINCT cdc.cicd_deployment_id)  AS deployments
 FROM cicd_deployment_commits cdc

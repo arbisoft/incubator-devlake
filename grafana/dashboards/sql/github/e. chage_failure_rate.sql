@@ -1,3 +1,4 @@
+-- Per time bucket, the share of successful production deployments followed within 24h by a revert/hotfix PR in the same repo or by any incident.
 WITH deploys AS (
   SELECT cicd_deployment_id AS id,
          MIN(finished_date)  AS ts

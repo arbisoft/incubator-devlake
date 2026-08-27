@@ -1,3 +1,4 @@
+-- Per repo, counts merged PRs having no APPROVED comment from anyone other than the author, and their share of all merged PRs.
 SELECT * FROM (
   SELECT Repository, COUNT(has_been_reviewed) - SUM(has_been_reviewed) AS 'Unapproved PR Count', CONCAT(ROUND((COUNT(has_been_reviewed) - SUM(has_been_reviewed))/COUNT(has_been_reviewed)*100, 1), '%') AS 'Unapproved PRs Percentage'
   FROM (

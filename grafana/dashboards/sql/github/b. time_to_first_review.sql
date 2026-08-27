@@ -1,3 +1,4 @@
+-- Per time bucket, derives median and P90 hours from PR creation to the earliest comment by someone other than the author.
 WITH first_touch AS (
   SELECT pr.id,
          pr.created_date,

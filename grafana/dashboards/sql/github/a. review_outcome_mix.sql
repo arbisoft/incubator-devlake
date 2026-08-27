@@ -1,3 +1,4 @@
+-- Per PR author, counts merged PRs as approvals and sums the CHANGES_REQUESTED comments their PRs received, top 20 authors.
 SELECT 
   REPLACE(
     COALESCE(

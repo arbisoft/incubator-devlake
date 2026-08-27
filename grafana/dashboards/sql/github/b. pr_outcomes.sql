@@ -1,3 +1,4 @@
+-- Per author, counts PRs created in the window split by status into Merged, Open, Closed and Draft, top 20 by total.
 SELECT REPLACE(
          COALESCE(
            NULLIF(TRIM(a.full_name), ''),
