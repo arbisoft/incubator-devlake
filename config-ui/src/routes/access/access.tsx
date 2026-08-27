@@ -16,31 +16,27 @@
  *
  */
 
-import { useState } from 'react';
-import { Button, Input, Modal, Popconfirm, Select, Space, Table, Tag, Tooltip } from 'antd';
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
+import { useMemo, useState } from 'react';
+import { Button, Table } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
 
 import API from '@/api';
-import { Block, Message, PageHeader } from '@/components';
+import { PageHeader } from '@/components';
 import { useRefreshData } from '@/hooks';
 import { operator } from '@/utils';
 import {
   ACCESS_ROLE,
-  ACCESS_STATUS,
   type AccessDomain,
   type AccessRole,
   type AccessStatus,
   type AccessUser,
 } from '@/api/access';
 
-import { ACCESS_PATH, ACCESS_STATUS_COLOR, DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from './constants';
+import { getAuditColumns, getDomainColumns, getUserColumns } from './columns';
+import { BREADCRUMBS, DEFAULT_PAGE_SIZE, PAGE_DESCRIPTION, PAGE_SIZE_OPTIONS } from './constants';
+import { CreateDomainModal, CreateUserModal } from './modals';
 import { SectionHeader, SectionTitle } from './styled';
 import { getCreateDomainError, getCreateUserError, isValidDomain, isValidEmail, normalizeDomain } from './utils';
-
-const roleOptions = [
-  { value: ACCESS_ROLE.MEMBER, label: 'Member' },
-  { value: ACCESS_ROLE.CUSTOMER_ADMIN, label: 'Customer administrator' },
-];
 
 type ModalState = 'user' | 'domain' | undefined;
 
@@ -55,6 +51,7 @@ export const Access = () => {
   const [email, setEmail] = useState('');
   const [domain, setDomain] = useState('');
   const [role, setRole] = useState<AccessRole>(ACCESS_ROLE.MEMBER);
+
   const { data, ready } = useRefreshData(
     () =>
       Promise.all([
@@ -65,6 +62,7 @@ export const Access = () => {
     [version, userPage, userPageSize, domainPage, domainPageSize],
   );
   const [users, domains, auditEvents] = data ?? [undefined, undefined, []];
+
   const normalizedDomain = normalizeDomain(domain);
   const domainError =
     domain.length > 0 && !isValidDomain(domain) ? 'Enter a valid email domain, such as example.com.' : '';
@@ -135,11 +133,30 @@ export const Access = () => {
     if (success) refresh();
   };
 
+  const userColumns = useMemo(
+    () =>
+      getUserColumns({
+        onRoleChange: updateUserRole,
+        onStatusChange: updateUser,
+        onRemove: hideUser,
+      }),
+    [],
+  );
+
+  const domainColumns = useMemo(
+    () =>
+      getDomainColumns({
+        onRoleChange: updateDomainRole,
+        onStatusChange: updateDomain,
+        onRemove: hideDomain,
+      }),
+    [],
+  );
+
+  const auditColumns = useMemo(() => getAuditColumns(), []);
+
   return (
-    <PageHeader
-      breadcrumbs={[{ name: 'User Management', path: ACCESS_PATH }]}
-      description="Manage who can access DevLake. Grafana access remains independently managed in Grafana."
-    >
+    <PageHeader breadcrumbs={BREADCRUMBS} description={PAGE_DESCRIPTION}>
       <SectionHeader>
         <SectionTitle>People</SectionTitle>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setModal('user')}>
@@ -166,66 +183,7 @@ export const Access = () => {
             setUserPage(nextPage);
           },
         }}
-        columns={[
-          { title: 'Email', dataIndex: 'email', key: 'email' },
-          {
-            title: 'Name',
-            dataIndex: 'displayName',
-            key: 'displayName',
-            render: (value: string) => value || 'Pending first login',
-          },
-          {
-            title: 'Role',
-            dataIndex: 'role',
-            key: 'role',
-            render: (value: AccessRole, user: AccessUser) => (
-              <Select
-                size="small"
-                value={value}
-                options={roleOptions}
-                onChange={(nextRole) => updateUserRole(user, nextRole)}
-              />
-            ),
-          },
-          {
-            title: 'Status',
-            dataIndex: 'status',
-            key: 'status',
-            render: (value: AccessStatus) => <Tag color={ACCESS_STATUS_COLOR[value]}>{value}</Tag>,
-          },
-          {
-            title: '',
-            key: 'actions',
-            width: 160,
-            render: (_: unknown, user: AccessUser) => (
-              <Space size="small">
-                <Button
-                  size="small"
-                  danger={user.status === ACCESS_STATUS.ACTIVE}
-                  onClick={() =>
-                    updateUser(
-                      user,
-                      user.status === ACCESS_STATUS.ACTIVE ? ACCESS_STATUS.DISABLED : ACCESS_STATUS.ACTIVE,
-                    )
-                  }
-                >
-                  {user.status === ACCESS_STATUS.ACTIVE ? 'Disable' : 'Enable'}
-                </Button>
-                <Popconfirm
-                  title="Remove this person from User Management?"
-                  description="Their DevLake access will be disabled and the record will remain in audit history."
-                  okText="Remove"
-                  okButtonProps={{ danger: true }}
-                  onConfirm={() => hideUser(user)}
-                >
-                  <Tooltip title="Remove person from User Management">
-                    <Button type="text" danger icon={<DeleteOutlined />} aria-label="Remove person" />
-                  </Tooltip>
-                </Popconfirm>
-              </Space>
-            ),
-          },
-        ]}
+        columns={userColumns}
       />
 
       <SectionHeader $spaced>
@@ -254,60 +212,7 @@ export const Access = () => {
             setDomainPage(nextPage);
           },
         }}
-        columns={[
-          { title: 'Domain', dataIndex: 'domain', key: 'domain' },
-          {
-            title: 'Default role',
-            dataIndex: 'defaultRole',
-            key: 'defaultRole',
-            render: (value: AccessRole, accessDomain: AccessDomain) => (
-              <Select
-                size="small"
-                value={value}
-                options={roleOptions}
-                onChange={(nextRole) => updateDomainRole(accessDomain, nextRole)}
-              />
-            ),
-          },
-          {
-            title: 'Status',
-            dataIndex: 'status',
-            key: 'status',
-            render: (value: AccessStatus) => <Tag color={ACCESS_STATUS_COLOR[value]}>{value}</Tag>,
-          },
-          {
-            title: '',
-            key: 'actions',
-            width: 160,
-            render: (_: unknown, accessDomain: AccessDomain) => (
-              <Space size="small">
-                <Button
-                  size="small"
-                  danger={accessDomain.status === ACCESS_STATUS.ACTIVE}
-                  onClick={() =>
-                    updateDomain(
-                      accessDomain,
-                      accessDomain.status === ACCESS_STATUS.ACTIVE ? ACCESS_STATUS.DISABLED : ACCESS_STATUS.ACTIVE,
-                    )
-                  }
-                >
-                  {accessDomain.status === ACCESS_STATUS.ACTIVE ? 'Disable' : 'Enable'}
-                </Button>
-                <Popconfirm
-                  title="Remove this domain from User Management?"
-                  description="New sign-ins from this domain will no longer be provisioned. The record will remain in audit history."
-                  okText="Remove"
-                  okButtonProps={{ danger: true }}
-                  onConfirm={() => hideDomain(accessDomain)}
-                >
-                  <Tooltip title="Remove domain from User Management">
-                    <Button type="text" danger icon={<DeleteOutlined />} aria-label="Remove domain" />
-                  </Tooltip>
-                </Popconfirm>
-              </Space>
-            ),
-          },
-        ]}
+        columns={domainColumns}
       />
 
       <SectionHeader $spaced>
@@ -319,73 +224,32 @@ export const Access = () => {
         loading={!ready}
         dataSource={auditEvents}
         pagination={false}
-        columns={[
-          { title: 'When', dataIndex: 'createdAt', key: 'createdAt' },
-          { title: 'Action', dataIndex: 'action', key: 'action' },
-          {
-            title: 'Actor',
-            dataIndex: 'actorEmail',
-            key: 'actorEmail',
-            render: (value: string) => value || 'System',
-          },
-          {
-            title: 'Target',
-            dataIndex: 'targetEmail',
-            key: 'targetEmail',
-            render: (value: string) => value || '-',
-          },
-          { title: 'Detail', dataIndex: 'detail', key: 'detail' },
-        ]}
+        columns={auditColumns}
       />
 
-      {modal === 'user' && (
-        <Modal
-          open
-          title="Add DevLake user"
-          onCancel={closeModal}
-          onOk={createUser}
-          okText="Add"
-          okButtonProps={{ loading: operating, disabled: !isValidEmail(email) }}
-        >
-          <Block title="Email" required>
-            <Input
-              value={email}
-              placeholder="person@example.com"
-              status={emailError ? 'error' : undefined}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-          </Block>
-          {emailError && <Message content={emailError} />}
-          <Block title="Role" required>
-            <Select value={role} options={roleOptions} onChange={setRole} style={{ width: '100%' }} />
-          </Block>
-          <Message content="The person is authorized after their first verified sign-in with the configured OIDC provider." />
-        </Modal>
-      )}
-      {modal === 'domain' && (
-        <Modal
-          open
-          title="Allow email domain"
-          onCancel={closeModal}
-          onOk={createDomain}
-          okText="Allow"
-          okButtonProps={{ loading: operating, disabled: !isValidDomain(domain) }}
-        >
-          <Block title="Domain" required>
-            <Input
-              value={domain}
-              placeholder="example.com"
-              status={domainError ? 'error' : undefined}
-              onChange={(event) => setDomain(event.target.value)}
-            />
-          </Block>
-          {domainError && <Message content={domainError} />}
-          <Block title="Default role" required>
-            <Select value={role} options={roleOptions} onChange={setRole} style={{ width: '100%' }} />
-          </Block>
-          <Message content="People with verified email addresses at this domain are created as DevLake users on first sign-in." />
-        </Modal>
-      )}
+      <CreateUserModal
+        open={modal === 'user'}
+        email={email}
+        role={role}
+        emailError={emailError}
+        operating={operating}
+        onEmailChange={setEmail}
+        onRoleChange={setRole}
+        onCancel={closeModal}
+        onSubmit={createUser}
+      />
+
+      <CreateDomainModal
+        open={modal === 'domain'}
+        domain={domain}
+        role={role}
+        domainError={domainError}
+        operating={operating}
+        onDomainChange={setDomain}
+        onRoleChange={setRole}
+        onCancel={closeModal}
+        onSubmit={createDomain}
+      />
     </PageHeader>
   );
 };
