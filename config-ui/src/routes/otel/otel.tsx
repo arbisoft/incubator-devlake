@@ -28,14 +28,19 @@ import { operator, type OperateConfig } from '@/utils';
 import { getOtelColumns } from './columns';
 import { OTEL_ERROR, OTEL_LIFECYCLE_ACTION } from './constants';
 import { OTEL_MODAL, OtelModals, type OtelLifecycleAction, type OtelModalState } from './modals';
-import { getOtelCreateError, getOtelLifecycleError } from './utils';
+import {
+  getOtelCreateError,
+  getOtelLifecycleError,
+  hasRecoveryRequired,
+  hasStorageNeedsApplying,
+  notifyOtelAttentionChanged,
+} from './utils';
 
+// Avoid importing PATHS here: config/paths imports the routes barrel, which also exports this module.
 const OTEL_PATH = `${import.meta.env.DEVLAKE_PATH_PREFIX ?? ''}/otel`;
 const BREADCRUMBS = [{ name: 'Claude Code OTel', path: OTEL_PATH }];
 
-type OtelOperationResult =
-  | { success: true; data: OtelConnectionResponse }
-  | { success: false; error: unknown };
+type OtelOperationResult = { success: true; data: OtelConnectionResponse } | { success: false; error: unknown };
 
 // Keep OTel lifecycle responses typed without changing the shared legacy operator contract.
 const operateOtel = async (
@@ -43,9 +48,7 @@ const operateOtel = async (
   config?: OperateConfig,
 ): Promise<OtelOperationResult> => {
   const [success, result] = await operator(request, config);
-  return success
-    ? { success: true, data: result as OtelConnectionResponse }
-    : { success: false, error: result };
+  return success ? { success: true, data: result as OtelConnectionResponse } : { success: false, error: result };
 };
 
 export const Otel = () => {
@@ -79,6 +82,7 @@ export const Otel = () => {
       setTeamName('');
       setModal(OTEL_MODAL.SNIPPET);
       refresh();
+      notifyOtelAttentionChanged();
       return;
     }
 
@@ -105,6 +109,7 @@ export const Otel = () => {
     const response = result.data;
     setCurrent(response);
     refresh();
+    notifyOtelAttentionChanged();
     const postActionHandlers: Partial<Record<OtelLifecycleAction, (response: OtelConnectionResponse) => boolean>> = {
       [OTEL_LIFECYCLE_ACTION.HIDE]: () => {
         setModal(undefined);
@@ -134,8 +139,11 @@ export const Otel = () => {
           Generate Claude Settings
         </Button>
       </Flex>
-      {dataSource.some((connection) => connection.recoveryRequired) && (
+      {hasRecoveryRequired(dataSource) && (
         <Message content="The Collector credential verifier is unavailable. Revoke the affected connection, then generate new Claude settings to restore telemetry." />
+      )}
+      {hasStorageNeedsApplying(dataSource) && (
+        <Message content="Credential storage differs from the registered credentials. Select Apply to reconcile the telemetry endpoint." />
       )}
       <Table
         rowKey={(record) => record.connection.id}

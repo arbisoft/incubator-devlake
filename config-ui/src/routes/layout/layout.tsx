@@ -26,6 +26,7 @@ import API from '@/api';
 import { PageLoading, Logo, ExternalLink } from '@/components';
 import { init, selectError, selectStatus } from '@/features';
 import { OnboardCard } from '@/routes/onboard/components';
+import { OtelAttention } from '@/routes/otel/attention';
 import { useAppDispatch, useAppSelector } from '@/hooks';
 
 import { menuItems, menuItemsMatch, headerItems } from './config';
@@ -178,6 +179,7 @@ export const Layout = () => {
         </Header>
         <Content style={{ overflowY: 'auto' }}>
           <div style={{ padding: 24, margin: '0 auto', maxWidth: 1280 }}>
+            <OtelAttention />
             <OnboardCard style={{ marginBottom: 32 }} />
             <Outlet />
           </div>
