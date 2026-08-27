@@ -23,7 +23,6 @@ import { Button, Flex, message, Table } from 'antd';
 import API from '@/api';
 import { type OtelConnectionResponse } from '@/api/otel';
 import { Message, PageHeader } from '@/components';
-import { PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
 import { operator, type OperateConfig } from '@/utils';
 import { getOtelColumns } from './columns';
@@ -37,7 +36,9 @@ import {
   notifyOtelAttentionChanged,
 } from './utils';
 
-const BREADCRUMBS = [{ name: 'Claude Code OTel', path: PATHS.OTEL() }];
+// Avoid importing PATHS here: config/paths imports the routes barrel, which also exports this module.
+const OTEL_PATH = `${import.meta.env.DEVLAKE_PATH_PREFIX ?? ''}/otel`;
+const BREADCRUMBS = [{ name: 'Claude Code OTel', path: OTEL_PATH }];
 
 type OtelOperationResult = { success: true; data: OtelConnectionResponse } | { success: false; error: unknown };
 
