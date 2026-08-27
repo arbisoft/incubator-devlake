@@ -40,7 +40,19 @@ const (
 	LargePageSize   = 50
 
 	invalidPageSizeMessage = "pageSize must be 10, 25, or 50"
+
+	ErrCodeDuplicateUser   = "DUPLICATE_USER"
+	ErrCodeDuplicateDomain = "DUPLICATE_DOMAIN"
+	ErrCodeInvalidUser     = "INVALID_USER"
+	ErrCodeInvalidDomain   = "INVALID_DOMAIN"
 )
+
+type ApiErrorResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Code    string `json:"code,omitempty"`
+}
+
 
 type AccessUser struct {
 	common.Model

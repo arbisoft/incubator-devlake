@@ -32,10 +32,26 @@ export const ACCESS_STATUS = {
 
 export type AccessStatus = (typeof ACCESS_STATUS)[keyof typeof ACCESS_STATUS];
 
+export const ACCESS_ERROR_CODE = {
+  DUPLICATE_USER: 'DUPLICATE_USER',
+  DUPLICATE_DOMAIN: 'DUPLICATE_DOMAIN',
+  INVALID_USER: 'INVALID_USER',
+  INVALID_DOMAIN: 'INVALID_DOMAIN',
+} as const;
+
+export type AccessErrorCode = (typeof ACCESS_ERROR_CODE)[keyof typeof ACCESS_ERROR_CODE];
+
+export type AccessApiErrorResponse = {
+  success: false;
+  message?: string;
+  code?: AccessErrorCode | string;
+};
+
 export type AccessCurrent = {
   enabled: boolean;
   role?: AccessRole;
 };
+
 
 export type AccessUser = {
   id: ID;

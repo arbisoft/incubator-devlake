@@ -370,12 +370,12 @@ func (s *Service) ListAuditEvents() ([]AuditEvent, errors.Error) {
 func (s *Service) CreateDomain(actor string, input AccessDomain) (*AccessDomain, errors.Error) {
 	domain := normalizeDomain(input.Domain)
 	if !validDomain(domain) || !validRole(input.DefaultRole) {
-		return nil, errors.BadInput.New("provide a valid domain and default role")
+		return nil, errors.BadInput.New("provide a valid domain and default role", errors.WithData(ErrCodeInvalidDomain))
 	}
 	existing := &AccessDomain{}
 	if err := s.db.First(existing, dal.Where("domain = ?", domain)); err == nil {
 		if existing.HiddenAt == nil {
-			return nil, errors.BadInput.New("this domain already has a DevLake access policy")
+			return nil, errors.BadInput.New("this domain already has a DevLake access policy", errors.WithData(ErrCodeDuplicateDomain))
 		}
 		existing.DefaultRole = input.DefaultRole
 		existing.Status = StatusActive
@@ -392,7 +392,7 @@ func (s *Service) CreateDomain(actor string, input AccessDomain) (*AccessDomain,
 	input.Status = StatusActive
 	if err := s.db.Create(&input); err != nil {
 		if s.db.IsDuplicationError(err) {
-			return nil, errors.BadInput.New("this domain already has a DevLake access policy")
+			return nil, errors.BadInput.New("this domain already has a DevLake access policy", errors.WithData(ErrCodeDuplicateDomain))
 		}
 		return nil, errors.Default.Wrap(err, "error creating access domain")
 	}
@@ -403,11 +403,11 @@ func (s *Service) CreateDomain(actor string, input AccessDomain) (*AccessDomain,
 func (s *Service) CreateUser(actor, email, role string) (*AccessUser, errors.Error) {
 	email = normalizeEmail(email)
 	if _, ok := emailDomain(email); !ok || !validRole(role) {
-		return nil, errors.BadInput.New("provide a valid email and role")
+		return nil, errors.BadInput.New("provide a valid email and role", errors.WithData(ErrCodeInvalidUser))
 	}
 	visible := &AccessUser{}
 	if err := s.db.First(visible, dal.Where("email = ? AND hidden_at IS NULL", email)); err == nil {
-		return nil, errors.BadInput.New("this email already has a DevLake access entry")
+		return nil, errors.BadInput.New("this email already has a DevLake access entry", errors.WithData(ErrCodeDuplicateUser))
 	} else if !s.db.IsErrorNotFound(err) {
 		return nil, errors.Default.Wrap(err, "error looking up access user")
 	}
@@ -431,7 +431,7 @@ func (s *Service) CreateUser(actor, email, role string) (*AccessUser, errors.Err
 	}
 	if err := s.db.Create(user); err != nil {
 		if s.db.IsDuplicationError(err) {
-			return nil, errors.BadInput.New("this email already has a DevLake access entry")
+			return nil, errors.BadInput.New("this email already has a DevLake access entry", errors.WithData(ErrCodeDuplicateUser))
 		}
 		return nil, errors.Default.Wrap(err, "error creating access user")
 	}
@@ -441,7 +441,7 @@ func (s *Service) CreateUser(actor, email, role string) (*AccessUser, errors.Err
 
 func (s *Service) UpdateDomain(actor string, id uint64, role, status string) (*AccessDomain, errors.Error) {
 	if !validRole(role) || !validStatus(status) {
-		return nil, errors.BadInput.New("provide a valid default role and status")
+		return nil, errors.BadInput.New("provide a valid default role and status", errors.WithData(ErrCodeInvalidDomain))
 	}
 	domain := &AccessDomain{}
 	if err := s.db.First(domain, dal.Where("id = ? AND hidden_at IS NULL", id)); err != nil {
@@ -471,7 +471,7 @@ func (s *Service) HideUser(actor string, id uint64) (*AccessUser, errors.Error) 
 
 func (s *Service) updateUser(actor string, id uint64, role, status string, hide bool) (*AccessUser, errors.Error) {
 	if !hide && (!validRole(role) || !validStatus(status)) {
-		return nil, errors.BadInput.New("provide a valid role and status")
+		return nil, errors.BadInput.New("provide a valid role and status", errors.WithData(ErrCodeInvalidUser))
 	}
 	tx := s.db.Begin()
 	committed := false

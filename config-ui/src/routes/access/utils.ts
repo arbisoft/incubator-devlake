@@ -18,7 +18,9 @@
 
 import axios, { HttpStatusCode } from 'axios';
 
-const ACCESS_ERROR = {
+import { ACCESS_ERROR_CODE, type AccessApiErrorResponse } from '@/api/access';
+
+export const ACCESS_ERROR = {
   DUPLICATE_DOMAIN: 'This domain already has a DevLake access policy.',
   DUPLICATE_USER: 'This email already has a DevLake access entry.',
   INVALID_DOMAIN: 'Enter a valid email domain and role, then try again.',
@@ -45,6 +47,13 @@ export const isValidEmail = (value: string) => {
   return at > 0 && at === email.lastIndexOf('@') && isValidDomain(email.slice(at + 1)) && !/\s/.test(email);
 };
 
+const extractErrorCode = (error: unknown): string | undefined => {
+  if (!axios.isAxiosError<AccessApiErrorResponse>(error) || error.response?.status !== HttpStatusCode.BadRequest) {
+    return undefined;
+  }
+  return typeof error.response.data?.code === 'string' ? error.response.data.code : undefined;
+};
+
 const serverMessage = (error: unknown) => {
   if (!axios.isAxiosError<{ message?: unknown }>(error) || error.response?.status !== HttpStatusCode.BadRequest) {
     return '';
@@ -53,13 +62,22 @@ const serverMessage = (error: unknown) => {
 };
 
 export const getCreateUserError = (error: unknown) => {
+  const code = extractErrorCode(error);
+  if (code === ACCESS_ERROR_CODE.DUPLICATE_USER) return ACCESS_ERROR.DUPLICATE_USER;
+  if (code === ACCESS_ERROR_CODE.INVALID_USER) return ACCESS_ERROR.INVALID_USER;
+
   const message = serverMessage(error);
   if (message.includes('this email already has a DevLake access entry')) return ACCESS_ERROR.DUPLICATE_USER;
   return message ? ACCESS_ERROR.INVALID_USER : ACCESS_ERROR.REQUEST_FAILED;
 };
 
 export const getCreateDomainError = (error: unknown) => {
+  const code = extractErrorCode(error);
+  if (code === ACCESS_ERROR_CODE.DUPLICATE_DOMAIN) return ACCESS_ERROR.DUPLICATE_DOMAIN;
+  if (code === ACCESS_ERROR_CODE.INVALID_DOMAIN) return ACCESS_ERROR.INVALID_DOMAIN;
+
   const message = serverMessage(error);
   if (message.includes('this domain already has a DevLake access policy')) return ACCESS_ERROR.DUPLICATE_DOMAIN;
   return message ? ACCESS_ERROR.INVALID_DOMAIN : ACCESS_ERROR.REQUEST_FAILED;
 };
+

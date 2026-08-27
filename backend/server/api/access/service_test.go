@@ -36,14 +36,66 @@ func TestOutputErrorUsesSafeBadInputMessage(t *testing.T) {
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
 	}
-	response := struct {
-		Message string `json:"message"`
-	}{}
+	response := ApiErrorResponse{}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if response.Message != "provide a valid email and role" {
 		t.Fatalf("message = %q, want safe validation message", response.Message)
+	}
+}
+
+func TestOutputErrorReturnsCode(t *testing.T) {
+	testCases := []struct {
+		name        string
+		err         errors.Error
+		wantStatus  int
+		wantMessage string
+		wantCode    string
+	}{
+		{
+			name:        "duplicate user code",
+			err:         errors.BadInput.New("this email already has a DevLake access entry", errors.WithData(ErrCodeDuplicateUser)),
+			wantStatus:  http.StatusBadRequest,
+			wantMessage: "this email already has a DevLake access entry",
+			wantCode:    ErrCodeDuplicateUser,
+		},
+		{
+			name:        "invalid domain code",
+			err:         errors.BadInput.New("provide a valid domain and default role", errors.WithData(ErrCodeInvalidDomain)),
+			wantStatus:  http.StatusBadRequest,
+			wantMessage: "provide a valid domain and default role",
+			wantCode:    ErrCodeInvalidDomain,
+		},
+		{
+			name:        "internal error returns safe message and no code",
+			err:         errors.Default.New("database connection failed", errors.WithData("INTERNAL_SECRET")),
+			wantStatus:  http.StatusInternalServerError,
+			wantMessage: "unable to process access request",
+			wantCode:    "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			context, _ := gin.CreateTestContext(recorder)
+			outputError(context, tc.err)
+
+			if recorder.Code != tc.wantStatus {
+				t.Fatalf("status = %d, want %d", recorder.Code, tc.wantStatus)
+			}
+			response := ApiErrorResponse{}
+			if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if response.Message != tc.wantMessage {
+				t.Fatalf("message = %q, want %q", response.Message, tc.wantMessage)
+			}
+			if response.Code != tc.wantCode {
+				t.Fatalf("code = %q, want %q", response.Code, tc.wantCode)
+			}
+		})
 	}
 }
 

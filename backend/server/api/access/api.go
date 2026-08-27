@@ -40,14 +40,21 @@ type currentResponse struct {
 func outputError(c *gin.Context, err errors.Error) {
 	status := err.GetType().GetHttpCode()
 	message := "unable to process access request"
+	var code string
 	if status >= http.StatusBadRequest && status < http.StatusInternalServerError {
+		if errData := err.GetData(); errData != nil {
+			if c, ok := errData.(string); ok {
+				code = c
+			}
+		}
 		if safeMessage := err.Messages().Get(); safeMessage != "" {
 			message = strings.TrimSuffix(safeMessage, fmt.Sprintf(" (%d)", status))
 		}
 	}
 	logruslog.Global.Error(err, "HTTP %d access API error", status)
-	c.JSON(status, &shared.ApiBody{Success: false, Message: message})
+	c.JSON(status, &ApiErrorResponse{Success: false, Message: message, Code: code})
 }
+
 
 func GetCurrent(c *gin.Context) {
 	service := Default()
@@ -85,7 +92,7 @@ func PostUser(c *gin.Context) {
 	}
 	input := CreateUserInput{}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		outputError(c, errors.BadInput.Wrap(err, "invalid access user"))
+		outputError(c, errors.BadInput.Wrap(err, "invalid access user", errors.WithData(ErrCodeInvalidUser)))
 		return
 	}
 	actor, _ := GetIdentity(c)
@@ -131,7 +138,7 @@ func PostDomain(c *gin.Context) {
 	}
 	input := CreateDomainInput{}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		outputError(c, errors.BadInput.Wrap(err, "invalid access domain"))
+		outputError(c, errors.BadInput.Wrap(err, "invalid access domain", errors.WithData(ErrCodeInvalidDomain)))
 		return
 	}
 	actor, _ := GetIdentity(c)
@@ -153,7 +160,7 @@ func PatchDomain(c *gin.Context) {
 	}
 	input := UpdateDomainInput{}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		outputError(c, errors.BadInput.Wrap(err, "invalid access domain update"))
+		outputError(c, errors.BadInput.Wrap(err, "invalid access domain update", errors.WithData(ErrCodeInvalidDomain)))
 		return
 	}
 	actor, _ := GetIdentity(c)
@@ -164,6 +171,7 @@ func PatchDomain(c *gin.Context) {
 	}
 	shared.ApiOutputSuccess(c, domain, http.StatusOK)
 }
+
 
 func HideDomain(c *gin.Context) {
 	if _, ok := requireAdmin(c); !ok {
@@ -192,7 +200,7 @@ func PatchUser(c *gin.Context) {
 	}
 	input := UpdateUserInput{}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		outputError(c, errors.BadInput.Wrap(err, "invalid access user update"))
+		outputError(c, errors.BadInput.Wrap(err, "invalid access user update", errors.WithData(ErrCodeInvalidUser)))
 		return
 	}
 	actor, _ := GetIdentity(c)

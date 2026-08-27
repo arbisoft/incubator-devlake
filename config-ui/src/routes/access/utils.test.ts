@@ -18,8 +18,27 @@
 
 import { equal } from 'node:assert/strict';
 import { test } from 'node:test';
+import { AxiosError, AxiosHeaders, HttpStatusCode } from 'axios';
 
-import { isValidDomain, isValidEmail, normalizeDomain } from './utils';
+import { ACCESS_ERROR_CODE } from '@/api/access';
+
+import {
+  ACCESS_ERROR,
+  getCreateDomainError,
+  getCreateUserError,
+  isValidDomain,
+  isValidEmail,
+  normalizeDomain,
+} from './utils';
+
+const createAxiosError = (status: number, data: unknown) =>
+  new AxiosError('Request failed', 'ERR_BAD_REQUEST', undefined, undefined, {
+    status,
+    statusText: status === 400 ? 'Bad Request' : 'Internal Server Error',
+    headers: {},
+    config: { headers: new AxiosHeaders() },
+    data,
+  });
 
 test('normalizes allowed-domain input before it is submitted', () => {
   equal(normalizeDomain(' Example.COM '), 'example.com');
@@ -43,3 +62,46 @@ test('rejects invalid email input locally', () => {
   equal(isValidEmail('person @example.com'), false);
   equal(isValidEmail('person@example..com'), false);
 });
+
+test('maps create-user error codes to safe UI copy', () => {
+  const duplicateErr = createAxiosError(HttpStatusCode.BadRequest, {
+    code: ACCESS_ERROR_CODE.DUPLICATE_USER,
+    message: 'this email already has a DevLake access entry',
+  });
+  equal(getCreateUserError(duplicateErr), ACCESS_ERROR.DUPLICATE_USER);
+
+  const invalidErr = createAxiosError(HttpStatusCode.BadRequest, {
+    code: ACCESS_ERROR_CODE.INVALID_USER,
+    message: 'provide a valid email and role',
+  });
+  equal(getCreateUserError(invalidErr), ACCESS_ERROR.INVALID_USER);
+
+  const serverErr = createAxiosError(HttpStatusCode.InternalServerError, {
+    message: 'internal server error',
+  });
+  equal(getCreateUserError(serverErr), ACCESS_ERROR.REQUEST_FAILED);
+
+  equal(getCreateUserError(new Error('network error')), ACCESS_ERROR.REQUEST_FAILED);
+});
+
+test('maps create-domain error codes to safe UI copy', () => {
+  const duplicateErr = createAxiosError(HttpStatusCode.BadRequest, {
+    code: ACCESS_ERROR_CODE.DUPLICATE_DOMAIN,
+    message: 'this domain already has a DevLake access policy',
+  });
+  equal(getCreateDomainError(duplicateErr), ACCESS_ERROR.DUPLICATE_DOMAIN);
+
+  const invalidErr = createAxiosError(HttpStatusCode.BadRequest, {
+    code: ACCESS_ERROR_CODE.INVALID_DOMAIN,
+    message: 'provide a valid domain and default role',
+  });
+  equal(getCreateDomainError(invalidErr), ACCESS_ERROR.INVALID_DOMAIN);
+
+  const serverErr = createAxiosError(HttpStatusCode.InternalServerError, {
+    message: 'internal server error',
+  });
+  equal(getCreateDomainError(serverErr), ACCESS_ERROR.REQUEST_FAILED);
+
+  equal(getCreateDomainError(new Error('network error')), ACCESS_ERROR.REQUEST_FAILED);
+});
+
