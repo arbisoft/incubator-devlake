@@ -35,6 +35,17 @@ import * as S from './styled';
 const SORT_START_WITH = ['o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'];
 const CLAUDE_PLUGIN = 'claude';
 
+interface StatusBadgeProps {
+  count: number;
+  color: string;
+  text: string;
+}
+
+const StatusBadge = ({ count, color, text }: StatusBadgeProps) => {
+  if (count <= 0) return null;
+  return <Badge color={color} text={text} />;
+};
+
 export const Connections = () => {
   const [type, setType] = useState<'list' | 'form'>();
   const [plugin, setPlugin] = useState('');
@@ -109,24 +120,21 @@ export const Connections = () => {
         otelCredentialSummary.restartRequired ||
         otelCredentialSummary.recoveryRequired ? (
           <span className="otel-credential-summary">
-            {otelCredentialSummary.active > 0 && (
-              <Badge
-                color={colorPrimary}
-                text={formatPlural(otelCredentialSummary.active, 'active credential')}
-              />
-            )}
-            {otelCredentialSummary.recoveryRequired > 0 && (
-              <Badge
-                color="#ff4d4f"
-                text={`${formatPlural(otelCredentialSummary.recoveryRequired, 'connection')} needing storage recovery`}
-              />
-            )}
-            {otelCredentialSummary.restartRequired > 0 && (
-              <Badge
-                color="#faad14"
-                text={`${formatPlural(otelCredentialSummary.restartRequired, 'connection')} requiring action`}
-              />
-            )}
+            <StatusBadge
+              count={otelCredentialSummary.active}
+              color={colorPrimary}
+              text={formatPlural(otelCredentialSummary.active, 'active credential')}
+            />
+            <StatusBadge
+              count={otelCredentialSummary.recoveryRequired}
+              color="#ff4d4f"
+              text={`${formatPlural(otelCredentialSummary.recoveryRequired, 'connection')} needing storage recovery`}
+            />
+            <StatusBadge
+              count={otelCredentialSummary.restartRequired}
+              color="#faad14"
+              text={`${formatPlural(otelCredentialSummary.restartRequired, 'connection')} requiring action`}
+            />
           </span>
         ) : (
           'No connection'
