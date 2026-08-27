@@ -18,6 +18,7 @@ limitations under the License.
 package api
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -56,10 +57,11 @@ type proxyAuthResponse struct {
 	Email         string `json:"email"`
 }
 
-func newProxyAuthRouter(secret string) *gin.Engine {
+func newProxyAuthRouter(secret string, accessDirectoryEnabled bool) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	cfg := viper.New()
 	cfg.Set("FORWARDED_USER_SECRET", secret)
+	cfg.Set("AUTH_ACCESS_ENABLED", accessDirectoryEnabled)
 	basicRes := &proxyAuthTestBasicRes{
 		cfg:    cfg,
 		logger: logruslog.Global,
@@ -100,7 +102,7 @@ func performProxyAuthRequest(t *testing.T, router *gin.Engine, headers map[strin
 }
 
 func TestOAuth2ProxyAuthenticationRejectsUntrustedForwardedHeaders(t *testing.T) {
-	router := newProxyAuthRouter("shared-secret")
+	router := newProxyAuthRouter("shared-secret", false)
 	cases := map[string]map[string]string{
 		"missing secret header": {
 			forwardedUserHeader:  "admin@example.com",
@@ -123,7 +125,7 @@ func TestOAuth2ProxyAuthenticationRejectsUntrustedForwardedHeaders(t *testing.T)
 }
 
 func TestOAuth2ProxyAuthenticationRequiresConfiguredSecret(t *testing.T) {
-	router := newProxyAuthRouter("")
+	router := newProxyAuthRouter("", false)
 	body := performProxyAuthRequest(t, router, map[string]string{
 		forwardedUserHeader:       "admin@example.com",
 		forwardedEmailHeader:      "admin@example.com",
@@ -135,7 +137,7 @@ func TestOAuth2ProxyAuthenticationRequiresConfiguredSecret(t *testing.T) {
 }
 
 func TestOAuth2ProxyAuthenticationAcceptsTrustedForwardedHeaders(t *testing.T) {
-	router := newProxyAuthRouter("shared-secret")
+	router := newProxyAuthRouter("shared-secret", false)
 	body := performProxyAuthRequest(t, router, map[string]string{
 		forwardedUserHeader:       "admin@example.com",
 		forwardedEmailHeader:      "admin@example.com",
@@ -143,5 +145,16 @@ func TestOAuth2ProxyAuthenticationAcceptsTrustedForwardedHeaders(t *testing.T) {
 	})
 	if !body.Authenticated || body.Name != "admin@example.com" || body.Email != "admin@example.com" {
 		t.Fatalf("expected trusted forwarded user, got %+v", body)
+	}
+}
+
+func TestOAuth2ProxyAuthenticationRejectsBasicAuthInDirectoryMode(t *testing.T) {
+	router := newProxyAuthRouter("shared-secret", true)
+	basicAuth := base64.StdEncoding.EncodeToString([]byte("anyone:anything"))
+	body := performProxyAuthRequest(t, router, map[string]string{
+		"Authorization": "Basic " + basicAuth,
+	})
+	if body.Authenticated {
+		t.Fatalf("expected legacy Basic identity to be ignored in access-directory mode, got %+v", body)
 	}
 }

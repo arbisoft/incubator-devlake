@@ -36,6 +36,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/apache/incubator-devlake/core/dal"
+	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/helpers/oidchelper"
 	"github.com/apache/incubator-devlake/impls/logruslog"
 	mockdal "github.com/apache/incubator-devlake/mocks/core/dal"
@@ -49,11 +50,12 @@ type fakeIdP struct {
 	keyID  string
 	issuer string
 
-	mu       sync.Mutex
-	lastCode string
-	subject  string
-	email    string
-	name     string
+	mu            sync.Mutex
+	lastCode      string
+	subject       string
+	email         string
+	name          string
+	emailVerified bool
 }
 
 func newFakeIdP(t *testing.T) *fakeIdP {
@@ -63,11 +65,12 @@ func newFakeIdP(t *testing.T) *fakeIdP {
 		t.Fatalf("rsa.GenerateKey: %v", err)
 	}
 	idp := &fakeIdP{
-		key:     key,
-		keyID:   "test-key",
-		subject: "user-123",
-		email:   "alice@example.com",
-		name:    "Alice",
+		key:           key,
+		keyID:         "test-key",
+		subject:       "user-123",
+		email:         "alice@example.com",
+		name:          "Alice",
+		emailVerified: true,
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/.well-known/openid-configuration", idp.handleDiscovery)
@@ -134,13 +137,14 @@ func (f *fakeIdP) handleToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tok := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
-		"iss":   f.issuer,
-		"aud":   clientID,
-		"sub":   f.subject,
-		"email": f.email,
-		"name":  f.name,
-		"iat":   time.Now().Unix(),
-		"exp":   time.Now().Add(5 * time.Minute).Unix(),
+		"iss":            f.issuer,
+		"aud":            clientID,
+		"sub":            f.subject,
+		"email":          f.email,
+		"email_verified": f.emailVerified,
+		"name":           f.name,
+		"iat":            time.Now().Unix(),
+		"exp":            time.Now().Add(5 * time.Minute).Unix(),
 	})
 	tok.Header["kid"] = f.keyID
 	signed, err := tok.SignedString(f.key)
@@ -325,6 +329,56 @@ func TestFullLoginCallbackFlow(t *testing.T) {
 	}
 	if userResp2.Authenticated {
 		t.Fatal("expected revoked session to no longer be authenticated")
+	}
+}
+
+func TestCallbackRejectsUnverifiedDirectoryEmail(t *testing.T) {
+	idp := newFakeIdP(t)
+	idp.emailVerified = false
+	s, _ := newTestService(t, idp)
+	authorizer := &testAccessAuthorizer{}
+	s.access = authorizer
+	r := newTestRouter(s)
+
+	loginW := httptest.NewRecorder()
+	r.ServeHTTP(loginW, httptest.NewRequest(http.MethodGet, PathLogin+"?provider=test", nil))
+	stateCookie := extractCookie(t, loginW.Result(), oidchelper.StateCookieName)
+	nonce := stateNonceFromCookie(t, s.cfg.SessionSecret, stateCookie.Value)
+
+	callbackW := httptest.NewRecorder()
+	callbackReq := httptest.NewRequest(http.MethodGet, PathCallback+"?code=fake-code&state="+url.QueryEscape(nonce), nil)
+	callbackReq.AddCookie(stateCookie)
+	r.ServeHTTP(callbackW, callbackReq)
+
+	if callbackW.Code != http.StatusForbidden {
+		t.Fatalf("callback: expected 403 for an unverified email, got %d: %s", callbackW.Code, callbackW.Body.String())
+	}
+	if len(authorizer.identities) != 0 {
+		t.Fatalf("expected unverified email to bypass directory admission, got %d lookups", len(authorizer.identities))
+	}
+}
+
+func TestCallbackRedirectsUnexpectedDirectoryFailure(t *testing.T) {
+	idp := newFakeIdP(t)
+	s, _ := newTestService(t, idp)
+	s.access = &testAccessAuthorizer{err: errors.Default.New("database unavailable")}
+	r := newTestRouter(s)
+
+	loginW := httptest.NewRecorder()
+	r.ServeHTTP(loginW, httptest.NewRequest(http.MethodGet, PathLogin+"?provider=test", nil))
+	stateCookie := extractCookie(t, loginW.Result(), oidchelper.StateCookieName)
+	nonce := stateNonceFromCookie(t, s.cfg.SessionSecret, stateCookie.Value)
+
+	callbackW := httptest.NewRecorder()
+	callbackReq := httptest.NewRequest(http.MethodGet, PathCallback+"?code=fake-code&state="+url.QueryEscape(nonce), nil)
+	callbackReq.AddCookie(stateCookie)
+	r.ServeHTTP(callbackW, callbackReq)
+
+	if callbackW.Code != http.StatusSeeOther {
+		t.Fatalf("callback: expected browser-safe redirect, got %d: %s", callbackW.Code, callbackW.Body.String())
+	}
+	if location := callbackW.Header().Get("Location"); location != "/login?error=access_denied" {
+		t.Fatalf("callback redirect = %q, want access-denied login", location)
 	}
 }
 

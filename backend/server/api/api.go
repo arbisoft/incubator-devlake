@@ -108,12 +108,14 @@ func CreateApiServer() *gin.Engine {
 	router.GET("/version", version.Get)
 
 	// Auth chain order matters: REST API key first (its own short-circuit),
-	// then OIDC session, then oauth2-proxy header (only sets USER if not yet
-	// set and the forwarded secret matches), then the terminal 401 gate,
-	// finally CSRF on unsafe methods.
+	// then OIDC session, then the terminal 401 gate, finally CSRF on unsafe
+	// methods. Legacy proxy/Basic identity fallback is incompatible with the
+	// access directory because it cannot prove directory admission.
 	router.Use(RestAuthentication(router, basicRes))
 	router.Use(auth.OIDCAuthentication())
-	router.Use(OAuth2ProxyAuthentication(basicRes))
+	if access.Default() == nil || !access.Default().Enabled() {
+		router.Use(OAuth2ProxyAuthentication(basicRes))
+	}
 	router.Use(auth.RequireAuth())
 	router.Use(auth.CSRFProtect())
 

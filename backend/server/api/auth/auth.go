@@ -111,7 +111,7 @@ func NewService(ctx stdctx.Context, basicRes corectx.BasicRes) (*Service, error)
 		return nil, err
 	}
 	if access.Default() != nil && access.Default().Enabled() {
-		if err := access.ValidateConfiguration(basicRes.GetConfigReader().GetString("FORWARDED_USER_SECRET")); err != nil {
+		if err := access.ValidateConfiguration(cfg.AuthEnabled, cfg.OIDCEnabled, basicRes.GetConfigReader().GetString("FORWARDED_USER_SECRET")); err != nil {
 			return nil, err
 		}
 	}
@@ -318,9 +318,13 @@ func (s *Service) Callback(c *gin.Context) {
 		return
 	}
 
-	sub, email, name, err := extractUser(idTok)
+	sub, email, name, emailVerified, err := extractUser(idTok)
 	if err != nil {
 		fail(c, http.StatusBadGateway, "extract claims", err)
+		return
+	}
+	if !emailVerified {
+		fail(c, http.StatusForbidden, "id_token email is not verified", nil)
 		return
 	}
 	if accessService := s.access; accessService != nil && accessService.Enabled() {
@@ -330,10 +334,10 @@ func (s *Service) Callback(c *gin.Context) {
 		}); accessErr != nil {
 			if accessErr.GetType() == errors.Unauthorized || accessErr.GetType() == errors.Forbidden {
 				s.logger.Info("oidc login denied: provider=%s email=%s", state.Provider, email)
-				c.Redirect(http.StatusSeeOther, "/login?error=access_denied")
-				return
+			} else {
+				s.logger.Error(accessErr, "oidc login authorization failed: provider=%s email=%s", state.Provider, email)
 			}
-			shared.ApiOutputError(c, accessErr)
+			c.Redirect(http.StatusSeeOther, "/login?error=access_denied")
 			return
 		}
 	} else if !s.cfg.IsUserAllowed(email) {
@@ -527,18 +531,19 @@ func safeReturnURL(raw string) string {
 // taken strictly from the `email` claim; we never coerce a username into
 // the email column. Display name falls back to preferred_username, then
 // email, so the UI always has *something* to render.
-func extractUser(tok *oidc.IDToken) (sub, email, name string, err error) {
+func extractUser(tok *oidc.IDToken) (sub, email, name string, emailVerified bool, err error) {
 	var claims struct {
 		Sub               string `json:"sub"`
 		Email             string `json:"email"`
+		EmailVerified     bool   `json:"email_verified"`
 		PreferredUsername string `json:"preferred_username"`
 		Name              string `json:"name"`
 	}
 	if err := tok.Claims(&claims); err != nil {
-		return "", "", "", err
+		return "", "", "", false, err
 	}
 	if claims.Sub == "" {
-		return "", "", "", fmt.Errorf("id_token missing sub claim")
+		return "", "", "", false, fmt.Errorf("id_token missing sub claim")
 	}
 	name = claims.Name
 	if name == "" {
@@ -547,7 +552,7 @@ func extractUser(tok *oidc.IDToken) (sub, email, name string, err error) {
 	if name == "" {
 		name = claims.Email
 	}
-	return claims.Sub, claims.Email, name, nil
+	return claims.Sub, claims.Email, name, claims.EmailVerified, nil
 }
 
 func pkceChallenge(verifier string) string {

@@ -64,6 +64,8 @@ func TestRestAuthKeyReachesHandlerWhenAuthEnabled(t *testing.T) {
 	// apikeyhelper reads ENCRYPTION_SECRET from the global viper config.
 	const encryptionSecret = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" // 32 bytes
 	config.GetConfig().Set("ENCRYPTION_SECRET", encryptionSecret)
+	config.GetConfig().Set("FORWARDED_USER_SECRET", "shared-secret")
+	t.Cleanup(func() { config.GetConfig().Set("FORWARDED_USER_SECRET", "") })
 
 	basicRes := contextimpl.NewDefaultBasicRes(config.GetConfig(), logruslog.Global, nil)
 	helper := apikeyhelper.NewApiKeyHelper(basicRes, logruslog.Global)
@@ -82,7 +84,7 @@ func TestRestAuthKeyReachesHandlerWhenAuthEnabled(t *testing.T) {
 			dst := args.Get(0).(*coremodels.ApiKey)
 			dst.ApiKey = hashedKey
 			dst.AllowedPath = `/plugins/webhook/connections/1/.*`
-			dst.Creator = common.Creator{Creator: "test-user"}
+			dst.Creator = common.Creator{Creator: "test-user", CreatorEmail: "test-user@example.com"}
 		}).
 		Return(nil)
 
@@ -90,18 +92,30 @@ func TestRestAuthKeyReachesHandlerWhenAuthEnabled(t *testing.T) {
 
 	router := gin.New()
 	router.Use(RestAuthentication(router, basicRes))
+	router.Use(OAuth2ProxyAuthentication(basicRes))
 	router.Use(requireUserGate())
 	router.POST("/plugins/webhook/connections/:id/deployments", func(c *gin.Context) {
-		c.Status(http.StatusOK)
+		user, ok := shared.GetUser(c)
+		if !ok {
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+		c.String(http.StatusOK, user.Email)
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/rest/plugins/webhook/connections/1/deployments", nil)
 	req.Header.Set("Authorization", "Bearer "+plaintext)
+	req.Header.Set(forwardedUserHeader, "proxy-user")
+	req.Header.Set(forwardedEmailHeader, "proxy@example.com")
+	req.Header.Set(forwardedUserSecretHeader, "shared-secret")
 	resp := httptest.NewRecorder()
 	router.ServeHTTP(resp, req)
 
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200 with valid REST API key when auth gate is active, got %d: %s",
 			resp.Code, resp.Body.String())
+	}
+	if got := resp.Body.String(); got != "test-user@example.com" {
+		t.Fatalf("expected REST API-key identity to survive rerouting, got %q", got)
 	}
 }

@@ -84,14 +84,19 @@ func SetSessionRevoker(revoker SessionRevoker) {
 
 func (s *Service) Enabled() bool { return s != nil && s.cfg.Enabled }
 
-// ValidateConfiguration rejects the legacy trusted-proxy identity path when
-// the access directory is enabled, because that path does not consult the
-// directory before authenticating a request.
-func ValidateConfiguration(forwardedUserSecret string) error {
-	if strings.TrimSpace(forwardedUserSecret) == "" {
-		return nil
+// ValidateConfiguration ensures access-directory admission is backed by native
+// OIDC only, rather than a legacy proxy identity that cannot consult the directory.
+func ValidateConfiguration(authEnabled, oidcEnabled bool, forwardedUserSecret string) error {
+	if !authEnabled {
+		return fmt.Errorf("AUTH_ACCESS_ENABLED=true requires AUTH_ENABLED=true")
 	}
-	return fmt.Errorf("AUTH_ACCESS_ENABLED=true cannot be combined with FORWARDED_USER_SECRET; remove trusted oauth2-proxy forwarded identity authentication before enabling the access directory")
+	if !oidcEnabled {
+		return fmt.Errorf("AUTH_ACCESS_ENABLED=true requires OIDC_ENABLED=true")
+	}
+	if strings.TrimSpace(forwardedUserSecret) != "" {
+		return fmt.Errorf("AUTH_ACCESS_ENABLED=true cannot be combined with FORWARDED_USER_SECRET; remove trusted oauth2-proxy forwarded identity authentication before enabling the access directory")
+	}
+	return nil
 }
 
 func SetIdentity(c *gin.Context, identity Identity) { c.Set(identityContextKey, identity) }
@@ -150,7 +155,15 @@ func (s *Service) Authorize(identity Identity) (*Principal, errors.Error) {
 		}
 		if createErr := s.db.Create(user); createErr != nil {
 			if s.db.IsDuplicationError(createErr) {
-				return s.Authorize(identity)
+				existing := &AccessUser{}
+				lookupErr := s.db.First(existing, dal.Where("issuer = ? AND subject = ?", identity.Issuer, identity.Subject))
+				if lookupErr == nil {
+					return s.authorizeExistingUser(existing, identity)
+				}
+				if s.db.IsErrorNotFound(lookupErr) {
+					return nil, errors.Default.New("domain-authorized user was not available after duplicate identity creation")
+				}
+				return nil, errors.Default.Wrap(lookupErr, "error reading domain-authorized user after duplicate identity creation")
 			}
 			return nil, errors.Default.Wrap(createErr, "error creating domain-authorized user")
 		}

@@ -21,7 +21,6 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
-	"github.com/apache/incubator-devlake/core/log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -30,6 +29,7 @@ import (
 	"github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/core/log"
 	"github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/helpers/apikeyhelper"
 	"github.com/apache/incubator-devlake/server/api/shared"
@@ -92,10 +92,15 @@ func getBasicAuthUserInfo(c *gin.Context, basicRes context.BasicRes) (*common.Us
 
 func OAuth2ProxyAuthentication(basicRes context.BasicRes) gin.HandlerFunc {
 	logger := basicRes.GetLogger()
-	forwardedUserSecret := strings.TrimSpace(basicRes.GetConfigReader().GetString("FORWARDED_USER_SECRET"))
+	configReader := basicRes.GetConfigReader()
+	forwardedUserSecret := strings.TrimSpace(configReader.GetString("FORWARDED_USER_SECRET"))
+	accessDirectoryEnabled := configReader.GetBool("AUTH_ACCESS_ENABLED")
 	return func(c *gin.Context) {
-		_, exist := c.Get(common.USER)
-		if !exist {
+		if accessDirectoryEnabled {
+			c.Next()
+			return
+		}
+		if _, exists := shared.GetUser(c); !exists {
 			user, err := getOAuthUserInfo(c, forwardedUserSecret)
 			if err != nil {
 				logger.Warn(err, "rejected forwarded user headers")

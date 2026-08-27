@@ -22,17 +22,21 @@ import "testing"
 func TestValidateConfiguration(t *testing.T) {
 	testCases := []struct {
 		name                string
+		authEnabled         bool
+		oidcEnabled         bool
 		forwardedUserSecret string
 		wantError           bool
 	}{
-		{name: "unset"},
-		{name: "whitespace only", forwardedUserSecret: " \t\n"},
-		{name: "configured", forwardedUserSecret: "shared-secret", wantError: true},
+		{name: "native OIDC", authEnabled: true, oidcEnabled: true},
+		{name: "whitespace only", authEnabled: true, oidcEnabled: true, forwardedUserSecret: " \t\n"},
+		{name: "auth disabled", oidcEnabled: true, wantError: true},
+		{name: "OIDC disabled", authEnabled: true, wantError: true},
+		{name: "forwarded secret configured", authEnabled: true, oidcEnabled: true, forwardedUserSecret: "shared-secret", wantError: true},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			err := ValidateConfiguration(testCase.forwardedUserSecret)
+			err := ValidateConfiguration(testCase.authEnabled, testCase.oidcEnabled, testCase.forwardedUserSecret)
 			if (err != nil) != testCase.wantError {
 				t.Fatalf("ValidateConfiguration() error = %v, wantError %v", err, testCase.wantError)
 			}
