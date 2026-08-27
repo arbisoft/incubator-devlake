@@ -55,7 +55,6 @@ func outputError(c *gin.Context, err errors.Error) {
 	c.JSON(status, &ApiErrorResponse{Success: false, Message: message, Code: code})
 }
 
-
 func GetCurrent(c *gin.Context) {
 	service := Default()
 	if service == nil || !service.Enabled() {
@@ -171,7 +170,6 @@ func PatchDomain(c *gin.Context) {
 	}
 	shared.ApiOutputSuccess(c, domain, http.StatusOK)
 }
-
 
 func HideDomain(c *gin.Context) {
 	if _, ok := requireAdmin(c); !ok {

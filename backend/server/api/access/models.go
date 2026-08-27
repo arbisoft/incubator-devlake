@@ -53,7 +53,6 @@ type ApiErrorResponse struct {
 	Code    string `json:"code,omitempty"`
 }
 
-
 type AccessUser struct {
 	common.Model
 	Issuer      string     `gorm:"type:varchar(512);uniqueIndex:idx_auth_access_identity" json:"issuer"`
