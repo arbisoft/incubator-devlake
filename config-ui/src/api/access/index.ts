@@ -93,10 +93,13 @@ export const createUser = (data: { email: string; role: AccessRole }): Promise<A
   request(`${basePath}/users`, { method: 'POST', data });
 export const updateUser = (id: ID, data: { role: AccessRole; status: AccessStatus }): Promise<AccessUser> =>
   request(`${basePath}/users/${id}`, { method: 'PATCH', data });
+export const hideUser = (id: ID): Promise<AccessUser> => request(`${basePath}/users/${id}/hide`, { method: 'POST' });
 export const listDomains = (params: AccessPagination): Promise<PaginatedAccessDomains> =>
   request(`${basePath}/domains`, { data: params });
 export const createDomain = (data: { domain: string; defaultRole: AccessRole }): Promise<AccessDomain> =>
   request(`${basePath}/domains`, { method: 'POST', data });
 export const updateDomain = (id: ID, data: { defaultRole: AccessRole; status: AccessStatus }): Promise<AccessDomain> =>
   request(`${basePath}/domains/${id}`, { method: 'PATCH', data });
+export const hideDomain = (id: ID): Promise<AccessDomain> =>
+  request(`${basePath}/domains/${id}/hide`, { method: 'POST' });
 export const listAuditEvents = (): Promise<AccessAuditEvent[]> => request(`${basePath}/audit-events`);

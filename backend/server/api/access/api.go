@@ -18,18 +18,35 @@ limitations under the License.
 package access
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/impls/logruslog"
 	"github.com/apache/incubator-devlake/server/api/shared"
 )
 
 type currentResponse struct {
 	Enabled bool   `json:"enabled"`
 	Role    string `json:"role,omitempty"`
+}
+
+// outputError keeps access-directory validation messages useful without exposing
+// stack traces when local development enables them globally.
+func outputError(c *gin.Context, err errors.Error) {
+	status := err.GetType().GetHttpCode()
+	message := "unable to process access request"
+	if status >= http.StatusBadRequest && status < http.StatusInternalServerError {
+		if safeMessage := err.Messages().Get(); safeMessage != "" {
+			message = strings.TrimSuffix(safeMessage, fmt.Sprintf(" (%d)", status))
+		}
+	}
+	logruslog.Global.Error(err, "HTTP %d access API error", status)
+	c.JSON(status, &shared.ApiBody{Success: false, Message: message})
 }
 
 func GetCurrent(c *gin.Context) {
@@ -40,7 +57,7 @@ func GetCurrent(c *gin.Context) {
 	}
 	principal, err := service.CurrentPrincipal(c)
 	if err != nil {
-		shared.ApiOutputError(c, err)
+		outputError(c, err)
 		return
 	}
 	shared.ApiOutputSuccess(c, currentResponse{Enabled: true, Role: principal.Role}, http.StatusOK)
@@ -56,7 +73,7 @@ func ListUsers(c *gin.Context) {
 	}
 	users, err := Default().ListUsers(query)
 	if err != nil {
-		shared.ApiOutputError(c, err)
+		outputError(c, err)
 		return
 	}
 	shared.ApiOutputSuccess(c, users, http.StatusOK)
@@ -68,13 +85,13 @@ func PostUser(c *gin.Context) {
 	}
 	input := CreateUserInput{}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		shared.ApiOutputError(c, errors.BadInput.Wrap(err, "invalid access user"))
+		outputError(c, errors.BadInput.Wrap(err, "invalid access user"))
 		return
 	}
 	actor, _ := GetIdentity(c)
 	user, err := Default().CreateUser(actor.Email, input.Email, input.Role)
 	if err != nil {
-		shared.ApiOutputError(c, err)
+		outputError(c, err)
 		return
 	}
 	shared.ApiOutputSuccess(c, user, http.StatusCreated)
@@ -90,7 +107,7 @@ func ListDomains(c *gin.Context) {
 	}
 	domains, err := Default().ListDomains(query)
 	if err != nil {
-		shared.ApiOutputError(c, err)
+		outputError(c, err)
 		return
 	}
 	shared.ApiOutputSuccess(c, domains, http.StatusOK)
@@ -102,7 +119,7 @@ func ListAuditEvents(c *gin.Context) {
 	}
 	events, err := Default().ListAuditEvents()
 	if err != nil {
-		shared.ApiOutputError(c, err)
+		outputError(c, err)
 		return
 	}
 	shared.ApiOutputSuccess(c, events, http.StatusOK)
@@ -114,13 +131,13 @@ func PostDomain(c *gin.Context) {
 	}
 	input := CreateDomainInput{}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		shared.ApiOutputError(c, errors.BadInput.Wrap(err, "invalid access domain"))
+		outputError(c, errors.BadInput.Wrap(err, "invalid access domain"))
 		return
 	}
 	actor, _ := GetIdentity(c)
 	domain, err := Default().CreateDomain(actor.Email, AccessDomain{Domain: input.Domain, DefaultRole: input.DefaultRole})
 	if err != nil {
-		shared.ApiOutputError(c, err)
+		outputError(c, err)
 		return
 	}
 	shared.ApiOutputSuccess(c, domain, http.StatusCreated)
@@ -130,20 +147,36 @@ func PatchDomain(c *gin.Context) {
 	if _, ok := requireAdmin(c); !ok {
 		return
 	}
-	id, parseErr := strconv.ParseUint(c.Param("id"), 10, 64)
-	if parseErr != nil || id == 0 {
-		shared.ApiOutputError(c, errors.BadInput.New("invalid access domain id"))
+	id, ok := accessID(c, "domain")
+	if !ok {
 		return
 	}
 	input := UpdateDomainInput{}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		shared.ApiOutputError(c, errors.BadInput.Wrap(err, "invalid access domain update"))
+		outputError(c, errors.BadInput.Wrap(err, "invalid access domain update"))
 		return
 	}
 	actor, _ := GetIdentity(c)
 	domain, err := Default().UpdateDomain(actor.Email, id, input.DefaultRole, input.Status)
 	if err != nil {
-		shared.ApiOutputError(c, err)
+		outputError(c, err)
+		return
+	}
+	shared.ApiOutputSuccess(c, domain, http.StatusOK)
+}
+
+func HideDomain(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	id, ok := accessID(c, "domain")
+	if !ok {
+		return
+	}
+	actor, _ := GetIdentity(c)
+	domain, err := Default().HideDomain(actor.Email, id)
+	if err != nil {
+		outputError(c, err)
 		return
 	}
 	shared.ApiOutputSuccess(c, domain, http.StatusOK)
@@ -153,20 +186,36 @@ func PatchUser(c *gin.Context) {
 	if _, ok := requireAdmin(c); !ok {
 		return
 	}
-	id, parseErr := strconv.ParseUint(c.Param("id"), 10, 64)
-	if parseErr != nil || id == 0 {
-		shared.ApiOutputError(c, errors.BadInput.New("invalid access user id"))
+	id, ok := accessID(c, "user")
+	if !ok {
 		return
 	}
 	input := UpdateUserInput{}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		shared.ApiOutputError(c, errors.BadInput.Wrap(err, "invalid access user update"))
+		outputError(c, errors.BadInput.Wrap(err, "invalid access user update"))
 		return
 	}
 	actor, _ := GetIdentity(c)
 	user, err := Default().UpdateUser(actor.Email, id, input.Role, input.Status)
 	if err != nil {
-		shared.ApiOutputError(c, err)
+		outputError(c, err)
+		return
+	}
+	shared.ApiOutputSuccess(c, user, http.StatusOK)
+}
+
+func HideUser(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	id, ok := accessID(c, "user")
+	if !ok {
+		return
+	}
+	actor, _ := GetIdentity(c)
+	user, err := Default().HideUser(actor.Email, id)
+	if err != nil {
+		outputError(c, err)
 		return
 	}
 	shared.ApiOutputSuccess(c, user, http.StatusOK)
@@ -175,7 +224,7 @@ func PatchUser(c *gin.Context) {
 func requireAdmin(c *gin.Context) (*Principal, bool) {
 	principal, err := Default().RequireAdmin(c)
 	if err != nil {
-		shared.ApiOutputError(c, err)
+		outputError(c, err)
 		return nil, false
 	}
 	return principal, true
@@ -184,13 +233,22 @@ func requireAdmin(c *gin.Context) (*Principal, bool) {
 func listQuery(c *gin.Context) (PageQuery, bool) {
 	query := PageQuery{}
 	if err := c.ShouldBindQuery(&query); err != nil {
-		shared.ApiOutputError(c, errors.BadInput.Wrap(err, "invalid access list query"))
+		outputError(c, errors.BadInput.Wrap(err, "invalid access list query"))
 		return PageQuery{}, false
 	}
 	query, valid := query.Normalize()
 	if !valid {
-		shared.ApiOutputError(c, errors.BadInput.New(invalidPageSizeMessage))
+		outputError(c, errors.BadInput.New(invalidPageSizeMessage))
 		return PageQuery{}, false
 	}
 	return query, true
+}
+
+func accessID(c *gin.Context, resource string) (uint64, bool) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		outputError(c, errors.BadInput.New("invalid access "+resource+" id"))
+		return 0, false
+	}
+	return id, true
 }

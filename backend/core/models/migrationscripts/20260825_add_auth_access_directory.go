@@ -39,6 +39,7 @@ type authAccessUser20260825 struct {
 	Status      string `gorm:"type:varchar(32);index"`
 	LastLoginAt *time.Time
 	DisabledAt  *time.Time
+	HiddenAt    *time.Time
 }
 
 func (authAccessUser20260825) TableName() string { return "auth_access_users" }
@@ -48,6 +49,7 @@ type authAccessDomain20260825 struct {
 	Domain      string `gorm:"type:varchar(255);uniqueIndex"`
 	DefaultRole string `gorm:"type:varchar(32)"`
 	Status      string `gorm:"type:varchar(32);index"`
+	HiddenAt    *time.Time
 }
 
 func (authAccessDomain20260825) TableName() string { return "auth_access_domains" }

@@ -17,8 +17,8 @@
  */
 
 import { useState } from 'react';
-import { Button, Input, Modal, Select, Table, Tag } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { Button, Input, Modal, Popconfirm, Select, Space, Table, Tag, Tooltip } from 'antd';
+import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 
 import API from '@/api';
 import { Block, Message, PageHeader } from '@/components';
@@ -27,7 +27,6 @@ import { operator } from '@/utils';
 import {
   ACCESS_ROLE,
   ACCESS_STATUS,
-  type AccessAuditEvent,
   type AccessDomain,
   type AccessRole,
   type AccessStatus,
@@ -36,7 +35,7 @@ import {
 
 import { ACCESS_PATH, ACCESS_STATUS_COLOR, DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from './constants';
 import { SectionHeader, SectionTitle } from './styled';
-import { isValidDomain, normalizeDomain } from './utils';
+import { getCreateDomainError, getCreateUserError, isValidDomain, isValidEmail, normalizeDomain } from './utils';
 
 const roleOptions = [
   { value: ACCESS_ROLE.MEMBER, label: 'Member' },
@@ -69,6 +68,8 @@ export const Access = () => {
   const normalizedDomain = normalizeDomain(domain);
   const domainError =
     domain.length > 0 && !isValidDomain(domain) ? 'Enter a valid email domain, such as example.com.' : '';
+  const emailError =
+    email.length > 0 && !isValidEmail(email) ? 'Enter a valid email address, such as person@example.com.' : '';
 
   const refresh = () => setVersion((current) => current + 1);
   const closeModal = () => {
@@ -79,7 +80,10 @@ export const Access = () => {
   };
 
   const createUser = async () => {
-    const [success] = await operator(() => API.access.createUser({ email, role }), { setOperating });
+    const [success] = await operator(() => API.access.createUser({ email: email.trim().toLowerCase(), role }), {
+      setOperating,
+      formatReason: getCreateUserError,
+    });
     if (success) {
       closeModal();
       refresh();
@@ -89,6 +93,7 @@ export const Access = () => {
   const createDomain = async () => {
     const [success] = await operator(() => API.access.createDomain({ domain: normalizedDomain, defaultRole: role }), {
       setOperating,
+      formatReason: getCreateDomainError,
     });
     if (success) {
       closeModal();
@@ -117,6 +122,16 @@ export const Access = () => {
     const [success] = await operator(() =>
       API.access.updateDomain(accessDomain.id, { defaultRole: nextRole, status: accessDomain.status }),
     );
+    if (success) refresh();
+  };
+
+  const hideUser = async (user: AccessUser) => {
+    const [success] = await operator(() => API.access.hideUser(user.id));
+    if (success) refresh();
+  };
+
+  const hideDomain = async (accessDomain: AccessDomain) => {
+    const [success] = await operator(() => API.access.hideDomain(accessDomain.id));
     if (success) refresh();
   };
 
@@ -181,17 +196,33 @@ export const Access = () => {
           {
             title: '',
             key: 'actions',
-            width: 120,
+            width: 160,
             render: (_: unknown, user: AccessUser) => (
-              <Button
-                size="small"
-                danger={user.status === ACCESS_STATUS.ACTIVE}
-                onClick={() =>
-                  updateUser(user, user.status === ACCESS_STATUS.ACTIVE ? ACCESS_STATUS.DISABLED : ACCESS_STATUS.ACTIVE)
-                }
-              >
-                {user.status === ACCESS_STATUS.ACTIVE ? 'Disable' : 'Enable'}
-              </Button>
+              <Space size="small">
+                <Button
+                  size="small"
+                  danger={user.status === ACCESS_STATUS.ACTIVE}
+                  onClick={() =>
+                    updateUser(
+                      user,
+                      user.status === ACCESS_STATUS.ACTIVE ? ACCESS_STATUS.DISABLED : ACCESS_STATUS.ACTIVE,
+                    )
+                  }
+                >
+                  {user.status === ACCESS_STATUS.ACTIVE ? 'Disable' : 'Enable'}
+                </Button>
+                <Popconfirm
+                  title="Remove this person from User Management?"
+                  description="Their DevLake access will be disabled and the record will remain in audit history."
+                  okText="Remove"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() => hideUser(user)}
+                >
+                  <Tooltip title="Remove person from User Management">
+                    <Button type="text" danger icon={<DeleteOutlined />} aria-label="Remove person" />
+                  </Tooltip>
+                </Popconfirm>
+              </Space>
             ),
           },
         ]}
@@ -247,20 +278,33 @@ export const Access = () => {
           {
             title: '',
             key: 'actions',
-            width: 120,
+            width: 160,
             render: (_: unknown, accessDomain: AccessDomain) => (
-              <Button
-                size="small"
-                danger={accessDomain.status === ACCESS_STATUS.ACTIVE}
-                onClick={() =>
-                  updateDomain(
-                    accessDomain,
-                    accessDomain.status === ACCESS_STATUS.ACTIVE ? ACCESS_STATUS.DISABLED : ACCESS_STATUS.ACTIVE,
-                  )
-                }
-              >
-                {accessDomain.status === ACCESS_STATUS.ACTIVE ? 'Disable' : 'Enable'}
-              </Button>
+              <Space size="small">
+                <Button
+                  size="small"
+                  danger={accessDomain.status === ACCESS_STATUS.ACTIVE}
+                  onClick={() =>
+                    updateDomain(
+                      accessDomain,
+                      accessDomain.status === ACCESS_STATUS.ACTIVE ? ACCESS_STATUS.DISABLED : ACCESS_STATUS.ACTIVE,
+                    )
+                  }
+                >
+                  {accessDomain.status === ACCESS_STATUS.ACTIVE ? 'Disable' : 'Enable'}
+                </Button>
+                <Popconfirm
+                  title="Remove this domain from User Management?"
+                  description="New sign-ins from this domain will no longer be provisioned. The record will remain in audit history."
+                  okText="Remove"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() => hideDomain(accessDomain)}
+                >
+                  <Tooltip title="Remove domain from User Management">
+                    <Button type="text" danger icon={<DeleteOutlined />} aria-label="Remove domain" />
+                  </Tooltip>
+                </Popconfirm>
+              </Space>
             ),
           },
         ]}
@@ -301,11 +345,17 @@ export const Access = () => {
           onCancel={closeModal}
           onOk={createUser}
           okText="Add"
-          okButtonProps={{ loading: operating, disabled: !email }}
+          okButtonProps={{ loading: operating, disabled: !isValidEmail(email) }}
         >
           <Block title="Email" required>
-            <Input value={email} placeholder="person@example.com" onChange={(event) => setEmail(event.target.value)} />
+            <Input
+              value={email}
+              placeholder="person@example.com"
+              status={emailError ? 'error' : undefined}
+              onChange={(event) => setEmail(event.target.value)}
+            />
           </Block>
+          {emailError && <Message content={emailError} />}
           <Block title="Role" required>
             <Select value={role} options={roleOptions} onChange={setRole} style={{ width: '100%' }} />
           </Block>

@@ -142,7 +142,7 @@ func (s *Service) Authorize(identity Identity) (*Principal, errors.Error) {
 		return nil, errors.Unauthorized.New("verified email is invalid")
 	}
 	accessDomain := &AccessDomain{}
-	err = s.db.First(accessDomain, dal.Where("domain = ?", domain))
+	err = s.db.First(accessDomain, dal.Where("domain = ? AND hidden_at IS NULL", domain))
 	if err == nil && accessDomain.Status == StatusActive {
 		user = &AccessUser{
 			Issuer: identity.Issuer, Subject: identity.Subject, Email: identity.Email,
@@ -232,7 +232,7 @@ func (s *Service) claimInvitation(identity Identity) (*AccessUser, bool, errors.
 	}()
 
 	invitation := &AccessUser{}
-	err := tx.First(invitation, dal.Where("issuer = ? AND subject = ?", "", invitationSubject(identity.Email)))
+	err := tx.First(invitation, dal.Where("issuer = ? AND subject = ? AND hidden_at IS NULL", "", invitationSubject(identity.Email)))
 	if err != nil {
 		if tx.IsErrorNotFound(err) {
 			return nil, false, nil
@@ -269,7 +269,7 @@ func (s *Service) claimInvitation(identity Identity) (*AccessUser, bool, errors.
 }
 
 func (s *Service) authorizeExistingUser(user *AccessUser, identity Identity) (*Principal, errors.Error) {
-	if user.Status != StatusActive {
+	if user.HiddenAt != nil || user.Status != StatusActive {
 		return nil, errors.Unauthorized.New("this account is disabled")
 	}
 	now := time.Now()
@@ -310,7 +310,7 @@ func (s *Service) AuthorizeSession(identity Identity) (*Principal, errors.Error)
 		}
 		return nil, errors.Default.Wrap(err, "error looking up current access user")
 	}
-	if user.Status != StatusActive {
+	if user.HiddenAt != nil || user.Status != StatusActive {
 		return nil, errors.Unauthorized.New("this account is disabled")
 	}
 	return &Principal{UserID: user.ID, Role: user.Role}, nil
@@ -332,12 +332,12 @@ func (s *Service) ListUsers(query PageQuery) (*PaginatedUsers, errors.Error) {
 	if !valid {
 		return nil, errors.BadInput.New(invalidPageSizeMessage)
 	}
-	count, err := s.db.Count(dal.From(&AccessUser{}))
+	count, err := s.db.Count(dal.From(&AccessUser{}), dal.Where("hidden_at IS NULL"))
 	if err != nil {
 		return nil, errors.Default.Wrap(err, "error counting access users")
 	}
 	users := make([]AccessUser, 0)
-	if err := s.db.All(&users, dal.Orderby("email ASC"), dal.Offset(query.Offset()), dal.Limit(query.PageSize)); err != nil {
+	if err := s.db.All(&users, dal.Where("hidden_at IS NULL"), dal.Orderby("email ASC"), dal.Offset(query.Offset()), dal.Limit(query.PageSize)); err != nil {
 		return nil, errors.Default.Wrap(err, "error listing access users")
 	}
 	return &PaginatedUsers{Users: users, Count: count, Page: query.Page, PageSize: query.PageSize}, nil
@@ -348,12 +348,12 @@ func (s *Service) ListDomains(query PageQuery) (*PaginatedDomains, errors.Error)
 	if !valid {
 		return nil, errors.BadInput.New(invalidPageSizeMessage)
 	}
-	count, err := s.db.Count(dal.From(&AccessDomain{}))
+	count, err := s.db.Count(dal.From(&AccessDomain{}), dal.Where("hidden_at IS NULL"))
 	if err != nil {
 		return nil, errors.Default.Wrap(err, "error counting access domains")
 	}
 	domains := make([]AccessDomain, 0)
-	if err := s.db.All(&domains, dal.Orderby("domain ASC"), dal.Offset(query.Offset()), dal.Limit(query.PageSize)); err != nil {
+	if err := s.db.All(&domains, dal.Where("hidden_at IS NULL"), dal.Orderby("domain ASC"), dal.Offset(query.Offset()), dal.Limit(query.PageSize)); err != nil {
 		return nil, errors.Default.Wrap(err, "error listing access domains")
 	}
 	return &PaginatedDomains{Domains: domains, Count: count, Page: query.Page, PageSize: query.PageSize}, nil
@@ -372,6 +372,22 @@ func (s *Service) CreateDomain(actor string, input AccessDomain) (*AccessDomain,
 	if !validDomain(domain) || !validRole(input.DefaultRole) {
 		return nil, errors.BadInput.New("provide a valid domain and default role")
 	}
+	existing := &AccessDomain{}
+	if err := s.db.First(existing, dal.Where("domain = ?", domain)); err == nil {
+		if existing.HiddenAt == nil {
+			return nil, errors.BadInput.New("this domain already has a DevLake access policy")
+		}
+		existing.DefaultRole = input.DefaultRole
+		existing.Status = StatusActive
+		existing.HiddenAt = nil
+		if updateErr := s.db.Update(existing); updateErr != nil {
+			return nil, errors.Default.Wrap(updateErr, "error restoring access domain")
+		}
+		s.audit(actor, "domain.restored", nil, fmt.Sprintf("domain=%s", existing.Domain))
+		return existing, nil
+	} else if !s.db.IsErrorNotFound(err) {
+		return nil, errors.Default.Wrap(err, "error looking up access domain")
+	}
 	input.Domain = domain
 	input.Status = StatusActive
 	if err := s.db.Create(&input); err != nil {
@@ -388,6 +404,26 @@ func (s *Service) CreateUser(actor, email, role string) (*AccessUser, errors.Err
 	email = normalizeEmail(email)
 	if _, ok := emailDomain(email); !ok || !validRole(role) {
 		return nil, errors.BadInput.New("provide a valid email and role")
+	}
+	visible := &AccessUser{}
+	if err := s.db.First(visible, dal.Where("email = ? AND hidden_at IS NULL", email)); err == nil {
+		return nil, errors.BadInput.New("this email already has a DevLake access entry")
+	} else if !s.db.IsErrorNotFound(err) {
+		return nil, errors.Default.Wrap(err, "error looking up access user")
+	}
+	existing := &AccessUser{}
+	if err := s.db.First(existing, dal.Where("email = ? AND hidden_at IS NOT NULL", email)); err == nil {
+		existing.Role = role
+		existing.Status = StatusActive
+		existing.DisabledAt = nil
+		existing.HiddenAt = nil
+		if updateErr := s.db.Update(existing); updateErr != nil {
+			return nil, errors.Default.Wrap(updateErr, "error restoring access user")
+		}
+		s.audit(actor, "user.restored", existing, "")
+		return existing, nil
+	} else if !s.db.IsErrorNotFound(err) {
+		return nil, errors.Default.Wrap(err, "error looking up access user")
 	}
 	user := &AccessUser{
 		Email: email, Role: role, Status: StatusActive,
@@ -408,7 +444,7 @@ func (s *Service) UpdateDomain(actor string, id uint64, role, status string) (*A
 		return nil, errors.BadInput.New("provide a valid default role and status")
 	}
 	domain := &AccessDomain{}
-	if err := s.db.First(domain, dal.Where("id = ?", id)); err != nil {
+	if err := s.db.First(domain, dal.Where("id = ? AND hidden_at IS NULL", id)); err != nil {
 		if s.db.IsErrorNotFound(err) {
 			return nil, errors.NotFound.New("access domain not found")
 		}
@@ -424,7 +460,17 @@ func (s *Service) UpdateDomain(actor string, id uint64, role, status string) (*A
 }
 
 func (s *Service) UpdateUser(actor string, id uint64, role, status string) (*AccessUser, errors.Error) {
-	if !validRole(role) || !validStatus(status) {
+	return s.updateUser(actor, id, role, status, false)
+}
+
+// HideUser retains the user and its audit history but disables the account before
+// excluding it from the management UI.
+func (s *Service) HideUser(actor string, id uint64) (*AccessUser, errors.Error) {
+	return s.updateUser(actor, id, "", StatusDisabled, true)
+}
+
+func (s *Service) updateUser(actor string, id uint64, role, status string, hide bool) (*AccessUser, errors.Error) {
+	if !hide && (!validRole(role) || !validStatus(status)) {
 		return nil, errors.BadInput.New("provide a valid role and status")
 	}
 	tx := s.db.Begin()
@@ -432,21 +478,25 @@ func (s *Service) UpdateUser(actor string, id uint64, role, status string) (*Acc
 	defer func() {
 		if !committed {
 			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				s.logger.Error(rollbackErr, "access: rollback user update id=%d", id)
+				s.logger.Error(rollbackErr, "access: rollback user change id=%d", id)
 			}
 		}
 	}()
 
 	user := &AccessUser{}
-	if err := tx.First(user, dal.Where("id = ?", id)); err != nil {
+	if err := tx.First(user, dal.Where("id = ? AND hidden_at IS NULL", id)); err != nil {
 		if tx.IsErrorNotFound(err) {
 			return nil, errors.NotFound.New("access user not found")
 		}
 		return nil, errors.Default.Wrap(err, "error looking up access user")
 	}
+	if hide {
+		role = user.Role
+		status = StatusDisabled
+	}
 	removesActiveAdmin := user.Role == RoleCustomerAdmin && user.Status == StatusActive && (status == StatusDisabled || role != RoleCustomerAdmin)
 	if removesActiveAdmin {
-		activeAdmins, err := tx.Count(dal.From(&AccessUser{}), dal.Where("role = ? AND status = ?", RoleCustomerAdmin, StatusActive))
+		activeAdmins, err := tx.Count(dal.From(&AccessUser{}), dal.Where("role = ? AND status = ? AND hidden_at IS NULL", RoleCustomerAdmin, StatusActive))
 		if err != nil {
 			return nil, errors.Default.Wrap(err, "error checking customer administrators")
 		}
@@ -462,8 +512,12 @@ func (s *Service) UpdateUser(actor string, id uint64, role, status string) (*Acc
 	} else {
 		user.DisabledAt = nil
 	}
+	if hide {
+		now := time.Now()
+		user.HiddenAt = &now
+	}
 	if err := tx.Update(user); err != nil {
-		return nil, errors.Default.Wrap(err, "error updating access user")
+		return nil, errors.Default.Wrap(err, "error saving access user")
 	}
 	var revokedSessionIDs []string
 	if status == StatusDisabled && s.sessionRevoker != nil {
@@ -475,14 +529,40 @@ func (s *Service) UpdateUser(actor string, id uint64, role, status string) (*Acc
 		revokedSessionIDs = ids
 	}
 	if err := tx.Commit(); err != nil {
-		return nil, errors.Default.Wrap(err, "error committing access user update")
+		return nil, errors.Default.Wrap(err, "error committing access user change")
 	}
 	committed = true
 	if s.sessionRevoker != nil && len(revokedSessionIDs) > 0 {
 		s.sessionRevoker.CacheRevokedSessions(revokedSessionIDs)
 	}
-	s.audit(actor, "user.updated", user, fmt.Sprintf("role=%s status=%s", role, status))
+	action := "user.updated"
+	detail := fmt.Sprintf("role=%s status=%s", role, status)
+	if hide {
+		action = "user.hidden"
+		detail = ""
+	}
+	s.audit(actor, action, user, detail)
 	return user, nil
+}
+
+// HideDomain retains the policy and audit history but prevents new domain-based
+// user provisioning before excluding it from the management UI.
+func (s *Service) HideDomain(actor string, id uint64) (*AccessDomain, errors.Error) {
+	domain := &AccessDomain{}
+	if err := s.db.First(domain, dal.Where("id = ? AND hidden_at IS NULL", id)); err != nil {
+		if s.db.IsErrorNotFound(err) {
+			return nil, errors.NotFound.New("access domain not found")
+		}
+		return nil, errors.Default.Wrap(err, "error looking up access domain")
+	}
+	now := time.Now()
+	domain.Status = StatusDisabled
+	domain.HiddenAt = &now
+	if err := s.db.Update(domain); err != nil {
+		return nil, errors.Default.Wrap(err, "error hiding access domain")
+	}
+	s.audit(actor, "domain.hidden", nil, fmt.Sprintf("domain=%s", domain.Domain))
+	return domain, nil
 }
 
 func (s *Service) audit(actor, action string, user *AccessUser, detail string) {
@@ -500,10 +580,13 @@ func normalizeEmail(raw string) string { return strings.ToLower(strings.TrimSpac
 func invitationSubject(email string) string { return invitationSubjectPrefix + email }
 
 func normalizeDomain(raw string) string {
-	return strings.ToLower(strings.TrimPrefix(strings.TrimSpace(raw), "@"))
+	return strings.ToLower(strings.TrimSpace(raw))
 }
 
 func validDomain(domain string) bool {
+	if domain == "" || strings.ContainsAny(domain, "@ \t\r\n") || strings.HasPrefix(domain, ".") || strings.HasSuffix(domain, ".") || strings.Contains(domain, "..") {
+		return false
+	}
 	parsed, ok := emailDomain("access@" + domain)
 	return ok && parsed == domain
 }

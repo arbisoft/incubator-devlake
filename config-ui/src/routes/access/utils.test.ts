@@ -19,10 +19,10 @@
 import { equal } from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { isValidDomain, normalizeDomain } from './utils';
+import { isValidDomain, isValidEmail, normalizeDomain } from './utils';
 
 test('normalizes allowed-domain input before it is submitted', () => {
-  equal(normalizeDomain(' @Example.COM '), 'example.com');
+  equal(normalizeDomain(' Example.COM '), 'example.com');
 });
 
 test('rejects invalid allowed-domain input locally', () => {
@@ -31,4 +31,15 @@ test('rejects invalid allowed-domain input locally', () => {
   equal(isValidDomain(''), false);
   equal(isValidDomain('example..com'), false);
   equal(isValidDomain('person@example.com'), false);
+  equal(isValidDomain('@example.com'), false);
+  equal(isValidDomain('example.com.'), false);
+});
+
+test('rejects invalid email input locally', () => {
+  equal(isValidEmail('person@example.com'), true);
+  equal(isValidEmail('person@example'), true);
+  equal(isValidEmail('@example.com'), false);
+  equal(isValidEmail('person@example.com '), true);
+  equal(isValidEmail('person @example.com'), false);
+  equal(isValidEmail('person@example..com'), false);
 });

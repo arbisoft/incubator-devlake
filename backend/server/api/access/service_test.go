@@ -17,7 +17,35 @@ limitations under the License.
 
 package access
 
-import "testing"
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/gin-gonic/gin"
+
+	"github.com/apache/incubator-devlake/core/errors"
+)
+
+func TestOutputErrorUsesSafeBadInputMessage(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	outputError(context, errors.BadInput.New("provide a valid email and role"))
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+	response := struct {
+		Message string `json:"message"`
+	}{}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.Message != "provide a valid email and role" {
+		t.Fatalf("message = %q, want safe validation message", response.Message)
+	}
+}
 
 func TestEmailDomain(t *testing.T) {
 	testCases := []struct {
@@ -91,6 +119,7 @@ func TestValidDomain(t *testing.T) {
 		{domain: "example", valid: true},
 		{domain: "", valid: false},
 		{domain: "@example.com", valid: false},
+		{domain: "example.com.", valid: false},
 		{domain: "example.com ", valid: false},
 	}
 

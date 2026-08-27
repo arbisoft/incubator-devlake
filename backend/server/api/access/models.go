@@ -52,6 +52,7 @@ type AccessUser struct {
 	Status      string     `gorm:"type:varchar(32);index" json:"status"`
 	LastLoginAt *time.Time `json:"lastLoginAt,omitempty"`
 	DisabledAt  *time.Time `json:"disabledAt,omitempty"`
+	HiddenAt    *time.Time `json:"hiddenAt,omitempty"`
 }
 
 func (AccessUser) TableName() string { return "auth_access_users" }
@@ -68,9 +69,10 @@ func (BootstrapClaim) TableName() string { return "auth_access_bootstrap_claims"
 
 type AccessDomain struct {
 	common.Model
-	Domain      string `gorm:"type:varchar(255);uniqueIndex" json:"domain"`
-	DefaultRole string `gorm:"type:varchar(32)" json:"defaultRole"`
-	Status      string `gorm:"type:varchar(32);index" json:"status"`
+	Domain      string     `gorm:"type:varchar(255);uniqueIndex" json:"domain"`
+	DefaultRole string     `gorm:"type:varchar(32)" json:"defaultRole"`
+	Status      string     `gorm:"type:varchar(32);index" json:"status"`
+	HiddenAt    *time.Time `json:"hiddenAt,omitempty"`
 }
 
 func (AccessDomain) TableName() string { return "auth_access_domains" }

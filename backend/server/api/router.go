@@ -101,9 +101,11 @@ func RegisterRouter(r *gin.Engine, basicRes context.BasicRes) {
 	r.GET("/access/users", access.ListUsers)
 	r.POST("/access/users", access.PostUser)
 	r.PATCH("/access/users/:id", access.PatchUser)
+	r.POST("/access/users/:id/hide", access.HideUser)
 	r.GET("/access/domains", access.ListDomains)
 	r.POST("/access/domains", access.PostDomain)
 	r.PATCH("/access/domains/:id", access.PatchDomain)
+	r.POST("/access/domains/:id/hide", access.HideDomain)
 	r.GET("/access/audit-events", access.ListAuditEvents)
 
 	// user project mapping api
