@@ -23,5 +23,7 @@ module.exports = {
     'prettier/prettier': 'warn',
     'header/header': ['error', '.file-headerrc'],
     'react-hooks/exhaustive-deps': 'off',
+    'no-console': 'warn',
   },
 };
+

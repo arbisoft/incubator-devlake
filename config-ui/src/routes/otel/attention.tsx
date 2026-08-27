@@ -17,25 +17,18 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import axios from 'axios';
 import { Alert, Button } from 'antd';
 import { useNavigate } from 'react-router-dom';
 
 import API from '@/api';
 import { OTEL_ATTENTION_CHANGED_EVENT, OTEL_PATH, OTEL_REFRESH_INTERVAL_MS } from './constants';
-import {
-  getAttentionState,
-  isSameAttentionState,
-  withVerb,
-  type OtelAttentionState,
-} from './utils';
+import { getAttentionState, isSameAttentionState, withVerb, type OtelAttentionState } from './utils';
 
 // Surface credential activation problems globally without changing DevLake's core pipeline UX.
 export const OtelAttention = () => {
   const [attention, setAttention] = useState<OtelAttentionState>();
   const mounted = useRef(false);
   const abortController = useRef<AbortController>();
-  const loggedRequestFailure = useRef(false);
   const navigate = useNavigate();
   const refresh = useCallback(async (force = false) => {
     if (!force && document.visibilityState === 'hidden') return;
@@ -44,19 +37,14 @@ export const OtelAttention = () => {
     abortController.current = new AbortController();
     try {
       const connections = await API.otel.list(abortController.current.signal);
-      loggedRequestFailure.current = false;
       const nextAttention = getAttentionState(connections);
       if (mounted.current) {
         setAttention((currentAttention) =>
           isSameAttentionState(currentAttention, nextAttention) ? currentAttention : nextAttention,
         );
       }
-    } catch (error) {
-      if (!axios.isCancel(error) && !loggedRequestFailure.current) {
-        loggedRequestFailure.current = true;
-        // Keep the global alert non-disruptive while leaving a browser diagnostic for support.
-        console.warn('Unable to refresh Claude Code OTel attention state.', error);
-      }
+    } catch {
+      // Silent failure for background polling banner; avoid intrusive UI/console noise.
     }
   }, []);
 
