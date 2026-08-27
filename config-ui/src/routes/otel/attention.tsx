@@ -21,15 +21,18 @@ import { Alert, Button } from 'antd';
 import { useNavigate } from 'react-router-dom';
 
 import API from '@/api';
-import { OTEL_ATTENTION_CHANGED_EVENT, OTEL_PATH, OTEL_REFRESH_INTERVAL_MS } from './constants';
-import { getAttentionState, isSameAttentionState, withVerb, type OtelAttentionState } from './utils';
+import { PATHS } from '@/config';
+import { OTEL_ATTENTION_CHANGED_EVENT, OTEL_REFRESH_INTERVAL_MS, OTEL_VISIBILITY_THROTTLE_MS } from './constants';
+import { getAttentionDescription, getAttentionState, isSameAttentionState, type OtelAttentionState } from './utils';
 
 // Surface credential activation problems globally without changing DevLake's core pipeline UX.
 export const OtelAttention = () => {
   const [attention, setAttention] = useState<OtelAttentionState>();
   const mounted = useRef(false);
   const abortController = useRef<AbortController>();
+  const lastRefreshedAt = useRef(0);
   const navigate = useNavigate();
+
   const refresh = useCallback(async (force = false) => {
     if (!force && document.visibilityState === 'hidden') return;
 
@@ -37,6 +40,7 @@ export const OtelAttention = () => {
     abortController.current = new AbortController();
     try {
       const connections = await API.otel.list(abortController.current.signal);
+      lastRefreshedAt.current = Date.now();
       const nextAttention = getAttentionState(connections);
       if (mounted.current) {
         setAttention((currentAttention) =>
@@ -52,12 +56,21 @@ export const OtelAttention = () => {
     mounted.current = true;
     void refresh(true);
     const timer = window.setInterval(() => void refresh(), OTEL_REFRESH_INTERVAL_MS);
+
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') void refresh(true);
+      if (document.visibilityState === 'visible') {
+        const now = Date.now();
+        if (now - lastRefreshedAt.current >= OTEL_VISIBILITY_THROTTLE_MS) {
+          void refresh(true);
+        }
+      }
     };
+
     const handleAttentionChange = () => void refresh(true);
+
     window.addEventListener(OTEL_ATTENTION_CHANGED_EVENT, handleAttentionChange);
     document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       mounted.current = false;
       abortController.current?.abort();
@@ -70,39 +83,23 @@ export const OtelAttention = () => {
   if (!attention || (!attention.restartRequired && !attention.recoveryRequired)) return null;
 
   const storageRecovery = attention.recoveryRequired > 0;
-  const pendingRestart = attention.restartRequired > 0;
-  const details = [
-    storageRecovery &&
-      withVerb(attention.recoveryRequired, 'needs credential storage recovery', 'need credential storage recovery'),
-    pendingRestart &&
-      withVerb(
-        attention.restartRequired,
-        'has credential changes waiting to be applied',
-        'have credential changes waiting to be applied',
-      ),
-  ].filter(Boolean);
-  const description = [
-    `${withVerb(attention.connectionCount, 'needs attention', 'need attention')}: ${details.join('; ')}.`,
-    storageRecovery && pendingRestart && 'A connection can appear in both categories.',
-    storageRecovery && 'Revoke affected connections and generate new Claude settings to restore telemetry.',
-    pendingRestart && 'Open Claude Code OTel to apply pending credential changes.',
-  ]
-    .filter(Boolean)
-    .join(' ');
+  const description = getAttentionDescription(attention);
 
   return (
-    <Alert
-      banner
-      showIcon
-      type={storageRecovery ? 'error' : 'warning'}
-      message="Claude Code telemetry needs attention."
-      description={description}
-      action={
-        <Button type="link" onClick={() => navigate(OTEL_PATH)}>
-          Manage Claude Code OTel
-        </Button>
-      }
-      style={{ marginBottom: 24 }}
-    />
+    <div role="region" aria-live="polite" aria-label="Claude Code telemetry attention">
+      <Alert
+        banner
+        showIcon
+        type={storageRecovery ? 'error' : 'warning'}
+        message="Claude Code telemetry needs attention."
+        description={description}
+        action={
+          <Button type="link" onClick={() => navigate(PATHS.OTEL())}>
+            Manage Claude Code OTel
+          </Button>
+        }
+        style={{ marginBottom: 24 }}
+      />
+    </div>
   );
 };

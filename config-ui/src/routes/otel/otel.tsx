@@ -23,14 +23,15 @@ import { Button, Flex, message, Table } from 'antd';
 import API from '@/api';
 import { type OtelConnectionResponse } from '@/api/otel';
 import { Message, PageHeader } from '@/components';
+import { PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
 import { operator, type OperateConfig } from '@/utils';
 import { getOtelColumns } from './columns';
-import { OTEL_ERROR, OTEL_LIFECYCLE_ACTION, OTEL_PATH } from './constants';
+import { OTEL_ERROR, OTEL_LIFECYCLE_ACTION } from './constants';
 import { OTEL_MODAL, OtelModals, type OtelLifecycleAction, type OtelModalState } from './modals';
 import { getOtelCreateError, getOtelLifecycleError, notifyOtelAttentionChanged } from './utils';
 
-const BREADCRUMBS = [{ name: 'Claude Code OTel', path: OTEL_PATH }];
+const BREADCRUMBS = [{ name: 'Claude Code OTel', path: PATHS.OTEL() }];
 
 type OtelOperationResult = { success: true; data: OtelConnectionResponse } | { success: false; error: unknown };
 

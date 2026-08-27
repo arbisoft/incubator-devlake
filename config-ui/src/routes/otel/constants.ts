@@ -34,5 +34,5 @@ export const OTEL_LIFECYCLE_ACTION = {
 } as const;
 
 export const OTEL_ATTENTION_CHANGED_EVENT = 'devlake:otel-attention-changed';
-export const OTEL_PATH = `${import.meta.env.DEVLAKE_PATH_PREFIX ?? ''}/otel`;
 export const OTEL_REFRESH_INTERVAL_MS = 30_000;
+export const OTEL_VISIBILITY_THROTTLE_MS = 10_000;

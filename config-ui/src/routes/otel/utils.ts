@@ -26,7 +26,7 @@ const SAFE_LIFECYCLE_MESSAGE_STATUSES: readonly number[] = [HttpStatusCode.BadRe
 type OtelErrorResponse = { message?: unknown };
 
 export type OtelAttentionState = {
-  connectionCount: number;
+  connectionsNeedingAttention: number;
   restartRequired: number;
   recoveryRequired: number;
 };
@@ -39,11 +39,12 @@ type AttentionTarget = {
 export const getAttentionState = (connections: AttentionTarget[]): OtelAttentionState =>
   connections.reduce(
     (state, connection) => ({
-      connectionCount: state.connectionCount + (connection.restartRequired || connection.recoveryRequired ? 1 : 0),
+      connectionsNeedingAttention:
+        state.connectionsNeedingAttention + (connection.restartRequired || connection.recoveryRequired ? 1 : 0),
       restartRequired: state.restartRequired + (connection.restartRequired ? 1 : 0),
       recoveryRequired: state.recoveryRequired + (connection.recoveryRequired ? 1 : 0),
     }),
-    { connectionCount: 0, restartRequired: 0, recoveryRequired: 0 },
+    { connectionsNeedingAttention: 0, restartRequired: 0, recoveryRequired: 0 },
   );
 
 export const formatConnectionCount = (count: number) => formatPlural(count, 'connection');
@@ -52,9 +53,37 @@ export const withVerb = (count: number, singular: string, plural: string) =>
   `${formatConnectionCount(count)} ${count === 1 ? singular : plural}`;
 
 export const isSameAttentionState = (left?: OtelAttentionState, right?: OtelAttentionState) =>
-  left?.connectionCount === right?.connectionCount &&
+  left?.connectionsNeedingAttention === right?.connectionsNeedingAttention &&
   left?.restartRequired === right?.restartRequired &&
   left?.recoveryRequired === right?.recoveryRequired;
+
+export const getAttentionDescription = (attention: OtelAttentionState): string => {
+  const parts: string[] = [];
+  const details: string[] = [];
+
+  if (attention.recoveryRequired > 0) {
+    details.push(`${formatPlural(attention.recoveryRequired, 'connection')} requiring credential storage recovery`);
+  }
+  if (attention.restartRequired > 0) {
+    details.push(`${formatPlural(attention.restartRequired, 'connection')} with pending credential changes`);
+  }
+
+  const totalSummary = `${withVerb(
+    attention.connectionsNeedingAttention,
+    'needs attention',
+    'need attention',
+  )}: ${details.join('; ')}.`;
+  parts.push(totalSummary);
+
+  if (attention.recoveryRequired > 0) {
+    parts.push('Revoke affected connections and generate new Claude settings to restore telemetry.');
+  }
+  if (attention.restartRequired > 0) {
+    parts.push('Open Claude Code OTel to apply pending credential changes.');
+  }
+
+  return parts.join(' ');
+};
 
 export const notifyOtelAttentionChanged = () => {
   window.dispatchEvent(new Event(OTEL_ATTENTION_CHANGED_EVENT));

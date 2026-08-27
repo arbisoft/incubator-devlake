@@ -133,7 +133,16 @@ type LifecycleModalProps = OtelModalProps & {
   error?: string;
 };
 
-const LifecycleModal = ({ action, title, content, danger, error, operating, onClose, onAction }: LifecycleModalProps) => (
+const LifecycleModal = ({
+  action,
+  title,
+  content,
+  danger,
+  error,
+  operating,
+  onClose,
+  onAction,
+}: LifecycleModalProps) => (
   <Modal
     open
     width={720}
@@ -208,7 +217,8 @@ const OTEL_MODALS: Record<OtelModalState, OtelModalConfig> = {
     kind: MODAL_KIND.LIFECYCLE,
     action: OTEL_LIFECYCLE_ACTION.HIDE,
     title: 'Remove Revoked Connection',
-    content: 'This removes the revoked connection from this page. Its credential history remains retained in DevLake for audit purposes.',
+    content:
+      'This removes the revoked connection from this page. Its credential history remains retained in DevLake for audit purposes.',
     danger: true,
   },
 };
