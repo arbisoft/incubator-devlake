@@ -27,6 +27,7 @@ import { OTEL_CREDENTIAL_STATUS } from '@/api/otel';
 import { PATHS } from '@/config';
 import { useAppSelector, useRefreshData } from '@/hooks';
 import { getPluginConfig, ConnectionList, ConnectionForm } from '@/plugins';
+import { formatPlural } from '@/utils';
 
 import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?react';
 import * as S from './styled';
@@ -111,25 +112,19 @@ export const Connections = () => {
             {otelCredentialSummary.active > 0 && (
               <Badge
                 color={colorPrimary}
-                text={`${otelCredentialSummary.active} active credential${
-                  otelCredentialSummary.active === 1 ? '' : 's'
-                }`}
+                text={formatPlural(otelCredentialSummary.active, 'active credential')}
               />
             )}
             {otelCredentialSummary.recoveryRequired > 0 && (
               <Badge
                 color="#ff4d4f"
-                text={`${otelCredentialSummary.recoveryRequired} connection${
-                  otelCredentialSummary.recoveryRequired === 1 ? '' : 's'
-                } needing storage recovery`}
+                text={`${formatPlural(otelCredentialSummary.recoveryRequired, 'connection')} needing storage recovery`}
               />
             )}
             {otelCredentialSummary.restartRequired > 0 && (
               <Badge
                 color="#faad14"
-                text={`${otelCredentialSummary.restartRequired} connection${
-                  otelCredentialSummary.restartRequired === 1 ? '' : 's'
-                } requiring action`}
+                text={`${formatPlural(otelCredentialSummary.restartRequired, 'connection')} requiring action`}
               />
             )}
           </span>

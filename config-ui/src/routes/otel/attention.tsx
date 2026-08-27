@@ -23,6 +23,7 @@ import { useNavigate } from 'react-router-dom';
 
 import API from '@/api';
 import type { OtelConnectionResponse } from '@/api/otel';
+import { formatPlural } from '@/utils';
 import { OTEL_ATTENTION_CHANGED_EVENT } from './constants';
 
 const OTEL_PATH = `${import.meta.env.DEVLAKE_PATH_PREFIX ?? ''}/otel`;
@@ -43,7 +44,7 @@ const getAttentionState = (connections: OtelConnectionResponse[]): OtelAttention
     { connectionCount: 0, restartRequired: 0, recoveryRequired: 0 },
   );
 
-const formatConnectionCount = (count: number) => `${count} connection${count === 1 ? '' : 's'}`;
+const formatConnectionCount = (count: number) => formatPlural(count, 'connection');
 const withVerb = (count: number, singular: string, plural: string) =>
   `${formatConnectionCount(count)} ${count === 1 ? singular : plural}`;
 

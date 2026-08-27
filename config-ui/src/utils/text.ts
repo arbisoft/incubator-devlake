@@ -16,8 +16,5 @@
  *
  */
 
-export * from './operator';
-export * from './request';
-export * from './text';
-export * from './time';
-
+export const formatPlural = (count: number, singular: string, plural = `${singular}s`): string =>
+  `${count} ${count === 1 ? singular : plural}`;
