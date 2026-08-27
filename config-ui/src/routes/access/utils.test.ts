@@ -51,6 +51,7 @@ test('rejects invalid allowed-domain input locally', () => {
   equal(isValidDomain('example..com'), false);
   equal(isValidDomain('person@example.com'), false);
   equal(isValidDomain('@example.com'), false);
+  equal(isValidDomain('[192.168.1.1]'), false);
   equal(isValidDomain('example.com.'), false);
 });
 

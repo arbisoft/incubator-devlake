@@ -396,7 +396,7 @@ func (s *Service) CreateDomain(actor string, input AccessDomain) (*AccessDomain,
 		if updateErr := s.db.Update(existing); updateErr != nil {
 			return nil, errors.Default.Wrap(updateErr, "error restoring access domain")
 		}
-		s.audit(actor, "domain.restored", nil, fmt.Sprintf("domain=%s", existing.Domain))
+		s.audit(actor, "domain.restored", nil, domainAuditDetail(existing.Domain))
 		return existing, nil
 	} else if !s.db.IsErrorNotFound(err) {
 		return nil, errors.Default.Wrap(err, "error looking up access domain")
@@ -409,7 +409,7 @@ func (s *Service) CreateDomain(actor string, input AccessDomain) (*AccessDomain,
 		}
 		return nil, errors.Default.Wrap(err, "error creating access domain")
 	}
-	s.audit(actor, "domain.created", nil, input.Domain)
+	s.audit(actor, "domain.created", nil, domainAuditDetail(input.Domain))
 	return &input, nil
 }
 
@@ -468,7 +468,7 @@ func (s *Service) UpdateDomain(actor string, id uint64, role, status string) (*A
 	if err := s.db.Update(domain); err != nil {
 		return nil, errors.Default.Wrap(err, "error updating access domain")
 	}
-	s.audit(actor, "domain.updated", nil, fmt.Sprintf("domain=%s role=%s status=%s", domain.Domain, role, status))
+	s.audit(actor, "domain.updated", nil, fmt.Sprintf("%s role=%s status=%s", domainAuditDetail(domain.Domain), role, status))
 	return domain, nil
 }
 
@@ -574,7 +574,7 @@ func (s *Service) HideDomain(actor string, id uint64) (*AccessDomain, errors.Err
 	if err := s.db.Update(domain); err != nil {
 		return nil, errors.Default.Wrap(err, "error hiding access domain")
 	}
-	s.audit(actor, "domain.hidden", nil, fmt.Sprintf("domain=%s", domain.Domain))
+	s.audit(actor, "domain.hidden", nil, domainAuditDetail(domain.Domain))
 	return domain, nil
 }
 
@@ -597,7 +597,7 @@ func normalizeDomain(raw string) string {
 }
 
 func validDomain(domain string) bool {
-	if domain == "" || strings.ContainsAny(domain, "@ \t\r\n") || strings.HasPrefix(domain, ".") || strings.HasSuffix(domain, ".") || strings.Contains(domain, "..") {
+	if domain == "" || strings.ContainsAny(domain, "@ \t\r\n") || strings.HasPrefix(domain, ".") || strings.HasSuffix(domain, ".") || strings.Contains(domain, "..") || isIPLiteralDomain(domain) {
 		return false
 	}
 	parsed, ok := emailDomain("access@" + domain)
@@ -613,7 +613,17 @@ func emailDomain(email string) (string, bool) {
 	if len(parts) != 2 || parts[1] == "" {
 		return "", false
 	}
-	return normalizeDomain(parts[1]), true
+	domain := normalizeDomain(parts[1])
+	if isIPLiteralDomain(domain) {
+		return "", false
+	}
+	return domain, true
+}
+
+func domainAuditDetail(domain string) string { return fmt.Sprintf("domain=%s", domain) }
+
+func isIPLiteralDomain(domain string) bool {
+	return strings.HasPrefix(domain, "[") && strings.HasSuffix(domain, "]")
 }
 
 func validRole(role string) bool     { return role == RoleCustomerAdmin || role == RoleMember }

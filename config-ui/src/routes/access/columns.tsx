@@ -145,7 +145,7 @@ export const getDomainColumns = (actions: DomainColumnActions): ColumnsType<Acce
         </Button>
         <Popconfirm
           title="Remove this domain from User Management?"
-          description="New sign-ins from this domain will no longer be provisioned. The record will remain in audit history."
+          description="This stops automatic provisioning only. Existing people keep their current access, and the record remains in audit history."
           okText="Remove"
           okButtonProps={{ danger: true }}
           onConfirm={() => actions.onRemove(accessDomain)}

@@ -16,7 +16,7 @@
  *
  */
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Button, Table } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 
@@ -39,6 +39,8 @@ import { SectionHeader, SectionTitle } from './styled';
 import { getCreateDomainError, getCreateUserError, isValidDomain, isValidEmail, normalizeDomain } from './utils';
 
 type ModalState = 'user' | 'domain' | undefined;
+
+const AUDIT_COLUMNS = getAuditColumns();
 
 export const Access = () => {
   const [version, setVersion] = useState(0);
@@ -69,15 +71,15 @@ export const Access = () => {
   const emailError =
     email.length > 0 && !isValidEmail(email) ? 'Enter a valid email address, such as person@example.com.' : '';
 
-  const refresh = () => setVersion((current) => current + 1);
-  const closeModal = () => {
+  const refresh = useCallback(() => setVersion((current) => current + 1), []);
+  const closeModal = useCallback(() => {
     setModal(undefined);
     setEmail('');
     setDomain('');
     setRole(ACCESS_ROLE.MEMBER);
-  };
+  }, []);
 
-  const createUser = async () => {
+  const createUser = useCallback(async () => {
     const [success] = await operator(() => API.access.createUser({ email: email.trim().toLowerCase(), role }), {
       setOperating,
       formatReason: getCreateUserError,
@@ -86,9 +88,9 @@ export const Access = () => {
       closeModal();
       refresh();
     }
-  };
+  }, [closeModal, email, refresh, role]);
 
-  const createDomain = async () => {
+  const createDomain = useCallback(async () => {
     const [success] = await operator(() => API.access.createDomain({ domain: normalizedDomain, defaultRole: role }), {
       setOperating,
       formatReason: getCreateDomainError,
@@ -97,41 +99,41 @@ export const Access = () => {
       closeModal();
       refresh();
     }
-  };
+  }, [closeModal, normalizedDomain, refresh, role]);
 
-  const updateUser = async (user: AccessUser, nextStatus: AccessStatus) => {
+  const updateUser = useCallback(async (user: AccessUser, nextStatus: AccessStatus) => {
     const [success] = await operator(() => API.access.updateUser(user.id, { role: user.role, status: nextStatus }));
     if (success) refresh();
-  };
+  }, [refresh]);
 
-  const updateUserRole = async (user: AccessUser, nextRole: AccessRole) => {
+  const updateUserRole = useCallback(async (user: AccessUser, nextRole: AccessRole) => {
     const [success] = await operator(() => API.access.updateUser(user.id, { role: nextRole, status: user.status }));
     if (success) refresh();
-  };
+  }, [refresh]);
 
-  const updateDomain = async (accessDomain: AccessDomain, nextStatus: AccessStatus) => {
+  const updateDomain = useCallback(async (accessDomain: AccessDomain, nextStatus: AccessStatus) => {
     const [success] = await operator(() =>
       API.access.updateDomain(accessDomain.id, { defaultRole: accessDomain.defaultRole, status: nextStatus }),
     );
     if (success) refresh();
-  };
+  }, [refresh]);
 
-  const updateDomainRole = async (accessDomain: AccessDomain, nextRole: AccessRole) => {
+  const updateDomainRole = useCallback(async (accessDomain: AccessDomain, nextRole: AccessRole) => {
     const [success] = await operator(() =>
       API.access.updateDomain(accessDomain.id, { defaultRole: nextRole, status: accessDomain.status }),
     );
     if (success) refresh();
-  };
+  }, [refresh]);
 
-  const hideUser = async (user: AccessUser) => {
+  const hideUser = useCallback(async (user: AccessUser) => {
     const [success] = await operator(() => API.access.hideUser(user.id));
     if (success) refresh();
-  };
+  }, [refresh]);
 
-  const hideDomain = async (accessDomain: AccessDomain) => {
+  const hideDomain = useCallback(async (accessDomain: AccessDomain) => {
     const [success] = await operator(() => API.access.hideDomain(accessDomain.id));
     if (success) refresh();
-  };
+  }, [refresh]);
 
   const userColumns = useMemo(
     () =>
@@ -140,7 +142,7 @@ export const Access = () => {
         onStatusChange: updateUser,
         onRemove: hideUser,
       }),
-    [],
+    [hideUser, updateUser, updateUserRole],
   );
 
   const domainColumns = useMemo(
@@ -150,10 +152,8 @@ export const Access = () => {
         onStatusChange: updateDomain,
         onRemove: hideDomain,
       }),
-    [],
+    [hideDomain, updateDomain, updateDomainRole],
   );
-
-  const auditColumns = useMemo(() => getAuditColumns(), []);
 
   return (
     <PageHeader breadcrumbs={BREADCRUMBS} description={PAGE_DESCRIPTION}>
@@ -224,7 +224,7 @@ export const Access = () => {
         loading={!ready}
         dataSource={auditEvents}
         pagination={false}
-        columns={auditColumns}
+        columns={AUDIT_COLUMNS}
       />
 
       <CreateUserModal

@@ -29,7 +29,8 @@ import { OnboardCard } from '@/routes/onboard/components';
 import { useAppDispatch, useAppSelector } from '@/hooks';
 
 import { ACCESS_PATH, menuItems, menuItemsMatch, headerItems } from './config';
-import { ACCESS_ROLE, type AccessCurrent } from '@/api/access';
+import type { AccessCurrent } from '@/api/access';
+import { canManageAccess } from '@/routes/access/guard';
 
 const { Sider, Header, Content, Footer } = AntdLayout;
 
@@ -47,8 +48,8 @@ export const Layout = () => {
   };
 
   const visibleMenuItems = useMemo(
-    () => menuItems.filter((item) => item.key !== ACCESS_PATH || access?.role === ACCESS_ROLE.CUSTOMER_ADMIN),
-    [access?.role],
+    () => menuItems.filter((item) => item.key !== ACCESS_PATH || canManageAccess(access)),
+    [access],
   );
 
   const handleLogout = async () => {

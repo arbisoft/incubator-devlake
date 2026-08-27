@@ -107,6 +107,7 @@ func TestEmailDomain(t *testing.T) {
 	}{
 		{email: "person@example.com", domain: "example.com", valid: true},
 		{email: "PERSON@EXAMPLE.COM", domain: "example.com", valid: true},
+		{email: "person@[192.168.1.1]", valid: false},
 		{email: "person", valid: false},
 		{email: "person@example", domain: "example", valid: true},
 	}
@@ -171,6 +172,7 @@ func TestValidDomain(t *testing.T) {
 		{domain: "example", valid: true},
 		{domain: "", valid: false},
 		{domain: "@example.com", valid: false},
+		{domain: "[192.168.1.1]", valid: false},
 		{domain: "example.com.", valid: false},
 		{domain: "example.com ", valid: false},
 	}
@@ -181,5 +183,11 @@ func TestValidDomain(t *testing.T) {
 				t.Fatalf("validDomain(%q) = %t, want %t", testCase.domain, actual, testCase.valid)
 			}
 		})
+	}
+}
+
+func TestDomainAuditDetail(t *testing.T) {
+	if detail := domainAuditDetail("example.com"); detail != "domain=example.com" {
+		t.Fatalf("domainAuditDetail() = %q, want %q", detail, "domain=example.com")
 	}
 }

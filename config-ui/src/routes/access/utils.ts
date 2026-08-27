@@ -37,7 +37,8 @@ export const isValidDomain = (value: string) => {
     !/[\s@]/.test(domain) &&
     !domain.startsWith('.') &&
     !domain.endsWith('.') &&
-    !domain.includes('..')
+    !domain.includes('..') &&
+    !(domain.startsWith('[') && domain.endsWith(']'))
   );
 };
 
