@@ -22,16 +22,13 @@ import { Alert, Button } from 'antd';
 import { useNavigate } from 'react-router-dom';
 
 import API from '@/api';
-import { OTEL_ATTENTION_CHANGED_EVENT } from './constants';
+import { OTEL_ATTENTION_CHANGED_EVENT, OTEL_PATH, OTEL_REFRESH_INTERVAL_MS } from './constants';
 import {
   getAttentionState,
   isSameAttentionState,
   withVerb,
   type OtelAttentionState,
 } from './utils';
-
-const OTEL_PATH = `${import.meta.env.DEVLAKE_PATH_PREFIX ?? ''}/otel`;
-const REFRESH_INTERVAL_MS = 30_000;
 
 // Surface credential activation problems globally without changing DevLake's core pipeline UX.
 export const OtelAttention = () => {
@@ -66,7 +63,7 @@ export const OtelAttention = () => {
   useEffect(() => {
     mounted.current = true;
     void refresh(true);
-    const timer = window.setInterval(() => void refresh(), REFRESH_INTERVAL_MS);
+    const timer = window.setInterval(() => void refresh(), OTEL_REFRESH_INTERVAL_MS);
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') void refresh(true);
     };
