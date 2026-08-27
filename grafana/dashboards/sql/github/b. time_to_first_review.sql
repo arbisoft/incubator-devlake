@@ -14,6 +14,7 @@ WITH first_touch AS (
                  WHERE pm.row_id = pr.base_repo_id
                    AND pm.`table` = 'repos'
                    AND pm.project_name IN ( ${project} ))
+    AND pr.author_id IN ( $developer_id )
   GROUP BY pr.id, pr.created_date
 ),
 d AS (

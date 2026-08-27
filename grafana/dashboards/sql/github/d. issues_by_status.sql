@@ -1,6 +1,6 @@
 SELECT REPLACE(COALESCE(
-         NULLIF(TRIM(u.name),      ''),
          NULLIF(TRIM(a.full_name), ''),
+         NULLIF(TRIM(u.name),      ''),
          NULLIF(TRIM(a.user_name), ''),
          NULLIF(TRIM(a.email),     ''),
          NULLIF(TRIM(i.assignee_name), ''),

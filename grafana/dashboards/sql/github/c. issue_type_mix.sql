@@ -27,5 +27,6 @@ FROM issues i
 JOIN type_map tm ON tm.original_type <=> i.original_type
 WHERE i.id LIKE 'github:%'
   AND $__timeFilter(i.created_date)
+  AND i.assignee_id IN ( $developer_id )
 GROUP BY time
 ORDER BY time;

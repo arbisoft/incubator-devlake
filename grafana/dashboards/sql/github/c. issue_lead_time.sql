@@ -26,6 +26,7 @@ d AS (
     AND i.lead_time_minutes > 0
     AND i.id LIKE 'github:%'
     AND $__timeFilter(i.resolution_date)
+    AND i.assignee_id IN ( $developer_id  )
 ),
 ranked AS (
   SELECT type, priority, days,

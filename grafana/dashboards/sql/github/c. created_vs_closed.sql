@@ -3,6 +3,7 @@ WITH ev AS (
   FROM issues i
   WHERE i.id LIKE 'github:%'
     AND $__timeFilter(i.created_date)
+    AND i.creator_id IN ( $developer_id )
   UNION ALL
   SELECT i.resolution_date, 0, 1
   FROM issues i
@@ -10,6 +11,7 @@ WITH ev AS (
     AND i.status = 'DONE'
     AND i.resolution_date IS NOT NULL
     AND $__timeFilter(i.resolution_date)
+    AND i.assignee_id IN ( $developer_id )
 )
 SELECT $__timeGroup(ts, $interval)                                        AS time,
        SUM(opened)                                                   AS Opened,

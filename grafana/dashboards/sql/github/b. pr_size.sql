@@ -8,9 +8,10 @@ WITH pr_size AS (
     AND $__timeFilter(pr.created_date)
     AND pr.base_repo_id IN ( ${repo_id} )
     AND EXISTS (SELECT 1 FROM project_mapping pm
-          WHERE pm.row_id = pr.base_repo_id
-            AND pm.`table` = 'repos'
-            AND pm.project_name IN ( ${project} ))
+                 WHERE pm.row_id = pr.base_repo_id
+                   AND pm.`table` = 'repos'
+                   AND pm.project_name IN ( ${project} ))
+    AND pr.author_id IN ( $developer_id )
   GROUP BY pr.id
 ),
 bucketed AS (

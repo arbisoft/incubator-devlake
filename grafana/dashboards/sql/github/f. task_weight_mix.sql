@@ -40,6 +40,7 @@ LEFT JOIN accounts a ON a.id = w.author_id
 LEFT JOIN (SELECT account_id, MIN(user_id) AS user_id
            FROM user_accounts GROUP BY account_id) ua ON ua.account_id = a.id
 LEFT JOIN users u ON u.id = ua.user_id
+WHERE a.id IN ( $developer_id )
 GROUP BY developer
 HAVING `Total PRs` >= 3
-ORDER BY Heavy DESC, `Total PRs` DESC;
+ORDER BY `Total PRs` DESC;
