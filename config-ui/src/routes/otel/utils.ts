@@ -57,6 +57,12 @@ export const isSameAttentionState = (left?: OtelAttentionState, right?: OtelAtte
   left?.restartRequired === right?.restartRequired &&
   left?.recoveryRequired === right?.recoveryRequired;
 
+export const hasRecoveryRequired = (connections: readonly { recoveryRequired?: boolean }[]) =>
+  connections.some((connection) => Boolean(connection.recoveryRequired));
+
+export const hasStorageNeedsApplying = (connections: readonly { storageNeedsApplying?: boolean }[]) =>
+  connections.some((connection) => Boolean(connection.storageNeedsApplying));
+
 export const getAttentionDescription = (attention: OtelAttentionState): string => {
   const parts: string[] = [];
   const details: string[] = [];

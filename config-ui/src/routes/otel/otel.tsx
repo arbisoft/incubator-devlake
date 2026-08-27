@@ -29,7 +29,13 @@ import { operator, type OperateConfig } from '@/utils';
 import { getOtelColumns } from './columns';
 import { OTEL_ERROR, OTEL_LIFECYCLE_ACTION } from './constants';
 import { OTEL_MODAL, OtelModals, type OtelLifecycleAction, type OtelModalState } from './modals';
-import { getOtelCreateError, getOtelLifecycleError, notifyOtelAttentionChanged } from './utils';
+import {
+  getOtelCreateError,
+  getOtelLifecycleError,
+  hasRecoveryRequired,
+  hasStorageNeedsApplying,
+  notifyOtelAttentionChanged,
+} from './utils';
 
 const BREADCRUMBS = [{ name: 'Claude Code OTel', path: PATHS.OTEL() }];
 
@@ -132,10 +138,10 @@ export const Otel = () => {
           Generate Claude Settings
         </Button>
       </Flex>
-      {dataSource.some((connection) => connection.recoveryRequired) && (
+      {hasRecoveryRequired(dataSource) && (
         <Message content="The Collector credential verifier is unavailable. Revoke the affected connection, then generate new Claude settings to restore telemetry." />
       )}
-      {dataSource.some((connection) => connection.storageNeedsApplying) && (
+      {hasStorageNeedsApplying(dataSource) && (
         <Message content="Credential storage differs from the registered credentials. Select Apply to reconcile the telemetry endpoint." />
       )}
       <Table
