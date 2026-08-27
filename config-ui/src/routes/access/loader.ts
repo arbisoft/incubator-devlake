@@ -16,16 +16,16 @@
  *
  */
 
-export * from './api-keys';
-export * from './access';
-export * from './blueprint';
-export * from './connection';
-export * from './db-migrate';
-export * from './error';
-export * from './layout';
-export * from './login';
-export * from './not-found';
-export * from './onboard';
-export * from './otel';
-export * from './pipeline';
-export * from './project';
+import { redirect } from 'react-router-dom';
+
+import API from '@/api';
+import { PATH_PREFIX } from './constants';
+import { canManageAccess } from './guard';
+
+export const accessLoader = async () => {
+  const access = await API.access.current().catch(() => null);
+  if (canManageAccess(access)) {
+    return null;
+  }
+  return redirect(PATH_PREFIX || '/');
+};

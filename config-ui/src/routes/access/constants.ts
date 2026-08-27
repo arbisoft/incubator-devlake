@@ -16,16 +16,22 @@
  *
  */
 
-export * from './api-keys';
-export * from './access';
-export * from './blueprint';
-export * from './connection';
-export * from './db-migrate';
-export * from './error';
-export * from './layout';
-export * from './login';
-export * from './not-found';
-export * from './onboard';
-export * from './otel';
-export * from './pipeline';
-export * from './project';
+import { ACCESS_ROLE, type AccessRole } from '@/api/access';
+
+export const PATH_PREFIX = import.meta.env.DEVLAKE_PATH_PREFIX ?? '';
+export const ACCESS_PATH = `${PATH_PREFIX}/access`;
+export const BREADCRUMBS = [{ name: 'User Management', path: ACCESS_PATH }];
+export const PAGE_DESCRIPTION = 'Manage who can access DevLake. Grafana access remains independently managed in Grafana.';
+export const PAGE_SIZE_OPTIONS: Array<10 | 25 | 50> = [10, 25, 50];
+export const DEFAULT_PAGE_SIZE = PAGE_SIZE_OPTIONS[0];
+
+export const ACCESS_STATUS_COLOR = {
+  active: 'green',
+  disabled: 'default',
+} as const;
+
+export const ROLE_OPTIONS: Array<{ value: AccessRole; label: string }> = [
+  { value: ACCESS_ROLE.MEMBER, label: 'Member' },
+  { value: ACCESS_ROLE.CUSTOMER_ADMIN, label: 'Customer administrator' },
+];
+

@@ -44,6 +44,7 @@ import (
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/log"
 	"github.com/apache/incubator-devlake/helpers/oidchelper"
+	"github.com/apache/incubator-devlake/server/api/access"
 	"github.com/apache/incubator-devlake/server/api/shared"
 )
 
@@ -70,9 +71,16 @@ type Service struct {
 	logger    log.Logger
 	db        dal.Dal
 	revoked   *revocationCache
+	access    accessAuthorizer
 
 	lastSeenMu sync.Mutex
 	lastSeen   map[string]time.Time
+}
+
+type accessAuthorizer interface {
+	Enabled() bool
+	Authorize(identity access.Identity) (*access.Principal, errors.Error)
+	AuthorizeSession(identity access.Identity) (*access.Principal, errors.Error)
 }
 
 // defaultService is populated by Init and backs the package-level handler /
@@ -102,6 +110,11 @@ func NewService(ctx stdctx.Context, basicRes corectx.BasicRes) (*Service, error)
 	if err != nil {
 		return nil, err
 	}
+	if access.Default() != nil && access.Default().Enabled() {
+		if err := access.ValidateConfiguration(cfg.AuthEnabled, cfg.OIDCEnabled, basicRes.GetConfigReader().GetString("FORWARDED_USER_SECRET")); err != nil {
+			return nil, err
+		}
+	}
 	s := &Service{
 		cfg:       cfg,
 		providers: map[string]*oidchelper.Provider{},
@@ -109,10 +122,12 @@ func NewService(ctx stdctx.Context, basicRes corectx.BasicRes) (*Service, error)
 		db:        basicRes.GetDal(),
 		revoked:   newRevocationCache(),
 		lastSeen:  map[string]time.Time{},
+		access:    access.Default(),
 	}
 	if cfg.AuthEnabled {
 		startRefresher(ctx, s.revoked, s.db, s.logger)
 		startSessionCleanup(ctx, s.db, s.logger)
+		access.SetSessionRevoker(s)
 	}
 	if cfg.OIDCEnabled {
 		for name, pc := range cfg.Providers {
@@ -303,9 +318,30 @@ func (s *Service) Callback(c *gin.Context) {
 		return
 	}
 
-	sub, email, name, err := extractUser(idTok)
+	sub, email, name, emailVerified, err := extractUser(idTok)
 	if err != nil {
 		fail(c, http.StatusBadGateway, "extract claims", err)
+		return
+	}
+	if !emailVerified {
+		fail(c, http.StatusForbidden, "id_token email is not verified", nil)
+		return
+	}
+	if accessService := s.access; accessService != nil && accessService.Enabled() {
+		issuer := s.cfg.Providers[state.Provider].IssuerURL
+		if _, accessErr := accessService.Authorize(access.Identity{
+			Issuer: issuer, Subject: sub, Email: email, DisplayName: name,
+		}); accessErr != nil {
+			if accessErr.GetType() == errors.Unauthorized || accessErr.GetType() == errors.Forbidden {
+				s.logger.Info("oidc login denied: provider=%s email=%s", state.Provider, email)
+			} else {
+				s.logger.Error(accessErr, "oidc login authorization failed: provider=%s email=%s", state.Provider, email)
+			}
+			c.Redirect(http.StatusSeeOther, "/login?error=access_denied")
+			return
+		}
+	} else if !s.cfg.IsUserAllowed(email) {
+		fail(c, http.StatusForbidden, "user is not allowed", nil)
 		return
 	}
 	jti := uuid.NewString()
@@ -317,6 +353,7 @@ func (s *Service) Callback(c *gin.Context) {
 	now := time.Now()
 	if dbErr := CreateSession(s.db, &AuthSession{
 		Jti:        jti,
+		Provider:   state.Provider,
 		Sub:        sub,
 		Email:      email,
 		Name:       name,
@@ -494,18 +531,19 @@ func safeReturnURL(raw string) string {
 // taken strictly from the `email` claim; we never coerce a username into
 // the email column. Display name falls back to preferred_username, then
 // email, so the UI always has *something* to render.
-func extractUser(tok *oidc.IDToken) (sub, email, name string, err error) {
+func extractUser(tok *oidc.IDToken) (sub, email, name string, emailVerified bool, err error) {
 	var claims struct {
 		Sub               string `json:"sub"`
 		Email             string `json:"email"`
+		EmailVerified     bool   `json:"email_verified"`
 		PreferredUsername string `json:"preferred_username"`
 		Name              string `json:"name"`
 	}
 	if err := tok.Claims(&claims); err != nil {
-		return "", "", "", err
+		return "", "", "", false, err
 	}
 	if claims.Sub == "" {
-		return "", "", "", fmt.Errorf("id_token missing sub claim")
+		return "", "", "", false, fmt.Errorf("id_token missing sub claim")
 	}
 	name = claims.Name
 	if name == "" {
@@ -514,7 +552,7 @@ func extractUser(tok *oidc.IDToken) (sub, email, name string, err error) {
 	if name == "" {
 		name = claims.Email
 	}
-	return claims.Sub, claims.Email, name, nil
+	return claims.Sub, claims.Email, name, claims.EmailVerified, nil
 }
 
 func pkceChallenge(verifier string) string {

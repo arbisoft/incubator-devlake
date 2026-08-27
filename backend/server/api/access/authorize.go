@@ -1,0 +1,270 @@
+/*
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package access
+
+import (
+	"time"
+
+	"github.com/gin-gonic/gin"
+
+	"github.com/apache/incubator-devlake/core/dal"
+	"github.com/apache/incubator-devlake/core/errors"
+)
+
+const identityContextKey = "devlake_access_identity"
+
+func SetIdentity(c *gin.Context, identity Identity) { c.Set(identityContextKey, identity) }
+
+func GetIdentity(c *gin.Context) (Identity, bool) {
+	value, ok := c.Get(identityContextKey)
+	if !ok {
+		return Identity{}, false
+	}
+	identity, ok := value.(Identity)
+	return identity, ok
+}
+
+// Authorize accepts only a verified OIDC identity. It is invoked before a
+// DevLake session is issued, so denied identities never receive a cookie.
+func (s *Service) Authorize(identity Identity) (*Principal, errors.Error) {
+	if !s.Enabled() {
+		return &Principal{}, nil
+	}
+	identity.Email = normalizeEmail(identity.Email)
+	if identity.Issuer == "" || identity.Subject == "" || identity.Email == "" {
+		return nil, errors.Unauthorized.New("verified OIDC identity is incomplete")
+	}
+
+	user := &AccessUser{}
+	err := s.db.First(user, dal.Where("issuer = ? AND subject = ?", identity.Issuer, identity.Subject))
+	if err == nil {
+		return s.authorizeExistingUser(user, identity)
+	}
+	if !s.db.IsErrorNotFound(err) {
+		return nil, errors.Default.Wrap(err, "error looking up access user")
+	}
+	invitation, invitationFound, invitationErr := s.claimInvitation(identity)
+	if invitationErr != nil {
+		return nil, invitationErr
+	}
+	if invitationFound {
+		s.audit("", "user.invitation_claimed", invitation, "")
+		return s.authorizeExistingUser(invitation, identity)
+	}
+
+	if principal, bootstrapErr := s.bootstrap(identity); bootstrapErr != nil || principal != nil {
+		return principal, bootstrapErr
+	}
+
+	domain, ok := emailDomain(identity.Email)
+	if !ok {
+		return nil, errors.Unauthorized.New("verified email is invalid")
+	}
+	accessDomain := &AccessDomain{}
+	err = s.db.First(accessDomain, dal.Where("domain = ? AND hidden_at IS NULL", domain))
+	if err == nil && accessDomain.Status == StatusActive {
+		user = &AccessUser{
+			Issuer: identity.Issuer, Subject: identity.Subject, Email: identity.Email,
+			DisplayName: identity.DisplayName, Role: accessDomain.DefaultRole, Status: StatusActive,
+		}
+		if createErr := s.db.Create(user); createErr != nil {
+			if s.db.IsDuplicationError(createErr) {
+				existing := &AccessUser{}
+				lookupErr := s.db.First(existing, dal.Where("issuer = ? AND subject = ?", identity.Issuer, identity.Subject))
+				if lookupErr == nil {
+					return s.authorizeExistingUser(existing, identity)
+				}
+				if s.db.IsErrorNotFound(lookupErr) {
+					return nil, errors.Default.New("domain-authorized user was not available after duplicate identity creation")
+				}
+				return nil, errors.Default.Wrap(lookupErr, "error reading domain-authorized user after duplicate identity creation")
+			}
+			return nil, errors.Default.Wrap(createErr, "error creating domain-authorized user")
+		}
+		s.audit("", "user.domain_provisioned", user, "")
+		return &Principal{UserID: user.ID, Role: user.Role}, nil
+	}
+	if err != nil && !s.db.IsErrorNotFound(err) {
+		return nil, errors.Default.Wrap(err, "error looking up access domain")
+	}
+	return nil, errors.Unauthorized.New("this account is not allowed to access DevLake")
+}
+
+func (s *Service) bootstrap(identity Identity) (*Principal, errors.Error) {
+	if s.cfg.BootstrapAdminEmail == "" || identity.Email != s.cfg.BootstrapAdminEmail {
+		return nil, nil
+	}
+	tx := s.db.Begin()
+	finished := false
+	defer func() {
+		if !finished {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				s.logger.Error(rollbackErr, "access: rollback bootstrap administrator claim")
+			}
+		}
+	}()
+
+	count, err := tx.Count(dal.From(&AccessUser{}))
+	if err != nil {
+		return nil, errors.Default.Wrap(err, "error checking access bootstrap state")
+	}
+	if count != 0 {
+		return nil, nil
+	}
+	if err := tx.Create(&BootstrapClaim{Key: bootstrapClaimKey}); err != nil {
+		if tx.IsDuplicationError(err) {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				return nil, errors.Default.Wrap(rollbackErr, "error rolling back bootstrap administrator claim")
+			}
+			finished = true
+			existing := &AccessUser{}
+			if lookupErr := s.db.First(existing, dal.Where("issuer = ? AND subject = ?", identity.Issuer, identity.Subject)); lookupErr == nil {
+				return s.authorizeExistingUser(existing, identity)
+			} else if !s.db.IsErrorNotFound(lookupErr) {
+				return nil, errors.Default.Wrap(lookupErr, "error reading bootstrap administrator")
+			}
+			return nil, errors.Unauthorized.New("the bootstrap administrator has already been claimed")
+		}
+		return nil, errors.Default.Wrap(err, "error claiming bootstrap administrator")
+	}
+	now := time.Now()
+	user := &AccessUser{
+		Issuer: identity.Issuer, Subject: identity.Subject, Email: identity.Email,
+		DisplayName: identity.DisplayName, Role: RoleCustomerAdmin, Status: StatusActive, LastLoginAt: &now,
+	}
+	if err := tx.Create(user); err != nil {
+		return nil, errors.Default.Wrap(err, "error creating bootstrap administrator")
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, errors.Default.Wrap(err, "error committing bootstrap administrator")
+	}
+	finished = true
+	s.audit(identity.Email, "bootstrap.consumed", user, "")
+	s.logger.Info("access: bootstrap administrator provisioned email=%s", identity.Email)
+	return &Principal{UserID: user.ID, Role: user.Role}, nil
+}
+
+// claimInvitation conditionally binds an email invitation to the verified OIDC
+// identity. A concurrent claimant can update only an unclaimed row; the final
+// read authorizes the winner and rejects every other identity.
+func (s *Service) claimInvitation(identity Identity) (*AccessUser, bool, errors.Error) {
+	tx := s.db.Begin()
+	finished := false
+	defer func() {
+		if !finished {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				s.logger.Error(rollbackErr, "access: rollback invitation claim email=%s", identity.Email)
+			}
+		}
+	}()
+
+	invitation := &AccessUser{}
+	err := tx.First(invitation, dal.Where("issuer = ? AND subject = ? AND hidden_at IS NULL", "", invitationSubject(identity.Email)))
+	if err != nil {
+		if tx.IsErrorNotFound(err) {
+			return nil, false, nil
+		}
+		return nil, false, errors.Default.Wrap(err, "error looking up invited access user")
+	}
+	now := time.Now()
+	if err := tx.UpdateColumns(
+		&AccessUser{},
+		[]dal.DalSet{
+			{ColumnName: "issuer", Value: identity.Issuer},
+			{ColumnName: "subject", Value: identity.Subject},
+			{ColumnName: "email", Value: identity.Email},
+			{ColumnName: "display_name", Value: identity.DisplayName},
+			{ColumnName: "last_login_at", Value: now},
+		},
+		dal.Where("id = ? AND issuer = ? AND subject = ?", invitation.ID, "", invitationSubject(identity.Email)),
+	); err != nil {
+		return nil, false, errors.Default.Wrap(err, "error claiming invited access user")
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, false, errors.Default.Wrap(err, "error committing invited access user claim")
+	}
+	finished = true
+
+	claimed := &AccessUser{}
+	if err := s.db.First(claimed, dal.Where("id = ?", invitation.ID)); err != nil {
+		return nil, false, errors.Default.Wrap(err, "error reading claimed access user")
+	}
+	if claimed.Issuer != identity.Issuer || claimed.Subject != identity.Subject {
+		return nil, false, errors.Unauthorized.New("this invitation has already been claimed")
+	}
+	return claimed, true, nil
+}
+
+func (s *Service) authorizeExistingUser(user *AccessUser, identity Identity) (*Principal, errors.Error) {
+	if user.HiddenAt != nil || user.Status != StatusActive {
+		return nil, errors.Unauthorized.New("this account is disabled")
+	}
+	now := time.Now()
+	user.Email = identity.Email
+	user.DisplayName = identity.DisplayName
+	user.LastLoginAt = &now
+	if err := s.db.Update(user); err != nil {
+		return nil, errors.Default.Wrap(err, "error recording access user login")
+	}
+	return &Principal{UserID: user.ID, Role: user.Role}, nil
+}
+
+func (s *Service) CurrentPrincipal(c *gin.Context) (*Principal, errors.Error) {
+	if !s.Enabled() {
+		return nil, errors.HttpStatus(404).New("access management is not enabled")
+	}
+	identity, ok := GetIdentity(c)
+	if !ok {
+		return nil, errors.Unauthorized.New("native OIDC authentication is required")
+	}
+	return s.AuthorizeSession(identity)
+}
+
+// AuthorizeSession validates a previously issued native OIDC session against the
+// current access directory without updating login metadata on every request.
+func (s *Service) AuthorizeSession(identity Identity) (*Principal, errors.Error) {
+	if !s.Enabled() {
+		return &Principal{}, nil
+	}
+	if identity.Issuer == "" || identity.Subject == "" {
+		return nil, errors.Unauthorized.New("native session identity is incomplete")
+	}
+	user := &AccessUser{}
+	err := s.db.First(user, dal.Where("issuer = ? AND subject = ?", identity.Issuer, identity.Subject))
+	if err != nil {
+		if s.db.IsErrorNotFound(err) {
+			return nil, errors.Unauthorized.New("this account is not allowed to access DevLake")
+		}
+		return nil, errors.Default.Wrap(err, "error looking up current access user")
+	}
+	if user.HiddenAt != nil || user.Status != StatusActive {
+		return nil, errors.Unauthorized.New("this account is disabled")
+	}
+	return &Principal{UserID: user.ID, Role: user.Role}, nil
+}
+
+func (s *Service) RequireAdmin(c *gin.Context) (*Principal, errors.Error) {
+	principal, err := s.CurrentPrincipal(c)
+	if err != nil {
+		return nil, err
+	}
+	if principal.Role != RoleCustomerAdmin {
+		return nil, errors.Forbidden.New("customer administrator access is required")
+	}
+	return principal, nil
+}

@@ -69,6 +69,11 @@ type Config struct {
 	Providers      map[string]*ProviderConfig
 	LogoutRedirect bool
 
+	// Optional OIDC authorization restrictions.
+	// Empty means no restriction.
+	AllowEmails  map[string]struct{}
+	AllowDomains map[string]struct{}
+
 	SessionSecret []byte
 	SessionTTL    time.Duration
 
@@ -128,6 +133,8 @@ func LoadConfig(basicRes context.BasicRes) (*Config, error) {
 		OIDCEnabled:        cfg.GetBool("OIDC_ENABLED"),
 		Providers:          map[string]*ProviderConfig{},
 		LogoutRedirect:     cfg.GetBool("OIDC_LOGOUT_REDIRECT"),
+		AllowEmails:        parseStringSet(cfg.GetString("OIDC_ALLOW_EMAILS")),
+		AllowDomains:       parseStringSet(cfg.GetString("OIDC_ALLOW_DOMAINS")),
 		SessionSecret:      []byte(sessionSecret),
 		SessionTTL:         ttl,
 		CookieDomain:       strings.TrimSpace(cfg.GetString("COOKIE_DOMAIN")),
@@ -201,6 +208,23 @@ func parseProviderNames(raw string) []string {
 		seen[n] = struct{}{}
 		out = append(out, n)
 	}
+
+	return out
+}
+
+func parseStringSet(raw string) map[string]struct{} {
+	out := make(map[string]struct{})
+
+	for _, v := range strings.Split(raw, ",") {
+		v = strings.ToLower(strings.TrimSpace(v))
+
+		if v == "" {
+			continue
+		}
+
+		out[v] = struct{}{}
+	}
+
 	return out
 }
 

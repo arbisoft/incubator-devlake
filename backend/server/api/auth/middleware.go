@@ -24,8 +24,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/apache/incubator-devlake/core/dal"
+	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/helpers/oidchelper"
+	"github.com/apache/incubator-devlake/server/api/access"
 	"github.com/apache/incubator-devlake/server/api/shared"
 )
 
@@ -83,12 +86,68 @@ func (s *Service) OIDCAuthentication() gin.HandlerFunc {
 			c.Next()
 			return
 		}
+		if s.access != nil && s.access.Enabled() {
+			provider := s.cfg.Providers[claims.Provider]
+			if provider == nil {
+				s.logger.Info("native session denied: unknown provider=%s jti=%s", claims.Provider, claims.ID)
+				oidchelper.ClearSessionCookie(c, s.cfg)
+				c.Next()
+				return
+			}
+			identity := access.Identity{
+				Issuer: provider.IssuerURL, Subject: claims.Subject, Email: claims.Email, DisplayName: claims.Name,
+			}
+			if _, accessErr := s.access.AuthorizeSession(identity); accessErr != nil {
+				if accessErr.GetType() == errors.Unauthorized || accessErr.GetType() == errors.Forbidden {
+					s.logger.Info("native session denied: provider=%s email=%s", claims.Provider, claims.Email)
+					oidchelper.ClearSessionCookie(c, s.cfg)
+				} else {
+					s.logger.Error(accessErr, "native session authorization failed provider=%s email=%s", claims.Provider, claims.Email)
+				}
+				c.Next()
+				return
+			}
+		}
 		c.Set(common.USER, &common.User{
 			Name:  claims.Name,
 			Email: claims.Email,
 		})
+		if provider := s.cfg.Providers[claims.Provider]; provider != nil {
+			access.SetIdentity(c, access.Identity{
+				Issuer: provider.IssuerURL, Subject: claims.Subject, Email: claims.Email, DisplayName: claims.Name,
+			})
+		}
 		s.bumpLastSeen(claims.ID)
 		c.Next()
+	}
+}
+
+// RevokePersistentSessions implements access.SessionRevoker. The caller owns the
+// transaction so disabling a directory user and revoking their session rows commit
+// together.
+func (s *Service) RevokePersistentSessions(tx dal.Transaction, issuer, subject string) ([]string, errors.Error) {
+	ids := make([]string, 0)
+	for providerName, provider := range s.cfg.Providers {
+		if provider == nil || provider.IssuerURL != issuer {
+			continue
+		}
+		activeIDs, err := ListActiveSessionIDsForIdentity(tx, providerName, subject)
+		if err != nil {
+			return nil, err
+		}
+		if err := RevokeSessionsForIdentity(tx, providerName, subject); err != nil {
+			return nil, err
+		}
+		ids = append(ids, activeIDs...)
+	}
+	return ids, nil
+}
+
+// CacheRevokedSessions updates the process-local fast path only after the
+// transaction that persisted the revocations has committed.
+func (s *Service) CacheRevokedSessions(ids []string) {
+	for _, id := range ids {
+		s.revoked.Add(id)
 	}
 }
 

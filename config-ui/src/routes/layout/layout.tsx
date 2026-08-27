@@ -29,7 +29,9 @@ import { OnboardCard } from '@/routes/onboard/components';
 import { OtelAttention } from '@/routes/otel/attention';
 import { useAppDispatch, useAppSelector } from '@/hooks';
 
-import { menuItems, menuItemsMatch, headerItems } from './config';
+import { ACCESS_PATH, menuItems, menuItemsMatch, headerItems } from './config';
+import type { AccessCurrent } from '@/api/access';
+import { canManageAccess } from '@/routes/access/guard';
 
 const { Sider, Header, Content, Footer } = AntdLayout;
 
@@ -39,11 +41,17 @@ export const Layout = () => {
   const [openKeys, setOpenKeys] = useState<string[]>([]);
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
 
-  const { version, plugins, user } = useLoaderData() as {
+  const { version, plugins, user, access } = useLoaderData() as {
     version: string;
     plugins: string[];
     user: { authenticated: boolean; name: string; email: string } | null;
+    access: AccessCurrent | null;
   };
+
+  const visibleMenuItems = useMemo(
+    () => menuItems.filter((item) => item.key !== ACCESS_PATH || canManageAccess(access)),
+    [access],
+  );
 
   const handleLogout = async () => {
     try {
@@ -122,7 +130,7 @@ export const Layout = () => {
         <Menu
           mode="inline"
           theme="dark"
-          items={menuItems}
+          items={visibleMenuItems}
           openKeys={openKeys}
           selectedKeys={selectedKeys}
           onClick={({ key }) => navigate(key)}

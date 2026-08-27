@@ -16,16 +16,7 @@
  *
  */
 
-export * from './api-keys';
-export * from './access';
-export * from './blueprint';
-export * from './connection';
-export * from './db-migrate';
-export * from './error';
-export * from './layout';
-export * from './login';
-export * from './not-found';
-export * from './onboard';
-export * from './otel';
-export * from './pipeline';
-export * from './project';
+import { ACCESS_ROLE, type AccessCurrent } from '../../api/access';
+
+export const canManageAccess = (access: AccessCurrent | null) =>
+  access?.enabled === true && access.role === ACCESS_ROLE.CUSTOMER_ADMIN;

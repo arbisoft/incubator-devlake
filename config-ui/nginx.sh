@@ -45,7 +45,23 @@ export DNS=$(awk 'BEGIN{ORS=" "} $1=="nameserver" {if ($2 ~ ":") {print "["$2"]"
 export DNS_VALID=${DNS_VALID:-300s}
 export DEVLAKE_ENDPOINT_PROTO=${DEVLAKE_ENDPOINT_PROTO:-http}
 export GRAFANA_ENDPOINT_PROTO=${GRAFANA_ENDPOINT_PROTO:-http}
-envsubst '${LISTENER} ${DEVLAKE_ENDPOINT} ${DEVLAKE_ENDPOINT_PROTO} ${GRAFANA_ENDPOINT} ${GRAFANA_ENDPOINT_PROTO} ${USE_EXTERNAL_GRAFANA} ${SERVER_CONF} ${DNS} ${DNS_VALID}' \
+export GRAFANA_OIDC_ENABLED=${GRAFANA_OIDC_ENABLED:-false}
+
+if [ "${USE_EXTERNAL_GRAFANA}" = "true" ] && [ -z "${GRAFANA_EXTERNAL_URL}" ]; then
+    echo "GRAFANA_EXTERNAL_URL is required when USE_EXTERNAL_GRAFANA=true" >&2
+    exit 1
+fi
+
+if [ "${USE_EXTERNAL_GRAFANA}" = "true" ] && [ "${GRAFANA_OIDC_ENABLED}" = "true" ] && [ -z "${GRAFANA_OIDC_LOGIN_URL}" ]; then
+    echo "GRAFANA_OIDC_LOGIN_URL is required when external Grafana Generic OAuth is enabled" >&2
+    exit 1
+fi
+
+# The exact route is unreachable while OAuth is disabled, but keep every rendered
+# redirect syntactically valid for deployment configuration inspection.
+export GRAFANA_OIDC_LOGIN_URL=${GRAFANA_OIDC_LOGIN_URL:-/grafana/}
+
+envsubst '${LISTENER} ${DEVLAKE_ENDPOINT} ${DEVLAKE_ENDPOINT_PROTO} ${GRAFANA_ENDPOINT} ${GRAFANA_ENDPOINT_PROTO} ${GRAFANA_EXTERNAL_URL} ${GRAFANA_OIDC_ENABLED} ${GRAFANA_OIDC_LOGIN_URL} ${USE_EXTERNAL_GRAFANA} ${SERVER_CONF} ${DNS} ${DNS_VALID}' \
     < /etc/nginx/conf.d/default.conf.tpl \
     > /etc/nginx/conf.d/default.conf
 nginx -g 'daemon off;'

@@ -1,0 +1,93 @@
+/*
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package access
+
+import (
+	"fmt"
+	"strings"
+	"sync"
+
+	"github.com/apache/incubator-devlake/core/context"
+	"github.com/apache/incubator-devlake/core/dal"
+	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/core/log"
+)
+
+type Config struct {
+	Enabled             bool
+	BootstrapAdminEmail string
+}
+
+// SessionRevoker persists revocations in the same transaction as an access-user
+// disable. It returns the affected session IDs so the auth service can update its
+// in-memory cache only after the transaction commits.
+type SessionRevoker interface {
+	RevokePersistentSessions(tx dal.Transaction, issuer, subject string) ([]string, errors.Error)
+	CacheRevokedSessions(ids []string)
+}
+
+type Service struct {
+	cfg            Config
+	db             dal.Dal
+	logger         log.Logger
+	sessionRevoker SessionRevoker
+}
+
+var (
+	defaultService *Service
+	initOnce       sync.Once
+)
+
+func Init(basicRes context.BasicRes) {
+	initOnce.Do(func() {
+		cfg := basicRes.GetConfigReader()
+		defaultService = &Service{
+			cfg: Config{
+				Enabled:             cfg.GetBool("AUTH_ACCESS_ENABLED"),
+				BootstrapAdminEmail: normalizeEmail(cfg.GetString("AUTH_BOOTSTRAP_ADMIN_EMAIL")),
+			},
+			db:     basicRes.GetDal(),
+			logger: basicRes.GetLogger(),
+		}
+	})
+}
+
+func Default() *Service { return defaultService }
+
+func SetSessionRevoker(revoker SessionRevoker) {
+	if defaultService != nil {
+		defaultService.sessionRevoker = revoker
+	}
+}
+
+func (s *Service) Enabled() bool { return s != nil && s.cfg.Enabled }
+
+// ValidateConfiguration ensures access-directory admission is backed by native
+// OIDC only, rather than a legacy proxy identity that cannot consult the directory.
+func ValidateConfiguration(authEnabled, oidcEnabled bool, forwardedUserSecret string) error {
+	if !authEnabled {
+		return fmt.Errorf("AUTH_ACCESS_ENABLED=true requires AUTH_ENABLED=true")
+	}
+	if !oidcEnabled {
+		return fmt.Errorf("AUTH_ACCESS_ENABLED=true requires OIDC_ENABLED=true")
+	}
+	if strings.TrimSpace(forwardedUserSecret) != "" {
+		return fmt.Errorf("AUTH_ACCESS_ENABLED=true cannot be combined with FORWARDED_USER_SECRET; remove trusted oauth2-proxy forwarded identity authentication before enabling the access directory")
+	}
+	return nil
+}

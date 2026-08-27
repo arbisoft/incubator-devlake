@@ -16,16 +16,15 @@
  *
  */
 
-export * from './api-keys';
-export * from './access';
-export * from './blueprint';
-export * from './connection';
-export * from './db-migrate';
-export * from './error';
-export * from './layout';
-export * from './login';
-export * from './not-found';
-export * from './onboard';
-export * from './otel';
-export * from './pipeline';
-export * from './project';
+import styled from 'styled-components';
+
+export const SectionHeader = styled.div<{ $spaced?: boolean }>`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: ${({ $spaced }) => ($spaced ? '32px 0 16px' : '0 0 16px')};
+`;
+
+export const SectionTitle = styled.h3`
+  margin: 0;
+`;
