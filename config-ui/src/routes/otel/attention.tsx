@@ -22,36 +22,16 @@ import { Alert, Button } from 'antd';
 import { useNavigate } from 'react-router-dom';
 
 import API from '@/api';
-import type { OtelConnectionResponse } from '@/api/otel';
-import { formatPlural } from '@/utils';
 import { OTEL_ATTENTION_CHANGED_EVENT } from './constants';
+import {
+  getAttentionState,
+  isSameAttentionState,
+  withVerb,
+  type OtelAttentionState,
+} from './utils';
 
 const OTEL_PATH = `${import.meta.env.DEVLAKE_PATH_PREFIX ?? ''}/otel`;
 const REFRESH_INTERVAL_MS = 30_000;
-type OtelAttentionState = {
-  connectionCount: number;
-  restartRequired: number;
-  recoveryRequired: number;
-};
-
-const getAttentionState = (connections: OtelConnectionResponse[]): OtelAttentionState =>
-  connections.reduce(
-    (state, connection) => ({
-      connectionCount: state.connectionCount + (connection.restartRequired || connection.recoveryRequired ? 1 : 0),
-      restartRequired: state.restartRequired + (connection.restartRequired ? 1 : 0),
-      recoveryRequired: state.recoveryRequired + (connection.recoveryRequired ? 1 : 0),
-    }),
-    { connectionCount: 0, restartRequired: 0, recoveryRequired: 0 },
-  );
-
-const formatConnectionCount = (count: number) => formatPlural(count, 'connection');
-const withVerb = (count: number, singular: string, plural: string) =>
-  `${formatConnectionCount(count)} ${count === 1 ? singular : plural}`;
-
-const isSameAttentionState = (left?: OtelAttentionState, right?: OtelAttentionState) =>
-  left?.connectionCount === right?.connectionCount &&
-  left?.restartRequired === right?.restartRequired &&
-  left?.recoveryRequired === right?.recoveryRequired;
 
 // Surface credential activation problems globally without changing DevLake's core pipeline UX.
 export const OtelAttention = () => {

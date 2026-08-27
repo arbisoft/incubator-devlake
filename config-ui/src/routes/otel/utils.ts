@@ -17,11 +17,44 @@
  */
 
 import axios, { HttpStatusCode } from 'axios';
+
+import { formatPlural } from '../../utils';
 import { OTEL_ATTENTION_CHANGED_EVENT, OTEL_ERROR } from './constants';
 
 const SAFE_LIFECYCLE_MESSAGE_STATUSES: readonly number[] = [HttpStatusCode.BadRequest];
 
 type OtelErrorResponse = { message?: unknown };
+
+export type OtelAttentionState = {
+  connectionCount: number;
+  restartRequired: number;
+  recoveryRequired: number;
+};
+
+type AttentionTarget = {
+  restartRequired?: boolean;
+  recoveryRequired?: boolean;
+};
+
+export const getAttentionState = (connections: AttentionTarget[]): OtelAttentionState =>
+  connections.reduce(
+    (state, connection) => ({
+      connectionCount: state.connectionCount + (connection.restartRequired || connection.recoveryRequired ? 1 : 0),
+      restartRequired: state.restartRequired + (connection.restartRequired ? 1 : 0),
+      recoveryRequired: state.recoveryRequired + (connection.recoveryRequired ? 1 : 0),
+    }),
+    { connectionCount: 0, restartRequired: 0, recoveryRequired: 0 },
+  );
+
+export const formatConnectionCount = (count: number) => formatPlural(count, 'connection');
+
+export const withVerb = (count: number, singular: string, plural: string) =>
+  `${formatConnectionCount(count)} ${count === 1 ? singular : plural}`;
+
+export const isSameAttentionState = (left?: OtelAttentionState, right?: OtelAttentionState) =>
+  left?.connectionCount === right?.connectionCount &&
+  left?.restartRequired === right?.restartRequired &&
+  left?.recoveryRequired === right?.recoveryRequired;
 
 export const notifyOtelAttentionChanged = () => {
   window.dispatchEvent(new Event(OTEL_ATTENTION_CHANGED_EVENT));
