@@ -18,7 +18,7 @@
 
 import axios, { HttpStatusCode } from 'axios';
 
-import { ACCESS_ERROR_CODE, type AccessApiErrorResponse } from '@/api/access';
+import { ACCESS_ERROR_CODE, type AccessApiErrorResponse } from '../../api/access';
 
 export const ACCESS_ERROR = {
   DUPLICATE_DOMAIN: 'This domain already has a DevLake access policy.',
@@ -80,4 +80,3 @@ export const getCreateDomainError = (error: unknown) => {
   if (message.includes('this domain already has a DevLake access policy')) return ACCESS_ERROR.DUPLICATE_DOMAIN;
   return message ? ACCESS_ERROR.INVALID_DOMAIN : ACCESS_ERROR.REQUEST_FAILED;
 };
-

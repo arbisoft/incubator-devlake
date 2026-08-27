@@ -30,8 +30,8 @@ import (
 // expiry.
 type AuthSession struct {
 	Jti        string     `gorm:"primaryKey;type:varchar(36)" json:"jti"`
-	Provider   string     `gorm:"type:varchar(64);index" json:"provider"`
-	Sub        string     `gorm:"type:varchar(255);index" json:"sub"`
+	Provider   string     `gorm:"type:varchar(64);index:idx_auth_sessions_provider_sub" json:"provider"`
+	Sub        string     `gorm:"type:varchar(255);index:idx_auth_sessions_provider_sub" json:"sub"`
 	Email      string     `gorm:"type:varchar(255)" json:"email"`
 	Name       string     `gorm:"type:varchar(255)" json:"name"`
 	IssuedAt   time.Time  `json:"issuedAt"`

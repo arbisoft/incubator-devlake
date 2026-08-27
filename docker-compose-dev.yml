@@ -182,8 +182,12 @@ services:
       # Keep the Config UI's stable /grafana/ link while Grafana itself serves
       # at its own local root URL for the Generic OAuth callback.
       USE_EXTERNAL_GRAFANA: "${USE_EXTERNAL_GRAFANA:-true}"
-      GRAFANA_ENDPOINT: "${GRAFANA_ENDPOINT:-http://localhost:3002}"
-      GRAFANA_OIDC_LOGIN_URL: "${GRAFANA_OIDC_LOGIN_URL:-http://localhost:3002/login/generic_oauth}"
+      # Internal-only upstream used by Config UI when external routing is disabled.
+      GRAFANA_ENDPOINT: "${GRAFANA_ENDPOINT:-grafana:3000}"
+      # Browser-facing URL used only when external Grafana routing is enabled.
+      GRAFANA_EXTERNAL_URL: "${GRAFANA_EXTERNAL_URL:-http://localhost:3002}"
+      GRAFANA_OIDC_ENABLED: "${GRAFANA_OIDC_ENABLED:-false}"
+      GRAFANA_OIDC_LOGIN_URL: "${GRAFANA_OIDC_LOGIN_URL:-}"
       TZ: UTC
       #ADMIN_USER: devlake
       #ADMIN_PASS: letsdivein

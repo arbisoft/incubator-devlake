@@ -72,6 +72,15 @@ type authAccessBootstrapClaim20260825 struct {
 
 func (authAccessBootstrapClaim20260825) TableName() string { return "auth_access_bootstrap_claims" }
 
+// authSessionProvider20260825 applies the index required by identity-based session
+// revocation without re-declaring the full auth session model in this migration.
+type authSessionProvider20260825 struct {
+	Provider string `gorm:"type:varchar(64);index:idx_auth_sessions_provider_sub"`
+	Sub      string `gorm:"type:varchar(255);index:idx_auth_sessions_provider_sub"`
+}
+
+func (authSessionProvider20260825) TableName() string { return "auth_sessions" }
+
 type addAuthAccessDirectory struct{}
 
 func (*addAuthAccessDirectory) Up(basicRes context.BasicRes) errors.Error {
@@ -84,12 +93,21 @@ func (*addAuthAccessDirectory) Up(basicRes context.BasicRes) errors.Error {
 	); err != nil {
 		return err
 	}
-	// Older local databases can already contain this forward-compatible column.
+	// Sessions created before provider identity was stored cannot be matched safely to
+	// a directory user, so revoke them before enabling directory-backed revocation.
 	// Do not hide real migration errors such as a missing or inaccessible table.
 	if !basicRes.GetDal().HasColumn("auth_sessions", "provider") {
-		return basicRes.GetDal().AddColumn("auth_sessions", "provider", "varchar(64)")
+		if err := basicRes.GetDal().AddColumn("auth_sessions", "provider", "varchar(64)"); err != nil {
+			return err
+		}
 	}
-	return nil
+	if err := basicRes.GetDal().Exec(
+		"UPDATE auth_sessions SET revoked_at = ? WHERE (provider IS NULL OR provider = '') AND revoked_at IS NULL",
+		time.Now(),
+	); err != nil {
+		return err
+	}
+	return migrationhelper.AutoMigrateTables(basicRes, new(authSessionProvider20260825))
 }
 
 func (*addAuthAccessDirectory) Version() uint64 { return 20260825000001 }

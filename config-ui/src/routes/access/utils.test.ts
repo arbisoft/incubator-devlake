@@ -20,7 +20,7 @@ import { equal } from 'node:assert/strict';
 import { test } from 'node:test';
 import { AxiosError, AxiosHeaders, HttpStatusCode } from 'axios';
 
-import { ACCESS_ERROR_CODE } from '@/api/access';
+import { ACCESS_ERROR_CODE } from '../../api/access';
 
 import {
   ACCESS_ERROR,
@@ -104,4 +104,3 @@ test('maps create-domain error codes to safe UI copy', () => {
 
   equal(getCreateDomainError(new Error('network error')), ACCESS_ERROR.REQUEST_FAILED);
 });
-
