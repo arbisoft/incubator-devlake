@@ -23,6 +23,8 @@ import type { ColumnsType } from 'antd/es/table';
 import { OTEL_CONNECTION_STATUS, OTEL_CREDENTIAL_STATUS, type OtelConnectionResponse } from '@/api/otel';
 import { formatTime } from '@/utils';
 import { OTEL_MODAL, type OtelModalState } from './modals';
+import { getOtelConnectionStatus } from './utils';
+import { OTEL_CONNECTION_DISPLAY_STATUS } from './constants';
 
 export const getOtelColumns = (
   setCurrent: (connection: OtelConnectionResponse) => void,
@@ -58,21 +60,10 @@ export const getOtelColumns = (
   {
     title: 'Status',
     width: 180,
-    render: (_, record) => (
-      <Space>
-        <Tag
-          color={
-            record.connection.status === OTEL_CONNECTION_STATUS.ACTIVE && !record.restartRequired ? 'green' : 'default'
-          }
-        >
-          {record.connection.status === OTEL_CONNECTION_STATUS.REVOKED
-            ? 'Revoked'
-            : record.restartRequired
-            ? 'Action required'
-            : 'Ready'}
-        </Tag>
-      </Space>
-    ),
+    render: (_, record) => {
+      const status = getOtelConnectionStatus(record);
+      return <Tag color={status === OTEL_CONNECTION_DISPLAY_STATUS.READY ? 'green' : 'default'}>{status}</Tag>;
+    },
   },
   {
     title: 'Credentials',
@@ -108,10 +99,7 @@ export const getOtelColumns = (
     width: 250,
     render: (_, record) => (
       <Space wrap>
-        <Button
-          size="small"
-          onClick={() => onManageProjects(record)}
-        >
+        <Button size="small" onClick={() => onManageProjects(record)}>
           Projects
         </Button>
         <Button

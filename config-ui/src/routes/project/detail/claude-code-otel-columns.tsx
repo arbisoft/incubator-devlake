@@ -20,18 +20,12 @@ import type { NavigateFunction } from 'react-router-dom';
 import { Button, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 
-import { OTEL_CONNECTION_STATUS, type OtelConnectionResponse } from '@/api/otel';
+import { type OtelConnectionResponse } from '@/api/otel';
 import { PATHS } from '@/config';
+import { OTEL_CONNECTION_DISPLAY_STATUS } from '@/routes/otel/constants';
+import { getOtelConnectionStatus } from '@/routes/otel/utils';
 
-const getConnectionStatus = (connection: OtelConnectionResponse) => {
-  if (connection.connection.status === OTEL_CONNECTION_STATUS.REVOKED) return 'Revoked';
-  if (connection.restartRequired || connection.recoveryRequired) return 'Action required';
-  return 'Ready';
-};
-
-export const getClaudeCodeOtelProjectColumns = (
-  navigate: NavigateFunction,
-): ColumnsType<OtelConnectionResponse> => [
+export const getClaudeCodeOtelProjectColumns = (navigate: NavigateFunction): ColumnsType<OtelConnectionResponse> => [
   {
     title: 'Team',
     dataIndex: ['connection', 'teamName'],
@@ -39,11 +33,18 @@ export const getClaudeCodeOtelProjectColumns = (
   {
     title: 'Placement',
     render: (_, record) =>
-      record.projects.length > 1 ? <Tag color="blue">Shared across {record.projects.length} projects</Tag> : <Tag>Project only</Tag>,
+      record.projects.length > 1 ? (
+        <Tag color="blue">Shared across {record.projects.length} projects</Tag>
+      ) : (
+        <Tag>Project only</Tag>
+      ),
   },
   {
     title: 'Status',
-    render: (_, record) => <Tag>{getConnectionStatus(record)}</Tag>,
+    render: (_, record) => {
+      const status = getOtelConnectionStatus(record);
+      return <Tag color={status === OTEL_CONNECTION_DISPLAY_STATUS.READY ? 'green' : 'default'}>{status}</Tag>;
+    },
   },
   {
     title: '',

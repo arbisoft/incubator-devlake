@@ -34,6 +34,12 @@ export const OTEL_LIFECYCLE_ACTION = {
   APPLY: 'apply',
 } as const;
 
+export const OTEL_CONNECTION_DISPLAY_STATUS = {
+  REVOKED: 'Revoked',
+  ACTION_REQUIRED: 'Action required',
+  READY: 'Ready',
+} as const;
+
 export const OTEL_ATTENTION_CHANGED_EVENT = 'devlake:otel-attention-changed';
 export const OTEL_REFRESH_INTERVAL_MS = 30_000;
 export const OTEL_VISIBILITY_THROTTLE_MS = 10_000;

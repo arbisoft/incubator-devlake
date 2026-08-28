@@ -17,7 +17,7 @@
  */
 
 import { useNavigate } from 'react-router-dom';
-import { Button, Card, Space, Table } from 'antd';
+import { Button, Card, Space, Table, Typography } from 'antd';
 
 import API from '@/api';
 import { type OtelConnectionResponse } from '@/api/otel';
@@ -63,10 +63,10 @@ export const ClaudeCodeOtelPanel = ({ projectName }: ClaudeCodeOtelPanelProps) =
         locale={{ emptyText: 'No Claude Code OTel connections are linked to this project.' }}
         columns={getClaudeCodeOtelProjectColumns(navigate)}
       />
-      <p>
+      <Typography.Text type="secondary">
         This project shows telemetry configured for its linked teams. Shared teams appear in every linked project and do
         not represent repository-level attribution.
-      </p>
+      </Typography.Text>
     </Card>
   );
 };

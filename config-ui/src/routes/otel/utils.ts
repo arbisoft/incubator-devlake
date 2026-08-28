@@ -18,8 +18,10 @@
 
 import axios, { HttpStatusCode } from 'axios';
 
+import { type OtelConnectionResponse, OTEL_CONNECTION_STATUS } from '@/api/otel';
+
 import { formatPlural } from '../../utils';
-import { OTEL_ATTENTION_CHANGED_EVENT, OTEL_ERROR } from './constants';
+import { OTEL_ATTENTION_CHANGED_EVENT, OTEL_CONNECTION_DISPLAY_STATUS, OTEL_ERROR } from './constants';
 
 const SAFE_LIFECYCLE_MESSAGE_STATUSES: readonly number[] = [HttpStatusCode.BadRequest];
 
@@ -34,6 +36,10 @@ export type OtelAttentionState = {
 type AttentionTarget = {
   restartRequired?: boolean;
   recoveryRequired?: boolean;
+};
+
+type OtelConnectionStatusTarget = Pick<OtelConnectionResponse, 'recoveryRequired' | 'restartRequired'> & {
+  connection: Pick<OtelConnectionResponse['connection'], 'status'>;
 };
 
 export const getAttentionState = (connections: AttentionTarget[]): OtelAttentionState =>
@@ -62,6 +68,16 @@ export const hasRecoveryRequired = (connections: readonly { recoveryRequired?: b
 
 export const hasStorageNeedsApplying = (connections: readonly { storageNeedsApplying?: boolean }[]) =>
   connections.some((connection) => Boolean(connection.storageNeedsApplying));
+
+export const getOtelConnectionStatus = ({
+  connection,
+  recoveryRequired,
+  restartRequired,
+}: OtelConnectionStatusTarget) => {
+  if (connection.status === OTEL_CONNECTION_STATUS.REVOKED) return OTEL_CONNECTION_DISPLAY_STATUS.REVOKED;
+  if (restartRequired || recoveryRequired) return OTEL_CONNECTION_DISPLAY_STATUS.ACTION_REQUIRED;
+  return OTEL_CONNECTION_DISPLAY_STATUS.READY;
+};
 
 export const getAttentionDescription = (attention: OtelAttentionState): string => {
   const parts: string[] = [];
