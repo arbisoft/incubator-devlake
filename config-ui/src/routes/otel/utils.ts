@@ -111,6 +111,15 @@ export const getOtelCreateError = (error: unknown) => {
   return serverMessage || OTEL_ERROR.CREATE;
 };
 
+// Project placement requests accept only server-side validated project names, so 400 messages are safe to show.
+export const getOtelProjectError = (error: unknown) => {
+  if (!axios.isAxiosError<OtelErrorResponse>(error) || error.response?.status !== HttpStatusCode.BadRequest) {
+    return OTEL_ERROR.PROJECTS;
+  }
+  const serverMessage = typeof error.response.data?.message === 'string' ? error.response.data.message : '';
+  return serverMessage || OTEL_ERROR.PROJECTS;
+};
+
 // Surface only known operational responses; filesystem details and stack traces stay server-side.
 export const getOtelLifecycleError = (error: unknown) => {
   if (!axios.isAxiosError<OtelErrorResponse>(error)) return OTEL_ERROR.LIFECYCLE;

@@ -27,6 +27,7 @@ import { OTEL_MODAL, type OtelModalState } from './modals';
 export const getOtelColumns = (
   setCurrent: (connection: OtelConnectionResponse) => void,
   setModal: (modal: OtelModalState) => void,
+  onManageProjects: (connection: OtelConnectionResponse) => void,
 ): ColumnsType<OtelConnectionResponse> => [
   {
     title: 'Team',
@@ -37,6 +38,18 @@ export const getOtelColumns = (
     title: 'Team slug',
     dataIndex: ['connection', 'teamSlug'],
     width: 220,
+  },
+  {
+    title: 'Projects',
+    width: 260,
+    render: (_, record) => (
+      <Space wrap>
+        {record.projects.map((project) => (
+          <Tag key={project.name}>{project.name}</Tag>
+        ))}
+        {record.projects.length > 1 && <Tag color="blue">shared</Tag>}
+      </Space>
+    ),
   },
   {
     title: 'Endpoint',
@@ -95,6 +108,12 @@ export const getOtelColumns = (
     width: 250,
     render: (_, record) => (
       <Space wrap>
+        <Button
+          size="small"
+          onClick={() => onManageProjects(record)}
+        >
+          Projects
+        </Button>
         <Button
           size="small"
           icon={<ReloadOutlined />}

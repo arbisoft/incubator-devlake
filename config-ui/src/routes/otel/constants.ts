@@ -22,6 +22,7 @@ export const OTEL_ERROR = {
   CREATE: 'Unable to generate Claude settings. Please try again or contact support.',
   CREDENTIAL_STORAGE: 'Telemetry credential storage is temporarily unavailable. Please retry shortly.',
   LIFECYCLE: 'Unable to update Claude Code OTel credentials. Please try again or contact support.',
+  PROJECTS: 'Unable to update Claude Code OTel project placements. Please try again or contact support.',
   APPLY: 'Credential changes were saved, but the telemetry endpoint could not apply them. Retry Apply shortly.',
 } as const;
 

@@ -16,6 +16,9 @@ processors:
       # Stamp the verified credential's team slug instead of trusting client input.
       - key: devlake_team
         action: delete
+      # Project placement is DevLake configuration metadata, never client-provided metric attribution.
+      - key: devlake_project
+        action: delete
       - key: devlake_auth_username
         from_context: auth.username
         action: upsert

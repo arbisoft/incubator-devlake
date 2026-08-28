@@ -41,7 +41,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "count(count by (user_account_uuid) (max_over_time(claude_code_session_count_total[$__range])))",
+          "expr": "count(count by (user_account_uuid) (max_over_time(claude_code_session_count_total{devlake_team=~\"${otel_teams:regex}\"}[$__range])))",
           "legendFormat": "Active Users",
           "refId": "A"
         }
@@ -73,7 +73,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum(max_over_time(claude_code_lines_of_code_count_total{type=\"added\"}[$__range]))",
+          "expr": "sum(max_over_time(claude_code_lines_of_code_count_total{devlake_team=~\"${otel_teams:regex}\",type=\"added\"}[$__range]))",
           "legendFormat": "Lines Added",
           "refId": "A"
         }
@@ -105,7 +105,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum(max_over_time(claude_code_pull_request_count_total[$__range]))",
+          "expr": "sum(max_over_time(claude_code_pull_request_count_total{devlake_team=~\"${otel_teams:regex}\"}[$__range]))",
           "legendFormat": "PRs by Claude",
           "refId": "A"
         }
@@ -145,7 +145,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum(max_over_time(claude_code_cost_usage_USD_total[$__range]))",
+          "expr": "sum(max_over_time(claude_code_cost_usage_USD_total{devlake_team=~\"${otel_teams:regex}\"}[$__range]))",
           "legendFormat": "Estimated Cost (USD)",
           "refId": "A"
         }
@@ -182,7 +182,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "count(count by (user_account_uuid) (increase(claude_code_session_count_total[$__interval]) > 0))",
+          "expr": "count(count by (user_account_uuid) (increase(claude_code_session_count_total{devlake_team=~\"${otel_teams:regex}\"}[$__interval]) > 0))",
           "legendFormat": "Daily Active Users",
           "refId": "A"
         }
@@ -219,13 +219,13 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum(increase(claude_code_pull_request_count_total[$__interval]))",
+          "expr": "sum(increase(claude_code_pull_request_count_total{devlake_team=~\"${otel_teams:regex}\"}[$__interval]))",
           "legendFormat": "PRs by Claude",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum(increase(claude_code_commit_count_total[$__interval]))",
+          "expr": "sum(increase(claude_code_commit_count_total{devlake_team=~\"${otel_teams:regex}\"}[$__interval]))",
           "legendFormat": "Commits by Claude",
           "refId": "B"
         }
@@ -261,7 +261,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum by (model_group) (label_replace(label_replace(label_replace(label_replace(increase(claude_code_cost_usage_USD_total[$__interval]), \"model_group\", \"$1\", \"model\", \"(.*)\"), \"model_group\", \"Opus\", \"model\", \"(?i).*opus.*\"), \"model_group\", \"Sonnet\", \"model\", \"(?i).*sonnet.*\"), \"model_group\", \"Haiku\", \"model\", \"(?i).*haiku.*\"))",
+          "expr": "sum by (model_group) (label_replace(label_replace(label_replace(label_replace(increase(claude_code_cost_usage_USD_total{devlake_team=~\"${otel_teams:regex}\"}[$__interval]), \"model_group\", \"$1\", \"model\", \"(.*)\"), \"model_group\", \"Opus\", \"model\", \"(?i).*opus.*\"), \"model_group\", \"Sonnet\", \"model\", \"(?i).*sonnet.*\"), \"model_group\", \"Haiku\", \"model\", \"(?i).*haiku.*\"))",
           "legendFormat": "{{model_group}}",
           "refId": "A"
         }
@@ -298,19 +298,19 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum(increase(claude_code_lines_of_code_count_total{type=\"added\"}[$__interval]))",
+          "expr": "sum(increase(claude_code_lines_of_code_count_total{devlake_team=~\"${otel_teams:regex}\",type=\"added\"}[$__interval]))",
           "legendFormat": "Lines Added (Features)",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum(increase(claude_code_lines_of_code_count_total{type=\"removed\"}[$__interval]))",
+          "expr": "sum(increase(claude_code_lines_of_code_count_total{devlake_team=~\"${otel_teams:regex}\",type=\"removed\"}[$__interval]))",
           "legendFormat": "Lines Removed (Refactoring)",
           "refId": "B"
         },
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum(increase(claude_code_lines_of_code_count_total{type=\"removed\"}[$__interval])) / sum(increase(claude_code_lines_of_code_count_total{type=\"added\"}[$__interval]))",
+          "expr": "sum(increase(claude_code_lines_of_code_count_total{devlake_team=~\"${otel_teams:regex}\",type=\"removed\"}[$__interval])) / sum(increase(claude_code_lines_of_code_count_total{devlake_team=~\"${otel_teams:regex}\",type=\"added\"}[$__interval]))",
           "legendFormat": "Refactor Ratio",
           "refId": "C"
         }
@@ -339,7 +339,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "count by (user_account_uuid) (max_over_time(claude_code_session_count_total[$__range]))",
+          "expr": "count by (user_account_uuid) (max_over_time(claude_code_session_count_total{devlake_team=~\"${otel_teams:regex}\"}[$__range]))",
           "format": "table",
           "instant": true,
           "legendFormat": "Sessions",
@@ -347,7 +347,7 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum by (user_account_uuid) (max_over_time(claude_code_cost_usage_USD_total[$__range]))",
+          "expr": "sum by (user_account_uuid) (max_over_time(claude_code_cost_usage_USD_total{devlake_team=~\"${otel_teams:regex}\"}[$__range]))",
           "format": "table",
           "instant": true,
           "legendFormat": "Cost (USD)",
@@ -391,7 +391,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum by (model) (max_over_time(claude_code_token_usage_tokens_total{type=\"input\"}[$__range]))",
+          "expr": "sum by (model) (max_over_time(claude_code_token_usage_tokens_total{devlake_team=~\"${otel_teams:regex}\",type=\"input\"}[$__range]))",
           "format": "table",
           "instant": true,
           "legendFormat": "Input Tokens",
@@ -399,7 +399,7 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum by (model) (max_over_time(claude_code_token_usage_tokens_total{type=\"output\"}[$__range]))",
+          "expr": "sum by (model) (max_over_time(claude_code_token_usage_tokens_total{devlake_team=~\"${otel_teams:regex}\",type=\"output\"}[$__range]))",
           "format": "table",
           "instant": true,
           "legendFormat": "Output Tokens",
@@ -407,7 +407,7 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum by (model) (max_over_time(claude_code_cost_usage_USD_total[$__range]))",
+          "expr": "sum by (model) (max_over_time(claude_code_cost_usage_USD_total{devlake_team=~\"${otel_teams:regex}\"}[$__range]))",
           "format": "table",
           "instant": true,
           "legendFormat": "Total Cost (USD)",
@@ -460,49 +460,49 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{tool=\"edit\", decision=\"accept\"}[$__interval]))",
+          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{devlake_team=~\"${otel_teams:regex}\",tool=\"edit\", decision=\"accept\"}[$__interval]))",
           "legendFormat": "Edit Accepted",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{tool=\"edit\", decision=\"reject\"}[$__interval]))",
+          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{devlake_team=~\"${otel_teams:regex}\",tool=\"edit\", decision=\"reject\"}[$__interval]))",
           "legendFormat": "Edit Rejected",
           "refId": "B"
         },
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{tool=\"multi_edit\", decision=\"accept\"}[$__interval]))",
+          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{devlake_team=~\"${otel_teams:regex}\",tool=\"multi_edit\", decision=\"accept\"}[$__interval]))",
           "legendFormat": "Multi-Edit Accepted",
           "refId": "C"
         },
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{tool=\"multi_edit\", decision=\"reject\"}[$__interval]))",
+          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{devlake_team=~\"${otel_teams:regex}\",tool=\"multi_edit\", decision=\"reject\"}[$__interval]))",
           "legendFormat": "Multi-Edit Rejected",
           "refId": "D"
         },
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{tool=\"write\", decision=\"accept\"}[$__interval]))",
+          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{devlake_team=~\"${otel_teams:regex}\",tool=\"write\", decision=\"accept\"}[$__interval]))",
           "legendFormat": "Write Accepted",
           "refId": "E"
         },
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{tool=\"write\", decision=\"reject\"}[$__interval]))",
+          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{devlake_team=~\"${otel_teams:regex}\",tool=\"write\", decision=\"reject\"}[$__interval]))",
           "legendFormat": "Write Rejected",
           "refId": "F"
         },
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{tool=\"notebook_edit\", decision=\"accept\"}[$__interval]))",
+          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{devlake_team=~\"${otel_teams:regex}\",tool=\"notebook_edit\", decision=\"accept\"}[$__interval]))",
           "legendFormat": "Notebook Accepted",
           "refId": "G"
         },
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{tool=\"notebook_edit\", decision=\"reject\"}[$__interval]))",
+          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{devlake_team=~\"${otel_teams:regex}\",tool=\"notebook_edit\", decision=\"reject\"}[$__interval]))",
           "legendFormat": "Notebook Rejected",
           "refId": "H"
         }
@@ -539,13 +539,13 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum(increase(claude_code_token_usage_tokens_total{type=\"cacheRead\"}[$__interval]))",
+          "expr": "sum(increase(claude_code_token_usage_tokens_total{devlake_team=~\"${otel_teams:regex}\",type=\"cacheRead\"}[$__interval]))",
           "legendFormat": "Cache Read Tokens",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum(increase(claude_code_token_usage_tokens_total{type=\"cacheCreation\"}[$__interval]))",
+          "expr": "sum(increase(claude_code_token_usage_tokens_total{devlake_team=~\"${otel_teams:regex}\",type=\"cacheCreation\"}[$__interval]))",
           "legendFormat": "Cache Creation Tokens",
           "refId": "B"
         }
@@ -574,7 +574,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum by (tool) (max_over_time(claude_code_code_edit_tool_decision_total{decision=\"accept\"}[$__range]))",
+          "expr": "sum by (tool) (max_over_time(claude_code_code_edit_tool_decision_total{devlake_team=~\"${otel_teams:regex}\",decision=\"accept\"}[$__range]))",
           "format": "table",
           "instant": true,
           "legendFormat": "Accepted",
@@ -582,7 +582,7 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum by (tool) (max_over_time(claude_code_code_edit_tool_decision_total{decision=\"reject\"}[$__range]))",
+          "expr": "sum by (tool) (max_over_time(claude_code_code_edit_tool_decision_total{devlake_team=~\"${otel_teams:regex}\",decision=\"reject\"}[$__range]))",
           "format": "table",
           "instant": true,
           "legendFormat": "Rejected",
@@ -590,7 +590,7 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "sum by (model) (max_over_time(claude_code_token_usage_tokens_total{type=\"cacheRead\"}[$__range])) / (sum by (model) (max_over_time(claude_code_token_usage_tokens_total{type=\"cacheRead\"}[$__range])) + sum by (model) (max_over_time(claude_code_token_usage_tokens_total{type=\"cacheCreation\"}[$__range]))) * 100",
+          "expr": "sum by (model) (max_over_time(claude_code_token_usage_tokens_total{devlake_team=~\"${otel_teams:regex}\",type=\"cacheRead\"}[$__range])) / (sum by (model) (max_over_time(claude_code_token_usage_tokens_total{devlake_team=~\"${otel_teams:regex}\",type=\"cacheRead\"}[$__range])) + sum by (model) (max_over_time(claude_code_token_usage_tokens_total{devlake_team=~\"${otel_teams:regex}\",type=\"cacheCreation\"}[$__range]))) * 100",
           "format": "table",
           "instant": true,
           "legendFormat": "Cache Hit %",
@@ -619,7 +619,38 @@
   "refresh": "1m",
   "schemaVersion": 38,
   "tags": ["claude", "anthropic", "devlake", "ai", "prometheus"],
-  "templating": { "list": [] },
+  "templating": {
+    "list": [
+      {
+        "name": "project",
+        "label": "DevLake project",
+        "type": "query",
+        "datasource": { "type": "mysql", "uid": "devlake-mysql" },
+        "definition": "SELECT name AS __text, name AS __value FROM projects ORDER BY name",
+        "query": "SELECT name AS __text, name AS __value FROM projects ORDER BY name",
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": false,
+        "refresh": 1,
+        "sort": 1,
+        "current": { "text": "All", "value": "$__all" }
+      },
+      {
+        "name": "otel_teams",
+        "label": "Claude Code OTel teams",
+        "type": "query",
+        "datasource": { "type": "mysql", "uid": "devlake-mysql" },
+        "definition": "SELECT DISTINCT c.team_slug AS __text, c.team_slug AS __value FROM _tool_claude_code_otel_connection_projects cp JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id WHERE ('${project:raw}' = '.*' OR cp.project_name = '${project:raw}') AND c.status = 'active' ORDER BY c.team_slug",
+        "query": "SELECT DISTINCT c.team_slug AS __text, c.team_slug AS __value FROM _tool_claude_code_otel_connection_projects cp JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id WHERE ('${project:raw}' = '.*' OR cp.project_name = '${project:raw}') AND c.status = 'active' ORDER BY c.team_slug",
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 2,
+        "sort": 1,
+        "current": { "text": "All", "value": ["$__all"] }
+      }
+    ]
+  },
   "time": { "from": "now-24h", "to": "now" },
   "timepicker": {},
   "timezone": "utc",

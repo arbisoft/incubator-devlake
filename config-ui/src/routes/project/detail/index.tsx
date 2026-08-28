@@ -31,6 +31,7 @@ import { BlueprintDetail, FromEnum } from '@/routes';
 
 import { WebhooksPanel } from './webhooks-panel';
 import { SettingsPanel } from './settings-panel';
+import { ClaudeCodeOtelPanel } from './claude-code-otel-panel';
 import * as S from './styled';
 
 const brandName = import.meta.env.DEVLAKE_BRAND_NAME ?? 'DevLake';
@@ -98,6 +99,11 @@ export const ProjectDetailPage = () => {
               key: 'webhook',
               label: 'Webhooks',
               children: <WebhooksPanel project={data} onRefresh={handleRefresh} />,
+            },
+            {
+              key: 'claude-code-otel',
+              label: 'Claude Code OTel',
+              children: <ClaudeCodeOtelPanel projectName={data.name} />,
             },
             {
               key: 'settings',
