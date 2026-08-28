@@ -20,7 +20,7 @@ import { equal } from 'node:assert/strict';
 import { test } from 'node:test';
 import { AxiosError, AxiosHeaders, HttpStatusCode } from 'axios';
 
-import { OTEL_CONNECTION_STATUS } from '@/api/otel';
+import { OTEL_CONNECTION_STATUS } from '../../api/otel/types';
 
 import { OTEL_CONNECTION_DISPLAY_STATUS, OTEL_ERROR } from './constants';
 import { getOtelConnectionStatus, getOtelProjectError } from './utils';

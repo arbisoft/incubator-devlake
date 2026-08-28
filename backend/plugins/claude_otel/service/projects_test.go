@@ -20,12 +20,19 @@ package service
 import (
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 
+	coremodels "github.com/apache/incubator-devlake/core/models"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
 )
 
 func TestNormalizeOtelProjectNames(t *testing.T) {
+	overLimitProjectNames := make([]string, maxOtelProjectsPerConnection+1)
+	for index := range overLimitProjectNames {
+		overLimitProjectNames[index] = strings.Repeat("p", index+1)
+	}
+
 	testCases := []struct {
 		name    string
 		input   []string
@@ -47,6 +54,11 @@ func TestNormalizeOtelProjectNames(t *testing.T) {
 			input:   []string{"Core", " "},
 			wantErr: true,
 		},
+		{
+			name:    "rejects more than the project limit",
+			input:   overLimitProjectNames,
+			wantErr: true,
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -63,6 +75,50 @@ func TestNormalizeOtelProjectNames(t *testing.T) {
 			}
 			if !reflect.DeepEqual(actual, testCase.expect) {
 				t.Fatalf("normalizeOtelProjectNames() = %v, want %v", actual, testCase.expect)
+			}
+		})
+	}
+}
+
+func TestValidateOtelProjectNamesExist(t *testing.T) {
+	testCases := []struct {
+		name     string
+		names    []string
+		projects []*coremodels.Project
+		wantErr  bool
+	}{
+		{
+			name:  "accepts all selected projects",
+			names: []string{"Core", "Mobile"},
+			projects: []*coremodels.Project{
+				{BaseProject: coremodels.BaseProject{Name: "Core"}},
+				{BaseProject: coremodels.BaseProject{Name: "Mobile"}},
+			},
+		},
+		{
+			name:  "rejects a selected project that no longer exists",
+			names: []string{"Core", "Mobile"},
+			projects: []*coremodels.Project{
+				{BaseProject: coremodels.BaseProject{Name: "Core"}},
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			err := validateOtelProjectNamesExist(testCase.names, testCase.projects)
+			if testCase.wantErr {
+				if err == nil {
+					t.Fatal("validateOtelProjectNamesExist() error = nil, want an error")
+				}
+				if status := err.GetType().GetHttpCode(); status != http.StatusBadRequest {
+					t.Fatalf("validateOtelProjectNamesExist() status = %d, want %d", status, http.StatusBadRequest)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("validateOtelProjectNamesExist() error = %v, want nil", err)
 			}
 		})
 	}

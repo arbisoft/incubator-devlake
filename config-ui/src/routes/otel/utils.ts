@@ -18,9 +18,9 @@
 
 import axios, { HttpStatusCode } from 'axios';
 
-import { type OtelConnectionResponse, OTEL_CONNECTION_STATUS } from '@/api/otel';
+import { type OtelConnectionResponse, OTEL_CONNECTION_STATUS } from '../../api/otel/types';
 
-import { formatPlural } from '../../utils';
+import { formatPlural } from '../../utils/text';
 import { OTEL_ATTENTION_CHANGED_EVENT, OTEL_CONNECTION_DISPLAY_STATUS, OTEL_ERROR } from './constants';
 
 const SAFE_LIFECYCLE_MESSAGE_STATUSES: readonly number[] = [HttpStatusCode.BadRequest];

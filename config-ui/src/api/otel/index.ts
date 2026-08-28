@@ -18,62 +18,9 @@
 
 import { request } from '@/utils';
 
-export const OTEL_CONNECTION_STATUS = {
-  ACTIVE: 'active',
-  REVOKED: 'revoked',
-} as const;
+import type { OtelConnectionResponse, OtelProject } from './types';
 
-export type OtelConnectionStatus = (typeof OTEL_CONNECTION_STATUS)[keyof typeof OTEL_CONNECTION_STATUS];
-
-export const OTEL_CREDENTIAL_STATUS = {
-  ACTIVE: 'active',
-  RETIRING: 'retiring',
-  REVOKED: 'revoked',
-} as const;
-
-export type OtelCredentialStatus = (typeof OTEL_CREDENTIAL_STATUS)[keyof typeof OTEL_CREDENTIAL_STATUS];
-
-export type OtelConnection = {
-  id: ID;
-  name: string;
-  teamName: string;
-  teamSlug: string;
-  collectorEndpoint: string;
-  protocol: string;
-  status: OtelConnectionStatus;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type OtelProject = {
-  name: string;
-};
-
-export type OtelCredential = {
-  id: ID;
-  connectionId: ID;
-  username: string;
-  status: OtelCredentialStatus;
-  createdAt: string;
-  updatedAt: string;
-  rotatedAt?: string;
-  revokedAt?: string;
-  pendingCollectorRestart: boolean;
-  lastCollectorRestartHint?: string;
-};
-
-export type OtelConnectionResponse = {
-  connection: OtelConnection;
-  credentials: OtelCredential[];
-  managedSettings?: {
-    env: Record<string, string>;
-  };
-  restartRequired: boolean;
-  restartHint?: string;
-  recoveryRequired: boolean;
-  storageNeedsApplying: boolean;
-  projects: OtelProject[];
-};
+export * from './types';
 
 const basePath = '/plugins/claude_otel/connections';
 

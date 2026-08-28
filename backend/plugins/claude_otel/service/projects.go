@@ -18,6 +18,7 @@ limitations under the License.
 package service
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -27,9 +28,11 @@ import (
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
 )
 
-const maxOtelProjectsPerConnection = 100
-
-const finalActiveOtelProjectPlacementMessage = "revoke the active Claude Code OTel connection before deleting its final project placement"
+const (
+	maxOtelProjectsPerConnection           = 100
+	finalActiveOtelProjectPlacementMessage = "revoke the active Claude Code OTel connection before deleting its final project placement"
+	missingOtelProjectPlacementMessage     = "one or more selected DevLake projects no longer exist"
+)
 
 // ListOtelProjects returns the existing DevLake projects available for OTel placement.
 func ListOtelProjects() ([]*models.OtelProjectSummary, errors.Error) {
@@ -53,7 +56,7 @@ func normalizeOtelProjectNames(projectNames []string) ([]string, errors.Error) {
 		return nil, errors.BadInput.New("select at least one DevLake project")
 	}
 	if len(uniqueNames) > maxOtelProjectsPerConnection {
-		return nil, errors.BadInput.New("select 100 projects or fewer")
+		return nil, errors.BadInput.New(fmt.Sprintf("select %d projects or fewer", maxOtelProjectsPerConnection))
 	}
 
 	names := make([]string, 0, len(uniqueNames))
@@ -74,18 +77,27 @@ func validateOtelProjectNames(projectNames []string) ([]string, errors.Error) {
 	if err := db.All(&projects, dal.Where("name IN ?", names)); err != nil {
 		return nil, errors.Default.Wrap(err, "error validating Claude Code OTel projects")
 	}
-	if len(projects) != len(names) {
-		foundNames := make(map[string]struct{}, len(projects))
-		for _, project := range projects {
-			foundNames[project.Name] = struct{}{}
-		}
-		for _, name := range names {
-			if _, found := foundNames[name]; !found {
-				return nil, errors.BadInput.New("one or more selected DevLake projects no longer exist")
-			}
-		}
+	if err := validateOtelProjectNamesExist(names, projects); err != nil {
+		return nil, err
 	}
 	return names, nil
+}
+
+func validateOtelProjectNamesExist(names []string, projects []*coremodels.Project) errors.Error {
+	if len(projects) == len(names) {
+		return nil
+	}
+
+	foundNames := make(map[string]struct{}, len(projects))
+	for _, project := range projects {
+		foundNames[project.Name] = struct{}{}
+	}
+	for _, name := range names {
+		if _, found := foundNames[name]; !found {
+			return errors.BadInput.New(missingOtelProjectPlacementMessage)
+		}
+	}
+	return nil
 }
 
 func createOtelConnectionProjects(tx dal.Transaction, connectionID uint64, projectNames []string) errors.Error {

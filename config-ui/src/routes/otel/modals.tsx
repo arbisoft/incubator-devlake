@@ -58,6 +58,26 @@ type OtelModalProps = {
   onUpdateProjects: () => void;
 };
 
+type OtelProjectSelectProps = Pick<OtelModalProps, 'projectNames' | 'projectOptions' | 'onProjectNamesChange' | 'onClearCreateError'>;
+
+const OtelProjectSelect = ({ projectNames, projectOptions, onProjectNamesChange, onClearCreateError }: OtelProjectSelectProps) => (
+  <Select
+    style={{ width: '100%' }}
+    mode="multiple"
+    allowClear
+    showSearch
+    optionFilterProp="label"
+    popupMatchSelectWidth={true}
+    placeholder="Select one or more projects"
+    value={projectNames}
+    options={projectOptions.map((project) => ({ value: project.name, label: project.name }))}
+    onChange={(names) => {
+      onProjectNamesChange(names);
+      onClearCreateError();
+    }}
+  />
+);
+
 const CreateModal = ({
   teamName,
   projectNames,
@@ -96,20 +116,11 @@ const CreateModal = ({
         }}
       />
       <span>DevLake projects</span>
-      <Select
-        style={{ width: '100%' }}
-        mode="multiple"
-        allowClear
-        showSearch
-        optionFilterProp="label"
-        popupMatchSelectWidth={true}
-        placeholder="Select one or more projects"
-        value={projectNames}
-        options={projectOptions.map((project) => ({ value: project.name, label: project.name }))}
-        onChange={(names) => {
-          onProjectNamesChange(names);
-          onClearCreateError();
-        }}
+      <OtelProjectSelect
+        projectNames={projectNames}
+        projectOptions={projectOptions}
+        onProjectNamesChange={onProjectNamesChange}
+        onClearCreateError={onClearCreateError}
       />
       {createError && <Alert type="error" showIcon message={createError} />}
       <Message content="The team name and its derived reporting slug cannot be changed later. Project placement controls dashboard visibility; it is not repository attribution." />
@@ -142,20 +153,11 @@ const ProjectPlacementsModal = ({
   >
     <Space direction="vertical" size={8} style={{ width: '100%' }}>
       <span>DevLake projects for {current?.connection.teamName}</span>
-      <Select
-        style={{ width: '100%' }}
-        mode="multiple"
-        allowClear
-        showSearch
-        optionFilterProp="label"
-        popupMatchSelectWidth={true}
-        placeholder="Select one or more projects"
-        value={projectNames}
-        options={projectOptions.map((project) => ({ value: project.name, label: project.name }))}
-        onChange={(names) => {
-          onProjectNamesChange(names);
-          onClearCreateError();
-        }}
+      <OtelProjectSelect
+        projectNames={projectNames}
+        projectOptions={projectOptions}
+        onProjectNamesChange={onProjectNamesChange}
+        onClearCreateError={onClearCreateError}
       />
       {createError && <Alert type="error" showIcon message={createError} />}
       <Message content="Changing project placement does not generate a credential, rewrite credential storage, restart the Collector, or change existing telemetry." />
