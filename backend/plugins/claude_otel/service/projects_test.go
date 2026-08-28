@@ -18,8 +18,11 @@ limitations under the License.
 package service
 
 import (
+	"net/http"
 	"reflect"
 	"testing"
+
+	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
 )
 
 func TestNormalizeOtelProjectNames(t *testing.T) {
@@ -60,6 +63,50 @@ func TestNormalizeOtelProjectNames(t *testing.T) {
 			}
 			if !reflect.DeepEqual(actual, testCase.expect) {
 				t.Fatalf("normalizeOtelProjectNames() = %v, want %v", actual, testCase.expect)
+			}
+		})
+	}
+}
+
+func TestValidateOtelProjectPlacementRemovalState(t *testing.T) {
+	testCases := []struct {
+		name            string
+		connectionState string
+		placementCount  int
+		wantErr         bool
+	}{
+		{
+			name:            "rejects the final placement of an active connection",
+			connectionState: models.OtelConnectionStatusActive,
+			placementCount:  1,
+			wantErr:         true,
+		},
+		{
+			name:            "allows removal from a shared active connection",
+			connectionState: models.OtelConnectionStatusActive,
+			placementCount:  2,
+		},
+		{
+			name:            "allows removal from a revoked connection",
+			connectionState: models.OtelConnectionStatusRevoked,
+			placementCount:  1,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			err := validateOtelProjectPlacementRemovalState(testCase.connectionState, testCase.placementCount)
+			if testCase.wantErr {
+				if err == nil {
+					t.Fatal("validateOtelProjectPlacementRemovalState() error = nil, want an error")
+				}
+				if status := err.GetType().GetHttpCode(); status != http.StatusBadRequest {
+					t.Fatalf("validateOtelProjectPlacementRemovalState() status = %d, want %d", status, http.StatusBadRequest)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("validateOtelProjectPlacementRemovalState() error = %v, want nil", err)
 			}
 		})
 	}

@@ -29,6 +29,8 @@ import (
 
 const maxOtelProjectsPerConnection = 100
 
+const finalActiveOtelProjectPlacementMessage = "revoke the active Claude Code OTel connection before deleting its final project placement"
+
 // ListOtelProjects returns the existing DevLake projects available for OTel placement.
 func ListOtelProjects() ([]*models.OtelProjectSummary, errors.Error) {
 	projects := make([]*coremodels.Project, 0)
@@ -193,6 +195,12 @@ func ValidateOtelProjectRemoval(projectName string) errors.Error {
 	lifecycleMu.Lock()
 	defer lifecycleMu.Unlock()
 
+	return validateOtelProjectRemovalLocked(projectName)
+}
+
+// validateOtelProjectRemovalLocked verifies the placement invariant while lifecycleMu is held.
+func validateOtelProjectRemovalLocked(projectName string) errors.Error {
+
 	placements := make([]*models.OtelConnectionProject, 0)
 	if err := db.All(&placements, dal.Where("project_name = ?", projectName)); err != nil {
 		return errors.Default.Wrap(err, "error getting Claude Code OTel project placements")
@@ -210,9 +218,16 @@ func ValidateOtelProjectRemoval(projectName string) errors.Error {
 		if err != nil {
 			return err
 		}
-		if connection.Status == models.OtelConnectionStatusActive && len(projectNames) == 1 {
-			return errors.BadInput.New("revoke the active Claude Code OTel connection before deleting its final project placement")
+		if err := validateOtelProjectPlacementRemovalState(connection.Status, len(projectNames)); err != nil {
+			return err
 		}
+	}
+	return nil
+}
+
+func validateOtelProjectPlacementRemovalState(connectionStatus string, placementCount int) errors.Error {
+	if connectionStatus == models.OtelConnectionStatusActive && placementCount == 1 {
+		return errors.BadInput.New(finalActiveOtelProjectPlacementMessage)
 	}
 	return nil
 }
@@ -223,6 +238,9 @@ func RemoveOtelProjectPlacements(projectName string) errors.Error {
 	lifecycleMu.Lock()
 	defer lifecycleMu.Unlock()
 
+	if err := validateOtelProjectRemovalLocked(projectName); err != nil {
+		return err
+	}
 	if err := db.Delete(&models.OtelConnectionProject{}, dal.Where("project_name = ?", projectName)); err != nil {
 		return errors.Default.Wrap(err, "error removing Claude Code OTel project placements")
 	}
