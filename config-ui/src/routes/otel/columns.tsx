@@ -17,14 +17,14 @@
  */
 
 import { CheckOutlined, DeleteOutlined, ReloadOutlined, StopOutlined, SyncOutlined } from '@ant-design/icons';
-import { Button, Space, Tag } from 'antd';
+import { Button, Space, Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 
 import { OTEL_CONNECTION_STATUS, OTEL_CREDENTIAL_STATUS, type OtelConnectionResponse } from '@/api/otel';
 import { formatTime } from '@/utils';
 import { OTEL_MODAL, type OtelModalState } from './modals';
 import { getOtelConnectionStatus } from './utils';
-import { OTEL_CONNECTION_DISPLAY_STATUS } from './constants';
+import { OTEL_CONNECTION_DISPLAY_STATUS, OTEL_PROJECT_PLACEMENT } from './constants';
 
 export const getOtelColumns = (
   setCurrent: (connection: OtelConnectionResponse) => void,
@@ -46,10 +46,14 @@ export const getOtelColumns = (
     width: 260,
     render: (_, record) => (
       <Space wrap>
-        {record.projects.map((project) => (
-          <Tag key={project.name}>{project.name}</Tag>
-        ))}
-        {record.projects.length > 1 && <Tag color="blue">shared</Tag>}
+        {record.projects.length === 0 ? (
+          <Tooltip title={OTEL_PROJECT_PLACEMENT.UNASSIGNED_HELP}>
+            <Tag color="orange">{OTEL_PROJECT_PLACEMENT.UNASSIGNED}</Tag>
+          </Tooltip>
+        ) : (
+          record.projects.map((project) => <Tag key={project.name}>{project.name}</Tag>)
+        )}
+        {record.projects.length > 1 && <Tag color="blue">{OTEL_PROJECT_PLACEMENT.SHARED}</Tag>}
       </Space>
     ),
   },

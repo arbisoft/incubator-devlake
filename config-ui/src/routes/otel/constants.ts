@@ -40,6 +40,12 @@ export const OTEL_CONNECTION_DISPLAY_STATUS = {
   READY: 'Ready',
 } as const;
 
+export const OTEL_PROJECT_PLACEMENT = {
+  UNASSIGNED: 'Unassigned',
+  UNASSIGNED_HELP: 'Use Projects to assign this connection to a DevLake project.',
+  SHARED: 'shared',
+} as const;
+
 export const OTEL_ATTENTION_CHANGED_EVENT = 'devlake:otel-attention-changed';
 export const OTEL_REFRESH_INTERVAL_MS = 30_000;
 export const OTEL_VISIBILITY_THROTTLE_MS = 10_000;
