@@ -17,16 +17,19 @@
  */
 
 import { CheckOutlined, DeleteOutlined, ReloadOutlined, StopOutlined, SyncOutlined } from '@ant-design/icons';
-import { Button, Space, Tag } from 'antd';
+import { Button, Space, Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 
 import { OTEL_CONNECTION_STATUS, OTEL_CREDENTIAL_STATUS, type OtelConnectionResponse } from '@/api/otel';
 import { formatTime } from '@/utils';
 import { OTEL_MODAL, type OtelModalState } from './modals';
+import { getOtelConnectionStatus } from './utils';
+import { OTEL_CONNECTION_DISPLAY_STATUS, OTEL_PROJECT_PLACEMENT } from './constants';
 
 export const getOtelColumns = (
   setCurrent: (connection: OtelConnectionResponse) => void,
   setModal: (modal: OtelModalState) => void,
+  onManageProjects: (connection: OtelConnectionResponse) => void,
 ): ColumnsType<OtelConnectionResponse> => [
   {
     title: 'Team',
@@ -39,27 +42,32 @@ export const getOtelColumns = (
     width: 220,
   },
   {
+    title: 'Projects',
+    width: 260,
+    render: (_, record) => (
+      <Space wrap>
+        {record.projects.length === 0 ? (
+          <Tooltip title={OTEL_PROJECT_PLACEMENT.UNASSIGNED_HELP}>
+            <Tag color="orange">{OTEL_PROJECT_PLACEMENT.UNASSIGNED}</Tag>
+          </Tooltip>
+        ) : (
+          record.projects.map((project) => <Tag key={project.name}>{project.name}</Tag>)
+        )}
+        {record.projects.length > 1 && <Tag color="blue">{OTEL_PROJECT_PLACEMENT.SHARED}</Tag>}
+      </Space>
+    ),
+  },
+  {
     title: 'Endpoint',
     dataIndex: ['connection', 'collectorEndpoint'],
   },
   {
     title: 'Status',
     width: 180,
-    render: (_, record) => (
-      <Space>
-        <Tag
-          color={
-            record.connection.status === OTEL_CONNECTION_STATUS.ACTIVE && !record.restartRequired ? 'green' : 'default'
-          }
-        >
-          {record.connection.status === OTEL_CONNECTION_STATUS.REVOKED
-            ? 'Revoked'
-            : record.restartRequired
-            ? 'Action required'
-            : 'Ready'}
-        </Tag>
-      </Space>
-    ),
+    render: (_, record) => {
+      const status = getOtelConnectionStatus(record);
+      return <Tag color={status === OTEL_CONNECTION_DISPLAY_STATUS.READY ? 'green' : 'default'}>{status}</Tag>;
+    },
   },
   {
     title: 'Credentials',
@@ -95,6 +103,9 @@ export const getOtelColumns = (
     width: 250,
     render: (_, record) => (
       <Space wrap>
+        <Button size="small" onClick={() => onManageProjects(record)}>
+          Projects
+        </Button>
         <Button
           size="small"
           icon={<ReloadOutlined />}

@@ -10,5 +10,5 @@
     "esModuleInterop": true,
     "types": ["node"]
   },
-  "include": ["src/global.d.ts", "src/**/*.test.ts", "src/**/*.test.tsx"]
+  "include": ["src/global.d.ts", "src/vite-env.d.ts", "src/**/*.test.ts", "src/**/*.test.tsx"]
 }

@@ -22,6 +22,7 @@ export const OTEL_ERROR = {
   CREATE: 'Unable to generate Claude settings. Please try again or contact support.',
   CREDENTIAL_STORAGE: 'Telemetry credential storage is temporarily unavailable. Please retry shortly.',
   LIFECYCLE: 'Unable to update Claude Code OTel credentials. Please try again or contact support.',
+  PROJECTS: 'Unable to update Claude Code OTel project placements. Please try again or contact support.',
   APPLY: 'Credential changes were saved, but the telemetry endpoint could not apply them. Retry Apply shortly.',
 } as const;
 
@@ -31,6 +32,18 @@ export const OTEL_LIFECYCLE_ACTION = {
   HIDE: 'hide',
   FINALIZE: 'finalize',
   APPLY: 'apply',
+} as const;
+
+export const OTEL_CONNECTION_DISPLAY_STATUS = {
+  REVOKED: 'Revoked',
+  ACTION_REQUIRED: 'Action required',
+  READY: 'Ready',
+} as const;
+
+export const OTEL_PROJECT_PLACEMENT = {
+  UNASSIGNED: 'Unassigned',
+  UNASSIGNED_HELP: 'Use Projects to assign this connection to a DevLake project.',
+  SHARED: 'shared',
 } as const;
 
 export const OTEL_ATTENTION_CHANGED_EVENT = 'devlake:otel-attention-changed';

@@ -62,6 +62,21 @@ func (p ClaudeOtel) ApiResources() map[string]map[string]plugin.ApiResourceHandl
 			"GET":  api.ListConnections,
 			"POST": api.PostConnection,
 		},
+		"projects": {
+			"GET": api.ListProjects,
+		},
+		"projects/:projectName/connections": {
+			"GET": api.ListProjectConnections,
+		},
+		"projects/:projectName/removal-preflight": {
+			"POST": api.ValidateProjectRemoval,
+		},
+		"projects/:projectName/placements": {
+			"DELETE": api.DeleteProjectPlacements,
+		},
+		"connections/:connectionId/projects": {
+			"PUT": api.PutConnectionProjects,
+		},
 		"connections/:connectionId/rotate": {
 			"POST": api.RotateConnection,
 		},
