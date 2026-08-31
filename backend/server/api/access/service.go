@@ -46,6 +46,8 @@ type Service struct {
 	db             dal.Dal
 	logger         log.Logger
 	sessionRevoker SessionRevoker
+	oidcRuntime    OIDCProviderRuntime
+	grafanaSSO     *GrafanaSSOClient
 }
 
 var (
@@ -64,6 +66,14 @@ func Init(basicRes context.BasicRes) {
 			db:     basicRes.GetDal(),
 			logger: basicRes.GetLogger(),
 		}
+		grafanaClient, err := NewGrafanaSSOClient(
+			cfg.GetString("GRAFANA_INTERNAL_URL"),
+			cfg.GetString("GRAFANA_SSO_SERVICE_TOKEN"),
+			nil,
+		)
+		if err == nil {
+			defaultService.grafanaSSO = grafanaClient
+		}
 	})
 }
 
@@ -72,6 +82,12 @@ func Default() *Service { return defaultService }
 func SetSessionRevoker(revoker SessionRevoker) {
 	if defaultService != nil {
 		defaultService.sessionRevoker = revoker
+	}
+}
+
+func SetOIDCProviderRuntime(runtime OIDCProviderRuntime) {
+	if defaultService != nil {
+		defaultService.oidcRuntime = runtime
 	}
 }
 

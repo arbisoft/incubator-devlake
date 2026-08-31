@@ -66,12 +66,21 @@ const lastSeenThrottle = 5 * time.Minute
 // unit of testability for this package: tests build one with stub deps and
 // drive the gin handlers directly.
 type Service struct {
-	cfg       *oidchelper.Config
-	providers map[string]*oidchelper.Provider
-	logger    log.Logger
-	db        dal.Dal
-	revoked   *revocationCache
-	access    accessAuthorizer
+	// cfg remains the bootstrap configuration for existing focused handler tests.
+	// Runtime requests use providerState so administrative updates can replace the
+	// database-backed provider atomically without a backend restart.
+	cfg          *oidchelper.Config
+	bootstrapCfg *oidchelper.Config
+	providerMu   sync.RWMutex
+	runtimeCfg   *oidchelper.Config
+	providers    map[string]*oidchelper.Provider
+	databaseOIDC bool
+	basicRes     corectx.BasicRes
+	protector    CredentialProtector
+	logger       log.Logger
+	db           dal.Dal
+	revoked      *revocationCache
+	access       accessAuthorizer
 
 	lastSeenMu sync.Mutex
 	lastSeen   map[string]time.Time
@@ -110,7 +119,8 @@ func NewService(ctx stdctx.Context, basicRes corectx.BasicRes) (*Service, error)
 	if err != nil {
 		return nil, err
 	}
-	cfg, _, err = loadProviderSource(cfg, basicRes.GetDal(), basicRes)
+	bootstrapCfg := cfg
+	cfg, protector, err := loadProviderSource(cfg, basicRes.GetDal(), basicRes)
 	if err != nil {
 		return nil, err
 	}
@@ -123,13 +133,18 @@ func NewService(ctx stdctx.Context, basicRes corectx.BasicRes) (*Service, error)
 		}
 	}
 	s := &Service{
-		cfg:       cfg,
-		providers: map[string]*oidchelper.Provider{},
-		logger:    basicRes.GetLogger(),
-		db:        basicRes.GetDal(),
-		revoked:   newRevocationCache(),
-		lastSeen:  map[string]time.Time{},
-		access:    access.Default(),
+		cfg:          cfg,
+		bootstrapCfg: bootstrapCfg,
+		runtimeCfg:   cfg,
+		providers:    buildProviders(cfg),
+		databaseOIDC: cfg != bootstrapCfg,
+		basicRes:     basicRes,
+		protector:    protector,
+		logger:       basicRes.GetLogger(),
+		db:           basicRes.GetDal(),
+		revoked:      newRevocationCache(),
+		lastSeen:     map[string]time.Time{},
+		access:       access.Default(),
 	}
 	if cfg.AuthEnabled {
 		startRefresher(ctx, s.revoked, s.db, s.logger)
@@ -138,23 +153,58 @@ func NewService(ctx stdctx.Context, basicRes corectx.BasicRes) (*Service, error)
 	}
 	if cfg.OIDCEnabled {
 		for name, pc := range cfg.Providers {
-			s.providers[name] = oidchelper.NewProvider(pc)
 			s.logger.Info("OIDC provider %q enabled (issuer=%s, client=%s)", name, pc.IssuerURL, pc.ClientID)
 		}
 	} else if cfg.AuthEnabled {
 		s.logger.Info("AUTH_ENABLED but OIDC_ENABLED=false: only API-key/proxy auth will work")
 	}
+	access.SetOIDCProviderRuntime(s)
 	return s, nil
 }
 
-func (s *Service) Config() *oidchelper.Config { return s.cfg }
+func buildProviders(cfg *oidchelper.Config) map[string]*oidchelper.Provider {
+	providers := make(map[string]*oidchelper.Provider, len(cfg.Providers))
+	for name, providerConfig := range cfg.Providers {
+		providers[name] = oidchelper.NewProvider(providerConfig)
+	}
+	return providers
+}
+
+func (s *Service) providerState() (*oidchelper.Config, map[string]*oidchelper.Provider) {
+	s.providerMu.RLock()
+	defer s.providerMu.RUnlock()
+	return s.runtimeCfg, s.providers
+}
+
+func (s *Service) replaceProviderState(cfg *oidchelper.Config, databaseOIDC bool) {
+	s.providerMu.Lock()
+	s.runtimeCfg = cfg
+	s.providers = buildProviders(cfg)
+	s.databaseOIDC = databaseOIDC
+	s.providerMu.Unlock()
+}
+
+func (s *Service) refreshCurrentDatabaseProvider() errors.Error {
+	s.providerMu.RLock()
+	databaseOIDC := s.databaseOIDC
+	s.providerMu.RUnlock()
+	if !databaseOIDC {
+		return nil
+	}
+	return s.RefreshOIDCProvider(stdctx.Background())
+}
+
+func (s *Service) Config() *oidchelper.Config {
+	cfg, _ := s.providerState()
+	return cfg
+}
 
 // Config returns the default service's config. Nil before Init has run.
 func Config() *oidchelper.Config {
 	if defaultService == nil {
 		return nil
 	}
-	return defaultService.cfg
+	return defaultService.Config()
 }
 
 type ProviderInfo struct {
@@ -179,10 +229,15 @@ func GetMethods(c *gin.Context) { defaultService.GetMethods(c) }
 // @Success 200 {object} Methods
 // @Router /auth/methods [get]
 func (s *Service) GetMethods(c *gin.Context) {
+	if err := s.refreshCurrentDatabaseProvider(); err != nil {
+		fail(c, http.StatusServiceUnavailable, "database OIDC provider is unavailable", err)
+		return
+	}
+	cfg, _ := s.providerState()
 	out := Methods{APIKey: &APIKey{Enabled: true}}
-	if s.cfg != nil && s.cfg.OIDCEnabled {
-		for _, name := range s.cfg.ProviderNames() {
-			pc := s.cfg.Providers[name]
+	if cfg != nil && cfg.OIDCEnabled {
+		for _, name := range cfg.ProviderNames() {
+			pc := cfg.Providers[name]
 			out.Providers = append(out.Providers, ProviderInfo{
 				Name:        name,
 				DisplayName: pc.DisplayName,
@@ -202,9 +257,14 @@ func LoginInit(c *gin.Context) { defaultService.LoginInit(c) }
 // @Success 303
 // @Router /auth/login [get]
 func (s *Service) LoginInit(c *gin.Context) {
+	if err := s.refreshCurrentDatabaseProvider(); err != nil {
+		fail(c, http.StatusServiceUnavailable, "database OIDC provider is unavailable", err)
+		return
+	}
 	if !s.ensureOIDC(c) {
 		return
 	}
+	cfg, _ := s.providerState()
 	name, p, ok := s.pickProvider(c, c.Query("provider"))
 	if !ok {
 		return
@@ -221,7 +281,7 @@ func (s *Service) LoginInit(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, "state nonce", err)
 		return
 	}
-	encoded, err := oidchelper.EncodeState(s.cfg.SessionSecret, &oidchelper.StatePayload{
+	encoded, err := oidchelper.EncodeState(cfg.SessionSecret, &oidchelper.StatePayload{
 		Provider:     name,
 		Nonce:        nonce,
 		ReturnURL:    returnURL,
@@ -232,7 +292,7 @@ func (s *Service) LoginInit(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, "state encode", err)
 		return
 	}
-	oidchelper.SetStateCookie(c, s.cfg, encoded)
+	oidchelper.SetStateCookie(c, cfg, encoded)
 
 	oa, err := p.OAuth2Config(c.Request.Context())
 	if err != nil {
@@ -253,18 +313,23 @@ func Callback(c *gin.Context) { defaultService.Callback(c) }
 // @Success 303
 // @Router /auth/callback [get]
 func (s *Service) Callback(c *gin.Context) {
+	if err := s.refreshCurrentDatabaseProvider(); err != nil {
+		fail(c, http.StatusServiceUnavailable, "database OIDC provider is unavailable", err)
+		return
+	}
 	if !s.ensureOIDC(c) {
 		return
 	}
+	cfg, providers := s.providerState()
 
 	encoded, err := c.Cookie(oidchelper.StateCookieName)
 	if err != nil || encoded == "" {
 		fail(c, http.StatusBadRequest, "missing state cookie", err)
 		return
 	}
-	oidchelper.ClearStateCookie(c, s.cfg)
+	oidchelper.ClearStateCookie(c, cfg)
 
-	state, err := oidchelper.DecodeState(s.cfg.SessionSecret, encoded)
+	state, err := oidchelper.DecodeState(cfg.SessionSecret, encoded)
 	if err != nil {
 		fail(c, http.StatusBadRequest, "state decode", err)
 		return
@@ -275,7 +340,7 @@ func (s *Service) Callback(c *gin.Context) {
 		fail(c, http.StatusBadRequest, "state mismatch", nil)
 		return
 	}
-	p, ok := s.providers[state.Provider]
+	p, ok := providers[state.Provider]
 	if !ok {
 		fail(c, http.StatusBadRequest, "unknown provider in state: "+state.Provider, nil)
 		return
@@ -298,7 +363,7 @@ func (s *Service) Callback(c *gin.Context) {
 	exchangeOpts := []oauth2.AuthCodeOption{
 		oauth2.SetAuthURLParam("code_verifier", state.PKCEVerifier),
 	}
-	if pc := s.cfg.Providers[state.Provider]; pc != nil && pc.UseWorkloadIdentity {
+	if pc := cfg.Providers[state.Provider]; pc != nil && pc.UseWorkloadIdentity {
 		assertion, werr := oidchelper.FederatedAssertion()
 		if werr != nil {
 			fail(c, http.StatusInternalServerError, "workload identity assertion", werr)
@@ -335,7 +400,7 @@ func (s *Service) Callback(c *gin.Context) {
 		return
 	}
 	if accessService := s.access; accessService != nil && accessService.Enabled() {
-		issuer := s.cfg.Providers[state.Provider].IssuerURL
+		issuer := cfg.Providers[state.Provider].IssuerURL
 		if _, accessErr := accessService.Authorize(access.Identity{
 			Issuer: issuer, Subject: sub, Email: email, DisplayName: name,
 		}); accessErr != nil {
@@ -347,12 +412,12 @@ func (s *Service) Callback(c *gin.Context) {
 			c.Redirect(http.StatusSeeOther, "/login?error=access_denied")
 			return
 		}
-	} else if !s.cfg.IsUserAllowed(email) {
+	} else if !cfg.IsUserAllowed(email) {
 		fail(c, http.StatusForbidden, "user is not allowed", nil)
 		return
 	}
 	jti := uuid.NewString()
-	jwt, expiresAt, err := oidchelper.IssueSession(s.cfg, jti, state.Provider, sub, email, name)
+	jwt, expiresAt, err := oidchelper.IssueSession(cfg, jti, state.Provider, sub, email, name)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "issue session", err)
 		return
@@ -376,8 +441,8 @@ func (s *Service) Callback(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, "csrf token", err)
 		return
 	}
-	oidchelper.SetSessionCookie(c, s.cfg, jwt)
-	oidchelper.SetCSRFCookie(c, s.cfg, csrf)
+	oidchelper.SetSessionCookie(c, cfg, jwt)
+	oidchelper.SetCSRFCookie(c, cfg, csrf)
 	s.logger.Info("oidc login: provider=%s sub=%s email=%s jti=%s", state.Provider, sub, email, jti)
 
 	c.Redirect(http.StatusSeeOther, state.ReturnURL)
@@ -395,10 +460,11 @@ func Logout(c *gin.Context) { defaultService.Logout(c) }
 // @Success 200 {object} logoutResponse
 // @Router /auth/logout [post]
 func (s *Service) Logout(c *gin.Context) {
-	if s.cfg == nil || !s.cfg.AuthEnabled {
+	cfg, providers := s.providerState()
+	if cfg == nil || !cfg.AuthEnabled {
 		out := logoutResponse{OK: true}
-		if s.cfg != nil {
-			out.LogoutURL = s.cfg.AuthProxyLogoutURL
+		if cfg != nil {
+			out.LogoutURL = cfg.AuthProxyLogoutURL
 		}
 		shared.ApiOutputSuccess(c, out, http.StatusOK)
 		return
@@ -406,7 +472,7 @@ func (s *Service) Logout(c *gin.Context) {
 
 	var sessionProvider string
 	if raw, err := c.Cookie(oidchelper.SessionCookieName); err == nil && raw != "" {
-		if claims, err := oidchelper.ParseSession(s.cfg.SessionSecret, raw); err == nil && claims.ID != "" {
+		if claims, err := oidchelper.ParseSession(cfg.SessionSecret, raw); err == nil && claims.ID != "" {
 			sessionProvider = claims.Provider
 			if err := RevokeSession(s.db, claims.ID); err != nil {
 				s.logger.Error(err, "auth: revoke session row")
@@ -414,12 +480,12 @@ func (s *Service) Logout(c *gin.Context) {
 			s.revoked.Add(claims.ID)
 		}
 	}
-	oidchelper.ClearSessionCookie(c, s.cfg)
-	oidchelper.ClearCSRFCookie(c, s.cfg)
+	oidchelper.ClearSessionCookie(c, cfg)
+	oidchelper.ClearCSRFCookie(c, cfg)
 
 	out := logoutResponse{OK: true}
-	if s.cfg.OIDCEnabled && s.cfg.LogoutRedirect && sessionProvider != "" {
-		if p, ok := s.providers[sessionProvider]; ok {
+	if cfg.OIDCEnabled && cfg.LogoutRedirect && sessionProvider != "" {
+		if p, ok := providers[sessionProvider]; ok {
 			if u, err := p.EndSessionURL(c.Request.Context()); err == nil && u != "" {
 				out.LogoutURL = u
 			}
@@ -459,10 +525,11 @@ func (s *Service) UserInfo(c *gin.Context) {
 // pickProvider resolves the requested provider name. Empty names are allowed
 // only when exactly one provider is configured (single-IdP convenience).
 func (s *Service) pickProvider(c *gin.Context, requested string) (string, *oidchelper.Provider, bool) {
+	_, providers := s.providerState()
 	name := strings.ToLower(strings.TrimSpace(requested))
 	if name == "" {
-		if len(s.providers) == 1 {
-			for n := range s.providers {
+		if len(providers) == 1 {
+			for n := range providers {
 				name = n
 			}
 		} else {
@@ -470,7 +537,7 @@ func (s *Service) pickProvider(c *gin.Context, requested string) (string, *oidch
 			return "", nil, false
 		}
 	}
-	p, ok := s.providers[name]
+	p, ok := providers[name]
 	if !ok {
 		fail(c, http.StatusBadRequest, "unknown provider: "+name, nil)
 		return "", nil, false
@@ -479,7 +546,8 @@ func (s *Service) pickProvider(c *gin.Context, requested string) (string, *oidch
 }
 
 func (s *Service) ensureOIDC(c *gin.Context) bool {
-	if s.cfg == nil || !s.cfg.OIDCEnabled || len(s.providers) == 0 {
+	cfg, providers := s.providerState()
+	if cfg == nil || !cfg.OIDCEnabled || len(providers) == 0 {
 		shared.ApiOutputError(c, errors.HttpStatus(http.StatusServiceUnavailable).New("OIDC is not enabled"))
 		return false
 	}

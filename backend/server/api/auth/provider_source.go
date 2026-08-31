@@ -53,7 +53,7 @@ func loadProviderSource(cfg *oidchelper.Config, db dal.Dal, config context.Basic
 	if provider == nil {
 		return nil, nil, fmt.Errorf("database OIDC source is active but has no enabled provider")
 	}
-	secret, decryptErr := protector.Unprotect(ProtectedCredential{Ciphertext: provider.EncryptedClientSecret, Nonce: provider.ClientSecretNonce, KeyID: provider.ClientSecretKeyID}, providerCredentialAAD(provider.ID))
+	secret, decryptErr := protector.Unprotect(ProtectedCredential{Ciphertext: provider.EncryptedClientSecret, Nonce: provider.ClientSecretNonce, KeyID: provider.ClientSecretKeyID}, providerCredentialAAD(provider.ProviderKey))
 	if decryptErr != nil {
 		return nil, nil, fmt.Errorf("decrypt database OIDC provider credential: %w", decryptErr)
 	}
@@ -69,7 +69,7 @@ func loadProviderSource(cfg *oidchelper.Config, db dal.Dal, config context.Basic
 	}
 	effective.Providers = map[string]*oidchelper.ProviderConfig{provider.ProviderKey: {
 		Name: provider.ProviderKey, IssuerURL: issuerURL.String(), ClientID: provider.ClientID,
-		ClientSecret: string(secret), RedirectURL: cfg.PublicURL + PathCallback, DisplayName: provider.DisplayName,
+		ClientSecret: string(secret), RedirectURL: cfg.PublicURL + publicOIDCCallbackPath, DisplayName: provider.DisplayName,
 		Scopes:     strings.FieldsFunc(provider.Scopes, func(r rune) bool { return r == ',' || r == ' ' }),
 		HTTPClient: oidchelper.NewRestrictedHTTPClient(allowHTTP),
 	}}
@@ -106,6 +106,6 @@ func decodeCredentialKey(raw string) ([]byte, error) {
 	return key, nil
 }
 
-func providerCredentialAAD(providerID uint64) []byte {
-	return []byte(fmt.Sprintf("auth_oidc_providers:%d:client_secret", providerID))
+func providerCredentialAAD(providerKey string) []byte {
+	return []byte(fmt.Sprintf("auth_oidc_providers:%s:client_secret", providerKey))
 }

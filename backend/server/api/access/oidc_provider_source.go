@@ -36,6 +36,9 @@ func LoadDatabaseOIDCProvider(db dal.Dal) (*OIDCProvider, bool, errors.Error) {
 		}
 		return nil, false, err
 	}
+	if configuration.ActivatedAt == nil {
+		return nil, false, nil
+	}
 	provider := &OIDCProvider{}
 	if err := db.First(provider, dal.Where("enabled = ? AND retired_at IS NULL", true)); err != nil {
 		if db.IsErrorNotFound(err) {

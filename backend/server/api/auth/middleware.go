@@ -60,7 +60,16 @@ func CSRFProtect() gin.HandlerFunc { return defaultService.CSRFProtect() }
 // pass through and RequireAuth decides whether to reject.
 func (s *Service) OIDCAuthentication() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if s.cfg == nil || !s.cfg.AuthEnabled {
+		if err := s.refreshCurrentDatabaseProvider(); err != nil {
+			if _, cookieErr := c.Cookie(oidchelper.SessionCookieName); cookieErr == nil {
+				cfg, _ := s.providerState()
+				oidchelper.ClearSessionCookie(c, cfg)
+			}
+			c.Next()
+			return
+		}
+		cfg, _ := s.providerState()
+		if cfg == nil || !cfg.AuthEnabled {
 			c.Next()
 			return
 		}
@@ -73,24 +82,24 @@ func (s *Service) OIDCAuthentication() gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		claims, err := oidchelper.ParseSession(s.cfg.SessionSecret, raw)
+		claims, err := oidchelper.ParseSession(cfg.SessionSecret, raw)
 		if err != nil {
 			s.logger.Debug("invalid session cookie: %v", err)
-			oidchelper.ClearSessionCookie(c, s.cfg)
+			oidchelper.ClearSessionCookie(c, cfg)
 			c.Next()
 			return
 		}
 		if s.revoked != nil && s.revoked.IsRevoked(claims.ID) {
 			s.logger.Debug("revoked session presented: jti=%s", claims.ID)
-			oidchelper.ClearSessionCookie(c, s.cfg)
+			oidchelper.ClearSessionCookie(c, cfg)
 			c.Next()
 			return
 		}
 		if s.access != nil && s.access.Enabled() {
-			provider := s.cfg.Providers[claims.Provider]
+			provider := cfg.Providers[claims.Provider]
 			if provider == nil {
 				s.logger.Info("native session denied: unknown provider=%s jti=%s", claims.Provider, claims.ID)
-				oidchelper.ClearSessionCookie(c, s.cfg)
+				oidchelper.ClearSessionCookie(c, cfg)
 				c.Next()
 				return
 			}
@@ -100,7 +109,7 @@ func (s *Service) OIDCAuthentication() gin.HandlerFunc {
 			if _, accessErr := s.access.AuthorizeSession(identity); accessErr != nil {
 				if accessErr.GetType() == errors.Unauthorized || accessErr.GetType() == errors.Forbidden {
 					s.logger.Info("native session denied: provider=%s email=%s", claims.Provider, claims.Email)
-					oidchelper.ClearSessionCookie(c, s.cfg)
+					oidchelper.ClearSessionCookie(c, cfg)
 				} else {
 					s.logger.Error(accessErr, "native session authorization failed provider=%s email=%s", claims.Provider, claims.Email)
 				}
@@ -112,7 +121,7 @@ func (s *Service) OIDCAuthentication() gin.HandlerFunc {
 			Name:  claims.Name,
 			Email: claims.Email,
 		})
-		if provider := s.cfg.Providers[claims.Provider]; provider != nil {
+		if provider := cfg.Providers[claims.Provider]; provider != nil {
 			access.SetIdentity(c, access.Identity{
 				Issuer: provider.IssuerURL, Subject: claims.Subject, Email: claims.Email, DisplayName: claims.Name,
 			})
@@ -126,8 +135,9 @@ func (s *Service) OIDCAuthentication() gin.HandlerFunc {
 // transaction so disabling a directory user and revoking their session rows commit
 // together.
 func (s *Service) RevokePersistentSessions(tx dal.Transaction, issuer, subject string) ([]string, errors.Error) {
+	cfg, _ := s.providerState()
 	ids := make([]string, 0)
-	for providerName, provider := range s.cfg.Providers {
+	for providerName, provider := range cfg.Providers {
 		if provider == nil || provider.IssuerURL != issuer {
 			continue
 		}
@@ -143,6 +153,20 @@ func (s *Service) RevokePersistentSessions(tx dal.Transaction, issuer, subject s
 	return ids, nil
 }
 
+// RevokeProviderSessions persists revocations for every live session issued by the
+// specified provider. The caller owns the transaction and updates the cache after it
+// commits.
+func (s *Service) RevokeProviderSessions(tx dal.Transaction, providerKey string) ([]string, errors.Error) {
+	activeIDs, err := ListActiveSessionIDsForProvider(tx, providerKey)
+	if err != nil {
+		return nil, err
+	}
+	if err := RevokeSessionsForProvider(tx, providerKey); err != nil {
+		return nil, err
+	}
+	return activeIDs, nil
+}
+
 // CacheRevokedSessions updates the process-local fast path only after the
 // transaction that persisted the revocations has committed.
 func (s *Service) CacheRevokedSessions(ids []string) {
@@ -155,7 +179,8 @@ func (s *Service) CacheRevokedSessions(ids []string) {
 // deployments are unaffected.
 func (s *Service) RequireAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if s.cfg == nil || !s.cfg.AuthEnabled {
+		cfg, _ := s.providerState()
+		if cfg == nil || !cfg.AuthEnabled {
 			c.Next()
 			return
 		}
@@ -191,7 +216,8 @@ func isPublicPath(path string) bool {
 // future GET endpoint that is upgraded to a mutation.
 func (s *Service) CSRFProtect() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if s.cfg == nil || !s.cfg.AuthEnabled {
+		cfg, _ := s.providerState()
+		if cfg == nil || !cfg.AuthEnabled {
 			c.Next()
 			return
 		}

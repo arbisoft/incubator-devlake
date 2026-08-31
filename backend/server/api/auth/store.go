@@ -57,11 +57,31 @@ func RevokeSessionsForIdentity(db dal.Dal, provider, sub string) errors.Error {
 	return db.UpdateColumn(&AuthSession{}, "revoked_at", now, dal.Where("provider = ? AND sub = ? AND revoked_at IS NULL", provider, sub))
 }
 
+func RevokeSessionsForProvider(db dal.Dal, provider string) errors.Error {
+	now := time.Now()
+	return db.UpdateColumn(&AuthSession{}, "revoked_at", now, dal.Where("provider = ? AND revoked_at IS NULL", provider))
+}
+
 func ListActiveSessionIDsForIdentity(db dal.Dal, provider, sub string) ([]string, errors.Error) {
 	rows := make([]AuthSession, 0)
 	if err := db.All(&rows,
 		dal.Select("jti"),
 		dal.Where("provider = ? AND sub = ? AND revoked_at IS NULL AND expires_at > ?", provider, sub, time.Now()),
+	); err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(rows))
+	for _, row := range rows {
+		ids = append(ids, row.Jti)
+	}
+	return ids, nil
+}
+
+func ListActiveSessionIDsForProvider(db dal.Dal, provider string) ([]string, errors.Error) {
+	rows := make([]AuthSession, 0)
+	if err := db.All(&rows,
+		dal.Select("jti"),
+		dal.Where("provider = ? AND revoked_at IS NULL AND expires_at > ?", provider, time.Now()),
 	); err != nil {
 		return nil, err
 	}

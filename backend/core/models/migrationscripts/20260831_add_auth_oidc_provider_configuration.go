@@ -32,6 +32,7 @@ var _ plugin.MigrationScript = (*addAuthOIDCProviderConfiguration)(nil)
 type authOIDCProviderConfiguration20260831 struct {
 	ID                    string `gorm:"primaryKey;type:varchar(64)"`
 	ActivatedAt           *time.Time
+	CandidateProviderID   uint64 `gorm:"index:idx_auth_oidc_provider_candidate"`
 	ProviderRevision      uint64 `gorm:"not null;default:0"`
 	GrafanaSyncStatus     string `gorm:"type:varchar(32);not null;default:'pending'"`
 	GrafanaSyncedRevision uint64 `gorm:"not null;default:0"`
@@ -61,12 +62,29 @@ type authOIDCProvider20260831 struct {
 
 func (authOIDCProvider20260831) TableName() string { return "auth_oidc_providers" }
 
+type authOIDCProviderCandidate20260831 struct {
+	archived.Model
+	ProviderKey           string     `gorm:"type:varchar(64);index:idx_auth_oidc_provider_candidate_key"`
+	DisplayName           string     `gorm:"type:varchar(255)"`
+	IssuerURL             string     `gorm:"type:varchar(512)"`
+	ClientID              string     `gorm:"type:varchar(512)"`
+	EncryptedClientSecret []byte     `gorm:"type:blob"`
+	ClientSecretNonce     []byte     `gorm:"type:blob"`
+	ClientSecretKeyID     string     `gorm:"type:varchar(64)"`
+	Scopes                string     `gorm:"type:text"`
+	Revision              uint64     `gorm:"not null"`
+	PromotedAt            *time.Time `gorm:"index"`
+}
+
+func (authOIDCProviderCandidate20260831) TableName() string { return "auth_oidc_provider_candidates" }
+
 type addAuthOIDCProviderConfiguration struct{}
 
 func (*addAuthOIDCProviderConfiguration) Up(basicRes context.BasicRes) errors.Error {
 	return migrationhelper.AutoMigrateTables(basicRes,
 		new(authOIDCProviderConfiguration20260831),
 		new(authOIDCProvider20260831),
+		new(authOIDCProviderCandidate20260831),
 	)
 }
 
