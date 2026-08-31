@@ -42,6 +42,8 @@ type Props = {
   onRefresh: () => void;
 };
 
+type Operation = 'validate' | 'save' | 'activate' | 'grafana-sync';
+
 const EMPTY_PROVIDER: OIDCProviderInput = {
   providerKey: '',
   displayName: '',
@@ -87,8 +89,9 @@ const Callback = ({ label, value }: { label: string; value: string }) => (
 
 export const Authentication = ({ provider, loadFailed, onRefresh }: Props) => {
   const [form, setForm] = useState<OIDCProviderInput>(() => formFromProvider(provider));
-  const [operating, setOperating] = useState(false);
+  const [operating, setOperating] = useState<Operation>();
   const [operationError, setOperationError] = useState<string>();
+  const [operationSuccess, setOperationSuccess] = useState<string>();
   const providerVersion = `${provider?.providerKey ?? ''}:${provider?.providerRevision ?? 0}`;
   const status = getOIDCProviderStatus(provider);
   const validInput = isValidOIDCProviderInput(form);
@@ -97,6 +100,7 @@ export const Authentication = ({ provider, loadFailed, onRefresh }: Props) => {
   useEffect(() => {
     setForm(formFromProvider(provider));
     setOperationError(undefined);
+    setOperationSuccess(undefined);
   }, [providerVersion]);
 
   const normalizedInput = useMemo(() => normalizeOIDCProviderInput(form), [form]);
@@ -104,26 +108,29 @@ export const Authentication = ({ provider, loadFailed, onRefresh }: Props) => {
   const updateField = <Key extends keyof OIDCProviderInput>(field: Key, value: OIDCProviderInput[Key]) => {
     setForm((current) => ({ ...current, [field]: value }));
     setOperationError(undefined);
+    setOperationSuccess(undefined);
   };
 
-  const execute = async (request: () => Promise<unknown>) => {
+  const execute = async (action: Operation, request: () => Promise<unknown>) => {
     setOperationError(undefined);
+    setOperationSuccess(undefined);
     const [success, result] = await operator(request, {
       hideToast: true,
-      setOperating,
+      setOperating: (active) => setOperating(active ? action : undefined),
       formatReason: getOIDCProviderError,
     });
     if (success) {
+      if (action === 'validate') setOperationSuccess('OIDC provider settings are valid.');
       onRefresh();
       return;
     }
     setOperationError(getOIDCProviderError(result));
   };
 
-  const validate = () => execute(() => API.access.validateOIDCProvider(normalizedInput));
-  const save = () => execute(() => API.access.saveOIDCProvider(normalizedInput));
-  const activate = () => execute(() => API.access.activateOIDCProvider());
-  const retryGrafanaSync = () => execute(() => API.access.retryGrafanaOIDCProviderSync());
+  const validate = () => execute('validate', () => API.access.validateOIDCProvider(normalizedInput));
+  const save = () => execute('save', () => API.access.saveOIDCProvider(normalizedInput));
+  const activate = () => execute('activate', () => API.access.activateOIDCProvider());
+  const retryGrafanaSync = () => execute('grafana-sync', () => API.access.retryGrafanaOIDCProviderSync());
 
   if (loadFailed) {
     return (
@@ -196,11 +203,17 @@ export const Authentication = ({ provider, loadFailed, onRefresh }: Props) => {
           <Input value={form.scopes} onChange={(event) => updateField('scopes', event.target.value)} />
         </Block>
         {operationError && <Alert type="error" showIcon message={operationError} />}
+        {operationSuccess && <Alert type="success" showIcon message={operationSuccess} />}
         <Space wrap>
-          <Button loading={operating} disabled={!validInput} onClick={validate}>
+          <Button loading={operating === 'validate'} disabled={!validInput || Boolean(operating)} onClick={validate}>
             Validate
           </Button>
-          <Button type="primary" loading={operating} disabled={!validInput} onClick={save}>
+          <Button
+            type="primary"
+            loading={operating === 'save'}
+            disabled={!validInput || Boolean(operating)}
+            onClick={save}
+          >
             Save provider
           </Button>
           {canActivateOIDCProvider(provider) && (
@@ -210,14 +223,14 @@ export const Authentication = ({ provider, loadFailed, onRefresh }: Props) => {
               okText="Activate"
               onConfirm={activate}
             >
-              <Button loading={operating} type="primary">
+              <Button loading={operating === 'activate'} disabled={Boolean(operating)} type="primary">
                 Activate
               </Button>
             </Popconfirm>
           )}
           {(provider?.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.FAILED ||
             provider?.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.COMPENSATION_FAILED) && (
-            <Button loading={operating} onClick={retryGrafanaSync}>
+            <Button loading={operating === 'grafana-sync'} disabled={Boolean(operating)} onClick={retryGrafanaSync}>
               Retry Grafana synchronization
             </Button>
           )}

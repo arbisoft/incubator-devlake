@@ -151,7 +151,7 @@ services:
       - "host.docker.internal:host-gateway"
     env_file:
       - ./.env
-      - path: ./.auth-secrets.env
+      - path: ./auth-secrets.env
         required: false
     environment:
       LOGGING_DIR: /app/logs
