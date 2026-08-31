@@ -350,6 +350,7 @@ func (s *Service) persistOIDCCandidate(provider *OIDCProvider, prepared *Prepare
 func (s *Service) syncGrafana(ctx context.Context, provider *OIDCProvider, settings GrafanaSSOSettings, enabled bool, configuration *OIDCProviderConfiguration) errors.Error {
 	settings.Enabled = enabled
 	if err := s.grafanaSSO.PutGenericOAuth(ctx, settings); err != nil {
+		s.logger.Error(err, "access: Grafana OAuth synchronization failed provider=%s", provider.ProviderKey)
 		s.recordGrafanaSyncFailure(configuration, provider.ProviderKey)
 		return errors.Unavailable.New("Grafana OAuth configuration could not be synchronized", errors.WithData(ErrCodeProviderBlocked))
 	}

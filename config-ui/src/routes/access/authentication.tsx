@@ -120,7 +120,10 @@ export const Authentication = ({ provider, loadFailed, onRefresh }: Props) => {
       formatReason: getOIDCProviderError,
     });
     if (success) {
-      if (action === 'validate') setOperationSuccess('OIDC provider settings are valid.');
+      if (action === 'validate') {
+        setOperationSuccess('OIDC provider settings are valid.');
+        return;
+      }
       onRefresh();
       return;
     }
