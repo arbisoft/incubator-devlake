@@ -19,6 +19,7 @@ package oidchelper
 
 import (
 	"fmt"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -52,6 +53,7 @@ type ProviderConfig struct {
 	RedirectURL  string
 	Scopes       []string
 	DisplayName  string
+	HTTPClient   *http.Client
 
 	// UseWorkloadIdentity authenticates the code exchange with an Azure
 	// Workload Identity federated assertion (read from the SA token file)
@@ -62,6 +64,9 @@ type ProviderConfig struct {
 // Config is the typed view of the auth-related env vars. Build it once at boot.
 type Config struct {
 	AuthEnabled bool
+	// PublicURL is the canonical browser origin used to derive database-backed
+	// OIDC callbacks. Environment providers retain their explicit RedirectURL.
+	PublicURL string
 	// AuthProxyLogoutURL is used when an external auth proxy owns the browser session.
 	AuthProxyLogoutURL string
 
@@ -129,6 +134,7 @@ func LoadConfig(basicRes context.BasicRes) (*Config, error) {
 
 	out := &Config{
 		AuthEnabled:        true,
+		PublicURL:          strings.TrimRight(strings.TrimSpace(cfg.GetString("AUTH_PUBLIC_URL")), "/"),
 		AuthProxyLogoutURL: authProxyLogoutURL,
 		OIDCEnabled:        cfg.GetBool("OIDC_ENABLED"),
 		Providers:          map[string]*ProviderConfig{},
@@ -147,7 +153,10 @@ func LoadConfig(basicRes context.BasicRes) (*Config, error) {
 
 	names := parseProviderNames(cfg.GetString("OIDC_PROVIDERS"))
 	if len(names) == 0 {
-		return nil, fmt.Errorf("OIDC_ENABLED=true but OIDC_PROVIDERS is empty")
+		// Auth resolves the database-backed source after this bootstrap config is
+		// loaded. It preserves the historical environment-mode validation when no
+		// database source is active.
+		return out, nil
 	}
 	for _, name := range names {
 		prefix := "OIDC_" + strings.ToUpper(name) + "_"

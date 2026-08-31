@@ -110,6 +110,13 @@ func NewService(ctx stdctx.Context, basicRes corectx.BasicRes) (*Service, error)
 	if err != nil {
 		return nil, err
 	}
+	cfg, _, err = loadProviderSource(cfg, basicRes.GetDal(), basicRes)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.AuthEnabled && cfg.OIDCEnabled && len(cfg.Providers) == 0 {
+		return nil, fmt.Errorf("OIDC_ENABLED=true but neither OIDC_PROVIDERS nor an activated database provider is configured")
+	}
 	if access.Default() != nil && access.Default().Enabled() {
 		if err := access.ValidateConfiguration(cfg.AuthEnabled, cfg.OIDCEnabled, basicRes.GetConfigReader().GetString("FORWARDED_USER_SECRET")); err != nil {
 			return nil, err
@@ -302,7 +309,7 @@ func (s *Service) Callback(c *gin.Context) {
 			oauth2.SetAuthURLParam("client_assertion", assertion),
 		)
 	}
-	tok, err := oa.Exchange(c.Request.Context(), code, exchangeOpts...)
+	tok, err := oa.Exchange(p.HTTPContext(c.Request.Context()), code, exchangeOpts...)
 	if err != nil {
 		fail(c, http.StatusBadGateway, "code exchange", err)
 		return

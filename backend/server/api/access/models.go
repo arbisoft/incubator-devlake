@@ -45,6 +45,12 @@ const (
 	ErrCodeDuplicateDomain = "DUPLICATE_DOMAIN"
 	ErrCodeInvalidUser     = "INVALID_USER"
 	ErrCodeInvalidDomain   = "INVALID_DOMAIN"
+
+	OIDCProviderSourceKey                = "default"
+	OIDCProviderStatusPending            = "pending"
+	OIDCProviderStatusSynchronized       = "synchronized"
+	OIDCProviderStatusFailed             = "failed"
+	OIDCProviderStatusCompensationFailed = "compensation_failed"
 )
 
 type ApiErrorResponse struct {
@@ -98,6 +104,41 @@ type AuditEvent struct {
 }
 
 func (AuditEvent) TableName() string { return "auth_access_audit_events" }
+
+// OIDCProviderConfiguration makes the database OIDC source explicit. Its presence
+// means environment providers are no longer authoritative; phase-two activation sets
+// ActivatedAt only after Grafana accepts the matching provider revision.
+type OIDCProviderConfiguration struct {
+	ID                    string     `gorm:"primaryKey;type:varchar(64)"`
+	ActivatedAt           *time.Time `json:"activatedAt,omitempty"`
+	ProviderRevision      uint64     `gorm:"not null;default:0"`
+	GrafanaSyncStatus     string     `gorm:"type:varchar(32);not null;default:'pending'"`
+	GrafanaSyncedRevision uint64     `gorm:"not null;default:0"`
+	GrafanaLastSyncedAt   *time.Time `json:"grafanaLastSyncedAt,omitempty"`
+	GrafanaLastErrorCode  string     `gorm:"type:varchar(64)"`
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+}
+
+func (OIDCProviderConfiguration) TableName() string { return "auth_oidc_provider_configuration" }
+
+// OIDCProvider stores customer-managed OIDC metadata. ClientSecret fields are never
+// serialized and are encrypted by the auth credential protector before persistence.
+type OIDCProvider struct {
+	common.Model
+	ProviderKey           string     `gorm:"type:varchar(64);uniqueIndex:idx_auth_oidc_provider_key" json:"providerKey"`
+	DisplayName           string     `gorm:"type:varchar(255)" json:"displayName"`
+	IssuerURL             string     `gorm:"type:varchar(512);uniqueIndex:idx_auth_oidc_provider_issuer" json:"issuerUrl"`
+	ClientID              string     `gorm:"type:varchar(512)" json:"clientId"`
+	EncryptedClientSecret []byte     `gorm:"type:blob" json:"-"`
+	ClientSecretNonce     []byte     `gorm:"type:blob" json:"-"`
+	ClientSecretKeyID     string     `gorm:"type:varchar(64)" json:"-"`
+	Scopes                string     `gorm:"type:text" json:"scopes"`
+	Enabled               bool       `gorm:"index:idx_auth_oidc_provider_enabled" json:"enabled"`
+	RetiredAt             *time.Time `gorm:"index:idx_auth_oidc_provider_retired" json:"retiredAt,omitempty"`
+}
+
+func (OIDCProvider) TableName() string { return "auth_oidc_providers" }
 
 type Identity struct {
 	Issuer      string
