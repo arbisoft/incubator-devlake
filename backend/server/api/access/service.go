@@ -31,6 +31,8 @@ import (
 type Config struct {
 	Enabled             bool
 	BootstrapAdminEmail string
+	AuthPublicURL       string
+	GrafanaPublicURL    string
 }
 
 // SessionRevoker persists revocations in the same transaction as an access-user
@@ -62,6 +64,8 @@ func Init(basicRes context.BasicRes) {
 			cfg: Config{
 				Enabled:             cfg.GetBool("AUTH_ACCESS_ENABLED"),
 				BootstrapAdminEmail: normalizeEmail(cfg.GetString("AUTH_BOOTSTRAP_ADMIN_EMAIL")),
+				AuthPublicURL:       strings.TrimRight(strings.TrimSpace(cfg.GetString("AUTH_PUBLIC_URL")), "/"),
+				GrafanaPublicURL:    strings.TrimRight(strings.TrimSpace(cfg.GetString("GRAFANA_PUBLIC_URL")), "/"),
 			},
 			db:     basicRes.GetDal(),
 			logger: basicRes.GetLogger(),
@@ -75,6 +79,25 @@ func Init(basicRes context.BasicRes) {
 			defaultService.grafanaSSO = grafanaClient
 		}
 	})
+}
+
+func (s *Service) oidcProviderCallbacks() (string, string, errors.Error) {
+	if s.cfg.AuthPublicURL == "" || s.cfg.GrafanaPublicURL == "" {
+		return "", "", errors.Unavailable.New("OIDC provider public URLs are not configured", errors.WithData(ErrCodeProviderBlocked))
+	}
+	return s.cfg.AuthPublicURL + authOIDCCallbackPath, s.cfg.GrafanaPublicURL + grafanaOIDCCallbackPath, nil
+}
+
+func (s *Service) decorateOIDCProviderResponse(response *OIDCProviderResponse) *OIDCProviderResponse {
+	if response == nil {
+		return nil
+	}
+	devLakeCallbackURL, grafanaCallbackURL, err := s.oidcProviderCallbacks()
+	if err == nil {
+		response.DevLakeCallbackURL = devLakeCallbackURL
+		response.GrafanaCallbackURL = grafanaCallbackURL
+	}
+	return response
 }
 
 func Default() *Service { return defaultService }

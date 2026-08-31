@@ -236,7 +236,7 @@ func GetOIDCProvider(c *gin.Context) {
 		outputError(c, err)
 		return
 	}
-	shared.ApiOutputSuccess(c, provider, http.StatusOK)
+	shared.ApiOutputSuccess(c, Default().decorateOIDCProviderResponse(provider), http.StatusOK)
 }
 
 func ValidateOIDCProvider(c *gin.Context) {
@@ -268,7 +268,7 @@ func PutOIDCProvider(c *gin.Context) {
 		outputError(c, err)
 		return
 	}
-	shared.ApiOutputSuccess(c, provider, http.StatusOK)
+	shared.ApiOutputSuccess(c, Default().decorateOIDCProviderResponse(provider), http.StatusOK)
 }
 
 func ActivateOIDCProvider(c *gin.Context) {
@@ -281,7 +281,7 @@ func ActivateOIDCProvider(c *gin.Context) {
 		outputError(c, err)
 		return
 	}
-	shared.ApiOutputSuccess(c, provider, http.StatusOK)
+	shared.ApiOutputSuccess(c, Default().decorateOIDCProviderResponse(provider), http.StatusOK)
 }
 
 func EnableOIDCProvider(c *gin.Context) {
@@ -294,7 +294,7 @@ func EnableOIDCProvider(c *gin.Context) {
 		outputError(c, err)
 		return
 	}
-	shared.ApiOutputSuccess(c, provider, http.StatusOK)
+	shared.ApiOutputSuccess(c, Default().decorateOIDCProviderResponse(provider), http.StatusOK)
 }
 
 func DisableOIDCProvider(c *gin.Context) {
@@ -307,7 +307,7 @@ func DisableOIDCProvider(c *gin.Context) {
 		outputError(c, err)
 		return
 	}
-	shared.ApiOutputSuccess(c, provider, http.StatusOK)
+	shared.ApiOutputSuccess(c, Default().decorateOIDCProviderResponse(provider), http.StatusOK)
 }
 
 func RetireOIDCProvider(c *gin.Context) {
@@ -320,7 +320,7 @@ func RetireOIDCProvider(c *gin.Context) {
 		outputError(c, err)
 		return
 	}
-	shared.ApiOutputSuccess(c, provider, http.StatusOK)
+	shared.ApiOutputSuccess(c, Default().decorateOIDCProviderResponse(provider), http.StatusOK)
 }
 
 func RetryGrafanaOIDCProviderSync(c *gin.Context) {
@@ -333,7 +333,7 @@ func RetryGrafanaOIDCProviderSync(c *gin.Context) {
 		outputError(c, err)
 		return
 	}
-	shared.ApiOutputSuccess(c, provider, http.StatusOK)
+	shared.ApiOutputSuccess(c, Default().decorateOIDCProviderResponse(provider), http.StatusOK)
 }
 
 func oidcProviderInput(c *gin.Context) (OIDCProviderInput, bool) {

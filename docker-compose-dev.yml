@@ -151,6 +151,8 @@ services:
       - "host.docker.internal:host-gateway"
     env_file:
       - ./.env
+      - path: ./.auth-secrets.env
+        required: false
     environment:
       LOGGING_DIR: /app/logs
       OTEL_AUTH_HTPASSWD_PATH: /var/lib/devlake/otel-auth/.htpasswd

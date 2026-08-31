@@ -30,7 +30,6 @@ import (
 const (
 	auditProviderCreated                   = "provider.created"
 	auditProviderUpdated                   = "provider.updated"
-	auditProviderValidated                 = "provider.validated"
 	auditProviderActivated                 = "provider.database_activated"
 	auditProviderEnabled                   = "provider.enabled"
 	auditProviderDisabled                  = "provider.disabled"
@@ -71,6 +70,9 @@ func (s *Service) GetOIDCProvider() (*OIDCProviderResponse, errors.Error) {
 }
 
 func (s *Service) ValidateOIDCProvider(ctx context.Context, input OIDCProviderInput) errors.Error {
+	if _, _, err := s.oidcProviderCallbacks(); err != nil {
+		return err
+	}
 	provider, secret, err := normalizeOIDCProviderInput(input)
 	if err != nil {
 		return err
@@ -83,11 +85,18 @@ func (s *Service) ValidateOIDCProvider(ctx context.Context, input OIDCProviderIn
 }
 
 func (s *Service) SaveOIDCProvider(ctx context.Context, actor string, input OIDCProviderInput) (*OIDCProviderResponse, errors.Error) {
+	if _, _, err := s.oidcProviderCallbacks(); err != nil {
+		return nil, err
+	}
 	provider, secret, err := normalizeOIDCProviderInput(input)
 	if err != nil {
 		return nil, err
 	}
-	if s.oidcRuntime == nil || s.grafanaSSO == nil {
+	if s.oidcRuntime == nil {
+		return nil, errors.Unavailable.New("OIDC provider administration is not configured", errors.WithData(ErrCodeProviderBlocked))
+	}
+	if s.grafanaSSO == nil {
+		s.logger.Warn(errors.Default.New("Grafana SSO client is unavailable"), "access: OIDC provider save blocked")
 		return nil, errors.Unavailable.New("OIDC provider administration is not configured", errors.WithData(ErrCodeProviderBlocked))
 	}
 

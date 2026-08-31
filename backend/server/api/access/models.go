@@ -57,6 +57,9 @@ const (
 	OIDCProviderStatusSynchronized       = "synchronized"
 	OIDCProviderStatusFailed             = "failed"
 	OIDCProviderStatusCompensationFailed = "compensation_failed"
+
+	authOIDCCallbackPath    = "/api/auth/callback"
+	grafanaOIDCCallbackPath = "/login/generic_oauth"
 )
 
 type ApiErrorResponse struct {
@@ -275,4 +278,6 @@ type OIDCProviderResponse struct {
 	GrafanaSyncStatus     string     `json:"grafanaSyncStatus"`
 	GrafanaSyncedRevision uint64     `json:"grafanaSyncedRevision"`
 	ProviderRevision      uint64     `json:"providerRevision"`
+	DevLakeCallbackURL    string     `json:"devlakeCallbackUrl"`
+	GrafanaCallbackURL    string     `json:"grafanaCallbackUrl"`
 }

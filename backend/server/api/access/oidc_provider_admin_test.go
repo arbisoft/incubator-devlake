@@ -69,3 +69,24 @@ func TestOIDCProviderResponseDoesNotExposeSecret(t *testing.T) {
 		t.Fatal("response should report configured secret")
 	}
 }
+
+func TestOIDCProviderResponseIncludesDeploymentDerivedCallbacks(t *testing.T) {
+	service := &Service{cfg: Config{
+		AuthPublicURL:    "https://devlake.example.com",
+		GrafanaPublicURL: "https://grafana.example.com",
+	}}
+	response := service.decorateOIDCProviderResponse(&OIDCProviderResponse{})
+	if response.DevLakeCallbackURL != "https://devlake.example.com/api/auth/callback" {
+		t.Fatalf("DevLake callback = %q", response.DevLakeCallbackURL)
+	}
+	if response.GrafanaCallbackURL != "https://grafana.example.com/login/generic_oauth" {
+		t.Fatalf("Grafana callback = %q", response.GrafanaCallbackURL)
+	}
+}
+
+func TestOIDCProviderCallbacksRequireDeploymentOrigins(t *testing.T) {
+	service := &Service{cfg: Config{AuthPublicURL: "https://devlake.example.com"}}
+	if _, _, err := service.oidcProviderCallbacks(); err == nil {
+		t.Fatal("expected missing Grafana public URL to block provider administration")
+	}
+}
