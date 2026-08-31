@@ -278,6 +278,7 @@ func (s *Service) RetryGrafanaOIDCProviderSync(ctx context.Context, actor string
 func (s *Service) persistOIDCCandidate(provider *OIDCProvider, prepared *PreparedOIDCProvider, update bool) (*OIDCProviderConfiguration, errors.Error) {
 	tx := s.db.Begin()
 	committed := false
+	now := time.Now()
 	defer func() {
 		if !committed {
 			if rollbackErr := tx.Rollback(); rollbackErr != nil {
@@ -296,7 +297,9 @@ func (s *Service) persistOIDCCandidate(provider *OIDCProvider, prepared *Prepare
 	configuration.GrafanaSyncStatus = OIDCProviderStatusPending
 	configuration.GrafanaLastErrorCode = ""
 	configuration.GrafanaLastSyncedAt = nil
+	configuration.UpdatedAt = now
 	if configuration.CreatedAt.IsZero() {
+		configuration.CreatedAt = now
 		if err := tx.Create(configuration); err != nil {
 			return nil, errors.Default.Wrap(err, "error creating OIDC provider configuration")
 		}
@@ -314,6 +317,8 @@ func (s *Service) persistOIDCCandidate(provider *OIDCProvider, prepared *Prepare
 			ClientSecretNonce: provider.ClientSecretNonce, ClientSecretKeyID: provider.ClientSecretKeyID,
 			Scopes: provider.Scopes, Revision: configuration.ProviderRevision,
 		}
+		candidate.CreatedAt = now
+		candidate.UpdatedAt = now
 		if err := tx.Create(candidate); err != nil {
 			return nil, errors.Default.Wrap(err, "error creating OIDC provider candidate")
 		}
@@ -324,11 +329,16 @@ func (s *Service) persistOIDCCandidate(provider *OIDCProvider, prepared *Prepare
 		provider.ID = candidate.ID
 		provider.Enabled = true
 	} else if provider.ID != 0 {
+		provider.UpdatedAt = now
 		if err := tx.Update(provider); err != nil {
 			return nil, errors.Default.Wrap(err, "error updating OIDC provider")
 		}
-	} else if err := tx.Create(provider); err != nil {
-		return nil, errors.Default.Wrap(err, "error creating OIDC provider")
+	} else {
+		provider.CreatedAt = now
+		provider.UpdatedAt = now
+		if err := tx.Create(provider); err != nil {
+			return nil, errors.Default.Wrap(err, "error creating OIDC provider")
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, errors.Default.Wrap(err, "error committing OIDC provider candidate")
