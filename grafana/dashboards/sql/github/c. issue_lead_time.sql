@@ -12,7 +12,7 @@ WITH type_map AS (
              OR original_type LIKE '%enhancement%'
              OR original_type LIKE '%improvement%'   THEN 'Refactoring'
            WHEN original_type LIKE '%task%'          THEN 'Tasks'
-           ELSE 'Other'
+           ELSE 'Unclassified'
          END AS category
   FROM (SELECT DISTINCT original_type FROM issues) d
 ),

@@ -23,7 +23,7 @@ SELECT $__timeGroup(i.created_date, $interval)     AS time,
        SUM(tm.category = 'Documentation')     AS Documentation,
        SUM(tm.category = 'R&D')               AS `R&D`,
        SUM(tm.category = 'Reviews')           AS Reviews,
-       SUM(tm.category = 'Other')             AS Other
+       SUM(tm.category = 'Other')             AS Unclassified
 FROM issues i
 JOIN type_map tm ON tm.original_type <=> i.original_type
 WHERE i.id LIKE 'github:%'
