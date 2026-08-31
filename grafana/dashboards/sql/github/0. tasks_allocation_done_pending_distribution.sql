@@ -1,3 +1,4 @@
+-- Per assignee, counts issues created in the window split into Done versus Pending by status, scoped to boards mapped to the selected project, top 20 by total issues.
 SELECT
   replace(COALESCE(
     NULLIF(TRIM(a.full_name), ''),

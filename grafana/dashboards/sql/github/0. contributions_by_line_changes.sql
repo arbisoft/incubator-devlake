@@ -1,3 +1,4 @@
+-- Sums additions and deletions per contributor across commits authored in the window (deduped by commit SHA), scoped to repos mapped to the selected project, top 20 by total lines changed.
 WITH dedup AS (
   SELECT DISTINCT
     COALESCE(a.full_name, u.name, c.author_name) AS contributor,

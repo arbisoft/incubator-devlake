@@ -1,3 +1,4 @@
+-- Averages lead_time_minutes converted to days per assignee for issues created in the window, scoped to boards mapped to the selected project.
 select * from (
   SELECT replace(COALESCE(
         NULLIF(TRIM(a.full_name), ''),

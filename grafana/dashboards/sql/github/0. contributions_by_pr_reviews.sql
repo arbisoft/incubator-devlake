@@ -1,3 +1,4 @@
+-- Per reviewer, counts their latest review per PR as Approved, Rejected or Commented, excluding self-reviews, scoped to repos mapped to the selected project, top 20 reviewers.
 WITH ranked AS (
   SELECT
     c.account_id,

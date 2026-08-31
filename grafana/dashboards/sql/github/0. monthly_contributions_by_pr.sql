@@ -1,3 +1,4 @@
+-- Per calendar month, counts PRs created in the window by the outcome of their most recent non-author review: Approved, Changes requested, Commented only, or No review.
 WITH latest_review AS (
   SELECT
     pr.id,

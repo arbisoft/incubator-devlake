@@ -1,3 +1,4 @@
+-- Per author, counts PRs created in the window split by status into Merged, Closed and Open, scoped to repos mapped to the selected project, top 20 by total PRs.
 SELECT
   REPLACE(
     COALESCE(

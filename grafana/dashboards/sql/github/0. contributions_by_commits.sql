@@ -1,3 +1,4 @@
+-- Counts distinct commits authored in the window per contributor, scoped to repos mapped to the selected project, top 20 by commit count.
 SELECT
   COALESCE(a.full_name, u.name, c.author_name, a.email) AS contributor,
   COUNT(DISTINCT c.sha)           AS commit_count

@@ -1,3 +1,4 @@
+-- Per assignee, counts issues created in the window split into Task versus Bug by whether original_type contains 'bug', scoped to boards mapped to the selected project, top 20 by total issues.
 SELECT
   REPLACE(COALESCE(
     NULLIF(TRIM(a.full_name), ''),
