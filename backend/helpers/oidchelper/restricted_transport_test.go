@@ -61,7 +61,7 @@ func TestValidateIssuerURL(t *testing.T) {
 
 func TestRestrictedTransportDialsValidatedAddress(t *testing.T) {
 	dialer := &recordingDialer{}
-	client := newRestrictedHTTPClient(false, testResolver{
+	client := restrictedHTTPClientWithDependencies(false, testResolver{
 		addresses: []netip.Addr{netip.MustParseAddr("198.51.100.10")},
 	}, dialer)
 
@@ -76,7 +76,7 @@ func TestRestrictedTransportDialsValidatedAddress(t *testing.T) {
 
 func TestRestrictedTransportRejectsPrivateResolvedAddress(t *testing.T) {
 	dialer := &recordingDialer{}
-	client := newRestrictedHTTPClient(false, testResolver{
+	client := restrictedHTTPClientWithDependencies(false, testResolver{
 		addresses: []netip.Addr{netip.MustParseAddr("127.0.0.1")},
 	}, dialer)
 

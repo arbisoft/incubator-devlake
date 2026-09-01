@@ -58,10 +58,10 @@ func ValidateIssuerURL(raw string, allowHTTP bool) (*url.URL, error) {
 // NewRestrictedHTTPClient supplies OIDC discovery/JWKS/token exchange with a
 // bounded transport that rejects private resolved addresses and unsafe redirects.
 func NewRestrictedHTTPClient(allowHTTP bool) *http.Client {
-	return newRestrictedHTTPClient(allowHTTP, net.DefaultResolver, &net.Dialer{Timeout: oidcRequestTimeout})
+	return restrictedHTTPClientWithDependencies(allowHTTP, net.DefaultResolver, &net.Dialer{Timeout: oidcRequestTimeout})
 }
 
-func newRestrictedHTTPClient(allowHTTP bool, resolver netIPResolver, dialer contextDialer) *http.Client {
+func restrictedHTTPClientWithDependencies(allowHTTP bool, resolver netIPResolver, dialer contextDialer) *http.Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
 		host, port, err := net.SplitHostPort(address)
