@@ -1,0 +1,1678 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "Joins AI assistant usage (ai_activities) with delivery performance (project_pr_metrics / pull_requests) in single SQL queries, by calendar week and by developer. NOTE: the Project variable filters the DELIVERY side only \u2014 ai_activities has no repo or project column, so AI usage is never project-scoped here.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 100,
+      "panels": [],
+      "title": "Overview \u2014 do both sides actually have data?",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Distinct developers with any AI activity in the time range. COUNT(DISTINCT user_email) is safe across both cursor row grains.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 0,
+        "y": 1
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH member_emails AS (\n  SELECT DISTINCT LOWER(ai.user_email) AS email\n  FROM ai_activities ai\n  LEFT JOIN accounts acc     ON LOWER(acc.email) = LOWER(ai.user_email)\n  LEFT JOIN users u          ON LOWER(u.email)   = LOWER(ai.user_email)\n  LEFT JOIN user_accounts ua ON ua.user_id = u.id\n  JOIN pull_requests pr\n    ON pr.author_id IN (ai.account_id, acc.id, ua.account_id)\n  JOIN project_mapping pm\n    ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\n  WHERE pm.project_name IN ($project)\n)\nSELECT COUNT(DISTINCT user_email) AS \"AI Active Users\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n    AND provider IN ($provider)\n  AND user_email <> ''\n  AND LOWER(user_email) IN (SELECT email FROM member_emails)\n",
+          "refId": "A"
+        }
+      ],
+      "title": "AI Active Users",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Sum of lines_added. Only the daily grain populates this column, so no double counting.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 5,
+        "y": 1
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH member_emails AS (\n  SELECT DISTINCT LOWER(ai.user_email) AS email\n  FROM ai_activities ai\n  LEFT JOIN accounts acc     ON LOWER(acc.email) = LOWER(ai.user_email)\n  LEFT JOIN users u          ON LOWER(u.email)   = LOWER(ai.user_email)\n  LEFT JOIN user_accounts ua ON ua.user_id = u.id\n  JOIN pull_requests pr\n    ON pr.author_id IN (ai.account_id, acc.id, ua.account_id)\n  JOIN project_mapping pm\n    ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\n  WHERE pm.project_name IN ($project)\n)\nSELECT SUM(lines_added) AS \"AI Lines Added\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n    AND provider IN ($provider)\n  AND LOWER(user_email) IN (SELECT email FROM member_emails)\n",
+          "refId": "A"
+        }
+      ],
+      "title": "AI Lines Added",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Sum of estimated_cost_usd. Only the per-event grain populates this column, so no double counting.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "unit": "currencyUSD",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 10,
+        "y": 1
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH member_emails AS (\n  SELECT DISTINCT LOWER(ai.user_email) AS email\n  FROM ai_activities ai\n  LEFT JOIN accounts acc     ON LOWER(acc.email) = LOWER(ai.user_email)\n  LEFT JOIN users u          ON LOWER(u.email)   = LOWER(ai.user_email)\n  LEFT JOIN user_accounts ua ON ua.user_id = u.id\n  JOIN pull_requests pr\n    ON pr.author_id IN (ai.account_id, acc.id, ua.account_id)\n  JOIN project_mapping pm\n    ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\n  WHERE pm.project_name IN ($project)\n)\nSELECT SUM(estimated_cost_usd) AS \"AI Cost (USD)\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n    AND provider IN ($provider)\n  AND LOWER(user_email) IN (SELECT email FROM member_emails)\n",
+          "refId": "A"
+        }
+      ],
+      "title": "AI Cost (USD)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Merged PRs in the selected project(s).",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 15,
+        "y": 1
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS \"PRs Merged\"\nFROM project_pr_metrics\nWHERE $__timeFilter(pr_merged_date)\n  AND project_name IN ($project)",
+          "refId": "A"
+        }
+      ],
+      "title": "PRs Merged",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "project_pr_metrics.pr_cycle_time is stored in MINUTES by the dora plugin; divided by 60 for hours.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              }
+            ]
+          },
+          "unit": "h",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 1
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT AVG(pr_cycle_time) / 60.0 AS \"Avg PR Cycle Time (h)\"\nFROM project_pr_metrics\nWHERE $__timeFilter(pr_merged_date)\n  AND project_name IN ($project)\n  AND pr_cycle_time IS NOT NULL",
+          "refId": "A"
+        }
+      ],
+      "title": "Avg PR Cycle Time",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Sum of input_tokens across membership-scoped AI activity for the selected project(s).",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 5
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH member_emails AS (\n  SELECT DISTINCT LOWER(ai.user_email) AS email\n  FROM ai_activities ai\n  LEFT JOIN accounts acc     ON LOWER(acc.email) = LOWER(ai.user_email)\n  LEFT JOIN users u          ON LOWER(u.email)   = LOWER(ai.user_email)\n  LEFT JOIN user_accounts ua ON ua.user_id = u.id\n  JOIN pull_requests pr\n    ON pr.author_id IN (ai.account_id, acc.id, ua.account_id)\n  JOIN project_mapping pm\n    ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\n  WHERE pm.project_name IN ($project)\n)\nSELECT SUM(input_tokens) AS \"AI Input Tokens\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n    AND provider IN ($provider)\n  AND LOWER(user_email) IN (SELECT email FROM member_emails)\n",
+          "refId": "A"
+        }
+      ],
+      "title": "AI Input Tokens",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Sum of output_tokens across membership-scoped AI activity for the selected project(s).",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 5
+      },
+      "id": 7,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH member_emails AS (\n  SELECT DISTINCT LOWER(ai.user_email) AS email\n  FROM ai_activities ai\n  LEFT JOIN accounts acc     ON LOWER(acc.email) = LOWER(ai.user_email)\n  LEFT JOIN users u          ON LOWER(u.email)   = LOWER(ai.user_email)\n  LEFT JOIN user_accounts ua ON ua.user_id = u.id\n  JOIN pull_requests pr\n    ON pr.author_id IN (ai.account_id, acc.id, ua.account_id)\n  JOIN project_mapping pm\n    ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\n  WHERE pm.project_name IN ($project)\n)\nSELECT SUM(output_tokens) AS \"AI Output Tokens\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n    AND provider IN ($provider)\n  AND LOWER(user_email) IN (SELECT email FROM member_emails)\n",
+          "refId": "A"
+        }
+      ],
+      "title": "AI Output Tokens",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "id": 101,
+      "panels": [],
+      "title": "The join \u2014 AI usage and delivery on one timeline",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "INNER JOIN of AI usage and PR delivery on calendar week (Monday start). Empty result almost always means the two date ranges do not overlap \u2014 widen the time range and set Project to All before suspecting the SQL.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "left",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 6,
+            "showPoints": "auto",
+            "spanNulls": true
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Avg PR Cycle Time (h)"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "h"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH member_emails AS (\n  SELECT DISTINCT LOWER(ai.user_email) AS email\n  FROM ai_activities ai\n  LEFT JOIN accounts acc     ON LOWER(acc.email) = LOWER(ai.user_email)\n  LEFT JOIN users u          ON LOWER(u.email)   = LOWER(ai.user_email)\n  LEFT JOIN user_accounts ua ON ua.user_id = u.id\n  JOIN pull_requests pr\n    ON pr.author_id IN (ai.account_id, acc.id, ua.account_id)\n  JOIN project_mapping pm\n    ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\n  WHERE pm.project_name IN ($project)\n),\nai AS (\n  SELECT DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY) AS week_start,\n         COUNT(DISTINCT user_email) AS ai_users,\n         SUM(lines_added)           AS ai_lines,\n         SUM(num_sessions)          AS ai_sessions,\n         SUM(estimated_cost_usd)    AS ai_cost\n  FROM ai_activities\n  WHERE $__timeFilter(date)\n    AND provider IN ($provider)\n    AND user_email <> ''\n    AND LOWER(user_email) IN (SELECT email FROM member_emails)\n  GROUP BY 1\n),\ndelivery AS (\n  SELECT DATE_SUB(DATE(pr_merged_date), INTERVAL WEEKDAY(pr_merged_date) DAY) AS week_start,\n         COUNT(*) AS prs_merged,\n         AVG(pr_cycle_time) / 60.0 AS avg_cycle_hours\n  FROM project_pr_metrics\n  WHERE $__timeFilter(pr_merged_date)\n    AND project_name IN ($project)\n  GROUP BY 1\n)\nSELECT ai.week_start                    AS time,\n       ai.ai_users                      AS \"AI Active Users\",\n       d.prs_merged                     AS \"PRs Merged\",\n       ROUND(d.avg_cycle_hours, 1)      AS \"Avg PR Cycle Time (h)\"\nFROM ai\nINNER JOIN delivery d ON d.week_start = ai.week_start\nORDER BY 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Weekly \u2014 AI Active Users vs PR Delivery",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "description": "One row per week where BOTH AI usage and merged PRs exist. This is the 'single SQL query across both datasets' deliverable \u2014 if this table has rows, the datasets are no longer isolated.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI Cost (USD)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Avg PR Cycle Time (h)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "h"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI Input Tokens"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI Output Tokens"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 19
+      },
+      "id": 11,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH member_emails AS (\n  -- Precomputed by dbt (mart_ai_project_members). Emails are already lower-cased.\n  SELECT DISTINCT email\n  FROM mart_ai_project_members\n  WHERE project_name IN ($project)\n),\nai AS (\n  SELECT DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY) AS week_start,\n         COUNT(DISTINCT user_email) AS ai_users,\n         SUM(lines_added)           AS ai_lines,\n         SUM(num_sessions)          AS ai_sessions,\n         SUM(estimated_cost_usd)    AS ai_cost,\n         SUM(input_tokens)          AS ai_input_tokens,\n         SUM(output_tokens)         AS ai_output_tokens\n  FROM ai_activities\n  WHERE $__timeFilter(date)\n    AND provider IN ($provider)\n    AND user_email <> ''\n    AND LOWER(user_email) IN (SELECT email FROM member_emails)\n  GROUP BY 1\n),\ndelivery AS (\n  SELECT DATE_SUB(DATE(pr_merged_date), INTERVAL WEEKDAY(pr_merged_date) DAY) AS week_start,\n         COUNT(*) AS prs_merged,\n         AVG(pr_cycle_time) / 60.0 AS avg_cycle_hours\n  FROM project_pr_metrics\n  WHERE $__timeFilter(pr_merged_date)\n    AND project_name IN ($project)\n  GROUP BY 1\n)\nSELECT ai.week_start                   AS \"Week\",\n       ai.ai_users                     AS \"AI Active Users\",\n       ai.ai_lines                     AS \"AI Lines Added\",\n       ai.ai_sessions                  AS \"AI Sessions\",\n       ROUND(ai.ai_cost, 2)            AS \"AI Cost (USD)\",\n       ai.ai_input_tokens              AS \"AI Input Tokens\",\n       ai.ai_output_tokens             AS \"AI Output Tokens\",\n       d.prs_merged                    AS \"PRs Merged\",\n       ROUND(d.avg_cycle_hours, 1)     AS \"Avg PR Cycle Time (h)\"\nFROM ai\nINNER JOIN delivery d ON d.week_start = ai.week_start\nORDER BY 1 DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Weekly Fact Table (INNER JOIN on week)",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "id": 102,
+      "panels": [],
+      "title": "Developer join \u2014 AI usage next to that developer's PRs",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "AI usage next to that same person's delivery. Blank PR columns mean identity did not match, NOT that the developer opened no PRs \u2014 check 'Identity' and the gaps table below. 'Accounts Merged' is how many `accounts` rows were treated as this person; PRs are summed across all of them, so someone active on two platforms is not undercounted.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI Cost (USD)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Avg PR Cycle Time (h)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "h"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI Input Tokens"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI Output Tokens"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 29
+      },
+      "id": 20,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH member_emails AS (\n  -- Precomputed by dbt (mart_ai_project_members). Emails are already lower-cased.\n  SELECT DISTINCT email\n  FROM mart_ai_project_members\n  WHERE project_name IN ($project)\n),\nai_agg AS (\n  SELECT LOWER(user_email)             AS email,\n         MAX(NULLIF(account_id, ''))   AS direct_account_id,\n         SUM(lines_added)              AS ai_lines,\n         SUM(num_sessions)             AS ai_sessions,\n         SUM(estimated_cost_usd)       AS ai_cost,\n         SUM(input_tokens)             AS ai_input_tokens,\n         SUM(output_tokens)            AS ai_output_tokens,\n         GROUP_CONCAT(DISTINCT provider ORDER BY provider) AS providers\n  FROM ai_activities\n  WHERE $__timeFilter(date)\n    AND provider IN ($provider)\n    AND user_email <> ''\n    AND LOWER(user_email) IN (SELECT email FROM member_emails)\n  GROUP BY 1\n),\n-- Identity: collect EVERY account belonging to this person, then\n-- aggregate delivery across all of them.\n--\n-- Sources, any of which may contribute an account:\n--   1. ai_activities.account_id, pre-resolved at convert time. It holds\n--      only ONE id, so it can never represent someone with several\n--      accounts \u2014 it is treated as one candidate, not the answer.\n--   2. case-insensitive match on accounts.email. Contributes nothing for\n--      private GitHub profiles, where accounts.email is ''.\n--   3. org-plugin identity: users.email -> user_accounts -> accounts.id.\n--      The only source that survives re-collection and the only one that\n--      works when emails are absent.\n--\n-- Why union rather than pick-one: a person routinely owns several rows in\n-- `accounts`. Some are duplicates that author nothing (gitextractor mints\n-- one keyed by commit email); others are genuinely active accounts on\n-- different platforms, each with real PRs. Selecting a single 'best'\n-- account handles the first case but silently discards delivery from the\n-- second \u2014 a developer with 2 GitLab and 4 GitHub PRs would report 4.\n-- Summing over every account is correct for both: empty duplicates\n-- contribute zero and drop out on their own.\naccts AS (\n  -- Precomputed by dbt (mart_ai_person_accounts): every account belonging to a\n  -- person, resolved once per sync. Scoped here to the emails in ai_agg.\n  SELECT DISTINCT a.email AS email, m.account_id\n  FROM ai_agg a\n  JOIN mart_ai_person_accounts m ON m.email = a.email\n),\nidentity AS (\n  SELECT a.email,\n         COUNT(ac.account_id) AS account_count,\n         CASE WHEN COUNT(ac.account_id) = 0 THEN 'UNMATCHED'\n              ELSE 'matched' END AS match_state\n  FROM ai_agg a\n  LEFT JOIN accts ac ON ac.email = a.email\n  GROUP BY 1\n),\npr_agg AS (\n  SELECT ac.email,\n         COUNT(DISTINCT pr.id) AS prs_opened,\n         COUNT(DISTINCT CASE WHEN pr.merged_date IS NOT NULL\n                             THEN pr.id END) AS prs_merged\n  FROM accts ac\n  JOIN pull_requests pr ON pr.author_id = ac.account_id\n  LEFT JOIN project_mapping pm\n         ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\n  WHERE $__timeFilter(pr.created_date)\n    AND pm.project_name IN ($project)\n  GROUP BY 1\n),\ncycle_agg AS (\n  SELECT ac.email,\n         AVG(ppm.pr_cycle_time) / 60.0 AS avg_cycle_hours\n  FROM accts ac\n  JOIN pull_requests pr ON pr.author_id = ac.account_id\n  JOIN project_pr_metrics ppm ON ppm.id = pr.id\n  WHERE $__timeFilter(ppm.pr_merged_date)\n    AND ppm.project_name IN ($project)\n    AND ppm.pr_cycle_time IS NOT NULL\n  GROUP BY 1\n)\nSELECT a.email                           AS \"Developer\",\n       a.providers                       AS \"AI Providers\",\n       i.match_state                     AS \"Identity\",\n       i.account_count                   AS \"Accounts Merged\",\n       a.ai_lines                        AS \"AI Lines Added\",\n       a.ai_sessions                     AS \"AI Sessions\",\n       ROUND(a.ai_cost, 2)               AS \"AI Cost (USD)\",\n       a.ai_input_tokens                 AS \"AI Input Tokens\",\n       a.ai_output_tokens                AS \"AI Output Tokens\",\n       p.prs_opened                      AS \"PRs Opened\",\n       p.prs_merged                      AS \"PRs Merged\",\n       ROUND(c.avg_cycle_hours, 1)       AS \"Avg PR Cycle Time (h)\"\nFROM ai_agg a\nJOIN identity  i ON i.email = a.email\nLEFT JOIN pr_agg    p ON p.email = a.email\nLEFT JOIN cycle_agg c ON c.email = a.email\nORDER BY a.ai_lines DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Developer Fact Table (LEFT JOIN from the AI side)",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
+      "id": 104,
+      "panels": [],
+      "title": "Project rollup \u2014 membership-scoped AI next to project delivery",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "AI columns are the usage of this project's members (people who authored PRs in the project), summed across all AI tools. AI is person-scoped, not attributed to a repo \u2014 someone active on multiple projects shows full AI usage in each, so AI totals across projects can exceed the global total. Delivery columns are the project's real merged-PR metrics.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI Cost (USD)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Avg PR Cycle Time (h)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "h"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI Input Tokens"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI Output Tokens"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 41
+      },
+      "id": 40,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH\n-- Members of each project = AI users who authored a PR in that project.\n-- Same account-resolution join used by the Developer/Weekly panels above,\n-- but keyed by project instead of filtered to one.\nproject_members AS (\n  -- Precomputed by dbt (mart_ai_project_members): AI users who authored a PR\n  -- in each project's repos. Replaces the per-query identity+membership join.\n  SELECT project_name, email\n  FROM mart_ai_project_members\n  WHERE project_name IN ($project)\n),\n-- AI usage per project = SUM over that project's members. Person-scoped and\n-- intentionally NOT split across projects: a member of 3 projects contributes\n-- full usage to each, so AI totals across projects can exceed the global total.\n-- Disjoint metric columns => SUM each is safe; never COUNT(*) on ai_activities.\nai_by_project AS (\n  SELECT m.project_name,\n         COUNT(DISTINCT m.email)   AS ai_users,\n         SUM(a.lines_added)        AS ai_lines,\n         SUM(a.num_sessions)       AS ai_sessions,\n         SUM(a.estimated_cost_usd) AS ai_cost,\n         SUM(a.input_tokens)       AS ai_input_tokens,\n         SUM(a.output_tokens)      AS ai_output_tokens,\n         GROUP_CONCAT(DISTINCT a.provider ORDER BY a.provider) AS providers\n  FROM project_members m\n  JOIN ai_activities a\n    ON LOWER(a.user_email) = m.email\n   AND a.provider IN ($provider)\n   AND $__timeFilter(a.date)\n  GROUP BY m.project_name\n),\ndelivery_by_project AS (\n  SELECT project_name,\n         COUNT(*)                  AS prs_merged,\n         AVG(pr_cycle_time) / 60.0 AS avg_cycle_hours\n  FROM project_pr_metrics\n  WHERE $__timeFilter(pr_merged_date)\n    AND project_name IN ($project)\n  GROUP BY project_name\n),\n-- Union of project keys so a project with activity on EITHER side is not\n-- dropped (MySQL has no FULL OUTER JOIN).\nproject_keys AS (\n  SELECT project_name FROM ai_by_project\n  UNION\n  SELECT project_name FROM delivery_by_project\n)\nSELECT k.project_name                 AS \"Project\",\n       a.ai_users                     AS \"AI Active Users\",\n       a.providers                    AS \"AI Providers\",\n       a.ai_lines                     AS \"AI Lines Added\",\n       a.ai_sessions                  AS \"AI Sessions\",\n       ROUND(a.ai_cost, 2)            AS \"AI Cost (USD)\",\n       a.ai_input_tokens              AS \"AI Input Tokens\",\n       a.ai_output_tokens             AS \"AI Output Tokens\",\n       d.prs_merged                   AS \"PRs Merged\",\n       ROUND(d.avg_cycle_hours, 1)    AS \"Avg PR Cycle Time (h)\"\nFROM project_keys k\nLEFT JOIN ai_by_project       a ON a.project_name = k.project_name\nLEFT JOIN delivery_by_project d ON d.project_name = k.project_name\nORDER BY a.ai_lines DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Project Fact Table",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "AI columns are the usage of this project's members (people who authored PRs in the project), summed across all AI tools. AI is person-scoped, not attributed to a repo \u2014 someone active on multiple projects shows full AI usage in each, so AI totals across projects can exceed the global total. Delivery columns are the project's real merged-PR metrics. Grouped by calendar week within each project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI Cost (USD)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Avg PR Cycle Time (h)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "h"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI Input Tokens"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI Output Tokens"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 51
+      },
+      "id": 41,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH\nproject_members AS (\n  -- Precomputed by dbt (mart_ai_project_members): AI users who authored a PR\n  -- in each project's repos. Replaces the per-query identity+membership join.\n  SELECT project_name, email\n  FROM mart_ai_project_members\n  WHERE project_name IN ($project)\n),\n-- Same membership scoping as the Project Fact Table, additionally bucketed\n-- by calendar week (Monday start), matching the Weekly Fact Table above.\nai_by_project_week AS (\n  SELECT m.project_name,\n         DATE_SUB(DATE(a.date), INTERVAL WEEKDAY(a.date) DAY) AS week_start,\n         COUNT(DISTINCT m.email)   AS ai_users,\n         SUM(a.lines_added)        AS ai_lines,\n         SUM(a.estimated_cost_usd) AS ai_cost,\n         SUM(a.input_tokens)       AS ai_input_tokens,\n         SUM(a.output_tokens)      AS ai_output_tokens\n  FROM project_members m\n  JOIN ai_activities a\n    ON LOWER(a.user_email) = m.email\n   AND a.provider IN ($provider)\n   AND $__timeFilter(a.date)\n  GROUP BY m.project_name, week_start\n),\ndelivery_by_project_week AS (\n  SELECT project_name,\n         DATE_SUB(DATE(pr_merged_date), INTERVAL WEEKDAY(pr_merged_date) DAY) AS week_start,\n         COUNT(*)                  AS prs_merged,\n         AVG(pr_cycle_time) / 60.0 AS avg_cycle_hours\n  FROM project_pr_metrics\n  WHERE $__timeFilter(pr_merged_date)\n    AND project_name IN ($project)\n  GROUP BY project_name, week_start\n),\npw_keys AS (\n  SELECT project_name, week_start FROM ai_by_project_week\n  UNION\n  SELECT project_name, week_start FROM delivery_by_project_week\n)\nSELECT k.project_name                 AS \"Project\",\n       k.week_start                   AS \"Week\",\n       a.ai_users                     AS \"AI Active Users\",\n       a.ai_lines                     AS \"AI Lines Added\",\n       ROUND(a.ai_cost, 2)            AS \"AI Cost (USD)\",\n       a.ai_input_tokens              AS \"AI Input Tokens\",\n       a.ai_output_tokens             AS \"AI Output Tokens\",\n       d.prs_merged                   AS \"PRs Merged\",\n       ROUND(d.avg_cycle_hours, 1)    AS \"Avg PR Cycle Time (h)\"\nFROM pw_keys k\nLEFT JOIN ai_by_project_week      a ON a.project_name = k.project_name AND a.week_start = k.week_start\nLEFT JOIN delivery_by_project_week d ON d.project_name = k.project_name AND d.week_start = k.week_start\nORDER BY k.project_name, k.week_start DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Project \u00d7 Week Fact Table",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Same project-membership scope as the Project Fact Table, but each AI tool is its own row instead of being merged into one total. 'AI Active Users' is per provider \u2014 someone using two tools counts once in each row. Delivery is intentionally omitted here (delivery has no provider dimension); see the Project Fact Table for delivery next to combined AI usage.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI Cost (USD)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI Input Tokens"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI Output Tokens"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 61
+      },
+      "id": 42,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH\n-- Same membership scoping as the Project Fact Table above: a project's\n-- members are people who authored a PR in that project's repo(s).\nproject_members AS (\n  -- Precomputed by dbt (mart_ai_project_members): AI users who authored a PR\n  -- in each project's repos. Replaces the per-query identity+membership join.\n  SELECT project_name, email\n  FROM mart_ai_project_members\n  WHERE project_name IN ($project)\n),\n-- Unlike the Project Fact Table (which merges all tools into one row via\n-- GROUP_CONCAT), this keeps provider as its own grouping key, so each AI\n-- tool's usage for a project is its own row rather than a summed total.\nai_by_project_provider AS (\n  SELECT m.project_name,\n         a.provider,\n         COUNT(DISTINCT m.email)   AS ai_users,\n         SUM(a.lines_added)        AS ai_lines,\n         SUM(a.num_sessions)       AS ai_sessions,\n         SUM(a.estimated_cost_usd) AS ai_cost,\n         SUM(a.input_tokens)       AS ai_input_tokens,\n         SUM(a.output_tokens)      AS ai_output_tokens\n  FROM project_members m\n  JOIN ai_activities a\n    ON LOWER(a.user_email) = m.email\n   AND a.provider IN ($provider)\n   AND $__timeFilter(a.date)\n  GROUP BY m.project_name, a.provider\n)\nSELECT project_name              AS \"Project\",\n       provider                  AS \"AI Provider\",\n       ai_users                  AS \"AI Active Users\",\n       ai_lines                  AS \"AI Lines Added\",\n       ai_sessions               AS \"AI Sessions\",\n       ROUND(ai_cost, 2)         AS \"AI Cost (USD)\",\n       ai_input_tokens           AS \"AI Input Tokens\",\n       ai_output_tokens          AS \"AI Output Tokens\"\nFROM ai_by_project_provider\nORDER BY project_name, provider",
+          "refId": "A"
+        }
+      ],
+      "title": "Project \u00d7 AI Provider Breakdown",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 70
+      },
+      "id": 103,
+      "panels": [],
+      "title": "Identity health \u2014 how much of the developer join actually lands",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Share of distinct AI user emails resolving to a DevLake account by any of the three tiers (pre-resolved account_id, accounts.email, or org-plugin users/user_accounts). Near 0% means the developer table will look empty even when AI data is fine \u2014 that is an identity problem, not a dashboard problem.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "yellow",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percent",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 71
+      },
+      "id": 30,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ROUND(\n         100.0 * COUNT(DISTINCT CASE\n           WHEN ai.account_id <> ''\n             OR acc.id IS NOT NULL\n             OR ua.account_id IS NOT NULL\n           THEN LOWER(ai.user_email) END)\n         / NULLIF(COUNT(DISTINCT LOWER(ai.user_email)), 0)\n       , 1) AS \"Identity Match %\"\nFROM ai_activities ai\nLEFT JOIN accounts acc ON LOWER(acc.email) = LOWER(ai.user_email)\nLEFT JOIN users u      ON LOWER(u.email)   = LOWER(ai.user_email)\nLEFT JOIN user_accounts ua ON ua.user_id = u.id\nWHERE $__timeFilter(ai.date)\n  AND ai.provider IN ($provider)\n  AND ai.user_email <> ''",
+          "refId": "A"
+        }
+      ],
+      "title": "Identity Match % (all projects)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "AI users unmatched by ALL THREE identity tiers. Fix these by adding the person to the org plugin: PUT /plugins/org/users.csv (Id,Name,Email) then map them with PUT /plugins/org/user_account_mapping.csv \u2014 note that endpoint only reads its Id and UserId columns and silently ignores the rest, and it CANNOT set accounts.email. Also expect gh-copilot users here: that plugin stores a GitHub LOGIN in user_email, not an email.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI Cost (USD)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 18,
+        "x": 6,
+        "y": 71
+      },
+      "id": 31,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT LOWER(ai.user_email)                          AS \"Unmatched AI User\",\n       GROUP_CONCAT(DISTINCT ai.provider ORDER BY ai.provider) AS \"Providers\",\n       SUM(ai.lines_added)                           AS \"AI Lines Added\",\n       ROUND(SUM(ai.estimated_cost_usd), 2)          AS \"AI Cost (USD)\",\n       MAX(ai.date)                                  AS \"Last Active\"\nFROM ai_activities ai\nLEFT JOIN accounts acc ON LOWER(acc.email) = LOWER(ai.user_email)\nLEFT JOIN users u      ON LOWER(u.email)   = LOWER(ai.user_email)\nLEFT JOIN user_accounts ua ON ua.user_id = u.id\nWHERE $__timeFilter(ai.date)\n  AND ai.provider IN ($provider)\n  AND ai.user_email <> ''\n  AND (ai.account_id IS NULL OR ai.account_id = '')\n  AND acc.id IS NULL\n  AND ua.account_id IS NULL\nGROUP BY 1\nORDER BY 3 DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Identity Gaps \u2014 AI users with no matching account (all projects)",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 76
+      },
+      "id": 105,
+      "panels": [],
+      "title": "Quality & Technical Debt \u2014 AI usage next to bugs, churn, and debt",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Membership-scoped, not attribution: AI columns are the usage of this project's members (people who authored PRs in the project's repos), summed across all AI tools. AI is person-scoped \u2014 someone active on several projects shows full usage in each, so AI totals can exceed the global total. No claim is made that any specific commit or line was AI-written. Bugs are issues of standardized type BUG/INCIDENT on the project's boards, from ANY issue tracker connected to DevLake (Jira, GitHub Issues, GitLab, TAPD, Zentao, PagerDuty, \u2026) \u2014 read from the domain layer, so no tracker is special-cased. Counted by the week they were opened and the week they were resolved. This shows co-movement of AI-usage intensity and bug volume \u2014 correlation, not causation. Empty until an issue tracker's board is connected and mapped to the project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 77
+      },
+      "id": 50,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH project_members AS (\n  SELECT project_name, email FROM mart_ai_project_members WHERE project_name IN ($project)\n),\nai_pw AS (\n  SELECT m.project_name,\n         DATE_SUB(DATE(a.date), INTERVAL WEEKDAY(a.date) DAY) AS week,\n         COUNT(DISTINCT m.email) AS ai_users,\n         SUM(a.lines_added)      AS ai_lines,\n         SUM(a.num_sessions)     AS ai_sessions\n  FROM project_members m\n  JOIN ai_activities a\n    ON LOWER(a.user_email) = m.email\n   AND a.provider IN ($provider)\n   AND $__timeFilter(a.date)\n  GROUP BY m.project_name, week\n),\nbugs AS (\n  SELECT project_name, week, bugs_opened, bugs_opened_high_sev, bugs_resolved, net_bug_delta\n  FROM mart_project_bugs_weekly\n  WHERE project_name IN ($project) AND $__timeFilter(week)\n),\nk AS (\n  SELECT project_name, week FROM ai_pw\n  UNION\n  SELECT project_name, week FROM bugs\n)\nSELECT k.project_name             AS \"Project\",\n       k.week                     AS \"Week\",\n       a.ai_users                 AS \"AI Active Users\",\n       a.ai_lines                 AS \"AI Lines Added\",\n       a.ai_sessions              AS \"AI Sessions\",\n       b.bugs_opened              AS \"Bugs Opened\",\n       b.bugs_opened_high_sev     AS \"Bugs Opened (High Sev)\",\n       b.bugs_resolved            AS \"Bugs Resolved\",\n       b.net_bug_delta            AS \"Net Bug \u0394\"\nFROM k\nLEFT JOIN ai_pw a ON a.project_name = k.project_name AND a.week = k.week\nLEFT JOIN bugs  b ON b.project_name = k.project_name AND b.week = k.week\nORDER BY k.project_name, k.week DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Bug Correlation \u2014 Project \u00d7 Week",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "AI Lines Added (left) and Bugs Opened (right) over time, summed across the selected projects' members. A visual read on whether weeks of heavier AI usage track with more bugs subsequently logged. Bugs line is empty until any issue tracker is connected.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "left",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 6,
+            "showPoints": "auto",
+            "spanNulls": true
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Bugs Opened"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 86
+      },
+      "id": 51,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH project_members AS (\n  SELECT project_name, email FROM mart_ai_project_members WHERE project_name IN ($project)\n),\nai_w AS (\n  SELECT DATE_SUB(DATE(a.date), INTERVAL WEEKDAY(a.date) DAY) AS week,\n         SUM(a.lines_added) AS ai_lines\n  FROM project_members m\n  JOIN ai_activities a\n    ON LOWER(a.user_email) = m.email\n   AND a.provider IN ($provider)\n   AND $__timeFilter(a.date)\n  GROUP BY week\n),\nbugs_w AS (\n  SELECT week, SUM(bugs_opened) AS bugs_opened\n  FROM mart_project_bugs_weekly\n  WHERE project_name IN ($project) AND $__timeFilter(week)\n  GROUP BY week\n),\nk AS (SELECT week FROM ai_w UNION SELECT week FROM bugs_w)\nSELECT k.week            AS time,\n       a.ai_lines        AS \"AI Lines Added\",\n       b.bugs_opened     AS \"Bugs Opened\"\nFROM k\nLEFT JOIN ai_w   a ON a.week = k.week\nLEFT JOIN bugs_w b ON b.week = k.week\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "title": "Bug Correlation \u2014 AI Lines vs Bugs Opened (weekly)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Within each project\u00d7week, commits are split by whether the AUTHOR had any AI activity that week (adopter) or not. Compares code churn and rework (deletions as a share of churn) between the two groups. \"AI-augmented author\" flags a person who used an AI tool that week \u2014 it does NOT mean the code was AI-written.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Adopter Rework %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Non-Adopter Rework %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 94
+      },
+      "id": 52,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT project_name AS \"Project\",\n       week         AS \"Week\",\n       SUM(CASE WHEN is_ai_adopter=1 THEN commits ELSE 0 END) AS \"Adopter Commits\",\n       SUM(CASE WHEN is_ai_adopter=1 THEN churn   ELSE 0 END) AS \"Adopter Churn\",\n       ROUND(100 * SUM(CASE WHEN is_ai_adopter=1 THEN deletions ELSE 0 END)\n             / NULLIF(SUM(CASE WHEN is_ai_adopter=1 THEN churn ELSE 0 END),0), 1) AS \"Adopter Rework %\",\n       SUM(CASE WHEN is_ai_adopter=0 THEN commits ELSE 0 END) AS \"Non-Adopter Commits\",\n       SUM(CASE WHEN is_ai_adopter=0 THEN churn   ELSE 0 END) AS \"Non-Adopter Churn\",\n       ROUND(100 * SUM(CASE WHEN is_ai_adopter=0 THEN deletions ELSE 0 END)\n             / NULLIF(SUM(CASE WHEN is_ai_adopter=0 THEN churn ELSE 0 END),0), 1) AS \"Non-Adopter Rework %\"\nFROM mart_project_churn_weekly\nWHERE project_name IN ($project) AND $__timeFilter(week)\nGROUP BY project_name, week\nORDER BY project_name, week DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Quality Variance \u2014 AI-Adopters vs Non-Adopters",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Membership-scoped, not attribution: AI columns are the usage of this project's members (people who authored PRs in the project's repos), summed across all AI tools. AI is person-scoped \u2014 someone active on several projects shows full usage in each, so AI totals can exceed the global total. No claim is made that any specific commit or line was AI-written. Technical debt is taken SOLELY from SonarQube (sqale_index = estimated remediation effort, plus code smells, bugs, and reliability rating) \u2014 no derived proxy. DevLake keeps only SonarQube's latest analysis, so this is a current per-project snapshot, not a time series; correlate the debt figures against each project's AI-usage intensity over the selected window. Empty until SonarQube is connected and its project mapped to a DevLake project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SQALE Debt (h)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "h"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 103
+      },
+      "id": 53,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH project_members AS (\n  SELECT project_name, email FROM mart_ai_project_members WHERE project_name IN ($project)\n),\nai_p AS (\n  SELECT m.project_name,\n         COUNT(DISTINCT m.email) AS ai_users,\n         SUM(a.lines_added)      AS ai_lines\n  FROM project_members m\n  JOIN ai_activities a\n    ON LOWER(a.user_email) = m.email\n   AND a.provider IN ($provider)\n   AND $__timeFilter(a.date)\n  GROUP BY m.project_name\n)\nSELECT s.project_name              AS \"Project\",\n       s.sqale_index_hours         AS \"SQALE Debt (h)\",\n       s.code_smells               AS \"Code Smells\",\n       s.sonar_bugs                AS \"Sonar Bugs\",\n       s.worst_reliability_rating  AS \"Reliability\",\n       s.files_analyzed            AS \"Files Analyzed\",\n       s.last_analysis_date        AS \"Last Analysis\",\n       a.ai_users                  AS \"AI Active Users\",\n       a.ai_lines                  AS \"AI Lines Added\"\nFROM mart_project_sonar_debt s\nLEFT JOIN ai_p a ON a.project_name = s.project_name\nWHERE s.project_name IN ($project)\nORDER BY s.sqale_index_minutes DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Technical Debt (SonarQube) vs AI Usage \u2014 per Project",
+      "type": "table"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 38,
+  "tags": [
+    "ai",
+    "dora",
+    "correlation",
+    "devlake",
+    "dashboard"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT provider FROM ai_activities ORDER BY provider",
+        "hide": 0,
+        "includeAll": true,
+        "label": "AI Provider",
+        "multi": true,
+        "name": "provider",
+        "options": [],
+        "query": "SELECT DISTINCT provider FROM ai_activities ORDER BY provider",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT name FROM projects ORDER BY name",
+        "description": "Filters the delivery side only. AI usage has no project dimension.",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Project (delivery side only)",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "SELECT DISTINCT name FROM projects ORDER BY name",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-90d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "AI Usage + Delivery Correlation",
+  "uid": "ai_delivery_correlation",
+  "version": 5,
+  "weekStart": "monday"
+}

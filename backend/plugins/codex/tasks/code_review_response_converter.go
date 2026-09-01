@@ -26,11 +26,10 @@ import (
 	"github.com/apache/incubator-devlake/core/models/domainlayer/ai"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/didgen"
 	"github.com/apache/incubator-devlake/core/plugin"
+	"github.com/apache/incubator-devlake/helpers/identityhelper"
 	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/plugins/codex/models"
 )
-
-// Note: resolveCodexAccountId is defined in usage_converter.go
 
 // buildCodexCodeReviewResponseActivity maps a CodexCodeReviewResponse to AiActivity.
 // Type = "CODE_REVIEW_RESPONSE"; AcceptanceCount = upvotes (positive reactions).
@@ -67,6 +66,11 @@ func ConvertCodeReviewResponses(taskCtx plugin.SubTaskContext) errors.Error {
 	}
 
 	db := taskCtx.GetDal()
+
+	resolver, err := identityhelper.NewAccountResolver(db)
+	if err != nil {
+		return err
+	}
 	connectionId := data.Options.ConnectionId
 
 	idGen := didgen.NewDomainIdGenerator(&models.CodexCodeReviewResponse{})
@@ -94,7 +98,7 @@ func ConvertCodeReviewResponses(taskCtx plugin.SubTaskContext) errors.Error {
 		Input:        cursor,
 		Convert: func(inputRow interface{}) ([]interface{}, errors.Error) {
 			r := inputRow.(*models.CodexCodeReviewResponse)
-			accountId := resolveCodexAccountId(db, r.UserEmail)
+			accountId := resolver.ByEmail(r.UserEmail)
 			return []interface{}{buildCodexCodeReviewResponseActivity(idGen, connectionId, accountId, r)}, nil
 		},
 	})

@@ -1,0 +1,26 @@
+version: 2
+
+# DevLake domain-layer tables these marts read from. Declared as sources so dbt
+# renders them fully-qualified as `lake.<table>` — the dbt-mysql adapter connects
+# without selecting a default database, so unqualified refs fail with
+# "1046 (3D000): No database selected". Schema is the DevLake DB (override via
+# MYSQL_DATABASE for non-default deployments).
+sources:
+  - name: devlake
+    schema: "{{ env_var('MYSQL_DATABASE', 'lake') }}"
+    tables:
+      - name: ai_activities
+      - name: accounts
+      - name: users
+      - name: user_accounts
+      - name: pull_requests
+      - name: project_mapping
+      # Bugs (mart_project_bugs_weekly): issues -> board_issues -> project_mapping(boards)
+      - name: issues
+      - name: board_issues
+      # Churn (mart_project_churn_weekly): commits -> repo_commits -> project_mapping(repos)
+      - name: commits
+      - name: repo_commits
+      # Real technical debt (mart_project_sonar_debt): cq_file_metrics -> cq_projects -> project_mapping(cq_projects)
+      - name: cq_file_metrics
+      - name: cq_projects
