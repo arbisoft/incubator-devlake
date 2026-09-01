@@ -113,6 +113,15 @@ export const normalizeOIDCProviderInput = (provider: OIDCProviderInput): OIDCPro
     .join(' '),
 });
 
+export const formFromOIDCProvider = (provider?: OIDCProvider): OIDCProviderInput => ({
+  providerKey: provider?.providerKey ?? '',
+  displayName: provider?.displayName ?? '',
+  issuerUrl: provider?.issuerUrl ?? '',
+  clientId: provider?.clientId ?? '',
+  clientSecret: '',
+  scopes: provider?.scopes ?? 'openid profile email',
+});
+
 export const isValidOIDCProviderInput = (provider: OIDCProviderInput, configuredProvider?: OIDCProvider) => {
   const normalized = normalizeOIDCProviderInput(provider);
   let issuer: URL;

@@ -25,6 +25,7 @@ import { ACCESS_ERROR_CODE, OIDC_PROVIDER_SYNC_STATUS, type OIDCProvider } from 
 import {
   ACCESS_ERROR,
   canActivateOIDCProvider,
+  formFromOIDCProvider,
   getCreateDomainError,
   getCreateUserError,
   getOIDCProviderError,
@@ -35,7 +36,7 @@ import {
   normalizeOIDCProviderInput,
   normalizeDomain,
 } from './utils';
-import { OIDC_PROVIDER_STATUS } from './constants';
+import { OIDC_PROVIDER_STATUS, OIDC_PROVIDER_STATUS_COLOR } from './constants';
 
 const createAxiosError = (status: number, data: unknown) =>
   new AxiosError('Request failed', 'ERR_BAD_REQUEST', undefined, undefined, {
@@ -160,6 +161,28 @@ test('allows stored OIDC credentials only for the unchanged client ID', () => {
   equal(isValidOIDCProviderInput({ ...provider, clientId: 'client-b' }, configuredProvider), false);
 });
 
+test('creates a write-only OIDC provider form from configured state', () => {
+  const provider: OIDCProvider = {
+    providerKey: 'google',
+    displayName: 'Google',
+    issuerUrl: 'https://accounts.google.com',
+    clientId: 'client',
+    scopes: 'openid profile email',
+    enabled: true,
+    secretConfigured: true,
+    databaseSourceActive: true,
+    grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.SYNCHRONIZED,
+    grafanaSyncedRevision: 1,
+    providerRevision: 1,
+    devlakeCallbackUrl: 'https://devlake.example.com/api/auth/callback',
+    grafanaCallbackUrl: 'https://grafana.example.com/login/generic_oauth',
+  };
+
+  equal(formFromOIDCProvider(provider).clientSecret, '');
+  equal(formFromOIDCProvider(provider).scopes, provider.scopes);
+  equal(formFromOIDCProvider().scopes, 'openid profile email');
+});
+
 test('maps OIDC provider errors to safe user-facing messages', () => {
   const invalidProvider = createAxiosError(HttpStatusCode.BadRequest, {
     code: ACCESS_ERROR_CODE.INVALID_OIDC_PROVIDER,
@@ -209,4 +232,7 @@ test('summarizes OIDC provider lifecycle state without exposing internal synchro
     getOIDCProviderStatus({ ...configuredProvider, grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.COMPENSATION_FAILED }),
     OIDC_PROVIDER_STATUS.RECOVERY,
   );
+  equal(OIDC_PROVIDER_STATUS_COLOR[OIDC_PROVIDER_STATUS.ACTIVE], 'green');
+  equal(OIDC_PROVIDER_STATUS_COLOR[OIDC_PROVIDER_STATUS.RECOVERY], 'red');
+  equal(OIDC_PROVIDER_STATUS_COLOR[OIDC_PROVIDER_STATUS.CONFIGURED], 'orange');
 });

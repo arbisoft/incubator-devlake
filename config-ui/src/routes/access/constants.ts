@@ -41,9 +41,26 @@ export const OIDC_PROVIDER_STATUS = {
   RECOVERY: 'Grafana recovery required',
 } as const;
 
-export const OIDC_PROVIDER_SUCCESS = {
+export const OIDC_PROVIDER_MESSAGE = {
   GRAFANA_SYNCHRONIZED: 'Grafana OAuth configuration synchronized.',
+  CALLBACK_DESCRIPTION: 'Register this exact callback URL with the customer OIDC provider.',
+  DEPLOYMENT_MANAGED:
+    'DevLake is using deployment-managed OIDC settings until you validate and activate a database provider.',
+  SECRET_REPLACEMENT_REQUIRED: 'Required only when changing the client ID or rotating the secret.',
+  VALIDATED: 'OIDC provider settings are valid.',
+  ACTIVATE_TITLE: 'Activate database OIDC settings?',
+  ACTIVATE_DESCRIPTION: 'DevLake will stop using the deployment OIDC provider after this succeeds.',
+  RECOVERY_REQUIRED:
+    'Grafana OAuth was disabled because the new configuration could not be safely rolled back. Retry synchronization after resolving the deployment issue.',
 } as const;
+
+export const OIDC_PROVIDER_STATUS_COLOR: Record<string, string> = {
+  [OIDC_PROVIDER_STATUS.ACTIVE]: 'green',
+  [OIDC_PROVIDER_STATUS.FAILED]: 'red',
+  [OIDC_PROVIDER_STATUS.RECOVERY]: 'red',
+  [OIDC_PROVIDER_STATUS.CONFIGURED]: 'orange',
+  [OIDC_PROVIDER_STATUS.PENDING]: 'orange',
+};
 
 export const ROLE_OPTIONS: Array<{ value: AccessRole; label: string }> = [
   { value: ACCESS_ROLE.MEMBER, label: 'Member' },

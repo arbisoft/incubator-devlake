@@ -26,10 +26,11 @@ import { OIDC_PROVIDER_SYNC_STATUS, type OIDCProvider, type OIDCProviderInput } 
 import { Block, Message } from '@/components';
 import { operator } from '@/utils';
 
-import { OIDC_PROVIDER_STATUS, OIDC_PROVIDER_SUCCESS } from './constants';
+import { OIDC_PROVIDER_MESSAGE, OIDC_PROVIDER_STATUS_COLOR } from './constants';
 import { SectionHeader, SectionTitle } from './styled';
 import {
   canActivateOIDCProvider,
+  formFromOIDCProvider,
   getOIDCProviderError,
   getOIDCProviderStatus,
   isValidOIDCProviderInput,
@@ -44,33 +45,8 @@ type Props = {
 
 type Operation = 'validate' | 'save' | 'activate' | 'grafana-sync';
 
-const EMPTY_PROVIDER: OIDCProviderInput = {
-  providerKey: '',
-  displayName: '',
-  issuerUrl: '',
-  clientId: '',
-  clientSecret: '',
-  scopes: 'openid profile email',
-};
-
-const formFromProvider = (provider?: OIDCProvider): OIDCProviderInput => ({
-  providerKey: provider?.providerKey ?? '',
-  displayName: provider?.displayName ?? '',
-  issuerUrl: provider?.issuerUrl ?? '',
-  clientId: provider?.clientId ?? '',
-  clientSecret: '',
-  scopes: provider?.scopes ?? EMPTY_PROVIDER.scopes,
-});
-
-const statusColor = (status: string) => {
-  if (status === OIDC_PROVIDER_STATUS.ACTIVE) return 'green';
-  if (status === OIDC_PROVIDER_STATUS.FAILED || status === OIDC_PROVIDER_STATUS.RECOVERY) return 'red';
-  if (status === OIDC_PROVIDER_STATUS.CONFIGURED || status === OIDC_PROVIDER_STATUS.PENDING) return 'orange';
-  return 'default';
-};
-
 const Callback = ({ label, value }: { label: string; value: string }) => (
-  <Block title={label} description="Register this exact callback URL with the customer OIDC provider.">
+  <Block title={label} description={OIDC_PROVIDER_MESSAGE.CALLBACK_DESCRIPTION}>
     <Input
       readOnly
       value={value || 'Deployment public URL is not configured.'}
@@ -88,7 +64,7 @@ const Callback = ({ label, value }: { label: string; value: string }) => (
 );
 
 export const Authentication = ({ provider, loadFailed, onRefresh }: Props) => {
-  const [form, setForm] = useState<OIDCProviderInput>(() => formFromProvider(provider));
+  const [form, setForm] = useState<OIDCProviderInput>(() => formFromOIDCProvider(provider));
   const [operating, setOperating] = useState<Operation>();
   const [operationError, setOperationError] = useState<string>();
   const [operationSuccess, setOperationSuccess] = useState<string>();
@@ -97,9 +73,10 @@ export const Authentication = ({ provider, loadFailed, onRefresh }: Props) => {
   const validInput = isValidOIDCProviderInput(form, provider);
   const requiresReplacementSecret = !provider?.secretConfigured || form.clientId.trim() !== provider.clientId;
   const hasProvider = Boolean(provider?.providerKey);
+  const isOperating = Boolean(operating);
 
   useEffect(() => {
-    setForm(formFromProvider(provider));
+    setForm(formFromOIDCProvider(provider));
     setOperationError(undefined);
     setOperationSuccess(undefined);
   }, [providerVersion]);
@@ -122,10 +99,10 @@ export const Authentication = ({ provider, loadFailed, onRefresh }: Props) => {
     });
     if (success) {
       if (action === 'validate') {
-        setOperationSuccess('OIDC provider settings are valid.');
+        setOperationSuccess(OIDC_PROVIDER_MESSAGE.VALIDATED);
         return;
       }
-      if (action === 'grafana-sync') message.success(OIDC_PROVIDER_SUCCESS.GRAFANA_SYNCHRONIZED);
+      if (action === 'grafana-sync') message.success(OIDC_PROVIDER_MESSAGE.GRAFANA_SYNCHRONIZED);
       onRefresh();
       return;
     }
@@ -156,11 +133,9 @@ export const Authentication = ({ provider, loadFailed, onRefresh }: Props) => {
     <>
       <SectionHeader $spaced>
         <SectionTitle>Authentication</SectionTitle>
-        <Tag color={statusColor(status)}>{status}</Tag>
+        <Tag color={OIDC_PROVIDER_STATUS_COLOR[status] ?? 'default'}>{status}</Tag>
       </SectionHeader>
-      {!hasProvider && (
-        <Message content="DevLake is using deployment-managed OIDC settings until you validate and activate a database provider." />
-      )}
+      {!hasProvider && <Message content={OIDC_PROVIDER_MESSAGE.DEPLOYMENT_MANAGED} />}
       <Space direction="vertical" size={16} style={{ width: '100%', marginTop: 16 }}>
         <Callback label="DevLake callback URL" value={provider?.devlakeCallbackUrl ?? ''} />
         <Callback label="Grafana callback URL" value={provider?.grafanaCallbackUrl ?? ''} />
@@ -171,7 +146,7 @@ export const Authentication = ({ provider, loadFailed, onRefresh }: Props) => {
         >
           <Input
             value={form.providerKey}
-            disabled={provider?.databaseSourceActive}
+            disabled={isOperating || provider?.databaseSourceActive}
             placeholder="google"
             onChange={(event) => updateField('providerKey', event.target.value)}
           />
@@ -179,6 +154,7 @@ export const Authentication = ({ provider, loadFailed, onRefresh }: Props) => {
         <Block title="Display name" required>
           <Input
             value={form.displayName}
+            disabled={isOperating}
             placeholder="Google"
             onChange={(event) => updateField('displayName', event.target.value)}
           />
@@ -187,57 +163,62 @@ export const Authentication = ({ provider, loadFailed, onRefresh }: Props) => {
           <Input
             value={form.issuerUrl}
             placeholder="https://accounts.google.com"
-            disabled={provider?.databaseSourceActive}
+            disabled={isOperating || provider?.databaseSourceActive}
             onChange={(event) => updateField('issuerUrl', event.target.value)}
           />
         </Block>
         <Block title="Client ID" required>
-          <Input value={form.clientId} onChange={(event) => updateField('clientId', event.target.value)} />
+          <Input
+            value={form.clientId}
+            disabled={isOperating}
+            onChange={(event) => updateField('clientId', event.target.value)}
+          />
         </Block>
         <Block
           title="Client secret"
-          description={
-            provider?.secretConfigured ? 'Required only when changing the client ID or rotating the secret.' : undefined
-          }
+          description={provider?.secretConfigured ? OIDC_PROVIDER_MESSAGE.SECRET_REPLACEMENT_REQUIRED : undefined}
           required={requiresReplacementSecret}
         >
           <Input.Password
             value={form.clientSecret}
+            disabled={isOperating}
             onChange={(event) => updateField('clientSecret', event.target.value)}
           />
         </Block>
         <Block title="Scopes" description="The openid scope is required." required>
-          <Input value={form.scopes} onChange={(event) => updateField('scopes', event.target.value)} />
+          <Input
+            value={form.scopes}
+            disabled={isOperating}
+            onChange={(event) => updateField('scopes', event.target.value)}
+          />
         </Block>
+        {provider?.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.COMPENSATION_FAILED && (
+          <Alert type="warning" showIcon message={OIDC_PROVIDER_MESSAGE.RECOVERY_REQUIRED} />
+        )}
         {operationError && <Alert type="error" showIcon message={operationError} />}
         {operationSuccess && <Alert type="success" showIcon message={operationSuccess} />}
         <Space wrap>
-          <Button loading={operating === 'validate'} disabled={!validInput || Boolean(operating)} onClick={validate}>
+          <Button loading={operating === 'validate'} disabled={!validInput || isOperating} onClick={validate}>
             Validate
           </Button>
-          <Button
-            type="primary"
-            loading={operating === 'save'}
-            disabled={!validInput || Boolean(operating)}
-            onClick={save}
-          >
+          <Button type="primary" loading={operating === 'save'} disabled={!validInput || isOperating} onClick={save}>
             Save provider
           </Button>
           {canActivateOIDCProvider(provider) && (
             <Popconfirm
-              title="Activate database OIDC settings?"
-              description="DevLake will stop using the deployment OIDC provider after this succeeds."
+              title={OIDC_PROVIDER_MESSAGE.ACTIVATE_TITLE}
+              description={OIDC_PROVIDER_MESSAGE.ACTIVATE_DESCRIPTION}
               okText="Activate"
               onConfirm={activate}
             >
-              <Button loading={operating === 'activate'} disabled={Boolean(operating)} type="primary">
+              <Button loading={operating === 'activate'} disabled={isOperating} type="primary">
                 Activate
               </Button>
             </Popconfirm>
           )}
           {(provider?.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.FAILED ||
             provider?.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.COMPENSATION_FAILED) && (
-            <Button loading={operating === 'grafana-sync'} disabled={Boolean(operating)} onClick={retryGrafanaSync}>
+            <Button loading={operating === 'grafana-sync'} disabled={isOperating} onClick={retryGrafanaSync}>
               Retry Grafana synchronization
             </Button>
           )}
