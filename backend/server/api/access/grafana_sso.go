@@ -43,20 +43,21 @@ type GrafanaSSOSettings struct {
 }
 
 type GrafanaSSOClient struct {
-	baseURL string
-	token   string
-	client  *http.Client
+	baseURL  string
+	username string
+	password string
+	client   *http.Client
 }
 
-func NewGrafanaSSOClient(baseURL, token string, client *http.Client) (*GrafanaSSOClient, error) {
+func NewGrafanaSSOClient(baseURL, username, password string, client *http.Client) (*GrafanaSSOClient, error) {
 	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
-	if baseURL == "" || strings.TrimSpace(token) == "" {
-		return nil, fmt.Errorf("Grafana SSO API URL and service token are required")
+	if baseURL == "" || strings.TrimSpace(username) == "" || password == "" {
+		return nil, fmt.Errorf("Grafana SSO API URL and management credentials are required")
 	}
 	if client == nil {
 		client = &http.Client{Timeout: 10 * time.Second}
 	}
-	return &GrafanaSSOClient{baseURL: baseURL, token: token, client: client}, nil
+	return &GrafanaSSOClient{baseURL: baseURL, username: username, password: password, client: client}, nil
 }
 
 // PutGenericOAuth uses Grafana's documented SSO Settings API. Its errors are
@@ -73,7 +74,7 @@ func (c *GrafanaSSOClient) PutGenericOAuth(ctx context.Context, settings Grafana
 	if err != nil {
 		return fmt.Errorf("create Grafana SSO request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.SetBasicAuth(c.username, c.password)
 	req.Header.Set("Content-Type", "application/json")
 	response, err := c.client.Do(req)
 	if err != nil {

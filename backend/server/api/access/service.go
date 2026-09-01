@@ -72,7 +72,8 @@ func Init(basicRes context.BasicRes) {
 		}
 		grafanaClient, err := NewGrafanaSSOClient(
 			cfg.GetString("GRAFANA_INTERNAL_URL"),
-			cfg.GetString("GRAFANA_SSO_SERVICE_TOKEN"),
+			cfg.GetString("GRAFANA_MANAGEMENT_USER"),
+			cfg.GetString("GRAFANA_MANAGEMENT_PASSWORD"),
 			nil,
 		)
 		if err == nil {

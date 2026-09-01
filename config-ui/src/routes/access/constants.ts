@@ -41,6 +41,10 @@ export const OIDC_PROVIDER_STATUS = {
   RECOVERY: 'Grafana recovery required',
 } as const;
 
+export const OIDC_PROVIDER_SUCCESS = {
+  GRAFANA_SYNCHRONIZED: 'Grafana OAuth configuration synchronized.',
+} as const;
+
 export const ROLE_OPTIONS: Array<{ value: AccessRole; label: string }> = [
   { value: ACCESS_ROLE.MEMBER, label: 'Member' },
   { value: ACCESS_ROLE.CUSTOMER_ADMIN, label: 'Customer administrator' },

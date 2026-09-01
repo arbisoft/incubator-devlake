@@ -119,6 +119,7 @@ func (s *Service) SaveOIDCProvider(ctx context.Context, actor string, input OIDC
 			return nil, errors.BadInput.New("a replacement client secret is required when updating OIDC provider settings", errors.WithData(ErrCodeInvalidProvider))
 		}
 		provider.ID = current.ID
+		provider.CreatedAt = current.CreatedAt
 	}
 	if secret == "" {
 		return nil, errors.BadInput.New("client secret is required", errors.WithData(ErrCodeInvalidProvider))

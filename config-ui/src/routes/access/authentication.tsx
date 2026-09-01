@@ -26,7 +26,7 @@ import { OIDC_PROVIDER_SYNC_STATUS, type OIDCProvider, type OIDCProviderInput } 
 import { Block, Message } from '@/components';
 import { operator } from '@/utils';
 
-import { OIDC_PROVIDER_STATUS } from './constants';
+import { OIDC_PROVIDER_STATUS, OIDC_PROVIDER_SUCCESS } from './constants';
 import { SectionHeader, SectionTitle } from './styled';
 import {
   canActivateOIDCProvider,
@@ -124,6 +124,7 @@ export const Authentication = ({ provider, loadFailed, onRefresh }: Props) => {
         setOperationSuccess('OIDC provider settings are valid.');
         return;
       }
+      if (action === 'grafana-sync') message.success(OIDC_PROVIDER_SUCCESS.GRAFANA_SYNCHRONIZED);
       onRefresh();
       return;
     }

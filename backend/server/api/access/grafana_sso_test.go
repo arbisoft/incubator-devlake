@@ -31,12 +31,13 @@ func (roundTripper grafanaRoundTripper) RoundTrip(request *http.Request) (*http.
 }
 
 func TestGrafanaSSOClientUsesDocumentedSettingsEndpoint(t *testing.T) {
-	client, err := NewGrafanaSSOClient("http://grafana.internal", "service-token", &http.Client{Transport: grafanaRoundTripper(func(request *http.Request) (*http.Response, error) {
+	client, err := NewGrafanaSSOClient("http://grafana.internal", "devlake-system", "machine-password", &http.Client{Transport: grafanaRoundTripper(func(request *http.Request) (*http.Response, error) {
 		if request.Method != http.MethodPut || request.URL.Path != grafanaSSOSettingsPath {
 			t.Fatalf("request = %s %s", request.Method, request.URL.Path)
 		}
-		if request.Header.Get("Authorization") != "Bearer service-token" {
-			t.Fatal("missing Grafana service token")
+		username, password, ok := request.BasicAuth()
+		if !ok || username != "devlake-system" || password != "machine-password" {
+			t.Fatal("missing Grafana management credentials")
 		}
 		return &http.Response{StatusCode: http.StatusNoContent, Body: io.NopCloser(nil), Header: make(http.Header)}, nil
 	})})
@@ -49,7 +50,7 @@ func TestGrafanaSSOClientUsesDocumentedSettingsEndpoint(t *testing.T) {
 }
 
 func TestGrafanaSSOClientRedactsUpstreamResponse(t *testing.T) {
-	client, err := NewGrafanaSSOClient("http://grafana.internal", "service-token", &http.Client{Transport: grafanaRoundTripper(func(request *http.Request) (*http.Response, error) {
+	client, err := NewGrafanaSSOClient("http://grafana.internal", "devlake-system", "machine-password", &http.Client{Transport: grafanaRoundTripper(func(request *http.Request) (*http.Response, error) {
 		return &http.Response{StatusCode: http.StatusBadRequest, Body: io.NopCloser(nil), Header: make(http.Header)}, nil
 	})})
 	if err != nil {
@@ -58,5 +59,27 @@ func TestGrafanaSSOClientRedactsUpstreamResponse(t *testing.T) {
 	err = client.PutGenericOAuth(context.Background(), GrafanaSSOSettings{})
 	if err == nil || err.Error() != "Grafana SSO request returned status 400" {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestNewGrafanaSSOClientRequiresManagementCredentials(t *testing.T) {
+	testCases := []struct {
+		name     string
+		baseURL  string
+		username string
+		password string
+	}{
+		{name: "missing URL", username: "devlake-system", password: "machine-password"},
+		{name: "missing username", baseURL: "http://grafana.internal", password: "machine-password"},
+		{name: "missing password", baseURL: "http://grafana.internal", username: "devlake-system"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			client, err := NewGrafanaSSOClient(testCase.baseURL, testCase.username, testCase.password, nil)
+			if err == nil || client != nil {
+				t.Fatalf("NewGrafanaSSOClient() = %v, %v; want nil client and error", client, err)
+			}
+		})
 	}
 }
