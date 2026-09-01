@@ -85,6 +85,9 @@ func (s *Service) ValidateOIDCProvider(ctx context.Context, input OIDCProviderIn
 }
 
 func (s *Service) SaveOIDCProvider(ctx context.Context, actor string, input OIDCProviderInput) (*OIDCProviderResponse, errors.Error) {
+	s.oidcLifecycleMu.Lock()
+	defer s.oidcLifecycleMu.Unlock()
+
 	if _, _, err := s.oidcProviderCallbacks(); err != nil {
 		return nil, err
 	}
@@ -157,6 +160,9 @@ func (s *Service) SaveOIDCProvider(ctx context.Context, actor string, input OIDC
 }
 
 func (s *Service) ActivateOIDCProvider(ctx context.Context, actor string) (*OIDCProviderResponse, errors.Error) {
+	s.oidcLifecycleMu.Lock()
+	defer s.oidcLifecycleMu.Unlock()
+
 	provider, configuration, err := s.currentOIDCCandidate()
 	if err != nil {
 		return nil, err
@@ -215,6 +221,9 @@ func (s *Service) compensateGrafanaActivation(ctx context.Context, candidate *OI
 }
 
 func (s *Service) DisableOIDCProvider(ctx context.Context, actor string) (*OIDCProviderResponse, errors.Error) {
+	s.oidcLifecycleMu.Lock()
+	defer s.oidcLifecycleMu.Unlock()
+
 	provider, configuration, err := s.currentOIDCCandidate()
 	if err != nil {
 		return nil, err
@@ -229,6 +238,9 @@ func (s *Service) DisableOIDCProvider(ctx context.Context, actor string) (*OIDCP
 }
 
 func (s *Service) EnableOIDCProvider(ctx context.Context, actor string) (*OIDCProviderResponse, errors.Error) {
+	s.oidcLifecycleMu.Lock()
+	defer s.oidcLifecycleMu.Unlock()
+
 	provider, configuration, err := s.currentOIDCCandidate()
 	if err != nil {
 		return nil, err
@@ -243,6 +255,9 @@ func (s *Service) EnableOIDCProvider(ctx context.Context, actor string) (*OIDCPr
 }
 
 func (s *Service) RetireOIDCProvider(actor string) (*OIDCProviderResponse, errors.Error) {
+	s.oidcLifecycleMu.Lock()
+	defer s.oidcLifecycleMu.Unlock()
+
 	provider, configuration, err := s.currentOIDCCandidate()
 	if err != nil {
 		return nil, err
@@ -254,6 +269,9 @@ func (s *Service) RetireOIDCProvider(actor string) (*OIDCProviderResponse, error
 }
 
 func (s *Service) RetryGrafanaOIDCProviderSync(ctx context.Context, actor string) (*OIDCProviderResponse, errors.Error) {
+	s.oidcLifecycleMu.Lock()
+	defer s.oidcLifecycleMu.Unlock()
+
 	provider, configuration, err := s.currentOIDCCandidate()
 	if err != nil {
 		return nil, err

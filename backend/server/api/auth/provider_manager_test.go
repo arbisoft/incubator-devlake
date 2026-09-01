@@ -18,7 +18,11 @@ limitations under the License.
 package auth
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/gin-gonic/gin"
 
 	"github.com/apache/incubator-devlake/helpers/oidchelper"
 	"github.com/apache/incubator-devlake/server/api/access"
@@ -42,5 +46,28 @@ func TestDatabaseOIDCUnavailableConfigFailsClosed(t *testing.T) {
 	cfg := databaseOIDCUnavailableConfig(base)
 	if !cfg.OIDCEnabled || len(cfg.Providers) != 0 {
 		t.Fatalf("unavailable config = %#v", cfg)
+	}
+}
+
+func TestGetMethodsUsesDatabaseProviderSnapshot(t *testing.T) {
+	previousMode := gin.Mode()
+	gin.SetMode(gin.TestMode)
+	t.Cleanup(func() { gin.SetMode(previousMode) })
+
+	response := httptest.NewRecorder()
+	requestContext, _ := gin.CreateTestContext(response)
+	service := &Service{
+		runtimeCfg: &oidchelper.Config{
+			OIDCEnabled: true,
+			Providers: map[string]*oidchelper.ProviderConfig{
+				"google": {Name: "google", DisplayName: "Google"},
+			},
+		},
+	}
+
+	service.GetMethods(requestContext)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
 	}
 }

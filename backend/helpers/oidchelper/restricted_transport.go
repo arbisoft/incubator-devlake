@@ -30,6 +30,14 @@ import (
 
 const oidcRequestTimeout = 10 * time.Second
 
+type netIPResolver interface {
+	LookupNetIP(ctx context.Context, network, host string) ([]netip.Addr, error)
+}
+
+type contextDialer interface {
+	DialContext(ctx context.Context, network, address string) (net.Conn, error)
+}
+
 // ValidateIssuerURL rejects syntactically unsafe issuer URLs before discovery.
 // DNS addresses are also checked at dial time to prevent a hostname resolving to
 // private infrastructure after validation.
@@ -50,14 +58,17 @@ func ValidateIssuerURL(raw string, allowHTTP bool) (*url.URL, error) {
 // NewRestrictedHTTPClient supplies OIDC discovery/JWKS/token exchange with a
 // bounded transport that rejects private resolved addresses and unsafe redirects.
 func NewRestrictedHTTPClient(allowHTTP bool) *http.Client {
-	dialer := &net.Dialer{Timeout: oidcRequestTimeout}
+	return newRestrictedHTTPClient(allowHTTP, net.DefaultResolver, &net.Dialer{Timeout: oidcRequestTimeout})
+}
+
+func newRestrictedHTTPClient(allowHTTP bool, resolver netIPResolver, dialer contextDialer) *http.Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
 		host, port, err := net.SplitHostPort(address)
 		if err != nil {
 			return nil, err
 		}
-		addresses, err := net.DefaultResolver.LookupNetIP(ctx, "ip", host)
+		addresses, err := resolver.LookupNetIP(ctx, "ip", host)
 		if err != nil {
 			return nil, err
 		}
@@ -66,7 +77,10 @@ func NewRestrictedHTTPClient(allowHTTP bool) *http.Client {
 				return nil, fmt.Errorf("OIDC endpoint resolves to a private address")
 			}
 		}
-		return dialer.DialContext(ctx, network, net.JoinHostPort(host, port))
+		if len(addresses) == 0 {
+			return nil, fmt.Errorf("OIDC endpoint did not resolve to an IP address")
+		}
+		return dialer.DialContext(ctx, network, net.JoinHostPort(addresses[0].String(), port))
 	}
 	return &http.Client{
 		Timeout:   oidcRequestTimeout,

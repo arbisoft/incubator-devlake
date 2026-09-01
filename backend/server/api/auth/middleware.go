@@ -60,14 +60,6 @@ func CSRFProtect() gin.HandlerFunc { return defaultService.CSRFProtect() }
 // pass through and RequireAuth decides whether to reject.
 func (s *Service) OIDCAuthentication() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if err := s.refreshCurrentDatabaseProvider(); err != nil {
-			if _, cookieErr := c.Cookie(oidchelper.SessionCookieName); cookieErr == nil {
-				cfg, _ := s.providerState()
-				oidchelper.ClearSessionCookie(c, cfg)
-			}
-			c.Next()
-			return
-		}
 		cfg, _ := s.providerState()
 		if cfg == nil || !cfg.AuthEnabled {
 			c.Next()

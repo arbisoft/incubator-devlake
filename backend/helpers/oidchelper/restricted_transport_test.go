@@ -17,7 +17,31 @@ limitations under the License.
 
 package oidchelper
 
-import "testing"
+import (
+	"context"
+	"net"
+	"net/http"
+	"net/netip"
+	"testing"
+)
+
+type testResolver struct {
+	addresses []netip.Addr
+	err       error
+}
+
+func (r testResolver) LookupNetIP(_ context.Context, _, _ string) ([]netip.Addr, error) {
+	return r.addresses, r.err
+}
+
+type recordingDialer struct {
+	address string
+}
+
+func (d *recordingDialer) DialContext(_ context.Context, _, address string) (net.Conn, error) {
+	d.address = address
+	return nil, nil
+}
 
 func TestValidateIssuerURL(t *testing.T) {
 	for _, testCase := range []struct {
@@ -32,5 +56,35 @@ func TestValidateIssuerURL(t *testing.T) {
 		if (err == nil) != testCase.valid {
 			t.Errorf("ValidateIssuerURL(%q) error = %v", testCase.raw, err)
 		}
+	}
+}
+
+func TestRestrictedTransportDialsValidatedAddress(t *testing.T) {
+	dialer := &recordingDialer{}
+	client := newRestrictedHTTPClient(false, testResolver{
+		addresses: []netip.Addr{netip.MustParseAddr("198.51.100.10")},
+	}, dialer)
+
+	_, err := client.Transport.(*http.Transport).DialContext(context.Background(), "tcp", "issuer.example:443")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dialer.address != "198.51.100.10:443" {
+		t.Fatalf("dialed address = %q, want validated IP", dialer.address)
+	}
+}
+
+func TestRestrictedTransportRejectsPrivateResolvedAddress(t *testing.T) {
+	dialer := &recordingDialer{}
+	client := newRestrictedHTTPClient(false, testResolver{
+		addresses: []netip.Addr{netip.MustParseAddr("127.0.0.1")},
+	}, dialer)
+
+	_, err := client.Transport.(*http.Transport).DialContext(context.Background(), "tcp", "issuer.example:443")
+	if err == nil {
+		t.Fatal("expected private resolved address to be rejected")
+	}
+	if dialer.address != "" {
+		t.Fatalf("dialer was called with %q", dialer.address)
 	}
 }

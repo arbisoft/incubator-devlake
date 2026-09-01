@@ -86,13 +86,13 @@ func (s *Service) RefreshOIDCProvider(ctx stdctx.Context) errors.Error {
 	_ = ctx
 	cfg, protector, err := loadProviderSource(s.bootstrapCfg, s.db, s.basicRes)
 	if err != nil {
-		s.replaceProviderState(databaseOIDCUnavailableConfig(s.bootstrapCfg), true)
+		s.replaceProviderState(databaseOIDCUnavailableConfig(s.bootstrapCfg))
 		return errors.Default.Wrap(err, "refresh database OIDC provider")
 	}
 	if cfg == s.bootstrapCfg {
 		return errors.Default.New("database OIDC provider source is not active")
 	}
-	s.replaceProviderState(cfg, true)
+	s.replaceProviderState(cfg)
 	s.providerMu.Lock()
 	s.protector = protector
 	s.providerMu.Unlock()

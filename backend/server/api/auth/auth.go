@@ -74,7 +74,6 @@ type Service struct {
 	providerMu   sync.RWMutex
 	runtimeCfg   *oidchelper.Config
 	providers    map[string]*oidchelper.Provider
-	databaseOIDC bool
 	basicRes     corectx.BasicRes
 	protector    CredentialProtector
 	logger       log.Logger
@@ -137,7 +136,6 @@ func NewService(ctx stdctx.Context, basicRes corectx.BasicRes) (*Service, error)
 		bootstrapCfg: bootstrapCfg,
 		runtimeCfg:   cfg,
 		providers:    buildProviders(cfg),
-		databaseOIDC: cfg != bootstrapCfg,
 		basicRes:     basicRes,
 		protector:    protector,
 		logger:       basicRes.GetLogger(),
@@ -176,22 +174,11 @@ func (s *Service) providerState() (*oidchelper.Config, map[string]*oidchelper.Pr
 	return s.runtimeCfg, s.providers
 }
 
-func (s *Service) replaceProviderState(cfg *oidchelper.Config, databaseOIDC bool) {
+func (s *Service) replaceProviderState(cfg *oidchelper.Config) {
 	s.providerMu.Lock()
 	s.runtimeCfg = cfg
 	s.providers = buildProviders(cfg)
-	s.databaseOIDC = databaseOIDC
 	s.providerMu.Unlock()
-}
-
-func (s *Service) refreshCurrentDatabaseProvider() errors.Error {
-	s.providerMu.RLock()
-	databaseOIDC := s.databaseOIDC
-	s.providerMu.RUnlock()
-	if !databaseOIDC {
-		return nil
-	}
-	return s.RefreshOIDCProvider(stdctx.Background())
 }
 
 func (s *Service) Config() *oidchelper.Config {
@@ -229,10 +216,6 @@ func GetMethods(c *gin.Context) { defaultService.GetMethods(c) }
 // @Success 200 {object} Methods
 // @Router /auth/methods [get]
 func (s *Service) GetMethods(c *gin.Context) {
-	if err := s.refreshCurrentDatabaseProvider(); err != nil {
-		fail(c, http.StatusServiceUnavailable, "database OIDC provider is unavailable", err)
-		return
-	}
 	cfg, _ := s.providerState()
 	out := Methods{APIKey: &APIKey{Enabled: true}}
 	if cfg != nil && cfg.OIDCEnabled {
@@ -257,10 +240,6 @@ func LoginInit(c *gin.Context) { defaultService.LoginInit(c) }
 // @Success 303
 // @Router /auth/login [get]
 func (s *Service) LoginInit(c *gin.Context) {
-	if err := s.refreshCurrentDatabaseProvider(); err != nil {
-		fail(c, http.StatusServiceUnavailable, "database OIDC provider is unavailable", err)
-		return
-	}
 	if !s.ensureOIDC(c) {
 		return
 	}
@@ -313,10 +292,6 @@ func Callback(c *gin.Context) { defaultService.Callback(c) }
 // @Success 303
 // @Router /auth/callback [get]
 func (s *Service) Callback(c *gin.Context) {
-	if err := s.refreshCurrentDatabaseProvider(); err != nil {
-		fail(c, http.StatusServiceUnavailable, "database OIDC provider is unavailable", err)
-		return
-	}
 	if !s.ensureOIDC(c) {
 		return
 	}

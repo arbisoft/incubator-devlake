@@ -44,12 +44,13 @@ type SessionRevoker interface {
 }
 
 type Service struct {
-	cfg            Config
-	db             dal.Dal
-	logger         log.Logger
-	sessionRevoker SessionRevoker
-	oidcRuntime    OIDCProviderRuntime
-	grafanaSSO     *GrafanaSSOClient
+	cfg             Config
+	db              dal.Dal
+	logger          log.Logger
+	oidcLifecycleMu sync.Mutex
+	sessionRevoker  SessionRevoker
+	oidcRuntime     OIDCProviderRuntime
+	grafanaSSO      *GrafanaSSOClient
 }
 
 var (
