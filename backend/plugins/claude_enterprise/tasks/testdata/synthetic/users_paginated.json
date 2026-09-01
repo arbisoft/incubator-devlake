@@ -1,0 +1,17 @@
+{
+  "data": [
+    {
+      "date": "2026-01-06",
+      "grain": "daily",
+      "user": {
+        "id": "user_synthetic_003",
+        "email_address": "reviewer@example.invalid"
+      },
+      "cowork_metrics": {
+        "distinct_session_count": 2,
+        "message_count": 12
+      }
+    }
+  ],
+  "next_page": null
+}

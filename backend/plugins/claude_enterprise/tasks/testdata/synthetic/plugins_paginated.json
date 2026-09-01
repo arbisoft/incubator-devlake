@@ -1,0 +1,20 @@
+{
+  "data": [
+    {
+      "date": "2026-01-06",
+      "grain": "daily",
+      "plugin_id": "plugin_synthetic_003",
+      "plugin_name": "PagerDuty Alerts",
+      "distinct_user_count": 2,
+      "install_count": 4,
+      "invocation_count": 8,
+      "claude_code_metrics": {
+        "distinct_session_plugin_used_count": 5
+      },
+      "cowork_metrics": {
+        "distinct_session_plugin_used_count": 1
+      }
+    }
+  ],
+  "next_page": null
+}
