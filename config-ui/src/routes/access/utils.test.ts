@@ -131,6 +131,35 @@ test('normalizes and validates OIDC provider settings locally', () => {
   equal(isValidOIDCProviderInput({ ...provider, scopes: 'profile email' }), false);
 });
 
+test('allows stored OIDC credentials only for the unchanged client ID', () => {
+  const provider = normalizeOIDCProviderInput({
+    providerKey: 'google',
+    displayName: 'Google',
+    issuerUrl: 'https://accounts.example.com',
+    clientId: 'client-a',
+    clientSecret: '',
+    scopes: 'openid profile email',
+  });
+  const configuredProvider: OIDCProvider = {
+    providerKey: 'google',
+    displayName: 'Google',
+    issuerUrl: 'https://accounts.example.com',
+    clientId: 'client-a',
+    scopes: 'openid profile email',
+    enabled: true,
+    secretConfigured: true,
+    databaseSourceActive: true,
+    grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.SYNCHRONIZED,
+    grafanaSyncedRevision: 1,
+    providerRevision: 1,
+    devlakeCallbackUrl: 'https://devlake.example.com/api/auth/callback',
+    grafanaCallbackUrl: 'https://grafana.example.com/login/generic_oauth',
+  };
+
+  equal(isValidOIDCProviderInput(provider, configuredProvider), true);
+  equal(isValidOIDCProviderInput({ ...provider, clientId: 'client-b' }, configuredProvider), false);
+});
+
 test('maps OIDC provider errors to safe user-facing messages', () => {
   const invalidProvider = createAxiosError(HttpStatusCode.BadRequest, {
     code: ACCESS_ERROR_CODE.INVALID_OIDC_PROVIDER,
@@ -138,9 +167,17 @@ test('maps OIDC provider errors to safe user-facing messages', () => {
   const blockedProvider = createAxiosError(HttpStatusCode.BadRequest, {
     code: ACCESS_ERROR_CODE.OIDC_PROVIDER_BLOCKED,
   });
+  const unavailableBlockedProvider = createAxiosError(HttpStatusCode.ServiceUnavailable, {
+    code: ACCESS_ERROR_CODE.OIDC_PROVIDER_BLOCKED,
+  });
+  const unavailableUnknownProvider = createAxiosError(HttpStatusCode.ServiceUnavailable, {
+    code: 'GRAFANA_CREDENTIAL_REJECTED',
+  });
 
   equal(getOIDCProviderError(invalidProvider), ACCESS_ERROR.INVALID_OIDC_PROVIDER);
   equal(getOIDCProviderError(blockedProvider), ACCESS_ERROR.OIDC_PROVIDER_BLOCKED);
+  equal(getOIDCProviderError(unavailableBlockedProvider), ACCESS_ERROR.OIDC_PROVIDER_BLOCKED);
+  equal(getOIDCProviderError(unavailableUnknownProvider), ACCESS_ERROR.OIDC_PROVIDER_FAILED);
   equal(getOIDCProviderError(new Error('network error')), ACCESS_ERROR.OIDC_PROVIDER_FAILED);
 });
 

@@ -40,19 +40,32 @@ type currentResponse struct {
 func outputError(c *gin.Context, err errors.Error) {
 	status := err.GetType().GetHttpCode()
 	message := "unable to process access request"
-	var code string
-	if status >= http.StatusBadRequest && status < http.StatusInternalServerError {
-		if errData := err.GetData(); errData != nil {
-			if c, ok := errData.(string); ok {
-				code = c
-			}
-		}
+	code := accessErrorCode(err)
+	if safeAccessError(status, code) {
 		if safeMessage := err.Messages().Get(); safeMessage != "" {
 			message = strings.TrimSuffix(safeMessage, fmt.Sprintf(" (%d)", status))
 		}
+	} else {
+		code = ""
 	}
 	logruslog.Global.Error(err, "HTTP %d access API error", status)
 	c.JSON(status, &ApiErrorResponse{Success: false, Message: message, Code: code})
+}
+
+func accessErrorCode(err errors.Error) string {
+	if errData := err.GetData(); errData != nil {
+		if code, ok := errData.(string); ok {
+			return code
+		}
+	}
+	return ""
+}
+
+func safeAccessError(status int, code string) bool {
+	if status >= http.StatusBadRequest && status < http.StatusInternalServerError {
+		return true
+	}
+	return status == http.StatusServiceUnavailable && code == ErrCodeProviderBlocked
 }
 
 func GetCurrent(c *gin.Context) {

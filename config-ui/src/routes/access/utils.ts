@@ -65,6 +65,14 @@ const extractErrorCode = (error: unknown): string | undefined => {
   return typeof error.response.data?.code === 'string' ? error.response.data.code : undefined;
 };
 
+const extractOIDCProviderErrorCode = (error: unknown): string | undefined => {
+  if (!axios.isAxiosError<AccessApiErrorResponse>(error)) return undefined;
+  const response = error.response;
+  const status = response?.status;
+  if (status !== HttpStatusCode.BadRequest && status !== HttpStatusCode.ServiceUnavailable) return undefined;
+  return typeof response?.data?.code === 'string' ? response.data.code : undefined;
+};
+
 const serverMessage = (error: unknown) => {
   if (!axios.isAxiosError<{ message?: unknown }>(error) || error.response?.status !== HttpStatusCode.BadRequest) {
     return '';
@@ -105,7 +113,7 @@ export const normalizeOIDCProviderInput = (provider: OIDCProviderInput): OIDCPro
     .join(' '),
 });
 
-export const isValidOIDCProviderInput = (provider: OIDCProviderInput) => {
+export const isValidOIDCProviderInput = (provider: OIDCProviderInput, configuredProvider?: OIDCProvider) => {
   const normalized = normalizeOIDCProviderInput(provider);
   let issuer: URL;
   try {
@@ -115,18 +123,20 @@ export const isValidOIDCProviderInput = (provider: OIDCProviderInput) => {
   }
   const isLocalHTTP =
     issuer.protocol === 'http:' && (issuer.hostname === 'localhost' || issuer.hostname === '127.0.0.1');
+  const requiresReplacementSecret =
+    !configuredProvider?.secretConfigured || normalized.clientId !== configuredProvider.clientId;
   return (
     /^[a-z0-9_-]{1,64}$/.test(normalized.providerKey) &&
     normalized.displayName.length > 0 &&
     normalized.clientId.length > 0 &&
-    normalized.clientSecret.length > 0 &&
+    (!requiresReplacementSecret || normalized.clientSecret.length > 0) &&
     (issuer.protocol === 'https:' || isLocalHTTP) &&
     normalized.scopes.split(' ').includes('openid')
   );
 };
 
 export const getOIDCProviderError = (error: unknown) => {
-  const code = extractErrorCode(error);
+  const code = extractOIDCProviderErrorCode(error);
   if (code === ACCESS_ERROR_CODE.INVALID_OIDC_PROVIDER) return ACCESS_ERROR.INVALID_OIDC_PROVIDER;
   if (code === ACCESS_ERROR_CODE.OIDC_PROVIDER_BLOCKED || code === ACCESS_ERROR_CODE.OIDC_PROVIDER_MISSING) {
     return ACCESS_ERROR.OIDC_PROVIDER_BLOCKED;

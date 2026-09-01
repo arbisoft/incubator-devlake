@@ -70,6 +70,76 @@ func TestOIDCProviderResponseDoesNotExposeSecret(t *testing.T) {
 	}
 }
 
+func TestReuseOIDCProviderCredential(t *testing.T) {
+	stored := oidcProviderFromCandidate(&OIDCProviderCandidate{
+		ClientID: "client-a", EncryptedClientSecret: []byte("ciphertext"), ClientSecretNonce: []byte("nonce"), ClientSecretKeyID: "key-1",
+	})
+	testCases := []struct {
+		name          string
+		provider      *OIDCProvider
+		stored        *OIDCProvider
+		clientSecret  string
+		wantErrorCode string
+		wantReuse     bool
+	}{
+		{
+			name: "reuses configured credential for unchanged client ID", provider: &OIDCProvider{ClientID: "client-a"}, stored: stored,
+			wantReuse: true,
+		},
+		{
+			name: "requires replacement credential for changed client ID", provider: &OIDCProvider{ClientID: "client-b"}, stored: stored,
+			wantErrorCode: ErrCodeInvalidProvider,
+		},
+		{
+			name: "requires credential for first provider", provider: &OIDCProvider{ClientID: "client-a"},
+			wantErrorCode: ErrCodeInvalidProvider,
+		},
+		{
+			name: "uses supplied replacement credential", provider: &OIDCProvider{ClientID: "client-b"}, stored: stored, clientSecret: "replacement",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			err := reuseOIDCProviderCredential(testCase.provider, testCase.stored, testCase.clientSecret)
+			if testCase.wantErrorCode == "" {
+				if err != nil {
+					t.Fatalf("reuseOIDCProviderCredential() error = %v", err)
+				}
+			} else if err == nil || err.GetData() != testCase.wantErrorCode {
+				t.Fatalf("reuseOIDCProviderCredential() error = %v, want code %q", err, testCase.wantErrorCode)
+			}
+			if testCase.wantReuse && !hasOIDCProviderSecret(testCase.provider) {
+				t.Fatal("expected stored credential to remain available internally")
+			}
+		})
+	}
+}
+
+func TestValidateOIDCProviderIdentity(t *testing.T) {
+	current := &OIDCProvider{ProviderKey: "google", IssuerURL: "https://accounts.google.com"}
+	testCases := []struct {
+		name      string
+		provider  *OIDCProvider
+		current   *OIDCProvider
+		wantError bool
+	}{
+		{name: "allows unchanged provider identity", provider: &OIDCProvider{ProviderKey: "google", IssuerURL: "https://accounts.google.com"}, current: current},
+		{name: "allows first provider identity", provider: &OIDCProvider{ProviderKey: "google", IssuerURL: "https://accounts.google.com"}},
+		{name: "rejects changed provider key", provider: &OIDCProvider{ProviderKey: "entra", IssuerURL: "https://accounts.google.com"}, current: current, wantError: true},
+		{name: "rejects changed issuer", provider: &OIDCProvider{ProviderKey: "google", IssuerURL: "https://login.microsoftonline.com"}, current: current, wantError: true},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			err := validateOIDCProviderIdentity(testCase.provider, testCase.current)
+			if (err != nil) != testCase.wantError {
+				t.Fatalf("validateOIDCProviderIdentity() error = %v, wantError %t", err, testCase.wantError)
+			}
+		})
+	}
+}
+
 func TestOIDCProviderResponseIncludesDeploymentDerivedCallbacks(t *testing.T) {
 	service := &Service{cfg: Config{
 		AuthPublicURL:    "https://devlake.example.com",

@@ -94,7 +94,8 @@ export const Authentication = ({ provider, loadFailed, onRefresh }: Props) => {
   const [operationSuccess, setOperationSuccess] = useState<string>();
   const providerVersion = `${provider?.providerKey ?? ''}:${provider?.providerRevision ?? 0}`;
   const status = getOIDCProviderStatus(provider);
-  const validInput = isValidOIDCProviderInput(form);
+  const validInput = isValidOIDCProviderInput(form, provider);
+  const requiresReplacementSecret = !provider?.secretConfigured || form.clientId.trim() !== provider.clientId;
   const hasProvider = Boolean(provider?.providerKey);
 
   useEffect(() => {
@@ -195,8 +196,10 @@ export const Authentication = ({ provider, loadFailed, onRefresh }: Props) => {
         </Block>
         <Block
           title="Client secret"
-          description={provider?.secretConfigured ? 'Enter a replacement secret to update this provider.' : undefined}
-          required
+          description={
+            provider?.secretConfigured ? 'Required only when changing the client ID or rotating the secret.' : undefined
+          }
+          required={requiresReplacementSecret}
         >
           <Input.Password
             value={form.clientSecret}

@@ -80,6 +80,9 @@ func (s *Service) ValidateOIDCProvider(ctx context.Context, input OIDCProviderIn
 	if s.oidcRuntime == nil {
 		return errors.Unavailable.New("OIDC provider administration is not configured", errors.WithData(ErrCodeProviderBlocked))
 	}
+	if _, _, err := s.resolveOIDCProviderInput(provider, secret); err != nil {
+		return err
+	}
 	_, runtimeErr := s.oidcRuntime.PrepareOIDCProvider(ctx, provider, secret)
 	return runtimeErr
 }
@@ -103,29 +106,13 @@ func (s *Service) SaveOIDCProvider(ctx context.Context, actor string, input OIDC
 		return nil, errors.Unavailable.New("OIDC provider administration is not configured", errors.WithData(ErrCodeProviderBlocked))
 	}
 
-	configuration := &OIDCProviderConfiguration{}
-	configurationErr := s.db.First(configuration, dal.Where("id = ?", OIDCProviderSourceKey))
-	if configurationErr != nil && !s.db.IsErrorNotFound(configurationErr) {
-		return nil, errors.Default.Wrap(configurationErr, "error reading OIDC provider configuration")
+	configuration, current, resolveErr := s.resolveOIDCProviderInput(provider, secret)
+	if resolveErr != nil {
+		return nil, resolveErr
 	}
-
-	current := &OIDCProvider{}
-	lookupErr := s.db.First(current, dal.Where("retired_at IS NULL"))
-	if lookupErr != nil && !s.db.IsErrorNotFound(lookupErr) {
-		return nil, errors.Default.Wrap(lookupErr, "error reading OIDC provider")
-	}
-	if lookupErr == nil {
-		if current.ProviderKey != provider.ProviderKey || current.IssuerURL != provider.IssuerURL {
-			return nil, errors.BadInput.New("the current release requires the active OIDC provider key and issuer to remain unchanged", errors.WithData(ErrCodeProviderBlocked))
-		}
-		if secret == "" {
-			return nil, errors.BadInput.New("a replacement client secret is required when updating OIDC provider settings", errors.WithData(ErrCodeInvalidProvider))
-		}
+	if current != nil {
 		provider.ID = current.ID
 		provider.CreatedAt = current.CreatedAt
-	}
-	if secret == "" {
-		return nil, errors.BadInput.New("client secret is required", errors.WithData(ErrCodeInvalidProvider))
 	}
 
 	prepared, prepareErr := s.oidcRuntime.PrepareOIDCProvider(ctx, provider, secret)
@@ -133,7 +120,7 @@ func (s *Service) SaveOIDCProvider(ctx context.Context, actor string, input OIDC
 		return nil, prepareErr
 	}
 
-	configuration, saveErr := s.persistOIDCCandidate(provider, prepared, lookupErr == nil && configuration.ActivatedAt != nil)
+	configuration, saveErr := s.persistOIDCCandidate(provider, prepared, current != nil && configuration.ActivatedAt != nil)
 	if saveErr != nil {
 		return nil, saveErr
 	}
@@ -151,12 +138,76 @@ func (s *Service) SaveOIDCProvider(ctx context.Context, actor string, input OIDC
 		return oidcProviderResponse(provider, configuration), syncErr
 	}
 	action := auditProviderCreated
-	if lookupErr == nil {
+	if current != nil {
 		action = auditProviderUpdated
 	}
 	s.audit(actor, action, nil, providerAuditDetail(provider.ProviderKey))
 	s.audit(actor, auditProviderGrafanaSyncSucceeded, nil, providerAuditDetail(provider.ProviderKey))
 	return oidcProviderResponse(provider, configuration), nil
+}
+
+// resolveOIDCProviderInput enforces the update contract without exposing a stored
+// credential. A configured credential can be reused only for the same OAuth client.
+func (s *Service) resolveOIDCProviderInput(provider *OIDCProvider, clientSecret string) (*OIDCProviderConfiguration, *OIDCProvider, errors.Error) {
+	configuration := &OIDCProviderConfiguration{}
+	configurationErr := s.db.First(configuration, dal.Where("id = ?", OIDCProviderSourceKey))
+	if configurationErr != nil {
+		if !s.db.IsErrorNotFound(configurationErr) {
+			return nil, nil, errors.Default.Wrap(configurationErr, "error reading OIDC provider configuration")
+		}
+		configuration = &OIDCProviderConfiguration{}
+	}
+
+	current := &OIDCProvider{}
+	currentErr := s.db.First(current, dal.Where("retired_at IS NULL"))
+	if currentErr != nil {
+		if !s.db.IsErrorNotFound(currentErr) {
+			return nil, nil, errors.Default.Wrap(currentErr, "error reading OIDC provider")
+		}
+		current = nil
+	}
+	if err := validateOIDCProviderIdentity(provider, current); err != nil {
+		return nil, nil, err
+	}
+
+	credentialSource := current
+	if configuration.CandidateProviderID != 0 {
+		candidate := &OIDCProviderCandidate{}
+		if err := s.db.First(candidate, dal.Where("id = ? AND promoted_at IS NULL", configuration.CandidateProviderID)); err != nil {
+			return nil, nil, errors.Default.Wrap(err, "error reading OIDC provider candidate")
+		}
+		credentialSource = oidcProviderFromCandidate(candidate)
+	}
+	if err := reuseOIDCProviderCredential(provider, credentialSource, clientSecret); err != nil {
+		return nil, nil, err
+	}
+	return configuration, current, nil
+}
+
+func validateOIDCProviderIdentity(provider, current *OIDCProvider) errors.Error {
+	if current == nil || (current.ProviderKey == provider.ProviderKey && current.IssuerURL == provider.IssuerURL) {
+		return nil
+	}
+	return errors.BadInput.New("the current release requires the active OIDC provider key and issuer to remain unchanged", errors.WithData(ErrCodeProviderBlocked))
+}
+
+func reuseOIDCProviderCredential(provider, stored *OIDCProvider, clientSecret string) errors.Error {
+	if clientSecret != "" {
+		return nil
+	}
+	if stored == nil {
+		return errors.BadInput.New("client secret is required", errors.WithData(ErrCodeInvalidProvider))
+	}
+	if provider.ClientID != stored.ClientID {
+		return errors.BadInput.New("a replacement client secret is required when changing the client ID", errors.WithData(ErrCodeInvalidProvider))
+	}
+	if !hasOIDCProviderSecret(stored) {
+		return errors.Default.New("stored OIDC provider credential is unavailable")
+	}
+	provider.EncryptedClientSecret = stored.EncryptedClientSecret
+	provider.ClientSecretNonce = stored.ClientSecretNonce
+	provider.ClientSecretKeyID = stored.ClientSecretKeyID
+	return nil
 }
 
 func (s *Service) ActivateOIDCProvider(ctx context.Context, actor string) (*OIDCProviderResponse, errors.Error) {
@@ -599,10 +650,14 @@ func oidcProviderResponse(provider *OIDCProvider, configuration *OIDCProviderCon
 	return &OIDCProviderResponse{
 		ProviderKey: provider.ProviderKey, DisplayName: provider.DisplayName, IssuerURL: provider.IssuerURL,
 		ClientID: provider.ClientID, Scopes: provider.Scopes, Enabled: provider.Enabled, RetiredAt: provider.RetiredAt,
-		SecretConfigured:     len(provider.EncryptedClientSecret) > 0 && len(provider.ClientSecretNonce) > 0 && provider.ClientSecretKeyID != "",
+		SecretConfigured:     hasOIDCProviderSecret(provider),
 		DatabaseSourceActive: configuration.ActivatedAt != nil, GrafanaSyncStatus: configuration.GrafanaSyncStatus,
 		GrafanaSyncedRevision: configuration.GrafanaSyncedRevision, ProviderRevision: configuration.ProviderRevision,
 	}
+}
+
+func hasOIDCProviderSecret(provider *OIDCProvider) bool {
+	return provider != nil && len(provider.EncryptedClientSecret) > 0 && len(provider.ClientSecretNonce) > 0 && provider.ClientSecretKeyID != ""
 }
 
 func providerAuditDetail(providerKey string) string { return fmt.Sprintf("provider=%s", providerKey) }
