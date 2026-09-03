@@ -22,12 +22,12 @@ d AS (
          i.lead_time_minutes / 1440.0                       AS days
   FROM issues i
   JOIN type_map tm ON tm.original_type <=> i.original_type
+  JOIN accounts a ON a.id = i.assignee_id AND a.email IN ( $developer_id )
   WHERE i.status = 'DONE'
     AND i.lead_time_minutes IS NOT NULL
     AND i.lead_time_minutes > 0
     AND i.id LIKE 'github:%'
     AND $__timeFilter(i.resolution_date)
-    AND i.assignee_id IN ( $developer_id  )
 ),
 ranked AS (
   SELECT type, priority, days,

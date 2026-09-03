@@ -20,8 +20,8 @@ WITH latest_review AS (
       WHERE pm.`table` = 'repos'
         AND pm.project_name IN (${project})
     )
+  JOIN accounts a ON a.id = pr.author_id AND a.email IN ( $developer_id )
   WHERE $__timeFilter(pr.created_date)
-        AND pr.author_id IN ( $developer_id )
   order by pr.created_date
 )
 SELECT

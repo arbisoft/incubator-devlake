@@ -1,4 +1,3 @@
--- Counts issues created in the window and assigned to the selected developers, split into Bug versus Tasks by whether original_type contains 'bug', scoped to boards mapped to the selected project.
 SELECT
   CASE WHEN LOWER(COALESCE(i.original_type,'')) LIKE '%bug%' THEN 'Bug' ELSE 'Tasks' END AS category,
   COUNT(*) AS issues
@@ -10,5 +9,9 @@ JOIN project_mapping pm ON pm.row_id = bi.board_id
 WHERE i.id LIKE 'github:%'
   AND bi.board_id IN (${repo_id})
   AND $__timeFilter(i.created_date)
-  AND i.assignee_id IN ( $developer_id )
+  AND i.assignee_id IN (
+    SELECT a.id
+    FROM accounts a
+    WHERE a.email IN ( $developer_id )
+  )
 GROUP BY 1;

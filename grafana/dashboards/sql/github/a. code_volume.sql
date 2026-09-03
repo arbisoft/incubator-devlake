@@ -1,7 +1,7 @@
 -- Sums additions and deletions per contributor across non-merge commits authored in the window (deduped by commit SHA), top 20 by total lines changed.
 WITH dedup AS (
   SELECT DISTINCT
-    COALESCE(a.full_name, u.name, c.author_name) AS contributor,
+    COALESCE(a.full_name, a.user_name, c.author_name) AS contributor,
     c.sha, c.additions, c.deletions
   FROM commits c
   JOIN repo_commits rc       ON rc.commit_sha = c.sha 
@@ -12,13 +12,7 @@ WITH dedup AS (
       from project_mapping pm 
       where pm.table = 'repos' 
       AND pm.project_name in (${project}))
-  LEFT JOIN accounts a ON a.id = c.author_id 
-  LEFT JOIN (
-      SELECT account_id, MIN(user_id) AS user_id
-      FROM user_accounts
-      GROUP BY account_id
-  ) ua ON ua.account_id = a.id
-  LEFT JOIN users u ON u.id = ua.user_id
+  JOIN accounts a ON a.id = c.author_id AND a.email IN ($developer_id)
   WHERE $__timeFilter(c.authored_date)
   AND NOT EXISTS (
       SELECT 1 FROM commit_parents cp

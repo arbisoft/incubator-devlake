@@ -18,7 +18,7 @@ WITH _commit_logs AS (
       ON pm.row_id = pr.base_repo_id
       AND pm.table = 'repos'
       AND pm.project_name IN ( ${project} )
-    JOIN commits c ON c.sha = prc.commit_sha
+    JOIN commits c ON c.sha = prc.commit_sha AND c.author_email IN ( ${developer_id} )
     WHERE prc.pull_request_id like 'github:%' 
       AND $__timeFilter(prc.commit_authored_date)
     GROUP BY prc.commit_sha, c.author_id, c.author_name
@@ -29,18 +29,15 @@ SELECT developer,
        SUM(_closed) AS Abandoned
 FROM (
    SELECT 
-      REPLACE(COALESCE(a.full_name, a.user_name, u.name,
-                    cl.author_name, '(unmapped)'), '-', ' ') AS developer,
+      REPLACE(
+          COALESCE(a.full_name, 
+                   a.user_name,
+                   cl.author_name, 
+                   '(unmapped)'), '-', ' ') AS developer,
       COALESCE(cl.landed, 0) AS _landed,
       COALESCE(cl.closed_unmerged, 0) AS _closed
     FROM _commit_logs cl
-    LEFT JOIN accounts a ON a.id = cl.author_id 
-    LEFT JOIN (
-        SELECT account_id, MIN(user_id) AS user_id
-        FROM user_accounts
-        GROUP BY account_id
-    ) ua ON ua.account_id = a.id
-    LEFT JOIN users u ON u.id = ua.user_id
+    LEFT JOIN accounts a ON a.id = cl.author_id
 ) base
 GROUP BY developer
 ORDER BY (Abandoned + Landed) desc

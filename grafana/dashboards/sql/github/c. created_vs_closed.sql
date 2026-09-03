@@ -2,17 +2,17 @@
 WITH ev AS (
   SELECT i.created_date AS ts, 1 AS opened, 0 AS closed
   FROM issues i
+  JOIN accounts a ON a.id = i.creator_id AND a.email IN ( $developer_id )
   WHERE i.id LIKE 'github:%'
     AND $__timeFilter(i.created_date)
-    AND i.creator_id IN ( $developer_id )
   UNION ALL
   SELECT i.resolution_date, 0, 1
   FROM issues i
+  JOIN accounts a ON a.id = i.assignee_id IN ( $developer_id )
   WHERE i.id LIKE 'github:%'
     AND i.status = 'DONE'
     AND i.resolution_date IS NOT NULL
     AND $__timeFilter(i.resolution_date)
-    AND i.assignee_id IN ( $developer_id )
 )
 SELECT $__timeGroup(ts, $interval)                                        AS time,
        SUM(opened)                                                   AS Opened,

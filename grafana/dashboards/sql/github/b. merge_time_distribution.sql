@@ -11,6 +11,7 @@ SELECT CASE
 FROM (
   SELECT TIMESTAMPDIFF(MINUTE, pr.created_date, pr.merged_date) AS mins
   FROM pull_requests pr
+  JOIN accounts a ON a.id = pr.author_id AND a.email IN ( $developer_id )
   WHERE pr.status      = 'MERGED'
     AND pr.merged_date IS NOT NULL
     AND pr.merged_date > pr.created_date
@@ -21,7 +22,6 @@ FROM (
                WHERE pm.row_id = pr.base_repo_id
                  AND pm.`table` = 'repos'
                  AND pm.project_name IN ( ${project} ))
-    AND pr.author_id IN ( $developer_id )
 ) d
 GROUP BY bucket
 ORDER BY bucket;

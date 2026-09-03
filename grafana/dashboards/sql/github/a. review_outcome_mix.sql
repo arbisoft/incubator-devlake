@@ -1,33 +1,29 @@
--- Per PR author, counts merged PRs as approvals and sums the CHANGES_REQUESTED comments their PRs received, top 20 authors.
-SELECT 
-  REPLACE(
-    COALESCE(
-      NULLIF(TRIM(a.full_name), ''),
-      NULLIF(TRIM(a.user_name), ''),
-      NULLIF(TRIM(u.name),      ''),
-      base2.author_name,
-      NULLIF(TRIM(a.email),     ''),
-      NULLIF(TRIM(u.email),     ''),
-      '(unmapped)'
-    ), '-', ' ') AS Developer,
-    base2.approved as 'Approved',
-    base2.change_requests as 'Change Requests'
-FROM
-(
+--Per PR author, counts merged PRs as approvals and sums the CHANGES_REQUESTED comments their PRs received, top 20 authors.
   SELECT 
-    author_id, author_name,
-    SUM(base1._approved) as approved,
-    SUM(base1._change_requests) as change_requests
+    Developer,
+    SUM(base1._approved) as `Approved`,
+    SUM(base1._change_requests) as `Change Requests`
   FROM
   (
     SELECT 
-      pr.author_id, pr.author_name,
-      (CASE WHEN status = 'MERGED' THEN 1 ELSE 0 END) AS _approved,
-      (SELECT COUNT(prc.id) 
-      FROM pull_request_comments prc 
-      WHERE prc.pull_request_id = pr.id 
-      AND prc.status = 'CHANGES_REQUESTED') AS _change_requests
+      REPLACE(
+        COALESCE(
+          NULLIF(TRIM(a.full_name), ''),
+          NULLIF(TRIM(a.user_name), ''),
+          pr.author_name,
+          NULLIF(TRIM(a.email),     ''),
+          '(unmapped)'
+      ), '-', ' ') AS Developer,
+      (CASE WHEN pr.status = 'MERGED' THEN 1 ELSE 0 END) AS _approved,
+      (
+        SELECT COUNT(prc.id) 
+        FROM pull_request_comments prc 
+        WHERE prc.pull_request_id = pr.id 
+        AND prc.status = 'CHANGES_REQUESTED'
+      ) AS _change_requests
+    
     FROM pull_requests pr
+    JOIN accounts a ON a.id = pr.author_id AND a.email IN ( $developer_id )
     WHERE pr.base_repo_id like 'github:%'
       AND $__timeFilter(pr.created_date)
       AND pr.base_repo_id in ( $repo_id )
@@ -37,16 +33,7 @@ FROM
         WHERE pm.table = 'repos'
         AND pm.project_name in ( $project )
       )
-      AND pr.author_id IN ( ${developer_id} )
   ) base1
-  group by base1.author_id, base1. author_name
-  order by (approved + change_requests) desc
-  limit 20
-) base2
-LEFT JOIN accounts a ON a.id = base2.author_id
-LEFT JOIN (
-    SELECT account_id, MIN(user_id) AS user_id
-    FROM user_accounts
-    GROUP BY account_id
-) ua ON ua.account_id = a.id
-LEFT JOIN users u ON u.id = ua.user_id
+  group by base1.Developer
+  order by (`Approved` + `Change Requests`) desc
+  limit 20;

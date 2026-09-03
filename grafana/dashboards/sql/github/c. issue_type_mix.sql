@@ -26,8 +26,8 @@ SELECT $__timeGroup(i.created_date, $interval)     AS time,
        SUM(tm.category = 'Other')             AS Unclassified
 FROM issues i
 JOIN type_map tm ON tm.original_type <=> i.original_type
+JOIN accounts a ON a.id = i.assignee_id AND a.email IN ( $developer_id )
 WHERE i.id LIKE 'github:%'
   AND $__timeFilter(i.created_date)
-  AND i.assignee_id IN ( $developer_id )
 GROUP BY time
 ORDER BY time;

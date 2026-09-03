@@ -3,6 +3,7 @@ WITH d AS (
   SELECT $__timeGroup(pr.merged_date, $interval)                              AS bucket,
          TIMESTAMPDIFF(MINUTE, pr.created_date, pr.merged_date) / 1440.0 AS days
   FROM pull_requests pr
+  JOIN accounts a ON a.id = pr.author_id AND a.email IN ( $developer_id )
   WHERE pr.status      = 'MERGED'
     AND pr.merged_date IS NOT NULL
     AND pr.merged_date > pr.created_date
@@ -13,7 +14,6 @@ WITH d AS (
                  WHERE pm.row_id = pr.base_repo_id
                    AND pm.`table` = 'repos'
                    AND pm.project_name IN ( ${project} ))
-    AND pr.author_id IN ( $developer_id )
 ),
 ranked AS (
   SELECT bucket, days,

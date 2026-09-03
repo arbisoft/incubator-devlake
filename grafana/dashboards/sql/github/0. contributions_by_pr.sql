@@ -3,8 +3,8 @@ SELECT
   REPLACE(
     COALESCE(
       NULLIF(TRIM(a.full_name), ''),
-      NULLIF(TRIM(u.name), ''),
       NULLIF(TRIM(a.user_name), ''),
+      NULLIF(TRIM(a.email), ''),
       NULLIF(TRIM(pr.author_name), ''),
       'unknown user'
     ), '-', ' ') AS contributor,
@@ -14,17 +14,14 @@ SELECT
 FROM pull_requests pr
 JOIN repos r ON r.id = pr.base_repo_id
   AND r.deleted = 0
-  AND r.id IN (${repo_id:sqlstring})
+  AND r.id IN (${repo_id})
   AND pr.base_repo_id IN (
     SELECT pm.row_id FROM project_mapping pm
     WHERE pm.`table` = 'repos'
-      AND pm.project_name IN (${project:sqlstring})
+      AND pm.project_name IN (${project})
   )
-LEFT JOIN accounts a       ON a.id = pr.author_id
-LEFT JOIN user_accounts ua ON ua.account_id = pr.author_id
-LEFT JOIN users u          ON u.id = ua.user_id
+JOIN accounts a       ON a.id = pr.author_id AND a.email IN ( $developer_id )
 WHERE $__timeFilter(pr.created_date)
-    AND pr.author_id IN ( $developer_id )
 GROUP BY contributor
 ORDER BY COUNT(DISTINCT pr.id) DESC
 LIMIT 20;

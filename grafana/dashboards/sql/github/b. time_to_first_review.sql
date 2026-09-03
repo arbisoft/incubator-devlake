@@ -8,6 +8,7 @@ WITH first_touch AS (
     ON c.pull_request_id = pr.id
    AND NOT (c.account_id <=> pr.author_id)     
    AND c.created_date >= pr.created_date
+  JOIN accounts a on a.id = pr.author_id AND a.email IN ( $developer_id )
   WHERE pr.id LIKE 'github:%'
     AND $__timeFilter(pr.created_date)
     AND pr.base_repo_id IN ( ${repo_id} )
@@ -15,7 +16,6 @@ WITH first_touch AS (
                  WHERE pm.row_id = pr.base_repo_id
                    AND pm.`table` = 'repos'
                    AND pm.project_name IN ( ${project} ))
-    AND pr.author_id IN ( $developer_id )
   GROUP BY pr.id, pr.created_date
 ),
 d AS (

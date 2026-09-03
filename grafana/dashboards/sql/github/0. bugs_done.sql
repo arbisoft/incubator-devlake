@@ -9,5 +9,9 @@ JOIN project_mapping pm ON pm.row_id = bi.board_id
 WHERE i.id LIKE 'github:%'
   AND i.status IN ('TODO', 'DONE', 'Closed')
   AND bi.board_id IN (${repo_id})
-  AND i.assignee_id IN ( $developer_id )
   AND $__timeFilter(i.created_date)
+  AND i.assignee_id IN (
+    SELECT a.id
+    FROM accounts a
+    WHERE a.email IN ( $developer_id )
+  )

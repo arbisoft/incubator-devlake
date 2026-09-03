@@ -4,7 +4,7 @@ WITH pr_size AS (
          SUM(c.additions + c.deletions) AS lines_changed
   FROM pull_requests pr
   JOIN pull_request_commits prc ON prc.pull_request_id = pr.id
-  JOIN commits c                ON c.sha = prc.commit_sha
+  JOIN commits c                ON c.sha = prc.commit_sha AND c.author_email IN ( $developer_id )
   WHERE pr.id LIKE 'github:%'
     AND $__timeFilter(pr.created_date)
     AND pr.base_repo_id IN ( ${repo_id} )
@@ -12,7 +12,6 @@ WITH pr_size AS (
                  WHERE pm.row_id = pr.base_repo_id
                    AND pm.`table` = 'repos'
                    AND pm.project_name IN ( ${project} ))
-    AND pr.author_id IN ( $developer_id )
   GROUP BY pr.id
 ),
 bucketed AS (

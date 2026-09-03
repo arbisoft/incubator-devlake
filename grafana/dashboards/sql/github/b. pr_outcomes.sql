@@ -3,9 +3,7 @@ SELECT REPLACE(
          COALESCE(
            NULLIF(TRIM(a.full_name), ''),
            NULLIF(TRIM(a.user_name), ''),
-           NULLIF(TRIM(u.name),      ''),
            NULLIF(TRIM(a.email),     ''),
-           NULLIF(TRIM(u.email),     ''),
            NULLIF(TRIM(pr.author_name),     ''),
            '(unmapped)'
          ), '-', ' ')                                        AS developer,
@@ -14,15 +12,8 @@ SELECT REPLACE(
        SUM(CASE WHEN pr.status = 'CLOSED' THEN 1 ELSE 0 END) AS Closed,
        SUM(CASE WHEN pr.status = 'DRAFT' THEN 1 ELSE 0 END) AS Draft
 FROM pull_requests pr
-LEFT JOIN accounts a ON a.id = pr.author_id 
-LEFT JOIN (
-    SELECT account_id, MIN(user_id) AS user_id
-    FROM user_accounts
-    GROUP BY account_id
-) ua ON ua.account_id = a.id
-LEFT JOIN users u ON u.id = ua.user_id
+JOIN accounts a ON a.id = pr.author_id AND a.email IN ( $developer_id )
 WHERE pr.id LIKE 'github:%'
-  AND a.id IN ( $developer_id )
   AND $__timeFilter(pr.created_date)
   AND pr.base_repo_id IN ( ${repo_id} )
   AND EXISTS (SELECT 1 FROM project_mapping pm
