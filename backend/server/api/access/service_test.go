@@ -74,6 +74,20 @@ func TestOutputErrorReturnsCode(t *testing.T) {
 			wantMessage: "unable to process access request",
 			wantCode:    "",
 		},
+		{
+			name:        "blocked provider returns safe unavailable message and code",
+			err:         errors.Unavailable.New("OIDC provider administration is not configured", errors.WithData(ErrCodeProviderBlocked)),
+			wantStatus:  http.StatusServiceUnavailable,
+			wantMessage: "OIDC provider administration is not configured",
+			wantCode:    ErrCodeProviderBlocked,
+		},
+		{
+			name:        "unknown unavailable error returns generic message and no code",
+			err:         errors.Unavailable.New("Grafana password rejected", errors.WithData("GRAFANA_CREDENTIAL_REJECTED")),
+			wantStatus:  http.StatusServiceUnavailable,
+			wantMessage: "unable to process access request",
+			wantCode:    "",
+		},
 	}
 
 	for _, tc := range testCases {

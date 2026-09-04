@@ -24,15 +24,10 @@ import API from '@/api';
 import { PageHeader } from '@/components';
 import { useRefreshData } from '@/hooks';
 import { operator } from '@/utils';
-import {
-  ACCESS_ROLE,
-  type AccessDomain,
-  type AccessRole,
-  type AccessStatus,
-  type AccessUser,
-} from '@/api/access';
+import { ACCESS_ROLE, type AccessDomain, type AccessRole, type AccessStatus, type AccessUser } from '@/api/access';
 
 import { getAuditColumns, getDomainColumns, getUserColumns } from './columns';
+import { Authentication } from './authentication';
 import { BREADCRUMBS, DEFAULT_PAGE_SIZE, PAGE_DESCRIPTION, PAGE_SIZE_OPTIONS } from './constants';
 import { CreateDomainModal, CreateUserModal } from './modals';
 import { SectionHeader, SectionTitle } from './styled';
@@ -53,17 +48,23 @@ export const Access = () => {
   const [email, setEmail] = useState('');
   const [domain, setDomain] = useState('');
   const [role, setRole] = useState<AccessRole>(ACCESS_ROLE.MEMBER);
+  const refresh = useCallback(() => setVersion((current) => current + 1), []);
 
-  const { data, ready } = useRefreshData(
-    () =>
-      Promise.all([
-        API.access.listUsers({ page: userPage, pageSize: userPageSize }),
-        API.access.listDomains({ page: domainPage, pageSize: domainPageSize }),
-        API.access.listAuditEvents(),
-      ]),
-    [version, userPage, userPageSize, domainPage, domainPageSize],
-  );
-  const [users, domains, auditEvents] = data ?? [undefined, undefined, []];
+  const { data, ready } = useRefreshData(async () => {
+    const [users, domains, auditEvents, providerResult] = await Promise.all([
+      API.access.listUsers({ page: userPage, pageSize: userPageSize }),
+      API.access.listDomains({ page: domainPage, pageSize: domainPageSize }),
+      API.access.listAuditEvents(),
+      API.access
+        .getOIDCProvider()
+        .then((provider) => ({ provider, loadFailed: false }))
+        .catch(() => ({ provider: undefined, loadFailed: true })),
+    ]);
+    return { users, domains, auditEvents, providerResult };
+  }, [version, userPage, userPageSize, domainPage, domainPageSize]);
+  const users = data?.users;
+  const domains = data?.domains;
+  const auditEvents = data?.auditEvents ?? [];
 
   const normalizedDomain = normalizeDomain(domain);
   const domainError =
@@ -71,7 +72,6 @@ export const Access = () => {
   const emailError =
     email.length > 0 && !isValidEmail(email) ? 'Enter a valid email address, such as person@example.com.' : '';
 
-  const refresh = useCallback(() => setVersion((current) => current + 1), []);
   const closeModal = useCallback(() => {
     setModal(undefined);
     setEmail('');
@@ -101,39 +101,57 @@ export const Access = () => {
     }
   }, [closeModal, normalizedDomain, refresh, role]);
 
-  const updateUser = useCallback(async (user: AccessUser, nextStatus: AccessStatus) => {
-    const [success] = await operator(() => API.access.updateUser(user.id, { role: user.role, status: nextStatus }));
-    if (success) refresh();
-  }, [refresh]);
+  const updateUser = useCallback(
+    async (user: AccessUser, nextStatus: AccessStatus) => {
+      const [success] = await operator(() => API.access.updateUser(user.id, { role: user.role, status: nextStatus }));
+      if (success) refresh();
+    },
+    [refresh],
+  );
 
-  const updateUserRole = useCallback(async (user: AccessUser, nextRole: AccessRole) => {
-    const [success] = await operator(() => API.access.updateUser(user.id, { role: nextRole, status: user.status }));
-    if (success) refresh();
-  }, [refresh]);
+  const updateUserRole = useCallback(
+    async (user: AccessUser, nextRole: AccessRole) => {
+      const [success] = await operator(() => API.access.updateUser(user.id, { role: nextRole, status: user.status }));
+      if (success) refresh();
+    },
+    [refresh],
+  );
 
-  const updateDomain = useCallback(async (accessDomain: AccessDomain, nextStatus: AccessStatus) => {
-    const [success] = await operator(() =>
-      API.access.updateDomain(accessDomain.id, { defaultRole: accessDomain.defaultRole, status: nextStatus }),
-    );
-    if (success) refresh();
-  }, [refresh]);
+  const updateDomain = useCallback(
+    async (accessDomain: AccessDomain, nextStatus: AccessStatus) => {
+      const [success] = await operator(() =>
+        API.access.updateDomain(accessDomain.id, { defaultRole: accessDomain.defaultRole, status: nextStatus }),
+      );
+      if (success) refresh();
+    },
+    [refresh],
+  );
 
-  const updateDomainRole = useCallback(async (accessDomain: AccessDomain, nextRole: AccessRole) => {
-    const [success] = await operator(() =>
-      API.access.updateDomain(accessDomain.id, { defaultRole: nextRole, status: accessDomain.status }),
-    );
-    if (success) refresh();
-  }, [refresh]);
+  const updateDomainRole = useCallback(
+    async (accessDomain: AccessDomain, nextRole: AccessRole) => {
+      const [success] = await operator(() =>
+        API.access.updateDomain(accessDomain.id, { defaultRole: nextRole, status: accessDomain.status }),
+      );
+      if (success) refresh();
+    },
+    [refresh],
+  );
 
-  const hideUser = useCallback(async (user: AccessUser) => {
-    const [success] = await operator(() => API.access.hideUser(user.id));
-    if (success) refresh();
-  }, [refresh]);
+  const hideUser = useCallback(
+    async (user: AccessUser) => {
+      const [success] = await operator(() => API.access.hideUser(user.id));
+      if (success) refresh();
+    },
+    [refresh],
+  );
 
-  const hideDomain = useCallback(async (accessDomain: AccessDomain) => {
-    const [success] = await operator(() => API.access.hideDomain(accessDomain.id));
-    if (success) refresh();
-  }, [refresh]);
+  const hideDomain = useCallback(
+    async (accessDomain: AccessDomain) => {
+      const [success] = await operator(() => API.access.hideDomain(accessDomain.id));
+      if (success) refresh();
+    },
+    [refresh],
+  );
 
   const userColumns = useMemo(
     () =>
@@ -213,6 +231,12 @@ export const Access = () => {
           },
         }}
         columns={domainColumns}
+      />
+
+      <Authentication
+        provider={data?.providerResult.provider}
+        loadFailed={data?.providerResult.loadFailed ?? false}
+        onRefresh={refresh}
       />
 
       <SectionHeader $spaced>

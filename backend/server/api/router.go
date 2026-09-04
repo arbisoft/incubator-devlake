@@ -107,6 +107,14 @@ func RegisterRouter(r *gin.Engine, basicRes context.BasicRes) {
 	r.PATCH("/access/domains/:id", access.PatchDomain)
 	r.POST("/access/domains/:id/hide", access.HideDomain)
 	r.GET("/access/audit-events", access.ListAuditEvents)
+	r.GET("/access/oidc-provider", access.GetOIDCProvider)
+	r.POST("/access/oidc-provider/validate", access.ValidateOIDCProvider)
+	r.PUT("/access/oidc-provider", access.PutOIDCProvider)
+	r.POST("/access/oidc-provider/activate", access.ActivateOIDCProvider)
+	r.POST("/access/oidc-provider/enable", access.EnableOIDCProvider)
+	r.POST("/access/oidc-provider/disable", access.DisableOIDCProvider)
+	r.DELETE("/access/oidc-provider", access.RetireOIDCProvider)
+	r.POST("/access/oidc-provider/grafana/retry", access.RetryGrafanaOIDCProviderSync)
 
 	// user project mapping api
 	r.GET("/user-project-mappings", userprojectmapping.GetAllMappings)

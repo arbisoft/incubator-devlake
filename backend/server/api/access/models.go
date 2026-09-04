@@ -21,8 +21,11 @@ limitations under the License.
 package access
 
 import (
+	"context"
 	"time"
 
+	"github.com/apache/incubator-devlake/core/dal"
+	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models/common"
 )
 
@@ -45,12 +48,44 @@ const (
 	ErrCodeDuplicateDomain = "DUPLICATE_DOMAIN"
 	ErrCodeInvalidUser     = "INVALID_USER"
 	ErrCodeInvalidDomain   = "INVALID_DOMAIN"
+	ErrCodeInvalidProvider = "INVALID_OIDC_PROVIDER"
+	ErrCodeProviderBlocked = "OIDC_PROVIDER_BLOCKED"
+	ErrCodeProviderMissing = "OIDC_PROVIDER_MISSING"
+
+	OIDCProviderSourceKey                = "default"
+	OIDCProviderStatusPending            = "pending"
+	OIDCProviderStatusSynchronized       = "synchronized"
+	OIDCProviderStatusFailed             = "failed"
+	OIDCProviderStatusCompensated        = "compensated"
+	OIDCProviderStatusCompensationFailed = "compensation_failed"
+
+	authOIDCCallbackPath    = "/api/auth/callback"
+	grafanaOIDCCallbackPath = "/login/generic_oauth"
 )
 
 type ApiErrorResponse struct {
 	Success bool   `json:"success"`
 	Message string `json:"message"`
 	Code    string `json:"code,omitempty"`
+}
+
+// OIDCProviderRuntime is implemented by auth. Access owns administrative state
+// transitions, while auth retains ownership of OIDC discovery, encryption, runtime
+// execution, and persistent-session semantics.
+type OIDCProviderRuntime interface {
+	PrepareOIDCProvider(ctx context.Context, provider *OIDCProvider, clientSecret string) (*PreparedOIDCProvider, errors.Error)
+	RefreshOIDCProvider(ctx context.Context) errors.Error
+	RevokeProviderSessions(tx dal.Transaction, providerKey string) ([]string, errors.Error)
+	CacheRevokedSessions(ids []string)
+}
+
+// PreparedOIDCProvider is deliberately internal to the backend boundary. It carries
+// a write-only secret only long enough to persist ciphertext and synchronize Grafana.
+type PreparedOIDCProvider struct {
+	EncryptedClientSecret []byte
+	ClientSecretNonce     []byte
+	ClientSecretKeyID     string
+	GrafanaSettings       GrafanaSSOSettings
 }
 
 type AccessUser struct {
@@ -98,6 +133,61 @@ type AuditEvent struct {
 }
 
 func (AuditEvent) TableName() string { return "auth_access_audit_events" }
+
+// OIDCProviderConfiguration makes the database OIDC source explicit. Its presence
+// means environment providers are no longer authoritative; phase-two activation sets
+// ActivatedAt only after Grafana accepts the matching provider revision.
+type OIDCProviderConfiguration struct {
+	ID                    string     `gorm:"primaryKey;type:varchar(64)"`
+	ActivatedAt           *time.Time `json:"activatedAt,omitempty"`
+	ProviderRevision      uint64     `gorm:"not null;default:0"`
+	CandidateProviderID   uint64     `gorm:"index:idx_auth_oidc_provider_candidate"`
+	GrafanaSyncStatus     string     `gorm:"type:varchar(32);not null;default:'pending'"`
+	GrafanaSyncedRevision uint64     `gorm:"not null;default:0"`
+	GrafanaLastSyncedAt   *time.Time `json:"grafanaLastSyncedAt,omitempty"`
+	GrafanaLastErrorCode  string     `gorm:"type:varchar(64)"`
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+}
+
+func (OIDCProviderConfiguration) TableName() string { return "auth_oidc_provider_configuration" }
+
+// OIDCProvider stores customer-managed OIDC metadata. ClientSecret fields are never
+// serialized and are encrypted by the auth credential protector before persistence.
+type OIDCProvider struct {
+	common.Model
+	ProviderKey           string     `gorm:"type:varchar(64);uniqueIndex:idx_auth_oidc_provider_key" json:"providerKey"`
+	DisplayName           string     `gorm:"type:varchar(255)" json:"displayName"`
+	IssuerURL             string     `gorm:"type:varchar(512);uniqueIndex:idx_auth_oidc_provider_issuer" json:"issuerUrl"`
+	ClientID              string     `gorm:"type:varchar(512)" json:"clientId"`
+	EncryptedClientSecret []byte     `json:"-"`
+	ClientSecretNonce     []byte     `json:"-"`
+	ClientSecretKeyID     string     `gorm:"type:varchar(64)" json:"-"`
+	Scopes                string     `gorm:"type:text" json:"scopes"`
+	Enabled               bool       `gorm:"index:idx_auth_oidc_provider_enabled" json:"enabled"`
+	RetiredAt             *time.Time `gorm:"index:idx_auth_oidc_provider_retired" json:"retiredAt,omitempty"`
+}
+
+func (OIDCProvider) TableName() string { return "auth_oidc_providers" }
+
+// OIDCProviderCandidate holds a pending revision separately from the active provider.
+// It keeps an authenticated source live while a replacement is validated and staged in
+// Grafana, and is retained after promotion for audit/recovery rather than hard-deleted.
+type OIDCProviderCandidate struct {
+	common.Model
+	ProviderKey           string `gorm:"type:varchar(64);index:idx_auth_oidc_provider_candidate_key"`
+	DisplayName           string `gorm:"type:varchar(255)"`
+	IssuerURL             string `gorm:"type:varchar(512)"`
+	ClientID              string `gorm:"type:varchar(512)"`
+	EncryptedClientSecret []byte
+	ClientSecretNonce     []byte
+	ClientSecretKeyID     string     `gorm:"type:varchar(64)"`
+	Scopes                string     `gorm:"type:text"`
+	Revision              uint64     `gorm:"not null"`
+	PromotedAt            *time.Time `gorm:"index"`
+}
+
+func (OIDCProviderCandidate) TableName() string { return "auth_oidc_provider_candidates" }
 
 type Identity struct {
 	Issuer      string
@@ -165,4 +255,31 @@ type CreateDomainInput struct {
 type UpdateDomainInput struct {
 	DefaultRole string `json:"defaultRole"`
 	Status      string `json:"status"`
+}
+
+type OIDCProviderInput struct {
+	ProviderKey  string `json:"providerKey"`
+	DisplayName  string `json:"displayName"`
+	IssuerURL    string `json:"issuerUrl"`
+	ClientID     string `json:"clientId"`
+	ClientSecret string `json:"clientSecret"`
+	Scopes       string `json:"scopes"`
+}
+
+type OIDCProviderResponse struct {
+	ProviderKey           string     `json:"providerKey"`
+	DisplayName           string     `json:"displayName"`
+	IssuerURL             string     `json:"issuerUrl"`
+	ClientID              string     `json:"clientId"`
+	Scopes                string     `json:"scopes"`
+	Enabled               bool       `json:"enabled"`
+	RetiredAt             *time.Time `json:"retiredAt,omitempty"`
+	SecretConfigured      bool       `json:"secretConfigured"`
+	DatabaseSourceActive  bool       `json:"databaseSourceActive"`
+	GrafanaSyncStatus     string     `json:"grafanaSyncStatus"`
+	GrafanaSyncedRevision uint64     `json:"grafanaSyncedRevision"`
+	ProviderRevision      uint64     `json:"providerRevision"`
+	DevLakeCallbackURL    string     `json:"devlakeCallbackUrl"`
+	GrafanaCallbackURL    string     `json:"grafanaCallbackUrl"`
+	AllowLocalOIDC        bool       `json:"allowLocalOidc"`
 }
