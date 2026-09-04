@@ -130,6 +130,8 @@ test('normalizes and validates OIDC provider settings locally', () => {
   equal(isValidOIDCProviderInput({ ...provider, providerKey: 'invalid/key' }), false);
   equal(isValidOIDCProviderInput({ ...provider, issuerUrl: 'http://issuer.example.com' }), false);
   equal(isValidOIDCProviderInput({ ...provider, scopes: 'profile email' }), false);
+  equal(isValidOIDCProviderInput({ ...provider, issuerUrl: 'http://localhost:5556' }), false);
+  equal(isValidOIDCProviderInput({ ...provider, issuerUrl: 'http://localhost:5556' }, undefined, true), true);
 });
 
 test('allows stored OIDC credentials only for the unchanged client ID', () => {
@@ -155,6 +157,7 @@ test('allows stored OIDC credentials only for the unchanged client ID', () => {
     providerRevision: 1,
     devlakeCallbackUrl: 'https://devlake.example.com/api/auth/callback',
     grafanaCallbackUrl: 'https://grafana.example.com/login/generic_oauth',
+    allowLocalOidc: false,
   };
 
   equal(isValidOIDCProviderInput(provider, configuredProvider), true);
@@ -176,6 +179,7 @@ test('creates a write-only OIDC provider form from configured state', () => {
     providerRevision: 1,
     devlakeCallbackUrl: 'https://devlake.example.com/api/auth/callback',
     grafanaCallbackUrl: 'https://grafana.example.com/login/generic_oauth',
+    allowLocalOidc: false,
   };
 
   equal(formFromOIDCProvider(provider).clientSecret, '');
@@ -219,6 +223,7 @@ test('summarizes OIDC provider lifecycle state without exposing internal synchro
     providerRevision: 1,
     devlakeCallbackUrl: 'https://devlake.example.com/api/auth/callback',
     grafanaCallbackUrl: 'https://grafana.example.com/login/generic_oauth',
+    allowLocalOidc: false,
   };
 
   equal(getOIDCProviderStatus(undefined), OIDC_PROVIDER_STATUS.ENVIRONMENT);

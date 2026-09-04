@@ -66,10 +66,6 @@ const lastSeenThrottle = 5 * time.Minute
 // unit of testability for this package: tests build one with stub deps and
 // drive the gin handlers directly.
 type Service struct {
-	// cfg remains the bootstrap configuration for existing focused handler tests.
-	// Runtime requests use providerState so administrative updates can replace the
-	// database-backed provider atomically without a backend restart.
-	cfg          *oidchelper.Config
 	bootstrapCfg *oidchelper.Config
 	providerMu   sync.RWMutex
 	runtimeCfg   *oidchelper.Config
@@ -132,7 +128,6 @@ func NewService(ctx stdctx.Context, basicRes corectx.BasicRes) (*Service, error)
 		}
 	}
 	s := &Service{
-		cfg:          cfg,
 		bootstrapCfg: bootstrapCfg,
 		runtimeCfg:   cfg,
 		providers:    buildProviders(cfg),

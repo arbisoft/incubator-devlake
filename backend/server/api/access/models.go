@@ -281,4 +281,5 @@ type OIDCProviderResponse struct {
 	ProviderRevision      uint64     `json:"providerRevision"`
 	DevLakeCallbackURL    string     `json:"devlakeCallbackUrl"`
 	GrafanaCallbackURL    string     `json:"grafanaCallbackUrl"`
+	AllowLocalOIDC        bool       `json:"allowLocalOidc"`
 }

@@ -76,6 +76,25 @@ func TestOIDCProviderResponseDoesNotExposeSecret(t *testing.T) {
 	}
 }
 
+func TestDecorateOIDCProviderResponseDerivesLocalOIDCCapability(t *testing.T) {
+	for _, testCase := range []struct {
+		name           string
+		publicURL      string
+		allowLocalOIDC bool
+	}{
+		{name: "local deployment", publicURL: "http://localhost:4000", allowLocalOIDC: true},
+		{name: "public deployment", publicURL: "https://devlake.example.com", allowLocalOIDC: false},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			service := &Service{cfg: Config{AuthPublicURL: testCase.publicURL, GrafanaPublicURL: "https://grafana.example.com"}}
+			response := service.decorateOIDCProviderResponse(&OIDCProviderResponse{})
+			if response.AllowLocalOIDC != testCase.allowLocalOIDC {
+				t.Fatalf("AllowLocalOIDC = %t, want %t", response.AllowLocalOIDC, testCase.allowLocalOIDC)
+			}
+		})
+	}
+}
+
 func TestReuseOIDCProviderCredential(t *testing.T) {
 	stored := oidcProviderFromCandidate(&OIDCProviderCandidate{
 		ClientID: "client-a", EncryptedClientSecret: []byte("ciphertext"), ClientSecretNonce: []byte("nonce"), ClientSecretKeyID: "key-1",

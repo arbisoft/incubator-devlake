@@ -70,7 +70,7 @@ export const Authentication = ({ provider, loadFailed, onRefresh }: Props) => {
   const [operationSuccess, setOperationSuccess] = useState<string>();
   const providerVersion = `${provider?.providerKey ?? ''}:${provider?.providerRevision ?? 0}`;
   const status = getOIDCProviderStatus(provider);
-  const validInput = isValidOIDCProviderInput(form, provider);
+  const validInput = isValidOIDCProviderInput(form, provider, provider?.allowLocalOidc);
   const requiresReplacementSecret = !provider?.secretConfigured || form.clientId.trim() !== provider.clientId;
   const hasProvider = Boolean(provider?.providerKey);
   const isOperating = Boolean(operating);

@@ -26,6 +26,7 @@ import (
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/log"
+	"github.com/apache/incubator-devlake/helpers/oidchelper"
 )
 
 type Config struct {
@@ -98,6 +99,7 @@ func (s *Service) decorateOIDCProviderResponse(response *OIDCProviderResponse) *
 	if response == nil {
 		return nil
 	}
+	response.AllowLocalOIDC = oidchelper.AllowsLocalOIDCURL(s.cfg.AuthPublicURL)
 	devLakeCallbackURL, grafanaCallbackURL, err := s.oidcProviderCallbacks()
 	if err == nil {
 		response.DevLakeCallbackURL = devLakeCallbackURL

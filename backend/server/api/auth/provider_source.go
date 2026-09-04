@@ -46,8 +46,11 @@ const (
 )
 
 // loadProviderSource preserves environment providers until the activation record
-// exists. Once present, it rejects a missing/invalid database provider instead of
-// silently falling back to environment credentials.
+// exists. Once it exists, database source state is authoritative: (nil, false, nil)
+// means no source is active; (nil, true, nil) means active but invalid and must fail
+// closed; and a non-nil error means the source could not be read. Operators recover an
+// invalid active source by restoring or enabling a valid provider through supported
+// administration before restarting, rather than falling back to environment credentials.
 func loadProviderSource(cfg *oidchelper.Config, db dal.Dal, config context.BasicRes) (*oidchelper.Config, CredentialProtector, error) {
 	provider, databaseSource, err := access.LoadDatabaseOIDCProvider(db)
 	if err != nil {
@@ -87,7 +90,7 @@ func loadProviderSource(cfg *oidchelper.Config, db dal.Dal, config context.Basic
 }
 
 func allowLocalOIDC(publicURL string) bool {
-	return strings.HasPrefix(publicURL, "http://localhost:") || strings.HasPrefix(publicURL, "http://127.0.0.1:")
+	return oidchelper.AllowsLocalOIDCURL(publicURL)
 }
 
 func loadCredentialProtector(basicRes context.BasicRes) (CredentialProtector, error) {

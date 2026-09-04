@@ -99,9 +99,10 @@ func (c *Config) ProviderNames() []string {
 	return out
 }
 
-// LoadConfig reads auth env vars via Viper and validates required fields.
-// Returns Config{AuthEnabled:false} when AUTH_ENABLED=false (the default,
-// preserves historical behavior).
+// LoadConfig reads auth env vars via Viper and validates required fields. It returns
+// the environment bootstrap configuration used only by auth.NewService to resolve the
+// authoritative database provider source. Returns Config{AuthEnabled:false} when
+// AUTH_ENABLED=false (the default, preserves historical behavior).
 func LoadConfig(basicRes context.BasicRes) (*Config, error) {
 	cfg := basicRes.GetConfigReader()
 	authProxyLogoutURL := strings.TrimSpace(cfg.GetString("AUTH_PROXY_LOGOUT_URL"))

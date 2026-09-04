@@ -111,6 +111,7 @@ export type OIDCProvider = Omit<OIDCProviderInput, 'clientSecret'> & {
   providerRevision: number;
   devlakeCallbackUrl: string;
   grafanaCallbackUrl: string;
+  allowLocalOidc: boolean;
 };
 
 export type AccessPagination = {

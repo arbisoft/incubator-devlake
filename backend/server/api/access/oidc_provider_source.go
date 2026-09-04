@@ -22,9 +22,12 @@ import (
 	"github.com/apache/incubator-devlake/core/errors"
 )
 
-// LoadDatabaseOIDCProvider returns false until phase-two activation persists the
-// singleton record. It also returns false before this migration exists, because auth
-// starts before migrations and must preserve the environment bootstrap on that boot.
+// LoadDatabaseOIDCProvider returns a provider, whether database configuration is
+// authoritative, and an error. A nil provider with databaseSource=false means no
+// activated database source exists yet. A nil provider with databaseSource=true means
+// the activated source has no enabled provider and callers must fail closed. It also
+// returns databaseSource=false before this migration exists, because auth starts before
+// migrations and must preserve the environment bootstrap on that boot.
 func LoadDatabaseOIDCProvider(db dal.Dal) (*OIDCProvider, bool, errors.Error) {
 	if !db.HasTable((OIDCProviderConfiguration{}).TableName()) {
 		return nil, false, nil

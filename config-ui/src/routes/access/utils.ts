@@ -122,7 +122,11 @@ export const formFromOIDCProvider = (provider?: OIDCProvider): OIDCProviderInput
   scopes: provider?.scopes ?? 'openid profile email',
 });
 
-export const isValidOIDCProviderInput = (provider: OIDCProviderInput, configuredProvider?: OIDCProvider) => {
+export const isValidOIDCProviderInput = (
+  provider: OIDCProviderInput,
+  configuredProvider?: OIDCProvider,
+  allowLocalOidc = false,
+) => {
   const normalized = normalizeOIDCProviderInput(provider);
   let issuer: URL;
   try {
@@ -139,7 +143,7 @@ export const isValidOIDCProviderInput = (provider: OIDCProviderInput, configured
     normalized.displayName.length > 0 &&
     normalized.clientId.length > 0 &&
     (!requiresReplacementSecret || normalized.clientSecret.length > 0) &&
-    (issuer.protocol === 'https:' || isLocalHTTP) &&
+    (issuer.protocol === 'https:' || (allowLocalOidc && isLocalHTTP)) &&
     normalized.scopes.split(' ').includes('openid')
   );
 };
