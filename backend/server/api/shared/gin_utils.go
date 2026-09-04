@@ -37,6 +37,18 @@ func SetRestAuthUser(r *http.Request, user *common.User) *http.Request {
 	return r.WithContext(context.WithValue(r.Context(), restAuthKey{}, user))
 }
 
+// GetRestAuthUser reports whether this request was authenticated by a REST API
+// key, and returns that key's identity. The request context is the only place
+// that survives gin's HandleContext reroute, so this answers "was this a Bearer
+// API key?" reliably on both passes of the middleware chain.
+func GetRestAuthUser(r *http.Request) (*common.User, bool) {
+	if r == nil {
+		return nil, false
+	}
+	user, ok := r.Context().Value(restAuthKey{}).(*common.User)
+	return user, ok && user != nil
+}
+
 func GetUser(c *gin.Context) (*common.User, bool) {
 	userObj, exist := c.Get(common.USER)
 	if exist {
@@ -46,8 +58,5 @@ func GetUser(c *gin.Context) (*common.User, bool) {
 	}
 	// Fallback: RestAuthentication stores the user here before calling
 	// HandleContext, which resets c.Keys but preserves c.Request.
-	if user, ok := c.Request.Context().Value(restAuthKey{}).(*common.User); ok && user != nil {
-		return user, true
-	}
-	return nil, false
+	return GetRestAuthUser(c.Request)
 }
