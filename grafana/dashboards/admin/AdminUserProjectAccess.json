@@ -30,7 +30,7 @@
       "type": "panel",
       "id": "volkovlabs-form-panel",
       "name": "Business Forms",
-      "version": "6.0.0"
+      "version": "6.3.5"
     }
   ],
   "annotations": {
@@ -76,19 +76,9 @@
           "method": "-"
         },
         "update": {
-          "method": "POST",
-          "url": "/api/user-project-mappings/${userLogin}",
-          "header": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "contentType": "application/json",
+          "method": "-",
           "confirm": false,
-          "payloadMode": "custom",
-          "getPayload": "return { projectName: '${project}' };",
-          "code": "if (context.panel.response && context.panel.response.ok) { context.grafana.notifySuccess(['Mapping Added', '${userLogin} \u2192 ${project}']); context.grafana.refresh(); } else { context.grafana.notifyError(['Error', 'Failed to add mapping. Check DevLake API URL and try again.']); }"
+          "code": "// Grafana's API root is \"\" on prod and \"/grafana\" on staging; appSubUrl carries\n// it, so one file is correct in both. The call goes through Grafana's datasource\n// proxy, which attaches the scoped DevLake API key server-side and strips browser\n// cookies -- that keeps the key out of the browser and stops DevLake's CSRF check\n// engaging. See grafana/provisioning/datasources/datasource.yml.\nconst base = window.grafanaBootData?.settings?.appSubUrl || '';\nconst path = base + '/api/datasources/proxy/uid/devlake-api/rest/user-project-mappings/';\nreturn (async () => {\n  const res = await fetch(path + encodeURIComponent('${userLogin}'), {\n    method: 'POST',\n    credentials: 'same-origin',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify({ projectName: '${project}' }),\n  });\n  if (res.ok) {\n    context.grafana.notifySuccess(['Mapping Added', '${userLogin} \u2192 ${project}']);\n    context.grafana.refresh();\n  } else {\n    context.grafana.notifyError(['Error', 'HTTP ' + res.status + ': ' + (await res.text())]);\n  }\n})();"
         },
         "resetAction": "initial",
         "layout": {
@@ -140,13 +130,9 @@
           "method": "-"
         },
         "update": {
-          "method": "DELETE",
-          "url": "/api/user-project-mappings/${userLogin}/${project}",
-          "header": [],
-          "contentType": "application/json",
+          "method": "-",
           "confirm": false,
-          "payloadMode": "all",
-          "code": "if (context.panel.response && context.panel.response.ok) { context.grafana.notifySuccess(['Mapping Removed', '${userLogin} \u2192 ${project}']); context.grafana.refresh(); } else { context.grafana.notifyError(['Error', 'Failed to remove mapping.']); }"
+          "code": "// Grafana's API root is \"\" on prod and \"/grafana\" on staging; appSubUrl carries\n// it, so one file is correct in both. The call goes through Grafana's datasource\n// proxy, which attaches the scoped DevLake API key server-side and strips browser\n// cookies -- that keeps the key out of the browser and stops DevLake's CSRF check\n// engaging. See grafana/provisioning/datasources/datasource.yml.\nconst base = window.grafanaBootData?.settings?.appSubUrl || '';\nconst path = base + '/api/datasources/proxy/uid/devlake-api/rest/user-project-mappings/';\nreturn (async () => {\n  const res = await fetch(\n    path + encodeURIComponent('${userLogin}') + '/' + encodeURIComponent('${project}'),\n    { method: 'DELETE', credentials: 'same-origin' },\n  );\n  if (res.ok) {\n    context.grafana.notifySuccess(['Mapping Removed', '${userLogin} \u2192 ${project}']);\n    context.grafana.refresh();\n  } else {\n    context.grafana.notifyError(['Error', 'HTTP ' + res.status + ': ' + (await res.text())]);\n  }\n})();"
         },
         "resetAction": "initial",
         "layout": {
