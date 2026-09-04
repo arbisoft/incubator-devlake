@@ -83,8 +83,7 @@ services:
       # here it is installed at container start because the grafana-storage volume
       # mounted above shadows /var/lib/grafana/plugins, hiding the plugins baked into
       # the built image.
-      # Keep the version in sync with grafana/Dockerfile so dev matches production.
-      GF_INSTALL_PLUGINS: "volkovlabs-form-panel 6.3.5"
+      GF_PLUGINS_PREINSTALL: "${GF_PLUGINS_PREINSTALL:-volkovlabs-form-panel@5.1.0}"
       GF_SMTP_ENABLED: "${GF_SMTP_ENABLED:-false}"
       GF_SMTP_HOST: "${GF_SMTP_HOST:-}"
       GF_SMTP_USER: "${GF_SMTP_USER:-}"

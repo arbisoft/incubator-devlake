@@ -110,6 +110,9 @@ func (s *Service) SaveOIDCProvider(ctx context.Context, actor string, input OIDC
 	if current != nil {
 		provider.ID = current.ID
 		provider.CreatedAt = current.CreatedAt
+		// A retired provider keeps its row for audit history. Reusing the same
+		// provider identity restores that row instead of colliding with its keys.
+		provider.RetiredAt = nil
 	}
 
 	prepared, prepareErr := s.oidcRuntime.PrepareOIDCProvider(ctx, provider, secret)
@@ -121,24 +124,25 @@ func (s *Service) SaveOIDCProvider(ctx context.Context, actor string, input OIDC
 	if saveErr != nil {
 		return nil, saveErr
 	}
+	action := auditProviderCreated
+	if current != nil {
+		action = auditProviderUpdated
+	}
+	// The provider transaction has committed. Record its durable administration
+	// action before an independent Grafana call can fail.
+	s.audit(actor, action, nil, providerAuditDetail(provider.ProviderKey))
 	provider.Enabled = false
 	provider.EncryptedClientSecret = prepared.EncryptedClientSecret
 	provider.ClientSecretNonce = prepared.ClientSecretNonce
 	provider.ClientSecretKeyID = prepared.ClientSecretKeyID
 
 	if configuration.ActivatedAt != nil {
-		s.audit(actor, auditProviderUpdated, nil, providerAuditDetail(provider.ProviderKey))
 		return oidcProviderResponse(provider, configuration), nil
 	}
 	if syncErr := s.syncGrafana(ctx, provider, prepared.GrafanaSettings, false, configuration); syncErr != nil {
 		s.audit(actor, auditProviderGrafanaSyncFailed, nil, providerAuditDetail(provider.ProviderKey))
 		return oidcProviderResponse(provider, configuration), syncErr
 	}
-	action := auditProviderCreated
-	if current != nil {
-		action = auditProviderUpdated
-	}
-	s.audit(actor, action, nil, providerAuditDetail(provider.ProviderKey))
 	s.audit(actor, auditProviderGrafanaSyncSucceeded, nil, providerAuditDetail(provider.ProviderKey))
 	return oidcProviderResponse(provider, configuration), nil
 }
@@ -163,6 +167,13 @@ func (s *Service) resolveOIDCProviderInput(provider *OIDCProvider, clientSecret 
 		}
 		current = nil
 	}
+	if current == nil {
+		retired, retiredErr := s.findReusableRetiredOIDCProvider(provider)
+		if retiredErr != nil {
+			return nil, nil, retiredErr
+		}
+		current = retired
+	}
 	if err := validateOIDCProviderIdentity(provider, current); err != nil {
 		return nil, nil, err
 	}
@@ -181,11 +192,32 @@ func (s *Service) resolveOIDCProviderInput(provider *OIDCProvider, clientSecret 
 	return configuration, current, nil
 }
 
+// findReusableRetiredOIDCProvider preserves provider identity and audit history
+// when an administrator re-adds the same retired provider. A partial key/issuer
+// match is rejected so a retained identity cannot be silently repurposed.
+func (s *Service) findReusableRetiredOIDCProvider(provider *OIDCProvider) (*OIDCProvider, errors.Error) {
+	retiredProviders := []OIDCProvider{}
+	if err := s.db.All(&retiredProviders, dal.Where("retired_at IS NOT NULL AND (provider_key = ? OR issuer_url = ?)", provider.ProviderKey, provider.IssuerURL)); err != nil {
+		return nil, errors.Default.Wrap(err, "error reading retired OIDC provider")
+	}
+	if len(retiredProviders) == 0 {
+		return nil, nil
+	}
+	if len(retiredProviders) != 1 || !sameOIDCProviderIdentity(provider, &retiredProviders[0]) {
+		return nil, errors.BadInput.New("OIDC provider key and issuer must match a retired provider before it can be reused", errors.WithData(ErrCodeProviderBlocked))
+	}
+	return &retiredProviders[0], nil
+}
+
 func validateOIDCProviderIdentity(provider, current *OIDCProvider) errors.Error {
-	if current == nil || (current.ProviderKey == provider.ProviderKey && current.IssuerURL == provider.IssuerURL) {
+	if current == nil || sameOIDCProviderIdentity(provider, current) {
 		return nil
 	}
 	return errors.BadInput.New("the current release requires the active OIDC provider key and issuer to remain unchanged", errors.WithData(ErrCodeProviderBlocked))
+}
+
+func sameOIDCProviderIdentity(first, second *OIDCProvider) bool {
+	return first.ProviderKey == second.ProviderKey && first.IssuerURL == second.IssuerURL
 }
 
 func reuseOIDCProviderCredential(provider, stored *OIDCProvider, clientSecret string) errors.Error {

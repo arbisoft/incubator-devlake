@@ -48,12 +48,12 @@ func (authOIDCProviderConfiguration20260831) TableName() string {
 
 type authOIDCProvider20260831 struct {
 	archived.Model
-	ProviderKey           string     `gorm:"type:varchar(64);uniqueIndex:idx_auth_oidc_provider_key"`
-	DisplayName           string     `gorm:"type:varchar(255)"`
-	IssuerURL             string     `gorm:"type:varchar(512);uniqueIndex:idx_auth_oidc_provider_issuer"`
-	ClientID              string     `gorm:"type:varchar(512)"`
-	EncryptedClientSecret []byte     `gorm:"type:blob"`
-	ClientSecretNonce     []byte     `gorm:"type:blob"`
+	ProviderKey           string `gorm:"type:varchar(64);uniqueIndex:idx_auth_oidc_provider_key"`
+	DisplayName           string `gorm:"type:varchar(255)"`
+	IssuerURL             string `gorm:"type:varchar(512);uniqueIndex:idx_auth_oidc_provider_issuer"`
+	ClientID              string `gorm:"type:varchar(512)"`
+	EncryptedClientSecret []byte
+	ClientSecretNonce     []byte
 	ClientSecretKeyID     string     `gorm:"type:varchar(64)"`
 	Scopes                string     `gorm:"type:text"`
 	Enabled               bool       `gorm:"index:idx_auth_oidc_provider_enabled"`
@@ -64,12 +64,12 @@ func (authOIDCProvider20260831) TableName() string { return "auth_oidc_providers
 
 type authOIDCProviderCandidate20260831 struct {
 	archived.Model
-	ProviderKey           string     `gorm:"type:varchar(64);index:idx_auth_oidc_provider_candidate_key"`
-	DisplayName           string     `gorm:"type:varchar(255)"`
-	IssuerURL             string     `gorm:"type:varchar(512)"`
-	ClientID              string     `gorm:"type:varchar(512)"`
-	EncryptedClientSecret []byte     `gorm:"type:blob"`
-	ClientSecretNonce     []byte     `gorm:"type:blob"`
+	ProviderKey           string `gorm:"type:varchar(64);index:idx_auth_oidc_provider_candidate_key"`
+	DisplayName           string `gorm:"type:varchar(255)"`
+	IssuerURL             string `gorm:"type:varchar(512)"`
+	ClientID              string `gorm:"type:varchar(512)"`
+	EncryptedClientSecret []byte
+	ClientSecretNonce     []byte
 	ClientSecretKeyID     string     `gorm:"type:varchar(64)"`
 	Scopes                string     `gorm:"type:text"`
 	Revision              uint64     `gorm:"not null"`

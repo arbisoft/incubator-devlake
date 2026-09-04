@@ -17,7 +17,13 @@ limitations under the License.
 
 package access
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/apache/incubator-devlake/core/dal"
+	dalmocks "github.com/apache/incubator-devlake/mocks/core/dal"
+	"github.com/stretchr/testify/mock"
+)
 
 func TestNormalizeOIDCProviderInput(t *testing.T) {
 	testCases := []struct {
@@ -158,5 +164,24 @@ func TestOIDCProviderCallbacksRequireDeploymentOrigins(t *testing.T) {
 	service := &Service{cfg: Config{AuthPublicURL: "https://devlake.example.com"}}
 	if _, _, err := service.oidcProviderCallbacks(); err == nil {
 		t.Fatal("expected missing Grafana public URL to block provider administration")
+	}
+}
+
+func TestFindReusableRetiredOIDCProvider(t *testing.T) {
+	db := dalmocks.NewDal(t)
+	db.EXPECT().All(mock.Anything, mock.Anything).Run(func(dst interface{}, _ ...dal.Clause) {
+		providers := dst.(*[]OIDCProvider)
+		*providers = []OIDCProvider{{ProviderKey: "google", IssuerURL: "https://accounts.google.com"}}
+	}).Return(nil)
+
+	provider, err := (&Service{db: db}).findReusableRetiredOIDCProvider(&OIDCProvider{
+		ProviderKey: "google",
+		IssuerURL:   "https://accounts.google.com",
+	})
+	if err != nil {
+		t.Fatalf("findReusableRetiredOIDCProvider() error = %v", err)
+	}
+	if provider == nil || provider.ProviderKey != "google" || provider.IssuerURL != "https://accounts.google.com" {
+		t.Fatalf("findReusableRetiredOIDCProvider() = %#v, want matching retired provider", provider)
 	}
 }

@@ -176,8 +176,14 @@ func (s *Service) setOIDCProviderEnabled(ctx context.Context, actor string, prov
 			}
 		}
 	}()
-	if err := tx.UpdateColumns(&OIDCProvider{}, []dal.DalSet{{ColumnName: "enabled", Value: enabled}}, dal.Where("id = ? AND retired_at IS NULL", provider.ID)); err != nil {
+	if err := requireOIDCProviderState(tx, provider.ID, !enabled, false); err != nil {
+		return nil, err
+	}
+	if err := tx.UpdateColumns(&OIDCProvider{}, []dal.DalSet{{ColumnName: "enabled", Value: enabled}}, dal.Where("id = ? AND enabled = ? AND retired_at IS NULL", provider.ID, !enabled)); err != nil {
 		return nil, errors.Default.Wrap(err, "error updating OIDC provider enabled state")
+	}
+	if err := requireOIDCProviderState(tx, provider.ID, enabled, false); err != nil {
+		return nil, err
 	}
 	revokedIDs, revokeErr := s.oidcRuntime.RevokeProviderSessions(tx, provider.ProviderKey)
 	if revokeErr != nil {
@@ -214,8 +220,14 @@ func (s *Service) setOIDCProviderRetired(actor string, provider *OIDCProvider, c
 		}
 	}()
 	now := time.Now()
-	if err := tx.UpdateColumns(&OIDCProvider{}, []dal.DalSet{{ColumnName: "enabled", Value: false}, {ColumnName: "retired_at", Value: now}}, dal.Where("id = ? AND retired_at IS NULL", provider.ID)); err != nil {
+	if err := requireOIDCProviderState(tx, provider.ID, provider.Enabled, false); err != nil {
+		return nil, err
+	}
+	if err := tx.UpdateColumns(&OIDCProvider{}, []dal.DalSet{{ColumnName: "enabled", Value: false}, {ColumnName: "retired_at", Value: now}}, dal.Where("id = ? AND enabled = ? AND retired_at IS NULL", provider.ID, provider.Enabled)); err != nil {
 		return nil, errors.Default.Wrap(err, "error retiring OIDC provider")
+	}
+	if err := requireOIDCProviderState(tx, provider.ID, false, true); err != nil {
+		return nil, err
 	}
 	revokedIDs, revokeErr := s.oidcRuntime.RevokeProviderSessions(tx, provider.ProviderKey)
 	if revokeErr != nil {
@@ -230,4 +242,25 @@ func (s *Service) setOIDCProviderRetired(actor string, provider *OIDCProvider, c
 	s.oidcRuntime.CacheRevokedSessions(revokedIDs)
 	s.audit(actor, auditProviderRetired, nil, providerAuditDetail(provider.ProviderKey))
 	return oidcProviderResponse(provider, configuration), nil
+}
+
+// requireOIDCProviderState locks and verifies a lifecycle transition's expected
+// database state. DAL updates do not report affected rows, so this prevents a stale
+// process from revoking sessions after another process has already changed the row.
+func requireOIDCProviderState(tx dal.Transaction, providerID uint64, enabled, retired bool) errors.Error {
+	provider := &OIDCProvider{}
+	retiredClause := "retired_at IS NULL"
+	if retired {
+		retiredClause = "retired_at IS NOT NULL"
+	}
+	if err := tx.First(provider,
+		dal.Where("id = ? AND enabled = ? AND "+retiredClause, providerID, enabled),
+		dal.Lock(true, false),
+	); err != nil {
+		if tx.IsErrorNotFound(err) {
+			return errors.BadInput.New("OIDC provider state changed; refresh and retry", errors.WithData(ErrCodeProviderBlocked))
+		}
+		return errors.Default.Wrap(err, "error verifying OIDC provider state")
+	}
+	return nil
 }
