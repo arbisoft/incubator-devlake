@@ -36,8 +36,11 @@ func (s *Service) ActivateOIDCProvider(ctx context.Context, actor string) (*OIDC
 	if configuration.GrafanaSyncStatus == OIDCProviderStatusCompensationFailed {
 		return nil, errors.Unavailable.New("OIDC provider requires operator recovery before it can be activated", errors.WithData(ErrCodeProviderBlocked))
 	}
-	if s.oidcRuntime == nil || s.grafanaSSO == nil {
+	if s.oidcRuntime == nil {
 		return nil, errors.Unavailable.New("OIDC provider administration is not configured", errors.WithData(ErrCodeProviderBlocked))
+	}
+	if s.grafanaSSO == nil {
+		return nil, grafanaSynchronizationUnavailableError()
 	}
 	prepared, prepareErr := s.oidcRuntime.PrepareOIDCProvider(ctx, provider, "")
 	if prepareErr != nil {

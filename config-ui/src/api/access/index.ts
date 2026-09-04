@@ -87,6 +87,7 @@ export const OIDC_PROVIDER_SYNC_STATUS = {
   PENDING: 'pending',
   SYNCHRONIZED: 'synchronized',
   FAILED: 'failed',
+  COMPENSATED: 'compensated',
   COMPENSATION_FAILED: 'compensation_failed',
 } as const;
 

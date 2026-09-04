@@ -33,8 +33,11 @@ func (s *Service) RetryGrafanaOIDCProviderSync(ctx context.Context, actor string
 	if err != nil {
 		return nil, err
 	}
-	if s.oidcRuntime == nil || s.grafanaSSO == nil {
+	if s.oidcRuntime == nil {
 		return nil, errors.Unavailable.New("OIDC provider administration is not configured", errors.WithData(ErrCodeProviderBlocked))
+	}
+	if s.grafanaSSO == nil {
+		return nil, grafanaSynchronizationUnavailableError()
 	}
 	if configuration.ActivatedAt != nil && configuration.CandidateProviderID != 0 {
 		return nil, errors.BadInput.New("activate the staged OIDC provider revision to synchronize it", errors.WithData(ErrCodeProviderBlocked))
@@ -51,9 +54,17 @@ func (s *Service) RetryGrafanaOIDCProviderSync(ctx context.Context, actor string
 	return oidcProviderResponse(provider, configuration), nil
 }
 
+func grafanaSynchronizationUnavailableError() errors.Error {
+	return errors.Unavailable.New("Grafana synchronization is unavailable; configure the Grafana management connection", errors.WithData(ErrCodeProviderBlocked))
+}
+
 func (s *Service) compensateGrafanaActivation(ctx context.Context, candidate *OIDCProvider, candidateSettings GrafanaSSOSettings, configuration *OIDCProviderConfiguration) errors.Error {
 	if configuration.ActivatedAt == nil || configuration.CandidateProviderID == 0 {
-		return s.syncGrafana(ctx, candidate, candidateSettings, false, configuration)
+		candidateSettings.Enabled = false
+		if err := s.grafanaSSO.PutGenericOAuth(ctx, candidateSettings); err != nil {
+			return errors.Unavailable.New("Grafana OAuth configuration could not be restored", errors.WithData(ErrCodeProviderBlocked))
+		}
+		return s.recordGrafanaCompensated(configuration, configuration.ProviderRevision)
 	}
 	active := &OIDCProvider{}
 	if err := s.db.First(active, dal.Where("enabled = ? AND retired_at IS NULL", true)); err != nil {
@@ -67,12 +78,7 @@ func (s *Service) compensateGrafanaActivation(ctx context.Context, candidate *OI
 	if err := s.grafanaSSO.PutGenericOAuth(ctx, prepared.GrafanaSettings); err != nil {
 		return errors.Unavailable.New("Grafana OAuth configuration could not be restored", errors.WithData(ErrCodeProviderBlocked))
 	}
-	configuration.GrafanaSyncStatus = OIDCProviderStatusFailed
-	configuration.GrafanaLastErrorCode = ErrCodeProviderBlocked
-	if err := s.db.Update(configuration); err != nil {
-		return errors.Default.Wrap(err, "error recording restored Grafana OIDC configuration")
-	}
-	return nil
+	return s.recordGrafanaCompensated(configuration, configuration.GrafanaSyncedRevision)
 }
 
 func (s *Service) syncGrafana(ctx context.Context, provider *OIDCProvider, settings GrafanaSSOSettings, enabled bool, configuration *OIDCProviderConfiguration) errors.Error {
@@ -99,6 +105,22 @@ func (s *Service) recordGrafanaSyncFailure(configuration *OIDCProviderConfigurat
 	if err := s.db.Update(configuration); err != nil {
 		s.logger.Error(err, "access: record Grafana OIDC sync failure provider=%s", providerKey)
 	}
+}
+
+// recordGrafanaCompensated records that Grafana was restored after DevLake's
+// activation transaction failed. It is distinct from a normal synchronization
+// failure: retrying the explicit activation is safe because Grafana is known to
+// be back at the recorded revision.
+func (s *Service) recordGrafanaCompensated(configuration *OIDCProviderConfiguration, restoredRevision uint64) errors.Error {
+	now := time.Now()
+	configuration.GrafanaSyncStatus = OIDCProviderStatusCompensated
+	configuration.GrafanaSyncedRevision = restoredRevision
+	configuration.GrafanaLastSyncedAt = &now
+	configuration.GrafanaLastErrorCode = ErrCodeProviderBlocked
+	if err := s.db.Update(configuration); err != nil {
+		return errors.Default.Wrap(err, "error recording restored Grafana OIDC configuration")
+	}
+	return nil
 }
 
 func (s *Service) recordGrafanaCompensationFailure(configuration *OIDCProviderConfiguration, providerKey string, cause errors.Error) {

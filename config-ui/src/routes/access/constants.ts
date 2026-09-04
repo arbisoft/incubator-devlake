@@ -38,6 +38,7 @@ export const OIDC_PROVIDER_STATUS = {
   PENDING: 'Changes awaiting activation',
   SYNCHRONIZING: 'Synchronizing Grafana',
   FAILED: 'Grafana synchronization failed',
+  COMPENSATED: 'Activation failed; Grafana restored',
   RECOVERY: 'Grafana recovery required',
 } as const;
 
@@ -52,11 +53,14 @@ export const OIDC_PROVIDER_MESSAGE = {
   ACTIVATE_DESCRIPTION: 'DevLake will stop using the deployment OIDC provider after this succeeds.',
   RECOVERY_REQUIRED:
     'Grafana OAuth was disabled because the new configuration could not be safely rolled back. Retry synchronization after resolving the deployment issue.',
+  ACTIVATION_COMPENSATED:
+    'DevLake activation did not complete. Grafana was restored to its previous configuration; resolve the issue and activate again.',
 } as const;
 
 export const OIDC_PROVIDER_STATUS_COLOR: Record<string, string> = {
   [OIDC_PROVIDER_STATUS.ACTIVE]: 'green',
   [OIDC_PROVIDER_STATUS.FAILED]: 'red',
+  [OIDC_PROVIDER_STATUS.COMPENSATED]: 'orange',
   [OIDC_PROVIDER_STATUS.RECOVERY]: 'red',
   [OIDC_PROVIDER_STATUS.CONFIGURED]: 'orange',
   [OIDC_PROVIDER_STATUS.PENDING]: 'orange',

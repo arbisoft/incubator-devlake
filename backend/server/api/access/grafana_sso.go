@@ -22,6 +22,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -80,7 +81,12 @@ func (c *GrafanaSSOClient) PutGenericOAuth(ctx context.Context, settings Grafana
 	if err != nil {
 		return fmt.Errorf("Grafana SSO request failed")
 	}
-	defer response.Body.Close()
+	defer func() {
+		if response.Body != nil {
+			_, _ = io.Copy(io.Discard, response.Body)
+			_ = response.Body.Close()
+		}
+	}()
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		return fmt.Errorf("Grafana SSO request returned status %d", response.StatusCode)
 	}

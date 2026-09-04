@@ -19,6 +19,7 @@ package auth
 
 import (
 	stdctx "context"
+	stderrs "errors"
 	"fmt"
 	"strings"
 
@@ -86,6 +87,11 @@ func (s *Service) RefreshOIDCProvider(ctx stdctx.Context) errors.Error {
 	_ = ctx
 	cfg, protector, err := loadProviderSource(s.bootstrapCfg, s.db, s.basicRes)
 	if err != nil {
+		var sourceReadErr *providerSourceReadError
+		if stderrs.As(err, &sourceReadErr) {
+			s.logger.Warn(err, "auth: database OIDC provider refresh failed; retaining last-known-good provider state")
+			return errors.Default.Wrap(err, "refresh database OIDC provider")
+		}
 		s.replaceProviderState(databaseOIDCUnavailableConfig(s.bootstrapCfg))
 		return errors.Default.Wrap(err, "refresh database OIDC provider")
 	}

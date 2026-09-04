@@ -232,7 +232,11 @@ test('summarizes OIDC provider lifecycle state without exposing internal synchro
     getOIDCProviderStatus({ ...configuredProvider, grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.COMPENSATION_FAILED }),
     OIDC_PROVIDER_STATUS.RECOVERY,
   );
+  const compensatedProvider = { ...configuredProvider, grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.COMPENSATED };
+  equal(getOIDCProviderStatus(compensatedProvider), OIDC_PROVIDER_STATUS.COMPENSATED);
+  equal(canActivateOIDCProvider(compensatedProvider), true);
   equal(OIDC_PROVIDER_STATUS_COLOR[OIDC_PROVIDER_STATUS.ACTIVE], 'green');
+  equal(OIDC_PROVIDER_STATUS_COLOR[OIDC_PROVIDER_STATUS.COMPENSATED], 'orange');
   equal(OIDC_PROVIDER_STATUS_COLOR[OIDC_PROVIDER_STATUS.RECOVERY], 'red');
   equal(OIDC_PROVIDER_STATUS_COLOR[OIDC_PROVIDER_STATUS.CONFIGURED], 'orange');
 });

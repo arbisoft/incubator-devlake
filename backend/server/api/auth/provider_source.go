@@ -28,6 +28,16 @@ import (
 	"github.com/apache/incubator-devlake/server/api/access"
 )
 
+// providerSourceReadError identifies a transient failure while reading the
+// database source. Callers can retain a last-known-good runtime configuration
+// for this error while failing closed for a confirmed invalid source.
+type providerSourceReadError struct {
+	cause error
+}
+
+func (e *providerSourceReadError) Error() string { return e.cause.Error() }
+func (e *providerSourceReadError) Unwrap() error { return e.cause }
+
 const (
 	oidcCredentialKeyIDConfig         = "AUTH_OIDC_CREDENTIAL_KEY_ID"
 	oidcCredentialKeyConfig           = "AUTH_OIDC_CREDENTIAL_KEY"
@@ -41,7 +51,7 @@ const (
 func loadProviderSource(cfg *oidchelper.Config, db dal.Dal, config context.BasicRes) (*oidchelper.Config, CredentialProtector, error) {
 	provider, databaseSource, err := access.LoadDatabaseOIDCProvider(db)
 	if err != nil {
-		return nil, nil, fmt.Errorf("load database OIDC provider: %w", err)
+		return nil, nil, &providerSourceReadError{cause: fmt.Errorf("load database OIDC provider: %w", err)}
 	}
 	if !databaseSource {
 		return cfg, nil, nil

@@ -21,6 +21,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -39,7 +40,7 @@ func TestGrafanaSSOClientUsesDocumentedSettingsEndpoint(t *testing.T) {
 		if !ok || username != "devlake-system" || password != "machine-password" {
 			t.Fatal("missing Grafana management credentials")
 		}
-		return &http.Response{StatusCode: http.StatusNoContent, Body: io.NopCloser(nil), Header: make(http.Header)}, nil
+		return &http.Response{StatusCode: http.StatusNoContent, Body: http.NoBody, Header: make(http.Header)}, nil
 	})})
 	if err != nil {
 		t.Fatal(err)
@@ -51,7 +52,7 @@ func TestGrafanaSSOClientUsesDocumentedSettingsEndpoint(t *testing.T) {
 
 func TestGrafanaSSOClientRedactsUpstreamResponse(t *testing.T) {
 	client, err := NewGrafanaSSOClient("http://grafana.internal", "devlake-system", "machine-password", &http.Client{Transport: grafanaRoundTripper(func(request *http.Request) (*http.Response, error) {
-		return &http.Response{StatusCode: http.StatusBadRequest, Body: io.NopCloser(nil), Header: make(http.Header)}, nil
+		return &http.Response{StatusCode: http.StatusBadRequest, Body: http.NoBody, Header: make(http.Header)}, nil
 	})})
 	if err != nil {
 		t.Fatal(err)
@@ -60,6 +61,41 @@ func TestGrafanaSSOClientRedactsUpstreamResponse(t *testing.T) {
 	if err == nil || err.Error() != "Grafana SSO request returned status 400" {
 		t.Fatalf("error = %v", err)
 	}
+}
+
+func TestGrafanaSSOClientDrainsAndClosesResponseBody(t *testing.T) {
+	responseBody := &trackingReadCloser{Reader: strings.NewReader("Grafana response")}
+	client, err := NewGrafanaSSOClient("http://grafana.internal", "devlake-system", "machine-password", &http.Client{Transport: grafanaRoundTripper(func(*http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusBadRequest, Body: responseBody, Header: make(http.Header)}, nil
+	})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.PutGenericOAuth(context.Background(), GrafanaSSOSettings{}); err == nil {
+		t.Fatal("expected Grafana SSO status error")
+	}
+	if !responseBody.drained || !responseBody.closed {
+		t.Fatalf("response body drained=%t closed=%t, want both true", responseBody.drained, responseBody.closed)
+	}
+}
+
+type trackingReadCloser struct {
+	io.Reader
+	drained bool
+	closed  bool
+}
+
+func (body *trackingReadCloser) Read(p []byte) (int, error) {
+	n, err := body.Reader.Read(p)
+	if err == io.EOF {
+		body.drained = true
+	}
+	return n, err
+}
+
+func (body *trackingReadCloser) Close() error {
+	body.closed = true
+	return nil
 }
 
 func TestNewGrafanaSSOClientRequiresManagementCredentials(t *testing.T) {

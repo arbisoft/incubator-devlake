@@ -107,6 +107,7 @@ export const Authentication = ({ provider, loadFailed, onRefresh }: Props) => {
       return;
     }
     setOperationError(getOIDCProviderError(result));
+    if (action === 'activate' || action === 'grafana-sync') onRefresh();
   };
 
   const validate = () => execute('validate', () => API.access.validateOIDCProvider(normalizedInput));
@@ -194,6 +195,9 @@ export const Authentication = ({ provider, loadFailed, onRefresh }: Props) => {
         </Block>
         {provider?.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.COMPENSATION_FAILED && (
           <Alert type="warning" showIcon message={OIDC_PROVIDER_MESSAGE.RECOVERY_REQUIRED} />
+        )}
+        {provider?.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.COMPENSATED && (
+          <Alert type="warning" showIcon message={OIDC_PROVIDER_MESSAGE.ACTIVATION_COMPENSATED} />
         )}
         {operationError && <Alert type="error" showIcon message={operationError} />}
         {operationSuccess && <Alert type="success" showIcon message={operationSuccess} />}

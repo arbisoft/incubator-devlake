@@ -157,6 +157,7 @@ export const getOIDCProviderStatus = (provider?: OIDCProvider) => {
   if (!provider?.providerKey) return OIDC_PROVIDER_STATUS.ENVIRONMENT;
   if (provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.COMPENSATION_FAILED)
     return OIDC_PROVIDER_STATUS.RECOVERY;
+  if (provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.COMPENSATED) return OIDC_PROVIDER_STATUS.COMPENSATED;
   if (provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.FAILED) return OIDC_PROVIDER_STATUS.FAILED;
   if (!provider.databaseSourceActive) {
     return provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.SYNCHRONIZED
@@ -171,6 +172,11 @@ export const getOIDCProviderStatus = (provider?: OIDCProvider) => {
 export const canActivateOIDCProvider = (provider?: OIDCProvider) => {
   if (!provider?.providerKey || provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.COMPENSATION_FAILED)
     return false;
-  if (!provider.databaseSourceActive) return provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.SYNCHRONIZED;
+  if (!provider.databaseSourceActive) {
+    return (
+      provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.SYNCHRONIZED ||
+      provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.COMPENSATED
+    );
+  }
   return provider.providerRevision > provider.grafanaSyncedRevision;
 };

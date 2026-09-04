@@ -98,11 +98,6 @@ func (s *Service) SaveOIDCProvider(ctx context.Context, actor string, input OIDC
 	if s.oidcRuntime == nil {
 		return nil, errors.Unavailable.New("OIDC provider administration is not configured", errors.WithData(ErrCodeProviderBlocked))
 	}
-	if s.grafanaSSO == nil {
-		s.logger.Warn(errors.Default.New("Grafana SSO client is unavailable"), "access: OIDC provider save blocked")
-		return nil, errors.Unavailable.New("OIDC provider administration is not configured", errors.WithData(ErrCodeProviderBlocked))
-	}
-
 	configuration, current, resolveErr := s.resolveOIDCProviderInput(provider, secret)
 	if resolveErr != nil {
 		return nil, resolveErr
@@ -136,14 +131,9 @@ func (s *Service) SaveOIDCProvider(ctx context.Context, actor string, input OIDC
 	provider.ClientSecretNonce = prepared.ClientSecretNonce
 	provider.ClientSecretKeyID = prepared.ClientSecretKeyID
 
-	if configuration.ActivatedAt != nil {
-		return oidcProviderResponse(provider, configuration), nil
-	}
-	if syncErr := s.syncGrafana(ctx, provider, prepared.GrafanaSettings, false, configuration); syncErr != nil {
-		s.audit(actor, auditProviderGrafanaSyncFailed, nil, providerAuditDetail(provider.ProviderKey))
-		return oidcProviderResponse(provider, configuration), syncErr
-	}
-	s.audit(actor, auditProviderGrafanaSyncSucceeded, nil, providerAuditDetail(provider.ProviderKey))
+	// Saving a candidate changes only DevLake's durable desired state. Grafana is
+	// updated later by an explicit activation or retry action so a draft cannot
+	// change the customer-facing Grafana login configuration.
 	return oidcProviderResponse(provider, configuration), nil
 }
 

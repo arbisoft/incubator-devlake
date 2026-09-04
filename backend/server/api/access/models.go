@@ -56,6 +56,7 @@ const (
 	OIDCProviderStatusPending            = "pending"
 	OIDCProviderStatusSynchronized       = "synchronized"
 	OIDCProviderStatusFailed             = "failed"
+	OIDCProviderStatusCompensated        = "compensated"
 	OIDCProviderStatusCompensationFailed = "compensation_failed"
 
 	authOIDCCallbackPath    = "/api/auth/callback"
