@@ -174,6 +174,41 @@ type BootstrapClaim struct {
 
 func (BootstrapClaim) TableName() string { return "auth_access_bootstrap_claims" }
 
+// LocalCredential is the single local-password authentication method associated
+// with an access-directory user. PasswordHash is intentionally write-only.
+type LocalCredential struct {
+	common.Model
+	AccessUserID       uint64     `gorm:"uniqueIndex:idx_auth_local_credentials_access_user" json:"accessUserId"`
+	LoginName          string     `gorm:"type:varchar(64);uniqueIndex:idx_auth_local_credentials_login_name" json:"loginName"`
+	PasswordHash       string     `gorm:"type:text" json:"-"`
+	PasswordChangedAt  *time.Time `json:"passwordChangedAt,omitempty"`
+	MustChangePassword bool       `json:"mustChangePassword"`
+}
+
+func (LocalCredential) TableName() string { return "auth_local_credentials" }
+
+// LocalLoginAttempt holds a privacy-preserving, rate-limit bucket. BucketKey is
+// an HMAC digest, never a raw login name or client address.
+type LocalLoginAttempt struct {
+	common.Model
+	BucketKind      string     `gorm:"type:varchar(32);uniqueIndex:idx_auth_local_login_attempt_bucket"`
+	BucketKey       string     `gorm:"type:char(64);uniqueIndex:idx_auth_local_login_attempt_bucket"`
+	FailureCount    uint       `gorm:"not null"`
+	WindowStartedAt time.Time  `gorm:"not null"`
+	BlockedUntil    *time.Time `gorm:"index"`
+}
+
+func (LocalLoginAttempt) TableName() string { return "auth_local_login_attempts" }
+
+// LocalBootstrapClaim makes one-time local bootstrap durable and independent
+// from the existing OIDC bootstrap transition.
+type LocalBootstrapClaim struct {
+	common.Model
+	Key string `gorm:"type:varchar(64);uniqueIndex:idx_auth_local_bootstrap_claim_key"`
+}
+
+func (LocalBootstrapClaim) TableName() string { return "auth_local_bootstrap_claims" }
+
 type AccessDomain struct {
 	common.Model
 	Domain      string     `gorm:"type:varchar(255);uniqueIndex" json:"domain"`

@@ -226,6 +226,12 @@ func (s *Service) updateUser(actor string, id uint64, role, status string, hide 
 				}
 				revokedSessionIDs = append(revokedSessionIDs, ids...)
 			}
+			localIDs, err := s.sessionRevoker.RevokeLocalSessions(tx, user.ID)
+			if err != nil {
+				s.logger.Error(err, "access: revoke local sessions for disabled user id=%d", user.ID)
+				return errors.Default.Wrap(err, "error revoking local sessions for disabled access user")
+			}
+			revokedSessionIDs = append(revokedSessionIDs, localIDs...)
 		}
 		return nil
 	})

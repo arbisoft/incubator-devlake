@@ -151,5 +151,6 @@ func All() []plugin.MigrationScript {
 		new(addAuthAccessDirectory),
 		new(addAuthOIDCProviderConfiguration),
 		new(addAuthOIDCMultiProviderIdentities),
+		new(addAuthLocalCredentials),
 	}
 }

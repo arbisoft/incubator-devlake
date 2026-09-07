@@ -20,6 +20,7 @@ package auth
 import (
 	"crypto/subtle"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -142,6 +143,25 @@ func (s *Service) RevokePersistentSessions(tx dal.Transaction, providerKeys []st
 		ids = append(ids, activeIDs...)
 	}
 	return ids, nil
+}
+
+func (s *Service) RevokeLocalSessions(tx dal.Transaction, userID uint64) ([]string, errors.Error) {
+	return revokeSessionsForIdentity(tx, localSessionProvider, localSessionSubject(userID))
+}
+
+func revokeSessionsForIdentity(tx dal.Transaction, provider, subject string) ([]string, errors.Error) {
+	activeIDs, err := ListActiveSessionIDsForIdentity(tx, provider, subject)
+	if err != nil {
+		return nil, err
+	}
+	if err := RevokeSessionsForIdentity(tx, provider, subject); err != nil {
+		return nil, err
+	}
+	return activeIDs, nil
+}
+
+func localSessionSubject(accessUserID uint64) string {
+	return strconv.FormatUint(accessUserID, 10)
 }
 
 // RevokeProviderSessions persists revocations for every live session issued by the

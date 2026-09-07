@@ -41,6 +41,7 @@ type Config struct {
 // in-memory cache only after the transaction commits.
 type SessionRevoker interface {
 	RevokePersistentSessions(tx dal.Transaction, providerKeys []string, subject string) ([]string, errors.Error)
+	RevokeLocalSessions(tx dal.Transaction, userID uint64) ([]string, errors.Error)
 	CacheRevokedSessions(ids []string)
 }
 
