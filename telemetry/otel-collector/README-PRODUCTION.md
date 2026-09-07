@@ -7,7 +7,7 @@ This directory provides a production-shaped, single-host Docker Compose deployme
 | Service | Purpose |
 | --- | --- |
 | `otel-auth-init` | Creates the shared `.htpasswd` file before the Collector starts. |
-| `otel-collector` | Authenticates OTLP traffic, derives the trusted team label, and exposes Prometheus metrics. |
+| `otel-collector` | Authenticates OTLP traffic, derives the trusted team label, writes bounded raw telemetry files, and exposes Prometheus metrics. |
 | `prometheus` | Scrapes the Collector every 15 seconds and retains data for 30 days. |
 | `otel-restart-helper` | Accepts only an authenticated backend request and restarts the configured Collector. |
 
@@ -70,7 +70,7 @@ The Compose configuration sets the following resource limits:
 | Collector | 2 | 1 GiB | 1 | 512 MiB |
 | Prometheus | 2 | 2 GiB | 1 | 1 GiB |
 
-The production Collector enables a memory limiter, delta-to-cumulative conversion, and a larger batch configuration. Prometheus retains data for 30 days. Adjust these only after observing metric volume, label cardinality, query patterns, and host capacity.
+The production Collector enables a memory limiter, delta-to-cumulative conversion, and a larger batch configuration. Prometheus retains data for 30 days. The file exporter writes raw OTLP JSON to the `otel-file-export` volume, rotating at 32 MiB and retaining files for at most seven days and 14 backups (approximately 480 MiB maximum). It is an observation sink only; DevLake does not read these files. Adjust these only after observing metric volume, label cardinality, query patterns, and host capacity.
 
 ## Credential Operations
 
@@ -87,10 +87,14 @@ The helper accepts one restart at a time. While a restart is underway it returns
 docker compose -f docker-compose-production.yml ps
 docker stats otel-collector-prod prometheus-prod
 
+# Raw telemetry file volume (contains sensitive telemetry attributes)
+docker run --rm -v otel-file-export:/data:ro busybox:1.36 \
+  sh -c 'du -sh /data && ls -lh /data'
+
 # Stop services without deleting data
 docker compose -f docker-compose-production.yml down
 
-# Destructive: remove auth and Prometheus volumes
+# Destructive: remove auth, Prometheus, and raw telemetry volumes
 docker compose -f docker-compose-production.yml down -v
 ```
 
