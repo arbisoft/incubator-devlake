@@ -105,7 +105,7 @@ func (s *Service) IsAdmin(identity string) (bool, error) {
 		return false, fmt.Errorf("no Grafana identity supplied")
 	}
 
-	endpoint := fmt.Sprintf("%s/api/org/users?query=%s&perpage=10", s.cfg.BaseURL, url.QueryEscape(identity))
+	endpoint := fmt.Sprintf("%s/api/org/users?query=%s&limit=10", s.cfg.BaseURL, url.QueryEscape(identity))
 	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
 		return false, err
