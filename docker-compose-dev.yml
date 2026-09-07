@@ -117,6 +117,22 @@ services:
       # deliberately opt-in: deployments must explicitly accept email-based
       # identity linking rather than accidentally enabling it through a default.
       GF_AUTH_OAUTH_ALLOW_INSECURE_EMAIL_LOOKUP: "${GF_AUTH_OAUTH_ALLOW_INSECURE_EMAIL_LOOKUP:-false}"
+      # Stop Grafana re-deriving the org role from the IdP on every sign-in, so a
+      # role granted by a Grafana Admin persists instead of being overwritten.
+      # The lake's check reads the live role from /api/org/users either way, so an
+      # account promoted in Administration -> Users stays an Admin across logins.
+      #
+      # Set for all four providers DevLake supports natively plus generic_oauth,
+      # which everything else falls back to, so behaviour stays identical once the
+      # multi-provider OIDC work lands and these stop being generic_oauth. Google's
+      # is already Grafana's default at 11.6.2 and the others are not configured
+      # here yet; both are stated anyway so a default change cannot silently
+      # reintroduce the reset.
+      GF_AUTH_GENERIC_OAUTH_SKIP_ORG_ROLE_SYNC: "true"
+      GF_AUTH_GOOGLE_SKIP_ORG_ROLE_SYNC: "true"
+      GF_AUTH_AZUREAD_SKIP_ORG_ROLE_SYNC: "true"
+      GF_AUTH_GITLAB_SKIP_ORG_ROLE_SYNC: "true"
+      GF_AUTH_OKTA_SKIP_ORG_ROLE_SYNC: "true"
       MYSQL_URL: mysql:3306
       MYSQL_DATABASE: lake
       MYSQL_USER: merico
