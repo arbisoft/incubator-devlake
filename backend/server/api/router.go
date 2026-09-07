@@ -33,6 +33,7 @@ import (
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/server/api/blueprints"
 	"github.com/apache/incubator-devlake/server/api/domainlayer"
+	"github.com/apache/incubator-devlake/server/api/grafanarole"
 	"github.com/apache/incubator-devlake/server/api/pipelines"
 	"github.com/apache/incubator-devlake/server/api/plugininfo"
 	"github.com/apache/incubator-devlake/server/api/project"
@@ -109,10 +110,17 @@ func RegisterRouter(r *gin.Engine, basicRes context.BasicRes) {
 	r.GET("/access/audit-events", access.ListAuditEvents)
 
 	// user project mapping api
-	r.GET("/user-project-mappings", userprojectmapping.GetAllMappings)
-	r.GET("/user-project-mappings/:userLogin", userprojectmapping.GetMappingsByUser)
-	r.POST("/user-project-mappings/:userLogin", userprojectmapping.PostMapping)
-	r.DELETE("/user-project-mappings/:userLogin/:projectName", userprojectmapping.DeleteMapping)
+	//
+	// Reachable from config-ui with a session, and from the Grafana admin dashboard
+	// through Grafana's datasource proxy with a scoped API key. RequireGrafanaAdmin
+	// constrains only the latter: that proxy admits any signed-in Grafana user, so
+	// without it a Viewer could grant themselves any project. Session callers are
+	// unaffected; gating those is tracked separately.
+	grafanaAdmin := grafanarole.RequireGrafanaAdmin()
+	r.GET("/user-project-mappings", grafanaAdmin, userprojectmapping.GetAllMappings)
+	r.GET("/user-project-mappings/:userLogin", grafanaAdmin, userprojectmapping.GetMappingsByUser)
+	r.POST("/user-project-mappings/:userLogin", grafanaAdmin, userprojectmapping.PostMapping)
+	r.DELETE("/user-project-mappings/:userLogin/:projectName", grafanaAdmin, userprojectmapping.DeleteMapping)
 
 	// mount all api resources for all plugins
 	resources, err := services.GetPluginsApiResources()

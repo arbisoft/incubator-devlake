@@ -85,6 +85,9 @@ services:
       # the built image.
       # Keep the version in sync with grafana/Dockerfile so dev matches production.
       GF_INSTALL_PLUGINS: "volkovlabs-form-panel 6.3.5"
+      GF_DATAPROXY_SEND_USER_HEADER: "true"
+      DEVLAKE_API_URL: "${DEVLAKE_API_URL:-http://devlake:8080}"
+      DEVLAKE_MAPPING_API_KEY: "${DEVLAKE_MAPPING_API_KEY:-}"
       GF_SMTP_ENABLED: "${GF_SMTP_ENABLED:-false}"
       GF_SMTP_HOST: "${GF_SMTP_HOST:-}"
       GF_SMTP_USER: "${GF_SMTP_USER:-}"

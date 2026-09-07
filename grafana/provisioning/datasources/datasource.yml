@@ -27,3 +27,30 @@ datasources:
     secureJsonData:
       password: $MYSQL_PASSWORD
     editable: false
+
+  # Upstream for the Add/Remove buttons on dashboards/admin/AdminUserProjectAccess.json.
+  # Grafana's datasource proxy forwards to DevLake and attaches the API key below
+  # server-side, so the key never reaches the browser and the call stays same-origin.
+  #
+  # "jaeger" is a carrier type, not a real backend: it ships with Grafana, declares no
+  # proxy routes of its own, and unlike prometheus/elasticsearch is not
+  # method-restricted -- POST and DELETE both have to work. Its health check probes
+  # /api/services, so this always shows "unhealthy" in the UI. Expected, not a fault.
+  #
+  # DO NOT ADD jsonData.keepCookies. Grafana strips every cookie from the proxied
+  # request, which is exactly why DevLake's CSRFProtect never engages -- it applies
+  # only when a devlake_session cookie is present (auth/middleware.go:209). Keeping
+  # that cookie would restore the 403 this datasource exists to avoid.
+  #
+  # Prod does NOT read this file; hks-argocd subPath-mounts its own ConfigMap over it.
+  # Keep the devlake-api entry identical in both, uid included.
+  - name: devlake-api
+    uid: devlake-api            # hardcoded in AdminUserProjectAccess.json -- do not change
+    type: jaeger
+    access: proxy
+    url: $DEVLAKE_API_URL
+    editable: false
+    jsonData:
+      httpHeaderName1: Authorization
+    secureJsonData:
+      httpHeaderValue1: Bearer $DEVLAKE_MAPPING_API_KEY
