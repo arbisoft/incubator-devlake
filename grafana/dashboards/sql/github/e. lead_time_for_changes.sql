@@ -1,0 +1,25 @@
+-- Per time bucket, derives median and P75 of the precomputed pr_cycle_time (project_pr_metrics) in days for merged PRs.
+WITH d AS (
+    SELECT $__timeGroup(pr.merged_date, $interval)  AS bucket,
+           m.pr_cycle_time / 1440.0            AS days
+    FROM project_pr_metrics m
+    JOIN pull_requests pr ON pr.id = m.id
+    WHERE m.project_name IN ( ${project} )
+      AND m.pr_cycle_time IS NOT NULL
+      AND m.pr_cycle_time > 0
+      AND pr.status = 'MERGED'
+      AND $__timeFilter(pr.merged_date)
+      AND pr.id LIKE 'github:%'
+      AND pr.base_repo_id IN ( ${repo_id} )
+  ),
+  ranked AS (
+    SELECT bucket, days,
+           CUME_DIST() OVER (PARTITION BY bucket ORDER BY days) AS cd
+    FROM d
+  )
+  SELECT bucket                                              AS time,
+         ROUND(MIN(CASE WHEN cd >= 0.50 THEN days END), 2)   AS Median,
+         ROUND(MIN(CASE WHEN cd >= 0.75 THEN days END), 2)   AS P75
+  FROM ranked
+  GROUP BY bucket
+  ORDER BY bucket;
