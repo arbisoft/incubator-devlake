@@ -43,6 +43,9 @@ func stubGrafana(t *testing.T, status int, users []orgUser, lastQuery *string) *
 		if lastQuery != nil {
 			*lastQuery = r.URL.Query().Get("query")
 		}
+		if gotLimit := r.URL.Query().Get("limit"); gotLimit != "10" {
+			t.Errorf("expected limit=10, got %q", gotLimit)
+		}
 		if status != http.StatusOK {
 			w.WriteHeader(status)
 			return
