@@ -22,6 +22,8 @@ telemetry/
 Claude Code
   -- OTLP/gRPC or OTLP/HTTP with Basic Auth --> OTel Collector
                                                    |
+                                                   +--> file exporter (bounded raw OTLP JSON retention)
+                                                   |
                                                    +--> Prometheus exporter :8889
                                                                 |
 Prometheus <---------- scrape every 15 seconds -----------------+
@@ -54,7 +56,7 @@ Endpoints exposed on the local machine:
 | Restart helper | `http://127.0.0.1:9199` | Backend-only restart service |
 | Collector health | `http://localhost:13133/healthz` | Collector health check |
 
-`otel-auth-init` creates an empty `.htpasswd` file in the named `devlake-otel-auth` volume before the Collector starts. DevLake mounts the same volume read-write; the Collector mounts it read-only. Do not run `docker compose down -v` unless deliberately resetting local OTel credentials and Prometheus data.
+`otel-auth-init` creates an empty `.htpasswd` file in the named `devlake-otel-auth` volume before the Collector starts. DevLake mounts the same volume read-write; the Collector mounts it read-only. The one-shot `otel-file-export-init` grants the Collector's non-root UID access to `devlake-otel-file-export`, where the file exporter writes raw OTLP JSON. Do not run `docker compose down -v` unless deliberately resetting local OTel credentials, Prometheus data, and exported telemetry files.
 
 The local Compose default helper token is for local development only. Set an explicit high-entropy `OTEL_RESTART_HELPER_TOKEN` before starting the stack when validating backend-to-helper authentication.
 
@@ -118,6 +120,23 @@ sum by (devlake_team, user_email) (claude_code_session_count_total)
 
 Prometheus scrapes the Collector every 15 seconds. A metric accepted immediately after a scrape may not appear in Prometheus until the next scrape.
 
+## File Export Storage Measurement
+
+The Collector also writes received metrics to newline-delimited OTLP JSON in the named
+`devlake-otel-file-export` volume. This is a storage-observation sink only; DevLake does
+not read or process these files. The exporter rotates at 32 MiB and retains files for at
+most seven days and 14 backups, bounding retained raw telemetry to approximately 480 MiB.
+The Collector currently classifies file export for metrics as alpha, so the files are not
+a source of truth or a product data contract.
+
+```bash
+docker run --rm -v devlake-otel-file-export:/data:ro busybox:1.36 \
+  sh -c 'du -sh /data && ls -lh /data'
+```
+
+The files contain raw telemetry attributes. Treat the volume as sensitive operational
+data and keep it private to the Docker host.
+
 ## Troubleshooting
 
 ### The Collector rejects telemetry
@@ -147,7 +166,7 @@ After the Collector is healthy, use Apply in Config UI to retry the restart. If 
 
 ### Reset local telemetry state
 
-This removes local credentials and Prometheus data:
+This removes local credentials, Prometheus data, and exported telemetry files:
 
 ```bash
 cd telemetry/otel-collector
