@@ -19,6 +19,7 @@
 import { request } from '@/utils';
 
 import * as apiKey from './api-key';
+import * as access from './access';
 import * as auth from './auth';
 import * as blueprint from './blueprint';
 import * as connection from './connection';
@@ -36,6 +37,7 @@ const ping = () => request('/ping');
 const version = (signal?: AbortSignal): Promise<{ version: string }> => request('/version', { signal });
 
 export const API = {
+  access,
   apiKey,
   auth,
   blueprint,

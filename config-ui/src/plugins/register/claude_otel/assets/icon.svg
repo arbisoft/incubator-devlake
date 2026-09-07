@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="Claude Code">
+  <rect width="48" height="48" rx="8" fill="#D97757"/>
+  <g fill="#fff">
+    <rect x="21" y="7" width="6" height="17" rx="3"/>
+    <rect x="21" y="7" width="6" height="17" rx="3" transform="rotate(45 24 24)"/>
+    <rect x="21" y="7" width="6" height="17" rx="3" transform="rotate(90 24 24)"/>
+    <rect x="21" y="7" width="6" height="17" rx="3" transform="rotate(135 24 24)"/>
+    <rect x="21" y="7" width="6" height="17" rx="3" transform="rotate(180 24 24)"/>
+    <rect x="21" y="7" width="6" height="17" rx="3" transform="rotate(225 24 24)"/>
+    <rect x="21" y="7" width="6" height="17" rx="3" transform="rotate(270 24 24)"/>
+    <rect x="21" y="7" width="6" height="17" rx="3" transform="rotate(315 24 24)"/>
+    <circle cx="24" cy="24" r="5"/>
+  </g>
+</svg>

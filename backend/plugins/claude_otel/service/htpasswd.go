@@ -19,25 +19,33 @@ package service
 
 import (
 	"bufio"
+	stderrors "errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
 	"golang.org/x/crypto/bcrypt"
 )
 
+const (
+	htpasswdCreateDirectoryOperation = "create credential storage directory"
+	htpasswdReadOperation            = "read credential storage"
+	htpasswdWriteOperation           = "write credential storage"
+)
+
 func writeHtpasswd(newPasswords map[string]string) errors.Error {
 	path := firstNonEmpty(cfg.GetString("OTEL_AUTH_HTPASSWD_PATH"), defaultOtelAuthHtpasswdPath)
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return errors.Default.Wrap(err, "error creating otel auth directory")
+		return otelCredentialStorageError(htpasswdCreateDirectoryOperation, err)
 	}
 
 	existing, err := readHtpasswd(path)
 	if err != nil {
-		return err
+		return otelCredentialStorageError(htpasswdReadOperation, err)
 	}
 	credentials, err := getAllActiveOtelCredentials()
 	if err != nil {
@@ -66,14 +74,17 @@ func writeHtpasswd(newPasswords map[string]string) errors.Error {
 	if len(lines) > 0 {
 		content = strings.Join(lines, "\n") + "\n"
 	}
-	return writeFileAtomic(path, content)
+	if err := writeFileAtomic(path, content); err != nil {
+		return otelCredentialStorageError(htpasswdWriteOperation, err)
+	}
+	return nil
 }
 
 func missingHtpasswdHashes(credentials []*models.OtelCredential) (bool, errors.Error) {
 	path := firstNonEmpty(cfg.GetString("OTEL_AUTH_HTPASSWD_PATH"), defaultOtelAuthHtpasswdPath)
 	existing, err := readHtpasswd(path)
 	if err != nil {
-		return false, err
+		return false, otelCredentialStorageError(htpasswdReadOperation, err)
 	}
 	for _, credential := range credentials {
 		if credential.Status != models.OtelCredentialStatusActive && credential.Status != models.OtelCredentialStatusRetiring {
@@ -84,6 +95,42 @@ func missingHtpasswdHashes(credentials []*models.OtelCredential) (bool, errors.E
 		}
 	}
 	return false, nil
+}
+
+// htpasswdHasUnexpectedUsernames detects verifiers with no active or retiring DB credential.
+// Missing verifiers are handled separately as per-connection recovery requirements because
+// their password hashes cannot be recreated without issuing a new credential.
+func htpasswdHasUnexpectedUsernames() (bool, errors.Error) {
+	path := firstNonEmpty(cfg.GetString("OTEL_AUTH_HTPASSWD_PATH"), defaultOtelAuthHtpasswdPath)
+	existing, err := readHtpasswd(path)
+	if err != nil {
+		return false, otelCredentialStorageError(htpasswdReadOperation, err)
+	}
+	credentials, err := getAllActiveOtelCredentials()
+	if err != nil {
+		return false, err
+	}
+	expectedUsernames := make(map[string]struct{}, len(credentials))
+	for _, credential := range credentials {
+		expectedUsernames[credential.Username] = struct{}{}
+	}
+	for username := range existing {
+		if _, ok := expectedUsernames[username]; !ok {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// otelCredentialStorageError keeps filesystem details in backend logs, not API responses.
+func otelCredentialStorageError(operation string, err error) errors.Error {
+	if logger != nil {
+		logger.Error(err, "failed to %s", operation)
+	}
+	if os.IsPermission(err) || stderrors.Is(err, syscall.EROFS) {
+		return errors.Default.New("telemetry credential storage is misconfigured")
+	}
+	return errors.Unavailable.New(otelCredentialStorageHint)
 }
 
 func readHtpasswd(path string) (map[string]string, errors.Error) {

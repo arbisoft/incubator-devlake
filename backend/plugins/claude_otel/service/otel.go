@@ -33,12 +33,13 @@ import (
 
 const (
 	defaultOtelAuthHtpasswdPath = "/var/lib/devlake/otel-auth/.htpasswd"
-	defaultOtelPublicEndpoint   = "https://otel.customer.example.com:4317"
+	defaultOtelPublicEndpoint   = "https://otel-aperture.arbisoft.com"
 	defaultOtelProtocol         = "grpc"
 	defaultOtelConnectionName   = "Claude Code OTel"
 	maxOtelTeamNameLength       = 255
 	maxOtelTeamSlugLength       = 63
 	collectorRestartHint        = "Telemetry endpoint is applying credential changes"
+	credentialStorageApplyHint  = "Credential storage needs applying. Select Apply to reconcile the telemetry endpoint."
 	defaultOtelRestartTimeout   = 45
 	otelRestartHelperUrlKey     = "OTEL_RESTART_HELPER_URL"
 	otelRestartHelperTokenKey   = "OTEL_RESTART_HELPER_TOKEN"
@@ -47,6 +48,7 @@ const (
 	otelAuthHeader              = "Authorization"
 	otelContentTypeHeader       = "Content-Type"
 	otelJsonContentType         = "application/json"
+	otelCredentialStorageHint   = "telemetry credential storage is temporarily unavailable"
 )
 
 var (
@@ -69,9 +71,17 @@ type OtelConnectionInput struct {
 
 func ListOtelConnections() ([]*models.OtelConnectionWithCredentials, errors.Error) {
 	connections := make([]*models.OtelConnection, 0)
-	err := db.All(&connections, dal.Orderby("created_at DESC"))
+	err := db.All(
+		&connections,
+		dal.Where("hidden_at IS NULL"),
+		dal.Orderby("created_at DESC"),
+	)
 	if err != nil {
 		return nil, errors.Default.Wrap(err, "error getting otel connections")
+	}
+	storageNeedsApplying, err := htpasswdHasUnexpectedUsernames()
+	if err != nil {
+		return nil, err
 	}
 
 	// Enrich each connection with its credential records and UI state: pending collector restarts,
@@ -87,14 +97,43 @@ func ListOtelConnections() ([]*models.OtelConnectionWithCredentials, errors.Erro
 			return nil, err
 		}
 		output = append(output, &models.OtelConnectionWithCredentials{
-			Connection:       connection,
-			Credentials:      credentials,
-			RestartRequired:  hasPendingCollectorRestart(credentials),
-			RestartHint:      restartHint(credentials),
-			RecoveryRequired: recoveryRequired,
+			Connection:           connection,
+			Credentials:          credentials,
+			RestartRequired:      hasPendingCollectorRestart(credentials) || storageNeedsApplying,
+			RestartHint:          firstNonEmpty(restartHint(credentials), storageApplyHint(storageNeedsApplying)),
+			RecoveryRequired:     recoveryRequired,
+			StorageNeedsApplying: storageNeedsApplying,
 		})
 	}
 	return output, nil
+}
+
+// HideOtelConnection removes a revoked connection from the management UI while retaining its audit record.
+func HideOtelConnection(user *common.User, id uint64) (*models.OtelConnectionWithCredentials, errors.Error) {
+	lifecycleMu.Lock()
+	defer lifecycleMu.Unlock()
+
+	connection, err := getOtelConnection(id)
+	if err != nil {
+		return nil, err
+	}
+	if connection.Status != models.OtelConnectionStatusRevoked {
+		return nil, errors.BadInput.New("only revoked Claude Code OTel connections can be removed")
+	}
+	if connection.HiddenAt == nil {
+		now := time.Now()
+		connection.HiddenAt = &now
+		setOtelActor(user, connection, false)
+		if err := db.Update(connection); err != nil {
+			return nil, errors.Default.Wrap(err, "error hiding revoked otel connection")
+		}
+	}
+
+	credentials, err := getOtelCredentials(connection.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &models.OtelConnectionWithCredentials{Connection: connection, Credentials: credentials}, nil
 }
 
 func CreateOtelConnection(user *common.User, input *OtelConnectionInput) (*models.OtelConnectionWithCredentials, errors.Error) {
@@ -191,7 +230,7 @@ func rollbackOtelCreate(connection *models.OtelConnection, credential *models.Ot
 	}
 	if err := writeHtpasswd(nil); err != nil {
 		cleanupErr = combineOtelLifecycleErrors(cleanupErr, err)
-	} else if err := callOtelRestartHelper(); err != nil {
+	} else if _, err := callOtelRestartHelper(); err != nil {
 		cleanupErr = combineOtelLifecycleErrors(cleanupErr, err)
 	}
 	return cleanupErr
@@ -209,7 +248,7 @@ func rollbackOtelRotation(activeCredentials []*models.OtelCredential, newCredent
 	if err := writeHtpasswd(nil); err != nil {
 		return combineOtelLifecycleErrors(cleanupErr, err)
 	}
-	if err := callOtelRestartHelper(); err != nil {
+	if _, err := callOtelRestartHelper(); err != nil {
 		return combineOtelLifecycleErrors(cleanupErr, err)
 	}
 	return cleanupErr
@@ -222,6 +261,9 @@ func removeOtelCredentialForRollback(credential *models.OtelCredential) (bool, e
 		deleteErr := errors.Default.Wrap(err, fmt.Sprintf("error removing otel credential %d during rollback", credential.ID))
 		markOtelCredentialRevoked(credential, time.Now())
 		if updateErr := db.Update(credential); updateErr == nil {
+			if logger != nil {
+				logger.Warn(deleteErr, "OTel credential %d could not be deleted during rollback and was marked revoked instead", credential.ID)
+			}
 			return true, nil
 		} else {
 			return false, errors.Default.Combine([]error{
@@ -249,17 +291,28 @@ func removeOtelConnectionForRollback(connection *models.OtelConnection) errors.E
 	}
 }
 
-func combineOtelLifecycleErrors(errs ...error) errors.Error {
-	combined := make([]error, 0, len(errs))
-	for _, err := range errs {
-		if err != nil {
-			combined = append(combined, err)
+// combineOtelLifecycleErrors preserves the primary error's API classification and logs
+// secondary cleanup failures for operators. A cleanup failure must not turn a safe,
+// actionable error such as credential storage unavailability into a generic 500 response.
+func combineOtelLifecycleErrors(primary error, secondary ...error) errors.Error {
+	primaryFound := primary != nil
+	for _, err := range secondary {
+		if err == nil {
+			continue
+		}
+		if !primaryFound {
+			primary = err
+			primaryFound = true
+			continue
+		}
+		if logger != nil {
+			logger.Warn(err, "additional OTel credential lifecycle cleanup failure")
 		}
 	}
-	if len(combined) == 0 {
+	if !primaryFound {
 		return nil
 	}
-	return errors.Default.Combine(combined)
+	return errors.Convert(primary)
 }
 
 func RotateOtelConnection(user *common.User, id uint64) (*models.OtelConnectionWithCredentials, errors.Error) {
@@ -304,26 +357,18 @@ func RotateOtelConnection(user *common.User, id uint64) (*models.OtelConnectionW
 		return nil, err
 	}
 	affectedCredentials := append(activeCredentials, newCredential)
-	for _, credential := range activeCredentials {
-		if err := db.Update(credential); err != nil {
-			return nil, errors.Default.Wrap(err, "error updating retiring otel credential")
-		}
-	}
-	if err := db.Create(newCredential); err != nil {
-		if restoreErr := restoreActiveCredentials(activeCredentials); restoreErr != nil {
-			return nil, errors.Default.Combine([]error{
-				errors.Default.Wrap(err, "error saving rotated otel credential"),
-				restoreErr,
-			})
-		}
-		return nil, errors.Default.Wrap(err, "error saving rotated otel credential")
+	if err := persistOtelRotation(activeCredentials, newCredential); err != nil {
+		return nil, err
 	}
 	if err := writeHtpasswd(map[string]string{newCredential.Username: password}); err != nil {
-		_ = db.Delete(newCredential)
-		if restoreErr := restoreActiveCredentials(activeCredentials); restoreErr != nil {
-			return nil, errors.Default.Combine([]error{err, restoreErr})
+		_, cleanupErr := removeOtelCredentialForRollback(newCredential)
+		if cleanupErr != nil && logger != nil {
+			logger.Warn(cleanupErr, "failed to clean up OTel credential %d after htpasswd write failure", newCredential.ID)
 		}
-		return nil, err
+		if restoreErr := restoreActiveCredentials(activeCredentials); restoreErr != nil {
+			return nil, combineOtelLifecycleErrors(err, cleanupErr, restoreErr)
+		}
+		return nil, combineOtelLifecycleErrors(err, cleanupErr)
 	}
 	if applyErr, err := applyAndRecordOtelCredentialChanges(affectedCredentials); err != nil {
 		rollbackErr := rollbackOtelRotation(activeCredentials, newCredential)
@@ -343,6 +388,39 @@ func RotateOtelConnection(user *common.User, id uint64) (*models.OtelConnectionW
 		)
 	}
 	return responseWithSettings(connection, affectedCredentials, newCredential, password), nil
+}
+
+// persistOtelRotation makes the retiring-state update and replacement credential creation atomic.
+// The auth file is not touched unless this desired database state is fully committed.
+func persistOtelRotation(activeCredentials []*models.OtelCredential, newCredential *models.OtelCredential) (result errors.Error) {
+	tx := db.Begin()
+	defer func() {
+		if result == nil {
+			return
+		}
+		if rollbackErr := tx.Rollback(); rollbackErr != nil && logger != nil {
+			logger.Warn(rollbackErr, "failed to roll back OTel credential rotation transaction")
+		}
+	}()
+	for _, credential := range activeCredentials {
+		if err := tx.Update(credential); err != nil {
+			return errors.Default.Wrap(err, "error updating retiring otel credential")
+		}
+	}
+	if err := tx.Create(newCredential); err != nil {
+		return errors.Default.Wrap(err, "error saving rotated otel credential")
+	}
+	if err := tx.Commit(); err != nil {
+		return errors.Default.Wrap(err, "error committing otel credential rotation")
+	}
+	return nil
+}
+
+func storageApplyHint(storageNeedsApplying bool) string {
+	if storageNeedsApplying {
+		return credentialStorageApplyHint
+	}
+	return ""
 }
 
 func RevokeOtelConnection(user *common.User, id uint64) (*models.OtelConnectionWithCredentials, errors.Error) {

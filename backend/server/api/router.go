@@ -25,6 +25,7 @@ import (
 	"github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/impls/logruslog"
+	"github.com/apache/incubator-devlake/server/api/access"
 	"github.com/apache/incubator-devlake/server/api/apikeys"
 	"github.com/apache/incubator-devlake/server/api/auth"
 	"github.com/apache/incubator-devlake/server/api/store"
@@ -94,6 +95,18 @@ func RegisterRouter(r *gin.Engine, basicRes context.BasicRes) {
 	r.GET(auth.PathCallback, auth.Callback)
 	r.POST(auth.PathLogout, auth.Logout)
 	r.GET(auth.PathUserInfo, auth.UserInfo)
+
+	// fork-owned native OIDC access directory
+	r.GET("/access/me", access.GetCurrent)
+	r.GET("/access/users", access.ListUsers)
+	r.POST("/access/users", access.PostUser)
+	r.PATCH("/access/users/:id", access.PatchUser)
+	r.POST("/access/users/:id/hide", access.HideUser)
+	r.GET("/access/domains", access.ListDomains)
+	r.POST("/access/domains", access.PostDomain)
+	r.PATCH("/access/domains/:id", access.PatchDomain)
+	r.POST("/access/domains/:id/hide", access.HideDomain)
+	r.GET("/access/audit-events", access.ListAuditEvents)
 
 	// user project mapping api
 	r.GET("/user-project-mappings", userprojectmapping.GetAllMappings)

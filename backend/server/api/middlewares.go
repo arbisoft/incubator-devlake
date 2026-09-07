@@ -18,9 +18,9 @@ limitations under the License.
 package api
 
 import (
+	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
-	"github.com/apache/incubator-devlake/core/log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -29,17 +29,35 @@ import (
 	"github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/core/log"
 	"github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/helpers/apikeyhelper"
+	"github.com/apache/incubator-devlake/server/api/shared"
 	"github.com/gin-gonic/gin"
 )
 
-func getOAuthUserInfo(c *gin.Context) (*common.User, error) {
+const (
+	forwardedUserHeader       = "X-Forwarded-User"
+	forwardedEmailHeader      = "X-Forwarded-Email"
+	forwardedUserSecretHeader = "X-Forwarded-User-Secret"
+)
+
+func getOAuthUserInfo(c *gin.Context, forwardedUserSecret string) (*common.User, error) {
 	if c == nil {
 		return nil, errors.Default.New("request is nil")
 	}
-	user := c.GetHeader("X-Forwarded-User")
-	email := c.GetHeader("X-Forwarded-Email")
+	user := strings.TrimSpace(c.GetHeader(forwardedUserHeader))
+	if user == "" {
+		return nil, nil
+	}
+	if forwardedUserSecret == "" {
+		return nil, errors.Default.New("ignoring forwarded user headers because FORWARDED_USER_SECRET is not configured")
+	}
+	providedSecret := strings.TrimSpace(c.GetHeader(forwardedUserSecretHeader))
+	if subtle.ConstantTimeCompare([]byte(providedSecret), []byte(forwardedUserSecret)) != 1 {
+		return nil, errors.Default.New("ignoring forwarded user headers because X-Forwarded-User-Secret did not match")
+	}
+	email := strings.TrimSpace(c.GetHeader(forwardedEmailHeader))
 	return &common.User{
 		Name:  user,
 		Email: email,
@@ -74,12 +92,18 @@ func getBasicAuthUserInfo(c *gin.Context, basicRes context.BasicRes) (*common.Us
 
 func OAuth2ProxyAuthentication(basicRes context.BasicRes) gin.HandlerFunc {
 	logger := basicRes.GetLogger()
+	configReader := basicRes.GetConfigReader()
+	forwardedUserSecret := strings.TrimSpace(configReader.GetString("FORWARDED_USER_SECRET"))
+	accessDirectoryEnabled := configReader.GetBool("AUTH_ACCESS_ENABLED")
 	return func(c *gin.Context) {
-		_, exist := c.Get(common.USER)
-		if !exist {
-			user, err := getOAuthUserInfo(c)
+		if accessDirectoryEnabled {
+			c.Next()
+			return
+		}
+		if _, exists := shared.GetUser(c); !exists {
+			user, err := getOAuthUserInfo(c, forwardedUserSecret)
 			if err != nil {
-				logger.Error(err, "getOAuthUserInfo")
+				logger.Warn(err, "rejected forwarded user headers")
 			}
 			if user == nil || user.Name == "" {
 				// fetch with basic auth header
@@ -207,9 +231,13 @@ func CheckAuthorizationHeader(c *gin.Context, logger log.Logger, db dal.Dal, api
 
 	logger.Info("redirect path: %s to: %s", c.Request.URL.Path, path)
 	c.Request.URL.Path = path
-	c.Set(common.USER, &common.User{
+	user := &common.User{
 		Name:  apiKey.Creator.Creator,
 		Email: apiKey.Creator.CreatorEmail,
-	})
+	}
+	c.Set(common.USER, user)
+	// Also store in the request context so the user survives gin's HandleContext
+	// resetting c.Keys when rerouting from /rest/... to /plugins/...
+	c.Request = shared.SetRestAuthUser(c.Request, user)
 	return true
 }

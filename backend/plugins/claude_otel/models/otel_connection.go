@@ -37,16 +37,17 @@ const (
 
 type OtelConnection struct {
 	common.Model
-	Name              string `json:"name" gorm:"type:varchar(255)"`
-	TeamName          string `json:"teamName" gorm:"type:varchar(255)"`
-	TeamSlug          string `json:"teamSlug" gorm:"type:varchar(63);index"`
-	CollectorEndpoint string `json:"collectorEndpoint" gorm:"type:varchar(255)"`
-	Protocol          string `json:"protocol" gorm:"type:varchar(32)"`
-	Status            string `json:"status" gorm:"type:varchar(32);index"`
-	CreatedBy         string `json:"createdBy" gorm:"type:varchar(255)"`
-	CreatedByEmail    string `json:"createdByEmail" gorm:"type:varchar(255)"`
-	UpdatedBy         string `json:"updatedBy" gorm:"type:varchar(255)"`
-	UpdatedByEmail    string `json:"updatedByEmail" gorm:"type:varchar(255)"`
+	Name              string     `json:"name" gorm:"type:varchar(255)"`
+	TeamName          string     `json:"teamName" gorm:"type:varchar(255)"`
+	TeamSlug          string     `json:"teamSlug" gorm:"type:varchar(63);index"`
+	CollectorEndpoint string     `json:"collectorEndpoint" gorm:"type:varchar(255)"`
+	Protocol          string     `json:"protocol" gorm:"type:varchar(32)"`
+	Status            string     `json:"status" gorm:"type:varchar(32);index"`
+	CreatedBy         string     `json:"createdBy" gorm:"type:varchar(255)"`
+	CreatedByEmail    string     `json:"createdByEmail" gorm:"type:varchar(255)"`
+	UpdatedBy         string     `json:"updatedBy" gorm:"type:varchar(255)"`
+	UpdatedByEmail    string     `json:"updatedByEmail" gorm:"type:varchar(255)"`
+	HiddenAt          *time.Time `json:"hiddenAt" gorm:"index"`
 }
 
 func (c OtelConnection) TableName() string {
@@ -79,4 +80,7 @@ type OtelConnectionWithCredentials struct {
 	RestartRequired  bool                 `json:"restartRequired"`
 	RestartHint      string               `json:"restartHint,omitempty"`
 	RecoveryRequired bool                 `json:"recoveryRequired"`
+	// StorageNeedsApplying means the shared htpasswd file differs from the active DB credentials.
+	// Apply safely rebuilds the file from the database and reloads the Collector.
+	StorageNeedsApplying bool `json:"storageNeedsApplying"`
 }

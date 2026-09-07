@@ -25,6 +25,7 @@ import { TipLayout } from '@/components';
 import { DEVLAKE_ENDPOINT } from '@/config';
 
 const { Title, Paragraph } = Typography;
+const ACCESS_DENIED_MESSAGE = 'Your account is not currently allowed to access DevLake.';
 
 export const Login = () => {
   const [methods, setMethods] = useState<Methods | null>(null);
@@ -32,6 +33,7 @@ export const Login = () => {
 
   const params = new URLSearchParams(window.location.search);
   const returnUrl = params.get('return_url') || '/';
+  const accessDenied = params.get('error') === 'access_denied';
 
   useEffect(() => {
     API.auth
@@ -56,6 +58,7 @@ export const Login = () => {
           Sign in to DevLake
         </Title>
         {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} />}
+        {accessDenied && <Alert type="error" message={ACCESS_DENIED_MESSAGE} style={{ marginBottom: 16 }} />}
         {providers.length > 0 && (
           <Space direction="vertical" size="middle" style={{ display: 'flex' }}>
             {providers.map((p) => (

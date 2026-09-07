@@ -30,7 +30,8 @@ import (
 // expiry.
 type AuthSession struct {
 	Jti        string     `gorm:"primaryKey;type:varchar(36)" json:"jti"`
-	Sub        string     `gorm:"type:varchar(255);index" json:"sub"`
+	Provider   string     `gorm:"type:varchar(64);index:idx_auth_sessions_provider_sub" json:"provider"`
+	Sub        string     `gorm:"type:varchar(255);index:idx_auth_sessions_provider_sub" json:"sub"`
 	Email      string     `gorm:"type:varchar(255)" json:"email"`
 	Name       string     `gorm:"type:varchar(255)" json:"name"`
 	IssuedAt   time.Time  `json:"issuedAt"`
@@ -49,6 +50,26 @@ func CreateSession(db dal.Dal, s *AuthSession) errors.Error {
 func RevokeSession(db dal.Dal, jti string) errors.Error {
 	now := time.Now()
 	return db.UpdateColumn(&AuthSession{}, "revoked_at", now, dal.Where("jti = ?", jti))
+}
+
+func RevokeSessionsForIdentity(db dal.Dal, provider, sub string) errors.Error {
+	now := time.Now()
+	return db.UpdateColumn(&AuthSession{}, "revoked_at", now, dal.Where("provider = ? AND sub = ? AND revoked_at IS NULL", provider, sub))
+}
+
+func ListActiveSessionIDsForIdentity(db dal.Dal, provider, sub string) ([]string, errors.Error) {
+	rows := make([]AuthSession, 0)
+	if err := db.All(&rows,
+		dal.Select("jti"),
+		dal.Where("provider = ? AND sub = ? AND revoked_at IS NULL AND expires_at > ?", provider, sub, time.Now()),
+	); err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(rows))
+	for _, row := range rows {
+		ids = append(ids, row.Jti)
+	}
+	return ids, nil
 }
 
 // UpdateLastSeen records that the session was used. Throttled by the caller

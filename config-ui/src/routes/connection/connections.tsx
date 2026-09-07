@@ -18,19 +18,33 @@
 
 import { Fragment, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CloudServerOutlined } from '@ant-design/icons';
 import { theme, Badge, Modal } from 'antd';
 import { chunk } from 'lodash';
 
 import { selectPlugins, selectAllConnections, selectWebhooks } from '@/features/connections';
+import API from '@/api';
+import { OTEL_CREDENTIAL_STATUS } from '@/api/otel';
 import { PATHS } from '@/config';
-import { useAppSelector } from '@/hooks';
+import { useAppSelector, useRefreshData } from '@/hooks';
 import { getPluginConfig, ConnectionList, ConnectionForm } from '@/plugins';
+import { formatPlural } from '@/utils';
 
+import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?react';
 import * as S from './styled';
 
 const SORT_START_WITH = ['o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'];
 const CLAUDE_PLUGIN = 'claude';
+
+interface StatusBadgeProps {
+  count: number;
+  color: string;
+  text: string;
+}
+
+const StatusBadge = ({ count, color, text }: StatusBadgeProps) => {
+  if (count <= 0) return null;
+  return <Badge color={color} text={text} />;
+};
 
 export const Connections = () => {
   const [type, setType] = useState<'list' | 'form'>();
@@ -47,6 +61,25 @@ export const Connections = () => {
   const plugins = useAppSelector(selectPlugins);
   const connections = useAppSelector(selectAllConnections);
   const webhooks = useAppSelector(selectWebhooks);
+  // Separate ready credentials from connections that need auth-file recovery or application.
+  const { data: otelConnections } = useRefreshData(() => API.otel.list(), []);
+  const otelCredentialSummary = useMemo(
+    () =>
+      otelConnections?.reduce(
+        (summary, connection) => {
+          if (connection.recoveryRequired) summary.recoveryRequired += 1;
+          if (connection.restartRequired) summary.restartRequired += 1;
+          if (!connection.restartRequired && !connection.recoveryRequired) {
+            summary.active += connection.credentials.filter(
+              (credential) => credential.status === OTEL_CREDENTIAL_STATUS.ACTIVE,
+            ).length;
+          }
+          return summary;
+        },
+        { active: 0, restartRequired: 0, recoveryRequired: 0 },
+      ) ?? { active: 0, restartRequired: 0, recoveryRequired: 0 },
+    [otelConnections],
+  );
 
   const filterWebhookPlugins = plugins.filter((p) => p !== 'webhook');
   const index = filterWebhookPlugins.findIndex((p) => SORT_START_WITH.includes(p[0]));
@@ -78,11 +111,35 @@ export const Connections = () => {
 
   const renderOtelConnection = () => (
     <li key="claude-code-otel" onClick={() => navigate(PATHS.OTEL())}>
-      <span className="logo ant-icon-logo">
-        <CloudServerOutlined />
+      <span className="logo">
+        <ClaudeCodeOtelIcon />
       </span>
       <span className="name">Claude Code OTel</span>
-      <span className="count">Manage credentials</span>
+      <span className="count">
+        {otelCredentialSummary.active ||
+        otelCredentialSummary.restartRequired ||
+        otelCredentialSummary.recoveryRequired ? (
+          <span className="otel-credential-summary">
+            <StatusBadge
+              count={otelCredentialSummary.active}
+              color={colorPrimary}
+              text={formatPlural(otelCredentialSummary.active, 'active credential')}
+            />
+            <StatusBadge
+              count={otelCredentialSummary.recoveryRequired}
+              color="#ff4d4f"
+              text={`${formatPlural(otelCredentialSummary.recoveryRequired, 'connection')} needing storage recovery`}
+            />
+            <StatusBadge
+              count={otelCredentialSummary.restartRequired}
+              color="#faad14"
+              text={`${formatPlural(otelCredentialSummary.restartRequired, 'connection')} requiring action`}
+            />
+          </span>
+        ) : (
+          'No connection'
+        )}
+      </span>
     </li>
   );
 
