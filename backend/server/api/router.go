@@ -95,6 +95,8 @@ func RegisterRouter(r *gin.Engine, basicRes context.BasicRes) {
 	r.GET(auth.PathLogin, auth.LoginInit)
 	r.GET(auth.PathLinkIdentity, auth.LinkIdentityInit)
 	r.GET(auth.PathCallback, auth.Callback)
+	r.POST(auth.PathLocalLogin, auth.LocalLogin)
+	r.POST(auth.PathLocalChangePassword, auth.LocalChangePassword)
 	r.POST(auth.PathLogout, auth.Logout)
 	r.GET(auth.PathUserInfo, auth.UserInfo)
 

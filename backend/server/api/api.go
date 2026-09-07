@@ -119,6 +119,7 @@ func CreateApiServer() *gin.Engine {
 		router.Use(OAuth2ProxyAuthentication(basicRes))
 	}
 	router.Use(auth.RequireAuth())
+	router.Use(auth.RequirePasswordChange())
 	router.Use(auth.CSRFProtect())
 
 	return router

@@ -153,13 +153,14 @@ func SetOIDCProviderRuntime(runtime OIDCProviderRuntime) {
 func (s *Service) Enabled() bool { return s != nil && s.cfg.Enabled }
 
 // ValidateConfiguration ensures access-directory admission is backed by native
-// OIDC only, rather than a legacy proxy identity that cannot consult the directory.
-func ValidateConfiguration(authEnabled, oidcEnabled bool, forwardedUserSecret string) error {
+// OIDC and/or local-password authentication, never a legacy proxy identity that
+// cannot consult the directory.
+func ValidateConfiguration(authEnabled, oidcEnabled, localEnabled bool, forwardedUserSecret string) error {
 	if !authEnabled {
 		return fmt.Errorf("AUTH_ACCESS_ENABLED=true requires AUTH_ENABLED=true")
 	}
-	if !oidcEnabled {
-		return fmt.Errorf("AUTH_ACCESS_ENABLED=true requires OIDC_ENABLED=true")
+	if !oidcEnabled && !localEnabled {
+		return fmt.Errorf("AUTH_ACCESS_ENABLED=true requires OIDC_ENABLED=true or AUTH_LOCAL_ENABLED=true")
 	}
 	if strings.TrimSpace(forwardedUserSecret) != "" {
 		return fmt.Errorf("AUTH_ACCESS_ENABLED=true cannot be combined with FORWARDED_USER_SECRET; remove trusted oauth2-proxy forwarded identity authentication before enabling the access directory")

@@ -28,6 +28,8 @@ import (
 
 const identityContextKey = "devlake_access_identity"
 
+const principalContextKey = "devlake_access_principal"
+
 func SetIdentity(c *gin.Context, identity Identity) { c.Set(identityContextKey, identity) }
 
 func GetIdentity(c *gin.Context) (Identity, bool) {
@@ -37,6 +39,20 @@ func GetIdentity(c *gin.Context) (Identity, bool) {
 	}
 	identity, ok := value.(Identity)
 	return identity, ok
+}
+
+// SetPrincipal records directory admission after authentication. Local sessions
+// have no OIDC identity, so handlers must use this principal rather than infer
+// authorization from an identity claim.
+func SetPrincipal(c *gin.Context, principal *Principal) { c.Set(principalContextKey, principal) }
+
+func GetPrincipal(c *gin.Context) (*Principal, bool) {
+	value, ok := c.Get(principalContextKey)
+	if !ok {
+		return nil, false
+	}
+	principal, ok := value.(*Principal)
+	return principal, ok && principal != nil
 }
 
 // Authorize accepts only a verified OIDC identity. It is invoked before a
@@ -244,11 +260,34 @@ func (s *Service) CurrentPrincipal(c *gin.Context) (*Principal, errors.Error) {
 	if !s.Enabled() {
 		return nil, errors.HttpStatus(404).New("access management is not enabled")
 	}
+	if principal, ok := GetPrincipal(c); ok {
+		return principal, nil
+	}
 	identity, ok := GetIdentity(c)
 	if !ok {
 		return nil, errors.Unauthorized.New("native OIDC authentication is required")
 	}
 	return s.AuthorizeSession(identity)
+}
+
+// AuthorizeLocalSession verifies the directory state for a local session. The
+// numeric user ID is taken from a signed server-issued session claim, not a
+// browser supplied identity.
+func (s *Service) AuthorizeLocalSession(userID uint64) (*Principal, errors.Error) {
+	if !s.Enabled() {
+		return &Principal{}, nil
+	}
+	user := &AccessUser{}
+	if err := s.db.First(user, dal.Where("id = ?", userID)); err != nil {
+		if s.db.IsErrorNotFound(err) {
+			return nil, errors.Unauthorized.New("this account is not allowed to access DevLake")
+		}
+		return nil, errors.Default.Wrap(err, "error looking up current local access user")
+	}
+	if user.HiddenAt != nil || user.Status != StatusActive {
+		return nil, errors.Unauthorized.New("this account is disabled")
+	}
+	return &Principal{UserID: user.ID, Role: user.Role}, nil
 }
 
 // AuthorizeSession validates a previously issued native OIDC session against the
