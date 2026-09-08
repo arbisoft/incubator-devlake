@@ -18,15 +18,45 @@ limitations under the License.
 package shared
 
 import (
+	"context"
+	"net/http"
+
 	"github.com/apache/incubator-devlake/core/models/common"
 	"github.com/gin-gonic/gin"
 )
 
-func GetUser(c *gin.Context) (*common.User, bool) {
-	userObj, exist := c.Get(common.USER)
-	if !exist {
+// restAuthKey is an unexported type used as a request-context key so it cannot
+// collide with keys set by other packages.
+type restAuthKey struct{}
+
+// SetRestAuthUser stores the authenticated user in the HTTP request context.
+// This is necessary because gin's HandleContext calls c.reset(), which clears
+// c.Keys but leaves c.Request (and its context) intact. RestAuthentication
+// calls this before rerouting so the user survives the reset.
+func SetRestAuthUser(r *http.Request, user *common.User) *http.Request {
+	return r.WithContext(context.WithValue(r.Context(), restAuthKey{}, user))
+}
+
+// GetRestAuthUser reports whether this request was authenticated by a REST API
+// key, and returns that key's identity. The request context is the only place
+// that survives gin's HandleContext reroute, so this answers "was this a Bearer
+// API key?" reliably on both passes of the middleware chain.
+func GetRestAuthUser(r *http.Request) (*common.User, bool) {
+	if r == nil {
 		return nil, false
 	}
-	user := userObj.(*common.User)
-	return user, true
+	user, ok := r.Context().Value(restAuthKey{}).(*common.User)
+	return user, ok && user != nil
+}
+
+func GetUser(c *gin.Context) (*common.User, bool) {
+	userObj, exist := c.Get(common.USER)
+	if exist {
+		if user, ok := userObj.(*common.User); ok {
+			return user, true
+		}
+	}
+	// Fallback: RestAuthentication stores the user here before calling
+	// HandleContext, which resets c.Keys but preserves c.Request.
+	return GetRestAuthUser(c.Request)
 }
