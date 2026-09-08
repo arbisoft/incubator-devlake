@@ -23,6 +23,8 @@ import (
 	"testing"
 
 	"github.com/apache/incubator-devlake/core/dal"
+	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/helpers/unithelper"
 	dalmocks "github.com/apache/incubator-devlake/mocks/core/dal"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/mock"
@@ -52,6 +54,67 @@ func TestRemoveLocalCredentialRejectsFinalInteractiveMethod(t *testing.T) {
 	}
 }
 
+type enabledOIDCMethodChecker struct{}
+
+func (enabledOIDCMethodChecker) HasEnabledOIDCProvider() bool { return true }
+
+type localCredentialSessionRevoker struct {
+	localUserIDs []uint64
+	cachedIDs    []string
+}
+
+func (r *localCredentialSessionRevoker) RevokePersistentSessions(dal.Transaction, []string, string) ([]string, errors.Error) {
+	return nil, nil
+}
+
+func (r *localCredentialSessionRevoker) RevokeLocalSessions(_ dal.Transaction, userID uint64) ([]string, errors.Error) {
+	r.localUserIDs = append(r.localUserIDs, userID)
+	return []string{"local-session-1"}, nil
+}
+
+func (r *localCredentialSessionRevoker) CacheRevokedSessions(ids []string) {
+	r.cachedIDs = append(r.cachedIDs, ids...)
+}
+
+func TestRemoveLocalCredentialRevokesActiveLocalSessions(t *testing.T) {
+	db := dalmocks.NewDal(t)
+	tx := dalmocks.NewTransaction(t)
+	db.EXPECT().Begin().Return(tx)
+	tx.EXPECT().First(mock.Anything, mock.Anything).Run(func(destination interface{}, _ ...dal.Clause) {
+		switch value := destination.(type) {
+		case *AccessUser:
+			value.ID = 42
+			value.Status = StatusActive
+		case *LocalCredential:
+			value.AccessUserID = 42
+			value.LoginName = "member"
+		}
+	}).Return(nil).Twice()
+	tx.EXPECT().Delete(mock.Anything).Return(nil)
+	tx.EXPECT().Commit().Return(nil)
+	db.EXPECT().Create(mock.MatchedBy(func(entity interface{}) bool {
+		event, ok := entity.(*AuditEvent)
+		return ok && event.Action == "local.credential_removed" && event.TargetID == 42
+	})).Return(nil)
+
+	revoker := &localCredentialSessionRevoker{}
+	service := &Service{
+		db:             db,
+		logger:         unithelper.DummyLogger(),
+		oidcMethods:    enabledOIDCMethodChecker{},
+		sessionRevoker: revoker,
+	}
+	if _, err := service.RemoveLocalCredential("admin", 42); err != nil {
+		t.Fatalf("RemoveLocalCredential() error = %v", err)
+	}
+	if len(revoker.localUserIDs) != 1 || revoker.localUserIDs[0] != 42 {
+		t.Fatalf("RevokeLocalSessions() user IDs = %v, want [42]", revoker.localUserIDs)
+	}
+	if len(revoker.cachedIDs) != 1 || revoker.cachedIDs[0] != "local-session-1" {
+		t.Fatalf("CacheRevokedSessions() IDs = %v, want [local-session-1]", revoker.cachedIDs)
+	}
+}
+
 func TestOutputLocalCredentialDisablesResponseCaching(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)
@@ -60,5 +123,54 @@ func TestOutputLocalCredentialDisablesResponseCaching(t *testing.T) {
 
 	if got := recorder.Header().Get("Cache-Control"); got != "no-store" {
 		t.Fatalf("Cache-Control = %q, want no-store", got)
+	}
+}
+
+func TestBootstrapLocalAdministratorCreatesClaimCredentialAndAuditEvent(t *testing.T) {
+	db := dalmocks.NewDal(t)
+	tx := dalmocks.NewTransaction(t)
+	db.EXPECT().Begin().Return(tx)
+	tx.EXPECT().Count(mock.Anything).Return(int64(0), nil)
+	tx.EXPECT().Create(mock.Anything).Run(func(entity interface{}, _ ...dal.Clause) {
+		if user, ok := entity.(*AccessUser); ok {
+			user.ID = 42
+		}
+	}).Return(nil).Times(3)
+	tx.EXPECT().Commit().Return(nil)
+	db.EXPECT().Create(mock.MatchedBy(func(entity interface{}) bool {
+		event, ok := entity.(*AuditEvent)
+		return ok && event.Action == "local.bootstrap_consumed" && event.TargetID == 42
+	})).Return(nil)
+
+	service := &Service{db: db, logger: unithelper.DummyLogger()}
+	user, created, err := service.BootstrapLocalAdministrator(LocalBootstrapInput{
+		LoginName:    "admin",
+		PasswordHash: "$argon2id$test",
+	})
+	if err != nil {
+		t.Fatalf("BootstrapLocalAdministrator() error = %v", err)
+	}
+	if !created || user == nil || user.ID != 42 || user.Role != RoleCustomerAdmin || user.Status != StatusActive {
+		t.Fatalf("BootstrapLocalAdministrator() = (%#v, %t), want created customer administrator", user, created)
+	}
+}
+
+func TestBootstrapLocalAdministratorDoesNotResetInitializedDirectory(t *testing.T) {
+	db := dalmocks.NewDal(t)
+	tx := dalmocks.NewTransaction(t)
+	db.EXPECT().Begin().Return(tx)
+	tx.EXPECT().Count(mock.Anything).Return(int64(1), nil)
+	tx.EXPECT().Rollback().Return(nil)
+
+	service := &Service{db: db, logger: unithelper.DummyLogger()}
+	user, created, err := service.BootstrapLocalAdministrator(LocalBootstrapInput{
+		LoginName:    "admin",
+		PasswordHash: "$argon2id$replacement",
+	})
+	if err != nil {
+		t.Fatalf("BootstrapLocalAdministrator() error = %v", err)
+	}
+	if created || user != nil {
+		t.Fatalf("BootstrapLocalAdministrator() = (%#v, %t), want no change for initialized directory", user, created)
 	}
 }
