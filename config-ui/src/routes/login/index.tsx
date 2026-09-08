@@ -22,7 +22,7 @@ import { Card, Button, Typography, Alert, Form, Input, Space } from 'antd';
 import API from '@/api';
 import type { Methods, Provider } from '@/api/auth';
 import { TipLayout } from '@/components';
-import { DEVLAKE_ENDPOINT } from '@/config';
+import { DEVLAKE_ENDPOINT, PATHS } from '@/config';
 
 const { Title, Paragraph } = Typography;
 const ACCESS_DENIED_MESSAGE = 'Your account is not currently allowed to access DevLake.';
@@ -59,6 +59,11 @@ export const Login = () => {
     setLocalLoginError(undefined);
     try {
       await API.auth.localLogin({ ...values, returnUrl });
+      const user = await API.auth.userinfo().catch(() => null);
+      if (user?.authenticated && user.mustChangePassword) {
+        window.location.assign(PATHS.CHANGE_PASSWORD());
+        return;
+      }
       window.location.assign(returnUrl);
     } catch {
       setLocalLoginError('Invalid username or password.');
