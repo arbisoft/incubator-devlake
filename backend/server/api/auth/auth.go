@@ -293,14 +293,9 @@ func (s *Service) LinkIdentityInit(c *gin.Context) {
 		shared.ApiOutputError(c, errors.HttpStatus(http.StatusNotFound).New("identity linking is not enabled"))
 		return
 	}
-	currentIdentity, ok := access.GetIdentity(c)
+	principal, ok := access.GetPrincipal(c)
 	if !ok {
-		shared.ApiOutputError(c, errors.Unauthorized.New("native OIDC authentication is required"))
-		return
-	}
-	principal, accessErr := s.access.AuthorizeSession(currentIdentity)
-	if accessErr != nil {
-		shared.ApiOutputError(c, accessErr)
+		shared.ApiOutputError(c, errors.Unauthorized.New("native authentication is required"))
 		return
 	}
 	name, provider, ok := s.pickProvider(c, c.Query("provider"))

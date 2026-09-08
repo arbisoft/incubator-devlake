@@ -32,6 +32,7 @@ type testAccessAuthorizer struct {
 	err            errors.Error
 	identities     []access.Identity
 	linkStateID    string
+	linkUserID     uint64
 	linkProvider   string
 	linkedStateID  string
 	linkedProvider string
@@ -52,7 +53,8 @@ func (a *testAccessAuthorizer) AuthorizeSession(identity access.Identity) (*acce
 	return &access.Principal{UserID: 1, Role: access.RoleCustomerAdmin}, nil
 }
 
-func (a *testAccessAuthorizer) BeginIdentityLink(_ uint64, providerKey string) (string, errors.Error) {
+func (a *testAccessAuthorizer) BeginIdentityLink(userID uint64, providerKey string) (string, errors.Error) {
+	a.linkUserID = userID
 	a.linkProvider = providerKey
 	if a.linkStateID == "" {
 		a.linkStateID = "test-link-state"

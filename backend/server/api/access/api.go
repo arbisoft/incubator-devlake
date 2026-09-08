@@ -115,12 +115,12 @@ func ListLinkableOIDCProviders(c *gin.Context) {
 		outputError(c, errors.Unauthorized.New("native OIDC authentication is required"))
 		return
 	}
-	identity, ok := GetIdentity(c)
+	principal, ok := GetPrincipal(c)
 	if !ok {
-		outputError(c, errors.Unauthorized.New("native OIDC authentication is required"))
+		outputError(c, errors.Unauthorized.New("native authentication is required"))
 		return
 	}
-	providers, err := service.LinkableOIDCProviders(identity)
+	providers, err := service.LinkableOIDCProviders(principal.UserID)
 	if err != nil {
 		outputError(c, err)
 		return

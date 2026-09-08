@@ -143,7 +143,8 @@ func (s *Service) OIDCAuthentication() gin.HandlerFunc {
 			identity := access.Identity{
 				Issuer: provider.IssuerURL, Subject: claims.Subject, Email: claims.Email, DisplayName: claims.Name,
 			}
-			if _, accessErr := s.access.AuthorizeSession(identity); accessErr != nil {
+			principal, accessErr := s.access.AuthorizeSession(identity)
+			if accessErr != nil {
 				if accessErr.GetType() == errors.Unauthorized || accessErr.GetType() == errors.Forbidden {
 					s.logger.Info("native session denied: provider=%s email=%s", claims.Provider, claims.Email)
 					oidchelper.ClearSessionCookie(c, cfg)
@@ -153,6 +154,7 @@ func (s *Service) OIDCAuthentication() gin.HandlerFunc {
 				c.Next()
 				return
 			}
+			access.SetPrincipal(c, principal)
 		}
 		c.Set(common.USER, &common.User{
 			Name:  claims.Name,
