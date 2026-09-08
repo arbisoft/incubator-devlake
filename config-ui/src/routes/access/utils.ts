@@ -33,6 +33,8 @@ export const ACCESS_ERROR = {
   DUPLICATE_USER: 'This email already has a DevLake access entry.',
   INVALID_DOMAIN: 'Enter a valid email domain and role, then try again.',
   INVALID_USER: 'Enter a valid email and role, then try again.',
+  LOCAL_CREDENTIAL_MISSING: 'This person does not have a local password.',
+  LAST_LOGIN_METHOD: 'Keep at least one interactive login method enabled.',
   REQUEST_FAILED: 'Unable to update access settings. Please try again.',
   INVALID_OIDC_PROVIDER: 'Enter valid OIDC provider settings and include the openid scope.',
   OIDC_PROVIDER_BLOCKED: 'OIDC provider settings cannot be applied until the deployment prerequisites are available.',
@@ -61,6 +63,8 @@ export const isValidEmail = (value: string) => {
   return at > 0 && at === email.lastIndexOf('@') && isValidDomain(email.slice(at + 1)) && !/\s/.test(email);
 };
 
+export const isValidLocalLoginName = (value: string) => /^[a-z0-9][a-z0-9._-]{2,63}$/i.test(value.trim());
+
 const extractErrorCode = (error: unknown): string | undefined => {
   if (!axios.isAxiosError<AccessApiErrorResponse>(error) || error.response?.status !== HttpStatusCode.BadRequest) {
     return undefined;
@@ -87,6 +91,8 @@ export const getCreateUserError = (error: unknown) => {
   const code = extractErrorCode(error);
   if (code === ACCESS_ERROR_CODE.DUPLICATE_USER) return ACCESS_ERROR.DUPLICATE_USER;
   if (code === ACCESS_ERROR_CODE.INVALID_USER) return ACCESS_ERROR.INVALID_USER;
+  if (code === ACCESS_ERROR_CODE.LOCAL_CREDENTIAL_MISSING) return ACCESS_ERROR.LOCAL_CREDENTIAL_MISSING;
+  if (code === ACCESS_ERROR_CODE.LAST_LOGIN_METHOD) return ACCESS_ERROR.LAST_LOGIN_METHOD;
 
   const message = serverMessage(error);
   if (message.includes('this email already has a DevLake access entry')) return ACCESS_ERROR.DUPLICATE_USER;

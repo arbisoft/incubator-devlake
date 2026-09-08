@@ -38,6 +38,7 @@ import {
   getOIDCProviderStatus,
   isValidDomain,
   isValidEmail,
+  isValidLocalLoginName,
   isValidOIDCProviderInput,
   normalizeOIDCProviderInput,
   canSelectGenericOIDCProvider,
@@ -78,6 +79,15 @@ test('rejects invalid email input locally', () => {
   equal(isValidEmail('person@example..com'), false);
 });
 
+test('accepts only supported local usernames', () => {
+  equal(isValidLocalLoginName('admin'), true);
+  equal(isValidLocalLoginName('Person.Name_1'), true);
+  equal(isValidLocalLoginName('ab'), false);
+  equal(isValidLocalLoginName('-admin'), false);
+  equal(isValidLocalLoginName('admin name'), false);
+  equal(isValidLocalLoginName('admin@example.com'), false);
+});
+
 test('maps create-user error codes to safe UI copy', () => {
   const duplicateErr = createAxiosError(HttpStatusCode.BadRequest, {
     code: ACCESS_ERROR_CODE.DUPLICATE_USER,
@@ -97,6 +107,18 @@ test('maps create-user error codes to safe UI copy', () => {
   equal(getCreateUserError(serverErr), ACCESS_ERROR.REQUEST_FAILED);
 
   equal(getCreateUserError(new Error('network error')), ACCESS_ERROR.REQUEST_FAILED);
+});
+
+test('maps local credential lifecycle errors to safe UI copy', () => {
+  const missingCredential = createAxiosError(HttpStatusCode.BadRequest, {
+    code: ACCESS_ERROR_CODE.LOCAL_CREDENTIAL_MISSING,
+  });
+  const finalMethod = createAxiosError(HttpStatusCode.BadRequest, {
+    code: ACCESS_ERROR_CODE.LAST_LOGIN_METHOD,
+  });
+
+  equal(getCreateUserError(missingCredential), ACCESS_ERROR.LOCAL_CREDENTIAL_MISSING);
+  equal(getCreateUserError(finalMethod), ACCESS_ERROR.LAST_LOGIN_METHOD);
 });
 
 test('maps create-domain error codes to safe UI copy', () => {

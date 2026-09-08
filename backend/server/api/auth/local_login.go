@@ -49,6 +49,39 @@ type localAccessDirectory interface {
 	ReplaceLocalPassword(userID uint64, passwordHash string) (*access.AccessUser, []string, errors.Error)
 }
 
+// PrepareLocalCredential implements access.LocalCredentialGenerator. Auth owns
+// the password policy, entropy, and Argon2id hash; access owns the transaction
+// which persists the resulting credential.
+func (s *Service) PrepareLocalCredential(loginName string) (*access.LocalCredentialMaterial, errors.Error) {
+	if s.local == nil {
+		return nil, errors.Unavailable.New("local password authentication is not enabled")
+	}
+	normalizedLoginName, err := normalizeLocalUsername(loginName)
+	if err != nil {
+		return nil, errors.BadInput.New("provide a valid local username", errors.WithData(access.ErrCodeInvalidUser))
+	}
+	temporaryPassword, err := generateTemporaryLocalPassword()
+	if err != nil {
+		return nil, errors.Default.Wrap(err, "generate temporary local password")
+	}
+	passwordHash, err := s.local.hasher.Hash(temporaryPassword)
+	if err != nil {
+		return nil, errors.Default.Wrap(err, "hash temporary local password")
+	}
+	return &access.LocalCredentialMaterial{
+		LoginName:         normalizedLoginName,
+		PasswordHash:      passwordHash,
+		TemporaryPassword: temporaryPassword,
+	}, nil
+}
+
+// HasEnabledOIDCProvider implements access.OIDCMethodChecker without exposing
+// auth runtime state to the access package.
+func (s *Service) HasEnabledOIDCProvider() bool {
+	cfg, providers := s.providerState()
+	return cfg != nil && cfg.OIDCEnabled && len(providers) > 0
+}
+
 type localLoginInput struct {
 	LoginName string `json:"loginName"`
 	Password  string `json:"password"`

@@ -26,6 +26,10 @@ export type Provider = {
 
 export type Methods = {
   providers?: Provider[];
+  localPassword?: {
+    enabled: boolean;
+    loginUrl: string;
+  };
   apiKey?: {
     enabled: boolean;
   };
@@ -35,10 +39,28 @@ export type UserInfo = {
   authenticated: boolean;
   name: string;
   email: string;
+  mustChangePassword: boolean;
+};
+
+export type LocalLoginInput = {
+  loginName: string;
+  password: string;
+  returnUrl: string;
+};
+
+export type LocalPasswordChangeInput = {
+  currentPassword?: string;
+  password: string;
 };
 
 export const methods = (): Promise<Methods> => request('/auth/methods');
 
 export const userinfo = (): Promise<UserInfo> => request('/auth/userinfo');
+
+export const localLogin = (data: LocalLoginInput): Promise<unknown> =>
+  request('/auth/local/login', { method: 'POST', data });
+
+export const changeLocalPassword = (data: LocalPasswordChangeInput): Promise<void> =>
+  request('/auth/local/change-password', { method: 'POST', data });
 
 export const logout = (): Promise<{ ok: boolean; logoutUrl?: string }> => request('/auth/logout', { method: 'POST' });

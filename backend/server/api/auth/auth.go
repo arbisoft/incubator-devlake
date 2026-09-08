@@ -162,8 +162,10 @@ func NewService(ctx stdctx.Context, basicRes corectx.BasicRes) (*Service, error)
 		startRefresher(ctx, s.revoked, s.db, s.logger)
 		startSessionCleanup(ctx, s.db, s.logger)
 		access.SetSessionRevoker(s)
+		access.SetOIDCMethodChecker(s)
 	}
 	if localRuntime != nil {
+		access.SetLocalCredentialGenerator(s)
 		if err := s.bootstrapLocalAdministrator(); err != nil {
 			return nil, err
 		}

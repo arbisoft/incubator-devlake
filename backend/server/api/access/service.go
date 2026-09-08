@@ -45,12 +45,36 @@ type SessionRevoker interface {
 	CacheRevokedSessions(ids []string)
 }
 
+// LocalCredentialGenerator is implemented by auth, which owns password policy,
+// entropy generation, and Argon2id hashing. Access owns the durable directory
+// transition and receives only the generated material required to persist it.
+type LocalCredentialGenerator interface {
+	PrepareLocalCredential(loginName string) (*LocalCredentialMaterial, errors.Error)
+}
+
+// LocalCredentialMaterial contains a one-time password only until the access
+// API writes its response. It must not be logged, audited, or persisted beyond
+// PasswordHash.
+type LocalCredentialMaterial struct {
+	LoginName         string
+	PasswordHash      string
+	TemporaryPassword string
+}
+
+// OIDCMethodChecker lets access preserve the "at least one interactive login
+// method" invariant without reading auth runtime state directly.
+type OIDCMethodChecker interface {
+	HasEnabledOIDCProvider() bool
+}
+
 type Service struct {
 	cfg             Config
 	db              dal.Dal
 	logger          log.Logger
 	oidcLifecycleMu sync.Mutex
 	sessionRevoker  SessionRevoker
+	localGenerator  LocalCredentialGenerator
+	oidcMethods     OIDCMethodChecker
 	oidcRuntime     OIDCProviderRuntime
 	grafanaSSO      *GrafanaSSOClient
 }
@@ -141,6 +165,18 @@ func Default() *Service { return defaultService }
 func SetSessionRevoker(revoker SessionRevoker) {
 	if defaultService != nil {
 		defaultService.sessionRevoker = revoker
+	}
+}
+
+func SetLocalCredentialGenerator(generator LocalCredentialGenerator) {
+	if defaultService != nil {
+		defaultService.localGenerator = generator
+	}
+}
+
+func SetOIDCMethodChecker(checker OIDCMethodChecker) {
+	if defaultService != nil {
+		defaultService.oidcMethods = checker
 	}
 }
 

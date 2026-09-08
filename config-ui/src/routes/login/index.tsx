@@ -17,7 +17,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Card, Button, Typography, Alert, Space } from 'antd';
+import { Card, Button, Typography, Alert, Form, Input, Space } from 'antd';
 
 import API from '@/api';
 import type { Methods, Provider } from '@/api/auth';
@@ -27,9 +27,16 @@ import { DEVLAKE_ENDPOINT } from '@/config';
 const { Title, Paragraph } = Typography;
 const ACCESS_DENIED_MESSAGE = 'Your account is not currently allowed to access DevLake.';
 
+type LocalLoginValues = {
+  loginName: string;
+  password: string;
+};
+
 export const Login = () => {
   const [methods, setMethods] = useState<Methods | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [localLoginPending, setLocalLoginPending] = useState(false);
+  const [localLoginError, setLocalLoginError] = useState<string>();
 
   const params = new URLSearchParams(window.location.search);
   const returnUrl = params.get('return_url') || '/';
@@ -47,9 +54,23 @@ export const Login = () => {
     window.location.href = `${DEVLAKE_ENDPOINT}${p.loginUrl}${sep}return_url=${encodeURIComponent(returnUrl)}`;
   };
 
+  const startLocalLogin = async (values: LocalLoginValues) => {
+    setLocalLoginPending(true);
+    setLocalLoginError(undefined);
+    try {
+      await API.auth.localLogin({ ...values, returnUrl });
+      window.location.assign(returnUrl);
+    } catch {
+      setLocalLoginError('Invalid username or password.');
+    } finally {
+      setLocalLoginPending(false);
+    }
+  };
+
   const providers = methods?.providers ?? [];
+  const localPassword = methods?.localPassword;
   const apiKey = methods?.apiKey;
-  const noProviders = providers.length === 0 && !apiKey?.enabled;
+  const noProviders = providers.length === 0 && !localPassword?.enabled && !apiKey?.enabled;
 
   return (
     <TipLayout>
@@ -59,6 +80,23 @@ export const Login = () => {
         </Title>
         {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} />}
         {accessDenied && <Alert type="error" message={ACCESS_DENIED_MESSAGE} style={{ marginBottom: 16 }} />}
+        {localPassword?.enabled && (
+          <Form<LocalLoginValues> layout="vertical" onFinish={startLocalLogin} requiredMark={false}>
+            <Form.Item label="Username" name="loginName" rules={[{ required: true, message: 'Enter your username.' }]}>
+              <Input autoComplete="username" />
+            </Form.Item>
+            <Form.Item label="Password" name="password" rules={[{ required: true, message: 'Enter your password.' }]}>
+              <Input.Password autoComplete="current-password" />
+            </Form.Item>
+            {localLoginError && <Alert type="error" message={localLoginError} style={{ marginBottom: 16 }} />}
+            <Button type="primary" htmlType="submit" size="large" block loading={localLoginPending}>
+              Sign in
+            </Button>
+          </Form>
+        )}
+        {localPassword?.enabled && providers.length > 0 && (
+          <Paragraph type="secondary">Or continue with single sign-on.</Paragraph>
+        )}
         {providers.length > 0 && (
           <Space direction="vertical" size="middle" style={{ display: 'flex' }}>
             {providers.map((p) => (

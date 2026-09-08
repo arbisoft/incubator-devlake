@@ -162,6 +162,23 @@ func PostUser(c *gin.Context) {
 	shared.ApiOutputSuccess(c, user, http.StatusCreated)
 }
 
+func PostLocalUser(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	input := CreateLocalUserInput{}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		outputError(c, errors.BadInput.Wrap(err, "invalid local access user", errors.WithData(ErrCodeInvalidUser)))
+		return
+	}
+	response, err := Default().CreateLocalUser(actorLabel(c), input)
+	if err != nil {
+		outputError(c, err)
+		return
+	}
+	outputLocalCredential(c, response, http.StatusCreated)
+}
+
 func ListDomains(c *gin.Context) {
 	if _, ok := requireAdmin(c); !ok {
 		return
@@ -286,14 +303,71 @@ func HideUser(c *gin.Context) {
 	shared.ApiOutputSuccess(c, user, http.StatusOK)
 }
 
+func PostLocalCredential(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	id, ok := accessID(c, "user")
+	if !ok {
+		return
+	}
+	input := LocalCredentialInput{}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		outputError(c, errors.BadInput.Wrap(err, "invalid local credential", errors.WithData(ErrCodeInvalidUser)))
+		return
+	}
+	response, err := Default().AddLocalCredential(actorLabel(c), id, input.LoginName)
+	if err != nil {
+		outputError(c, err)
+		return
+	}
+	outputLocalCredential(c, response, http.StatusCreated)
+}
+
+func ResetLocalCredential(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	id, ok := accessID(c, "user")
+	if !ok {
+		return
+	}
+	response, err := Default().ResetLocalCredential(actorLabel(c), id)
+	if err != nil {
+		outputError(c, err)
+		return
+	}
+	outputLocalCredential(c, response, http.StatusOK)
+}
+
+func DeleteLocalCredential(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	id, ok := accessID(c, "user")
+	if !ok {
+		return
+	}
+	user, err := Default().RemoveLocalCredential(actorLabel(c), id)
+	if err != nil {
+		outputError(c, err)
+		return
+	}
+	shared.ApiOutputSuccess(c, user, http.StatusOK)
+}
+
 func RegisterRoutes(r *gin.Engine) {
 	r.GET("/access/me", GetCurrent)
 	r.GET("/access/grafana-login", GetGrafanaLogin)
 	r.GET("/access/oidc-providers/linkable", ListLinkableOIDCProviders)
 	r.GET("/access/users", ListUsers)
 	r.POST("/access/users", PostUser)
+	r.POST("/access/local-users", PostLocalUser)
 	r.PATCH("/access/users/:id", PatchUser)
 	r.POST("/access/users/:id/hide", HideUser)
+	r.POST("/access/users/:id/local-credential", PostLocalCredential)
+	r.POST("/access/users/:id/local-credential/reset", ResetLocalCredential)
+	r.DELETE("/access/users/:id/local-credential", DeleteLocalCredential)
 	r.GET("/access/domains", ListDomains)
 	r.POST("/access/domains", PostDomain)
 	r.PATCH("/access/domains/:id", PatchDomain)
@@ -438,6 +512,23 @@ func requireAdmin(c *gin.Context) (*Principal, bool) {
 		return nil, false
 	}
 	return principal, true
+}
+
+func actorLabel(c *gin.Context) string {
+	if identity, ok := GetIdentity(c); ok {
+		return identity.Email
+	}
+	if principal, ok := GetPrincipal(c); ok {
+		return "local:" + strconv.FormatUint(principal.UserID, 10)
+	}
+	return ""
+}
+
+// outputLocalCredential marks the one-time password response as uncacheable at
+// browser and intermediary layers. The plaintext must not survive the response.
+func outputLocalCredential(c *gin.Context, response *LocalCredentialResponse, status int) {
+	c.Header("Cache-Control", "no-store")
+	shared.ApiOutputSuccess(c, response, status)
 }
 
 func listQuery(c *gin.Context) (PageQuery, bool) {

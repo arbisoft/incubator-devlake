@@ -54,6 +54,8 @@ const (
 	ErrCodeProviderRevisionConflict = "OIDC_PROVIDER_REVISION_CONFLICT"
 	ErrCodeGrafanaTargetConflict    = "GRAFANA_TARGET_CONFLICT"
 	ErrCodeIdentityLinked           = "OIDC_IDENTITY_LINKED"
+	ErrCodeLocalCredentialMissing   = "LOCAL_CREDENTIAL_MISSING"
+	ErrCodeLastLoginMethod          = "LAST_LOGIN_METHOD"
 
 	OIDCProviderSourceKey                = "default"
 	OIDCProviderStatusPending            = "pending"
@@ -108,15 +110,17 @@ type PreparedOIDCProvider struct {
 
 type AccessUser struct {
 	common.Model
-	Issuer      string     `gorm:"type:varchar(512);uniqueIndex:idx_auth_access_identity" json:"issuer"`
-	Subject     string     `gorm:"type:varchar(255);uniqueIndex:idx_auth_access_identity" json:"subject"`
-	Email       string     `gorm:"type:varchar(255);index:idx_auth_access_email" json:"email"`
-	DisplayName string     `gorm:"type:varchar(255)" json:"displayName"`
-	Role        string     `gorm:"type:varchar(32)" json:"role"`
-	Status      string     `gorm:"type:varchar(32);index" json:"status"`
-	LastLoginAt *time.Time `json:"lastLoginAt,omitempty"`
-	DisabledAt  *time.Time `json:"disabledAt,omitempty"`
-	HiddenAt    *time.Time `json:"hiddenAt,omitempty"`
+	Issuer             string     `gorm:"type:varchar(512);uniqueIndex:idx_auth_access_identity" json:"issuer"`
+	Subject            string     `gorm:"type:varchar(255);uniqueIndex:idx_auth_access_identity" json:"subject"`
+	Email              string     `gorm:"type:varchar(255);index:idx_auth_access_email" json:"email"`
+	DisplayName        string     `gorm:"type:varchar(255)" json:"displayName"`
+	Role               string     `gorm:"type:varchar(32)" json:"role"`
+	Status             string     `gorm:"type:varchar(32);index" json:"status"`
+	LastLoginAt        *time.Time `json:"lastLoginAt,omitempty"`
+	DisabledAt         *time.Time `json:"disabledAt,omitempty"`
+	HiddenAt           *time.Time `json:"hiddenAt,omitempty"`
+	LocalLoginName     string     `gorm:"-" json:"localLoginName,omitempty"`
+	HasLocalCredential bool       `gorm:"-" json:"hasLocalCredential"`
 }
 
 func (AccessUser) TableName() string { return "auth_access_users" }
@@ -345,6 +349,27 @@ type PaginatedDomains struct {
 type CreateUserInput struct {
 	Email string `json:"email"`
 	Role  string `json:"role"`
+}
+
+// CreateLocalUserInput creates a directory user and its initial local
+// credential together. The temporary password is generated server-side and is
+// deliberately not accepted from an administrator or persisted in this type.
+type CreateLocalUserInput struct {
+	LoginName   string `json:"loginName"`
+	DisplayName string `json:"displayName"`
+	Role        string `json:"role"`
+}
+
+type LocalCredentialInput struct {
+	LoginName string `json:"loginName"`
+}
+
+// LocalCredentialResponse returns a generated temporary password exactly once.
+// It must remain an API response only and must never be stored in audit data.
+type LocalCredentialResponse struct {
+	User              *AccessUser `json:"user"`
+	LoginName         string      `json:"loginName"`
+	TemporaryPassword string      `json:"temporaryPassword"`
 }
 
 type UpdateUserInput struct {

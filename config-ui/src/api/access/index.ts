@@ -38,6 +38,8 @@ export const ACCESS_ERROR_CODE = {
   INVALID_USER: 'INVALID_USER',
   INVALID_DOMAIN: 'INVALID_DOMAIN',
   INVALID_OIDC_PROVIDER: 'INVALID_OIDC_PROVIDER',
+  LOCAL_CREDENTIAL_MISSING: 'LOCAL_CREDENTIAL_MISSING',
+  LAST_LOGIN_METHOD: 'LAST_LOGIN_METHOD',
   OIDC_PROVIDER_BLOCKED: 'OIDC_PROVIDER_BLOCKED',
   OIDC_PROVIDER_MISSING: 'OIDC_PROVIDER_MISSING',
   OIDC_PROVIDER_REVISION_CONFLICT: 'OIDC_PROVIDER_REVISION_CONFLICT',
@@ -62,12 +64,20 @@ export type AccessUser = {
   id: ID;
   issuer: string;
   subject: string;
-  email: string;
+  email?: string;
   displayName: string;
   role: AccessRole;
   status: AccessStatus;
   lastLoginAt?: string;
   disabledAt?: string;
+  localLoginName?: string;
+  hasLocalCredential: boolean;
+};
+
+export type LocalCredentialResponse = {
+  user: AccessUser;
+  loginName: string;
+  temporaryPassword: string;
 };
 
 export type AccessDomain = {
@@ -171,6 +181,17 @@ export const createUser = (data: { email: string; role: AccessRole }): Promise<A
 export const updateUser = (id: ID, data: { role: AccessRole; status: AccessStatus }): Promise<AccessUser> =>
   request(`${basePath}/users/${id}`, { method: 'PATCH', data });
 export const hideUser = (id: ID): Promise<AccessUser> => request(`${basePath}/users/${id}/hide`, { method: 'POST' });
+export const createLocalUser = (data: {
+  loginName: string;
+  displayName: string;
+  role: AccessRole;
+}): Promise<LocalCredentialResponse> => request(`${basePath}/local-users`, { method: 'POST', data });
+export const addLocalCredential = (id: ID, data: { loginName: string }): Promise<LocalCredentialResponse> =>
+  request(`${basePath}/users/${id}/local-credential`, { method: 'POST', data });
+export const resetLocalCredential = (id: ID): Promise<LocalCredentialResponse> =>
+  request(`${basePath}/users/${id}/local-credential/reset`, { method: 'POST' });
+export const removeLocalCredential = (id: ID): Promise<AccessUser> =>
+  request(`${basePath}/users/${id}/local-credential`, { method: 'DELETE' });
 export const listDomains = (params: AccessPagination): Promise<PaginatedAccessDomains> =>
   request(`${basePath}/domains`, { data: params });
 export const createDomain = (data: { domain: string; defaultRole: AccessRole }): Promise<AccessDomain> =>

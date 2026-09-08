@@ -20,6 +20,7 @@ import { redirect } from 'react-router-dom';
 import { intersection } from 'lodash';
 
 import API from '@/api';
+import { PATHS } from '@/config';
 import { getRegisterPlugins } from '@/plugins';
 
 type Props = {
@@ -45,6 +46,10 @@ export const layoutLoader = async ({ request }: Props) => {
     API.auth.userinfo().catch(() => null),
     API.access.current().catch(() => null),
   ]);
+
+  if (user?.authenticated && user.mustChangePassword) {
+    return redirect(PATHS.CHANGE_PASSWORD());
+  }
 
   return {
     version: res.version,

@@ -35,6 +35,9 @@ export type UserColumnActions = {
   onRoleChange: (user: AccessUser, nextRole: AccessRole) => void;
   onStatusChange: (user: AccessUser, nextStatus: AccessStatus) => void;
   onRemove: (user: AccessUser) => void;
+  onAddLocalCredential: (user: AccessUser) => void;
+  onResetLocalCredential: (user: AccessUser) => void;
+  onRemoveLocalCredential: (user: AccessUser) => void;
 };
 
 export type DomainColumnActions = {
@@ -44,7 +47,11 @@ export type DomainColumnActions = {
 };
 
 export const getUserColumns = (actions: UserColumnActions): ColumnsType<AccessUser> => [
-  { title: 'Email', dataIndex: 'email', key: 'email' },
+  {
+    title: 'Identity',
+    key: 'identity',
+    render: (_: unknown, user: AccessUser) => user.email || user.localLoginName || '-',
+  },
   {
     title: 'Name',
     dataIndex: 'displayName',
@@ -69,6 +76,40 @@ export const getUserColumns = (actions: UserColumnActions): ColumnsType<AccessUs
     dataIndex: 'status',
     key: 'status',
     render: (value: AccessStatus) => <Tag color={ACCESS_STATUS_COLOR[value]}>{value}</Tag>,
+  },
+  {
+    title: 'Local password',
+    key: 'localPassword',
+    render: (_: unknown, user: AccessUser) =>
+      user.status !== ACCESS_STATUS.ACTIVE ? (
+        '-'
+      ) : user.hasLocalCredential ? (
+        <Space size="small">
+          <Popconfirm
+            title="Reset this local password?"
+            description="Existing DevLake sessions for this person will be signed out."
+            okText="Reset"
+            onConfirm={() => actions.onResetLocalCredential(user)}
+          >
+            <Button size="small">Reset</Button>
+          </Popconfirm>
+          <Popconfirm
+            title="Remove this local password?"
+            description="The person can still use a linked OIDC provider, if one is available."
+            okText="Remove"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => actions.onRemoveLocalCredential(user)}
+          >
+            <Button type="text" danger aria-label="Remove local password">
+              Remove
+            </Button>
+          </Popconfirm>
+        </Space>
+      ) : (
+        <Button size="small" onClick={() => actions.onAddLocalCredential(user)}>
+          Add password
+        </Button>
+      ),
   },
   {
     title: '',
