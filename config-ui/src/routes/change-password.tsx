@@ -17,11 +17,13 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Alert, Button, Card, Form, Input, Typography } from 'antd';
+import { Alert, Button, Form, Input, Typography } from 'antd';
 
 import API from '@/api';
 import { TipLayout } from '@/components';
 import { PATHS } from '@/config';
+
+import { ChangePasswordCard } from './change-password.styled';
 
 const { Title } = Typography;
 
@@ -32,18 +34,34 @@ type PasswordChangeValues = {
 };
 
 export const ChangePassword = () => {
-  const [mustChangePassword, setMustChangePassword] = useState(true);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
 
   useEffect(() => {
-    API.auth.userinfo().then((user) => {
-      if (!user.authenticated) {
-        window.location.replace(PATHS.LOGIN());
-        return;
-      }
-      setMustChangePassword(user.mustChangePassword);
-    });
+    let cancelled = false;
+    API.auth
+      .userinfo()
+      .then((user) => {
+        if (cancelled) return;
+        if (!user.authenticated) {
+          window.location.replace(PATHS.LOGIN());
+          return;
+        }
+        if (user.authenticationMethod !== 'local') {
+          window.location.replace(PATHS.CONNECTIONS());
+          return;
+        }
+        setMustChangePassword(user.mustChangePassword);
+        setReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) window.location.replace(PATHS.LOGIN());
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const changePassword = async (values: PasswordChangeValues) => {
@@ -59,9 +77,11 @@ export const ChangePassword = () => {
     }
   };
 
+  if (!ready) return null;
+
   return (
     <TipLayout>
-      <Card style={{ maxWidth: 480, margin: '0 auto' }}>
+      <ChangePasswordCard>
         <Title level={3}>Change your password</Title>
         {mustChangePassword && (
           <Alert type="info" message="Choose a new password to continue." style={{ marginBottom: 16 }} />
@@ -104,7 +124,7 @@ export const ChangePassword = () => {
             Change password
           </Button>
         </Form>
-      </Card>
+      </ChangePasswordCard>
     </TipLayout>
   );
 };

@@ -40,6 +40,7 @@ export type UserInfo = {
   name: string;
   email: string;
   mustChangePassword: boolean;
+  authenticationMethod: 'local' | 'oidc' | '';
 };
 
 export type LocalLoginInput = {

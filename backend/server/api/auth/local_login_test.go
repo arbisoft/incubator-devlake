@@ -121,7 +121,7 @@ func TestLocalSessionAdmissionAndForcedChangeBoundary(t *testing.T) {
 	if err := json.Unmarshal(userinfo.Body.Bytes(), &response); err != nil {
 		t.Fatalf("decode userinfo: %v", err)
 	}
-	if !response.Authenticated || !response.MustChangePassword {
+	if !response.Authenticated || !response.MustChangePassword || response.AuthenticationMethod != "local" {
 		t.Fatalf("userinfo = %#v, want authenticated forced-change local user", response)
 	}
 }

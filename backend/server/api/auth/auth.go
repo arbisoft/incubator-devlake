@@ -538,10 +538,11 @@ func (s *Service) Logout(c *gin.Context) {
 }
 
 type userInfoResponse struct {
-	Authenticated      bool   `json:"authenticated"`
-	Name               string `json:"name"`
-	Email              string `json:"email"`
-	MustChangePassword bool   `json:"mustChangePassword"`
+	Authenticated        bool   `json:"authenticated"`
+	Name                 string `json:"name"`
+	Email                string `json:"email"`
+	MustChangePassword   bool   `json:"mustChangePassword"`
+	AuthenticationMethod string `json:"authenticationMethod"`
 }
 
 func UserInfo(c *gin.Context) { defaultService.UserInfo(c) }
@@ -566,6 +567,11 @@ func (s *Service) UserInfo(c *gin.Context) {
 	}
 	if claims, ok := sessionClaims(c); ok {
 		response.MustChangePassword = claims.MustChangePassword
+		if claims.Provider == localSessionProvider {
+			response.AuthenticationMethod = "local"
+		} else {
+			response.AuthenticationMethod = "oidc"
+		}
 	}
 	shared.ApiOutputSuccess(c, response, http.StatusOK)
 }

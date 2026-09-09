@@ -55,6 +55,7 @@ import {
 } from './utils';
 
 type ModalState = 'user' | 'local-user' | 'local-credential' | 'domain' | undefined;
+type LocalCredentialOperation = { action: 'reset' | 'remove'; userID: ID } | undefined;
 
 type TemporaryCredential = Pick<LocalCredentialResponse, 'loginName' | 'temporaryPassword'>;
 
@@ -68,6 +69,7 @@ export const Access = () => {
   const [domainPageSize, setDomainPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(DEFAULT_PAGE_SIZE);
   const [modal, setModal] = useState<ModalState>();
   const [operating, setOperating] = useState(false);
+  const [localCredentialOperation, setLocalCredentialOperation] = useState<LocalCredentialOperation>();
   const [email, setEmail] = useState('');
   const [domain, setDomain] = useState('');
   const [role, setRole] = useState<AccessRole>(ACCESS_ROLE.MEMBER);
@@ -174,7 +176,8 @@ export const Access = () => {
   const resetLocalCredential = useCallback(
     async (user: AccessUser) => {
       const [success, response] = await operator(() => API.access.resetLocalCredential(user.id), {
-        setOperating,
+        setOperating: (active) =>
+          setLocalCredentialOperation(active ? { action: 'reset', userID: user.id } : undefined),
         formatReason: getLocalCredentialError,
       });
       if (success && response) {
@@ -188,11 +191,19 @@ export const Access = () => {
   const removeLocalCredential = useCallback(
     async (user: AccessUser) => {
       const [success] = await operator(() => API.access.removeLocalCredential(user.id), {
+        setOperating: (active) =>
+          setLocalCredentialOperation(active ? { action: 'remove', userID: user.id } : undefined),
         formatReason: getLocalCredentialError,
       });
       if (success) refresh();
     },
     [refresh],
+  );
+
+  const isLocalCredentialOperation = useCallback(
+    (action: 'reset' | 'remove', userID: ID) =>
+      localCredentialOperation?.action === action && localCredentialOperation.userID === userID,
+    [localCredentialOperation],
   );
 
   const openAddLocalCredential = useCallback((user: AccessUser) => {
@@ -262,8 +273,17 @@ export const Access = () => {
         onAddLocalCredential: openAddLocalCredential,
         onResetLocalCredential: resetLocalCredential,
         onRemoveLocalCredential: removeLocalCredential,
+        isLocalCredentialOperation,
       }),
-    [hideUser, openAddLocalCredential, removeLocalCredential, resetLocalCredential, updateUser, updateUserRole],
+    [
+      hideUser,
+      isLocalCredentialOperation,
+      openAddLocalCredential,
+      removeLocalCredential,
+      resetLocalCredential,
+      updateUser,
+      updateUserRole,
+    ],
   );
 
   const domainColumns = useMemo(
@@ -288,6 +308,7 @@ export const Access = () => {
         </Space>
       </SectionHeader>
       <Table
+        data-testid="access-people-table"
         rowKey="id"
         size="middle"
         loading={!ready}
@@ -317,6 +338,7 @@ export const Access = () => {
         </Button>
       </SectionHeader>
       <Table
+        data-testid="access-domains-table"
         rowKey="id"
         size="middle"
         loading={!ready}
@@ -350,6 +372,7 @@ export const Access = () => {
         <SectionTitle>Recent access activity</SectionTitle>
       </SectionHeader>
       <Table
+        data-testid="access-activity-table"
         rowKey="id"
         size="middle"
         loading={!ready}

@@ -38,6 +38,7 @@ export type UserColumnActions = {
   onAddLocalCredential: (user: AccessUser) => void;
   onResetLocalCredential: (user: AccessUser) => void;
   onRemoveLocalCredential: (user: AccessUser) => void;
+  isLocalCredentialOperation: (action: 'reset' | 'remove', userID: ID) => boolean;
 };
 
 export type DomainColumnActions = {
@@ -91,7 +92,9 @@ export const getUserColumns = (actions: UserColumnActions): ColumnsType<AccessUs
             okText="Reset"
             onConfirm={() => actions.onResetLocalCredential(user)}
           >
-            <Button size="small">Reset</Button>
+            <Button size="small" loading={actions.isLocalCredentialOperation('reset', user.id)}>
+              Reset
+            </Button>
           </Popconfirm>
           <Popconfirm
             title="Remove this local password?"
@@ -100,7 +103,12 @@ export const getUserColumns = (actions: UserColumnActions): ColumnsType<AccessUs
             okButtonProps={{ danger: true }}
             onConfirm={() => actions.onRemoveLocalCredential(user)}
           >
-            <Button type="text" danger aria-label="Remove local password">
+            <Button
+              type="text"
+              danger
+              aria-label="Remove local password"
+              loading={actions.isLocalCredentialOperation('remove', user.id)}
+            >
               Remove
             </Button>
           </Popconfirm>

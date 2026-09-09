@@ -381,7 +381,7 @@ func TestFullLoginCallbackFlow(t *testing.T) {
 	if err := json.Unmarshal(uiW.Body.Bytes(), &userResp); err != nil {
 		t.Fatalf("decode userinfo: %v: %s", err, uiW.Body.String())
 	}
-	if !userResp.Authenticated || userResp.Email != idp.email {
+	if !userResp.Authenticated || userResp.Email != idp.email || userResp.AuthenticationMethod != "oidc" {
 		t.Fatalf("unexpected userinfo: %+v body=%s", userResp, uiW.Body.String())
 	}
 
