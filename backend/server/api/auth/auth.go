@@ -60,6 +60,19 @@ const (
 	PathLocalChangePassword = "/auth/local/change-password"
 )
 
+// RegisterRoutes keeps auth-owned route paths and handlers together so the
+// generic API router has one narrow integration point.
+func RegisterRoutes(r *gin.Engine) {
+	r.GET(PathMethods, GetMethods)
+	r.GET(PathLogin, LoginInit)
+	r.GET(PathLinkIdentity, LinkIdentityInit)
+	r.GET(PathCallback, Callback)
+	r.POST(PathLocalLogin, LocalLogin)
+	r.POST(PathLocalChangePassword, LocalChangePassword)
+	r.POST(PathLogout, Logout)
+	r.GET(PathUserInfo, UserInfo)
+}
+
 // lastSeenThrottle bounds DB writes to one per-jti per window. Tracking
 // "last activity" doesn't need per-request precision.
 const lastSeenThrottle = 5 * time.Minute
