@@ -185,9 +185,7 @@ func (t *localLoginThrottle) lockAttempt(tx dal.Transaction, bucket localLoginTh
 		BucketKey:       bucket.key,
 		WindowStartedAt: now,
 	}
-	if err := tx.Create(attempt); err == nil {
-		return attempt, nil
-	} else if !tx.IsDuplicationError(err) {
+	if err := tx.CreateIfNotExist(attempt); err != nil {
 		return nil, errors.Default.Wrap(err, "error creating local login throttle")
 	}
 	if err := tx.First(attempt, dal.Where("bucket_kind = ? AND bucket_key = ?", bucket.kind, bucket.key), dal.Lock(true, false)); err != nil {

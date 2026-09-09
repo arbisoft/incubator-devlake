@@ -44,13 +44,11 @@ func (authLocalCredential20260907) TableName() string { return "auth_local_crede
 
 type authLocalLoginAttempt20260907 struct {
 	archived.Model
-	BucketKind           string     `gorm:"type:varchar(32);uniqueIndex:idx_auth_local_login_attempt_bucket"`
-	BucketKey            string     `gorm:"type:char(64);uniqueIndex:idx_auth_local_login_attempt_bucket"`
-	FailureCount         uint       `gorm:"not null"`
-	WindowStartedAt      time.Time  `gorm:"not null"`
-	BlockedUntil         *time.Time `gorm:"index"`
-	ReservationCount     uint       `gorm:"not null"`
-	ReservationExpiresAt *time.Time
+	BucketKind      string     `gorm:"type:varchar(32);uniqueIndex:idx_auth_local_login_attempt_bucket"`
+	BucketKey       string     `gorm:"type:char(64);uniqueIndex:idx_auth_local_login_attempt_bucket"`
+	FailureCount    uint       `gorm:"not null"`
+	WindowStartedAt time.Time  `gorm:"not null"`
+	BlockedUntil    *time.Time `gorm:"index"`
 }
 
 func (authLocalLoginAttempt20260907) TableName() string { return "auth_local_login_attempts" }

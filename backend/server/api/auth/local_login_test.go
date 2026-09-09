@@ -146,7 +146,9 @@ func TestLocalLoginIssuesSharedBrowserSessionAndCookies(t *testing.T) {
 	db := dalmocks.NewDal(t)
 	tx := dalmocks.NewTransaction(t)
 	db.EXPECT().Begin().Return(tx).Twice()
-	tx.On("Create", mock.Anything).Return(nil).Times(5)
+	tx.On("CreateIfNotExist", mock.Anything).Return(nil).Times(4)
+	tx.On("First", mock.Anything, mock.Anything, mock.Anything).Return(nil).Times(4)
+	tx.On("Create", mock.Anything).Return(nil).Once()
 	tx.On("Update", mock.Anything).Return(nil).Times(4)
 	tx.On("Commit").Return(nil).Twice()
 

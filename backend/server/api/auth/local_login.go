@@ -228,8 +228,13 @@ func (s *Service) LocalLogin(c *gin.Context) {
 			return
 		}
 	}
+	if c.Request.Context().Err() != nil {
+		s.releaseLocalLoginAttempt(reservation)
+		return
+	}
 	issued, issueErr := s.issueLocalBrowserSession(reservation, user, credential.MustChangePassword)
 	if issueErr != nil {
+		s.completeSuccessfulLocalLogin(reservation)
 		fail(c, http.StatusInternalServerError, "issue local session", issueErr)
 		return
 	}

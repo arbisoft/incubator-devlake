@@ -124,7 +124,13 @@ func TestLocalLoginThrottleReservationsUseMySQLLocking(t *testing.T) {
 		t.Fatalf("allowed reservations = %d, want %d", len(reservations), localLoginFailureLimit)
 	}
 
-	if err := completeLocalLoginAttempt(db, throttle, reservations[0], localLoginAttemptSucceeded); err != nil {
+	if err := completeLocalLoginAttempt(db, throttle, reservations[0], localLoginAttemptFailed); err != nil {
+		t.Fatalf("complete failed reservation: %v", err)
+	}
+	if _, allowed, reserveErr := reserveLocalLoginAttempt(db, throttle, loginName, clientIP); reserveErr != nil || allowed {
+		t.Fatalf("reserve with failed and pending attempts = allowed:%t err:%v, want throttled", allowed, reserveErr)
+	}
+	if err := completeLocalLoginAttempt(db, throttle, reservations[1], localLoginAttemptSucceeded); err != nil {
 		t.Fatalf("complete successful reservation: %v", err)
 	}
 	if _, allowed, reserveErr := reserveLocalLoginAttempt(db, throttle, loginName, clientIP); reserveErr != nil || !allowed {
