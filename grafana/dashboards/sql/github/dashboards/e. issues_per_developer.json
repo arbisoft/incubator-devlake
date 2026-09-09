@@ -1,0 +1,565 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 84,
+  "links": [],
+  "panels": [
+    {
+      "description": "",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 5,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "# Issues Per Developer",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.6.2",
+      "title": "Dashboard E",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "P430005175C4C7810"
+      },
+      "description": "Per assignee, counts issues created in the window split by status into To Do, In Progress and Done.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 3
+      },
+      "id": 1,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.75,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "normal",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "P430005175C4C7810"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT REPLACE(COALESCE(\n         NULLIF(TRIM(a.full_name), ''),\n         NULLIF(TRIM(u.name),      ''),\n         NULLIF(TRIM(a.user_name), ''),\n         NULLIF(TRIM(a.email),     ''),\n         NULLIF(TRIM(i.assignee_name), ''),\n         i.assignee_id\n       ), '-', ' ')                                          AS developer,\n       SUM(CASE WHEN i.status = 'TODO'        THEN 1 ELSE 0 END) AS 'To Do',\n       SUM(CASE WHEN i.status = 'IN_PROGRESS' THEN 1 ELSE 0 END) AS 'In Progress',\n       SUM(CASE WHEN i.status = 'DONE'        THEN 1 ELSE 0 END) AS Done\nFROM issues i\nLEFT JOIN accounts a ON a.id = i.assignee_id\nLEFT JOIN (\n    SELECT account_id, MIN(user_id) AS user_id\n    FROM user_accounts GROUP BY account_id\n) ua ON ua.account_id = a.id\nLEFT JOIN users u ON u.id = ua.user_id\nLEFT JOIN issue_commits ic ON ic.issue_id = i.id\nLEFT JOIN repo_commits  rc ON rc.commit_sha = ic.commit_sha\nWHERE i.id LIKE 'github:%'\n  AND $__timeFilter(i.created_date)\n  AND i.assignee_id IN ( ${developer_id} )\nGROUP BY developer\nORDER BY COUNT(*) DESC, developer;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Issues By Status",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "P430005175C4C7810"
+      },
+      "description": "Counts issues currently in OPEN original_status per assignee, with no time window applied.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 2,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "P430005175C4C7810"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT REPLACE(COALESCE(\n         NULLIF(TRIM(a.full_name),     ''),\n         NULLIF(TRIM(a.user_name),     ''),\n         NULLIF(TRIM(a.email),         ''),\n         NULLIF(TRIM(i.assignee_name), ''),\n         '(unassigned)'\n       ), '-', ' ')                                                  AS Developer,\n       COUNT(*)                                                      AS `Work In Progress`\nFROM issues i\nJOIN accounts a ON a.id = i.assignee_id AND a.id IN ( $developer_id )\nWHERE i.original_status = 'OPEN'\n  AND i.id LIKE 'github:%'\nGROUP BY developer\nORDER BY `Work In Progress` DESC;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Current Work In Progress",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "P430005175C4C7810"
+      },
+      "description": "Time series counting DONE issues per assignee, bucketed by resolution date.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Issues Closed",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "P430005175C4C7810"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroup(i.resolution_date, ${interval})                     AS time,\n       REPLACE(COALESCE(\n         NULLIF(TRIM(a.full_name),     ''),\n         NULLIF(TRIM(a.user_name),     ''),\n         NULLIF(TRIM(i.assignee_name), ''),\n         '(unassigned)'\n       ), '-', ' ')                                              AS metric,\n       COUNT(*)                                                  AS value\nFROM issues i\nJOIN accounts a ON a.id = i.assignee_id AND a.id IN ( $developer_id )\nWHERE i.status = 'DONE'\n  AND i.resolution_date IS NOT NULL\n  AND i.id LIKE 'github:%'\n  AND $__timeFilter(i.resolution_date)\nGROUP BY time, metric\nORDER BY time;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Issues Closed",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "P430005175C4C7810"
+      },
+      "description": "Per assignee, counts issues by mapped type category and splits them into Planned versus Adhoc based on whether their sprint has a start date.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "id": 4,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "P430005175C4C7810"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH type_map AS (\n  SELECT original_type,\n         CASE\n           WHEN original_type LIKE '%bug%'\n             OR original_type LIKE '%issue%'         THEN 'Bugs'\n           WHEN original_type LIKE '%documentation%' THEN 'Documentation'\n           WHEN original_type LIKE '%R&D%'           THEN 'R&D'\n           WHEN original_type LIKE '%review%'        THEN 'Reviews'\n           WHEN original_type LIKE '%refactor%'\n             OR original_type LIKE '%debt%'\n             OR original_type LIKE '%enhancement%'\n             OR original_type LIKE '%improvement%'   THEN 'Refactoring'\n           WHEN original_type LIKE '%task%'          THEN 'Tasks'\n           ELSE 'Unclassified'\n         END AS category\n  FROM (SELECT DISTINCT original_type FROM issues) d\n)\nSELECT REPLACE(COALESCE(\n         NULLIF(TRIM(a.full_name),     ''),\n         NULLIF(TRIM(a.user_name),     ''),\n         NULLIF(TRIM(i.assignee_name), ''),\n         '(unassigned)'\n       ), '-', ' ')                       AS Developer,\n       SUM(tm.category = 'Bugs')          AS Bugs,\n       SUM(tm.category = 'Documentation') AS Documentation,\n       SUM(tm.category = 'R&D')           AS `R&D`,\n       SUM(tm.category = 'Reviews')       AS Reviews,\n       SUM(tm.category = 'Refactoring')   AS Refactoring,\n       SUM(tm.category = 'Tasks')         AS Tasks,\n       SUM(tm.category = 'Other')         AS Other,\n       COUNT(*)                           AS Total,\n       COUNT(IF (s.started_date IS NULL, 1, NULL)) AS Adhoc,\n       COUNT(IF (s.started_date IS NOT NULL, 1, NULL)) AS Planned\nFROM issues i\nJOIN type_map tm ON tm.original_type <=> i.original_type\nLEFT JOIN sprint_issues si ON si.issue_id = i.id\nLEFT JOIN sprints s ON s.id = si.sprint_id\nJOIN accounts a ON a.id = i.assignee_id AND a.id IN ( $developer_id )\nWHERE i.id LIKE 'github:%'\n  AND $__timeFilter(i.created_date)\nGROUP BY Developer \nORDER BY Developer ASC",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Issue Type Mix Per Developer",
+      "type": "table"
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 41,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "1m",
+          "value": "1m"
+        },
+        "label": "Time Interval",
+        "name": "interval",
+        "options": [
+          {
+            "selected": true,
+            "text": "Month",
+            "value": "1m"
+          },
+          {
+            "selected": false,
+            "text": "Week",
+            "value": "1w"
+          },
+          {
+            "selected": false,
+            "text": "Day",
+            "value": "1d"
+          }
+        ],
+        "query": "Month : 1m, Week : 1w, Day : 1d",
+        "type": "custom"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "P430005175C4C7810"
+        },
+        "definition": "SELECT DISTINCT pm.project_name  \nFROM project_mapping pm \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nORDER BY pm.project_name ",
+        "includeAll": true,
+        "label": "Project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "SELECT DISTINCT pm.project_name  \nFROM project_mapping pm \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nORDER BY pm.project_name ",
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "P430005175C4C7810"
+        },
+        "definition": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nAND pm.project_name IN ( $project )\nORDER BY text",
+        "includeAll": true,
+        "label": "Repo",
+        "multi": true,
+        "name": "repo_id",
+        "options": [],
+        "query": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nAND pm.project_name IN ( $project )\nORDER BY text",
+        "refresh": 1,
+        "regex": "/^(?<text>.*)--(?<value>.*)$/",
+        "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "P430005175C4C7810"
+        },
+        "definition": "WITH scoped_repos AS (\n  SELECT r.id\n  FROM repos r\n  WHERE r.id LIKE 'github:%'\n    AND r.deleted = 0\n    AND r.id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = r.id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN ( ${project} ))\n),\nscoped_accounts AS (\n  -- PR authors\n  SELECT pr.author_id AS account_id\n  FROM pull_requests pr\n  JOIN scoped_repos sr ON sr.id = pr.base_repo_id\n  WHERE pr.author_id LIKE 'github:%'\n  UNION\n  -- reviewers and commenters\n  SELECT cmt.account_id\n  FROM pull_request_comments cmt\n  JOIN pull_requests pr ON pr.id = cmt.pull_request_id\n  JOIN scoped_repos sr  ON sr.id = pr.base_repo_id\n  WHERE cmt.account_id LIKE 'github:%'\n  UNION\n  -- issue assignees, scoped through boards (github board ids match repo ids)\n  SELECT ia.assignee_id\n  FROM issue_assignees ia\n  JOIN board_issues bi ON bi.issue_id = ia.issue_id\n  WHERE ia.assignee_id LIKE 'github:%'\n    AND bi.board_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = bi.board_id\n                   AND pm.`table` = 'boards'\n                   AND pm.project_name IN ( ${project} ))\n)\nSELECT CONCAT(\n         REPLACE(COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           '(unmapped)'\n         ), '-', ' '),\n         '--', a.id) AS Name\nFROM accounts a\nJOIN scoped_accounts sa ON sa.account_id = a.id\nGROUP BY Name\nORDER BY Name",
+        "description": "",
+        "includeAll": true,
+        "label": "Developer",
+        "multi": true,
+        "name": "developer_id",
+        "options": [],
+        "query": "WITH scoped_repos AS (\n  SELECT r.id\n  FROM repos r\n  WHERE r.id LIKE 'github:%'\n    AND r.deleted = 0\n    AND r.id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = r.id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN ( ${project} ))\n),\nscoped_accounts AS (\n  -- PR authors\n  SELECT pr.author_id AS account_id\n  FROM pull_requests pr\n  JOIN scoped_repos sr ON sr.id = pr.base_repo_id\n  WHERE pr.author_id LIKE 'github:%'\n  UNION\n  -- reviewers and commenters\n  SELECT cmt.account_id\n  FROM pull_request_comments cmt\n  JOIN pull_requests pr ON pr.id = cmt.pull_request_id\n  JOIN scoped_repos sr  ON sr.id = pr.base_repo_id\n  WHERE cmt.account_id LIKE 'github:%'\n  UNION\n  -- issue assignees, scoped through boards (github board ids match repo ids)\n  SELECT ia.assignee_id\n  FROM issue_assignees ia\n  JOIN board_issues bi ON bi.issue_id = ia.issue_id\n  WHERE ia.assignee_id LIKE 'github:%'\n    AND bi.board_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = bi.board_id\n                   AND pm.`table` = 'boards'\n                   AND pm.project_name IN ( ${project} ))\n)\nSELECT CONCAT(\n         REPLACE(COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           '(unmapped)'\n         ), '-', ' '),\n         '--', a.id) AS Name\nFROM accounts a\nJOIN scoped_accounts sa ON sa.account_id = a.id\nGROUP BY Name\nORDER BY Name",
+        "refresh": 1,
+        "regex": "/^(?<text>.*)--(?<value>.*)$/",
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "E. Issues Per Developer",
+  "uid": "efxmw34cjhszkc",
+  "version": 10
+}

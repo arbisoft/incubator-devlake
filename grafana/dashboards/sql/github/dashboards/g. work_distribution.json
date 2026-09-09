@@ -1,0 +1,238 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 86,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "P430005175C4C7810"
+      },
+      "description": "Per author, classifies merged PRs as Light/Standard/Heavy by total lines changed (merge commits excluded) and reports counts and percentages for authors with at least 3 PRs.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 0.75,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Total PRs"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 21,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.75,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "normal",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "P430005175C4C7810"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "  -- Per author, classifies merged PRs as Light/Standard/Heavy by total lines changed (merge commits excluded) and reports counts and percentages for authors with at least 3 PRs.\n  WITH pr_size AS (\n    SELECT pr.id,\n          pr.author_id,\n          SUM(c.additions + c.deletions) AS lines_changed\n    FROM pull_requests pr\n    JOIN pull_request_commits prc ON prc.pull_request_id = pr.id\n    JOIN commits c                ON c.sha = prc.commit_sha\n    WHERE pr.status = 'MERGED'\n      AND pr.id LIKE 'github:%'\n      AND $__timeFilter(pr.merged_date)\n      AND (SELECT COUNT(*) FROM commit_parents cp\n            WHERE cp.commit_sha = c.sha) < 2          -- exclude merge commits\n    GROUP BY pr.id, pr.author_id\n  ),\n  weighted AS (\n    SELECT author_id,\n          CASE WHEN lines_changed <  50 THEN 'Light'\n                WHEN lines_changed < 500 THEN 'Standard'\n                ELSE                          'Heavy'\n          END AS weight\n    FROM pr_size\n  )\n  SELECT REPLACE(COALESCE(\n          NULLIF(TRIM(a.full_name), ''),\n          NULLIF(TRIM(a.user_name), ''),\n          NULLIF(TRIM(a.email),     ''),\n          '(unmapped)'\n        ), '-', ' ')                                             AS `Developer`,\n        COUNT(*)                                                 AS `Total PRs`,\n        SUM(w.weight = 'Light')                                  AS Light,\n        CONCAT(ROUND(100.0 * SUM(w.weight = 'Light')    / COUNT(*), 1), '%')  AS 'Light%',\n        SUM(w.weight = 'Standard')                               AS Standard,\n        CONCAT(ROUND(100.0 * SUM(w.weight = 'Standard')    / COUNT(*), 1), '%')  AS 'Standard%',\n        SUM(w.weight = 'Heavy')                                  AS Heavy,\n        CONCAT(ROUND(100.0 * SUM(w.weight = 'Heavy')    / COUNT(*), 1), '%')  AS 'Heavy%'\n  FROM weighted w\n  JOIN accounts a ON a.id = w.author_id AND a.id IN ( $developer_id )\n  GROUP BY developer\n  HAVING `Total PRs` >= 3\n  ORDER BY `Total PRs` DESC;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Task Weight Mix",
+      "type": "barchart"
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 41,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "P430005175C4C7810"
+        },
+        "definition": "SELECT DISTINCT pm.project_name  \nFROM project_mapping pm \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nORDER BY pm.project_name ",
+        "includeAll": true,
+        "label": "Project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "SELECT DISTINCT pm.project_name  \nFROM project_mapping pm \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nORDER BY pm.project_name ",
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "P430005175C4C7810"
+        },
+        "definition": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nAND pm.project_name IN ( $project )\nORDER BY text",
+        "includeAll": true,
+        "label": "Repo",
+        "multi": true,
+        "name": "repo_id",
+        "options": [],
+        "query": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nAND pm.project_name IN ( $project )\nORDER BY text",
+        "refresh": 1,
+        "regex": "/^(?<text>.*)--(?<value>.*)$/",
+        "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "P430005175C4C7810"
+        },
+        "definition": "WITH scoped_repos AS (\n  SELECT r.id\n  FROM repos r\n  WHERE r.id LIKE 'github:%'\n    AND r.deleted = 0\n    AND r.id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = r.id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN ( ${project} ))\n),\nscoped_accounts AS (\n  -- PR authors\n  SELECT pr.author_id AS account_id\n  FROM pull_requests pr\n  JOIN scoped_repos sr ON sr.id = pr.base_repo_id\n  WHERE pr.author_id LIKE 'github:%'\n  UNION\n  -- reviewers and commenters\n  SELECT cmt.account_id\n  FROM pull_request_comments cmt\n  JOIN pull_requests pr ON pr.id = cmt.pull_request_id\n  JOIN scoped_repos sr  ON sr.id = pr.base_repo_id\n  WHERE cmt.account_id LIKE 'github:%'\n  UNION\n  -- issue assignees, scoped through boards (github board ids match repo ids)\n  SELECT ia.assignee_id\n  FROM issue_assignees ia\n  JOIN board_issues bi ON bi.issue_id = ia.issue_id\n  WHERE ia.assignee_id LIKE 'github:%'\n    AND bi.board_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = bi.board_id\n                   AND pm.`table` = 'boards'\n                   AND pm.project_name IN ( ${project} ))\n)\nSELECT CONCAT(\n         REPLACE(COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           '(unmapped)'\n         ), '-', ' '),\n         '--', a.id) AS Name\nFROM accounts a\nJOIN scoped_accounts sa ON sa.account_id = a.id\nGROUP BY Name\nORDER BY Name",
+        "description": "",
+        "includeAll": true,
+        "label": "Developer",
+        "multi": true,
+        "name": "developer_id",
+        "options": [],
+        "query": "WITH scoped_repos AS (\n  SELECT r.id\n  FROM repos r\n  WHERE r.id LIKE 'github:%'\n    AND r.deleted = 0\n    AND r.id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = r.id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN ( ${project} ))\n),\nscoped_accounts AS (\n  -- PR authors\n  SELECT pr.author_id AS account_id\n  FROM pull_requests pr\n  JOIN scoped_repos sr ON sr.id = pr.base_repo_id\n  WHERE pr.author_id LIKE 'github:%'\n  UNION\n  -- reviewers and commenters\n  SELECT cmt.account_id\n  FROM pull_request_comments cmt\n  JOIN pull_requests pr ON pr.id = cmt.pull_request_id\n  JOIN scoped_repos sr  ON sr.id = pr.base_repo_id\n  WHERE cmt.account_id LIKE 'github:%'\n  UNION\n  -- issue assignees, scoped through boards (github board ids match repo ids)\n  SELECT ia.assignee_id\n  FROM issue_assignees ia\n  JOIN board_issues bi ON bi.issue_id = ia.issue_id\n  WHERE ia.assignee_id LIKE 'github:%'\n    AND bi.board_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = bi.board_id\n                   AND pm.`table` = 'boards'\n                   AND pm.project_name IN ( ${project} ))\n)\nSELECT CONCAT(\n         REPLACE(COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           '(unmapped)'\n         ), '-', ' '),\n         '--', a.id) AS Name\nFROM accounts a\nJOIN scoped_accounts sa ON sa.account_id = a.id\nGROUP BY Name\nORDER BY Name",
+        "refresh": 1,
+        "regex": "/^(?<text>.*)--(?<value>.*)$/",
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-90d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "G. Work Distribution",
+  "uid": "afxmxmufytf5sf",
+  "version": 7
+}

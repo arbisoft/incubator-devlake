@@ -1,0 +1,909 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 85,
+  "links": [],
+  "panels": [
+    {
+      "description": "",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 7,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "# Delivery Metrics",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.6.2",
+      "title": "Dashboard F",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "P430005175C4C7810"
+      },
+      "description": "Counts distinct successful production deployments per time bucket.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Deployment Count",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 3
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "P430005175C4C7810"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroup(cdc.finished_date, $interval)   AS time,\n       COUNT(DISTINCT cdc.cicd_deployment_id)  AS deployments\nFROM cicd_deployment_commits cdc\nWHERE cdc.id like 'github:%' \n  AND cdc.environment = 'PRODUCTION'\n  AND cdc.result      = 'SUCCESS'\n  AND $__timeFilter(cdc.finished_date)\n  AND cdc.repo_id IN ( ${repo_id} )\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n                WHERE pm.row_id = cdc.repo_id\n                  AND pm.`table` = 'repos'\n                  AND pm.project_name IN ( ${project} ))\nGROUP BY time\nORDER BY time;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Deployment Frequency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "P430005175C4C7810"
+      },
+      "description": "Per time bucket, derives median and P75 of the precomputed pr_cycle_time (project_pr_metrics) in days for merged PRs.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Days",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "P430005175C4C7810"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH d AS (\n    SELECT $__timeGroup(pr.merged_date, $interval)  AS bucket,\n           m.pr_cycle_time / 1440.0            AS days\n    FROM project_pr_metrics m\n    JOIN pull_requests pr ON pr.id = m.id\n    WHERE m.project_name IN ( ${project} )\n      AND m.pr_cycle_time IS NOT NULL\n      AND m.pr_cycle_time > 0\n      AND pr.status = 'MERGED'\n      AND $__timeFilter(pr.merged_date)\n      AND pr.id LIKE 'github:%'\n      AND pr.base_repo_id IN ( ${repo_id} )\n  ),\n  ranked AS (\n    SELECT bucket, days,\n           CUME_DIST() OVER (PARTITION BY bucket ORDER BY days) AS cd\n    FROM d\n  )\n  SELECT bucket                                              AS time,\n         ROUND(MIN(CASE WHEN cd >= 0.50 THEN days END), 2)   AS Median,\n         ROUND(MIN(CASE WHEN cd >= 0.75 THEN days END), 2)   AS P75\n  FROM ranked\n  GROUP BY bucket\n  ORDER BY bucket;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Lead Time For Changes",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "P430005175C4C7810"
+      },
+      "description": "Per time bucket, the share of successful production deployments followed within 24h by a revert/hotfix PR in the same repo or by any incident.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisGridShow": true,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Change/Failure Rate"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "max",
+                "value": 100
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 21
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "P430005175C4C7810"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH deploys AS (\n  SELECT cicd_deployment_id AS id,\n         MIN(finished_date)  AS ts\n  FROM cicd_deployment_commits\n  WHERE id LIKE 'github:%' \n    AND environment = 'PRODUCTION'\n    AND result      = 'SUCCESS'\n    AND $__timeFilter(finished_date)\n    AND repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN ( ${project} ))\n  GROUP BY cicd_deployment_id\n),\ndeploy_repos AS (\n  SELECT DISTINCT cicd_deployment_id AS id, repo_id\n  FROM cicd_deployment_commits\n  WHERE id LIKE 'github:%' \n    AND environment = 'PRODUCTION'\n    AND result      = 'SUCCESS'\n    AND $__timeFilter(finished_date)\n    AND repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN ( ${project} ))\n),\n-- repo-scoped failure signals: reverts and hotfixes\nrepo_failures AS (\n  SELECT pr.base_repo_id AS repo_id,\n         pr.merged_date  AS ts\n  FROM pull_requests pr\n  WHERE pr.id LIKE 'github:%' \n    AND pr.status = 'MERGED'\n    AND pr.merged_date IS NOT NULL\n    AND (pr.title    LIKE 'Revert %'\n      OR pr.head_ref LIKE 'hotfix/%'\n      OR pr.head_ref LIKE 'revert-%')\n    AND pr.base_repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                  WHERE pm.row_id = pr.base_repo_id\n                    AND pm.`table` = 'repos'\n                    AND pm.project_name IN ( ${project} ))  \n),\nfailed AS (\n  SELECT DISTINCT d.id\n  FROM deploys d\n  JOIN deploy_repos dr ON dr.id = d.id\n  JOIN repo_failures f\n    ON f.repo_id = dr.repo_id\n   AND f.ts >  d.ts\n   AND f.ts <= d.ts + INTERVAL 24 HOUR\n  UNION\n  -- incidents have no repo link, so attribute by time only\n  SELECT DISTINCT d.id\n  FROM deploys d\n  JOIN incidents inc\n    ON inc.created_date >  d.ts\n   AND inc.created_date <= d.ts + INTERVAL 24 HOUR\n)\nSELECT $__timeGroup(d.ts, $interval)                          AS time,\n       COUNT(*)                                          AS Deployments,\n       COUNT(fa.id)                                      AS `Failed Deployments`,\n       ROUND(100.0 * COUNT(fa.id) / COUNT(*), 1)         AS `Change/Failure Rate`\nFROM deploys d\nLEFT JOIN failed fa ON fa.id = d.id\nGROUP BY time\nORDER BY time;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Change Failure Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "P430005175C4C7810"
+      },
+      "description": "Per time bucket, the share of successful production deployments followed within 24h by a revert PR or by a deployment named rollback/revert.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Rollback%"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "max",
+                "value": 100
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 30
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "P430005175C4C7810"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "\nWITH deploys AS (\n  SELECT cicd_deployment_id AS id,\n         MIN(finished_date)  AS ts\n  FROM cicd_deployment_commits\n  WHERE id LIKE 'github:%' \n    AND environment = 'PRODUCTION'\n    AND result      = 'SUCCESS'\n    AND $__timeFilter(finished_date)\n    AND repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                WHERE pm.row_id = repo_id\n                  AND pm.`table` = 'repos'\n                  AND pm.project_name IN ( ${project} ))\n  GROUP BY cicd_deployment_id\n),\ndeploy_repos AS (\n  SELECT DISTINCT cicd_deployment_id AS id, repo_id\n  FROM cicd_deployment_commits\n  WHERE id LIKE 'github:%'\n    AND environment = 'PRODUCTION'\n    AND result      = 'SUCCESS'\n    AND $__timeFilter(finished_date)\n    AND repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                WHERE pm.row_id = repo_id\n                  AND pm.`table` = 'repos'\n                  AND pm.project_name IN ( ${project} ))\n),\nreverts AS (\n  SELECT pr.base_repo_id AS repo_id,\n         pr.merged_date  AS ts\n  FROM pull_requests pr\n  WHERE pr.status = 'MERGED'\n    AND pr.merged_date IS NOT NULL\n    AND (pr.title    LIKE 'Revert %'\n      OR pr.head_ref LIKE 'revert-%'\n      OR pr.head_ref LIKE 'rollback/%')\n    AND $__timeFilter(pr.created_date)\n    AND pr.base_repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n            WHERE pm.row_id = pr.base_repo_id\n              AND pm.`table` = 'repos'\n              AND pm.project_name IN ( ${project} ))\n),\nrolled_back AS (\n  -- a revert merged in one of the deployment's repos, shortly after it shipped\n  SELECT DISTINCT d.id\n  FROM deploys d\n  JOIN deploy_repos dr ON dr.id = d.id\n  JOIN reverts r\n    ON r.repo_id = dr.repo_id\n   AND r.ts >  d.ts\n   AND r.ts <= d.ts + INTERVAL 24 HOUR\n  UNION\n  -- a deployment the CI system itself named as a rollback, shortly after\n  SELECT DISTINCT d.id\n  FROM deploys d\n  JOIN cicd_deployment_commits rb\n    ON rb.environment  = 'PRODUCTION'\n   AND rb.finished_date >  d.ts\n   AND rb.finished_date <= d.ts + INTERVAL 24 HOUR\n   AND (rb.name LIKE '%rollback%' OR rb.name LIKE '%revert%')\n)\nSELECT $__timeGroup(d.ts, $interval)                    AS time,\n       COUNT(*)                                    AS Deployments,\n       COUNT(rb.id)                                AS `Rolled Back`,\n       ROUND(100.0 * COUNT(rb.id) / COUNT(*), 1)   AS `Rollback%`\nFROM deploys d\nLEFT JOIN rolled_back rb ON rb.id = d.id\nGROUP BY time\nORDER BY time;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Rollback Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "P430005175C4C7810"
+      },
+      "description": "Per time bucket, counts deployments reverted within 7 days and derives median and P90 hours from deploy to the first revert PR merge.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Hours",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Rollbacks"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Count"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "P430005175C4C7810"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH deploys AS (\n  SELECT cicd_deployment_id AS id,\n         MIN(finished_date)  AS ts\n  FROM cicd_deployment_commits\n  WHERE id LIKE 'github:%' \n    AND environment = 'PRODUCTION'\n    AND result      = 'SUCCESS'\n    AND $__timeFilter(finished_date)\n    AND repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                WHERE pm.row_id = repo_id\n                  AND pm.`table` = 'repos'\n                  AND pm.project_name IN ( ${project} ))\n  GROUP BY cicd_deployment_id\n),\ndeploy_repos AS (\n  SELECT DISTINCT cicd_deployment_id AS id, repo_id\n  FROM cicd_deployment_commits\n  WHERE id LIKE 'github:%' \n    AND environment = 'PRODUCTION'\n    AND result      = 'SUCCESS'\n    AND $__timeFilter(finished_date)\n    AND repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                WHERE pm.row_id = repo_id\n                  AND pm.`table` = 'repos'\n                  AND pm.project_name IN ( ${project} ))\n),\nreverts AS (\n  SELECT pr.base_repo_id AS repo_id,\n         pr.merged_date  AS ts\n  FROM pull_requests pr\n  WHERE id LIKE 'github:%' \n    AND pr.status = 'MERGED'\n    AND pr.merged_date IS NOT NULL\n    AND (pr.title    LIKE 'Revert %'\n      OR pr.head_ref LIKE 'revert-%'\n      OR pr.head_ref LIKE 'rollback/%')\n    AND $__timeFilter(pr.created_date)\n    AND pr.base_repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n            WHERE pm.row_id = pr.base_repo_id\n              AND pm.`table` = 'repos'\n              AND pm.project_name IN ( ${project} ))\n),\npaired AS (\n  SELECT d.id,\n         d.ts                                                  AS deployed_at,\n         MIN(r.ts)                                             AS rolled_back_at\n  FROM deploys d\n  JOIN deploy_repos dr ON dr.id = d.id\n  JOIN reverts r\n    ON r.repo_id = dr.repo_id\n   AND r.ts >  d.ts\n   AND r.ts <= d.ts + INTERVAL 7 DAY\n  GROUP BY d.id, d.ts\n),\nd AS (\n  SELECT $__timeGroup(deployed_at, $interval)                                AS bucket,\n         TIMESTAMPDIFF(MINUTE, deployed_at, rolled_back_at) / 60.0      AS hours\n  FROM paired\n),\nranked AS (\n  SELECT bucket, hours,\n         CUME_DIST() OVER (PARTITION BY bucket ORDER BY hours) AS cd\n  FROM d\n)\nSELECT bucket                                              AS time,\n       COUNT(*)                                            AS Rollbacks,\n       ROUND(MIN(CASE WHEN cd >= 0.50 THEN hours END), 1)  AS Median,\n       ROUND(MIN(CASE WHEN cd >= 0.90 THEN hours END), 1)  AS `P90`\nFROM ranked\nGROUP BY bucket\nORDER BY bucket;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Time To Rollback",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "P430005175C4C7810"
+      },
+      "description": "For deployments followed within 24h by a revert or hotfix PR, classifies each by its earliest signal and reports rollback versus fixed-forward counts.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Count",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 100,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Rollback%"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Rollback%"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 49
+      },
+      "id": 1,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "P430005175C4C7810"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH deploys AS (\n  SELECT cicd_deployment_id AS id, MIN(finished_date) AS ts\n  FROM cicd_deployment_commits\n  WHERE id LIKE 'github:%'\n    AND environment = 'PRODUCTION' AND result = 'SUCCESS'\n    AND $__timeFilter(finished_date)\n    AND repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                WHERE pm.row_id = repo_id\n                  AND pm.`table` = 'repos'\n                  AND pm.project_name IN ( ${project} ))\n  GROUP BY cicd_deployment_id\n),\ndeploy_repos AS (\n  SELECT DISTINCT cicd_deployment_id AS id, repo_id\n  FROM cicd_deployment_commits\n  WHERE id LIKE 'github:%'\n    AND environment = 'PRODUCTION' AND result = 'SUCCESS'\n    AND $__timeFilter(finished_date)\n    AND repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                WHERE pm.row_id = repo_id\n                  AND pm.`table` = 'repos'\n                  AND pm.project_name IN ( ${project} ))\n),\nsignals AS (\n  SELECT pr.base_repo_id AS repo_id, pr.merged_date AS ts, 'rollback' AS kind\n  FROM pull_requests pr\n  WHERE pr.status = 'MERGED' AND pr.merged_date IS NOT NULL\n    AND (pr.title LIKE 'Revert %' OR pr.head_ref LIKE 'revert-%'\n      OR pr.head_ref LIKE 'rollback/%')\n    AND pr.base_repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n            WHERE pm.row_id = pr.base_repo_id\n              AND pm.`table` = 'repos'\n              AND pm.project_name IN ( ${project} ))\n  UNION ALL\n  SELECT pr.base_repo_id, pr.merged_date, 'forward'\n  FROM pull_requests pr\n  WHERE id LIKE 'github:%'\n    AND pr.status = 'MERGED' AND pr.merged_date IS NOT NULL\n    AND (pr.head_ref LIKE 'hotfix/%' OR pr.title LIKE '%hotfix%'\n      OR pr.title LIKE '%fix forward%')\n    AND pr.base_repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n            WHERE pm.row_id = pr.base_repo_id\n              AND pm.`table` = 'repos'\n              AND pm.project_name IN ( ${project} ))\n),\nremedied AS (\n  SELECT d.id,\n         d.ts AS deployed_at,\n         SUBSTRING_INDEX(\n           GROUP_CONCAT(s.kind ORDER BY s.ts SEPARATOR ','), ',', 1) AS remedy\n  FROM deploys d\n  JOIN deploy_repos dr ON dr.id = d.id\n  JOIN signals s\n    ON s.repo_id = dr.repo_id\n   AND s.ts >  d.ts\n   AND s.ts <= d.ts + INTERVAL 24 HOUR\n  GROUP BY d.id, d.ts\n)\nSELECT $__timeGroup(deployed_at, $interval)                              AS time,\n       SUM(remedy = 'rollback')                                     AS `Rollback`,\n       SUM(remedy = 'forward')                                      AS `Fixed Forward`,\n       COUNT(*)                                                     AS `Failed Deployments`,\n       ROUND(100.0 * SUM(remedy = 'rollback') / COUNT(*), 1)        AS `Rollback%`\nFROM remedied\nGROUP BY time\nORDER BY time;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Roll-forward VS Rollback",
+      "type": "timeseries"
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 41,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "1m",
+          "value": "1m"
+        },
+        "label": "Time Interval",
+        "name": "interval",
+        "options": [
+          {
+            "selected": true,
+            "text": "Month",
+            "value": "1m"
+          },
+          {
+            "selected": false,
+            "text": "Week",
+            "value": "1w"
+          },
+          {
+            "selected": false,
+            "text": "Day",
+            "value": "1d"
+          }
+        ],
+        "query": "Month : 1m, Week : 1w, Day : 1d",
+        "type": "custom"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "P430005175C4C7810"
+        },
+        "definition": "SELECT DISTINCT pm.project_name  \nFROM project_mapping pm \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nORDER BY pm.project_name ",
+        "includeAll": true,
+        "label": "Project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "SELECT DISTINCT pm.project_name  \nFROM project_mapping pm \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nORDER BY pm.project_name ",
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "P430005175C4C7810"
+        },
+        "definition": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nAND pm.project_name IN ( $project )\nORDER BY text",
+        "includeAll": true,
+        "label": "Repo",
+        "multi": true,
+        "name": "repo_id",
+        "options": [],
+        "query": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nAND pm.project_name IN ( $project )\nORDER BY text",
+        "refresh": 1,
+        "regex": "/^(?<text>.*)--(?<value>.*)$/",
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "F. Delivery Metrics",
+  "uid": "ffxmx2y33mayoa",
+  "version": 6
+}

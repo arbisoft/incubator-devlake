@@ -1,0 +1,945 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 82,
+  "links": [],
+  "panels": [
+    {
+      "description": "",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "# PR Health",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.6.2",
+      "title": "Dashboard C",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "P430005175C4C7810"
+      },
+      "description": "Per author, counts PRs created in the window split by status into Merged, Open, Closed and Draft, top 20 by total.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 3
+      },
+      "id": 2,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.75,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "normal",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "P430005175C4C7810"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT REPLACE(\n         COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           NULLIF(TRIM(pr.author_name),     ''),\n           '(unmapped)'\n         ), '-', ' ')                                        AS developer,\n       SUM(CASE WHEN pr.status = 'MERGED' THEN 1 ELSE 0 END) AS Merged,\n       SUM(CASE WHEN pr.status = 'OPEN'   THEN 1 ELSE 0 END) AS Open,\n       SUM(CASE WHEN pr.status = 'CLOSED' THEN 1 ELSE 0 END) AS Closed,\n       SUM(CASE WHEN pr.status = 'DRAFT' THEN 1 ELSE 0 END) AS Draft\nFROM pull_requests pr\nJOIN accounts a ON a.id = pr.author_id AND a.id IN ( $developer_id )\nWHERE pr.id LIKE 'github:%'\n  AND $__timeFilter(pr.created_date)\n  AND pr.base_repo_id IN ( ${repo_id} )\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN ( ${project} ))\nGROUP BY developer\nORDER BY (Merged + Open + Closed) DESC\nLIMIT 20;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "PR Outcomes",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "P430005175C4C7810"
+      },
+      "description": "Per author, divides merged PRs by merged plus closed PRs created in the window (closed floored at 1), top 20 by rate.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
+      "id": 3,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.75,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": -30,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "P430005175C4C7810"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT developer, Merged / (Merged + (CASE WHEN Closed = 0 THEN 1 ELSE Closed END)) AS `Acceptance Rate`\nFROM (\n      SELECT REPLACE(\n              COALESCE(\n                NULLIF(TRIM(a.full_name), ''),\n                NULLIF(TRIM(a.user_name), ''),\n                NULLIF(TRIM(a.email),     ''),\n                '(unmapped)'\n              ), '-', ' ')                                        AS developer,\n            SUM(CASE WHEN pr.status = 'MERGED' THEN 1 ELSE 0 END) AS Merged,\n            SUM(CASE WHEN pr.status = 'CLOSED' THEN 1 ELSE 0 END) AS Closed\n      FROM pull_requests pr\n      JOIN accounts a ON a.id = pr.author_id AND a.id IN ( $developer_id )\n      WHERE pr.id LIKE 'github:%'\n        AND $__timeFilter(pr.created_date)\n        AND pr.base_repo_id IN ( ${repo_id} )\n        AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN ( ${project} ))\n      GROUP BY developer\n) base\nORDER BY `Acceptance Rate` desc\nLIMIT 20;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "PR Acceptance Rate",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "P430005175C4C7810"
+      },
+      "description": "Per time bucket, derives median/P75/P90 of created-to-merged time in days using CUME_DIST over merged PRs.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Days",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "Median"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 26
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "P430005175C4C7810"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH d AS (\n  SELECT $__timeGroup(pr.merged_date, $interval)                              AS bucket,\n         TIMESTAMPDIFF(MINUTE, pr.created_date, pr.merged_date) / 1440.0 AS days\n  FROM pull_requests pr\n  JOIN accounts a ON a.id = pr.author_id AND a.id IN ( $developer_id )\n  WHERE pr.status      = 'MERGED'\n    AND pr.merged_date IS NOT NULL\n    AND pr.merged_date > pr.created_date\n    AND pr.id LIKE 'github:%'\n    AND $__timeFilter(pr.merged_date)\n    AND pr.base_repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN ( ${project} ))\n),\nranked AS (\n  SELECT bucket, days,\n         CUME_DIST() OVER (PARTITION BY bucket ORDER BY days) AS cd\n  FROM d\n)\nSELECT bucket                                              AS time,\n       ROUND(MIN(CASE WHEN cd >= 0.50 THEN days END), 2)   AS Median,\n       ROUND(MIN(CASE WHEN cd >= 0.75 THEN days END), 2)   AS P75,\n       ROUND(MIN(CASE WHEN cd >= 0.90 THEN days END), 2)   AS P90\nFROM ranked\nGROUP BY bucket\nORDER BY bucket;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Merge Time Trend",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "P430005175C4C7810"
+      },
+      "description": "Per time bucket, derives median and P90 hours from PR creation to the earliest comment by someone other than the author.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Hours",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "P430005175C4C7810"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH first_touch AS (\n  SELECT pr.id,\n         pr.created_date,\n         MIN(c.created_date) AS first_response\n  FROM pull_requests pr\n  JOIN pull_request_comments c\n    ON c.pull_request_id = pr.id\n   AND NOT (c.account_id <=> pr.author_id)     \n   AND c.created_date >= pr.created_date\n  JOIN accounts a on a.id = pr.author_id AND a.id IN ( $developer_id )\n  WHERE pr.id LIKE 'github:%'\n    AND $__timeFilter(pr.created_date)\n    AND pr.base_repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN ( ${project} ))\n  GROUP BY pr.id, pr.created_date\n),\nd AS (\n  SELECT $__timeGroup(created_date, ${interval})                              AS bucket,\n         TIMESTAMPDIFF(MINUTE, created_date, first_response) / 60.0    AS hours\n  FROM first_touch\n),\nranked AS (\n  SELECT bucket, hours,\n         CUME_DIST() OVER (PARTITION BY bucket ORDER BY hours) AS cd\n  FROM d\n)\nSELECT bucket                                               AS time,\n       ROUND(MIN(CASE WHEN cd >= 0.50 THEN hours END), 2)   AS Median,\n       ROUND(MIN(CASE WHEN cd >= 0.90 THEN hours END), 2)   AS P90\nFROM ranked\nGROUP BY bucket\nORDER BY bucket;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Time To First Review",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "P430005175C4C7810"
+      },
+      "description": "Buckets PRs by total lines changed summed across their commits into four size bands, reporting PR count and share of total.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Line Count",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 42
+      },
+      "id": 6,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "P430005175C4C7810"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH pr_size AS (\n  SELECT pr.id,\n         SUM(c.additions + c.deletions) AS lines_changed\n  FROM pull_requests pr\n  JOIN pull_request_commits prc ON prc.pull_request_id = pr.id\n  JOIN commits c                ON c.sha = prc.commit_sha\n  WHERE pr.id LIKE 'github:%'\n    AND $__timeFilter(pr.created_date)\n    AND pr.base_repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN ( ${project} ))\n    AND EXISTS (\n      SELECT 1\n      FROM accounts a where a.id IN ( $developer_id  )\n      AND a.email = c.author_email\n    )\n  GROUP BY pr.id\n),\nbucketed AS (\n  SELECT CASE\n           WHEN lines_changed <  200 THEN '1. < 200'\n           WHEN lines_changed <  500 THEN '2. 200-499'\n           WHEN lines_changed < 1000 THEN '3. 500-999'\n           ELSE                           '4. 1000+'\n         END      AS bucket,\n         COUNT(*) AS prs\n  FROM pr_size\n  GROUP BY bucket\n)\nSELECT bucket,\n       prs AS 'PR Count',\n       CONCAT(ROUND(100.0 * prs / SUM(prs) OVER (), 1), '%') AS Percentage\nFROM bucketed\nORDER BY bucket;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "PR Size",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "P430005175C4C7810"
+      },
+      "description": "Lists open PRs with days since creation, author and comma-joined reviewer names, keeping PRs the selected developer either authored or reviewed.",
+      "fieldConfig": {
+        "defaults": {
+          "actions": [],
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "links": [],
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repository"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 224
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 52
+      },
+      "id": 7,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "P430005175C4C7810"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH _names AS (\n  SELECT a.id AS id, \n    REPLACE(\n      COALESCE(\n        NULLIF(TRIM(a.full_name), ''),\n        NULLIF(TRIM(a.user_name), ''),\n        NULLIF(TRIM(a.email),     ''),\n        'u/m'\n      ), '-', ' ') AS name\n  FROM accounts a\n  WHERE a.id LIKE 'github:%'\n)\n\n\nSELECT * FROM \n(\n  SELECT \n    r.name AS 'Repository', \n    title as 'PR Title', \n    DATEDIFF(CURDATE(), pr.created_date) AS 'Days Open', \n    REPLACE(n.name, 'u/m', pr.author_id) AS 'Author',\n    (\n      SELECT GROUP_CONCAT(DISTINCT n.name ORDER BY n.name SEPARATOR ', ')\n      FROM pull_request_comments prc\n      JOIN _names n ON n.id = prc.account_id\n      WHERE prc.pull_request_id = pr.id\n        AND prc.type IN ('DIFF', 'REVIEW')\n        AND prc.account_id <> pr.author_id\n    ) AS Reviewers, \n    pr.url as URL\n  FROM pull_requests pr\n  JOIN repos r ON pr.base_repo_id = r.id \n  JOIN _names n ON n.id = pr.author_id\n  JOIN accounts a ON a.id = pr.author_id\n  WHERE pr.id LIKE 'github:%' \n    AND pr.status = 'OPEN'\n    AND (\n         a.email IN ( $developer_id )\n      OR EXISTS (\n                  SELECT 1 \n                  FROM pull_request_comments prc2\n                  JOIN accounts a ON a.id = prc2.account_id AND a.id IN ( $developer_id )\n                  WHERE prc2.pull_request_id = pr.id\n                    AND prc2.type IN ('DIFF', 'REVIEW')\n                    AND prc2.account_id <> pr.author_id\n                )\n    )\n    AND $__timeFilter(pr.created_date)\n    AND pr.base_repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                  WHERE pm.row_id = pr.base_repo_id\n                    AND pm.`table` = 'repos'\n                    AND pm.project_name IN ( ${project} ))  \n) base\nORDER BY base.`Days Open` DESC;\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Open PR Aging",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "P430005175C4C7810"
+      },
+      "description": "Per repo, counts merged PRs having no APPROVED comment from anyone other than the author, and their share of all merged PRs.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 61
+      },
+      "id": 8,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "P430005175C4C7810"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM (\n  SELECT \n    Repository, \n    COUNT(has_been_reviewed) - SUM(has_been_reviewed) AS 'Unapproved PR Count', \n    CONCAT(ROUND((COUNT(has_been_reviewed) - SUM(has_been_reviewed))/COUNT(has_been_reviewed)*100, 1), '%') AS 'Unapproved PRs Percentage'\n  FROM (\n    SELECT r.name as Repository, pr.title, \n      EXISTS (\n        SELECT 1\n        FROM pull_request_comments prc\n        WHERE pr.id = prc.pull_request_id\n        AND prc.type IN ('APPROVED')\n        AND pr.author_id <> prc.account_id\n      ) AS has_been_reviewed\n    FROM pull_requests pr\n    JOIN repos r ON pr.base_repo_id = r.id\n    JOIN accounts a ON a.id = pr.author_id AND a.id IN ( $developer_id )\n    WHERE pr.status = 'MERGED' \n      AND pr.id LIKE 'github:%'\n      AND $__timeFilter(pr.created_date)\n      AND pr.base_repo_id IN ( ${repo_id} )\n      AND EXISTS (SELECT 1 FROM project_mapping pm\n              WHERE pm.row_id = pr.base_repo_id\n                AND pm.`table` = 'repos'\n                AND pm.project_name IN ( ${project} ))\n  ) base\n  GROUP BY base.Repository\n) base2\nORDER BY base2.`Unapproved PR Count` DESC",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "PRs Merged Without Approval",
+      "type": "table"
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 41,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "1m",
+          "value": "1m"
+        },
+        "label": "Time Interval",
+        "name": "interval",
+        "options": [
+          {
+            "selected": true,
+            "text": "Month",
+            "value": "1m"
+          },
+          {
+            "selected": false,
+            "text": "Week",
+            "value": "1w"
+          },
+          {
+            "selected": false,
+            "text": "Day",
+            "value": "1d"
+          }
+        ],
+        "query": "Month : 1m, Week : 1w, Day : 1d",
+        "type": "custom"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "P430005175C4C7810"
+        },
+        "definition": "SELECT DISTINCT pm.project_name  \nFROM project_mapping pm \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nORDER BY pm.project_name ",
+        "includeAll": true,
+        "label": "Project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "SELECT DISTINCT pm.project_name  \nFROM project_mapping pm \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nORDER BY pm.project_name ",
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "P430005175C4C7810"
+        },
+        "definition": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nAND pm.project_name IN ( $project )\nORDER BY text",
+        "includeAll": true,
+        "label": "Repo",
+        "multi": true,
+        "name": "repo_id",
+        "options": [],
+        "query": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nAND pm.project_name IN ( $project )\nORDER BY text",
+        "refresh": 1,
+        "regex": "/^(?<text>.*)--(?<value>.*)$/",
+        "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "P430005175C4C7810"
+        },
+        "definition": "WITH scoped_repos AS (\n  SELECT r.id\n  FROM repos r\n  WHERE r.id LIKE 'github:%'\n    AND r.deleted = 0\n    AND r.id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = r.id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN ( ${project} ))\n),\nscoped_accounts AS (\n  -- PR authors\n  SELECT pr.author_id AS account_id\n  FROM pull_requests pr\n  JOIN scoped_repos sr ON sr.id = pr.base_repo_id\n  WHERE pr.author_id LIKE 'github:%'\n  UNION\n  -- reviewers and commenters\n  SELECT cmt.account_id\n  FROM pull_request_comments cmt\n  JOIN pull_requests pr ON pr.id = cmt.pull_request_id\n  JOIN scoped_repos sr  ON sr.id = pr.base_repo_id\n  WHERE cmt.account_id LIKE 'github:%'\n  UNION\n  -- issue assignees, scoped through boards (github board ids match repo ids)\n  SELECT ia.assignee_id\n  FROM issue_assignees ia\n  JOIN board_issues bi ON bi.issue_id = ia.issue_id\n  WHERE ia.assignee_id LIKE 'github:%'\n    AND bi.board_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = bi.board_id\n                   AND pm.`table` = 'boards'\n                   AND pm.project_name IN ( ${project} ))\n)\nSELECT CONCAT(\n         REPLACE(COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           '(unmapped)'\n         ), '-', ' '),\n         '--', a.id) AS Name\nFROM accounts a\nJOIN scoped_accounts sa ON sa.account_id = a.id\nGROUP BY Name\nORDER BY Name",
+        "description": "",
+        "includeAll": true,
+        "label": "Developer",
+        "multi": true,
+        "name": "developer_id",
+        "options": [],
+        "query": "WITH scoped_repos AS (\n  SELECT r.id\n  FROM repos r\n  WHERE r.id LIKE 'github:%'\n    AND r.deleted = 0\n    AND r.id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = r.id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN ( ${project} ))\n),\nscoped_accounts AS (\n  -- PR authors\n  SELECT pr.author_id AS account_id\n  FROM pull_requests pr\n  JOIN scoped_repos sr ON sr.id = pr.base_repo_id\n  WHERE pr.author_id LIKE 'github:%'\n  UNION\n  -- reviewers and commenters\n  SELECT cmt.account_id\n  FROM pull_request_comments cmt\n  JOIN pull_requests pr ON pr.id = cmt.pull_request_id\n  JOIN scoped_repos sr  ON sr.id = pr.base_repo_id\n  WHERE cmt.account_id LIKE 'github:%'\n  UNION\n  -- issue assignees, scoped through boards (github board ids match repo ids)\n  SELECT ia.assignee_id\n  FROM issue_assignees ia\n  JOIN board_issues bi ON bi.issue_id = ia.issue_id\n  WHERE ia.assignee_id LIKE 'github:%'\n    AND bi.board_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = bi.board_id\n                   AND pm.`table` = 'boards'\n                   AND pm.project_name IN ( ${project} ))\n)\nSELECT CONCAT(\n         REPLACE(COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           '(unmapped)'\n         ), '-', ' '),\n         '--', a.id) AS Name\nFROM accounts a\nJOIN scoped_accounts sa ON sa.account_id = a.id\nGROUP BY Name\nORDER BY Name",
+        "refresh": 1,
+        "regex": "/^(?<text>.*)--(?<value>.*)$/",
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "C. PR Health",
+  "uid": "efxmt33dl16gwf",
+  "version": 12
+}
