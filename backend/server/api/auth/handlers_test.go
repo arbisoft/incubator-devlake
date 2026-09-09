@@ -190,12 +190,13 @@ func newTestService(t *testing.T, idp *fakeIdP) (*Service, *mockdal.Dal) {
 	db.On("Delete", mock.Anything, mock.Anything).Return(nil)
 
 	s := &Service{
-		cfg:       cfg,
-		providers: map[string]*oidchelper.Provider{"test": oidchelper.NewProvider(pc)},
-		logger:    logruslog.Global,
-		db:        db,
-		revoked:   newRevocationCache(),
-		lastSeen:  map[string]time.Time{},
+		bootstrapCfg: cfg,
+		runtimeCfg:   cfg,
+		providers:    map[string]*oidchelper.Provider{"test": oidchelper.NewProvider(pc)},
+		logger:       logruslog.Global,
+		db:           db,
+		revoked:      newRevocationCache(),
+		lastSeen:     map[string]time.Time{},
 	}
 	return s, db
 }
@@ -271,7 +272,7 @@ func TestFullLoginCallbackFlow(t *testing.T) {
 		t.Fatalf("login: expected 303, got %d", loginW.Code)
 	}
 	stateCookie := extractCookie(t, loginW.Result(), oidchelper.StateCookieName)
-	nonce := stateNonceFromCookie(t, s.cfg.SessionSecret, stateCookie.Value)
+	nonce := stateNonceFromCookie(t, s.runtimeCfg.SessionSecret, stateCookie.Value)
 
 	// 2. /auth/callback: must succeed and set session + csrf cookies.
 	cbReq := httptest.NewRequest(http.MethodGet,
@@ -343,7 +344,7 @@ func TestCallbackRejectsUnverifiedDirectoryEmail(t *testing.T) {
 	loginW := httptest.NewRecorder()
 	r.ServeHTTP(loginW, httptest.NewRequest(http.MethodGet, PathLogin+"?provider=test", nil))
 	stateCookie := extractCookie(t, loginW.Result(), oidchelper.StateCookieName)
-	nonce := stateNonceFromCookie(t, s.cfg.SessionSecret, stateCookie.Value)
+	nonce := stateNonceFromCookie(t, s.runtimeCfg.SessionSecret, stateCookie.Value)
 
 	callbackW := httptest.NewRecorder()
 	callbackReq := httptest.NewRequest(http.MethodGet, PathCallback+"?code=fake-code&state="+url.QueryEscape(nonce), nil)
@@ -367,7 +368,7 @@ func TestCallbackRedirectsUnexpectedDirectoryFailure(t *testing.T) {
 	loginW := httptest.NewRecorder()
 	r.ServeHTTP(loginW, httptest.NewRequest(http.MethodGet, PathLogin+"?provider=test", nil))
 	stateCookie := extractCookie(t, loginW.Result(), oidchelper.StateCookieName)
-	nonce := stateNonceFromCookie(t, s.cfg.SessionSecret, stateCookie.Value)
+	nonce := stateNonceFromCookie(t, s.runtimeCfg.SessionSecret, stateCookie.Value)
 
 	callbackW := httptest.NewRecorder()
 	callbackReq := httptest.NewRequest(http.MethodGet, PathCallback+"?code=fake-code&state="+url.QueryEscape(nonce), nil)
@@ -429,7 +430,7 @@ func TestCSRFRequiredOnUnsafeMethod(t *testing.T) {
 	loginW := httptest.NewRecorder()
 	r.ServeHTTP(loginW, httptest.NewRequest(http.MethodGet, PathLogin+"?provider=test", nil))
 	stateCookie := extractCookie(t, loginW.Result(), oidchelper.StateCookieName)
-	nonce := stateNonceFromCookie(t, s.cfg.SessionSecret, stateCookie.Value)
+	nonce := stateNonceFromCookie(t, s.runtimeCfg.SessionSecret, stateCookie.Value)
 
 	cbReq := httptest.NewRequest(http.MethodGet,
 		PathCallback+"?code=c&state="+url.QueryEscape(nonce), nil)

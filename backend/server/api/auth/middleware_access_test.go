@@ -54,7 +54,7 @@ func TestOIDCAuthenticationRejectsUnauthorizedAccessSession(t *testing.T) {
 	service.access = authorizer
 	router := newTestRouter(service)
 
-	session, _, err := oidchelper.IssueSession(service.cfg, "disabled-session", "test", idp.subject, idp.email, idp.name)
+	session, _, err := oidchelper.IssueSession(service.runtimeCfg, "disabled-session", "test", idp.subject, idp.email, idp.name)
 	if err != nil {
 		t.Fatalf("issue session: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestOIDCAuthenticationRejectsUnknownProviderSession(t *testing.T) {
 	service.access = authorizer
 	router := newTestRouter(service)
 
-	session, _, err := oidchelper.IssueSession(service.cfg, "unknown-provider-session", "retired", idp.subject, idp.email, idp.name)
+	session, _, err := oidchelper.IssueSession(service.runtimeCfg, "unknown-provider-session", "retired", idp.subject, idp.email, idp.name)
 	if err != nil {
 		t.Fatalf("issue session: %v", err)
 	}

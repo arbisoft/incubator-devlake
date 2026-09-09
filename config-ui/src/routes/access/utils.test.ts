@@ -20,16 +20,23 @@ import { equal } from 'node:assert/strict';
 import { test } from 'node:test';
 import { AxiosError, AxiosHeaders, HttpStatusCode } from 'axios';
 
-import { ACCESS_ERROR_CODE } from '../../api/access';
+import { ACCESS_ERROR_CODE, OIDC_PROVIDER_SYNC_STATUS, type OIDCProvider } from '../../api/access';
 
 import {
   ACCESS_ERROR,
+  canActivateOIDCProvider,
+  formFromOIDCProvider,
   getCreateDomainError,
   getCreateUserError,
+  getOIDCProviderError,
+  getOIDCProviderStatus,
   isValidDomain,
   isValidEmail,
+  isValidOIDCProviderInput,
+  normalizeOIDCProviderInput,
   normalizeDomain,
 } from './utils';
+import { OIDC_PROVIDER_STATUS, OIDC_PROVIDER_STATUS_COLOR } from './constants';
 
 const createAxiosError = (status: number, data: unknown) =>
   new AxiosError('Request failed', 'ERR_BAD_REQUEST', undefined, undefined, {
@@ -104,4 +111,137 @@ test('maps create-domain error codes to safe UI copy', () => {
   equal(getCreateDomainError(serverErr), ACCESS_ERROR.REQUEST_FAILED);
 
   equal(getCreateDomainError(new Error('network error')), ACCESS_ERROR.REQUEST_FAILED);
+});
+
+test('normalizes and validates OIDC provider settings locally', () => {
+  const provider = normalizeOIDCProviderInput({
+    providerKey: ' Google-Workspace ',
+    displayName: ' Google Workspace ',
+    issuerUrl: 'https://accounts.example.com///',
+    clientId: ' client-id ',
+    clientSecret: ' secret ',
+    scopes: 'openid, profile openid email',
+  });
+
+  equal(provider.providerKey, 'google-workspace');
+  equal(provider.issuerUrl, 'https://accounts.example.com');
+  equal(provider.scopes, 'openid profile email');
+  equal(isValidOIDCProviderInput(provider), true);
+  equal(isValidOIDCProviderInput({ ...provider, providerKey: 'invalid/key' }), false);
+  equal(isValidOIDCProviderInput({ ...provider, issuerUrl: 'http://issuer.example.com' }), false);
+  equal(isValidOIDCProviderInput({ ...provider, scopes: 'profile email' }), false);
+  equal(isValidOIDCProviderInput({ ...provider, issuerUrl: 'http://localhost:5556' }), false);
+  equal(isValidOIDCProviderInput({ ...provider, issuerUrl: 'http://localhost:5556' }, undefined, true), true);
+});
+
+test('allows stored OIDC credentials only for the unchanged client ID', () => {
+  const provider = normalizeOIDCProviderInput({
+    providerKey: 'google',
+    displayName: 'Google',
+    issuerUrl: 'https://accounts.example.com',
+    clientId: 'client-a',
+    clientSecret: '',
+    scopes: 'openid profile email',
+  });
+  const configuredProvider: OIDCProvider = {
+    providerKey: 'google',
+    displayName: 'Google',
+    issuerUrl: 'https://accounts.example.com',
+    clientId: 'client-a',
+    scopes: 'openid profile email',
+    enabled: true,
+    secretConfigured: true,
+    databaseSourceActive: true,
+    grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.SYNCHRONIZED,
+    grafanaSyncedRevision: 1,
+    providerRevision: 1,
+    devlakeCallbackUrl: 'https://devlake.example.com/api/auth/callback',
+    grafanaCallbackUrl: 'https://grafana.example.com/login/generic_oauth',
+    allowLocalOidc: false,
+  };
+
+  equal(isValidOIDCProviderInput(provider, configuredProvider), true);
+  equal(isValidOIDCProviderInput({ ...provider, clientId: 'client-b' }, configuredProvider), false);
+});
+
+test('creates a write-only OIDC provider form from configured state', () => {
+  const provider: OIDCProvider = {
+    providerKey: 'google',
+    displayName: 'Google',
+    issuerUrl: 'https://accounts.google.com',
+    clientId: 'client',
+    scopes: 'openid profile email',
+    enabled: true,
+    secretConfigured: true,
+    databaseSourceActive: true,
+    grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.SYNCHRONIZED,
+    grafanaSyncedRevision: 1,
+    providerRevision: 1,
+    devlakeCallbackUrl: 'https://devlake.example.com/api/auth/callback',
+    grafanaCallbackUrl: 'https://grafana.example.com/login/generic_oauth',
+    allowLocalOidc: false,
+  };
+
+  equal(formFromOIDCProvider(provider).clientSecret, '');
+  equal(formFromOIDCProvider(provider).scopes, provider.scopes);
+  equal(formFromOIDCProvider().scopes, 'openid profile email');
+});
+
+test('maps OIDC provider errors to safe user-facing messages', () => {
+  const invalidProvider = createAxiosError(HttpStatusCode.BadRequest, {
+    code: ACCESS_ERROR_CODE.INVALID_OIDC_PROVIDER,
+  });
+  const blockedProvider = createAxiosError(HttpStatusCode.BadRequest, {
+    code: ACCESS_ERROR_CODE.OIDC_PROVIDER_BLOCKED,
+  });
+  const unavailableBlockedProvider = createAxiosError(HttpStatusCode.ServiceUnavailable, {
+    code: ACCESS_ERROR_CODE.OIDC_PROVIDER_BLOCKED,
+  });
+  const unavailableUnknownProvider = createAxiosError(HttpStatusCode.ServiceUnavailable, {
+    code: 'GRAFANA_CREDENTIAL_REJECTED',
+  });
+
+  equal(getOIDCProviderError(invalidProvider), ACCESS_ERROR.INVALID_OIDC_PROVIDER);
+  equal(getOIDCProviderError(blockedProvider), ACCESS_ERROR.OIDC_PROVIDER_BLOCKED);
+  equal(getOIDCProviderError(unavailableBlockedProvider), ACCESS_ERROR.OIDC_PROVIDER_BLOCKED);
+  equal(getOIDCProviderError(unavailableUnknownProvider), ACCESS_ERROR.OIDC_PROVIDER_FAILED);
+  equal(getOIDCProviderError(new Error('network error')), ACCESS_ERROR.OIDC_PROVIDER_FAILED);
+});
+
+test('summarizes OIDC provider lifecycle state without exposing internal synchronization details', () => {
+  const configuredProvider: OIDCProvider = {
+    providerKey: 'google',
+    displayName: 'Google',
+    issuerUrl: 'https://accounts.google.com',
+    clientId: 'client',
+    scopes: 'openid profile email',
+    enabled: false,
+    secretConfigured: true,
+    databaseSourceActive: false,
+    grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.SYNCHRONIZED,
+    grafanaSyncedRevision: 1,
+    providerRevision: 1,
+    devlakeCallbackUrl: 'https://devlake.example.com/api/auth/callback',
+    grafanaCallbackUrl: 'https://grafana.example.com/login/generic_oauth',
+    allowLocalOidc: false,
+  };
+
+  equal(getOIDCProviderStatus(undefined), OIDC_PROVIDER_STATUS.ENVIRONMENT);
+  equal(getOIDCProviderStatus(configuredProvider), OIDC_PROVIDER_STATUS.CONFIGURED);
+  equal(canActivateOIDCProvider(configuredProvider), true);
+  equal(
+    getOIDCProviderStatus({ ...configuredProvider, databaseSourceActive: true, enabled: true }),
+    OIDC_PROVIDER_STATUS.ACTIVE,
+  );
+  equal(
+    getOIDCProviderStatus({ ...configuredProvider, grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.COMPENSATION_FAILED }),
+    OIDC_PROVIDER_STATUS.RECOVERY,
+  );
+  const compensatedProvider = { ...configuredProvider, grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.COMPENSATED };
+  equal(getOIDCProviderStatus(compensatedProvider), OIDC_PROVIDER_STATUS.COMPENSATED);
+  equal(canActivateOIDCProvider(compensatedProvider), true);
+  equal(OIDC_PROVIDER_STATUS_COLOR[OIDC_PROVIDER_STATUS.ACTIVE], 'green');
+  equal(OIDC_PROVIDER_STATUS_COLOR[OIDC_PROVIDER_STATUS.COMPENSATED], 'orange');
+  equal(OIDC_PROVIDER_STATUS_COLOR[OIDC_PROVIDER_STATUS.RECOVERY], 'red');
+  equal(OIDC_PROVIDER_STATUS_COLOR[OIDC_PROVIDER_STATUS.CONFIGURED], 'orange');
 });

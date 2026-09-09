@@ -26,11 +26,14 @@ import (
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/log"
+	"github.com/apache/incubator-devlake/helpers/oidchelper"
 )
 
 type Config struct {
 	Enabled             bool
 	BootstrapAdminEmail string
+	AuthPublicURL       string
+	GrafanaPublicURL    string
 }
 
 // SessionRevoker persists revocations in the same transaction as an access-user
@@ -42,10 +45,13 @@ type SessionRevoker interface {
 }
 
 type Service struct {
-	cfg            Config
-	db             dal.Dal
-	logger         log.Logger
-	sessionRevoker SessionRevoker
+	cfg             Config
+	db              dal.Dal
+	logger          log.Logger
+	oidcLifecycleMu sync.Mutex
+	sessionRevoker  SessionRevoker
+	oidcRuntime     OIDCProviderRuntime
+	grafanaSSO      *GrafanaSSOClient
 }
 
 var (
@@ -60,11 +66,46 @@ func Init(basicRes context.BasicRes) {
 			cfg: Config{
 				Enabled:             cfg.GetBool("AUTH_ACCESS_ENABLED"),
 				BootstrapAdminEmail: normalizeEmail(cfg.GetString("AUTH_BOOTSTRAP_ADMIN_EMAIL")),
+				AuthPublicURL:       strings.TrimRight(strings.TrimSpace(cfg.GetString("AUTH_PUBLIC_URL")), "/"),
+				GrafanaPublicURL:    strings.TrimRight(strings.TrimSpace(cfg.GetString("GRAFANA_PUBLIC_URL")), "/"),
 			},
 			db:     basicRes.GetDal(),
 			logger: basicRes.GetLogger(),
 		}
+		grafanaClient, err := NewGrafanaSSOClient(
+			cfg.GetString("GRAFANA_INTERNAL_URL"),
+			cfg.GetString("GRAFANA_MANAGEMENT_USER"),
+			cfg.GetString("GRAFANA_MANAGEMENT_PASSWORD"),
+			nil,
+		)
+		if err == nil {
+			defaultService.grafanaSSO = grafanaClient
+		} else if defaultService.cfg.Enabled {
+			// The constructor error deliberately contains no supplied values. This
+			// warns operators without exposing backend-only Grafana credentials.
+			defaultService.logger.Warn(err, "access: Grafana SSO administration is unavailable; configure the private Grafana URL and management credentials")
+		}
 	})
+}
+
+func (s *Service) oidcProviderCallbacks() (string, string, errors.Error) {
+	if s.cfg.AuthPublicURL == "" || s.cfg.GrafanaPublicURL == "" {
+		return "", "", errors.Unavailable.New("OIDC provider public URLs are not configured", errors.WithData(ErrCodeProviderBlocked))
+	}
+	return s.cfg.AuthPublicURL + authOIDCCallbackPath, s.cfg.GrafanaPublicURL + grafanaOIDCCallbackPath, nil
+}
+
+func (s *Service) decorateOIDCProviderResponse(response *OIDCProviderResponse) *OIDCProviderResponse {
+	if response == nil {
+		return nil
+	}
+	response.AllowLocalOIDC = oidchelper.AllowsLocalOIDCURL(s.cfg.AuthPublicURL)
+	devLakeCallbackURL, grafanaCallbackURL, err := s.oidcProviderCallbacks()
+	if err == nil {
+		response.DevLakeCallbackURL = devLakeCallbackURL
+		response.GrafanaCallbackURL = grafanaCallbackURL
+	}
+	return response
 }
 
 func Default() *Service { return defaultService }
@@ -72,6 +113,12 @@ func Default() *Service { return defaultService }
 func SetSessionRevoker(revoker SessionRevoker) {
 	if defaultService != nil {
 		defaultService.sessionRevoker = revoker
+	}
+}
+
+func SetOIDCProviderRuntime(runtime OIDCProviderRuntime) {
+	if defaultService != nil {
+		defaultService.oidcRuntime = runtime
 	}
 }
 

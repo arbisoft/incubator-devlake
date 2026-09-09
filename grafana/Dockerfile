@@ -46,7 +46,7 @@ USER root
 # JSON targets the v6 panel schema, so an unpinned install would silently break
 # those panels on the next image build.
 RUN grafana-cli plugins install grafana-piechart-panel && \
-    grafana-cli plugins install volkovlabs-form-panel 6.3.5
+    grafana-cli plugins install volkovlabs-form-panel 5.1.0
 RUN chgrp -R 0 /etc/grafana /usr/share/grafana /var/lib/grafana && \
     chmod -R g=u /etc/grafana /usr/share/grafana /var/lib/grafana
 USER 101

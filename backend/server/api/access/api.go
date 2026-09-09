@@ -40,19 +40,32 @@ type currentResponse struct {
 func outputError(c *gin.Context, err errors.Error) {
 	status := err.GetType().GetHttpCode()
 	message := "unable to process access request"
-	var code string
-	if status >= http.StatusBadRequest && status < http.StatusInternalServerError {
-		if errData := err.GetData(); errData != nil {
-			if c, ok := errData.(string); ok {
-				code = c
-			}
-		}
+	code := accessErrorCode(err)
+	if safeAccessError(status, code) {
 		if safeMessage := err.Messages().Get(); safeMessage != "" {
 			message = strings.TrimSuffix(safeMessage, fmt.Sprintf(" (%d)", status))
 		}
+	} else {
+		code = ""
 	}
 	logruslog.Global.Error(err, "HTTP %d access API error", status)
 	c.JSON(status, &ApiErrorResponse{Success: false, Message: message, Code: code})
+}
+
+func accessErrorCode(err errors.Error) string {
+	if errData := err.GetData(); errData != nil {
+		if code, ok := errData.(string); ok {
+			return code
+		}
+	}
+	return ""
+}
+
+func safeAccessError(status int, code string) bool {
+	if status >= http.StatusBadRequest && status < http.StatusInternalServerError {
+		return true
+	}
+	return status == http.StatusServiceUnavailable && code == ErrCodeProviderBlocked
 }
 
 func GetCurrent(c *gin.Context) {
@@ -225,6 +238,124 @@ func HideUser(c *gin.Context) {
 		return
 	}
 	shared.ApiOutputSuccess(c, user, http.StatusOK)
+}
+
+func GetOIDCProvider(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	provider, err := Default().GetOIDCProvider()
+	if err != nil {
+		outputError(c, err)
+		return
+	}
+	shared.ApiOutputSuccess(c, Default().decorateOIDCProviderResponse(provider), http.StatusOK)
+}
+
+func ValidateOIDCProvider(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	input, ok := oidcProviderInput(c)
+	if !ok {
+		return
+	}
+	if err := Default().ValidateOIDCProvider(c.Request.Context(), input); err != nil {
+		outputError(c, err)
+		return
+	}
+	shared.ApiOutputSuccess(c, nil, http.StatusNoContent)
+}
+
+func PutOIDCProvider(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	input, ok := oidcProviderInput(c)
+	if !ok {
+		return
+	}
+	actor, _ := GetIdentity(c)
+	provider, err := Default().SaveOIDCProvider(c.Request.Context(), actor.Email, input)
+	if err != nil {
+		outputError(c, err)
+		return
+	}
+	shared.ApiOutputSuccess(c, Default().decorateOIDCProviderResponse(provider), http.StatusOK)
+}
+
+func ActivateOIDCProvider(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	actor, _ := GetIdentity(c)
+	provider, err := Default().ActivateOIDCProvider(c.Request.Context(), actor.Email)
+	if err != nil {
+		outputError(c, err)
+		return
+	}
+	shared.ApiOutputSuccess(c, Default().decorateOIDCProviderResponse(provider), http.StatusOK)
+}
+
+func EnableOIDCProvider(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	actor, _ := GetIdentity(c)
+	provider, err := Default().EnableOIDCProvider(c.Request.Context(), actor.Email)
+	if err != nil {
+		outputError(c, err)
+		return
+	}
+	shared.ApiOutputSuccess(c, Default().decorateOIDCProviderResponse(provider), http.StatusOK)
+}
+
+func DisableOIDCProvider(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	actor, _ := GetIdentity(c)
+	provider, err := Default().DisableOIDCProvider(c.Request.Context(), actor.Email)
+	if err != nil {
+		outputError(c, err)
+		return
+	}
+	shared.ApiOutputSuccess(c, Default().decorateOIDCProviderResponse(provider), http.StatusOK)
+}
+
+func RetireOIDCProvider(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	actor, _ := GetIdentity(c)
+	provider, err := Default().RetireOIDCProvider(actor.Email)
+	if err != nil {
+		outputError(c, err)
+		return
+	}
+	shared.ApiOutputSuccess(c, Default().decorateOIDCProviderResponse(provider), http.StatusOK)
+}
+
+func RetryGrafanaOIDCProviderSync(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	actor, _ := GetIdentity(c)
+	provider, err := Default().RetryGrafanaOIDCProviderSync(c.Request.Context(), actor.Email)
+	if err != nil {
+		outputError(c, err)
+		return
+	}
+	shared.ApiOutputSuccess(c, Default().decorateOIDCProviderResponse(provider), http.StatusOK)
+}
+
+func oidcProviderInput(c *gin.Context) (OIDCProviderInput, bool) {
+	input := OIDCProviderInput{}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		outputError(c, errors.BadInput.Wrap(err, "invalid OIDC provider settings", errors.WithData(ErrCodeInvalidProvider)))
+		return OIDCProviderInput{}, false
+	}
+	return input, true
 }
 
 func requireAdmin(c *gin.Context) (*Principal, bool) {

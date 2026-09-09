@@ -18,7 +18,14 @@
 
 import axios, { HttpStatusCode } from 'axios';
 
-import { ACCESS_ERROR_CODE, type AccessApiErrorResponse } from '../../api/access';
+import {
+  ACCESS_ERROR_CODE,
+  OIDC_PROVIDER_SYNC_STATUS,
+  type AccessApiErrorResponse,
+  type OIDCProvider,
+  type OIDCProviderInput,
+} from '../../api/access';
+import { OIDC_PROVIDER_STATUS } from './constants';
 
 export const ACCESS_ERROR = {
   DUPLICATE_DOMAIN: 'This domain already has a DevLake access policy.',
@@ -26,6 +33,9 @@ export const ACCESS_ERROR = {
   INVALID_DOMAIN: 'Enter a valid email domain and role, then try again.',
   INVALID_USER: 'Enter a valid email and role, then try again.',
   REQUEST_FAILED: 'Unable to update access settings. Please try again.',
+  INVALID_OIDC_PROVIDER: 'Enter valid OIDC provider settings and include the openid scope.',
+  OIDC_PROVIDER_BLOCKED: 'OIDC provider settings cannot be applied until the deployment prerequisites are available.',
+  OIDC_PROVIDER_FAILED: 'OIDC provider settings could not be completed. Please try again.',
 } as const;
 
 export const normalizeDomain = (value: string) => value.trim().toLowerCase();
@@ -55,6 +65,14 @@ const extractErrorCode = (error: unknown): string | undefined => {
   return typeof error.response.data?.code === 'string' ? error.response.data.code : undefined;
 };
 
+const extractOIDCProviderErrorCode = (error: unknown): string | undefined => {
+  if (!axios.isAxiosError<AccessApiErrorResponse>(error)) return undefined;
+  const response = error.response;
+  const status = response?.status;
+  if (status !== HttpStatusCode.BadRequest && status !== HttpStatusCode.ServiceUnavailable) return undefined;
+  return typeof response?.data?.code === 'string' ? response.data.code : undefined;
+};
+
 const serverMessage = (error: unknown) => {
   if (!axios.isAxiosError<{ message?: unknown }>(error) || error.response?.status !== HttpStatusCode.BadRequest) {
     return '';
@@ -80,4 +98,89 @@ export const getCreateDomainError = (error: unknown) => {
   const message = serverMessage(error);
   if (message.includes('this domain already has a DevLake access policy')) return ACCESS_ERROR.DUPLICATE_DOMAIN;
   return message ? ACCESS_ERROR.INVALID_DOMAIN : ACCESS_ERROR.REQUEST_FAILED;
+};
+
+export const normalizeOIDCProviderInput = (provider: OIDCProviderInput): OIDCProviderInput => ({
+  providerKey: provider.providerKey.trim().toLowerCase(),
+  displayName: provider.displayName.trim(),
+  issuerUrl: provider.issuerUrl.trim().replace(/\/+$/, ''),
+  clientId: provider.clientId.trim(),
+  clientSecret: provider.clientSecret.trim(),
+  scopes: provider.scopes
+    .split(/[\s,]+/)
+    .filter(Boolean)
+    .filter((scope, index, scopes) => scopes.indexOf(scope) === index)
+    .join(' '),
+});
+
+export const formFromOIDCProvider = (provider?: OIDCProvider): OIDCProviderInput => ({
+  providerKey: provider?.providerKey ?? '',
+  displayName: provider?.displayName ?? '',
+  issuerUrl: provider?.issuerUrl ?? '',
+  clientId: provider?.clientId ?? '',
+  clientSecret: '',
+  scopes: provider?.scopes ?? 'openid profile email',
+});
+
+export const isValidOIDCProviderInput = (
+  provider: OIDCProviderInput,
+  configuredProvider?: OIDCProvider,
+  allowLocalOidc = false,
+) => {
+  const normalized = normalizeOIDCProviderInput(provider);
+  let issuer: URL;
+  try {
+    issuer = new URL(normalized.issuerUrl);
+  } catch {
+    return false;
+  }
+  const isLocalHTTP =
+    issuer.protocol === 'http:' && (issuer.hostname === 'localhost' || issuer.hostname === '127.0.0.1');
+  const requiresReplacementSecret =
+    !configuredProvider?.secretConfigured || normalized.clientId !== configuredProvider.clientId;
+  return (
+    /^[a-z0-9_-]{1,64}$/.test(normalized.providerKey) &&
+    normalized.displayName.length > 0 &&
+    normalized.clientId.length > 0 &&
+    (!requiresReplacementSecret || normalized.clientSecret.length > 0) &&
+    (issuer.protocol === 'https:' || (allowLocalOidc && isLocalHTTP)) &&
+    normalized.scopes.split(' ').includes('openid')
+  );
+};
+
+export const getOIDCProviderError = (error: unknown) => {
+  const code = extractOIDCProviderErrorCode(error);
+  if (code === ACCESS_ERROR_CODE.INVALID_OIDC_PROVIDER) return ACCESS_ERROR.INVALID_OIDC_PROVIDER;
+  if (code === ACCESS_ERROR_CODE.OIDC_PROVIDER_BLOCKED || code === ACCESS_ERROR_CODE.OIDC_PROVIDER_MISSING) {
+    return ACCESS_ERROR.OIDC_PROVIDER_BLOCKED;
+  }
+  return ACCESS_ERROR.OIDC_PROVIDER_FAILED;
+};
+
+export const getOIDCProviderStatus = (provider?: OIDCProvider) => {
+  if (!provider?.providerKey) return OIDC_PROVIDER_STATUS.ENVIRONMENT;
+  if (provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.COMPENSATION_FAILED)
+    return OIDC_PROVIDER_STATUS.RECOVERY;
+  if (provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.COMPENSATED) return OIDC_PROVIDER_STATUS.COMPENSATED;
+  if (provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.FAILED) return OIDC_PROVIDER_STATUS.FAILED;
+  if (!provider.databaseSourceActive) {
+    return provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.SYNCHRONIZED
+      ? OIDC_PROVIDER_STATUS.CONFIGURED
+      : OIDC_PROVIDER_STATUS.SYNCHRONIZING;
+  }
+  if (provider.providerRevision > provider.grafanaSyncedRevision || !provider.enabled)
+    return OIDC_PROVIDER_STATUS.PENDING;
+  return OIDC_PROVIDER_STATUS.ACTIVE;
+};
+
+export const canActivateOIDCProvider = (provider?: OIDCProvider) => {
+  if (!provider?.providerKey || provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.COMPENSATION_FAILED)
+    return false;
+  if (!provider.databaseSourceActive) {
+    return (
+      provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.SYNCHRONIZED ||
+      provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.COMPENSATED
+    );
+  }
+  return provider.providerRevision > provider.grafanaSyncedRevision;
 };
