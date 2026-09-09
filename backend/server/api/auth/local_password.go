@@ -18,6 +18,7 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
@@ -125,6 +126,12 @@ func generateTemporaryLocalPassword() (string, error) {
 }
 
 func (h *localPasswordHasher) Hash(password string) (string, error) {
+	return h.HashContext(context.Background(), password)
+}
+
+// HashContext waits for bounded Argon2 capacity until the caller cancels. Once
+// Argon2 begins, the underlying implementation cannot be interrupted.
+func (h *localPasswordHasher) HashContext(ctx context.Context, password string) (string, error) {
 	if err := validateLocalPassword(password); err != nil {
 		return "", err
 	}
@@ -132,9 +139,11 @@ func (h *localPasswordHasher) Hash(password string) (string, error) {
 	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
 		return "", fmt.Errorf("generate password hash salt: %w", err)
 	}
-	h.acquire()
+	if err := h.acquire(ctx); err != nil {
+		return "", err
+	}
+	defer h.release()
 	key := argon2.IDKey([]byte(password), salt, h.config.Iterations, h.config.MemoryKiB, h.config.Parallelism, h.config.KeyLength)
-	h.release()
 	return fmt.Sprintf("$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s",
 		argon2idVersion,
 		h.config.MemoryKiB,
@@ -146,20 +155,35 @@ func (h *localPasswordHasher) Hash(password string) (string, error) {
 }
 
 func (h *localPasswordHasher) Verify(encodedHash, password string) (bool, bool, error) {
+	return h.VerifyContext(context.Background(), encodedHash, password)
+}
+
+// VerifyContext waits for bounded Argon2 capacity until the caller cancels.
+// An in-progress Argon2 computation remains non-cancelable by design.
+func (h *localPasswordHasher) VerifyContext(ctx context.Context, encodedHash, password string) (bool, bool, error) {
 	parameters, salt, expectedKey, err := parseLocalPasswordHash(encodedHash)
 	if err != nil {
 		return false, false, err
 	}
-	h.acquire()
+	if err := h.acquire(ctx); err != nil {
+		return false, false, err
+	}
+	defer h.release()
 	actualKey := argon2.IDKey([]byte(password), salt, parameters.Iterations, parameters.MemoryKiB, parameters.Parallelism, uint32(len(expectedKey)))
-	h.release()
 	if subtle.ConstantTimeCompare(actualKey, expectedKey) != 1 {
 		return false, false, nil
 	}
 	return true, !parameters.matches(h.config), nil
 }
 
-func (h *localPasswordHasher) acquire() { h.workers <- struct{}{} }
+func (h *localPasswordHasher) acquire(ctx context.Context) error {
+	select {
+	case h.workers <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
 
 func (h *localPasswordHasher) release() { <-h.workers }
 

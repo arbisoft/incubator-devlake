@@ -146,11 +146,8 @@ func TestLocalLoginIssuesSharedBrowserSessionAndCookies(t *testing.T) {
 	db := dalmocks.NewDal(t)
 	tx := dalmocks.NewTransaction(t)
 	db.EXPECT().Begin().Return(tx).Twice()
-	notFound := errors.NotFound.New("missing throttle bucket")
-	tx.On("First", mock.Anything, mock.Anything).Return(notFound).Twice()
-	tx.On("IsErrorNotFound", notFound).Return(true).Twice()
-	tx.On("Delete", mock.Anything, mock.Anything).Return(nil).Twice()
-	tx.On("Create", mock.Anything).Return(nil).Once()
+	tx.On("Create", mock.Anything).Return(nil).Times(5)
+	tx.On("Update", mock.Anything).Return(nil).Times(4)
 	tx.On("Commit").Return(nil).Twice()
 
 	cfg := &oidchelper.Config{

@@ -36,6 +36,7 @@ const (
 	localLoginFailureLimit             = uint(5)
 	localLoginWindow                   = 15 * time.Minute
 	localLoginCooldown                 = 15 * time.Minute
+	localLoginReservationLease         = time.Minute
 	localLoginRateLimitKeyMinimumBytes = 32
 )
 
@@ -60,55 +61,107 @@ func newLocalLoginThrottle(key []byte) (*localLoginThrottle, error) {
 	}, nil
 }
 
-// Allowed reports whether both privacy-preserving buckets currently permit an
-// attempt. Callers pass a transaction so the following failure/success update
-// can share the same storage boundary as authentication state.
-func (t *localLoginThrottle) Allowed(tx dal.Transaction, loginName, clientIP string) (bool, errors.Error) {
-	for _, bucket := range t.buckets(loginName, clientIP) {
-		attempt := &access.LocalLoginAttempt{}
-		err := tx.First(attempt, dal.Where("bucket_kind = ? AND bucket_key = ?", bucket.kind, bucket.key))
-		if err != nil {
-			if tx.IsErrorNotFound(err) {
-				continue
-			}
-			return false, errors.Default.Wrap(err, "error reading local login throttle")
-		}
-		if attempt.BlockedUntil != nil && attempt.BlockedUntil.After(t.now()) {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-// RecordFailure increments both buckets with a row lock. A caller must invoke
-// it in a transaction; callers must not split the read-modify-write sequence
-// across transactions because that would lose concurrent failures.
-func (t *localLoginThrottle) RecordFailure(tx dal.Transaction, loginName, clientIP string) (bool, errors.Error) {
-	blocked := false
-	for _, bucket := range t.buckets(loginName, clientIP) {
-		bucketBlocked, err := t.recordFailure(tx, bucket)
-		if err != nil {
-			return false, err
-		}
-		blocked = blocked || bucketBlocked
-	}
-	return blocked, nil
-}
-
-// Reset removes both buckets after a successful authentication. The keys are
-// HMAC values, so this does not persist a raw login name or client address.
-func (t *localLoginThrottle) Reset(tx dal.Transaction, loginName, clientIP string) errors.Error {
-	for _, bucket := range t.buckets(loginName, clientIP) {
-		if err := tx.Delete(&access.LocalLoginAttempt{}, dal.Where("bucket_kind = ? AND bucket_key = ?", bucket.kind, bucket.key)); err != nil {
-			return errors.Default.Wrap(err, "error clearing local login throttle")
-		}
-	}
-	return nil
-}
-
 type localLoginThrottleBucket struct {
 	kind string
 	key  string
+}
+
+// localLoginReservation represents work admitted by both HMAC buckets. It is
+// intentionally in-memory only: the database stores counts and leases, never
+// a login name, IP address, or request identifier.
+type localLoginReservation struct {
+	buckets   []localLoginThrottleBucket
+	expiresAt time.Time
+}
+
+type localLoginAttemptOutcome uint8
+
+const (
+	localLoginAttemptReleased localLoginAttemptOutcome = iota
+	localLoginAttemptSucceeded
+	localLoginAttemptFailed
+)
+
+// Reserve atomically admits at most failureLimit pending or failed attempts
+// per bucket. Every caller must later Complete the reservation. A bounded lease
+// releases capacity if a process dies after admission and before completion.
+func (t *localLoginThrottle) Reserve(tx dal.Transaction, loginName, clientIP string) (*localLoginReservation, bool, errors.Error) {
+	now := t.now()
+	buckets := t.buckets(loginName, clientIP)
+	attempts := make([]*access.LocalLoginAttempt, 0, len(buckets))
+	for _, bucket := range buckets {
+		attempt, err := t.lockAttempt(tx, bucket, now)
+		if err != nil {
+			return nil, false, err
+		}
+		attempts = append(attempts, attempt)
+	}
+
+	for _, attempt := range attempts {
+		if t.normalizeAttempt(attempt, now) {
+			if err := tx.Update(attempt); err != nil {
+				return nil, false, errors.Default.Wrap(err, "error normalizing local login throttle")
+			}
+		}
+		if t.isBlocked(attempt, now) || attempt.FailureCount+attempt.ReservationCount >= t.failureLimit {
+			return nil, false, nil
+		}
+	}
+
+	expiresAt := now.Add(localLoginReservationLease)
+	for _, attempt := range attempts {
+		if attempt.ReservationExpiresAt != nil && attempt.ReservationExpiresAt.After(now) && attempt.ReservationExpiresAt.Before(expiresAt) {
+			expiresAt = *attempt.ReservationExpiresAt
+		}
+	}
+	for _, attempt := range attempts {
+		attempt.ReservationCount++
+		attempt.ReservationExpiresAt = &expiresAt
+		if err := tx.Update(attempt); err != nil {
+			return nil, false, errors.Default.Wrap(err, "error reserving local login attempt")
+		}
+	}
+	return &localLoginReservation{buckets: buckets, expiresAt: expiresAt}, true, nil
+}
+
+// Complete releases a previously admitted attempt. Successful authentication
+// clears ordinary failures but retains other in-flight reservations. A canceled
+// request only releases capacity. A stale lease is ignored so delayed work
+// cannot alter a newer reservation window.
+func (t *localLoginThrottle) Complete(tx dal.Transaction, reservation *localLoginReservation, outcome localLoginAttemptOutcome) errors.Error {
+	if reservation == nil {
+		return errors.Default.New("local login reservation is required")
+	}
+	now := t.now()
+	for _, bucket := range reservation.buckets {
+		attempt, err := t.lockAttempt(tx, bucket, now)
+		if err != nil {
+			return err
+		}
+		if t.normalizeAttempt(attempt, now) || attempt.ReservationExpiresAt == nil || !attempt.ReservationExpiresAt.Equal(reservation.expiresAt) || attempt.ReservationCount == 0 {
+			if err := tx.Update(attempt); err != nil {
+				return errors.Default.Wrap(err, "error completing local login reservation")
+			}
+			continue
+		}
+
+		attempt.ReservationCount--
+		if attempt.ReservationCount == 0 {
+			attempt.ReservationExpiresAt = nil
+		}
+		switch outcome {
+		case localLoginAttemptSucceeded:
+			attempt.FailureCount = 0
+			attempt.WindowStartedAt = now
+			attempt.BlockedUntil = nil
+		case localLoginAttemptFailed:
+			t.recordFailure(attempt, now)
+		}
+		if err := tx.Update(attempt); err != nil {
+			return errors.Default.Wrap(err, "error completing local login reservation")
+		}
+	}
+	return nil
 }
 
 func (t *localLoginThrottle) buckets(loginName, clientIP string) []localLoginThrottleBucket {
@@ -126,63 +179,52 @@ func (t *localLoginThrottle) bucketKey(kind, value string) string {
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
-func (t *localLoginThrottle) recordFailure(tx dal.Transaction, bucket localLoginThrottleBucket) (bool, errors.Error) {
-	now := t.now()
-	attempt := &access.LocalLoginAttempt{}
-	err := tx.First(
-		attempt,
-		dal.Where("bucket_kind = ? AND bucket_key = ?", bucket.kind, bucket.key),
-		dal.Lock(true, false),
-	)
-	if err != nil {
-		if !tx.IsErrorNotFound(err) {
-			return false, errors.Default.Wrap(err, "error locking local login throttle")
-		}
-		attempt = &access.LocalLoginAttempt{
-			BucketKind:      bucket.kind,
-			BucketKey:       bucket.key,
-			FailureCount:    1,
-			WindowStartedAt: now,
-		}
-		if attempt.FailureCount >= t.failureLimit {
-			blockedUntil := now.Add(t.cooldown)
-			attempt.BlockedUntil = &blockedUntil
-		}
-		if createErr := tx.Create(attempt); createErr != nil {
-			if tx.IsDuplicationError(createErr) {
-				if readErr := tx.First(
-					attempt,
-					dal.Where("bucket_kind = ? AND bucket_key = ?", bucket.kind, bucket.key),
-					dal.Lock(true, false),
-				); readErr != nil {
-					return false, errors.Default.Wrap(readErr, "error locking concurrent local login throttle")
-				}
-				return t.incrementFailure(tx, attempt, now)
-			}
-			return false, errors.Default.Wrap(createErr, "error creating local login throttle")
-		}
-		return attempt.BlockedUntil != nil, nil
+func (t *localLoginThrottle) lockAttempt(tx dal.Transaction, bucket localLoginThrottleBucket, now time.Time) (*access.LocalLoginAttempt, errors.Error) {
+	attempt := &access.LocalLoginAttempt{
+		BucketKind:      bucket.kind,
+		BucketKey:       bucket.key,
+		WindowStartedAt: now,
 	}
-
-	return t.incrementFailure(tx, attempt, now)
+	if err := tx.Create(attempt); err == nil {
+		return attempt, nil
+	} else if !tx.IsDuplicationError(err) {
+		return nil, errors.Default.Wrap(err, "error creating local login throttle")
+	}
+	if err := tx.First(attempt, dal.Where("bucket_kind = ? AND bucket_key = ?", bucket.kind, bucket.key), dal.Lock(true, false)); err != nil {
+		return nil, errors.Default.Wrap(err, "error locking concurrent local login throttle")
+	}
+	return attempt, nil
 }
 
-func (t *localLoginThrottle) incrementFailure(tx dal.Transaction, attempt *access.LocalLoginAttempt, now time.Time) (bool, errors.Error) {
-	if attempt.BlockedUntil != nil && attempt.BlockedUntil.After(now) {
-		return true, nil
+func (t *localLoginThrottle) normalizeAttempt(attempt *access.LocalLoginAttempt, now time.Time) bool {
+	changed := false
+	if attempt.ReservationExpiresAt != nil && !attempt.ReservationExpiresAt.After(now) {
+		attempt.ReservationCount = 0
+		attempt.ReservationExpiresAt = nil
+		changed = true
 	}
-	if now.Sub(attempt.WindowStartedAt) >= t.window {
+	if attempt.BlockedUntil != nil && !attempt.BlockedUntil.After(now) {
 		attempt.FailureCount = 0
 		attempt.WindowStartedAt = now
 		attempt.BlockedUntil = nil
+		changed = true
+	} else if now.Sub(attempt.WindowStartedAt) >= t.window {
+		attempt.FailureCount = 0
+		attempt.WindowStartedAt = now
+		attempt.BlockedUntil = nil
+		changed = true
 	}
+	return changed
+}
+
+func (t *localLoginThrottle) isBlocked(attempt *access.LocalLoginAttempt, now time.Time) bool {
+	return attempt.BlockedUntil != nil && attempt.BlockedUntil.After(now)
+}
+
+func (t *localLoginThrottle) recordFailure(attempt *access.LocalLoginAttempt, now time.Time) {
 	attempt.FailureCount++
 	if attempt.FailureCount >= t.failureLimit {
 		blockedUntil := now.Add(t.cooldown)
 		attempt.BlockedUntil = &blockedUntil
 	}
-	if updateErr := tx.Update(attempt); updateErr != nil {
-		return false, errors.Default.Wrap(updateErr, "error updating local login throttle")
-	}
-	return attempt.BlockedUntil != nil, nil
 }

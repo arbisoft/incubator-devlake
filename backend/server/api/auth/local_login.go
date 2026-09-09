@@ -18,6 +18,7 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -162,9 +163,9 @@ func (s *Service) LocalLogin(c *gin.Context) {
 		fail(c, http.StatusBadRequest, "invalid local login request", err)
 		return
 	}
-	allowed, throttleErr := s.localLoginAllowed(loginName, c.ClientIP())
+	reservation, allowed, throttleErr := s.reserveLocalLoginAttempt(loginName, c.ClientIP())
 	if throttleErr != nil {
-		fail(c, http.StatusInternalServerError, "check local login throttle", throttleErr)
+		fail(c, http.StatusInternalServerError, "reserve local login throttle", throttleErr)
 		return
 	}
 	if !allowed {
@@ -174,44 +175,60 @@ func (s *Service) LocalLogin(c *gin.Context) {
 
 	credential, user, lookupErr := directory.ResolveActiveLocalCredential(loginName)
 	if lookupErr != nil {
-		s.verifyDummyLocalPassword(input.Password)
-		s.recordLocalLoginFailure(loginName, c.ClientIP())
+		if !s.verifyDummyLocalPassword(c.Request.Context(), input.Password) {
+			s.releaseLocalLoginAttempt(reservation)
+			return
+		}
+		s.completeFailedLocalLogin(reservation)
 		localLoginFailure(c)
 		return
 	}
-	matched, rehash, verifyErr := s.local.hasher.Verify(credential.PasswordHash, input.Password)
+	matched, rehash, verifyErr := s.local.hasher.VerifyContext(c.Request.Context(), credential.PasswordHash, input.Password)
 	if verifyErr != nil {
+		if c.Request.Context().Err() != nil {
+			s.releaseLocalLoginAttempt(reservation)
+			return
+		}
 		s.logger.Error(verifyErr, "local login credential hash is invalid")
-		s.verifyDummyLocalPassword(input.Password)
-		s.recordLocalLoginFailure(loginName, c.ClientIP())
+		if !s.verifyDummyLocalPassword(c.Request.Context(), input.Password) {
+			s.releaseLocalLoginAttempt(reservation)
+			return
+		}
+		s.completeFailedLocalLogin(reservation)
 		localLoginFailure(c)
 		return
 	}
 	if !matched {
-		s.recordLocalLoginFailure(loginName, c.ClientIP())
+		s.completeFailedLocalLogin(reservation)
 		localLoginFailure(c)
 		return
 	}
 	principal, accessErr := directory.AuthorizeLocalSession(user.ID)
 	if accessErr != nil {
-		s.recordLocalLoginFailure(loginName, c.ClientIP())
+		s.completeFailedLocalLogin(reservation)
 		localLoginFailure(c)
 		return
 	}
 	if rehash {
 		// A successful verification is the only safe point to upgrade a stored
 		// PHC value. This must preserve a forced-change requirement.
-		passwordHash, hashErr := s.local.hasher.Hash(input.Password)
+		passwordHash, hashErr := s.local.hasher.HashContext(c.Request.Context(), input.Password)
 		if hashErr != nil {
+			if c.Request.Context().Err() != nil {
+				s.releaseLocalLoginAttempt(reservation)
+				return
+			}
+			s.completeSuccessfulLocalLogin(reservation)
 			fail(c, http.StatusInternalServerError, "refresh local credential", hashErr)
 			return
 		}
 		if replaceErr := directory.RefreshLocalPasswordHash(user.ID, passwordHash); replaceErr != nil {
+			s.completeSuccessfulLocalLogin(reservation)
 			fail(c, http.StatusInternalServerError, "refresh local credential", replaceErr)
 			return
 		}
 	}
-	issued, issueErr := s.issueLocalBrowserSession(loginName, c.ClientIP(), user, credential.MustChangePassword)
+	issued, issueErr := s.issueLocalBrowserSession(reservation, user, credential.MustChangePassword)
 	if issueErr != nil {
 		fail(c, http.StatusInternalServerError, "issue local session", issueErr)
 		return
@@ -258,7 +275,7 @@ func (s *Service) LocalChangePassword(c *gin.Context) {
 		return
 	}
 	if !claims.MustChangePassword {
-		matched, _, verifyErr := s.local.hasher.Verify(credential.PasswordHash, input.CurrentPassword)
+		matched, _, verifyErr := s.local.hasher.VerifyContext(c.Request.Context(), credential.PasswordHash, input.CurrentPassword)
 		if verifyErr != nil {
 			fail(c, http.StatusInternalServerError, "verify local credential", verifyErr)
 			return
@@ -268,7 +285,7 @@ func (s *Service) LocalChangePassword(c *gin.Context) {
 			return
 		}
 	}
-	passwordHash, hashErr := s.local.hasher.Hash(input.Password)
+	passwordHash, hashErr := s.local.hasher.HashContext(c.Request.Context(), input.Password)
 	if hashErr != nil {
 		fail(c, http.StatusInternalServerError, "hash local password", hashErr)
 		return
@@ -314,22 +331,34 @@ func (issued *issuedBrowserSession) setCookies(c *gin.Context, cfg *oidchelper.C
 	oidchelper.SetCSRFCookie(c, cfg, issued.CSRF)
 }
 
-func (s *Service) localLoginAllowed(loginName, clientIP string) (bool, errors.Error) {
+func (s *Service) reserveLocalLoginAttempt(loginName, clientIP string) (*localLoginReservation, bool, errors.Error) {
 	tx := s.db.Begin()
-	allowed, err := s.local.throttle.Allowed(tx, loginName, clientIP)
+	reservation, allowed, err := s.local.throttle.Reserve(tx, loginName, clientIP)
 	if err != nil {
 		_ = tx.Rollback()
-		return false, err
+		return nil, false, err
 	}
 	if err := tx.Commit(); err != nil {
-		return false, errors.Default.Wrap(err, "commit local login throttle check")
+		return nil, false, errors.Default.Wrap(err, "commit local login throttle reservation")
 	}
-	return allowed, nil
+	return reservation, allowed, nil
 }
 
-func (s *Service) recordLocalLoginFailure(loginName, clientIP string) {
+func (s *Service) completeFailedLocalLogin(reservation *localLoginReservation) {
+	s.completeLocalLoginAttempt(reservation, localLoginAttemptFailed)
+}
+
+func (s *Service) completeSuccessfulLocalLogin(reservation *localLoginReservation) {
+	s.completeLocalLoginAttempt(reservation, localLoginAttemptSucceeded)
+}
+
+func (s *Service) releaseLocalLoginAttempt(reservation *localLoginReservation) {
+	s.completeLocalLoginAttempt(reservation, localLoginAttemptReleased)
+}
+
+func (s *Service) completeLocalLoginAttempt(reservation *localLoginReservation, outcome localLoginAttemptOutcome) {
 	tx := s.db.Begin()
-	if _, err := s.local.throttle.RecordFailure(tx, loginName, clientIP); err != nil {
+	if err := s.local.throttle.Complete(tx, reservation, outcome); err != nil {
 		_ = tx.Rollback()
 		s.logger.Error(err, "local login throttle update failed")
 		return
@@ -339,9 +368,9 @@ func (s *Service) recordLocalLoginFailure(loginName, clientIP string) {
 	}
 }
 
-func (s *Service) issueLocalBrowserSession(loginName, clientIP string, user *access.AccessUser, mustChangePassword bool) (*issuedBrowserSession, errors.Error) {
+func (s *Service) issueLocalBrowserSession(reservation *localLoginReservation, user *access.AccessUser, mustChangePassword bool) (*issuedBrowserSession, errors.Error) {
 	tx := s.db.Begin()
-	if err := s.local.throttle.Reset(tx, loginName, clientIP); err != nil {
+	if err := s.local.throttle.Complete(tx, reservation, localLoginAttemptSucceeded); err != nil {
 		_ = tx.Rollback()
 		return nil, err
 	}
@@ -356,8 +385,9 @@ func (s *Service) issueLocalBrowserSession(loginName, clientIP string, user *acc
 	return issued, nil
 }
 
-func (s *Service) verifyDummyLocalPassword(password string) {
-	_, _, _ = s.local.hasher.Verify(s.local.dummyHash, password)
+func (s *Service) verifyDummyLocalPassword(ctx context.Context, password string) bool {
+	_, _, err := s.local.hasher.VerifyContext(ctx, s.local.dummyHash, password)
+	return err == nil
 }
 
 func validLocalLoginPassword(password string) bool {

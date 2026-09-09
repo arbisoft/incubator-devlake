@@ -195,11 +195,13 @@ func (LocalCredential) TableName() string { return "auth_local_credentials" }
 // an HMAC digest, never a raw login name or client address.
 type LocalLoginAttempt struct {
 	common.Model
-	BucketKind      string     `gorm:"type:varchar(32);uniqueIndex:idx_auth_local_login_attempt_bucket"`
-	BucketKey       string     `gorm:"type:char(64);uniqueIndex:idx_auth_local_login_attempt_bucket"`
-	FailureCount    uint       `gorm:"not null"`
-	WindowStartedAt time.Time  `gorm:"not null"`
-	BlockedUntil    *time.Time `gorm:"index"`
+	BucketKind           string     `gorm:"type:varchar(32);uniqueIndex:idx_auth_local_login_attempt_bucket"`
+	BucketKey            string     `gorm:"type:char(64);uniqueIndex:idx_auth_local_login_attempt_bucket"`
+	FailureCount         uint       `gorm:"not null"`
+	WindowStartedAt      time.Time  `gorm:"not null"`
+	BlockedUntil         *time.Time `gorm:"index"`
+	ReservationCount     uint       `gorm:"not null"`
+	ReservationExpiresAt *time.Time
 }
 
 func (LocalLoginAttempt) TableName() string { return "auth_local_login_attempts" }
