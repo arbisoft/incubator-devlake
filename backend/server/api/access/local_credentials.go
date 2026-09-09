@@ -278,7 +278,7 @@ func (s *Service) revokeUserSessions(tx dal.Transaction, user *AccessUser) ([]st
 	if s.sessionRevoker == nil {
 		return nil, nil
 	}
-	ids, err := s.sessionRevoker.RevokePersistentSessions(tx, user)
+	ids, err := s.sessionRevoker.RevokeLocalSessions(tx, user.ID)
 	if err != nil {
 		return nil, errors.Default.Wrap(err, "error revoking user sessions")
 	}
@@ -449,7 +449,7 @@ func (s *Service) ReplaceLocalPassword(userID uint64, passwordHash string) (*Acc
 	}
 	var revokedSessionIDs []string
 	if s.sessionRevoker != nil {
-		ids, err := s.sessionRevoker.RevokePersistentSessions(tx, user)
+		ids, err := s.sessionRevoker.RevokeLocalSessions(tx, user.ID)
 		if err != nil {
 			return nil, nil, errors.Default.Wrap(err, "error revoking local sessions")
 		}
