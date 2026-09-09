@@ -63,6 +63,16 @@ type localCredentialSessionRevoker struct {
 	cachedIDs    []string
 }
 
+type localCredentialGeneratorStub struct{}
+
+func (localCredentialGeneratorStub) PrepareLocalCredential(loginName string) (*LocalCredentialMaterial, errors.Error) {
+	return &LocalCredentialMaterial{
+		LoginName:         loginName,
+		PasswordHash:      "hashed-" + loginName,
+		TemporaryPassword: "temporary-password",
+	}, nil
+}
+
 func (r *localCredentialSessionRevoker) RevokePersistentSessions(dal.Transaction, []string, string) ([]string, errors.Error) {
 	return nil, nil
 }
@@ -109,6 +119,82 @@ func TestRemoveLocalCredentialRevokesActiveLocalSessions(t *testing.T) {
 	}
 	if len(revoker.localUserIDs) != 1 || revoker.localUserIDs[0] != 42 {
 		t.Fatalf("RevokeLocalSessions() user IDs = %v, want [42]", revoker.localUserIDs)
+	}
+	if len(revoker.cachedIDs) != 1 || revoker.cachedIDs[0] != "local-session-1" {
+		t.Fatalf("CacheRevokedSessions() IDs = %v, want [local-session-1]", revoker.cachedIDs)
+	}
+}
+
+func TestResetLocalCredentialRevokesSessionsBeforeCommitAndCachesAfterward(t *testing.T) {
+	db := dalmocks.NewDal(t)
+	tx := dalmocks.NewTransaction(t)
+	revoker := &localCredentialSessionRevoker{}
+	db.EXPECT().Begin().Return(tx)
+	tx.EXPECT().First(mock.Anything, mock.Anything).Run(func(destination interface{}, _ ...dal.Clause) {
+		switch value := destination.(type) {
+		case *AccessUser:
+			value.ID = 42
+			value.Status = StatusActive
+		case *LocalCredential:
+			value.AccessUserID = 42
+			value.LoginName = "member"
+		}
+	}).Return(nil).Twice()
+	tx.EXPECT().Update(mock.Anything).Return(nil)
+	tx.EXPECT().Commit().Run(func() {
+		if len(revoker.localUserIDs) != 1 || revoker.localUserIDs[0] != 42 {
+			t.Fatalf("RevokeLocalSessions() must run before commit, got %v", revoker.localUserIDs)
+		}
+		if len(revoker.cachedIDs) != 0 {
+			t.Fatalf("CacheRevokedSessions() must run after commit, got %v", revoker.cachedIDs)
+		}
+	}).Return(nil)
+	db.EXPECT().Create(mock.MatchedBy(func(entity interface{}) bool {
+		event, ok := entity.(*AuditEvent)
+		return ok && event.Action == "local.credential_reset" && event.TargetID == 42
+	})).Return(nil)
+
+	service := &Service{db: db, logger: unithelper.DummyLogger(), localGenerator: localCredentialGeneratorStub{}, sessionRevoker: revoker}
+	if _, err := service.ResetLocalCredential("local:1", 42); err != nil {
+		t.Fatalf("ResetLocalCredential() error = %v", err)
+	}
+	if len(revoker.cachedIDs) != 1 || revoker.cachedIDs[0] != "local-session-1" {
+		t.Fatalf("CacheRevokedSessions() IDs = %v, want [local-session-1]", revoker.cachedIDs)
+	}
+}
+
+func TestReplaceLocalPasswordRevokesSessionsBeforeCommitAndCachesAfterward(t *testing.T) {
+	db := dalmocks.NewDal(t)
+	tx := dalmocks.NewTransaction(t)
+	revoker := &localCredentialSessionRevoker{}
+	db.EXPECT().Begin().Return(tx)
+	tx.EXPECT().First(mock.Anything, mock.Anything).Run(func(destination interface{}, _ ...dal.Clause) {
+		switch value := destination.(type) {
+		case *AccessUser:
+			value.ID = 42
+			value.Status = StatusActive
+		case *LocalCredential:
+			value.AccessUserID = 42
+			value.LoginName = "member"
+		}
+	}).Return(nil).Twice()
+	tx.EXPECT().Update(mock.Anything).Return(nil)
+	tx.EXPECT().Commit().Run(func() {
+		if len(revoker.localUserIDs) != 1 || revoker.localUserIDs[0] != 42 {
+			t.Fatalf("RevokeLocalSessions() must run before commit, got %v", revoker.localUserIDs)
+		}
+		if len(revoker.cachedIDs) != 0 {
+			t.Fatalf("CacheRevokedSessions() must run after commit, got %v", revoker.cachedIDs)
+		}
+	}).Return(nil)
+	db.EXPECT().Create(mock.MatchedBy(func(entity interface{}) bool {
+		event, ok := entity.(*AuditEvent)
+		return ok && event.Action == "local.password_changed" && event.TargetID == 42
+	})).Return(nil)
+
+	service := &Service{db: db, logger: unithelper.DummyLogger(), sessionRevoker: revoker}
+	if _, _, err := service.ReplaceLocalPassword(42, "replacement-hash"); err != nil {
+		t.Fatalf("ReplaceLocalPassword() error = %v", err)
 	}
 	if len(revoker.cachedIDs) != 1 || revoker.cachedIDs[0] != "local-session-1" {
 		t.Fatalf("CacheRevokedSessions() IDs = %v, want [local-session-1]", revoker.cachedIDs)

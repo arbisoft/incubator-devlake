@@ -18,10 +18,12 @@ limitations under the License.
 package access
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/mock"
 
@@ -74,5 +76,76 @@ func TestListLinkableOIDCProvidersAcceptsLocalSessionPrincipal(t *testing.T) {
 
 	if response.Code != http.StatusOK {
 		t.Fatalf("local session linkable providers status = %d, want %d: %s", response.Code, http.StatusOK, response.Body.String())
+	}
+}
+
+func TestPostDomainAuditsLocalAdministrator(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db := &mockdal.Dal{}
+	notFound := errors.NotFound.New("not found")
+	db.On("First", mock.AnythingOfType("*access.AccessDomain"), mock.Anything).Return(notFound).Once()
+	db.On("IsErrorNotFound", notFound).Return(true).Once()
+	db.On("Create", mock.MatchedBy(func(entity interface{}) bool {
+		_, ok := entity.(*AccessDomain)
+		return ok
+	})).Return(nil).Once()
+	db.On("Create", mock.MatchedBy(func(entity interface{}) bool {
+		event, ok := entity.(*AuditEvent)
+		return ok && event.ActorEmail == "local:42" && event.Action == "domain.created"
+	})).Return(nil).Once()
+
+	previous := defaultService
+	defaultService = &Service{cfg: Config{Enabled: true}, db: db}
+	t.Cleanup(func() { defaultService = previous })
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		SetPrincipal(c, &Principal{UserID: 42, Role: RoleCustomerAdmin})
+	})
+	router.POST("/access/domains", PostDomain)
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/access/domains", bytes.NewBufferString(`{"domain":"example.com","defaultRole":"member"}`))
+	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusCreated {
+		t.Fatalf("PostDomain() status = %d, want %d: %s", response.Code, http.StatusCreated, response.Body.String())
+	}
+}
+
+func TestCompleteIdentityLinkAuditsVerifiedIdentity(t *testing.T) {
+	db := &mockdal.Dal{}
+	tx := &mockdal.Transaction{}
+	notFound := errors.NotFound.New("not found")
+	db.On("Begin").Return(tx).Once()
+	tx.On("First", mock.AnythingOfType("*access.IdentityLinkState"), mock.Anything).Run(func(args mock.Arguments) {
+		state := args.Get(0).(*IdentityLinkState)
+		state.ID = "state-id"
+		state.AccessUserID = 42
+	}).Return(nil).Once()
+	tx.On("Create", mock.AnythingOfType("*access.IdentityLinkClaim")).Return(nil).Once()
+	tx.On("First", mock.AnythingOfType("*access.AccessUser"), mock.Anything).Run(func(args mock.Arguments) {
+		user := args.Get(0).(*AccessUser)
+		user.ID = 42
+		user.Status = StatusActive
+	}).Return(nil).Once()
+	tx.On("First", mock.AnythingOfType("*access.AccessIdentity"), mock.Anything).Return(notFound).Once()
+	tx.On("IsErrorNotFound", notFound).Return(true).Once()
+	tx.On("Create", mock.AnythingOfType("*access.AccessIdentity")).Return(nil).Once()
+	tx.On("UpdateColumns", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	tx.On("Commit").Return(nil).Once()
+	db.On("Create", mock.MatchedBy(func(entity interface{}) bool {
+		event, ok := entity.(*AuditEvent)
+		return ok && event.ActorEmail == "linked@example.com" && event.Action == "identity.linked"
+	})).Return(nil).Once()
+
+	service := &Service{db: db}
+	err := service.CompleteIdentityLink("state-id", "google", Identity{
+		Issuer:  "https://accounts.example.com",
+		Subject: "subject",
+		Email:   "Linked@Example.com",
+	})
+	if err != nil {
+		t.Fatalf("CompleteIdentityLink() error = %v", err)
 	}
 }

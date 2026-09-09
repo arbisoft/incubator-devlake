@@ -34,6 +34,7 @@ import {
   formFromOIDCProvider,
   getCreateDomainError,
   getCreateUserError,
+  getLocalCredentialError,
   getOIDCProviderError,
   getOIDCProviderStatus,
   isValidDomain,
@@ -110,15 +111,27 @@ test('maps create-user error codes to safe UI copy', () => {
 });
 
 test('maps local credential lifecycle errors to safe UI copy', () => {
-  const missingCredential = createAxiosError(HttpStatusCode.BadRequest, {
+  const missingCredential = createAxiosError(HttpStatusCode.NotFound, {
     code: ACCESS_ERROR_CODE.LOCAL_CREDENTIAL_MISSING,
   });
   const finalMethod = createAxiosError(HttpStatusCode.BadRequest, {
     code: ACCESS_ERROR_CODE.LAST_LOGIN_METHOD,
   });
 
-  equal(getCreateUserError(missingCredential), ACCESS_ERROR.LOCAL_CREDENTIAL_MISSING);
-  equal(getCreateUserError(finalMethod), ACCESS_ERROR.LAST_LOGIN_METHOD);
+  equal(getLocalCredentialError(missingCredential), ACCESS_ERROR.LOCAL_CREDENTIAL_MISSING);
+  equal(getLocalCredentialError(finalMethod), ACCESS_ERROR.LAST_LOGIN_METHOD);
+});
+
+test('maps local credential errors with username-specific copy', () => {
+  const duplicate = createAxiosError(HttpStatusCode.BadRequest, {
+    code: ACCESS_ERROR_CODE.DUPLICATE_USER,
+  });
+  const invalid = createAxiosError(HttpStatusCode.BadRequest, {
+    code: ACCESS_ERROR_CODE.INVALID_USER,
+  });
+
+  equal(getLocalCredentialError(duplicate), 'This username already has a DevLake local password.');
+  equal(getLocalCredentialError(invalid), 'Enter a valid username, then try again.');
 });
 
 test('maps create-domain error codes to safe UI copy', () => {

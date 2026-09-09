@@ -47,6 +47,7 @@ import { SectionHeader, SectionTitle } from './styled';
 import {
   getCreateDomainError,
   getCreateUserError,
+  getLocalCredentialError,
   isValidDomain,
   isValidEmail,
   isValidLocalLoginName,
@@ -148,7 +149,7 @@ export const Access = () => {
           displayName: localDisplayName.trim(),
           role,
         }),
-      { setOperating, formatReason: getCreateUserError },
+      { setOperating, formatReason: getLocalCredentialError },
     );
     if (success && response) {
       closeModal();
@@ -161,7 +162,7 @@ export const Access = () => {
     if (!credentialUser) return;
     const [success, response] = await operator(
       () => API.access.addLocalCredential(credentialUser.id, { loginName: localLoginName.trim() }),
-      { setOperating, formatReason: getCreateUserError },
+      { setOperating, formatReason: getLocalCredentialError },
     );
     if (success && response) {
       closeModal();
@@ -174,7 +175,7 @@ export const Access = () => {
     async (user: AccessUser) => {
       const [success, response] = await operator(() => API.access.resetLocalCredential(user.id), {
         setOperating,
-        formatReason: getCreateUserError,
+        formatReason: getLocalCredentialError,
       });
       if (success && response) {
         showTemporaryCredential(response);
@@ -187,7 +188,7 @@ export const Access = () => {
   const removeLocalCredential = useCallback(
     async (user: AccessUser) => {
       const [success] = await operator(() => API.access.removeLocalCredential(user.id), {
-        formatReason: getCreateUserError,
+        formatReason: getLocalCredentialError,
       });
       if (success) refresh();
     },

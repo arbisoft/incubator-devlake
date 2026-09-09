@@ -24,6 +24,8 @@ import type { Methods, Provider } from '@/api/auth';
 import { TipLayout } from '@/components';
 import { DEVLAKE_ENDPOINT, PATHS } from '@/config';
 
+import { normalizeLoginReturnPath } from './utils';
+
 const { Title, Paragraph } = Typography;
 const ACCESS_DENIED_MESSAGE = 'Your account is not currently allowed to access DevLake.';
 
@@ -39,7 +41,7 @@ export const Login = () => {
   const [localLoginError, setLocalLoginError] = useState<string>();
 
   const params = new URLSearchParams(window.location.search);
-  const returnUrl = params.get('return_url') || '/';
+  const returnUrl = normalizeLoginReturnPath(params.get('return_url'), PATHS.ROOT());
   const accessDenied = params.get('error') === 'access_denied';
 
   useEffect(() => {

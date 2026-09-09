@@ -153,8 +153,7 @@ func PostUser(c *gin.Context) {
 		outputError(c, errors.BadInput.Wrap(err, "invalid access user", errors.WithData(ErrCodeInvalidUser)))
 		return
 	}
-	actor, _ := GetIdentity(c)
-	user, err := Default().CreateUser(actor.Email, input.Email, input.Role)
+	user, err := Default().CreateUser(actorLabel(c), input.Email, input.Role)
 	if err != nil {
 		outputError(c, err)
 		return
@@ -216,8 +215,7 @@ func PostDomain(c *gin.Context) {
 		outputError(c, errors.BadInput.Wrap(err, "invalid access domain", errors.WithData(ErrCodeInvalidDomain)))
 		return
 	}
-	actor, _ := GetIdentity(c)
-	domain, err := Default().CreateDomain(actor.Email, AccessDomain{Domain: input.Domain, DefaultRole: input.DefaultRole})
+	domain, err := Default().CreateDomain(actorLabel(c), AccessDomain{Domain: input.Domain, DefaultRole: input.DefaultRole})
 	if err != nil {
 		outputError(c, err)
 		return
@@ -238,8 +236,7 @@ func PatchDomain(c *gin.Context) {
 		outputError(c, errors.BadInput.Wrap(err, "invalid access domain update", errors.WithData(ErrCodeInvalidDomain)))
 		return
 	}
-	actor, _ := GetIdentity(c)
-	domain, err := Default().UpdateDomain(actor.Email, id, input.DefaultRole, input.Status)
+	domain, err := Default().UpdateDomain(actorLabel(c), id, input.DefaultRole, input.Status)
 	if err != nil {
 		outputError(c, err)
 		return
@@ -255,8 +252,7 @@ func HideDomain(c *gin.Context) {
 	if !ok {
 		return
 	}
-	actor, _ := GetIdentity(c)
-	domain, err := Default().HideDomain(actor.Email, id)
+	domain, err := Default().HideDomain(actorLabel(c), id)
 	if err != nil {
 		outputError(c, err)
 		return
@@ -277,8 +273,7 @@ func PatchUser(c *gin.Context) {
 		outputError(c, errors.BadInput.Wrap(err, "invalid access user update", errors.WithData(ErrCodeInvalidUser)))
 		return
 	}
-	actor, _ := GetIdentity(c)
-	user, err := Default().UpdateUser(actor.Email, id, input.Role, input.Status)
+	user, err := Default().UpdateUser(actorLabel(c), id, input.Role, input.Status)
 	if err != nil {
 		outputError(c, err)
 		return
@@ -294,8 +289,7 @@ func HideUser(c *gin.Context) {
 	if !ok {
 		return
 	}
-	actor, _ := GetIdentity(c)
-	user, err := Default().HideUser(actor.Email, id)
+	user, err := Default().HideUser(actorLabel(c), id)
 	if err != nil {
 		outputError(c, err)
 		return
@@ -435,8 +429,7 @@ func SaveOIDCProvider(c *gin.Context) {
 	if !ok {
 		return
 	}
-	actor, _ := GetIdentity(c)
-	provider, err := Default().SaveOIDCProvider(c.Request.Context(), actor.Email, input)
+	provider, err := Default().SaveOIDCProvider(c.Request.Context(), actorLabel(c), input)
 	if err != nil {
 		outputError(c, err)
 		return
@@ -478,8 +471,7 @@ func runOIDCProviderAction(c *gin.Context, action oidcProviderAction) {
 	if !ok {
 		return
 	}
-	actor, _ := GetIdentity(c)
-	provider, err := action(c.Request.Context(), actor.Email, providerKey)
+	provider, err := action(c.Request.Context(), actorLabel(c), providerKey)
 	if err != nil {
 		outputError(c, err)
 		return

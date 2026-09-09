@@ -138,6 +138,6 @@ func (s *Service) CompleteIdentityLink(stateID, providerKey string, identity Ide
 	if err != nil {
 		return err
 	}
-	s.audit(user.Email, "identity.linked", user, "provider="+providerKey)
+	s.audit(identity.Email, "identity.linked", user, "provider="+providerKey)
 	return nil
 }

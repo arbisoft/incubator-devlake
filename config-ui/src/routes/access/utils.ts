@@ -45,6 +45,11 @@ export const ACCESS_ERROR = {
     'OIDC provider was saved, but Grafana OAuth synchronization failed. Use Retry Grafana to complete synchronization.',
 } as const;
 
+export const LOCAL_CREDENTIAL_ERROR = {
+  DUPLICATE_USER: 'This username already has a DevLake local password.',
+  INVALID_USER: 'Enter a valid username, then try again.',
+} as const;
+
 export const normalizeDomain = (value: string) => value.trim().toLowerCase();
 
 export const isValidDomain = (value: string) => {
@@ -74,6 +79,13 @@ const extractErrorCode = (error: unknown): string | undefined => {
   return typeof error.response.data?.code === 'string' ? error.response.data.code : undefined;
 };
 
+const extractLocalCredentialErrorCode = (error: unknown): string | undefined => {
+  if (!axios.isAxiosError<AccessApiErrorResponse>(error)) return undefined;
+  const response = error.response;
+  if (response?.status !== HttpStatusCode.BadRequest && response?.status !== HttpStatusCode.NotFound) return undefined;
+  return typeof response.data?.code === 'string' ? response.data.code : undefined;
+};
+
 const extractOIDCProviderErrorCode = (error: unknown): string | undefined => {
   if (!axios.isAxiosError<AccessApiErrorResponse>(error)) return undefined;
   const response = error.response;
@@ -99,6 +111,15 @@ export const getCreateUserError = (error: unknown) => {
   const message = serverMessage(error);
   if (message.includes('this email already has a DevLake access entry')) return ACCESS_ERROR.DUPLICATE_USER;
   return message ? ACCESS_ERROR.INVALID_USER : ACCESS_ERROR.REQUEST_FAILED;
+};
+
+export const getLocalCredentialError = (error: unknown) => {
+  const code = extractLocalCredentialErrorCode(error);
+  if (code === ACCESS_ERROR_CODE.LOCAL_CREDENTIAL_MISSING) return ACCESS_ERROR.LOCAL_CREDENTIAL_MISSING;
+  if (code === ACCESS_ERROR_CODE.LAST_LOGIN_METHOD) return ACCESS_ERROR.LAST_LOGIN_METHOD;
+  if (code === ACCESS_ERROR_CODE.DUPLICATE_USER) return LOCAL_CREDENTIAL_ERROR.DUPLICATE_USER;
+  if (code === ACCESS_ERROR_CODE.INVALID_USER) return LOCAL_CREDENTIAL_ERROR.INVALID_USER;
+  return ACCESS_ERROR.REQUEST_FAILED;
 };
 
 export const getCreateDomainError = (error: unknown) => {
