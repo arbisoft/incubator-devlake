@@ -189,7 +189,7 @@ func TestReplaceLocalPasswordRevokesSessionsBeforeCommitAndCachesAfterward(t *te
 	}).Return(nil)
 	db.EXPECT().Create(mock.MatchedBy(func(entity interface{}) bool {
 		event, ok := entity.(*AuditEvent)
-		return ok && event.Action == "local.password_changed" && event.TargetID == 42
+		return ok && event.ActorEmail == "local:42" && event.Action == "local.password_changed" && event.TargetID == 42
 	})).Return(nil)
 
 	service := &Service{db: db, logger: unithelper.DummyLogger(), sessionRevoker: revoker}

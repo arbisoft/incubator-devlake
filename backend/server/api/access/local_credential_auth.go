@@ -18,6 +18,7 @@ limitations under the License.
 package access
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/apache/incubator-devlake/core/dal"
@@ -74,6 +75,10 @@ func localCredentialResponse(user *AccessUser, material *LocalCredentialMaterial
 }
 
 func localCredentialAuditDetail(loginName string) string { return "login_name=" + loginName }
+
+func localActorLabel(userID uint64) string {
+	return localAccessIdentityIssuer + ":" + strconv.FormatUint(userID, 10)
+}
 
 // ResolveActiveLocalCredential returns a credential only when its parent user
 // remains visible and active. Authentication code uses this instead of joining
@@ -165,7 +170,7 @@ func (s *Service) ReplaceLocalPassword(userID uint64, passwordHash string) (*Acc
 	if s.sessionRevoker != nil {
 		s.sessionRevoker.CacheRevokedSessions(revokedSessionIDs)
 	}
-	s.audit("", "local.password_changed", user, "")
+	s.audit(localActorLabel(user.ID), "local.password_changed", user, "")
 	return user, revokedSessionIDs, nil
 }
 

@@ -511,7 +511,7 @@ func actorLabel(c *gin.Context) string {
 		return identity.Email
 	}
 	if principal, ok := GetPrincipal(c); ok {
-		return "local:" + strconv.FormatUint(principal.UserID, 10)
+		return localActorLabel(principal.UserID)
 	}
 	return ""
 }
