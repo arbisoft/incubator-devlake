@@ -303,7 +303,7 @@ func (s *Service) setOIDCProviderRetired(ctx context.Context, actor string, prov
 	provider.Enabled = false
 	provider.RetiredAt = &now
 	s.oidcRuntime.CacheRevokedSessions(revokedIDs)
-	if refreshErr := s.oidcRuntime.RefreshOIDCProvider(ctx); refreshErr != nil {
+	if refreshErr := s.oidcRuntime.RefreshOIDCProvider(ctx); refreshErr != nil && !s.hasEnabledLocalPassword() {
 		return nil, errors.Unavailable.New("OIDC provider retirement completed but runtime refresh failed", errors.WithData(ErrCodeProviderBlocked))
 	}
 	s.audit(actor, auditProviderRetired, nil, providerAuditDetail(provider.ProviderKey))
