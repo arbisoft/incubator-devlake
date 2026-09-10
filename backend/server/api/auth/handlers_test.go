@@ -206,10 +206,14 @@ func newTestRouter(s *Service) *gin.Engine {
 	r := gin.New()
 	r.Use(s.OIDCAuthentication())
 	r.Use(s.RequireAuth())
+	r.Use(s.RequirePasswordChange())
 	r.Use(s.CSRFProtect())
+	r.GET(PathMethods, s.GetMethods)
 	r.GET(PathLogin, s.LoginInit)
 	r.GET(PathLinkIdentity, s.LinkIdentityInit)
 	r.GET(PathCallback, s.Callback)
+	r.POST(PathLocalLogin, s.LocalLogin)
+	r.POST(PathLocalChangePassword, s.LocalChangePassword)
 	r.GET(PathUserInfo, s.UserInfo)
 	r.POST(PathLogout, s.Logout)
 	return r
@@ -308,6 +312,33 @@ func TestLinkIdentityFlowBindsStateToAuthenticatedUserAndProvider(t *testing.T) 
 	}
 }
 
+func TestLocalSessionCanStartIdentityLinkFlow(t *testing.T) {
+	idp := newFakeIdP(t)
+	s, _ := newTestService(t, idp)
+	directory := &testLocalDirectory{localUserID: 42}
+	directory.linkStateID = "local-link-state-123"
+	s.access = directory
+	s.local = newTestLocalRuntime(t)
+	r := newTestRouter(s)
+
+	cfg, _ := s.providerState()
+	session, _, err := oidchelper.IssueSession(cfg, "local-link-session", localSessionProvider, "42", "", "Local Admin")
+	if err != nil {
+		t.Fatalf("issue local session: %v", err)
+	}
+	request := httptest.NewRequest(http.MethodGet, PathLinkIdentity+"?provider=test", nil)
+	request.AddCookie(&http.Cookie{Name: oidchelper.SessionCookieName, Value: session})
+	response := httptest.NewRecorder()
+	r.ServeHTTP(response, request)
+
+	if response.Code != http.StatusSeeOther {
+		t.Fatalf("local identity-link start: expected 303, got %d: %s", response.Code, response.Body.String())
+	}
+	if directory.linkUserID != 42 || directory.linkProvider != "test" {
+		t.Fatalf("local identity link = user %d provider %q, want user 42 provider test", directory.linkUserID, directory.linkProvider)
+	}
+}
+
 func TestFullLoginCallbackFlow(t *testing.T) {
 	idp := newFakeIdP(t)
 	s, db := newTestService(t, idp)
@@ -350,7 +381,7 @@ func TestFullLoginCallbackFlow(t *testing.T) {
 	if err := json.Unmarshal(uiW.Body.Bytes(), &userResp); err != nil {
 		t.Fatalf("decode userinfo: %v: %s", err, uiW.Body.String())
 	}
-	if !userResp.Authenticated || userResp.Email != idp.email {
+	if !userResp.Authenticated || userResp.Email != idp.email || userResp.AuthenticationMethod != "oidc" {
 		t.Fatalf("unexpected userinfo: %+v body=%s", userResp, uiW.Body.String())
 	}
 

@@ -16,18 +16,17 @@
  *
  */
 
-export * from './api-keys';
-export * from './access';
-export * from './blueprint';
-export * from './connection';
+const encodedBackslash = /%5c/i;
 
-export * from './change-password';
-export * from './db-migrate';
-export * from './error';
-export * from './layout';
-export * from './login';
-export * from './not-found';
-export * from './onboard';
-export * from './otel';
-export * from './pipeline';
-export * from './project';
+// Keep browser-side navigation consistent with the backend's safeReturnURL
+// policy and prevent a deployment path prefix from being discarded after login.
+export const normalizeLoginReturnPath = (returnPath: string | null, fallbackPath: string) => {
+  if (!returnPath || !returnPath.startsWith('/') || returnPath.startsWith('//')) return fallbackPath;
+  if (returnPath.includes('\\') || encodedBackslash.test(returnPath)) return fallbackPath;
+
+  const pathPrefix = fallbackPath === '/' ? '' : fallbackPath.replace(/\/$/, '');
+  const pathname = returnPath.split(/[?#]/, 1)[0];
+  if (pathPrefix && pathname !== pathPrefix && !pathname.startsWith(`${pathPrefix}/`)) return fallbackPath;
+
+  return returnPath;
+};

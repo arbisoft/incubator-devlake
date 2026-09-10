@@ -16,18 +16,10 @@
  *
  */
 
-export * from './api-keys';
-export * from './access';
-export * from './blueprint';
-export * from './connection';
+import { Card } from 'antd';
+import styled from 'styled-components';
 
-export * from './change-password';
-export * from './db-migrate';
-export * from './error';
-export * from './layout';
-export * from './login';
-export * from './not-found';
-export * from './onboard';
-export * from './otel';
-export * from './pipeline';
-export * from './project';
+export const ChangePasswordCard = styled(Card)`
+  max-width: 480px;
+  margin: 0 auto;
+`;

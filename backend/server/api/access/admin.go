@@ -38,7 +38,33 @@ func (s *Service) ListUsers(query PageQuery) (*PaginatedUsers, errors.Error) {
 	if err := s.db.All(&users, dal.Where("hidden_at IS NULL"), dal.Orderby("email ASC"), dal.Offset(query.Offset()), dal.Limit(query.PageSize)); err != nil {
 		return nil, errors.Default.Wrap(err, "error listing access users")
 	}
+	if err := s.decorateLocalCredentials(users); err != nil {
+		return nil, err
+	}
 	return &PaginatedUsers{Users: users, Count: count, Page: query.Page, PageSize: query.PageSize}, nil
+}
+
+func (s *Service) decorateLocalCredentials(users []AccessUser) errors.Error {
+	if len(users) == 0 {
+		return nil
+	}
+	userIDs := make([]uint64, 0, len(users))
+	usersByID := make(map[uint64]*AccessUser, len(users))
+	for index := range users {
+		userIDs = append(userIDs, users[index].ID)
+		usersByID[users[index].ID] = &users[index]
+	}
+	credentials := make([]LocalCredential, 0)
+	if err := s.db.All(&credentials, dal.Where("access_user_id IN (?)", userIDs)); err != nil {
+		return errors.Default.Wrap(err, "error listing local credentials")
+	}
+	for _, credential := range credentials {
+		if user, ok := usersByID[credential.AccessUserID]; ok {
+			user.LocalLoginName = credential.LoginName
+			user.HasLocalCredential = true
+		}
+	}
+	return nil
 }
 
 func (s *Service) ListDomains(query PageQuery) (*PaginatedDomains, errors.Error) {
@@ -226,6 +252,12 @@ func (s *Service) updateUser(actor string, id uint64, role, status string, hide 
 				}
 				revokedSessionIDs = append(revokedSessionIDs, ids...)
 			}
+			localIDs, err := s.sessionRevoker.RevokeLocalSessions(tx, user.ID)
+			if err != nil {
+				s.logger.Error(err, "access: revoke local sessions for disabled user id=%d", user.ID)
+				return errors.Default.Wrap(err, "error revoking local sessions for disabled access user")
+			}
+			revokedSessionIDs = append(revokedSessionIDs, localIDs...)
 		}
 		return nil
 	})

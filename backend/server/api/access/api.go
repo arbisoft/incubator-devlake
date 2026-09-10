@@ -115,12 +115,12 @@ func ListLinkableOIDCProviders(c *gin.Context) {
 		outputError(c, errors.Unauthorized.New("native OIDC authentication is required"))
 		return
 	}
-	identity, ok := GetIdentity(c)
+	principal, ok := GetPrincipal(c)
 	if !ok {
-		outputError(c, errors.Unauthorized.New("native OIDC authentication is required"))
+		outputError(c, errors.Unauthorized.New("native authentication is required"))
 		return
 	}
-	providers, err := service.LinkableOIDCProviders(identity)
+	providers, err := service.LinkableOIDCProviders(principal.UserID)
 	if err != nil {
 		outputError(c, err)
 		return
@@ -153,13 +153,29 @@ func PostUser(c *gin.Context) {
 		outputError(c, errors.BadInput.Wrap(err, "invalid access user", errors.WithData(ErrCodeInvalidUser)))
 		return
 	}
-	actor, _ := GetIdentity(c)
-	user, err := Default().CreateUser(actor.Email, input.Email, input.Role)
+	user, err := Default().CreateUser(actorLabel(c), input.Email, input.Role)
 	if err != nil {
 		outputError(c, err)
 		return
 	}
 	shared.ApiOutputSuccess(c, user, http.StatusCreated)
+}
+
+func PostLocalUser(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	input := CreateLocalUserInput{}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		outputError(c, errors.BadInput.Wrap(err, "invalid local access user", errors.WithData(ErrCodeInvalidUser)))
+		return
+	}
+	response, err := Default().CreateLocalUser(actorLabel(c), input)
+	if err != nil {
+		outputError(c, err)
+		return
+	}
+	outputLocalCredential(c, response, http.StatusCreated)
 }
 
 func ListDomains(c *gin.Context) {
@@ -199,8 +215,7 @@ func PostDomain(c *gin.Context) {
 		outputError(c, errors.BadInput.Wrap(err, "invalid access domain", errors.WithData(ErrCodeInvalidDomain)))
 		return
 	}
-	actor, _ := GetIdentity(c)
-	domain, err := Default().CreateDomain(actor.Email, AccessDomain{Domain: input.Domain, DefaultRole: input.DefaultRole})
+	domain, err := Default().CreateDomain(actorLabel(c), AccessDomain{Domain: input.Domain, DefaultRole: input.DefaultRole})
 	if err != nil {
 		outputError(c, err)
 		return
@@ -221,8 +236,7 @@ func PatchDomain(c *gin.Context) {
 		outputError(c, errors.BadInput.Wrap(err, "invalid access domain update", errors.WithData(ErrCodeInvalidDomain)))
 		return
 	}
-	actor, _ := GetIdentity(c)
-	domain, err := Default().UpdateDomain(actor.Email, id, input.DefaultRole, input.Status)
+	domain, err := Default().UpdateDomain(actorLabel(c), id, input.DefaultRole, input.Status)
 	if err != nil {
 		outputError(c, err)
 		return
@@ -238,8 +252,7 @@ func HideDomain(c *gin.Context) {
 	if !ok {
 		return
 	}
-	actor, _ := GetIdentity(c)
-	domain, err := Default().HideDomain(actor.Email, id)
+	domain, err := Default().HideDomain(actorLabel(c), id)
 	if err != nil {
 		outputError(c, err)
 		return
@@ -260,8 +273,7 @@ func PatchUser(c *gin.Context) {
 		outputError(c, errors.BadInput.Wrap(err, "invalid access user update", errors.WithData(ErrCodeInvalidUser)))
 		return
 	}
-	actor, _ := GetIdentity(c)
-	user, err := Default().UpdateUser(actor.Email, id, input.Role, input.Status)
+	user, err := Default().UpdateUser(actorLabel(c), id, input.Role, input.Status)
 	if err != nil {
 		outputError(c, err)
 		return
@@ -277,8 +289,60 @@ func HideUser(c *gin.Context) {
 	if !ok {
 		return
 	}
-	actor, _ := GetIdentity(c)
-	user, err := Default().HideUser(actor.Email, id)
+	user, err := Default().HideUser(actorLabel(c), id)
+	if err != nil {
+		outputError(c, err)
+		return
+	}
+	shared.ApiOutputSuccess(c, user, http.StatusOK)
+}
+
+func PostLocalCredential(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	id, ok := accessID(c, "user")
+	if !ok {
+		return
+	}
+	input := LocalCredentialInput{}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		outputError(c, errors.BadInput.Wrap(err, "invalid local credential", errors.WithData(ErrCodeInvalidUser)))
+		return
+	}
+	response, err := Default().AddLocalCredential(actorLabel(c), id, input.LoginName)
+	if err != nil {
+		outputError(c, err)
+		return
+	}
+	outputLocalCredential(c, response, http.StatusCreated)
+}
+
+func ResetLocalCredential(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	id, ok := accessID(c, "user")
+	if !ok {
+		return
+	}
+	response, err := Default().ResetLocalCredential(actorLabel(c), id)
+	if err != nil {
+		outputError(c, err)
+		return
+	}
+	outputLocalCredential(c, response, http.StatusOK)
+}
+
+func DeleteLocalCredential(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	id, ok := accessID(c, "user")
+	if !ok {
+		return
+	}
+	user, err := Default().RemoveLocalCredential(actorLabel(c), id)
 	if err != nil {
 		outputError(c, err)
 		return
@@ -292,8 +356,12 @@ func RegisterRoutes(r *gin.Engine) {
 	r.GET("/access/oidc-providers/linkable", ListLinkableOIDCProviders)
 	r.GET("/access/users", ListUsers)
 	r.POST("/access/users", PostUser)
+	r.POST("/access/local-users", PostLocalUser)
 	r.PATCH("/access/users/:id", PatchUser)
 	r.POST("/access/users/:id/hide", HideUser)
+	r.POST("/access/users/:id/local-credential", PostLocalCredential)
+	r.POST("/access/users/:id/local-credential/reset", ResetLocalCredential)
+	r.DELETE("/access/users/:id/local-credential", DeleteLocalCredential)
 	r.GET("/access/domains", ListDomains)
 	r.POST("/access/domains", PostDomain)
 	r.PATCH("/access/domains/:id", PatchDomain)
@@ -361,8 +429,7 @@ func SaveOIDCProvider(c *gin.Context) {
 	if !ok {
 		return
 	}
-	actor, _ := GetIdentity(c)
-	provider, err := Default().SaveOIDCProvider(c.Request.Context(), actor.Email, input)
+	provider, err := Default().SaveOIDCProvider(c.Request.Context(), actorLabel(c), input)
 	if err != nil {
 		outputError(c, err)
 		return
@@ -404,8 +471,7 @@ func runOIDCProviderAction(c *gin.Context, action oidcProviderAction) {
 	if !ok {
 		return
 	}
-	actor, _ := GetIdentity(c)
-	provider, err := action(c.Request.Context(), actor.Email, providerKey)
+	provider, err := action(c.Request.Context(), actorLabel(c), providerKey)
 	if err != nil {
 		outputError(c, err)
 		return
@@ -438,6 +504,23 @@ func requireAdmin(c *gin.Context) (*Principal, bool) {
 		return nil, false
 	}
 	return principal, true
+}
+
+func actorLabel(c *gin.Context) string {
+	if identity, ok := GetIdentity(c); ok {
+		return identity.Email
+	}
+	if principal, ok := GetPrincipal(c); ok {
+		return localActorLabel(principal.UserID)
+	}
+	return ""
+}
+
+// outputLocalCredential marks the one-time password response as uncacheable at
+// browser and intermediary layers. The plaintext must not survive the response.
+func outputLocalCredential(c *gin.Context, response *LocalCredentialResponse, status int) {
+	c.Header("Cache-Control", "no-store")
+	shared.ApiOutputSuccess(c, response, status)
 }
 
 func listQuery(c *gin.Context) (PageQuery, bool) {

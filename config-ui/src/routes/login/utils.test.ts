@@ -16,18 +16,18 @@
  *
  */
 
-export * from './api-keys';
-export * from './access';
-export * from './blueprint';
-export * from './connection';
+import { equal } from 'node:assert/strict';
+import { test } from 'node:test';
 
-export * from './change-password';
-export * from './db-migrate';
-export * from './error';
-export * from './layout';
-export * from './login';
-export * from './not-found';
-export * from './onboard';
-export * from './otel';
-export * from './pipeline';
-export * from './project';
+import { normalizeLoginReturnPath } from './utils';
+
+test('keeps a relative return path under the configured application prefix', () => {
+  equal(normalizeLoginReturnPath('/devlake/connections?tab=active', '/devlake/'), '/devlake/connections?tab=active');
+});
+
+test('rejects external and malformed login return paths', () => {
+  equal(normalizeLoginReturnPath('https://example.com', '/devlake'), '/devlake/');
+  equal(normalizeLoginReturnPath('//example.com', '/devlake'), '/devlake/');
+  equal(normalizeLoginReturnPath('connections', '/devlake'), '/devlake/');
+  equal(normalizeLoginReturnPath('/\\example.com', '/devlake'), '/devlake/');
+});

@@ -20,6 +20,7 @@ package auth
 import (
 	"crypto/subtle"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -45,15 +46,20 @@ var publicPaths = map[string]struct{}{
 	PathMethods:             {},
 	PathLogin:               {},
 	PathCallback:            {},
+	PathLocalLogin:          {},
 	PathLogout:              {},
 	PathUserInfo:            {},
 }
+
+const sessionClaimsContextKey = "devlake_auth_session_claims"
 
 func OIDCAuthentication() gin.HandlerFunc { return defaultService.OIDCAuthentication() }
 
 func RequireAuth() gin.HandlerFunc { return defaultService.RequireAuth() }
 
 func CSRFProtect() gin.HandlerFunc { return defaultService.CSRFProtect() }
+
+func RequirePasswordChange() gin.HandlerFunc { return defaultService.RequirePasswordChange() }
 
 // OIDCAuthentication reads the session cookie, verifies the JWT, and sets
 // common.USER on the context. Soft authenticator: invalid/missing cookies
@@ -87,6 +93,45 @@ func (s *Service) OIDCAuthentication() gin.HandlerFunc {
 			c.Next()
 			return
 		}
+		if claims.Provider == localSessionProvider {
+			if s.local == nil {
+				s.logger.Info("native session denied: local provider is disabled jti=%s", claims.ID)
+				oidchelper.ClearSessionCookie(c, cfg)
+				c.Next()
+				return
+			}
+			userID, parseErr := localSessionUserID(claims.Subject)
+			if parseErr != nil {
+				s.logger.Info("native session denied: invalid local subject jti=%s", claims.ID)
+				oidchelper.ClearSessionCookie(c, cfg)
+				c.Next()
+				return
+			}
+			directory, ok := s.localDirectory()
+			if !ok {
+				s.logger.Error(errors.Default.New("local access directory unavailable"), "native session denied")
+				oidchelper.ClearSessionCookie(c, cfg)
+				c.Next()
+				return
+			}
+			principal, accessErr := directory.AuthorizeLocalSession(userID)
+			if accessErr != nil {
+				if accessErr.GetType() == errors.Unauthorized || accessErr.GetType() == errors.Forbidden {
+					s.logger.Info("native session denied: local user_id=%d", userID)
+				} else {
+					s.logger.Error(accessErr, "native session authorization failed local user_id=%d", userID)
+				}
+				oidchelper.ClearSessionCookie(c, cfg)
+				c.Next()
+				return
+			}
+			c.Set(common.USER, &common.User{Name: claims.Name, Email: claims.Email})
+			c.Set(sessionClaimsContextKey, claims)
+			access.SetPrincipal(c, principal)
+			s.bumpLastSeen(claims.ID)
+			c.Next()
+			return
+		}
 		if s.access != nil && s.access.Enabled() {
 			provider := cfg.Providers[claims.Provider]
 			if provider == nil {
@@ -98,7 +143,8 @@ func (s *Service) OIDCAuthentication() gin.HandlerFunc {
 			identity := access.Identity{
 				Issuer: provider.IssuerURL, Subject: claims.Subject, Email: claims.Email, DisplayName: claims.Name,
 			}
-			if _, accessErr := s.access.AuthorizeSession(identity); accessErr != nil {
+			principal, accessErr := s.access.AuthorizeSession(identity)
+			if accessErr != nil {
 				if accessErr.GetType() == errors.Unauthorized || accessErr.GetType() == errors.Forbidden {
 					s.logger.Info("native session denied: provider=%s email=%s", claims.Provider, claims.Email)
 					oidchelper.ClearSessionCookie(c, cfg)
@@ -108,11 +154,13 @@ func (s *Service) OIDCAuthentication() gin.HandlerFunc {
 				c.Next()
 				return
 			}
+			access.SetPrincipal(c, principal)
 		}
 		c.Set(common.USER, &common.User{
 			Name:  claims.Name,
 			Email: claims.Email,
 		})
+		c.Set(sessionClaimsContextKey, claims)
 		if provider := cfg.Providers[claims.Provider]; provider != nil {
 			access.SetIdentity(c, access.Identity{
 				Issuer: provider.IssuerURL, Subject: claims.Subject, Email: claims.Email, DisplayName: claims.Name,
@@ -121,6 +169,23 @@ func (s *Service) OIDCAuthentication() gin.HandlerFunc {
 		s.bumpLastSeen(claims.ID)
 		c.Next()
 	}
+}
+
+func sessionClaims(c *gin.Context) (*oidchelper.SessionClaims, bool) {
+	value, ok := c.Get(sessionClaimsContextKey)
+	if !ok {
+		return nil, false
+	}
+	claims, ok := value.(*oidchelper.SessionClaims)
+	return claims, ok && claims != nil
+}
+
+func localSessionUserID(subject string) (uint64, error) {
+	userID, err := strconv.ParseUint(subject, 10, 64)
+	if err != nil || userID == 0 {
+		return 0, errors.Default.New("invalid local session subject")
+	}
+	return userID, nil
 }
 
 // RevokePersistentSessions implements access.SessionRevoker. The caller owns the
@@ -142,6 +207,25 @@ func (s *Service) RevokePersistentSessions(tx dal.Transaction, providerKeys []st
 		ids = append(ids, activeIDs...)
 	}
 	return ids, nil
+}
+
+func (s *Service) RevokeLocalSessions(tx dal.Transaction, userID uint64) ([]string, errors.Error) {
+	return revokeSessionsForIdentity(tx, localSessionProvider, localSessionSubject(userID))
+}
+
+func revokeSessionsForIdentity(tx dal.Transaction, provider, subject string) ([]string, errors.Error) {
+	activeIDs, err := ListActiveSessionIDsForIdentity(tx, provider, subject)
+	if err != nil {
+		return nil, err
+	}
+	if err := RevokeSessionsForIdentity(tx, provider, subject); err != nil {
+		return nil, err
+	}
+	return activeIDs, nil
+}
+
+func localSessionSubject(accessUserID uint64) string {
+	return strconv.FormatUint(accessUserID, 10)
 }
 
 // RevokeProviderSessions persists revocations for every live session issued by the
@@ -186,6 +270,26 @@ func (s *Service) RequireAuth() gin.HandlerFunc {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 			"success": false,
 			"message": "unauthorized",
+		})
+	}
+}
+
+// RequirePasswordChange constrains a temporary local-password session at the
+// server boundary. UI routing is not relied on for this restriction.
+func (s *Service) RequirePasswordChange() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claims, ok := sessionClaims(c)
+		if !ok || !claims.MustChangePassword {
+			c.Next()
+			return
+		}
+		if c.Request.URL.Path == PathLocalChangePassword || c.Request.URL.Path == PathLogout || c.Request.URL.Path == PathUserInfo || c.Request.URL.Path == PathMethods {
+			c.Next()
+			return
+		}
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"message": "password change required",
 		})
 	}
 }

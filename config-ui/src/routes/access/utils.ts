@@ -33,12 +33,21 @@ export const ACCESS_ERROR = {
   DUPLICATE_USER: 'This email already has a DevLake access entry.',
   INVALID_DOMAIN: 'Enter a valid email domain and role, then try again.',
   INVALID_USER: 'Enter a valid email and role, then try again.',
+  LOCAL_CREDENTIAL_MISSING: 'This person does not have a local password.',
+  LAST_LOGIN_METHOD: 'Keep at least one interactive login method enabled.',
   REQUEST_FAILED: 'Unable to update access settings. Please try again.',
   INVALID_OIDC_PROVIDER: 'Enter valid OIDC provider settings and include the openid scope.',
   OIDC_PROVIDER_BLOCKED: 'OIDC provider settings cannot be applied until the deployment prerequisites are available.',
   OIDC_PROVIDER_FAILED: 'OIDC provider settings could not be completed. Please try again.',
   OIDC_PROVIDER_STALE: 'This provider changed. Refresh the page before saving it.',
   GRAFANA_TARGET_CONFLICT: 'Another provider already controls this Grafana sign-in option.',
+  GRAFANA_SYNC_FAILED:
+    'OIDC provider was saved, but Grafana OAuth synchronization failed. Use Retry Grafana to complete synchronization.',
+} as const;
+
+export const LOCAL_CREDENTIAL_ERROR = {
+  DUPLICATE_USER: 'This username already has a DevLake local password.',
+  INVALID_USER: 'Enter a valid username, then try again.',
 } as const;
 
 export const normalizeDomain = (value: string) => value.trim().toLowerCase();
@@ -61,11 +70,20 @@ export const isValidEmail = (value: string) => {
   return at > 0 && at === email.lastIndexOf('@') && isValidDomain(email.slice(at + 1)) && !/\s/.test(email);
 };
 
+export const isValidLocalLoginName = (value: string) => /^[a-z0-9][a-z0-9._-]{2,63}$/i.test(value.trim());
+
 const extractErrorCode = (error: unknown): string | undefined => {
   if (!axios.isAxiosError<AccessApiErrorResponse>(error) || error.response?.status !== HttpStatusCode.BadRequest) {
     return undefined;
   }
   return typeof error.response.data?.code === 'string' ? error.response.data.code : undefined;
+};
+
+const extractLocalCredentialErrorCode = (error: unknown): string | undefined => {
+  if (!axios.isAxiosError<AccessApiErrorResponse>(error)) return undefined;
+  const response = error.response;
+  if (response?.status !== HttpStatusCode.BadRequest && response?.status !== HttpStatusCode.NotFound) return undefined;
+  return typeof response.data?.code === 'string' ? response.data.code : undefined;
 };
 
 const extractOIDCProviderErrorCode = (error: unknown): string | undefined => {
@@ -87,10 +105,21 @@ export const getCreateUserError = (error: unknown) => {
   const code = extractErrorCode(error);
   if (code === ACCESS_ERROR_CODE.DUPLICATE_USER) return ACCESS_ERROR.DUPLICATE_USER;
   if (code === ACCESS_ERROR_CODE.INVALID_USER) return ACCESS_ERROR.INVALID_USER;
+  if (code === ACCESS_ERROR_CODE.LOCAL_CREDENTIAL_MISSING) return ACCESS_ERROR.LOCAL_CREDENTIAL_MISSING;
+  if (code === ACCESS_ERROR_CODE.LAST_LOGIN_METHOD) return ACCESS_ERROR.LAST_LOGIN_METHOD;
 
   const message = serverMessage(error);
   if (message.includes('this email already has a DevLake access entry')) return ACCESS_ERROR.DUPLICATE_USER;
   return message ? ACCESS_ERROR.INVALID_USER : ACCESS_ERROR.REQUEST_FAILED;
+};
+
+export const getLocalCredentialError = (error: unknown) => {
+  const code = extractLocalCredentialErrorCode(error);
+  if (code === ACCESS_ERROR_CODE.LOCAL_CREDENTIAL_MISSING) return ACCESS_ERROR.LOCAL_CREDENTIAL_MISSING;
+  if (code === ACCESS_ERROR_CODE.LAST_LOGIN_METHOD) return ACCESS_ERROR.LAST_LOGIN_METHOD;
+  if (code === ACCESS_ERROR_CODE.DUPLICATE_USER) return LOCAL_CREDENTIAL_ERROR.DUPLICATE_USER;
+  if (code === ACCESS_ERROR_CODE.INVALID_USER) return LOCAL_CREDENTIAL_ERROR.INVALID_USER;
+  return ACCESS_ERROR.REQUEST_FAILED;
 };
 
 export const getCreateDomainError = (error: unknown) => {
@@ -166,6 +195,7 @@ export const getOIDCProviderError = (error: unknown) => {
   }
   if (code === ACCESS_ERROR_CODE.OIDC_PROVIDER_REVISION_CONFLICT) return ACCESS_ERROR.OIDC_PROVIDER_STALE;
   if (code === ACCESS_ERROR_CODE.GRAFANA_TARGET_CONFLICT) return ACCESS_ERROR.GRAFANA_TARGET_CONFLICT;
+  if (code === ACCESS_ERROR_CODE.GRAFANA_SYNC_FAILED) return ACCESS_ERROR.GRAFANA_SYNC_FAILED;
   return ACCESS_ERROR.OIDC_PROVIDER_FAILED;
 };
 

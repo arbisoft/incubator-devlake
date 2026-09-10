@@ -45,7 +45,7 @@ export const Layout = () => {
   const { version, plugins, user, access } = useLoaderData() as {
     version: string;
     plugins: string[];
-    user: { authenticated: boolean; name: string; email: string } | null;
+    user: { authenticated: boolean; name: string; email: string; authenticationMethod: 'local' | 'oidc' | '' } | null;
     access: AccessCurrent | null;
   };
 

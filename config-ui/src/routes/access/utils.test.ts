@@ -34,10 +34,12 @@ import {
   formFromOIDCProvider,
   getCreateDomainError,
   getCreateUserError,
+  getLocalCredentialError,
   getOIDCProviderError,
   getOIDCProviderStatus,
   isValidDomain,
   isValidEmail,
+  isValidLocalLoginName,
   isValidOIDCProviderInput,
   normalizeOIDCProviderInput,
   canSelectGenericOIDCProvider,
@@ -78,6 +80,15 @@ test('rejects invalid email input locally', () => {
   equal(isValidEmail('person@example..com'), false);
 });
 
+test('accepts only supported local usernames', () => {
+  equal(isValidLocalLoginName('admin'), true);
+  equal(isValidLocalLoginName('Person.Name_1'), true);
+  equal(isValidLocalLoginName('ab'), false);
+  equal(isValidLocalLoginName('-admin'), false);
+  equal(isValidLocalLoginName('admin name'), false);
+  equal(isValidLocalLoginName('admin@example.com'), false);
+});
+
 test('maps create-user error codes to safe UI copy', () => {
   const duplicateErr = createAxiosError(HttpStatusCode.BadRequest, {
     code: ACCESS_ERROR_CODE.DUPLICATE_USER,
@@ -97,6 +108,30 @@ test('maps create-user error codes to safe UI copy', () => {
   equal(getCreateUserError(serverErr), ACCESS_ERROR.REQUEST_FAILED);
 
   equal(getCreateUserError(new Error('network error')), ACCESS_ERROR.REQUEST_FAILED);
+});
+
+test('maps local credential lifecycle errors to safe UI copy', () => {
+  const missingCredential = createAxiosError(HttpStatusCode.NotFound, {
+    code: ACCESS_ERROR_CODE.LOCAL_CREDENTIAL_MISSING,
+  });
+  const finalMethod = createAxiosError(HttpStatusCode.BadRequest, {
+    code: ACCESS_ERROR_CODE.LAST_LOGIN_METHOD,
+  });
+
+  equal(getLocalCredentialError(missingCredential), ACCESS_ERROR.LOCAL_CREDENTIAL_MISSING);
+  equal(getLocalCredentialError(finalMethod), ACCESS_ERROR.LAST_LOGIN_METHOD);
+});
+
+test('maps local credential errors with username-specific copy', () => {
+  const duplicate = createAxiosError(HttpStatusCode.BadRequest, {
+    code: ACCESS_ERROR_CODE.DUPLICATE_USER,
+  });
+  const invalid = createAxiosError(HttpStatusCode.BadRequest, {
+    code: ACCESS_ERROR_CODE.INVALID_USER,
+  });
+
+  equal(getLocalCredentialError(duplicate), 'This username already has a DevLake local password.');
+  equal(getLocalCredentialError(invalid), 'Enter a valid username, then try again.');
 });
 
 test('maps create-domain error codes to safe UI copy', () => {
@@ -218,10 +253,14 @@ test('maps OIDC provider errors to safe user-facing messages', () => {
   const unavailableUnknownProvider = createAxiosError(HttpStatusCode.ServiceUnavailable, {
     code: 'GRAFANA_CREDENTIAL_REJECTED',
   });
+  const grafanaSyncFailed = createAxiosError(HttpStatusCode.ServiceUnavailable, {
+    code: ACCESS_ERROR_CODE.GRAFANA_SYNC_FAILED,
+  });
 
   equal(getOIDCProviderError(invalidProvider), ACCESS_ERROR.INVALID_OIDC_PROVIDER);
   equal(getOIDCProviderError(blockedProvider), ACCESS_ERROR.OIDC_PROVIDER_BLOCKED);
   equal(getOIDCProviderError(unavailableBlockedProvider), ACCESS_ERROR.OIDC_PROVIDER_BLOCKED);
+  equal(getOIDCProviderError(grafanaSyncFailed), ACCESS_ERROR.GRAFANA_SYNC_FAILED);
   equal(getOIDCProviderError(unavailableUnknownProvider), ACCESS_ERROR.OIDC_PROVIDER_FAILED);
   equal(getOIDCProviderError(new Error('network error')), ACCESS_ERROR.OIDC_PROVIDER_FAILED);
 });

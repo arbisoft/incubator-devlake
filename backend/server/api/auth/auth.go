@@ -36,7 +36,6 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 
 	corectx "github.com/apache/incubator-devlake/core/context"
@@ -51,13 +50,28 @@ import (
 // Auth-related route paths, defined in one place so router registration and
 // the middleware whitelist cannot drift.
 const (
-	PathMethods      = "/auth/methods"
-	PathLogin        = "/auth/login"
-	PathLinkIdentity = "/auth/link-identity"
-	PathCallback     = "/auth/callback"
-	PathLogout       = "/auth/logout"
-	PathUserInfo     = "/auth/userinfo"
+	PathMethods             = "/auth/methods"
+	PathLogin               = "/auth/login"
+	PathLinkIdentity        = "/auth/link-identity"
+	PathCallback            = "/auth/callback"
+	PathLogout              = "/auth/logout"
+	PathUserInfo            = "/auth/userinfo"
+	PathLocalLogin          = "/auth/local/login"
+	PathLocalChangePassword = "/auth/local/change-password"
 )
+
+// RegisterRoutes keeps auth-owned route paths and handlers together so the
+// generic API router has one narrow integration point.
+func RegisterRoutes(r *gin.Engine) {
+	r.GET(PathMethods, GetMethods)
+	r.GET(PathLogin, LoginInit)
+	r.GET(PathLinkIdentity, LinkIdentityInit)
+	r.GET(PathCallback, Callback)
+	r.POST(PathLocalLogin, LocalLogin)
+	r.POST(PathLocalChangePassword, LocalChangePassword)
+	r.POST(PathLogout, Logout)
+	r.GET(PathUserInfo, UserInfo)
+}
 
 // lastSeenThrottle bounds DB writes to one per-jti per window. Tracking
 // "last activity" doesn't need per-request precision.
@@ -77,6 +91,7 @@ type Service struct {
 	db           dal.Dal
 	revoked      *revocationCache
 	access       accessAuthorizer
+	local        *localAuthRuntime
 
 	lastSeenMu sync.Mutex
 	lastSeen   map[string]time.Time
@@ -122,13 +137,23 @@ func NewService(ctx stdctx.Context, basicRes corectx.BasicRes) (*Service, error)
 	if err != nil {
 		return nil, err
 	}
+	localConfig, err := loadLocalAuthConfig(basicRes, cfg.AuthEnabled)
+	if err != nil {
+		return nil, err
+	}
 	if cfg.AuthEnabled && cfg.OIDCEnabled && len(cfg.Providers) == 0 {
 		return nil, fmt.Errorf("OIDC_ENABLED=true but neither OIDC_PROVIDERS nor an activated database provider is configured")
 	}
 	if access.Default() != nil && access.Default().Enabled() {
-		if err := access.ValidateConfiguration(cfg.AuthEnabled, cfg.OIDCEnabled, basicRes.GetConfigReader().GetString("FORWARDED_USER_SECRET")); err != nil {
+		if err := access.ValidateConfiguration(cfg.AuthEnabled, cfg.OIDCEnabled, localConfig.Enabled, basicRes.GetConfigReader().GetString("FORWARDED_USER_SECRET")); err != nil {
 			return nil, err
 		}
+	} else if localConfig.Enabled {
+		return nil, fmt.Errorf("AUTH_LOCAL_ENABLED=true requires AUTH_ACCESS_ENABLED=true")
+	}
+	localRuntime, err := newLocalAuthRuntime(localConfig)
+	if err != nil {
+		return nil, err
 	}
 	s := &Service{
 		bootstrapCfg: bootstrapCfg,
@@ -141,6 +166,7 @@ func NewService(ctx stdctx.Context, basicRes corectx.BasicRes) (*Service, error)
 		revoked:      newRevocationCache(),
 		lastSeen:     map[string]time.Time{},
 		access:       access.Default(),
+		local:        localRuntime,
 	}
 	for _, warning := range providerWarnings {
 		s.logger.Warn(warning, "auth: database OIDC provider omitted from runtime")
@@ -149,12 +175,21 @@ func NewService(ctx stdctx.Context, basicRes corectx.BasicRes) (*Service, error)
 		startRefresher(ctx, s.revoked, s.db, s.logger)
 		startSessionCleanup(ctx, s.db, s.logger)
 		access.SetSessionRevoker(s)
+		access.SetOIDCMethodChecker(s)
+	}
+	if localRuntime != nil {
+		access.SetLocalCredentialGenerator(s)
+		access.SetLocalMethodChecker(s)
+		if err := s.bootstrapLocalAdministrator(); err != nil {
+			return nil, err
+		}
+		s.logger.Info("local password authentication enabled")
 	}
 	if cfg.OIDCEnabled {
 		for name, pc := range cfg.Providers {
 			s.logger.Info("OIDC provider %q enabled (issuer=%s, client=%s)", name, pc.IssuerURL, pc.ClientID)
 		}
-	} else if cfg.AuthEnabled {
+	} else if cfg.AuthEnabled && localRuntime == nil {
 		s.logger.Info("AUTH_ENABLED but OIDC_ENABLED=false: only API-key/proxy auth will work")
 	}
 	access.SetOIDCProviderRuntime(s)
@@ -202,12 +237,20 @@ type ProviderInfo struct {
 }
 
 type Methods struct {
-	Providers []ProviderInfo `json:"providers,omitempty"`
-	APIKey    *APIKey        `json:"apiKey,omitempty"`
+	Providers     []ProviderInfo       `json:"providers,omitempty"`
+	LocalPassword *LocalPasswordMethod `json:"localPassword,omitempty"`
+	APIKey        *APIKey              `json:"apiKey,omitempty"`
 }
 
 type APIKey struct {
 	Enabled bool `json:"enabled"`
+}
+
+// LocalPasswordMethod describes a capability, never a specific credential or
+// account. It is safe to expose before authentication.
+type LocalPasswordMethod struct {
+	Enabled  bool   `json:"enabled"`
+	LoginURL string `json:"loginUrl"`
 }
 
 func GetMethods(c *gin.Context) { defaultService.GetMethods(c) }
@@ -219,6 +262,9 @@ func GetMethods(c *gin.Context) { defaultService.GetMethods(c) }
 func (s *Service) GetMethods(c *gin.Context) {
 	cfg, _ := s.providerState()
 	out := Methods{APIKey: &APIKey{Enabled: true}}
+	if s.local != nil {
+		out.LocalPassword = &LocalPasswordMethod{Enabled: true, LoginURL: PathLocalLogin}
+	}
 	if cfg != nil && cfg.OIDCEnabled {
 		for _, name := range cfg.ProviderNames() {
 			pc := cfg.Providers[name]
@@ -261,14 +307,9 @@ func (s *Service) LinkIdentityInit(c *gin.Context) {
 		shared.ApiOutputError(c, errors.HttpStatus(http.StatusNotFound).New("identity linking is not enabled"))
 		return
 	}
-	currentIdentity, ok := access.GetIdentity(c)
+	principal, ok := access.GetPrincipal(c)
 	if !ok {
-		shared.ApiOutputError(c, errors.Unauthorized.New("native OIDC authentication is required"))
-		return
-	}
-	principal, accessErr := s.access.AuthorizeSession(currentIdentity)
-	if accessErr != nil {
-		shared.ApiOutputError(c, accessErr)
+		shared.ApiOutputError(c, errors.Unauthorized.New("native authentication is required"))
 		return
 	}
 	name, provider, ok := s.pickProvider(c, c.Query("provider"))
@@ -442,34 +483,13 @@ func (s *Service) Callback(c *gin.Context) {
 		fail(c, http.StatusForbidden, "user is not allowed", nil)
 		return
 	}
-	jti := uuid.NewString()
-	jwt, expiresAt, err := oidchelper.IssueSession(cfg, jti, state.Provider, sub, email, name)
-	if err != nil {
-		fail(c, http.StatusInternalServerError, "issue session", err)
+	issued, issueErr := s.issueBrowserSession(s.db, state.Provider, sub, email, name, false)
+	if issueErr != nil {
+		fail(c, http.StatusInternalServerError, "issue session", issueErr)
 		return
 	}
-	now := time.Now()
-	if dbErr := CreateSession(s.db, &AuthSession{
-		Jti:        jti,
-		Provider:   state.Provider,
-		Sub:        sub,
-		Email:      email,
-		Name:       name,
-		IssuedAt:   now,
-		ExpiresAt:  expiresAt,
-		LastSeenAt: now,
-	}); dbErr != nil {
-		fail(c, http.StatusInternalServerError, "persist session", dbErr)
-		return
-	}
-	csrf, err := oidchelper.NewCSRFToken()
-	if err != nil {
-		fail(c, http.StatusInternalServerError, "csrf token", err)
-		return
-	}
-	oidchelper.SetSessionCookie(c, cfg, jwt)
-	oidchelper.SetCSRFCookie(c, cfg, csrf)
-	s.logger.Info("oidc login: provider=%s sub=%s email=%s jti=%s", state.Provider, sub, email, jti)
+	issued.setCookies(c, cfg)
+	s.logger.Info("oidc login: provider=%s sub=%s email=%s", state.Provider, sub, email)
 
 	c.Redirect(http.StatusSeeOther, state.ReturnURL)
 }
@@ -532,9 +552,11 @@ func (s *Service) Logout(c *gin.Context) {
 }
 
 type userInfoResponse struct {
-	Authenticated bool   `json:"authenticated"`
-	Name          string `json:"name"`
-	Email         string `json:"email"`
+	Authenticated        bool   `json:"authenticated"`
+	Name                 string `json:"name"`
+	Email                string `json:"email"`
+	MustChangePassword   bool   `json:"mustChangePassword"`
+	AuthenticationMethod string `json:"authenticationMethod"`
 }
 
 func UserInfo(c *gin.Context) { defaultService.UserInfo(c) }
@@ -552,11 +574,20 @@ func (s *Service) UserInfo(c *gin.Context) {
 		shared.ApiOutputSuccess(c, userInfoResponse{Authenticated: false}, http.StatusOK)
 		return
 	}
-	shared.ApiOutputSuccess(c, userInfoResponse{
+	response := userInfoResponse{
 		Authenticated: true,
 		Name:          u.Name,
 		Email:         u.Email,
-	}, http.StatusOK)
+	}
+	if claims, ok := sessionClaims(c); ok {
+		response.MustChangePassword = claims.MustChangePassword
+		if claims.Provider == localSessionProvider {
+			response.AuthenticationMethod = "local"
+		} else {
+			response.AuthenticationMethod = "oidc"
+		}
+	}
+	shared.ApiOutputSuccess(c, response, http.StatusOK)
 }
 
 // pickProvider resolves the requested provider name. Empty names are allowed

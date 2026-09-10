@@ -34,22 +34,37 @@ var sessionParser = jwt.NewParser(
 )
 
 type SessionClaims struct {
-	Provider string `json:"prv,omitempty"`
-	Email    string `json:"email,omitempty"`
-	Name     string `json:"name,omitempty"`
+	Provider           string `json:"prv,omitempty"`
+	Email              string `json:"email,omitempty"`
+	Name               string `json:"name,omitempty"`
+	MustChangePassword bool   `json:"mcp,omitempty"`
 	jwt.RegisteredClaims
+}
+
+// SessionOptions carries authentication-method-specific session restrictions.
+// It is intentionally small so all browser sessions share one signed cookie and
+// persistent session record format.
+type SessionOptions struct {
+	MustChangePassword bool
 }
 
 // IssueSession signs a session JWT carrying the jti, the provider name (so
 // /auth/logout can find the right end_session_endpoint), and the user-facing
 // claims. The jti lets the server-side revocation table address one session.
 func IssueSession(cfg *Config, jti, provider, sub, email, name string) (string, time.Time, error) {
+	return IssueSessionWithOptions(cfg, jti, provider, sub, email, name, SessionOptions{})
+}
+
+// IssueSessionWithOptions signs a browser session with optional server-enforced
+// restrictions. Callers must not copy claims from browser input.
+func IssueSessionWithOptions(cfg *Config, jti, provider, sub, email, name string, options SessionOptions) (string, time.Time, error) {
 	now := time.Now()
 	expiresAt := now.Add(cfg.SessionTTL)
 	claims := SessionClaims{
-		Provider: provider,
-		Email:    email,
-		Name:     name,
+		Provider:           provider,
+		Email:              email,
+		Name:               name,
+		MustChangePassword: options.MustChangePassword,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        jti,
 			Issuer:    sessionIssuer,

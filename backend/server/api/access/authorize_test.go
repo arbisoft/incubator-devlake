@@ -117,6 +117,10 @@ type fakeSessionRevoker struct {
 	cachedIDs         []string
 }
 
+func (f *fakeSessionRevoker) RevokeLocalSessions(tx dal.Transaction, userID uint64) ([]string, errors.Error) {
+	return nil, nil
+}
+
 func (f *fakeSessionRevoker) RevokePersistentSessions(tx dal.Transaction, providerKeys []string, subject string) ([]string, errors.Error) {
 	f.calledWithKeys = append(f.calledWithKeys, providerKeys...)
 	f.calledWithSubject = subject

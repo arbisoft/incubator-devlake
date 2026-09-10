@@ -144,7 +144,7 @@ func (s *Service) DisableOIDCProvider(ctx context.Context, actor, providerKey st
 	if !provider.Enabled {
 		return s.providerResponse(provider)
 	}
-	if err := s.ensureAnotherEnabledProvider(provider.ID); err != nil {
+	if err := s.ensureAnotherInteractiveMethod(provider.ID); err != nil {
 		return nil, err
 	}
 	return s.setOIDCProviderEnabled(ctx, actor, provider, false)
@@ -162,7 +162,7 @@ func (s *Service) RetireOIDCProvider(ctx context.Context, actor, providerKey str
 		return nil, errors.BadInput.New("activate or replace the staged OIDC provider revision before retiring it", errors.WithData(ErrCodeProviderBlocked))
 	}
 	if provider.Enabled {
-		if err := s.ensureAnotherEnabledProvider(provider.ID); err != nil {
+		if err := s.ensureAnotherInteractiveMethod(provider.ID); err != nil {
 			return nil, err
 		}
 	}
@@ -303,7 +303,7 @@ func (s *Service) setOIDCProviderRetired(ctx context.Context, actor string, prov
 	provider.Enabled = false
 	provider.RetiredAt = &now
 	s.oidcRuntime.CacheRevokedSessions(revokedIDs)
-	if refreshErr := s.oidcRuntime.RefreshOIDCProvider(ctx); refreshErr != nil {
+	if refreshErr := s.oidcRuntime.RefreshOIDCProvider(ctx); refreshErr != nil && !s.hasEnabledLocalPassword() {
 		return nil, errors.Unavailable.New("OIDC provider retirement completed but runtime refresh failed", errors.WithData(ErrCodeProviderBlocked))
 	}
 	s.audit(actor, auditProviderRetired, nil, providerAuditDetail(provider.ProviderKey))
@@ -319,6 +319,19 @@ func (s *Service) ensureAnotherEnabledProvider(providerID uint64) errors.Error {
 		return errors.BadInput.New("at least one OIDC provider must remain enabled", errors.WithData(ErrCodeProviderBlocked))
 	}
 	return nil
+}
+
+func (s *Service) ensureAnotherInteractiveMethod(providerID uint64) errors.Error {
+	if s.hasEnabledLocalPassword() {
+		count, err := countActiveLocalCredentials(s.db)
+		if err != nil {
+			return err
+		}
+		if count > 0 {
+			return nil
+		}
+	}
+	return s.ensureAnotherEnabledProvider(providerID)
 }
 
 // requireOIDCProviderState locks and verifies the state expected by a lifecycle

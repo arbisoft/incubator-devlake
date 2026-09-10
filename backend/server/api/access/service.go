@@ -41,7 +41,36 @@ type Config struct {
 // in-memory cache only after the transaction commits.
 type SessionRevoker interface {
 	RevokePersistentSessions(tx dal.Transaction, providerKeys []string, subject string) ([]string, errors.Error)
+	RevokeLocalSessions(tx dal.Transaction, userID uint64) ([]string, errors.Error)
 	CacheRevokedSessions(ids []string)
+}
+
+// LocalCredentialGenerator is implemented by auth, which owns password policy,
+// entropy generation, and Argon2id hashing. Access owns the durable directory
+// transition and receives only the generated material required to persist it.
+type LocalCredentialGenerator interface {
+	PrepareLocalCredential(loginName string) (*LocalCredentialMaterial, errors.Error)
+}
+
+// LocalCredentialMaterial contains a one-time password only until the access
+// API writes its response. It must not be logged, audited, or persisted beyond
+// PasswordHash.
+type LocalCredentialMaterial struct {
+	LoginName         string
+	PasswordHash      string
+	TemporaryPassword string
+}
+
+// OIDCMethodChecker lets access preserve the "at least one interactive login
+// method" invariant without reading auth runtime state directly.
+type OIDCMethodChecker interface {
+	HasEnabledOIDCProvider() bool
+}
+
+// LocalMethodChecker lets OIDC lifecycle transitions preserve the interactive
+// login-method invariant without coupling access to auth runtime state.
+type LocalMethodChecker interface {
+	LocalPasswordEnabled() bool
 }
 
 type Service struct {
@@ -50,6 +79,9 @@ type Service struct {
 	logger          log.Logger
 	oidcLifecycleMu sync.Mutex
 	sessionRevoker  SessionRevoker
+	localGenerator  LocalCredentialGenerator
+	oidcMethods     OIDCMethodChecker
+	localMethods    LocalMethodChecker
 	oidcRuntime     OIDCProviderRuntime
 	grafanaSSO      *GrafanaSSOClient
 }
@@ -143,6 +175,24 @@ func SetSessionRevoker(revoker SessionRevoker) {
 	}
 }
 
+func SetLocalCredentialGenerator(generator LocalCredentialGenerator) {
+	if defaultService != nil {
+		defaultService.localGenerator = generator
+	}
+}
+
+func SetOIDCMethodChecker(checker OIDCMethodChecker) {
+	if defaultService != nil {
+		defaultService.oidcMethods = checker
+	}
+}
+
+func SetLocalMethodChecker(checker LocalMethodChecker) {
+	if defaultService != nil {
+		defaultService.localMethods = checker
+	}
+}
+
 func SetOIDCProviderRuntime(runtime OIDCProviderRuntime) {
 	if defaultService != nil {
 		defaultService.oidcRuntime = runtime
@@ -152,13 +202,14 @@ func SetOIDCProviderRuntime(runtime OIDCProviderRuntime) {
 func (s *Service) Enabled() bool { return s != nil && s.cfg.Enabled }
 
 // ValidateConfiguration ensures access-directory admission is backed by native
-// OIDC only, rather than a legacy proxy identity that cannot consult the directory.
-func ValidateConfiguration(authEnabled, oidcEnabled bool, forwardedUserSecret string) error {
+// OIDC and/or local-password authentication, never a legacy proxy identity that
+// cannot consult the directory.
+func ValidateConfiguration(authEnabled, oidcEnabled, localEnabled bool, forwardedUserSecret string) error {
 	if !authEnabled {
 		return fmt.Errorf("AUTH_ACCESS_ENABLED=true requires AUTH_ENABLED=true")
 	}
-	if !oidcEnabled {
-		return fmt.Errorf("AUTH_ACCESS_ENABLED=true requires OIDC_ENABLED=true")
+	if !oidcEnabled && !localEnabled {
+		return fmt.Errorf("AUTH_ACCESS_ENABLED=true requires OIDC_ENABLED=true or AUTH_LOCAL_ENABLED=true")
 	}
 	if strings.TrimSpace(forwardedUserSecret) != "" {
 		return fmt.Errorf("AUTH_ACCESS_ENABLED=true cannot be combined with FORWARDED_USER_SECRET; remove trusted oauth2-proxy forwarded identity authentication before enabling the access directory")

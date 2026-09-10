@@ -27,15 +27,13 @@ import (
 )
 
 // LinkableOIDCProviders returns enabled providers that are not already linked
-// to the authenticated access user. Provider selection remains server-owned:
-// callers can start linking only with one of these non-secret provider keys.
-func (s *Service) LinkableOIDCProviders(identity Identity) ([]LinkableOIDCProviderResponse, errors.Error) {
-	principal, err := s.AuthorizeSession(identity)
-	if err != nil {
-		return nil, err
-	}
+// to the authenticated access user. The caller supplies the directory user ID
+// from the native-session principal, so this works for both OIDC and local
+// password sessions. Provider selection remains server-owned: callers can
+// start linking only with one of these non-secret provider keys.
+func (s *Service) LinkableOIDCProviders(userID uint64) ([]LinkableOIDCProviderResponse, errors.Error) {
 	identities := make([]AccessIdentity, 0)
-	if err := s.db.All(&identities, dal.Where("access_user_id = ?", principal.UserID)); err != nil {
+	if err := s.db.All(&identities, dal.Where("access_user_id = ?", userID)); err != nil {
 		return nil, errors.Default.Wrap(err, "error reading linked OIDC identities")
 	}
 	linkedIssuers := make(map[string]struct{}, len(identities))
@@ -140,6 +138,6 @@ func (s *Service) CompleteIdentityLink(stateID, providerKey string, identity Ide
 	if err != nil {
 		return err
 	}
-	s.audit(user.Email, "identity.linked", user, "provider="+providerKey)
+	s.audit(identity.Email, "identity.linked", user, "provider="+providerKey)
 	return nil
 }

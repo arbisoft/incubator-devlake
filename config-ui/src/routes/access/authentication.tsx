@@ -133,6 +133,7 @@ export const Authentication = ({ callbacks, providers, loadFailed, onRefresh }: 
       <Message content="Grafana access remains independently managed. Providers marked DevLake only use Grafana's ordinary login." />
       {pageError && <Alert type="error" showIcon message={pageError} style={{ marginTop: 16 }} />}
       <Table
+        data-testid="access-authentication-table"
         rowKey="providerKey"
         size="middle"
         dataSource={providers}

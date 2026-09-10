@@ -17,18 +17,18 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { LogoutOutlined } from '@ant-design/icons';
+import { KeyOutlined, LogoutOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { message } from 'antd';
 
 import API from '@/api';
 import type { AccessCurrent, LinkableOIDCProvider } from '@/api/access';
-import { DEVLAKE_ENDPOINT } from '@/config';
+import { DEVLAKE_ENDPOINT, PATHS } from '@/config';
 
 const FAILURE_COOLDOWN_MS = 10_000;
 
 type UseAccountMenuOptions = {
-  user?: { authenticated: boolean };
+  user?: { authenticated: boolean; authenticationMethod: 'local' | 'oidc' | '' };
   access?: AccessCurrent | null;
   handleLogout: () => void;
 };
@@ -66,6 +66,16 @@ export const useAccountMenu = ({ user, access, handleLogout }: UseAccountMenuOpt
   };
 
   const accountMenuItems: MenuProps['items'] = [
+    ...(user?.authenticationMethod === 'local'
+      ? [
+          {
+            key: 'change-password',
+            icon: React.createElement(KeyOutlined),
+            label: 'Change password',
+            onClick: () => window.location.assign(PATHS.CHANGE_PASSWORD()),
+          },
+        ]
+      : []),
     ...(linkableProviders?.map((provider) => ({
       key: `link-identity-${provider.providerKey}`,
       label: `Add ${provider.displayName} sign-in`,
