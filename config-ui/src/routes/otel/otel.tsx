@@ -16,7 +16,8 @@
  *
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PlusOutlined } from '@ant-design/icons';
 import { Button, Flex, message, Table } from 'antd';
 
@@ -31,6 +32,7 @@ import { OTEL_MODAL, OtelModals, type OtelLifecycleAction, type OtelModalState }
 import {
   getOtelCreateError,
   getOtelLifecycleError,
+  getOtelProjectError,
   hasRecoveryRequired,
   hasStorageNeedsApplying,
   notifyOtelAttentionChanged,
@@ -40,15 +42,15 @@ import {
 const OTEL_PATH = `${import.meta.env.DEVLAKE_PATH_PREFIX ?? ''}/otel`;
 const BREADCRUMBS = [{ name: 'Claude Code OTel', path: OTEL_PATH }];
 
-type OtelOperationResult = { success: true; data: OtelConnectionResponse } | { success: false; error: unknown };
+type OtelOperationResult<T> = { success: true; data: T } | { success: false; error: unknown };
 
 // Keep OTel lifecycle responses typed without changing the shared legacy operator contract.
-const operateOtel = async (
-  request: () => Promise<OtelConnectionResponse>,
+const operateOtel = async <T,>(
+  request: () => Promise<T>,
   config?: OperateConfig,
-): Promise<OtelOperationResult> => {
+): Promise<OtelOperationResult<T>> => {
   const [success, result] = await operator(request, config);
-  return success ? { success: true, data: result as OtelConnectionResponse } : { success: false, error: result };
+  return success ? { success: true, data: result as T } : { success: false, error: result };
 };
 
 export const Otel = () => {
@@ -57,29 +59,52 @@ export const Otel = () => {
   const [modal, setModal] = useState<OtelModalState>();
   const [current, setCurrent] = useState<OtelConnectionResponse>();
   const [teamName, setTeamName] = useState('');
+  const [projectNames, setProjectNames] = useState<string[]>([]);
   const [createError, setCreateError] = useState<string>();
   const [lifecycleError, setLifecycleError] = useState<string>();
 
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data, ready } = useRefreshData(() => API.otel.list(), [version]);
+  const { data: projectOptions } = useRefreshData(() => API.otel.listProjects(), []);
   const dataSource = useMemo(() => data ?? [], [data]);
-  const columns = useMemo(() => getOtelColumns(setCurrent, setModal), []);
+  const columns = useMemo(
+    () =>
+      getOtelColumns(setCurrent, setModal, (connection) => {
+        setCurrent(connection);
+        setProjectNames(connection.projects.map((project) => project.name));
+        setCreateError(undefined);
+        setModal(OTEL_MODAL.PROJECTS);
+      }),
+    [],
+  );
   const managedSettings = useMemo(
     () => (current?.managedSettings ? JSON.stringify(current.managedSettings, null, 2) : ''),
     [current],
   );
 
   const refresh = () => setVersion((v) => v + 1);
+
+  useEffect(() => {
+    const projectName = searchParams.get('project');
+    if (searchParams.get('create') !== 'true' || !projectName) return;
+    setProjectNames([projectName]);
+    setModal(OTEL_MODAL.CREATE);
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   const closeModal = () => {
     setLifecycleError(undefined);
+    setCreateError(undefined);
     setModal(undefined);
   };
 
   const handleCreate = async () => {
     setCreateError(undefined);
-    const result = await operateOtel(() => API.otel.create({ teamName }), { hideToast: true, setOperating });
+    const result = await operateOtel(() => API.otel.create({ teamName, projectNames }), { hideToast: true, setOperating });
     if (result.success) {
       setCurrent(result.data);
       setTeamName('');
+      setProjectNames([]);
       setModal(OTEL_MODAL.SNIPPET);
       refresh();
       notifyOtelAttentionChanged();
@@ -87,6 +112,23 @@ export const Otel = () => {
     }
 
     setCreateError(getOtelCreateError(result.error));
+  };
+
+  const handleUpdateProjects = async () => {
+    if (!current) return;
+    setCreateError(undefined);
+    const result = await operateOtel(() => API.otel.updateProjects(current.connection.id, projectNames), {
+      hideToast: true,
+      setOperating,
+    });
+    if (!result.success) {
+      setCreateError(getOtelProjectError(result.error));
+      return;
+    }
+    setCurrent({ ...current, projects: result.data });
+    setModal(undefined);
+    refresh();
+    message.success('Claude Code OTel project placements updated.');
   };
 
   const handleAction = async (action: OtelLifecycleAction) => {
@@ -135,7 +177,17 @@ export const Otel = () => {
       description="Generate and manage the Basic Auth credential used by Claude Code telemetry."
     >
       <Flex style={{ marginBottom: 16 }} justify="flex-end">
-        <Button type="primary" icon={<PlusOutlined />} loading={operating} onClick={() => setModal(OTEL_MODAL.CREATE)}>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          loading={operating}
+          onClick={() => {
+            setTeamName('');
+            setProjectNames([]);
+            setCreateError(undefined);
+            setModal(OTEL_MODAL.CREATE);
+          }}
+        >
           Generate Claude Settings
         </Button>
       </Flex>
@@ -157,6 +209,8 @@ export const Otel = () => {
         modal={modal}
         current={current}
         teamName={teamName}
+        projectNames={projectNames}
+        projectOptions={projectOptions ?? []}
         createError={createError}
         lifecycleError={lifecycleError}
         operating={operating}
@@ -164,8 +218,10 @@ export const Otel = () => {
         onClose={closeModal}
         onCreate={handleCreate}
         onTeamNameChange={setTeamName}
+        onProjectNamesChange={setProjectNames}
         onClearCreateError={() => setCreateError(undefined)}
         onAction={handleAction}
+        onUpdateProjects={handleUpdateProjects}
       />
     </PageHeader>
   );

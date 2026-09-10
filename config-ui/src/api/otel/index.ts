@@ -18,63 +18,15 @@
 
 import { request } from '@/utils';
 
-export const OTEL_CONNECTION_STATUS = {
-  ACTIVE: 'active',
-  REVOKED: 'revoked',
-} as const;
+import type { OtelConnectionResponse, OtelProject } from './types';
 
-export type OtelConnectionStatus = (typeof OTEL_CONNECTION_STATUS)[keyof typeof OTEL_CONNECTION_STATUS];
-
-export const OTEL_CREDENTIAL_STATUS = {
-  ACTIVE: 'active',
-  RETIRING: 'retiring',
-  REVOKED: 'revoked',
-} as const;
-
-export type OtelCredentialStatus = (typeof OTEL_CREDENTIAL_STATUS)[keyof typeof OTEL_CREDENTIAL_STATUS];
-
-export type OtelConnection = {
-  id: ID;
-  name: string;
-  teamName: string;
-  teamSlug: string;
-  collectorEndpoint: string;
-  protocol: string;
-  status: OtelConnectionStatus;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type OtelCredential = {
-  id: ID;
-  connectionId: ID;
-  username: string;
-  status: OtelCredentialStatus;
-  createdAt: string;
-  updatedAt: string;
-  rotatedAt?: string;
-  revokedAt?: string;
-  pendingCollectorRestart: boolean;
-  lastCollectorRestartHint?: string;
-};
-
-export type OtelConnectionResponse = {
-  connection: OtelConnection;
-  credentials: OtelCredential[];
-  managedSettings?: {
-    env: Record<string, string>;
-  };
-  restartRequired: boolean;
-  restartHint?: string;
-  recoveryRequired: boolean;
-  storageNeedsApplying: boolean;
-};
+export * from './types';
 
 const basePath = '/plugins/claude_otel/connections';
 
 export const list = (signal?: AbortSignal): Promise<OtelConnectionResponse[]> => request(basePath, { signal });
 
-export const create = (data: { teamName: string }) =>
+export const create = (data: { teamName: string; projectNames: string[] }) =>
   request(basePath, {
     method: 'POST',
     data,
@@ -93,3 +45,24 @@ export const revoke = otelAction('revoke');
 export const hide = otelAction('hide');
 export const finalizeRotation = otelAction('finalize-rotation');
 export const apply = otelAction('apply');
+
+export const listProjects = (): Promise<OtelProject[]> => request('/plugins/claude_otel/projects');
+
+export const listForProject = (projectName: string): Promise<OtelConnectionResponse[]> =>
+  request(`/plugins/claude_otel/projects/${encodeURIComponent(projectName)}/connections`);
+
+export const updateProjects = (id: ID, projectNames: string[]): Promise<OtelProject[]> =>
+  request(`${basePath}/${id}/projects`, {
+    method: 'PUT',
+    data: { projectNames },
+  });
+
+export const validateProjectRemoval = (projectName: string): Promise<void> =>
+  request(`/plugins/claude_otel/projects/${encodeURIComponent(projectName)}/removal-preflight`, {
+    method: 'POST',
+  });
+
+export const removeProjectPlacements = (projectName: string): Promise<void> =>
+  request(`/plugins/claude_otel/projects/${encodeURIComponent(projectName)}/placements`, {
+    method: 'DELETE',
+  });

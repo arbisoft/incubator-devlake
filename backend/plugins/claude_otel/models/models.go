@@ -23,5 +23,6 @@ func GetTablesInfo() []dal.Tabler {
 	return []dal.Tabler{
 		&OtelConnection{},
 		&OtelCredential{},
+		&OtelConnectionProject{},
 	}
 }

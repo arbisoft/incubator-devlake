@@ -19,9 +19,9 @@
 import type { ComponentType } from 'react';
 import { CopyOutlined } from '@ant-design/icons';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
-import { Alert, Button, Flex, Input, message, Modal, Space } from 'antd';
+import { Alert, Button, Flex, Input, message, Modal, Select, Space } from 'antd';
 
-import type { OtelConnectionResponse } from '@/api/otel';
+import type { OtelConnectionResponse, OtelProject } from '@/api/otel';
 import { ExternalLink, Message } from '@/components';
 import { OTEL_LIFECYCLE_ACTION } from './constants';
 import { ManagedSettings } from './styled';
@@ -32,6 +32,7 @@ export const OTEL_MODAL = {
   ROTATE: 'rotate',
   REVOKE: 'revoke',
   HIDE: 'hide',
+  PROJECTS: 'projects',
   FINALIZE: 'finalize',
   APPLY: 'apply',
 } as const;
@@ -42,6 +43,8 @@ export type OtelLifecycleAction = (typeof OTEL_LIFECYCLE_ACTION)[keyof typeof OT
 type OtelModalProps = {
   current?: OtelConnectionResponse;
   teamName: string;
+  projectNames: string[];
+  projectOptions: OtelProject[];
   createError?: string;
   lifecycleError?: string;
   operating: boolean;
@@ -49,17 +52,42 @@ type OtelModalProps = {
   onClose: () => void;
   onCreate: () => void;
   onTeamNameChange: (teamName: string) => void;
+  onProjectNamesChange: (projectNames: string[]) => void;
   onClearCreateError: () => void;
   onAction: (action: OtelLifecycleAction) => void;
+  onUpdateProjects: () => void;
 };
+
+type OtelProjectSelectProps = Pick<OtelModalProps, 'projectNames' | 'projectOptions' | 'onProjectNamesChange' | 'onClearCreateError'>;
+
+const OtelProjectSelect = ({ projectNames, projectOptions, onProjectNamesChange, onClearCreateError }: OtelProjectSelectProps) => (
+  <Select
+    style={{ width: '100%' }}
+    mode="multiple"
+    allowClear
+    showSearch
+    optionFilterProp="label"
+    popupMatchSelectWidth={true}
+    placeholder="Select one or more projects"
+    value={projectNames}
+    options={projectOptions.map((project) => ({ value: project.name, label: project.name }))}
+    onChange={(names) => {
+      onProjectNamesChange(names);
+      onClearCreateError();
+    }}
+  />
+);
 
 const CreateModal = ({
   teamName,
+  projectNames,
+  projectOptions,
   createError,
   operating,
   onClose,
   onCreate,
   onTeamNameChange,
+  onProjectNamesChange,
   onClearCreateError,
 }: OtelModalProps) => (
   <Modal
@@ -67,7 +95,7 @@ const CreateModal = ({
     centered
     title="Generate Claude Settings"
     okText="Generate"
-    okButtonProps={{ loading: operating, disabled: !teamName.trim() }}
+    okButtonProps={{ loading: operating, disabled: !teamName.trim() || projectNames.length === 0 }}
     onCancel={() => {
       onClearCreateError();
       onClose();
@@ -87,8 +115,52 @@ const CreateModal = ({
           onClearCreateError();
         }}
       />
+      <span>DevLake projects</span>
+      <OtelProjectSelect
+        projectNames={projectNames}
+        projectOptions={projectOptions}
+        onProjectNamesChange={onProjectNamesChange}
+        onClearCreateError={onClearCreateError}
+      />
       {createError && <Alert type="error" showIcon message={createError} />}
-      <Message content="The team name and its derived reporting slug cannot be changed later." />
+      <Message content="The team name and its derived reporting slug cannot be changed later. Project placement controls dashboard visibility; it is not repository attribution." />
+    </Space>
+  </Modal>
+);
+
+const ProjectPlacementsModal = ({
+  current,
+  projectNames,
+  projectOptions,
+  createError,
+  operating,
+  onClose,
+  onProjectNamesChange,
+  onClearCreateError,
+  onUpdateProjects,
+}: OtelModalProps) => (
+  <Modal
+    open
+    centered
+    title="Manage Claude Code OTel Projects"
+    okText="Save"
+    okButtonProps={{ loading: operating, disabled: projectNames.length === 0 }}
+    onCancel={() => {
+      onClearCreateError();
+      onClose();
+    }}
+    onOk={onUpdateProjects}
+  >
+    <Space direction="vertical" size={8} style={{ width: '100%' }}>
+      <span>DevLake projects for {current?.connection.teamName}</span>
+      <OtelProjectSelect
+        projectNames={projectNames}
+        projectOptions={projectOptions}
+        onProjectNamesChange={onProjectNamesChange}
+        onClearCreateError={onClearCreateError}
+      />
+      {createError && <Alert type="error" showIcon message={createError} />}
+      <Message content="Changing project placement does not generate a credential, rewrite credential storage, restart the Collector, or change existing telemetry." />
     </Space>
   </Modal>
 );
@@ -186,6 +258,10 @@ const OTEL_MODALS: Record<OtelModalState, OtelModalConfig> = {
   [OTEL_MODAL.SNIPPET]: {
     kind: MODAL_KIND.CUSTOM,
     component: SnippetModal,
+  },
+  [OTEL_MODAL.PROJECTS]: {
+    kind: MODAL_KIND.CUSTOM,
+    component: ProjectPlacementsModal,
   },
   [OTEL_MODAL.ROTATE]: {
     kind: MODAL_KIND.LIFECYCLE,

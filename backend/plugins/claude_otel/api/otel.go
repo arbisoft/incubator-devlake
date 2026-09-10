@@ -35,6 +35,22 @@ func ListConnections(_ *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, err
 	return &plugin.ApiResourceOutput{Body: connections, Status: http.StatusOK}, nil
 }
 
+func ListProjects(_ *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	projects, err := service.ListOtelProjects()
+	if err != nil {
+		return nil, err
+	}
+	return &plugin.ApiResourceOutput{Body: projects, Status: http.StatusOK}, nil
+}
+
+func ListProjectConnections(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	connections, err := service.ListOtelConnectionsForProject(input.Params["projectName"])
+	if err != nil {
+		return nil, err
+	}
+	return &plugin.ApiResourceOutput{Body: connections, Status: http.StatusOK}, nil
+}
+
 func PostConnection(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
 	body := &service.OtelConnectionInput{}
 	if err := api.Decode(input.Body, body, nil); err != nil {
@@ -105,6 +121,36 @@ func ApplyConnection(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput,
 		return nil, err
 	}
 	return &plugin.ApiResourceOutput{Body: connection, Status: http.StatusOK}, nil
+}
+
+func PutConnectionProjects(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	id, err := parseId(input.Params["connectionId"])
+	if err != nil {
+		return nil, err
+	}
+	body := &service.OtelConnectionInput{}
+	if err := api.Decode(input.Body, body, nil); err != nil {
+		return nil, err
+	}
+	projects, err := service.ReplaceOtelConnectionProjects(id, body.ProjectNames)
+	if err != nil {
+		return nil, err
+	}
+	return &plugin.ApiResourceOutput{Body: projects, Status: http.StatusOK}, nil
+}
+
+func ValidateProjectRemoval(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	if err := service.ValidateOtelProjectRemoval(input.Params["projectName"]); err != nil {
+		return nil, err
+	}
+	return &plugin.ApiResourceOutput{Status: http.StatusNoContent}, nil
+}
+
+func DeleteProjectPlacements(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	if err := service.RemoveOtelProjectPlacements(input.Params["projectName"]); err != nil {
+		return nil, err
+	}
+	return &plugin.ApiResourceOutput{Status: http.StatusNoContent}, nil
 }
 
 func parseId(raw string) (uint64, errors.Error) {

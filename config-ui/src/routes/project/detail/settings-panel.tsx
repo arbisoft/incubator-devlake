@@ -18,13 +18,17 @@
 
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Flex, Space, Card, Modal, Input, Checkbox, Button } from 'antd';
+import { Flex, Space, Card, Modal, Input, Checkbox, Button, message } from 'antd';
 
 import API from '@/api';
+import { OTEL_CONNECTION_STATUS } from '@/api/otel';
 import { Block, HelpTooltip, Message } from '@/components';
 import { PATHS } from '@/config';
+import { useRefreshData } from '@/hooks';
 import { IProject } from '@/types';
 import { operator } from '@/utils';
+
+import { getOtelProjectError } from '@/routes/otel/utils';
 
 import * as S from './styled';
 
@@ -51,6 +55,17 @@ export const SettingsPanel = ({ project, onRefresh }: Props) => {
   const [open, setOpen] = useState(false);
 
   const navigate = useNavigate();
+  const { data: otelConnections, ready: otelConnectionsReady } = useRefreshData(
+    () => API.otel.listForProject(project.name),
+    [project.name],
+  );
+  const hasOtelPlacements = Boolean(otelConnections?.length);
+  const hasActiveFinalOtelPlacement = Boolean(
+    otelConnections?.some(
+      (connection) =>
+        connection.connection.status === OTEL_CONNECTION_STATUS.ACTIVE && connection.projects.length === 1,
+    ),
+  );
 
   useEffect(() => {
     const dora = project.metrics.find((ms) => ms.pluginName === 'dora');
@@ -71,6 +86,10 @@ export const SettingsPanel = ({ project, onRefresh }: Props) => {
   }, [project]);
 
   const handleUpdate = async () => {
+    if (name !== project.name && hasOtelPlacements) {
+      message.error('Remove Claude Code OTel project placements before renaming this project.');
+      return;
+    }
     const [success] = await operator(
       () =>
         API.project.update(project.name, {
@@ -120,12 +139,27 @@ export const SettingsPanel = ({ project, onRefresh }: Props) => {
   };
 
   const handleDelete = async () => {
+    if (hasOtelPlacements) {
+      const [prepared] = await operator(() => API.otel.validateProjectRemoval(project.name), {
+        setOperating,
+        formatReason: getOtelProjectError,
+      });
+      if (!prepared) {
+        return;
+      }
+    }
     const [success] = await operator(() => API.project.remove(project.name), {
       setOperating,
       formatMessage: () => 'Delete project successful.',
     });
 
     if (success) {
+      if (hasOtelPlacements) {
+        const [placementsRemoved] = await operator(() => API.otel.removeProjectPlacements(project.name), { hideToast: true });
+        if (!placementsRemoved) {
+          message.warning('Project deleted, but Claude Code OTel placement cleanup needs operator attention.');
+        }
+      }
       navigate(PATHS.PROJECTS());
     }
   };
@@ -135,7 +169,15 @@ export const SettingsPanel = ({ project, onRefresh }: Props) => {
       <Space direction="vertical" size="large">
         <Card>
           <Block title="Project Name" description="Edit your project name with letters, numbers, -, _ or /" required>
-            <Input style={{ width: 386 }} value={name} onChange={(e) => setName(e.target.value)} />
+            <Input
+              style={{ width: 386 }}
+              value={name}
+              disabled={hasOtelPlacements}
+              onChange={(e) => setName(e.target.value)}
+            />
+            {hasOtelPlacements && (
+              <Message content="Remove the project's Claude Code OTel placements before renaming it. This keeps project-configured telemetry links stable." />
+            )}
           </Block>
           <Block
             title={
@@ -198,7 +240,7 @@ export const SettingsPanel = ({ project, onRefresh }: Props) => {
           </Block>
         </Card>
         <Flex justify="center">
-          <Button type="primary" danger onClick={handleShowDeleteDialog}>
+          <Button type="primary" danger disabled={!otelConnectionsReady} onClick={handleShowDeleteDialog}>
             Delete Project
           </Button>
         </Flex>
@@ -211,12 +253,22 @@ export const SettingsPanel = ({ project, onRefresh }: Props) => {
         okText="Confirm"
         okButtonProps={{
           loading: operating,
+          disabled: hasActiveFinalOtelPlacement,
         }}
         onCancel={handleHideDeleteDialog}
         onOk={handleDelete}
       >
         <S.DialogBody>
           <Message content="This operation cannot be undone. Deleting this project will remove all associated project settings and data. This action does not delete any data connections or the data collected through them." />
+          {hasOtelPlacements && (
+            <Message
+              content={
+                hasActiveFinalOtelPlacement
+                  ? 'This project is the final placement for an active Claude Code OTel connection. Revoke that connection before deleting the project.'
+                  : 'Claude Code OTel placements will be removed from this project. Shared credentials remain active for their other projects.'
+              }
+            />
+          )}
         </S.DialogBody>
       </Modal>
     </Flex>
