@@ -179,6 +179,7 @@ func NewService(ctx stdctx.Context, basicRes corectx.BasicRes) (*Service, error)
 	}
 	if localRuntime != nil {
 		access.SetLocalCredentialGenerator(s)
+		access.SetLocalMethodChecker(s)
 		if err := s.bootstrapLocalAdministrator(); err != nil {
 			return nil, err
 		}

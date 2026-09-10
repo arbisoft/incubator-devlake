@@ -67,6 +67,12 @@ type OIDCMethodChecker interface {
 	HasEnabledOIDCProvider() bool
 }
 
+// LocalMethodChecker lets OIDC lifecycle transitions preserve the interactive
+// login-method invariant without coupling access to auth runtime state.
+type LocalMethodChecker interface {
+	LocalPasswordEnabled() bool
+}
+
 type Service struct {
 	cfg             Config
 	db              dal.Dal
@@ -75,6 +81,7 @@ type Service struct {
 	sessionRevoker  SessionRevoker
 	localGenerator  LocalCredentialGenerator
 	oidcMethods     OIDCMethodChecker
+	localMethods    LocalMethodChecker
 	oidcRuntime     OIDCProviderRuntime
 	grafanaSSO      *GrafanaSSOClient
 }
@@ -177,6 +184,12 @@ func SetLocalCredentialGenerator(generator LocalCredentialGenerator) {
 func SetOIDCMethodChecker(checker OIDCMethodChecker) {
 	if defaultService != nil {
 		defaultService.oidcMethods = checker
+	}
+}
+
+func SetLocalMethodChecker(checker LocalMethodChecker) {
+	if defaultService != nil {
+		defaultService.localMethods = checker
 	}
 }
 

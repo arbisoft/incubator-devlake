@@ -144,7 +144,7 @@ func (s *Service) DisableOIDCProvider(ctx context.Context, actor, providerKey st
 	if !provider.Enabled {
 		return s.providerResponse(provider)
 	}
-	if err := s.ensureAnotherEnabledProvider(provider.ID); err != nil {
+	if err := s.ensureAnotherInteractiveMethod(provider.ID); err != nil {
 		return nil, err
 	}
 	return s.setOIDCProviderEnabled(ctx, actor, provider, false)
@@ -162,7 +162,7 @@ func (s *Service) RetireOIDCProvider(ctx context.Context, actor, providerKey str
 		return nil, errors.BadInput.New("activate or replace the staged OIDC provider revision before retiring it", errors.WithData(ErrCodeProviderBlocked))
 	}
 	if provider.Enabled {
-		if err := s.ensureAnotherEnabledProvider(provider.ID); err != nil {
+		if err := s.ensureAnotherInteractiveMethod(provider.ID); err != nil {
 			return nil, err
 		}
 	}
@@ -319,6 +319,13 @@ func (s *Service) ensureAnotherEnabledProvider(providerID uint64) errors.Error {
 		return errors.BadInput.New("at least one OIDC provider must remain enabled", errors.WithData(ErrCodeProviderBlocked))
 	}
 	return nil
+}
+
+func (s *Service) ensureAnotherInteractiveMethod(providerID uint64) errors.Error {
+	if s.hasEnabledLocalPassword() {
+		return nil
+	}
+	return s.ensureAnotherEnabledProvider(providerID)
 }
 
 // requireOIDCProviderState locks and verifies the state expected by a lifecycle

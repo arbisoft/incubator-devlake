@@ -68,6 +68,10 @@ func (s *Service) hasEnabledOIDCProvider() bool {
 	return s.oidcMethods != nil && s.oidcMethods.HasEnabledOIDCProvider()
 }
 
+func (s *Service) hasEnabledLocalPassword() bool {
+	return s.localMethods != nil && s.localMethods.LocalPasswordEnabled()
+}
+
 func localCredentialResponse(user *AccessUser, material *LocalCredentialMaterial) *LocalCredentialResponse {
 	user.LocalLoginName = material.LoginName
 	user.HasLocalCredential = true

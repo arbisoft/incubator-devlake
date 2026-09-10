@@ -39,6 +39,7 @@ export type UserColumnActions = {
   onResetLocalCredential: (user: AccessUser) => void;
   onRemoveLocalCredential: (user: AccessUser) => void;
   isLocalCredentialOperation: (action: 'reset' | 'remove', userID: ID) => boolean;
+  localAuthEnabled: boolean;
 };
 
 export type DomainColumnActions = {
@@ -86,16 +87,18 @@ export const getUserColumns = (actions: UserColumnActions): ColumnsType<AccessUs
         '-'
       ) : user.hasLocalCredential ? (
         <Space size="small">
-          <Popconfirm
-            title="Reset this local password?"
-            description="Existing DevLake sessions for this person will be signed out."
-            okText="Reset"
-            onConfirm={() => actions.onResetLocalCredential(user)}
-          >
-            <Button size="small" loading={actions.isLocalCredentialOperation('reset', user.id)}>
-              Reset
-            </Button>
-          </Popconfirm>
+          {actions.localAuthEnabled && (
+            <Popconfirm
+              title="Reset this local password?"
+              description="Existing DevLake sessions for this person will be signed out."
+              okText="Reset"
+              onConfirm={() => actions.onResetLocalCredential(user)}
+            >
+              <Button size="small" loading={actions.isLocalCredentialOperation('reset', user.id)}>
+                Reset
+              </Button>
+            </Popconfirm>
+          )}
           <Popconfirm
             title="Remove this local password?"
             description="The person can still use a linked OIDC provider, if one is available."
@@ -113,10 +116,12 @@ export const getUserColumns = (actions: UserColumnActions): ColumnsType<AccessUs
             </Button>
           </Popconfirm>
         </Space>
-      ) : (
+      ) : actions.localAuthEnabled ? (
         <Button size="small" onClick={() => actions.onAddLocalCredential(user)}>
           Add password
         </Button>
+      ) : (
+        '-'
       ),
   },
   {

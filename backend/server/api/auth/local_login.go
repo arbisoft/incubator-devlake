@@ -83,6 +83,10 @@ func (s *Service) HasEnabledOIDCProvider() bool {
 	return cfg != nil && cfg.OIDCEnabled && len(providers) > 0
 }
 
+// LocalPasswordEnabled implements access.LocalMethodChecker without exposing
+// auth runtime state to the access package.
+func (s *Service) LocalPasswordEnabled() bool { return s.local != nil }
+
 type localLoginInput struct {
 	LoginName string `json:"loginName"`
 	Password  string `json:"password"`

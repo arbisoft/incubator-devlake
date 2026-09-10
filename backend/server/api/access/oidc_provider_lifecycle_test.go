@@ -32,6 +32,10 @@ type oidcProviderRuntimeStub struct {
 	revocationCalls int
 }
 
+type enabledLocalMethodChecker struct{}
+
+func (enabledLocalMethodChecker) LocalPasswordEnabled() bool { return true }
+
 func (*oidcProviderRuntimeStub) PrepareOIDCProvider(context.Context, *OIDCProvider, string) (*PreparedOIDCProvider, errors.Error) {
 	return &PreparedOIDCProvider{
 		GrafanaSettings: GrafanaSSOSettings{Enabled: true},
@@ -70,6 +74,25 @@ func TestSetOIDCProviderEnabledDoesNotRevokeSessionsAfterStaleTransition(t *test
 	}
 	if runtime.revocationCalls != 0 {
 		t.Fatalf("session revocation calls = %d, want 0", runtime.revocationCalls)
+	}
+}
+
+func TestEnsureAnotherInteractiveMethodAllowsFinalOIDCProviderWhenLocalPasswordEnabled(t *testing.T) {
+	service := &Service{localMethods: enabledLocalMethodChecker{}}
+
+	if err := service.ensureAnotherInteractiveMethod(1); err != nil {
+		t.Fatalf("ensureAnotherInteractiveMethod() error = %v, want local-password fallback", err)
+	}
+}
+
+func TestEnsureAnotherInteractiveMethodRejectsFinalOIDCProviderWithoutLocalPassword(t *testing.T) {
+	db := dalmocks.NewDal(t)
+	db.EXPECT().Count(mock.Anything).Return(int64(0), nil)
+	service := &Service{db: db}
+
+	err := service.ensureAnotherInteractiveMethod(1)
+	if err == nil || err.GetData() != ErrCodeProviderBlocked {
+		t.Fatalf("ensureAnotherInteractiveMethod() error = %v, want last-provider rejection", err)
 	}
 }
 

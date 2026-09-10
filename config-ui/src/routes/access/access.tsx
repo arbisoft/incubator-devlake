@@ -80,21 +80,23 @@ export const Access = () => {
   const refresh = useCallback(() => setVersion((current) => current + 1), []);
 
   const { data, ready } = useRefreshData(async () => {
-    const [users, domains, auditEvents, providerResult, callbackResult] = await Promise.all([
+    const [users, domains, auditEvents, methods, providerResult, callbackResult] = await Promise.all([
       API.access.listUsers({ page: userPage, pageSize: userPageSize }),
       API.access.listDomains({ page: domainPage, pageSize: domainPageSize }),
       API.access.listAuditEvents(),
+      API.auth.methods().catch(() => undefined),
       API.access
         .listOIDCProviders()
         .then((providers) => ({ providers, loadFailed: false }))
         .catch(() => ({ providers: [], loadFailed: true })),
       API.access.getOIDCCallbacks().catch(() => undefined),
     ]);
-    return { users, domains, auditEvents, providerResult, callbackResult };
+    return { users, domains, auditEvents, methods, providerResult, callbackResult };
   }, [version, userPage, userPageSize, domainPage, domainPageSize]);
   const users = data?.users;
   const domains = data?.domains;
   const auditEvents = data?.auditEvents ?? [];
+  const localAuthEnabled = data?.methods?.localPassword?.enabled === true;
 
   const normalizedDomain = normalizeDomain(domain);
   const domainError =
@@ -274,10 +276,12 @@ export const Access = () => {
         onResetLocalCredential: resetLocalCredential,
         onRemoveLocalCredential: removeLocalCredential,
         isLocalCredentialOperation,
+        localAuthEnabled,
       }),
     [
       hideUser,
       isLocalCredentialOperation,
+      localAuthEnabled,
       openAddLocalCredential,
       removeLocalCredential,
       resetLocalCredential,
@@ -302,9 +306,11 @@ export const Access = () => {
         <SectionTitle>People</SectionTitle>
         <Space>
           <Button onClick={() => setModal('user')}>Add SSO person</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setModal('local-user')}>
-            Add local user
-          </Button>
+          {localAuthEnabled && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setModal('local-user')}>
+              Add local user
+            </Button>
+          )}
         </Space>
       </SectionHeader>
       <Table
