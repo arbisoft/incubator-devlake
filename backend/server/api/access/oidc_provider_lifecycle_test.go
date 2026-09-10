@@ -78,10 +78,23 @@ func TestSetOIDCProviderEnabledDoesNotRevokeSessionsAfterStaleTransition(t *test
 }
 
 func TestEnsureAnotherInteractiveMethodAllowsFinalOIDCProviderWhenLocalPasswordEnabled(t *testing.T) {
-	service := &Service{localMethods: enabledLocalMethodChecker{}}
+	db := dalmocks.NewDal(t)
+	db.EXPECT().Count(mock.Anything).Return(int64(1), nil)
+	service := &Service{db: db, localMethods: enabledLocalMethodChecker{}}
 
 	if err := service.ensureAnotherInteractiveMethod(1); err != nil {
 		t.Fatalf("ensureAnotherInteractiveMethod() error = %v, want local-password fallback", err)
+	}
+}
+
+func TestEnsureAnotherInteractiveMethodRejectsLocalPasswordWithoutActiveCredential(t *testing.T) {
+	db := dalmocks.NewDal(t)
+	db.EXPECT().Count(mock.Anything).Return(int64(0), nil).Twice()
+	service := &Service{db: db, localMethods: enabledLocalMethodChecker{}}
+
+	err := service.ensureAnotherInteractiveMethod(1)
+	if err == nil || err.GetData() != ErrCodeProviderBlocked {
+		t.Fatalf("ensureAnotherInteractiveMethod() error = %v, want last-provider rejection", err)
 	}
 }
 

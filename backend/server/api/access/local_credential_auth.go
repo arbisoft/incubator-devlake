@@ -72,6 +72,18 @@ func (s *Service) hasEnabledLocalPassword() bool {
 	return s.localMethods != nil && s.localMethods.LocalPasswordEnabled()
 }
 
+func countActiveLocalCredentials(db dal.Dal) (int64, errors.Error) {
+	count, err := db.Count(
+		dal.From(&LocalCredential{}),
+		dal.Join("JOIN auth_access_users ON auth_access_users.id = auth_local_credentials.access_user_id"),
+		dal.Where("auth_access_users.status = ? AND auth_access_users.hidden_at IS NULL", StatusActive),
+	)
+	if err != nil {
+		return 0, errors.Default.Wrap(err, "error counting active local credentials")
+	}
+	return count, nil
+}
+
 func localCredentialResponse(user *AccessUser, material *LocalCredentialMaterial) *LocalCredentialResponse {
 	user.LocalLoginName = material.LoginName
 	user.HasLocalCredential = true

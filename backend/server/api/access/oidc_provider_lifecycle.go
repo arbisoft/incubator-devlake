@@ -323,7 +323,13 @@ func (s *Service) ensureAnotherEnabledProvider(providerID uint64) errors.Error {
 
 func (s *Service) ensureAnotherInteractiveMethod(providerID uint64) errors.Error {
 	if s.hasEnabledLocalPassword() {
-		return nil
+		count, err := countActiveLocalCredentials(s.db)
+		if err != nil {
+			return err
+		}
+		if count > 0 {
+			return nil
+		}
 	}
 	return s.ensureAnotherEnabledProvider(providerID)
 }

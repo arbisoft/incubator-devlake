@@ -214,13 +214,9 @@ func (s *Service) RemoveLocalCredential(actor string, userID uint64) (*AccessUse
 		return nil, errors.Default.Wrap(err, "error loading local credential for removal")
 	}
 	if !s.hasEnabledOIDCProvider() {
-		remaining, countErr := tx.Count(
-			dal.From(&LocalCredential{}),
-			dal.Join("JOIN auth_access_users ON auth_access_users.id = auth_local_credentials.access_user_id"),
-			dal.Where("auth_access_users.status = ? AND auth_access_users.hidden_at IS NULL", StatusActive),
-		)
+		remaining, countErr := countActiveLocalCredentials(tx)
 		if countErr != nil {
-			return nil, errors.Default.Wrap(countErr, "error checking remaining local credentials")
+			return nil, countErr
 		}
 		if remaining <= 1 {
 			return nil, errors.BadInput.New("keep at least one interactive login method", errors.WithData(ErrCodeLastLoginMethod))
