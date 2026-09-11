@@ -18,1135 +18,2308 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 80,
+  "id": 94,
   "links": [],
   "panels": [
     {
-      "datasource": {
-        "type": "mysql",
-        "uid": "P430005175C4C7810"
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
       },
-      "description": "Counts issues created in the window and assigned to the selected developers, split into Bug versus Tasks.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
+      "id": 26,
+      "panels": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
           },
-          "custom": {
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
+          "description": "Counts PRs raised in the window and assigned to the selected developers, split into Merged, Open, Closed, and Draft.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                }
+              },
+              "links": [
+                {
+                  "targetBlank": true,
+                  "title": "Details",
+                  "url": "https://aperture.arbisoft.com/grafana/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
+                }
+              ],
+              "mappings": [],
+              "noValue": "No data against selected filters"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 30
+          },
+          "id": 18,
+          "options": {
+            "displayLabels": [
+              "name",
+              "value",
+              "percent"
+            ],
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": false,
+              "sortBy": "Value",
+              "sortDesc": true,
+              "values": [
+                "value"
+              ]
+            },
+            "pieType": "pie",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
             }
           },
-          "mappings": [],
-          "noValue": "No data against selected filters"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 7,
-        "x": 0,
-        "y": 0
-      },
-      "id": 1,
-      "options": {
-        "displayLabels": [
-          "name",
-          "value",
-          "percent"
-        ],
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "pieType": "pie",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "11.6.2",
-      "targets": [
-        {
-          "dataset": "devlake",
-          "datasource": {
-            "type": "mysql",
-            "uid": "P430005175C4C7810"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  CASE WHEN LOWER(COALESCE(i.original_type,'')) LIKE '%bug%' THEN 'Bug' ELSE 'Tasks' END AS category,\n  COUNT(*) AS issues\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.created_date)\n  AND i.assignee_id IN ( $developer_id )\nGROUP BY 1;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "GitHub Issues Summary",
-      "type": "piechart"
-    },
-    {
-      "datasource": {
-        "type": "mysql",
-        "uid": "P430005175C4C7810"
-      },
-      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "noValue": "0",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "dataset": "devlake",
+              "datasource": {
+                "type": "mysql",
+                "uid": "devlake-mysql"
               },
-              {
-                "color": "red",
-                "value": 500
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT SUM(CASE WHEN pr.status = 'MERGED' THEN 1 ELSE 0 END) AS Merged,\n       SUM(CASE WHEN pr.status = 'OPEN'   THEN 1 ELSE 0 END) AS Open,\n       SUM(CASE WHEN pr.status = 'CLOSED' THEN 1 ELSE 0 END) AS Closed,\n       SUM(CASE WHEN pr.status = 'DRAFT' THEN 1 ELSE 0 END) AS Draft\nFROM pull_requests pr\nWHERE pr.id LIKE 'github:%'\n  AND $__timeFilter(pr.created_date)\n  AND pr.base_repo_id IN ( ${repo_id} )\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN ( ${project} ))\n    AND pr.author_id IN ($developer_id)\nORDER BY (Merged + Open + Closed) DESC\nLIMIT 20;",
+              "refId": "A",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
               }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 7,
-        "y": 0
-      },
-      "id": 2,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
+            }
           ],
-          "fields": "",
-          "values": false
+          "title": "PRs Summary",
+          "type": "piechart"
         },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.6.2",
-      "targets": [
         {
-          "dataset": "devlake",
           "datasource": {
             "type": "mysql",
-            "uid": "P430005175C4C7810"
+            "uid": "devlake-mysql"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  SUM(CASE WHEN COALESCE(i.original_type, '') not like '%bug%' THEN 1 ELSE 0 END) AS issues\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.created_date)\n  AND i.assignee_id IN ( $developer_id )",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "New Tasks Created",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "mysql",
-        "uid": "P430005175C4C7810"
-      },
-      "description": "Counts completed (DONE/Closed) non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "noValue": "0",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
+          "description": "Number of PRs raised in the selected period, project and repostory",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
               },
-              {
-                "color": "red",
-                "value": 500
+              "links": [
+                {
+                  "targetBlank": true,
+                  "title": "Details",
+                  "url": "https://aperture.arbisoft.com/grafana/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
+                }
+              ],
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
               }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 11,
-        "y": 0
-      },
-      "id": 3,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.6.2",
-      "targets": [
-        {
-          "dataset": "devlake",
-          "datasource": {
-            "type": "mysql",
-            "uid": "P430005175C4C7810"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  SUM(CASE WHEN COALESCE(i.original_type, '') not like '%bug%' THEN 1 ELSE 0 END) AS issues\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND i.status IN ('DONE', 'Closed')\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.created_date)\n  AND i.assignee_id IN ($developer_id )",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Tasks Done",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "mysql",
-        "uid": "P430005175C4C7810"
-      },
-      "description": "Counts in-progress (status other than TODO/DONE/Closed) non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "noValue": "0",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "#EAB839",
-                "value": 0
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 15,
-        "y": 0
-      },
-      "id": 4,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.6.2",
-      "targets": [
-        {
-          "dataset": "devlake",
-          "datasource": {
-            "type": "mysql",
-            "uid": "P430005175C4C7810"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  SUM(CASE WHEN COALESCE(i.original_type, '') not like '%bug%' THEN 1 ELSE 0 END) AS issues\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND i.status NOT IN ('TODO', 'DONE', 'Closed')\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.created_date)\n  AND i.assignee_id IN ( $developer_id )",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Tasks In-Progress",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "mysql",
-        "uid": "P430005175C4C7810"
-      },
-      "description": "Counts not-yet-started (TODO) non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "noValue": "0",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 500
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 19,
-        "y": 0
-      },
-      "id": 5,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.6.2",
-      "targets": [
-        {
-          "dataset": "devlake",
-          "datasource": {
-            "type": "mysql",
-            "uid": "P430005175C4C7810"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  SUM(CASE WHEN i.original_type not like '%bug%' THEN 1 ELSE 0 END) AS issues\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND i.status LIKE 'TODO'\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.created_date)\n  AND i.assignee_id IN ($developer_id )",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Pending Tasks",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "mysql",
-        "uid": "P430005175C4C7810"
-      },
-      "description": "Counts bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "noValue": "0",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 0
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 7,
-        "y": 4
-      },
-      "id": 6,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.6.2",
-      "targets": [
-        {
-          "dataset": "devlake",
-          "datasource": {
-            "type": "mysql",
-            "uid": "P430005175C4C7810"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  SUM(CASE WHEN COALESCE(i.original_type, '') like '%bug%' THEN 1 ELSE 0 END) AS issues\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.created_date)\n  AND i.assignee_id IN ( $developer_id )",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Bugs Reported",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "mysql",
-        "uid": "P430005175C4C7810"
-      },
-      "description": "Counts completed (DONE/Closed) bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "noValue": "0",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 0
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 11,
-        "y": 4
-      },
-      "id": 7,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.6.2",
-      "targets": [
-        {
-          "dataset": "devlake",
-          "datasource": {
-            "type": "mysql",
-            "uid": "P430005175C4C7810"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  SUM(CASE WHEN COALESCE(i.original_type, '') like '%bug%' THEN 1 ELSE 0 END) AS issues\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND i.status IN ('TODO', 'DONE', 'Closed')\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.created_date)\n  AND i.assignee_id IN ( $developer_id )",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Bugs Done",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "mysql",
-        "uid": "P430005175C4C7810"
-      },
-      "description": "Counts in-progress (status other than TODO/DONE/Closed) bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "noValue": "0",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 0
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 15,
-        "y": 4
-      },
-      "id": 8,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.6.2",
-      "targets": [
-        {
-          "dataset": "devlake",
-          "datasource": {
-            "type": "mysql",
-            "uid": "P430005175C4C7810"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  SUM(CASE WHEN COALESCE(i.original_type, '') like '%bug%' THEN 1 ELSE 0 END) AS issues\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND i.status NOT IN ('TODO', 'DONE', 'Closed')\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.created_date)\n  AND i.assignee_id IN ( $developer_id )",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Bugs In-Progress",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "mysql",
-        "uid": "P430005175C4C7810"
-      },
-      "description": "Counts not-yet-started (TODO) bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "noValue": "0",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 0
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 19,
-        "y": 4
-      },
-      "id": 9,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.6.2",
-      "targets": [
-        {
-          "dataset": "devlake",
-          "datasource": {
-            "type": "mysql",
-            "uid": "P430005175C4C7810"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  SUM(CASE WHEN COALESCE(i.original_type, '') like '%bug%' THEN 1 ELSE 0 END) AS issues\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND i.status LIKE 'TODO'\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.created_date)\n  AND i.assignee_id IN ( $developer_id )",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Pending Bugs",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "mysql",
-        "uid": "P430005175C4C7810"
-      },
-      "description": "Averages lead_time_minutes converted to days across resolved non-bug issues assigned to the selected developers, scoped to boards mapped to the selected project.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "noValue": "0",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 15
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 7,
-        "x": 0,
-        "y": 8
-      },
-      "id": 10,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.6.2",
-      "targets": [
-        {
-          "dataset": "devlake",
-          "datasource": {
-            "type": "mysql",
-            "uid": "P430005175C4C7810"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT AVG(i.lead_time_minutes/1440) AS avg_days_to_resolve\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND i.original_type NOT LIKE '%bug%'\n  AND i.resolution_date IS NOT NULL\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.resolution_date)\n  AND i.assignee_id IN (${developer_id})",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Average Task Completion Time (Days)",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "uid": "P430005175C4C7810"
-      },
-      "description": "Lists up to 10 developers assigned more than 125% of the team's per-head average issue count (fair share) for issues created in the window, scoped to boards mapped to the selected project.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
             },
-            "inspect": false
+            "overrides": []
           },
-          "mappings": [],
-          "noValue": "No data against selected filters",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 8,
-        "x": 7,
-        "y": 8
-      },
-      "id": 12,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": false
-      },
-      "pluginVersion": "11.6.2",
-      "targets": [
-        {
-          "dataset": "devlake",
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "Select replace(member, '-', ' ') as Developers from (\n  WITH scoped AS (\n  SELECT\n    i.id,\n    COALESCE(\n      NULLIF(TRIM(a.full_name), ''),\n      NULLIF(TRIM(a.user_name), ''),\n      NULLIF(TRIM(a.email), ''),\n      NULLIF(TRIM(i.assignee_name), '')\n    ) AS member\n  FROM issues i\n  JOIN board_issues bi    ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id\n                         AND pm.`table` = 'boards'\n                         AND pm.project_name IN (${project})\n  JOIN accounts a       ON a.id = i.assignee_id\n  WHERE i.id LIKE 'github:%'\n    AND bi.board_id IN (${repo_id})\n    AND $__timeFilter(i.created_date)\n),\nper_member AS (\n  SELECT member, COUNT(DISTINCT id) AS tasks\n  FROM scoped\n  WHERE member IS NOT NULL\n  GROUP BY member\n),\ntotals AS (\n  SELECT SUM(tasks) AS total_tasks, COUNT(*) AS headcount FROM per_member\n)\nSELECT\n  p.member                                              AS `Member`,\n  p.tasks                                               AS `Tasks`,\n  ROUND(t.total_tasks / t.headcount, 1)                 AS `Fair share`,\n  ROUND(p.tasks - (t.total_tasks / t.headcount), 1)     AS `Deviation`,\n  ROUND((p.tasks - (t.total_tasks / t.headcount))\n        * 100.0 / NULLIF(t.total_tasks / t.headcount, 0), 0) AS `Pct vs fair`,\n  CASE\n    WHEN p.tasks > (t.total_tasks / t.headcount) * 1.25 THEN 'Overloaded'\n    WHEN p.tasks < (t.total_tasks / t.headcount) * 0.75 THEN 'Underloaded'\n    ELSE 'Balanced'\n  END                                                   AS `Status`\nFROM per_member p\nCROSS JOIN totals t\nORDER BY p.tasks DESC\n) base\nwhere status = 'Overloaded'\nlimit 10;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Workload Above Fair Share",
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "uid": "P430005175C4C7810"
-      },
-      "description": "Lists up to 10 developers assigned less than 75% of the team's per-head average issue count (fair share) for issues created in the window, scoped to boards mapped to the selected project.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 8,
+            "y": 30
           },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
+          "id": 17,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
             },
-            "inspect": false
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
           },
-          "mappings": [],
-          "noValue": "No data against selected filters",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "dataset": "devlake",
+              "datasource": {
+                "type": "mysql",
+                "uid": "devlake-mysql"
               },
-              {
-                "color": "red",
-                "value": 80
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "Select count(pr.id)\nfrom pull_requests pr\nJOIN project_mapping pm \n  ON pm.row_id = pr.base_repo_id\n  AND pm.`table` = 'repos'\n  AND pm.project_name IN ( ${project} )\nWHERE pr.id like 'github:%' \n  AND pr.base_repo_id in ( ${repo_id} )\n  AND $__timeFilter(pr.created_date)\n  AND pr.author_id IN ( $developer_id )",
+              "refId": "A",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
               }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 8,
-        "x": 15,
-        "y": 8
-      },
-      "id": 13,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
+            }
           ],
-          "show": false
+          "title": "PRs Raised",
+          "type": "stat"
         },
-        "showHeader": false
-      },
-      "pluginVersion": "11.6.2",
-      "targets": [
         {
-          "dataset": "devlake",
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "Select replace(member, '-', ' ') as Developers from (\n  WITH scoped AS (\n  SELECT\n    i.id,\n    COALESCE(\n      NULLIF(TRIM(a.full_name), ''),\n      NULLIF(TRIM(a.user_name), ''),\n      NULLIF(TRIM(a.email), ''),\n      NULLIF(TRIM(i.assignee_name), '')\n    ) AS member\n  FROM issues i\n  JOIN board_issues bi    ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id\n                         AND pm.`table` = 'boards'\n                         AND pm.project_name IN (${project})\n  LEFT JOIN accounts a       ON a.id = i.assignee_id\n  WHERE i.id LIKE 'github:%'\n    AND bi.board_id IN (${repo_id})\n    AND $__timeFilter(i.created_date)\n),\nper_member AS (\n  SELECT member, COUNT(DISTINCT id) AS tasks\n  FROM scoped\n  WHERE member IS NOT NULL\n  GROUP BY member\n),\ntotals AS (\n  SELECT SUM(tasks) AS total_tasks, COUNT(*) AS headcount FROM per_member\n)\nSELECT\n  p.member                                              AS `Member`,\n  p.tasks                                               AS `Tasks`,\n  ROUND(t.total_tasks / t.headcount, 1)                 AS `Fair share`,\n  ROUND(p.tasks - (t.total_tasks / t.headcount), 1)     AS `Deviation`,\n  ROUND((p.tasks - (t.total_tasks / t.headcount))\n        * 100.0 / NULLIF(t.total_tasks / t.headcount, 0), 0) AS `Pct vs fair`,\n  CASE\n    WHEN p.tasks > (t.total_tasks / t.headcount) * 1.25 THEN 'Overloaded'\n    WHEN p.tasks < (t.total_tasks / t.headcount) * 0.75 THEN 'Underloaded'\n    ELSE 'Balanced'\n  END                                                   AS `Status`\nFROM per_member p\nCROSS JOIN totals t\nORDER BY p.tasks DESC\n) base\nwhere status = 'Underloaded'\nlimit 10;",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Workload Below Fair Share",
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "mysql",
-        "uid": "P430005175C4C7810"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "mappings": [],
-          "noValue": "0",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
+          "description": "Number of PRs merged",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
               },
-              {
-                "color": "red",
-                "value": 15
+              "links": [
+                {
+                  "targetBlank": true,
+                  "title": "Details",
+                  "url": "https://aperture.arbisoft.com/grafana/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
+                }
+              ],
+              "mappings": [],
+              "noValue": "0",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
               }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 7,
-        "x": 0,
-        "y": 11
-      },
-      "id": 11,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 12,
+            "y": 30
+          },
+          "id": 19,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "datasource": {
+                "type": "datasource",
+                "uid": "-- Dashboard --"
+              },
+              "panelId": 18,
+              "refId": "A"
+            }
           ],
-          "fields": "",
-          "values": false
+          "title": "PRs Merged",
+          "transformations": [
+            {
+              "id": "filterFieldsByName",
+              "options": {
+                "include": {
+                  "names": [
+                    "Merged"
+                  ]
+                }
+              }
+            }
+          ],
+          "type": "stat"
         },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.6.2",
-      "targets": [
         {
-          "dataset": "devlake",
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "description": "Number of PRs closed in the selected period, project and repostory",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "links": [
+                {
+                  "targetBlank": true,
+                  "title": "Details",
+                  "url": "https://aperture.arbisoft.com/grafana/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
+                }
+              ],
+              "mappings": [],
+              "noValue": "0",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 16,
+            "y": 30
+          },
+          "id": 20,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "datasource": {
+                "type": "datasource",
+                "uid": "-- Dashboard --"
+              },
+              "panelId": 18,
+              "refId": "A"
+            }
+          ],
+          "title": "PRs Closed",
+          "transformations": [
+            {
+              "id": "filterFieldsByName",
+              "options": {
+                "include": {
+                  "names": [
+                    "Closed"
+                  ]
+                }
+              }
+            }
+          ],
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "description": "Number of PRs waiting for review in the selected period, project and repostory",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "links": [
+                {
+                  "targetBlank": true,
+                  "title": "Details",
+                  "url": "https://aperture.arbisoft.com/grafana/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
+                }
+              ],
+              "mappings": [],
+              "noValue": "0",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 20,
+            "y": 30
+          },
+          "id": 21,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "datasource": {
+                "type": "datasource",
+                "uid": "-- Dashboard --"
+              },
+              "panelId": 18,
+              "refId": "A"
+            }
+          ],
+          "title": "PRs Waiting Review",
+          "transformations": [
+            {
+              "id": "filterFieldsByName",
+              "options": {
+                "include": {
+                  "names": [
+                    "Open"
+                  ]
+                }
+              }
+            }
+          ],
+          "type": "stat"
+        },
+        {
           "datasource": {
             "type": "mysql",
-            "uid": "P430005175C4C7810"
+            "uid": "devlake-mysql"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT AVG(i.lead_time_minutes/1440) AS avg_days_to_resolve\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND i.original_type LIKE '%bug%'\n  AND i.resolution_date IS NOT NULL\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.resolution_date)\n  AND i.assignee_id IN (${developer_id})",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
+          "description": "PRs Merged without Approval",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "links": [
+                {
+                  "targetBlank": true,
+                  "title": "Details",
+                  "url": "https://aperture.arbisoft.com/grafana/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-8"
+                }
+              ],
+              "mappings": [],
+              "noValue": "0",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
               }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 8,
+            "y": 34
+          },
+          "id": 23,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "dataset": "devlake",
+              "datasource": {
+                "type": "mysql",
+                "uid": "devlake-mysql"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "-- Per repo, counts merged PRs that had no APPROVED review from anyone other than the author before the merge, and their share of all merged PRs.\nSELECT\n  SUM(CASE WHEN EXISTS (\n        SELECT 1\n        FROM pull_request_comments prc\n        WHERE prc.pull_request_id = pr.id\n          AND prc.type    = 'REVIEW'\n          AND prc.status  = 'APPROVED'\n          AND prc.account_id <> pr.author_id\n          AND (pr.merged_date IS NULL OR prc.created_date <= pr.merged_date)\n      ) THEN 0 ELSE 1 END) AS 'Unapproved PRs'\nFROM pull_requests pr\nJOIN repos r    ON r.id = pr.base_repo_id\nWHERE pr.status = 'MERGED'\n  AND pr.id LIKE 'github:%'\n  AND $__timeFilter(pr.created_date)\n  AND pr.base_repo_id IN ( ${repo_id} )\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN ( ${project} ))\n  AND pr.author_id IN ( $developer_id  )\n",
+              "refId": "A",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
               }
-            ],
-            "limit": 50
-          }
+            }
+          ],
+          "title": "Unapproved Merged PRs",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "description": "Average number of line changes in a PR",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "links": [
+                {
+                  "targetBlank": true,
+                  "title": "Details",
+                  "url": "https://aperture.arbisoft.com/grafana/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&${__all_variables}&${__url_time_range}&viewPanel=panel-6"
+                }
+              ],
+              "mappings": [],
+              "noValue": "0",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 12,
+            "y": 34
+          },
+          "id": 25,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "dataset": "devlake",
+              "datasource": {
+                "type": "mysql",
+                "uid": "devlake-mysql"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT \n         AVG(c.additions + c.deletions) AS lines_changed\n  FROM pull_requests pr\n  JOIN pull_request_commits prc ON prc.pull_request_id = pr.id\n  JOIN commits c                ON c.sha = prc.commit_sha\n  WHERE pr.id LIKE 'github:%'\n    AND $__timeFilter(pr.created_date)\n    AND pr.base_repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN ( ${project} ))\n    AND EXISTS (\n      SELECT 1\n      FROM accounts a where a.id IN ( $developer_id  )\n      OR a.id = c.author_email or a.email = c.author_email\n    )",
+              "refId": "A",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              }
+            }
+          ],
+          "title": "Average PR Size",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "description": "Average number of days taken to merge a PR",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "links": [
+                {
+                  "targetBlank": true,
+                  "title": "Details",
+                  "url": "https://aperture.arbisoft.com/grafana/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-4"
+                }
+              ],
+              "mappings": [],
+              "noValue": "0",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 16,
+            "y": 34
+          },
+          "id": 22,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "dataset": "devlake",
+              "datasource": {
+                "type": "mysql",
+                "uid": "devlake-mysql"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "\n  SELECT AVG(DATEDIFF(pr.merged_date, pr.created_date))\n  FROM pull_requests pr\n  WHERE pr.status      = 'MERGED'\n    AND pr.merged_date IS NOT NULL\n    AND pr.merged_date > pr.created_date\n    AND pr.id LIKE 'github:%'\n    AND $__timeFilter(pr.merged_date)\n    AND pr.base_repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN ( ${project} ))\n    AND pr.author_id IN ($developer_id)\n",
+              "refId": "A",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              }
+            }
+          ],
+          "title": "Average PR Merge Time (Days)",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "description": "Number of commits made in the selected period, project and repostory",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 20,
+            "y": 34
+          },
+          "id": 16,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "dataset": "devlake",
+              "datasource": {
+                "type": "mysql",
+                "uid": "devlake-mysql"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "Select count(c.sha)\nfrom commits c\nJOIN pull_request_commits prc on prc.commit_sha = c.sha\nJOIN pull_requests pr\n  ON pr.id = prc.pull_request_id\n  AND pr.base_repo_id in ( ${repo_id} )\nJOIN project_mapping pm \n  ON pm.row_id = pr.base_repo_id\n  AND pm.`table` = 'repos'\n  AND pm.project_name IN ( ${project} )\nWHERE prc.pull_request_id like 'github:%' \n  AND $__timeFilter(prc.commit_authored_date)",
+              "refId": "A",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              }
+            }
+          ],
+          "title": "Commits Raised",
+          "type": "stat"
         }
       ],
-      "title": "Average Bug Resolution Time (Days)",
-      "type": "stat"
+      "title": "PR Summary",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      },
+      "id": 27,
+      "panels": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "description": "Counts issues created in the window and assigned to the selected developers, split into Bug versus Tasks.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                }
+              },
+              "links": [
+                {
+                  "targetBlank": true,
+                  "title": "Details",
+                  "url": "https://aperture.arbisoft.com/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-4"
+                }
+              ],
+              "mappings": [],
+              "noValue": "No data against selected filters"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 2
+          },
+          "id": 1,
+          "options": {
+            "displayLabels": [
+              "name",
+              "value",
+              "percent"
+            ],
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": false,
+              "values": [
+                "value"
+              ]
+            },
+            "pieType": "pie",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "dataset": "devlake",
+              "datasource": {
+                "type": "mysql",
+                "uid": "devlake-mysql"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT\n  CASE WHEN LOWER(COALESCE(i.original_type,'')) LIKE '%bug%' THEN 'Bug' ELSE 'Tasks' END AS category,\n  COUNT(*) AS issues\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.created_date)\n  AND i.assignee_id IN ( $developer_id )\nGROUP BY 1;",
+              "refId": "A",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              }
+            }
+          ],
+          "title": "GitHub Issues Summary",
+          "type": "piechart"
+        },
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                }
+              },
+              "fieldMinMax": false,
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 2
+          },
+          "id": 28,
+          "options": {
+            "displayLabels": [
+              "percent",
+              "name",
+              "value"
+            ],
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "pieType": "pie",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "dataset": "devlake",
+              "datasource": {
+                "type": "mysql",
+                "uid": "devlake-mysql"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT\n  SUM(CASE WHEN i.status NOT IN ('TODO', 'DONE', 'Closed') THEN 1 ELSE 0 END) AS `In Progress`,\n  SUM(CASE WHEN i.status = 'TODO' THEN 1 ELSE 0 END) AS `To Do`,\n  SUM(CASE WHEN i.status IN ('DONE', 'Closed') THEN 1 ELSE 0 END) AS `Done`\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND COALESCE(i.original_type, '') not like '%bug%'\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.created_date)\n  AND i.assignee_id IN ( $developer_id )",
+              "refId": "A",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              }
+            }
+          ],
+          "title": "Tasks Status Distribution",
+          "type": "piechart"
+        },
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                }
+              },
+              "fieldMinMax": false,
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 2
+          },
+          "id": 29,
+          "options": {
+            "displayLabels": [
+              "percent",
+              "name",
+              "value"
+            ],
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "pieType": "pie",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "dataset": "devlake",
+              "datasource": {
+                "type": "mysql",
+                "uid": "devlake-mysql"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT\n  SUM(CASE WHEN i.status NOT IN ('TODO', 'DONE', 'Closed') THEN 1 ELSE 0 END) AS `In Progress`,\n  SUM(CASE WHEN i.status = 'TODO' THEN 1 ELSE 0 END) AS `To Do`,\n  SUM(CASE WHEN i.status IN ('DONE', 'Closed') THEN 1 ELSE 0 END) AS `Done`\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND COALESCE(i.original_type, '') like '%bug%'\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.created_date)\n  AND i.assignee_id IN ( $developer_id )",
+              "refId": "A",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              }
+            }
+          ],
+          "title": "Bugs Status Distribution",
+          "type": "piechart"
+        },
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "links": [
+                {
+                  "targetBlank": true,
+                  "title": "Details",
+                  "url": "https://aperture.arbisoft.com/grafana/d/cfxmvb4cu2gw0d/d-issue-overview?orgId=1&var-interval=1w&timezone=browser&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+                }
+              ],
+              "mappings": [],
+              "noValue": "0",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 500
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 0,
+            "y": 10
+          },
+          "id": 2,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "first"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "value",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "datasource": {
+                "type": "datasource",
+                "uid": "-- Dashboard --"
+              },
+              "panelId": 1,
+              "refId": "A"
+            }
+          ],
+          "title": "New Tasks Created",
+          "transformations": [
+            {
+              "id": "filterFieldsByName",
+              "options": {
+                "byVariable": false,
+                "include": {
+                  "names": [
+                    "issues"
+                  ]
+                }
+              }
+            }
+          ],
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "description": "Counts bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "links": [
+                {
+                  "targetBlank": true,
+                  "title": "Details",
+                  "url": "https://aperture.arbisoft.com/grafana/d/cfxmvb4cu2gw0d/d-issue-overview?orgId=1&var-interval=1w&timezone=browser&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+                }
+              ],
+              "mappings": [],
+              "noValue": "0",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 0
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 4,
+            "y": 10
+          },
+          "id": 6,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "last"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "datasource": {
+                "type": "datasource",
+                "uid": "-- Dashboard --"
+              },
+              "panelId": 1,
+              "refId": "A"
+            }
+          ],
+          "title": "Bugs Reported",
+          "transformations": [
+            {
+              "id": "filterFieldsByName",
+              "options": {
+                "byVariable": false,
+                "include": {
+                  "names": []
+                }
+              }
+            }
+          ],
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "description": "Counts in-progress (status other than TODO/DONE/Closed) non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "links": [
+                {
+                  "targetBlank": true,
+                  "title": "Details",
+                  "url": "https://aperture.arbisoft.com/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+                }
+              ],
+              "mappings": [],
+              "noValue": "0",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "#EAB839",
+                    "value": 0
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 8,
+            "y": 10
+          },
+          "id": 4,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "datasource": {
+                "type": "datasource",
+                "uid": "-- Dashboard --"
+              },
+              "panelId": 28,
+              "refId": "A"
+            }
+          ],
+          "title": "Tasks In-Progress",
+          "transformations": [
+            {
+              "id": "filterFieldsByName",
+              "options": {
+                "include": {
+                  "names": [
+                    "In Progress"
+                  ]
+                }
+              }
+            }
+          ],
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "description": "Counts not-yet-started (TODO) non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "links": [
+                {
+                  "targetBlank": true,
+                  "title": "Details",
+                  "url": "https://aperture.arbisoft.com/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+                }
+              ],
+              "mappings": [],
+              "noValue": "0",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 500
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 12,
+            "y": 10
+          },
+          "id": 5,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "datasource": {
+                "type": "datasource",
+                "uid": "-- Dashboard --"
+              },
+              "panelId": 28,
+              "refId": "A"
+            }
+          ],
+          "title": "Pending Tasks",
+          "transformations": [
+            {
+              "id": "filterFieldsByName",
+              "options": {
+                "include": {
+                  "names": [
+                    "To Do"
+                  ]
+                }
+              }
+            }
+          ],
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "description": "Counts in-progress (status other than TODO/DONE/Closed) bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "links": [
+                {
+                  "targetBlank": true,
+                  "title": "Details",
+                  "url": "https://aperture.arbisoft.com/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+                }
+              ],
+              "mappings": [],
+              "noValue": "0",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 0
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 16,
+            "y": 10
+          },
+          "id": 8,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "datasource": {
+                "type": "datasource",
+                "uid": "-- Dashboard --"
+              },
+              "panelId": 29,
+              "refId": "A"
+            }
+          ],
+          "title": "Bugs In-Progress",
+          "transformations": [
+            {
+              "id": "filterFieldsByName",
+              "options": {
+                "include": {
+                  "names": [
+                    "In Progress"
+                  ]
+                }
+              }
+            }
+          ],
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "description": "Counts not-yet-started (TODO) bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "links": [
+                {
+                  "targetBlank": true,
+                  "title": "Details",
+                  "url": "https://aperture.arbisoft.com/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+                }
+              ],
+              "mappings": [],
+              "noValue": "0",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 0
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 20,
+            "y": 10
+          },
+          "id": 9,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "datasource": {
+                "type": "datasource",
+                "uid": "-- Dashboard --"
+              },
+              "panelId": 29,
+              "refId": "A"
+            }
+          ],
+          "title": "Pending Bugs",
+          "transformations": [
+            {
+              "id": "filterFieldsByName",
+              "options": {
+                "include": {
+                  "names": [
+                    "To Do"
+                  ]
+                }
+              }
+            }
+          ],
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "description": "Counts completed (DONE/Closed) non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "links": [
+                {
+                  "targetBlank": true,
+                  "title": "Details",
+                  "url": "https://aperture.arbisoft.com/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+                }
+              ],
+              "mappings": [],
+              "noValue": "0",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 500
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 8,
+            "y": 14
+          },
+          "id": 3,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "datasource": {
+                "type": "datasource",
+                "uid": "-- Dashboard --"
+              },
+              "panelId": 28,
+              "refId": "A"
+            }
+          ],
+          "title": "Tasks Done",
+          "transformations": [
+            {
+              "id": "filterFieldsByName",
+              "options": {
+                "include": {
+                  "names": [
+                    "Done"
+                  ]
+                }
+              }
+            }
+          ],
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "description": "Number of tasks that are orphan/not assigned to anyone",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 12,
+            "y": 14
+          },
+          "id": 14,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "dataset": "devlake",
+              "datasource": {
+                "type": "mysql",
+                "uid": "devlake-mysql"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT\n  SUM(CASE WHEN COALESCE(i.original_type, '') not like '%bug%' THEN 1 ELSE 0 END) AS issues\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.created_date)\n  AND (i.assignee_id = '' OR i.assignee_id is NULL)",
+              "refId": "A",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              }
+            }
+          ],
+          "title": "Unassigned Tasks",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "description": "Counts completed (DONE/Closed) bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "links": [
+                {
+                  "targetBlank": true,
+                  "title": "Details",
+                  "url": "https://aperture.arbisoft.com/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+                }
+              ],
+              "mappings": [],
+              "noValue": "0",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 0
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 16,
+            "y": 14
+          },
+          "id": 7,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "datasource": {
+                "type": "datasource",
+                "uid": "-- Dashboard --"
+              },
+              "panelId": 29,
+              "refId": "A"
+            }
+          ],
+          "title": "Bugs Done",
+          "transformations": [
+            {
+              "id": "filterFieldsByName",
+              "options": {
+                "include": {
+                  "names": [
+                    "Done"
+                  ]
+                }
+              }
+            }
+          ],
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "description": "Bugs that are not assigned to anyone.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "noValue": "0",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 20,
+            "y": 14
+          },
+          "id": 15,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "dataset": "devlake",
+              "datasource": {
+                "type": "mysql",
+                "uid": "devlake-mysql"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT\n  SUM(CASE WHEN COALESCE(i.original_type, '') like '%bug%' THEN 1 ELSE 0 END) AS issues\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.created_date)\n  AND (i.assignee_id = '' OR i.assignee_id IS NULL)",
+              "refId": "A",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              }
+            }
+          ],
+          "title": "Unassigned Bugs",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "description": "Averages lead_time_minutes converted to days across resolved non-bug issues assigned to the selected developers, scoped to boards mapped to the selected project.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "noValue": "0",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 15
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 8,
+            "x": 8,
+            "y": 18
+          },
+          "id": 10,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "dataset": "devlake",
+              "datasource": {
+                "type": "mysql",
+                "uid": "devlake-mysql"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT AVG(i.lead_time_minutes/1440) AS avg_days_to_resolve\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND i.original_type NOT LIKE '%bug%'\n  AND i.resolution_date IS NOT NULL\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.resolution_date)\n  AND i.assignee_id IN (${developer_id})",
+              "refId": "A",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              }
+            }
+          ],
+          "title": "Average Task Completion Time (Days)",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "noValue": "0",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 15
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 8,
+            "x": 16,
+            "y": 18
+          },
+          "id": 11,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "dataset": "devlake",
+              "datasource": {
+                "type": "mysql",
+                "uid": "devlake-mysql"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT AVG(i.lead_time_minutes/1440) AS avg_days_to_resolve\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND i.original_type LIKE '%bug%'\n  AND i.resolution_date IS NOT NULL\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.resolution_date)\n  AND i.assignee_id IN (${developer_id})",
+              "refId": "A",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              }
+            }
+          ],
+          "title": "Average Bug Resolution Time (Days)",
+          "type": "stat"
+        }
+      ],
+      "title": "Issue Stats",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 2
+      },
+      "id": 30,
+      "panels": [
+        {
+          "datasource": {
+            "uid": "devlake-mysql"
+          },
+          "description": "Lists up to 10 developers assigned more than 125% of the team's per-head average issue count (fair share) for issues created in the window, scoped to boards mapped to the selected project.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "inspect": false
+              },
+              "mappings": [],
+              "noValue": "No data against selected filters",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 23
+          },
+          "id": 12,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "fields": "",
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "showHeader": false
+          },
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "dataset": "devlake",
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "Select replace(member, '-', ' ') as Developers from (\n  WITH scoped AS (\n  SELECT\n    i.id,\n    COALESCE(\n      NULLIF(TRIM(a.full_name), ''),\n      NULLIF(TRIM(a.user_name), ''),\n      NULLIF(TRIM(a.email), ''),\n      NULLIF(TRIM(i.assignee_name), '')\n    ) AS member\n  FROM issues i\n  JOIN board_issues bi    ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id\n                         AND pm.`table` = 'boards'\n                         AND pm.project_name IN (${project})\n  JOIN accounts a       ON a.id = i.assignee_id\n  WHERE i.id LIKE 'github:%'\n    AND bi.board_id IN (${repo_id})\n    AND $__timeFilter(i.created_date)\n),\nper_member AS (\n  SELECT member, COUNT(DISTINCT id) AS tasks\n  FROM scoped\n  WHERE member IS NOT NULL\n  GROUP BY member\n),\ntotals AS (\n  SELECT SUM(tasks) AS total_tasks, COUNT(*) AS headcount FROM per_member\n)\nSELECT\n  p.member                                              AS `Member`,\n  p.tasks                                               AS `Tasks`,\n  ROUND(t.total_tasks / t.headcount, 1)                 AS `Fair share`,\n  ROUND(p.tasks - (t.total_tasks / t.headcount), 1)     AS `Deviation`,\n  ROUND((p.tasks - (t.total_tasks / t.headcount))\n        * 100.0 / NULLIF(t.total_tasks / t.headcount, 0), 0) AS `Pct vs fair`,\n  CASE\n    WHEN p.tasks > (t.total_tasks / t.headcount) * 1.25 THEN 'Overloaded'\n    WHEN p.tasks < (t.total_tasks / t.headcount) * 0.75 THEN 'Underloaded'\n    ELSE 'Balanced'\n  END                                                   AS `Status`\nFROM per_member p\nCROSS JOIN totals t\nORDER BY p.tasks DESC\n) base\nwhere status = 'Overloaded'\nlimit 10;",
+              "refId": "A",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              }
+            }
+          ],
+          "title": "Workload Above Fair Share",
+          "type": "table"
+        },
+        {
+          "datasource": {
+            "uid": "devlake-mysql"
+          },
+          "description": "Lists up to 10 developers assigned less than 75% of the team's per-head average issue count (fair share) for issues created in the window, scoped to boards mapped to the selected project.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "inspect": false
+              },
+              "mappings": [],
+              "noValue": "No data against selected filters",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 23
+          },
+          "id": 13,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "fields": "",
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "showHeader": false
+          },
+          "pluginVersion": "11.6.2",
+          "targets": [
+            {
+              "dataset": "devlake",
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "Select replace(member, '-', ' ') as Developers from (\n  WITH scoped AS (\n  SELECT\n    i.id,\n    COALESCE(\n      NULLIF(TRIM(a.full_name), ''),\n      NULLIF(TRIM(a.user_name), ''),\n      NULLIF(TRIM(a.email), ''),\n      NULLIF(TRIM(i.assignee_name), '')\n    ) AS member\n  FROM issues i\n  JOIN board_issues bi    ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id\n                         AND pm.`table` = 'boards'\n                         AND pm.project_name IN (${project})\n  LEFT JOIN accounts a       ON a.id = i.assignee_id\n  WHERE i.id LIKE 'github:%'\n    AND bi.board_id IN (${repo_id})\n    AND $__timeFilter(i.created_date)\n),\nper_member AS (\n  SELECT member, COUNT(DISTINCT id) AS tasks\n  FROM scoped\n  WHERE member IS NOT NULL\n  GROUP BY member\n),\ntotals AS (\n  SELECT SUM(tasks) AS total_tasks, COUNT(*) AS headcount FROM per_member\n)\nSELECT\n  p.member                                              AS `Member`,\n  p.tasks                                               AS `Tasks`,\n  ROUND(t.total_tasks / t.headcount, 1)                 AS `Fair share`,\n  ROUND(p.tasks - (t.total_tasks / t.headcount), 1)     AS `Deviation`,\n  ROUND((p.tasks - (t.total_tasks / t.headcount))\n        * 100.0 / NULLIF(t.total_tasks / t.headcount, 0), 0) AS `Pct vs fair`,\n  CASE\n    WHEN p.tasks > (t.total_tasks / t.headcount) * 1.25 THEN 'Overloaded'\n    WHEN p.tasks < (t.total_tasks / t.headcount) * 0.75 THEN 'Underloaded'\n    ELSE 'Balanced'\n  END                                                   AS `Status`\nFROM per_member p\nCROSS JOIN totals t\nORDER BY p.tasks DESC\n) base\nwhere status = 'Underloaded'\nlimit 10;",
+              "refId": "A",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              }
+            }
+          ],
+          "title": "Workload Below Fair Share",
+          "type": "table"
+        }
+      ],
+      "title": "Workload",
+      "type": "row"
     }
   ],
   "preload": false,
@@ -1156,14 +2329,16 @@
     "list": [
       {
         "current": {
-          "text": "All",
+          "text": [
+            "DevLake - Pilot"
+          ],
           "value": [
-            "$__all"
+            "DevLake - Pilot"
           ]
         },
         "datasource": {
           "type": "mysql",
-          "uid": "P430005175C4C7810"
+          "uid": "devlake-mysql"
         },
         "definition": "SELECT DISTINCT pm.project_name  \nFROM project_mapping pm \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nORDER BY pm.project_name ",
         "includeAll": true,
@@ -1185,7 +2360,7 @@
         },
         "datasource": {
           "type": "mysql",
-          "uid": "P430005175C4C7810"
+          "uid": "devlake-mysql"
         },
         "definition": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nAND pm.project_name IN ( $project )\nORDER BY text",
         "includeAll": true,
@@ -1208,7 +2383,7 @@
         },
         "datasource": {
           "type": "mysql",
-          "uid": "P430005175C4C7810"
+          "uid": "devlake-mysql"
         },
         "definition": "WITH scoped_repos AS (\n  SELECT r.id\n  FROM repos r\n  WHERE r.id LIKE 'github:%'\n    AND r.deleted = 0\n    AND r.id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = r.id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN ( ${project} ))\n),\nscoped_accounts AS (\n  -- PR authors\n  SELECT pr.author_id AS account_id\n  FROM pull_requests pr\n  JOIN scoped_repos sr ON sr.id = pr.base_repo_id\n  WHERE pr.author_id LIKE 'github:%'\n  UNION\n  -- reviewers and commenters\n  SELECT cmt.account_id\n  FROM pull_request_comments cmt\n  JOIN pull_requests pr ON pr.id = cmt.pull_request_id\n  JOIN scoped_repos sr  ON sr.id = pr.base_repo_id\n  WHERE cmt.account_id LIKE 'github:%'\n  UNION\n  -- issue assignees, scoped through boards (github board ids match repo ids)\n  SELECT ia.assignee_id\n  FROM issue_assignees ia\n  JOIN board_issues bi ON bi.issue_id = ia.issue_id\n  WHERE ia.assignee_id LIKE 'github:%'\n    AND bi.board_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = bi.board_id\n                   AND pm.`table` = 'boards'\n                   AND pm.project_name IN ( ${project} ))\n)\nSELECT CONCAT(\n         REPLACE(COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           '(unmapped)'\n         ), '-', ' '),\n         '--', a.id) AS Name\nFROM accounts a\nJOIN scoped_accounts sa ON sa.account_id = a.id\nGROUP BY Name\nORDER BY Name",
         "description": "",
@@ -1225,12 +2400,12 @@
     ]
   },
   "time": {
-    "from": "now-90d",
+    "from": "now-30d",
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "browser",
+  "timezone": "utc",
   "title": "A. GitHub High Level Summary",
   "uid": "efxmn9vz2bv28b",
-  "version": 24
+  "version": 6
 }

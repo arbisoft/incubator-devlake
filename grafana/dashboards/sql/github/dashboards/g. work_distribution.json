@@ -24,7 +24,7 @@
     {
       "datasource": {
         "type": "mysql",
-        "uid": "P430005175C4C7810"
+        "uid": "devlake-mysql"
       },
       "description": "Per author, classifies merged PRs as Light/Standard/Heavy by total lines changed (merge commits excluded) and reports counts and percentages for authors with at least 3 PRs.",
       "fieldConfig": {
@@ -121,7 +121,7 @@
           "dataset": "devlake",
           "datasource": {
             "type": "mysql",
-            "uid": "P430005175C4C7810"
+            "uid": "devlake-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -165,7 +165,7 @@
         },
         "datasource": {
           "type": "mysql",
-          "uid": "P430005175C4C7810"
+          "uid": "devlake-mysql"
         },
         "definition": "SELECT DISTINCT pm.project_name  \nFROM project_mapping pm \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nORDER BY pm.project_name ",
         "includeAll": true,
@@ -187,7 +187,7 @@
         },
         "datasource": {
           "type": "mysql",
-          "uid": "P430005175C4C7810"
+          "uid": "devlake-mysql"
         },
         "definition": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nAND pm.project_name IN ( $project )\nORDER BY text",
         "includeAll": true,
@@ -210,7 +210,7 @@
         },
         "datasource": {
           "type": "mysql",
-          "uid": "P430005175C4C7810"
+          "uid": "devlake-mysql"
         },
         "definition": "WITH scoped_repos AS (\n  SELECT r.id\n  FROM repos r\n  WHERE r.id LIKE 'github:%'\n    AND r.deleted = 0\n    AND r.id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = r.id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN ( ${project} ))\n),\nscoped_accounts AS (\n  -- PR authors\n  SELECT pr.author_id AS account_id\n  FROM pull_requests pr\n  JOIN scoped_repos sr ON sr.id = pr.base_repo_id\n  WHERE pr.author_id LIKE 'github:%'\n  UNION\n  -- reviewers and commenters\n  SELECT cmt.account_id\n  FROM pull_request_comments cmt\n  JOIN pull_requests pr ON pr.id = cmt.pull_request_id\n  JOIN scoped_repos sr  ON sr.id = pr.base_repo_id\n  WHERE cmt.account_id LIKE 'github:%'\n  UNION\n  -- issue assignees, scoped through boards (github board ids match repo ids)\n  SELECT ia.assignee_id\n  FROM issue_assignees ia\n  JOIN board_issues bi ON bi.issue_id = ia.issue_id\n  WHERE ia.assignee_id LIKE 'github:%'\n    AND bi.board_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = bi.board_id\n                   AND pm.`table` = 'boards'\n                   AND pm.project_name IN ( ${project} ))\n)\nSELECT CONCAT(\n         REPLACE(COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           '(unmapped)'\n         ), '-', ' '),\n         '--', a.id) AS Name\nFROM accounts a\nJOIN scoped_accounts sa ON sa.account_id = a.id\nGROUP BY Name\nORDER BY Name",
         "description": "",
@@ -227,12 +227,12 @@
     ]
   },
   "time": {
-    "from": "now-90d",
+    "from": "now-30d",
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "browser",
+  "timezone": "utc",
   "title": "G. Work Distribution",
   "uid": "afxmxmufytf5sf",
-  "version": 7
+  "version": 9
 }

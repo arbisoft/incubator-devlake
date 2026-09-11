@@ -50,7 +50,7 @@
     {
       "datasource": {
         "type": "mysql",
-        "uid": "P430005175C4C7810"
+        "uid": "devlake-mysql"
       },
       "description": "Per assignee, counts issues created in the window split by status into To Do, In Progress and Done.",
       "fieldConfig": {
@@ -130,12 +130,12 @@
           "dataset": "devlake",
           "datasource": {
             "type": "mysql",
-            "uid": "P430005175C4C7810"
+            "uid": "devlake-mysql"
           },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT REPLACE(COALESCE(\n         NULLIF(TRIM(a.full_name), ''),\n         NULLIF(TRIM(u.name),      ''),\n         NULLIF(TRIM(a.user_name), ''),\n         NULLIF(TRIM(a.email),     ''),\n         NULLIF(TRIM(i.assignee_name), ''),\n         i.assignee_id\n       ), '-', ' ')                                          AS developer,\n       SUM(CASE WHEN i.status = 'TODO'        THEN 1 ELSE 0 END) AS 'To Do',\n       SUM(CASE WHEN i.status = 'IN_PROGRESS' THEN 1 ELSE 0 END) AS 'In Progress',\n       SUM(CASE WHEN i.status = 'DONE'        THEN 1 ELSE 0 END) AS Done\nFROM issues i\nLEFT JOIN accounts a ON a.id = i.assignee_id\nLEFT JOIN (\n    SELECT account_id, MIN(user_id) AS user_id\n    FROM user_accounts GROUP BY account_id\n) ua ON ua.account_id = a.id\nLEFT JOIN users u ON u.id = ua.user_id\nLEFT JOIN issue_commits ic ON ic.issue_id = i.id\nLEFT JOIN repo_commits  rc ON rc.commit_sha = ic.commit_sha\nWHERE i.id LIKE 'github:%'\n  AND $__timeFilter(i.created_date)\n  AND i.assignee_id IN ( ${developer_id} )\nGROUP BY developer\nORDER BY COUNT(*) DESC, developer;",
+          "rawSql": "SELECT REPLACE(COALESCE(\n         NULLIF(TRIM(a.full_name), ''),\n         NULLIF(TRIM(a.user_name), ''),\n         NULLIF(TRIM(a.email),     ''),\n         NULLIF(TRIM(i.assignee_name), ''),\n         i.assignee_id\n       ), '-', ' ')                                          AS developer,\n       SUM(CASE WHEN i.status = 'TODO'        THEN 1 ELSE 0 END) AS 'To Do',\n       SUM(CASE WHEN i.status = 'IN_PROGRESS' THEN 1 ELSE 0 END) AS 'In Progress',\n       SUM(CASE WHEN i.status = 'DONE'        THEN 1 ELSE 0 END) AS Done\nFROM issues i\nLEFT JOIN accounts a ON a.id = i.assignee_id\nLEFT JOIN issue_commits ic ON ic.issue_id = i.id\nLEFT JOIN repo_commits  rc ON rc.commit_sha = ic.commit_sha\nWHERE i.id LIKE 'github:%'\n  AND $__timeFilter(i.created_date)\n  AND i.assignee_id IN ( ${developer_id} )\nGROUP BY developer\nORDER BY COUNT(*) DESC, developer;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -162,7 +162,7 @@
     {
       "datasource": {
         "type": "mysql",
-        "uid": "P430005175C4C7810"
+        "uid": "devlake-mysql"
       },
       "description": "Counts issues currently in OPEN original_status per assignee, with no time window applied.",
       "fieldConfig": {
@@ -218,7 +218,7 @@
           "dataset": "devlake",
           "datasource": {
             "type": "mysql",
-            "uid": "P430005175C4C7810"
+            "uid": "devlake-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -250,7 +250,7 @@
     {
       "datasource": {
         "type": "mysql",
-        "uid": "P430005175C4C7810"
+        "uid": "devlake-mysql"
       },
       "description": "Time series counting DONE issues per assignee, bucketed by resolution date.",
       "fieldConfig": {
@@ -333,7 +333,7 @@
           "dataset": "devlake",
           "datasource": {
             "type": "mysql",
-            "uid": "P430005175C4C7810"
+            "uid": "devlake-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -365,7 +365,7 @@
     {
       "datasource": {
         "type": "mysql",
-        "uid": "P430005175C4C7810"
+        "uid": "devlake-mysql"
       },
       "description": "Per assignee, counts issues by mapped type category and splits them into Planned versus Adhoc based on whether their sprint has a start date.",
       "fieldConfig": {
@@ -421,7 +421,7 @@
           "dataset": "devlake",
           "datasource": {
             "type": "mysql",
-            "uid": "P430005175C4C7810"
+            "uid": "devlake-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -457,9 +457,10 @@
   "templating": {
     "list": [
       {
+        "allowCustomValue": false,
         "current": {
-          "text": "1m",
-          "value": "1m"
+          "text": "1M",
+          "value": "1M"
         },
         "label": "Time Interval",
         "name": "interval",
@@ -467,7 +468,7 @@
           {
             "selected": true,
             "text": "Month",
-            "value": "1m"
+            "value": "1M"
           },
           {
             "selected": false,
@@ -480,7 +481,7 @@
             "value": "1d"
           }
         ],
-        "query": "Month : 1m, Week : 1w, Day : 1d",
+        "query": "Month : 1M, Week : 1w, Day : 1d",
         "type": "custom"
       },
       {
@@ -492,7 +493,7 @@
         },
         "datasource": {
           "type": "mysql",
-          "uid": "P430005175C4C7810"
+          "uid": "devlake-mysql"
         },
         "definition": "SELECT DISTINCT pm.project_name  \nFROM project_mapping pm \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nORDER BY pm.project_name ",
         "includeAll": true,
@@ -514,7 +515,7 @@
         },
         "datasource": {
           "type": "mysql",
-          "uid": "P430005175C4C7810"
+          "uid": "devlake-mysql"
         },
         "definition": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nAND pm.project_name IN ( $project )\nORDER BY text",
         "includeAll": true,
@@ -537,7 +538,7 @@
         },
         "datasource": {
           "type": "mysql",
-          "uid": "P430005175C4C7810"
+          "uid": "devlake-mysql"
         },
         "definition": "WITH scoped_repos AS (\n  SELECT r.id\n  FROM repos r\n  WHERE r.id LIKE 'github:%'\n    AND r.deleted = 0\n    AND r.id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = r.id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN ( ${project} ))\n),\nscoped_accounts AS (\n  -- PR authors\n  SELECT pr.author_id AS account_id\n  FROM pull_requests pr\n  JOIN scoped_repos sr ON sr.id = pr.base_repo_id\n  WHERE pr.author_id LIKE 'github:%'\n  UNION\n  -- reviewers and commenters\n  SELECT cmt.account_id\n  FROM pull_request_comments cmt\n  JOIN pull_requests pr ON pr.id = cmt.pull_request_id\n  JOIN scoped_repos sr  ON sr.id = pr.base_repo_id\n  WHERE cmt.account_id LIKE 'github:%'\n  UNION\n  -- issue assignees, scoped through boards (github board ids match repo ids)\n  SELECT ia.assignee_id\n  FROM issue_assignees ia\n  JOIN board_issues bi ON bi.issue_id = ia.issue_id\n  WHERE ia.assignee_id LIKE 'github:%'\n    AND bi.board_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = bi.board_id\n                   AND pm.`table` = 'boards'\n                   AND pm.project_name IN ( ${project} ))\n)\nSELECT CONCAT(\n         REPLACE(COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           '(unmapped)'\n         ), '-', ' '),\n         '--', a.id) AS Name\nFROM accounts a\nJOIN scoped_accounts sa ON sa.account_id = a.id\nGROUP BY Name\nORDER BY Name",
         "description": "",
@@ -554,12 +555,12 @@
     ]
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-30d",
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "browser",
+  "timezone": "utc",
   "title": "E. Issues Per Developer",
   "uid": "efxmw34cjhszkc",
-  "version": 10
+  "version": 13
 }

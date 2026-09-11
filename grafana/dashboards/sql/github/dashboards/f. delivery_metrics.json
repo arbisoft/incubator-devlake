@@ -50,7 +50,7 @@
     {
       "datasource": {
         "type": "mysql",
-        "uid": "P430005175C4C7810"
+        "uid": "devlake-mysql"
       },
       "description": "Counts distinct successful production deployments per time bucket.",
       "fieldConfig": {
@@ -133,7 +133,7 @@
           "dataset": "devlake",
           "datasource": {
             "type": "mysql",
-            "uid": "P430005175C4C7810"
+            "uid": "devlake-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -165,7 +165,7 @@
     {
       "datasource": {
         "type": "mysql",
-        "uid": "P430005175C4C7810"
+        "uid": "devlake-mysql"
       },
       "description": "Per time bucket, derives median and P75 of the precomputed pr_cycle_time (project_pr_metrics) in days for merged PRs.",
       "fieldConfig": {
@@ -248,7 +248,7 @@
           "dataset": "devlake",
           "datasource": {
             "type": "mysql",
-            "uid": "P430005175C4C7810"
+            "uid": "devlake-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -280,7 +280,7 @@
     {
       "datasource": {
         "type": "mysql",
-        "uid": "P430005175C4C7810"
+        "uid": "devlake-mysql"
       },
       "description": "Per time bucket, the share of successful production deployments followed within 24h by a revert/hotfix PR in the same repo or by any incident.",
       "fieldConfig": {
@@ -385,7 +385,7 @@
           "dataset": "devlake",
           "datasource": {
             "type": "mysql",
-            "uid": "P430005175C4C7810"
+            "uid": "devlake-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -417,7 +417,7 @@
     {
       "datasource": {
         "type": "mysql",
-        "uid": "P430005175C4C7810"
+        "uid": "devlake-mysql"
       },
       "description": "Per time bucket, the share of successful production deployments followed within 24h by a revert PR or by a deployment named rollback/revert.",
       "fieldConfig": {
@@ -521,7 +521,7 @@
           "dataset": "devlake",
           "datasource": {
             "type": "mysql",
-            "uid": "P430005175C4C7810"
+            "uid": "devlake-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -553,7 +553,7 @@
     {
       "datasource": {
         "type": "mysql",
-        "uid": "P430005175C4C7810"
+        "uid": "devlake-mysql"
       },
       "description": "Per time bucket, counts deployments reverted within 7 days and derives median and P90 hours from deploy to the first revert PR merge.",
       "fieldConfig": {
@@ -653,7 +653,7 @@
           "dataset": "devlake",
           "datasource": {
             "type": "mysql",
-            "uid": "P430005175C4C7810"
+            "uid": "devlake-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -685,7 +685,7 @@
     {
       "datasource": {
         "type": "mysql",
-        "uid": "P430005175C4C7810"
+        "uid": "devlake-mysql"
       },
       "description": "For deployments followed within 24h by a revert or hotfix PR, classifies each by its earliest signal and reports rollback versus fixed-forward counts.",
       "fieldConfig": {
@@ -789,7 +789,7 @@
           "dataset": "devlake",
           "datasource": {
             "type": "mysql",
-            "uid": "P430005175C4C7810"
+            "uid": "devlake-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -860,7 +860,7 @@
         },
         "datasource": {
           "type": "mysql",
-          "uid": "P430005175C4C7810"
+          "uid": "devlake-mysql"
         },
         "definition": "SELECT DISTINCT pm.project_name  \nFROM project_mapping pm \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nORDER BY pm.project_name ",
         "includeAll": true,
@@ -882,7 +882,7 @@
         },
         "datasource": {
           "type": "mysql",
-          "uid": "P430005175C4C7810"
+          "uid": "devlake-mysql"
         },
         "definition": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nAND pm.project_name IN ( $project )\nORDER BY text",
         "includeAll": true,
@@ -898,12 +898,12 @@
     ]
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-30d",
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "browser",
+  "timezone": "utc",
   "title": "F. Delivery Metrics",
   "uid": "ffxmx2y33mayoa",
-  "version": 6
+  "version": 7
 }

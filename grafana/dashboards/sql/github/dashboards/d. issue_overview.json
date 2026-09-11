@@ -50,7 +50,7 @@
     {
       "datasource": {
         "type": "mysql",
-        "uid": "P430005175C4C7810"
+        "uid": "devlake-mysql"
       },
       "description": "Per time bucket, unions issue creation events (by creator) and DONE resolution events (by assignee) and counts each side.",
       "fieldConfig": {
@@ -133,12 +133,12 @@
           "dataset": "devlake",
           "datasource": {
             "type": "mysql",
-            "uid": "P430005175C4C7810"
+            "uid": "devlake-mysql"
           },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH ev AS (\n  SELECT i.created_date AS ts, 1 AS opened, 0 AS closed\n  FROM issues i\n  JOIN accounts a ON a.id = i.creator_id AND a.email IN ( $developer_id )\n  JOIN board_issues bi ON i.id = bi.issue_id\n    AND bi.board_id in ( ${repo_id} )\n  JOIN project_mapping pm \n    ON pm.row_id = bi.board_id\n    AND pm.table = 'repos'\n    AND pm.project_name IN ( ${project} )\n  WHERE i.id LIKE 'github:%'\n    AND $__timeFilter(i.created_date)\n  UNION ALL\n  SELECT i.resolution_date, 0, 1\n  FROM issues i\n  JOIN accounts a ON a.id = i.assignee_id and a.id IN ( $developer_id )\n  JOIN board_issues bi ON i.id = bi.issue_id\n    AND bi.board_id in ( ${repo_id} )\n  JOIN project_mapping pm \n    ON pm.row_id = bi.board_id\n    AND pm.table = 'repos'\n    AND pm.project_name IN ( ${project} )\n  WHERE i.id LIKE 'github:%'\n    AND i.status = 'DONE'\n    AND i.resolution_date IS NOT NULL\n    AND $__timeFilter(i.resolution_date)\n)\nSELECT $__timeGroup(ts, $interval)                                        AS time,\n       SUM(opened)                                                   AS Opened,\n       SUM(closed)                                                   AS Closed\nFROM ev\nGROUP BY time\nORDER BY time;",
+          "rawSql": "WITH ev AS (\n  SELECT i.created_date AS ts, 1 AS opened, 0 AS closed\n  FROM issues i\n  JOIN board_issues bi ON i.id = bi.issue_id\n    AND bi.board_id in ( ${repo_id} )\n  JOIN project_mapping pm \n    ON pm.row_id = bi.board_id\n    AND pm.table = 'repos'\n    AND pm.project_name IN ( ${project} )\n  WHERE i.id LIKE 'github:%'\n    AND i.assignee_id IN ( $developer_id )\n    AND $__timeFilter(i.created_date)\n  UNION ALL\n  SELECT i.resolution_date, 0, 1\n  FROM issues i\n  JOIN board_issues bi ON i.id = bi.issue_id\n    AND bi.board_id in ( ${repo_id} )\n  JOIN project_mapping pm \n    ON pm.row_id = bi.board_id\n    AND pm.table = 'repos'\n    AND pm.project_name IN ( ${project} )\n  WHERE i.id LIKE 'github:%'\n    AND i.status = 'DONE'\n    AND i.resolution_date IS NOT NULL\n    AND $__timeFilter(i.created_date)\n    AND i.assignee_id IN ( $developer_id )\n)\nSELECT $__timeGroup(ts, $interval)                                        AS time,\n       SUM(opened)                                                   AS Opened,\n       SUM(closed)                                                   AS Closed\nFROM ev\nGROUP BY time\nORDER BY time;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -159,13 +159,13 @@
           }
         }
       ],
-      "title": "Created VS Closed",
+      "title": "Created VS Closed Trend",
       "type": "timeseries"
     },
     {
       "datasource": {
         "type": "mysql",
-        "uid": "P430005175C4C7810"
+        "uid": "devlake-mysql"
       },
       "description": "Per time bucket, counts issues created by category after mapping original_type into fixed buckets via keyword matching.",
       "fieldConfig": {
@@ -248,7 +248,7 @@
           "dataset": "devlake",
           "datasource": {
             "type": "mysql",
-            "uid": "P430005175C4C7810"
+            "uid": "devlake-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -274,13 +274,13 @@
           }
         }
       ],
-      "title": "Issue Type Mix",
+      "title": "Issue Type Mix Trend",
       "type": "timeseries"
     },
     {
       "datasource": {
         "type": "mysql",
-        "uid": "P430005175C4C7810"
+        "uid": "devlake-mysql"
       },
       "description": "Per mapped issue type and priority, derives median and P75 of lead_time_minutes in days for DONE issues, keeping groups with at least 3 issues.",
       "fieldConfig": {
@@ -336,12 +336,12 @@
           "dataset": "devlake",
           "datasource": {
             "type": "mysql",
-            "uid": "P430005175C4C7810"
+            "uid": "devlake-mysql"
           },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH type_map AS (\n  SELECT original_type,\n         CASE\n           WHEN original_type LIKE '%bug%'\n             OR original_type LIKE '%issue%'         THEN 'Bugs'\n           WHEN original_type LIKE '%documentation%' THEN 'Documentation'\n           WHEN original_type LIKE '%R&D%'           THEN 'R&D'\n           WHEN original_type LIKE '%review%'        THEN 'Reviews'\n           WHEN original_type LIKE '%refactor%'\n             OR original_type LIKE '%debt%'\n             OR original_type LIKE '%enhancement%'\n             OR original_type LIKE '%improvement%'   THEN 'Refactoring'\n           WHEN original_type LIKE '%task%'          THEN 'Tasks'\n           ELSE 'Unclassified'\n         END AS category\n  FROM (SELECT DISTINCT original_type FROM issues) d\n),\nd AS (\n  SELECT tm.category                                        AS type,\n         COALESCE(NULLIF(TRIM(i.priority), ''), '(none)')   AS priority,\n         i.lead_time_minutes / 1440.0                       AS days\n  FROM issues i\n  JOIN type_map tm ON tm.original_type <=> i.original_type\n  JOIN accounts a ON a.id = i.assignee_id AND a.id IN ( $developer_id )\n  WHERE i.status = 'DONE'\n    AND i.lead_time_minutes IS NOT NULL\n    AND i.lead_time_minutes > 0\n    AND i.id LIKE 'github:%'\n    AND $__timeFilter(i.resolution_date)\n),\nranked AS (\n  SELECT type, priority, days,\n         CUME_DIST() OVER (PARTITION BY type, priority ORDER BY days) AS cd\n  FROM d\n)\nSELECT type AS Type,\n       priority AS Priority,\n       COUNT(*)                                            AS `Total Issues`,\n       ROUND(MIN(CASE WHEN cd >= 0.50 THEN days END), 1)  AS `Median Days`,\n       ROUND(MIN(CASE WHEN cd >= 0.75 THEN days END), 1)  AS `P75 Days`\nFROM ranked\nGROUP BY type, priority\nHAVING `Total Issues` >= 3\nORDER BY type, `Median Days` DESC;",
+          "rawSql": "WITH type_map AS (\n  SELECT original_type,\n         CASE\n           WHEN original_type LIKE '%bug%'\n             OR original_type LIKE '%issue%'         THEN 'Bugs'\n           WHEN original_type LIKE '%documentation%' THEN 'Documentation'\n           WHEN original_type LIKE '%R&D%'           THEN 'R&D'\n           WHEN original_type LIKE '%review%'        THEN 'Reviews'\n           WHEN original_type LIKE '%refactor%'\n             OR original_type LIKE '%debt%'\n             OR original_type LIKE '%enhancement%'\n             OR original_type LIKE '%improvement%'   THEN 'Refactoring'\n           WHEN original_type LIKE '%task%'          THEN 'Tasks'\n           ELSE 'Unclassified Issues'\n         END AS category\n  FROM (SELECT DISTINCT original_type FROM issues) d\n),\nd AS (\n  SELECT tm.category                                        AS type,\n         COALESCE(NULLIF(TRIM(i.priority), ''), '(none)')   AS priority,\n         i.lead_time_minutes / 1440.0                       AS days\n  FROM issues i\n  JOIN type_map tm ON tm.original_type <=> i.original_type\n  JOIN accounts a ON a.id = i.assignee_id AND a.id IN ( $developer_id )\n  WHERE i.status = 'DONE'\n    AND i.lead_time_minutes IS NOT NULL\n    AND i.lead_time_minutes > 0\n    AND i.id LIKE 'github:%'\n    AND $__timeFilter(i.resolution_date)\n),\nranked AS (\n  SELECT type, priority, days,\n         CUME_DIST() OVER (PARTITION BY type, priority ORDER BY days) AS cd\n  FROM d\n)\nSELECT type AS Type,\n       priority AS Priority,\n       COUNT(*)                                            AS `Total Issues`,\n       ROUND(MIN(CASE WHEN cd >= 0.50 THEN days END), 1)  AS `Median Days`,\n       ROUND(MIN(CASE WHEN cd >= 0.75 THEN days END), 1)  AS `P75 Days`\nFROM ranked\nGROUP BY type, priority\nHAVING `Total Issues` >= 3\nORDER BY type, `Median Days` DESC;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -368,7 +368,7 @@
     {
       "datasource": {
         "type": "mysql",
-        "uid": "P430005175C4C7810"
+        "uid": "devlake-mysql"
       },
       "description": "Lists open issues not updated in over 14 days with their assignee and days since the last update.",
       "fieldConfig": {
@@ -424,7 +424,7 @@
           "dataset": "devlake",
           "datasource": {
             "type": "mysql",
-            "uid": "P430005175C4C7810"
+            "uid": "devlake-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -461,8 +461,8 @@
     "list": [
       {
         "current": {
-          "text": "1m",
-          "value": "1m"
+          "text": "1M",
+          "value": "1M"
         },
         "label": "Time Interval",
         "name": "interval",
@@ -470,7 +470,7 @@
           {
             "selected": true,
             "text": "Month",
-            "value": "1m"
+            "value": "1M"
           },
           {
             "selected": false,
@@ -483,7 +483,7 @@
             "value": "1d"
           }
         ],
-        "query": "Month : 1m, Week : 1w, Day : 1d",
+        "query": "Month : 1M, Week : 1w, Day : 1d",
         "type": "custom"
       },
       {
@@ -495,7 +495,7 @@
         },
         "datasource": {
           "type": "mysql",
-          "uid": "P430005175C4C7810"
+          "uid": "devlake-mysql"
         },
         "definition": "SELECT DISTINCT pm.project_name  \nFROM project_mapping pm \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nORDER BY pm.project_name ",
         "includeAll": true,
@@ -517,7 +517,7 @@
         },
         "datasource": {
           "type": "mysql",
-          "uid": "P430005175C4C7810"
+          "uid": "devlake-mysql"
         },
         "definition": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nAND pm.project_name IN ( $project )\nORDER BY text",
         "includeAll": true,
@@ -540,7 +540,7 @@
         },
         "datasource": {
           "type": "mysql",
-          "uid": "P430005175C4C7810"
+          "uid": "devlake-mysql"
         },
         "definition": "WITH scoped_repos AS (\n  SELECT r.id\n  FROM repos r\n  WHERE r.id LIKE 'github:%'\n    AND r.deleted = 0\n    AND r.id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = r.id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN ( ${project} ))\n),\nscoped_accounts AS (\n  -- PR authors\n  SELECT pr.author_id AS account_id\n  FROM pull_requests pr\n  JOIN scoped_repos sr ON sr.id = pr.base_repo_id\n  WHERE pr.author_id LIKE 'github:%'\n  UNION\n  -- reviewers and commenters\n  SELECT cmt.account_id\n  FROM pull_request_comments cmt\n  JOIN pull_requests pr ON pr.id = cmt.pull_request_id\n  JOIN scoped_repos sr  ON sr.id = pr.base_repo_id\n  WHERE cmt.account_id LIKE 'github:%'\n  UNION\n  -- issue assignees, scoped through boards (github board ids match repo ids)\n  SELECT ia.assignee_id\n  FROM issue_assignees ia\n  JOIN board_issues bi ON bi.issue_id = ia.issue_id\n  WHERE ia.assignee_id LIKE 'github:%'\n    AND bi.board_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = bi.board_id\n                   AND pm.`table` = 'boards'\n                   AND pm.project_name IN ( ${project} ))\n)\nSELECT CONCAT(\n         REPLACE(COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           '(unmapped)'\n         ), '-', ' '),\n         '--', a.id) AS Name\nFROM accounts a\nJOIN scoped_accounts sa ON sa.account_id = a.id\nGROUP BY Name\nORDER BY Name",
         "description": "",
@@ -557,12 +557,12 @@
     ]
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-30d",
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "browser",
+  "timezone": "utc",
   "title": "D. Issue Overview",
   "uid": "cfxmvb4cu2gw0d",
-  "version": 9
+  "version": 15
 }

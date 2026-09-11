@@ -50,7 +50,7 @@
     {
       "datasource": {
         "type": "mysql",
-        "uid": "P430005175C4C7810"
+        "uid": "devlake-mysql"
       },
       "description": "Per author, counts PRs created in the window split by status into Merged, Open, Closed and Draft, top 20 by total.",
       "fieldConfig": {
@@ -130,7 +130,7 @@
           "dataset": "devlake",
           "datasource": {
             "type": "mysql",
-            "uid": "P430005175C4C7810"
+            "uid": "devlake-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -162,7 +162,7 @@
     {
       "datasource": {
         "type": "mysql",
-        "uid": "P430005175C4C7810"
+        "uid": "devlake-mysql"
       },
       "description": "Per author, divides merged PRs by merged plus closed PRs created in the window (closed floored at 1), top 20 by rate.",
       "fieldConfig": {
@@ -242,7 +242,7 @@
           "dataset": "devlake",
           "datasource": {
             "type": "mysql",
-            "uid": "P430005175C4C7810"
+            "uid": "devlake-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -274,7 +274,7 @@
     {
       "datasource": {
         "type": "mysql",
-        "uid": "P430005175C4C7810"
+        "uid": "devlake-mysql"
       },
       "description": "Per time bucket, derives median/P75/P90 of created-to-merged time in days using CUME_DIST over merged PRs.",
       "fieldConfig": {
@@ -382,7 +382,7 @@
           "dataset": "devlake",
           "datasource": {
             "type": "mysql",
-            "uid": "P430005175C4C7810"
+            "uid": "devlake-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -414,7 +414,7 @@
     {
       "datasource": {
         "type": "mysql",
-        "uid": "P430005175C4C7810"
+        "uid": "devlake-mysql"
       },
       "description": "Per time bucket, derives median and P90 hours from PR creation to the earliest comment by someone other than the author.",
       "fieldConfig": {
@@ -497,7 +497,7 @@
           "dataset": "devlake",
           "datasource": {
             "type": "mysql",
-            "uid": "P430005175C4C7810"
+            "uid": "devlake-mysql"
           },
           "editorMode": "code",
           "format": "table",
@@ -529,7 +529,7 @@
     {
       "datasource": {
         "type": "mysql",
-        "uid": "P430005175C4C7810"
+        "uid": "devlake-mysql"
       },
       "description": "Buckets PRs by total lines changed summed across their commits into four size bands, reporting PR count and share of total.",
       "fieldConfig": {
@@ -541,7 +541,7 @@
             "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
-            "axisLabel": "Line Count",
+            "axisLabel": "PR Count",
             "axisPlacement": "auto",
             "fillOpacity": 80,
             "gradientMode": "none",
@@ -609,12 +609,12 @@
           "dataset": "devlake",
           "datasource": {
             "type": "mysql",
-            "uid": "P430005175C4C7810"
+            "uid": "devlake-mysql"
           },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH pr_size AS (\n  SELECT pr.id,\n         SUM(c.additions + c.deletions) AS lines_changed\n  FROM pull_requests pr\n  JOIN pull_request_commits prc ON prc.pull_request_id = pr.id\n  JOIN commits c                ON c.sha = prc.commit_sha\n  WHERE pr.id LIKE 'github:%'\n    AND $__timeFilter(pr.created_date)\n    AND pr.base_repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN ( ${project} ))\n    AND EXISTS (\n      SELECT 1\n      FROM accounts a where a.id IN ( $developer_id  )\n      AND a.email = c.author_email\n    )\n  GROUP BY pr.id\n),\nbucketed AS (\n  SELECT CASE\n           WHEN lines_changed <  200 THEN '1. < 200'\n           WHEN lines_changed <  500 THEN '2. 200-499'\n           WHEN lines_changed < 1000 THEN '3. 500-999'\n           ELSE                           '4. 1000+'\n         END      AS bucket,\n         COUNT(*) AS prs\n  FROM pr_size\n  GROUP BY bucket\n)\nSELECT bucket,\n       prs AS 'PR Count',\n       CONCAT(ROUND(100.0 * prs / SUM(prs) OVER (), 1), '%') AS Percentage\nFROM bucketed\nORDER BY bucket;",
+          "rawSql": "WITH pr_size AS (\n  SELECT pr.id,\n         SUM(c.additions + c.deletions) AS lines_changed\n  FROM pull_requests pr\n  JOIN pull_request_commits prc ON prc.pull_request_id = pr.id\n  JOIN commits c                ON c.sha = prc.commit_sha\n  WHERE pr.id LIKE 'github:%'\n    AND $__timeFilter(pr.created_date)\n    AND pr.base_repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN ( ${project} ))\n    AND EXISTS (\n      SELECT 1\n      FROM accounts a where a.id IN ( $developer_id  )\n      OR a.id = c.author_email or a.email = c.author_email\n    )\n  GROUP BY pr.id\n),\nbucketed AS (\n  SELECT CASE\n           WHEN lines_changed <  200 THEN '1. < 200'\n           WHEN lines_changed <  500 THEN '2. 200-499'\n           WHEN lines_changed < 1000 THEN '3. 500-999'\n           ELSE                           '4. 1000+'\n         END      AS bucket,\n         COUNT(*) AS prs\n  FROM pr_size\n  GROUP BY bucket\n)\nSELECT bucket,\n       prs AS 'PR Count',\n       CONCAT(ROUND(100.0 * prs / SUM(prs) OVER (), 1), '%') AS Percentage\nFROM bucketed\nORDER BY bucket;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -641,7 +641,7 @@
     {
       "datasource": {
         "type": "mysql",
-        "uid": "P430005175C4C7810"
+        "uid": "devlake-mysql"
       },
       "description": "Lists open PRs with days since creation, author and comma-joined reviewer names, keeping PRs the selected developer either authored or reviewed.",
       "fieldConfig": {
@@ -713,12 +713,12 @@
           "dataset": "devlake",
           "datasource": {
             "type": "mysql",
-            "uid": "P430005175C4C7810"
+            "uid": "devlake-mysql"
           },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH _names AS (\n  SELECT a.id AS id, \n    REPLACE(\n      COALESCE(\n        NULLIF(TRIM(a.full_name), ''),\n        NULLIF(TRIM(a.user_name), ''),\n        NULLIF(TRIM(a.email),     ''),\n        'u/m'\n      ), '-', ' ') AS name\n  FROM accounts a\n  WHERE a.id LIKE 'github:%'\n)\n\n\nSELECT * FROM \n(\n  SELECT \n    r.name AS 'Repository', \n    title as 'PR Title', \n    DATEDIFF(CURDATE(), pr.created_date) AS 'Days Open', \n    REPLACE(n.name, 'u/m', pr.author_id) AS 'Author',\n    (\n      SELECT GROUP_CONCAT(DISTINCT n.name ORDER BY n.name SEPARATOR ', ')\n      FROM pull_request_comments prc\n      JOIN _names n ON n.id = prc.account_id\n      WHERE prc.pull_request_id = pr.id\n        AND prc.type IN ('DIFF', 'REVIEW')\n        AND prc.account_id <> pr.author_id\n    ) AS Reviewers, \n    pr.url as URL\n  FROM pull_requests pr\n  JOIN repos r ON pr.base_repo_id = r.id \n  JOIN _names n ON n.id = pr.author_id\n  JOIN accounts a ON a.id = pr.author_id\n  WHERE pr.id LIKE 'github:%' \n    AND pr.status = 'OPEN'\n    AND (\n         a.email IN ( $developer_id )\n      OR EXISTS (\n                  SELECT 1 \n                  FROM pull_request_comments prc2\n                  JOIN accounts a ON a.id = prc2.account_id AND a.id IN ( $developer_id )\n                  WHERE prc2.pull_request_id = pr.id\n                    AND prc2.type IN ('DIFF', 'REVIEW')\n                    AND prc2.account_id <> pr.author_id\n                )\n    )\n    AND $__timeFilter(pr.created_date)\n    AND pr.base_repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                  WHERE pm.row_id = pr.base_repo_id\n                    AND pm.`table` = 'repos'\n                    AND pm.project_name IN ( ${project} ))  \n) base\nORDER BY base.`Days Open` DESC;\n",
+          "rawSql": "WITH _names AS (\n  SELECT a.id AS id, \n    REPLACE(\n      COALESCE(\n        NULLIF(TRIM(a.full_name), ''),\n        NULLIF(TRIM(a.user_name), ''),\n        NULLIF(TRIM(a.email),     ''),\n        'u/m'\n      ), '-', ' ') AS name\n  FROM accounts a\n  WHERE a.id LIKE 'github:%'\n)\n\n\nSELECT * FROM \n(\n  SELECT \n    r.name AS 'Repository', \n    title as 'PR Title', \n    DATEDIFF(CURDATE(), pr.created_date) AS 'Days Open', \n    REPLACE(n.name, 'u/m', pr.author_id) AS 'Author',\n    (\n      SELECT GROUP_CONCAT(DISTINCT n.name ORDER BY n.name SEPARATOR ', ')\n      FROM pull_request_comments prc\n      JOIN _names n ON n.id = prc.account_id\n      WHERE prc.pull_request_id = pr.id\n        AND prc.type IN ('DIFF', 'REVIEW')\n        AND prc.account_id <> pr.author_id\n    ) AS Reviewers, \n    pr.url as URL\n  FROM pull_requests pr\n  JOIN repos r ON pr.base_repo_id = r.id \n  JOIN _names n ON n.id = pr.author_id\n  JOIN accounts a ON a.id = pr.author_id\n  WHERE pr.id LIKE 'github:%' \n    AND pr.status = 'OPEN'\n    AND (\n         a.id IN ( $developer_id )\n      OR EXISTS (\n                  SELECT 1 \n                  FROM pull_request_comments prc2\n                  WHERE prc2.pull_request_id = pr.id\n                    AND prc2.type IN ('DIFF', 'REVIEW')\n                    AND prc2.account_id <> pr.author_id\n                    AND prc2.account_id IN ( $developer_id )\n                )\n    )\n    AND $__timeFilter(pr.created_date)\n    AND pr.base_repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                  WHERE pm.row_id = pr.base_repo_id\n                    AND pm.`table` = 'repos'\n                    AND pm.project_name IN ( ${project} ))  \n) base\nORDER BY base.`Days Open` DESC;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -745,7 +745,7 @@
     {
       "datasource": {
         "type": "mysql",
-        "uid": "P430005175C4C7810"
+        "uid": "devlake-mysql"
       },
       "description": "Per repo, counts merged PRs having no APPROVED comment from anyone other than the author, and their share of all merged PRs.",
       "fieldConfig": {
@@ -801,12 +801,12 @@
           "dataset": "devlake",
           "datasource": {
             "type": "mysql",
-            "uid": "P430005175C4C7810"
+            "uid": "devlake-mysql"
           },
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT * FROM (\n  SELECT \n    Repository, \n    COUNT(has_been_reviewed) - SUM(has_been_reviewed) AS 'Unapproved PR Count', \n    CONCAT(ROUND((COUNT(has_been_reviewed) - SUM(has_been_reviewed))/COUNT(has_been_reviewed)*100, 1), '%') AS 'Unapproved PRs Percentage'\n  FROM (\n    SELECT r.name as Repository, pr.title, \n      EXISTS (\n        SELECT 1\n        FROM pull_request_comments prc\n        WHERE pr.id = prc.pull_request_id\n        AND prc.type IN ('APPROVED')\n        AND pr.author_id <> prc.account_id\n      ) AS has_been_reviewed\n    FROM pull_requests pr\n    JOIN repos r ON pr.base_repo_id = r.id\n    JOIN accounts a ON a.id = pr.author_id AND a.id IN ( $developer_id )\n    WHERE pr.status = 'MERGED' \n      AND pr.id LIKE 'github:%'\n      AND $__timeFilter(pr.created_date)\n      AND pr.base_repo_id IN ( ${repo_id} )\n      AND EXISTS (SELECT 1 FROM project_mapping pm\n              WHERE pm.row_id = pr.base_repo_id\n                AND pm.`table` = 'repos'\n                AND pm.project_name IN ( ${project} ))\n  ) base\n  GROUP BY base.Repository\n) base2\nORDER BY base2.`Unapproved PR Count` DESC",
+          "rawSql": "-- Per repo, counts merged PRs that had no APPROVED review from anyone other than the author before the merge, and their share of all merged PRs.\nSELECT\n  r.name AS Repository,\n  REPLACE(\n         COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           NULLIF(TRIM(pr.author_name),     ''),\n           '(unmapped)'\n         ), '-', ' ')  AS Developer,\n  COUNT(*) AS 'Merged PR Count',\n  SUM(CASE WHEN EXISTS (\n        SELECT 1\n        FROM pull_request_comments prc\n        WHERE prc.pull_request_id = pr.id\n          AND prc.type    = 'REVIEW'\n          AND prc.status  = 'APPROVED'\n          AND prc.account_id <> pr.author_id\n          AND (pr.merged_date IS NULL OR prc.created_date <= pr.merged_date)\n      ) THEN 0 ELSE 1 END) AS 'Unapproved PR Count',\n  CONCAT(ROUND(100.0 * SUM(CASE WHEN EXISTS (\n        SELECT 1\n        FROM pull_request_comments prc\n        WHERE prc.pull_request_id = pr.id\n          AND prc.type    = 'REVIEW'\n          AND prc.status  = 'APPROVED'\n          AND prc.account_id <> pr.author_id\n          AND (pr.merged_date IS NULL OR prc.created_date <= pr.merged_date)\n      ) THEN 0 ELSE 1 END) / COUNT(*), 1), '%') AS 'Unapproved PRs Percentage'\nFROM pull_requests pr\nJOIN repos r    ON r.id = pr.base_repo_id\nJOIN accounts a ON a.id = pr.author_id\nWHERE pr.status = 'MERGED'\n  AND pr.id LIKE 'github:%'\n  AND $__timeFilter(pr.created_date)\n  AND pr.base_repo_id IN ( ${repo_id} )\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN ( ${project} ))\n  AND pr.author_id IN ( $developer_id )\nGROUP BY r.name, Developer\nORDER BY `Unapproved PR Count` DESC\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -838,8 +838,8 @@
     "list": [
       {
         "current": {
-          "text": "1m",
-          "value": "1m"
+          "text": "1M",
+          "value": "1M"
         },
         "label": "Time Interval",
         "name": "interval",
@@ -847,7 +847,7 @@
           {
             "selected": true,
             "text": "Month",
-            "value": "1m"
+            "value": "1M"
           },
           {
             "selected": false,
@@ -860,7 +860,7 @@
             "value": "1d"
           }
         ],
-        "query": "Month : 1m, Week : 1w, Day : 1d",
+        "query": "Month : 1M, Week : 1w, Day : 1d",
         "type": "custom"
       },
       {
@@ -872,7 +872,7 @@
         },
         "datasource": {
           "type": "mysql",
-          "uid": "P430005175C4C7810"
+          "uid": "devlake-mysql"
         },
         "definition": "SELECT DISTINCT pm.project_name  \nFROM project_mapping pm \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nORDER BY pm.project_name ",
         "includeAll": true,
@@ -894,7 +894,7 @@
         },
         "datasource": {
           "type": "mysql",
-          "uid": "P430005175C4C7810"
+          "uid": "devlake-mysql"
         },
         "definition": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nAND pm.project_name IN ( $project )\nORDER BY text",
         "includeAll": true,
@@ -917,7 +917,7 @@
         },
         "datasource": {
           "type": "mysql",
-          "uid": "P430005175C4C7810"
+          "uid": "devlake-mysql"
         },
         "definition": "WITH scoped_repos AS (\n  SELECT r.id\n  FROM repos r\n  WHERE r.id LIKE 'github:%'\n    AND r.deleted = 0\n    AND r.id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = r.id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN ( ${project} ))\n),\nscoped_accounts AS (\n  -- PR authors\n  SELECT pr.author_id AS account_id\n  FROM pull_requests pr\n  JOIN scoped_repos sr ON sr.id = pr.base_repo_id\n  WHERE pr.author_id LIKE 'github:%'\n  UNION\n  -- reviewers and commenters\n  SELECT cmt.account_id\n  FROM pull_request_comments cmt\n  JOIN pull_requests pr ON pr.id = cmt.pull_request_id\n  JOIN scoped_repos sr  ON sr.id = pr.base_repo_id\n  WHERE cmt.account_id LIKE 'github:%'\n  UNION\n  -- issue assignees, scoped through boards (github board ids match repo ids)\n  SELECT ia.assignee_id\n  FROM issue_assignees ia\n  JOIN board_issues bi ON bi.issue_id = ia.issue_id\n  WHERE ia.assignee_id LIKE 'github:%'\n    AND bi.board_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = bi.board_id\n                   AND pm.`table` = 'boards'\n                   AND pm.project_name IN ( ${project} ))\n)\nSELECT CONCAT(\n         REPLACE(COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           '(unmapped)'\n         ), '-', ' '),\n         '--', a.id) AS Name\nFROM accounts a\nJOIN scoped_accounts sa ON sa.account_id = a.id\nGROUP BY Name\nORDER BY Name",
         "description": "",
@@ -934,12 +934,12 @@
     ]
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-30d",
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "browser",
+  "timezone": "utc",
   "title": "C. PR Health",
   "uid": "efxmt33dl16gwf",
-  "version": 12
+  "version": 21
 }
