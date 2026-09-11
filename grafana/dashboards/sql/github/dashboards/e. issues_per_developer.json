@@ -135,7 +135,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT REPLACE(COALESCE(\n         NULLIF(TRIM(a.full_name), ''),\n         NULLIF(TRIM(a.user_name), ''),\n         NULLIF(TRIM(a.email),     ''),\n         NULLIF(TRIM(i.assignee_name), ''),\n         i.assignee_id\n       ), '-', ' ')                                          AS developer,\n       SUM(CASE WHEN i.status = 'TODO'        THEN 1 ELSE 0 END) AS 'To Do',\n       SUM(CASE WHEN i.status = 'IN_PROGRESS' THEN 1 ELSE 0 END) AS 'In Progress',\n       SUM(CASE WHEN i.status = 'DONE'        THEN 1 ELSE 0 END) AS Done\nFROM issues i\nLEFT JOIN accounts a ON a.id = i.assignee_id\nLEFT JOIN issue_commits ic ON ic.issue_id = i.id\nLEFT JOIN repo_commits  rc ON rc.commit_sha = ic.commit_sha\nWHERE i.id LIKE 'github:%'\n  AND $__timeFilter(i.created_date)\n  AND i.assignee_id IN ( ${developer_id} )\nGROUP BY developer\nORDER BY COUNT(*) DESC, developer;",
+          "rawSql": "SELECT REPLACE(COALESCE(\n         NULLIF(TRIM(a.full_name), ''),\n         NULLIF(TRIM(a.user_name), ''),\n         NULLIF(TRIM(a.email),     ''),\n         NULLIF(TRIM(i.assignee_name), ''),\n         i.assignee_id\n       ), '-', ' ')                                          AS developer,\n       SUM(CASE WHEN i.status = 'TODO'        THEN 1 ELSE 0 END) AS `To Do`,\n       SUM(CASE WHEN i.status = 'IN_PROGRESS' THEN 1 ELSE 0 END) AS `In Progress`,\n       SUM(CASE WHEN i.status = 'DONE'        THEN 1 ELSE 0 END) AS Done\nFROM issue_assignees ia\nJOIN issues i           ON i.id = ia.issue_id\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN accounts a       ON a.id = ia.assignee_id \nWHERE i.id LIKE 'github:%'\n  AND i.original_type not like '%bug%'\n  AND bi.board_id IN (${repo_id}) \n  AND $__timeFilter(i.created_date)\n  AND ia.assignee_id IN ( $developer_id )\nGROUP BY developer\nORDER BY (`To Do` + `In Progress` + Done) DESC\nLIMIT 20;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -562,5 +562,5 @@
   "timezone": "utc",
   "title": "E. Issues Per Developer",
   "uid": "efxmw34cjhszkc",
-  "version": 13
+  "version": 15
 }

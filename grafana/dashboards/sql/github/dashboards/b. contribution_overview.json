@@ -360,7 +360,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH dedup AS (\n  SELECT DISTINCT\n    COALESCE(a.full_name, a.user_name, c.author_name) AS contributor,\n    c.sha, c.additions, c.deletions\n  FROM commits c\n  JOIN repo_commits rc       ON rc.commit_sha = c.sha \n    AND rc.repo_id like 'github:%'\n    AND rc.repo_id in (${repo_id}) \n    AND rc.repo_id in (\n      select pm.row_id \n      from project_mapping pm \n      where pm.table = 'repos' \n      AND pm.project_name in (${project}))\n  JOIN accounts a ON a.email = c.author_email AND a.id IN ($developer_id)\n  WHERE $__timeFilter(c.authored_date)\n  AND NOT EXISTS (\n      SELECT 1 FROM commit_parents cp\n      WHERE cp.commit_sha = c.sha\n      GROUP BY cp.commit_sha HAVING COUNT(*) > 1\n    )\n)\nSELECT\n  contributor,\n  SUM(additions)      AS 'Lines Added',\n  SUM(deletions)     AS 'Lines Removed'\nFROM dedup\nGROUP BY contributor\nORDER BY SUM(additions) + SUM(deletions) DESC\nLIMIT 20;",
+          "rawSql": "WITH dedup AS (\n  SELECT DISTINCT\n    COALESCE(a.full_name, a.user_name, c.author_name) AS contributor,\n    c.sha, c.additions, c.deletions\n  FROM commits c\n  JOIN repo_commits rc       ON rc.commit_sha = c.sha \n    AND rc.repo_id like 'github:%'\n    AND rc.repo_id in (${repo_id}) \n    AND rc.repo_id in (\n      select pm.row_id \n      from project_mapping pm \n      where pm.table = 'repos' \n      AND pm.project_name in (${project}))\n  JOIN accounts a ON a.email = c.author_email\n  WHERE $__timeFilter(c.authored_date)\n  AND NOT EXISTS (\n      SELECT 1 FROM commit_parents cp\n      WHERE cp.commit_sha = c.sha\n      GROUP BY cp.commit_sha HAVING COUNT(*) > 1\n    )\n)\nSELECT\n  contributor,\n  SUM(additions)      AS 'Lines Added',\n  SUM(deletions)     AS 'Lines Removed'\nFROM dedup\nGROUP BY contributor\nORDER BY SUM(additions) + SUM(deletions) DESC\nLIMIT 20;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -382,6 +382,119 @@
         }
       ],
       "title": "Code Volume",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Counts distinct commits authored in the window per contributor, scoped to repos mapped to the selected project, top 20 by commit count.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 100,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 0,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 39
+      },
+      "id": 8,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.75,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "text": {},
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  COALESCE(a.full_name, c.author_name, a.email) AS contributor,\n  COUNT(DISTINCT c.sha)           AS commits\nFROM commits c\nJOIN repo_commits rc      ON rc.commit_sha = c.sha \n    AND rc.repo_id in (${repo_id}) \n    AND rc.repo_id in (\n        select pm.row_id \n        from project_mapping pm \n        where pm.table = 'repos' and pm.project_name in (${project})\n        )\nJOIN accounts a       ON a.id = c.author_email\nWHERE $__timeFilter(c.authored_date)\nGROUP BY contributor\nORDER BY commits DESC\nLIMIT 20;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Contributions By Commits",
       "type": "barchart"
     },
     {
@@ -436,7 +549,7 @@
         "h": 11,
         "w": 24,
         "x": 0,
-        "y": 39
+        "y": 49
       },
       "id": 3,
       "options": {
@@ -493,7 +606,7 @@
           }
         }
       ],
-      "title": "Commits",
+      "title": "Commits Outcome",
       "type": "barchart"
     },
     {
@@ -583,7 +696,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 50
+        "y": 60
       },
       "id": 5,
       "options": {
@@ -689,7 +802,7 @@
         "h": 13,
         "w": 24,
         "x": 0,
-        "y": 58
+        "y": 68
       },
       "id": 6,
       "options": {
@@ -830,5 +943,5 @@
   "timezone": "utc",
   "title": "B. Contribution Overview",
   "uid": "dfxmphb8rmupsd",
-  "version": 17
+  "version": 22
 }
