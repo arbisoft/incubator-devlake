@@ -1,0 +1,8 @@
+{
+  "type": "error",
+  "request_id": "req_synthetic_invalid_date",
+  "error": {
+    "type": "invalid_request_error",
+    "message": "Synthetic date is outside the available analytics range"
+  }
+}

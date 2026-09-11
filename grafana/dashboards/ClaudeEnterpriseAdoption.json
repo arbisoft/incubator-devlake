@@ -1,0 +1,1469 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "datasource": "mysql",
+      "description": "Most recent assigned-seat count per connected organization within the selected range, summed across organizations. Uses one row per (connection, scope) via the latest date in range, so multi-org totals are additive, not duplicated.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH latest_summary AS (\n  SELECT s.*\n  FROM _tool_claude_enterprise_summaries s\n  INNER JOIN (\n    SELECT connection_id, scope_id, MAX(date) AS max_date\n    FROM _tool_claude_enterprise_summaries\n    WHERE $__timeFilter(STR_TO_DATE(date, '%Y-%m-%d'))\n    GROUP BY connection_id, scope_id\n  ) latest\n    ON latest.connection_id = s.connection_id\n   AND latest.scope_id = s.scope_id\n   AND latest.max_date = s.date\n)\nSELECT COALESCE(SUM(assigned_seats), 0) AS \"Assigned Seats\"\nFROM latest_summary",
+          "refId": "A"
+        }
+      ],
+      "title": "Assigned Seats (Latest)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Most recent pending-invite count per connected organization within the selected range, summed across organizations.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH latest_summary AS (\n  SELECT s.*\n  FROM _tool_claude_enterprise_summaries s\n  INNER JOIN (\n    SELECT connection_id, scope_id, MAX(date) AS max_date\n    FROM _tool_claude_enterprise_summaries\n    WHERE $__timeFilter(STR_TO_DATE(date, '%Y-%m-%d'))\n    GROUP BY connection_id, scope_id\n  ) latest\n    ON latest.connection_id = s.connection_id\n   AND latest.scope_id = s.scope_id\n   AND latest.max_date = s.date\n)\nSELECT COALESCE(SUM(pending_invites), 0) AS \"Pending Invites\"\nFROM latest_summary",
+          "refId": "A"
+        }
+      ],
+      "title": "Pending Invites (Latest)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Most recent daily-active-user count per connected organization within the selected range, summed across organizations.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH latest_summary AS (\n  SELECT s.*\n  FROM _tool_claude_enterprise_summaries s\n  INNER JOIN (\n    SELECT connection_id, scope_id, MAX(date) AS max_date\n    FROM _tool_claude_enterprise_summaries\n    WHERE $__timeFilter(STR_TO_DATE(date, '%Y-%m-%d'))\n    GROUP BY connection_id, scope_id\n  ) latest\n    ON latest.connection_id = s.connection_id\n   AND latest.scope_id = s.scope_id\n   AND latest.max_date = s.date\n)\nSELECT COALESCE(SUM(daily_active_users), 0) AS \"Daily Active Users\"\nFROM latest_summary",
+          "refId": "A"
+        }
+      ],
+      "title": "Daily Active Users (Latest)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Latest daily active users as a percentage of latest assigned seats, weighted across organizations (sum of DAU / sum of seats, not an average of per-org rates).",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH latest_summary AS (\n  SELECT s.*\n  FROM _tool_claude_enterprise_summaries s\n  INNER JOIN (\n    SELECT connection_id, scope_id, MAX(date) AS max_date\n    FROM _tool_claude_enterprise_summaries\n    WHERE $__timeFilter(STR_TO_DATE(date, '%Y-%m-%d'))\n    GROUP BY connection_id, scope_id\n  ) latest\n    ON latest.connection_id = s.connection_id\n   AND latest.scope_id = s.scope_id\n   AND latest.max_date = s.date\n)\nSELECT COALESCE(ROUND(SUM(daily_active_users) * 100.0 / NULLIF(SUM(assigned_seats), 0), 1), 0) AS \"DAU / Seats %\"\nFROM latest_summary",
+          "refId": "A"
+        }
+      ],
+      "title": "DAU / Seats Adoption Rate % (Latest)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Most recent weekly-active-user count per connected organization within the selected range, summed across organizations.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 4
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH latest_summary AS (\n  SELECT s.*\n  FROM _tool_claude_enterprise_summaries s\n  INNER JOIN (\n    SELECT connection_id, scope_id, MAX(date) AS max_date\n    FROM _tool_claude_enterprise_summaries\n    WHERE $__timeFilter(STR_TO_DATE(date, '%Y-%m-%d'))\n    GROUP BY connection_id, scope_id\n  ) latest\n    ON latest.connection_id = s.connection_id\n   AND latest.scope_id = s.scope_id\n   AND latest.max_date = s.date\n)\nSELECT COALESCE(SUM(weekly_active_users), 0) AS \"Weekly Active Users\"\nFROM latest_summary",
+          "refId": "A"
+        }
+      ],
+      "title": "Weekly Active Users (Latest)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Most recent monthly-active-user count per connected organization within the selected range, summed across organizations.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 4
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH latest_summary AS (\n  SELECT s.*\n  FROM _tool_claude_enterprise_summaries s\n  INNER JOIN (\n    SELECT connection_id, scope_id, MAX(date) AS max_date\n    FROM _tool_claude_enterprise_summaries\n    WHERE $__timeFilter(STR_TO_DATE(date, '%Y-%m-%d'))\n    GROUP BY connection_id, scope_id\n  ) latest\n    ON latest.connection_id = s.connection_id\n   AND latest.scope_id = s.scope_id\n   AND latest.max_date = s.date\n)\nSELECT COALESCE(SUM(monthly_active_users), 0) AS \"Monthly Active Users\"\nFROM latest_summary",
+          "refId": "A"
+        }
+      ],
+      "title": "Monthly Active Users (Latest)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Distinct users with at least one Claude Code activity row (ai_activities, provider=claude_enterprise, type=CODE_EDIT) in the selected range.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 4
+      },
+      "id": 7,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT NULLIF(user_email, '')) AS \"Claude Code Active Users\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude_enterprise'\n  AND type = 'CODE_EDIT'",
+          "refId": "A"
+        }
+      ],
+      "title": "Claude Code Active Users (Period)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Distinct users with at least one Claude chat activity row (ai_activities, provider=claude_enterprise, type=CHAT) in the selected range.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 4
+      },
+      "id": 8,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT NULLIF(user_email, '')) AS \"Claude Chat Active Users\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude_enterprise'\n  AND type = 'CHAT'",
+          "refId": "A"
+        }
+      ],
+      "title": "Claude Chat Active Users (Period)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Daily, weekly, and monthly active users over time from _tool_claude_enterprise_summaries, summed across connected organizations per day.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT STR_TO_DATE(date, '%Y-%m-%d') AS time,\n  SUM(daily_active_users) AS \"Daily Active Users\",\n  SUM(weekly_active_users) AS \"Weekly Active Users\",\n  SUM(monthly_active_users) AS \"Monthly Active Users\"\nFROM _tool_claude_enterprise_summaries\nWHERE $__timeFilter(STR_TO_DATE(date, '%Y-%m-%d'))\nGROUP BY date\nORDER BY date",
+          "refId": "A"
+        }
+      ],
+      "title": "Adoption Trend – DAU / WAU / MAU",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "description": "DAU/WAU/MAU expressed as a percentage of assigned seats per day, weighted across organizations (sum of active users / sum of seats per day).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT STR_TO_DATE(date, '%Y-%m-%d') AS time,\n  ROUND(SUM(daily_active_users) * 100.0 / NULLIF(SUM(assigned_seats), 0), 1) AS \"DAU / Seats %\",\n  ROUND(SUM(weekly_active_users) * 100.0 / NULLIF(SUM(assigned_seats), 0), 1) AS \"WAU / Seats %\",\n  ROUND(SUM(monthly_active_users) * 100.0 / NULLIF(SUM(assigned_seats), 0), 1) AS \"MAU / Seats %\"\nFROM _tool_claude_enterprise_summaries\nWHERE $__timeFilter(STR_TO_DATE(date, '%Y-%m-%d'))\nGROUP BY date\nORDER BY date",
+          "refId": "A"
+        }
+      ],
+      "title": "Adoption Rate Trend – % of Assigned Seats",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Distinct active users and total sessions per supported product, from ai_activities (provider=claude_enterprise). Only Claude Code and Claude chat appear here because Phase 9 only converts those two products into ai_activities; other Enterprise products (e.g. Cowork) remain tool-only until their domain mapping is confirmed.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 11,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  CASE type\n    WHEN 'CODE_EDIT' THEN 'Claude Code'\n    WHEN 'CHAT' THEN 'Claude Chat'\n    ELSE COALESCE(NULLIF(type, ''), 'Unknown')\n  END AS \"Product\",\n  COUNT(DISTINCT NULLIF(user_email, '')) AS \"Active Users\",\n  SUM(num_sessions) AS \"Sessions\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude_enterprise'\nGROUP BY type\nORDER BY COUNT(DISTINCT NULLIF(user_email, '')) DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Active Users by Product",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Claude chat conversation volume per day (ai_activities num_sessions for type=CHAT represents conversation count, not individual messages). Message-level counts are not collected: the Enterprise Analytics /messages endpoint is explicitly out of scope for this plugin (see implementation-plan.md Section 4.2), so no message-count panel is included.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 12,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT date AS time,\n  SUM(num_sessions) AS \"Chat Conversations\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude_enterprise'\n  AND type = 'CHAT'\nGROUP BY date\nORDER BY date",
+          "refId": "A"
+        }
+      ],
+      "title": "Chat Conversations Over Time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Daily Claude Code session count from ai_activities (type=CODE_EDIT).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "id": 13,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT date AS time,\n  SUM(num_sessions) AS \"Claude Code Sessions\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude_enterprise'\n  AND type = 'CODE_EDIT'\nGROUP BY date\nORDER BY date",
+          "refId": "A"
+        }
+      ],
+      "title": "Claude Code Sessions Over Time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Daily lines added and removed attributed to Claude Code (ai_activities, type=CODE_EDIT).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "id": 14,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT date AS time,\n  SUM(lines_added) AS \"Lines Added\",\n  SUM(lines_removed) AS \"Lines Removed\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude_enterprise'\n  AND type = 'CODE_EDIT'\nGROUP BY date\nORDER BY date",
+          "refId": "A"
+        }
+      ],
+      "title": "Claude Code Lines Added / Removed",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Daily commits and PRs attributed to Claude Code (ai_activities, type=CODE_EDIT).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "id": 15,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT date AS time,\n  SUM(commits_created) AS \"Commits\",\n  SUM(prs_created) AS \"PRs\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude_enterprise'\n  AND type = 'CODE_EDIT'\nGROUP BY date\nORDER BY date",
+          "refId": "A"
+        }
+      ],
+      "title": "Claude Code Commits & PRs",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Daily tool suggestion and acceptance counts attributed to Claude Code (ai_activities, type=CODE_EDIT).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "id": 16,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT date AS time,\n  SUM(suggestions_count) AS \"Suggestions\",\n  SUM(acceptance_count) AS \"Acceptances\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude_enterprise'\n  AND type = 'CODE_EDIT'\nGROUP BY date\nORDER BY date",
+          "refId": "A"
+        }
+      ],
+      "title": "Claude Code Tool Suggestions vs Acceptances",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Accepted tool actions as a percentage of suggested tool actions for Claude Code in the selected range (ai_activities, type=CODE_EDIT).",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 40
+      },
+      "id": 17,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(ROUND(SUM(acceptance_count) * 100.0 / NULLIF(SUM(suggestions_count), 0), 1), 0) AS \"Acceptance Rate %\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude_enterprise'\n  AND type = 'CODE_EDIT'",
+          "refId": "A"
+        }
+      ],
+      "title": "Claude Code Tool Acceptance Rate % (Period)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Total input + output tokens across all users, products, and models in the selected range, from _tool_claude_enterprise_usage_reports. Each (user, product, model) combination is one independent row, so this SUM does not multiply per-model totals.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 40
+      },
+      "id": 18,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(SUM(input_tokens + output_tokens), 0) AS \"Total Tokens\"\nFROM _tool_claude_enterprise_usage_reports\nWHERE $__timeFilter(STR_TO_DATE(starting_at, '%Y-%m-%dT%H:%i:%sZ'))",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Tokens (Period)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Total attributable cost across all users, products, and models in the selected range, from _tool_claude_enterprise_cost_reports. Amounts are decimal strings cast to DECIMAL to avoid float rounding; only USD-denominated rows are summed to avoid mixing currencies.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 40
+      },
+      "id": 19,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(ROUND(SUM(CAST(amount AS DECIMAL(20,4))), 2), 0) AS \"Total Cost (USD)\"\nFROM _tool_claude_enterprise_cost_reports\nWHERE $__timeFilter(STR_TO_DATE(starting_at, '%Y-%m-%dT%H:%i:%sZ'))\n  AND UPPER(currency) = 'USD'",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Cost (USD, Period)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Distinct users with positive USD cost in the selected range, from _tool_claude_enterprise_cost_reports.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 40
+      },
+      "id": 20,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT NULLIF(user_email, '')) AS \"Cost-Incurring Users\"\nFROM _tool_claude_enterprise_cost_reports\nWHERE $__timeFilter(STR_TO_DATE(starting_at, '%Y-%m-%dT%H:%i:%sZ'))\n  AND UPPER(currency) = 'USD'\n  AND CAST(amount AS DECIMAL(20,4)) > 0",
+          "refId": "A"
+        }
+      ],
+      "title": "Cost-Incurring Users (Period)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Daily input+output tokens grouped by product, from _tool_claude_enterprise_usage_reports. Grouping by product before summing avoids multiplying totals across the model dimension.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 44
+      },
+      "id": 21,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT STR_TO_DATE(starting_at, '%Y-%m-%dT%H:%i:%sZ') AS time,\n  COALESCE(NULLIF(product, ''), 'Unknown') AS metric,\n  SUM(input_tokens + output_tokens) AS value\nFROM _tool_claude_enterprise_usage_reports\nWHERE $__timeFilter(STR_TO_DATE(starting_at, '%Y-%m-%dT%H:%i:%sZ'))\nGROUP BY STR_TO_DATE(starting_at, '%Y-%m-%dT%H:%i:%sZ'), COALESCE(NULLIF(product, ''), 'Unknown')\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "title": "Token Use by Product Over Time",
+      "type": "timeseries",
+      "transformations": [
+        {
+          "id": "prepareTimeSeries",
+          "options": {
+            "format": "many"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^value (.+)$",
+            "renamePattern": "$1"
+          }
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "description": "Token usage broken down by product and model, from _tool_claude_enterprise_usage_reports. Each row is grouped at the table's native (product, model) grain, so totals are not duplicated across models.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 44
+      },
+      "id": 22,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  COALESCE(NULLIF(product, ''), 'Unknown') AS \"Product\",\n  COALESCE(NULLIF(model, ''), 'Unknown') AS \"Model\",\n  SUM(input_tokens) AS \"Input Tokens\",\n  SUM(output_tokens) AS \"Output Tokens\",\n  SUM(cache_read_tokens) AS \"Cache Read Tokens\",\n  SUM(cache_creation_tokens) AS \"Cache Creation Tokens\",\n  SUM(request_count) AS \"Requests\"\nFROM _tool_claude_enterprise_usage_reports\nWHERE $__timeFilter(STR_TO_DATE(starting_at, '%Y-%m-%dT%H:%i:%sZ'))\nGROUP BY COALESCE(NULLIF(product, ''), 'Unknown'), COALESCE(NULLIF(model, ''), 'Unknown')\nORDER BY SUM(input_tokens + output_tokens) DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Token Use by Product & Model",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Users ranked by Claude Code + chat session volume in the selected range, from ai_activities (provider=claude_enterprise). Deleted users or rows with a blank email are grouped under \"Unknown User\" instead of being silently dropped or merged into another account.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 52
+      },
+      "id": 23,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  COALESCE(NULLIF(user_email, ''), 'Unknown User') AS \"User\",\n  COUNT(DISTINCT date) AS \"Active Days\",\n  SUM(num_sessions) AS \"Sessions\",\n  SUM(lines_added) AS \"Lines Added\",\n  SUM(commits_created) AS \"Commits\",\n  SUM(prs_created) AS \"PRs\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude_enterprise'\nGROUP BY COALESCE(NULLIF(user_email, ''), 'Unknown User')\nORDER BY SUM(num_sessions) DESC\nLIMIT 25",
+          "refId": "A"
+        }
+      ],
+      "title": "Top Users by Activity",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Users ranked by USD cost in the selected range, from _tool_claude_enterprise_cost_reports. Deleted users or rows with a blank email fall back to the upstream user ID, or \"Unknown User\" if neither is present, instead of being silently merged into the first matching account.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 52
+      },
+      "id": 24,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  COALESCE(NULLIF(user_email, ''), CONCAT('User ', NULLIF(user_id, '')), 'Unknown User') AS \"User\",\n  ROUND(SUM(CAST(amount AS DECIMAL(20,4))), 2) AS \"Cost (USD)\"\nFROM _tool_claude_enterprise_cost_reports\nWHERE $__timeFilter(STR_TO_DATE(starting_at, '%Y-%m-%dT%H:%i:%sZ'))\n  AND UPPER(currency) = 'USD'\nGROUP BY COALESCE(NULLIF(user_email, ''), CONCAT('User ', NULLIF(user_id, '')), 'Unknown User')\nORDER BY SUM(CAST(amount AS DECIMAL(20,4))) DESC\nLIMIT 25",
+          "refId": "A"
+        }
+      ],
+      "title": "Top Users by Cost",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "USD cost grouped by product, from _tool_claude_enterprise_cost_reports. Grouping by product before summing avoids double-counting across the model and cost-type dimensions.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 60
+      },
+      "id": 25,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  COALESCE(NULLIF(product, ''), 'Unknown') AS \"Product\",\n  ROUND(SUM(CAST(amount AS DECIMAL(20,4))), 2) AS \"Cost (USD)\"\nFROM _tool_claude_enterprise_cost_reports\nWHERE $__timeFilter(STR_TO_DATE(starting_at, '%Y-%m-%dT%H:%i:%sZ'))\n  AND UPPER(currency) = 'USD'\nGROUP BY COALESCE(NULLIF(product, ''), 'Unknown')\nORDER BY SUM(CAST(amount AS DECIMAL(20,4))) DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Cost by Product",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "USD cost grouped by model, from _tool_claude_enterprise_cost_reports. Grouping by model before summing avoids double-counting across the product and cost-type dimensions.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 60
+      },
+      "id": 26,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  COALESCE(NULLIF(model, ''), 'Unknown') AS \"Model\",\n  ROUND(SUM(CAST(amount AS DECIMAL(20,4))), 2) AS \"Cost (USD)\"\nFROM _tool_claude_enterprise_cost_reports\nWHERE $__timeFilter(STR_TO_DATE(starting_at, '%Y-%m-%dT%H:%i:%sZ'))\n  AND UPPER(currency) = 'USD'\nGROUP BY COALESCE(NULLIF(model, ''), 'Unknown')\nORDER BY SUM(CAST(amount AS DECIMAL(20,4))) DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Cost by Model",
+      "type": "table"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 38,
+  "tags": [
+    "claude_enterprise",
+    "claude",
+    "anthropic",
+    "devlake",
+    "ai",
+    "enterprise"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-90d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "Claude Enterprise Adoption & Cost",
+  "uid": "claude_enterprise_adoption",
+  "version": 1,
+  "weekStart": ""
+}
