@@ -144,6 +144,13 @@ func SetupApiServer(router *gin.Engine) {
 	// Restrict access if database migration is required
 	router.Use(func(ctx *gin.Context) {
 		serviceStatus := services.CurrentStatus()
+		// The OTLP Collector permanently drops 428 responses; 503 keeps its batch queued.
+		if ctx.Request.URL.Path == auth.PathClaudeOtelMetrics &&
+			(serviceStatus == services.SERVICE_STATUS_WAIT_CONFIRM || serviceStatus == services.SERVICE_STATUS_MIGRATING) {
+			shared.ApiOutputError(ctx, errors.Unavailable.New(DB_MIGRATING))
+			ctx.Abort()
+			return
+		}
 		if serviceStatus == services.SERVICE_STATUS_WAIT_CONFIRM {
 			// Return error response
 			shared.ApiOutputError(
