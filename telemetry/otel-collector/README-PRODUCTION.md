@@ -77,8 +77,11 @@ The Compose configuration sets the following resource limits:
 The production Collector enables a memory limiter and a separate raw branch before the
 Prometheus-only delta-to-cumulative conversion. The raw branch uses a one-consumer,
 fsync-enabled persistent queue: 512 MiB configured queue capacity and a 1 GiB
-file-storage ceiling. `block_on_overflow` provides backpressure rather than silent
-loss. Prometheus retains data for 30 days. Adjust limits only after observing queue
+file-storage ceiling. A full queue rejects new raw batches rather than blocking
+(`block_on_overflow: false` avoids a known persistent-queue deadlock), so alert on
+`otelcol_exporter_queue_size`, `otelcol_exporter_queue_capacity`, and
+`otelcol_exporter_enqueue_failed_metric_points_total` from the `otel-collector-internal`
+scrape job. Prometheus retains data for 30 days. Adjust limits only after observing queue
 size, enqueue failures, exporter failures, label cardinality, and host capacity.
 
 ## Credential Operations

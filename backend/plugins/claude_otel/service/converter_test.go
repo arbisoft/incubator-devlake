@@ -18,6 +18,8 @@ limitations under the License.
 package service
 
 import (
+	"math"
+	"os"
 	"testing"
 	"time"
 
@@ -30,6 +32,7 @@ import (
 	commonv1 "go.opentelemetry.io/proto/otlp/common/v1"
 	metricsv1 "go.opentelemetry.io/proto/otlp/metrics/v1"
 	resourcev1 "go.opentelemetry.io/proto/otlp/resource/v1"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func TestPrepareUpdatesUsesTypedIdentityAndSeparateFactGrains(t *testing.T) {
@@ -88,8 +91,12 @@ func TestPrepareUpdatesRejectsMalformedSupportedMetric(t *testing.T) {
 		Name: metricTokenUsage,
 		Data: &metricsv1.Metric_Sum{Sum: &metricsv1.Sum{DataPoints: []*metricsv1.NumberDataPoint{{
 			TimeUnixNano: uint64(observedAt.UnixNano()),
-			Attributes:   []*commonv1.KeyValue{stringAttribute("user.account_id", "user_012pKEfgvvBR2CYw6KjnyAW2")},
-			Value:        &metricsv1.NumberDataPoint_AsInt{AsInt: 1},
+			Attributes: []*commonv1.KeyValue{
+				stringAttribute(devlakeTeamAttribute, "platform"),
+				stringAttribute("user.account_id", "user_012pKEfgvvBR2CYw6KjnyAW2"),
+				stringAttribute(organizationIDAttribute, "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e"),
+			},
+			Value: &metricsv1.NumberDataPoint_AsInt{AsInt: 1},
 		}}}},
 	}}}}
 	_, err := converter.prepareUpdates(request)
@@ -130,13 +137,117 @@ func TestCounterDeltaRejectsOutOfOrderCumulativeSamples(t *testing.T) {
 	}
 }
 
+func TestMetricNumberFromPointAcceptsIntegralDoubleAndRejectsInvalidValues(t *testing.T) {
+	testCases := []struct {
+		name    string
+		value   float64
+		wantInt bool
+		wantErr bool
+	}{
+		{name: "integral", value: 12, wantInt: true},
+		{name: "fractional", value: 1.5},
+		{name: "negative", value: -1, wantErr: true},
+		{name: "not a number", value: math.NaN(), wantErr: true},
+		{name: "infinite", value: math.Inf(1), wantErr: true},
+		{name: "oversized", value: math.MaxFloat64, wantErr: true},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			number, err := metricNumberFromPoint(&metricsv1.NumberDataPoint{
+				Value: &metricsv1.NumberDataPoint_AsDouble{AsDouble: testCase.value},
+			})
+			if (err != nil) != testCase.wantErr {
+				t.Fatalf("metricNumberFromPoint() error = %v, want error=%v", err, testCase.wantErr)
+			}
+			if err == nil && number.integer != testCase.wantInt {
+				t.Fatalf("metricNumberFromPoint() integer = %v, want %v", number.integer, testCase.wantInt)
+			}
+		})
+	}
+}
+
+func TestRealShapedClaudeCodeExportIsAcceptedAndConverted(t *testing.T) {
+	payload, err := os.ReadFile("testdata/claude_code_cumulative_metrics.json")
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	request := &collectormetrics.ExportMetricsServiceRequest{}
+	if err := protojson.Unmarshal(payload, request); err != nil {
+		t.Fatalf("protojson.Unmarshal() error = %v", err)
+	}
+	_, datapointCount, validationErr := validateOtelMetricsRequest(request)
+	if validationErr != nil {
+		t.Fatalf("validateOtelMetricsRequest() error = %v", validationErr)
+	}
+
+	database := dalmocks.NewDal(t)
+	database.EXPECT().All(mock.AnythingOfType("*[]*models.OtelConnection"), mock.Anything).Run(
+		func(connections interface{}, _ ...dal.Clause) {
+			*connections.(*[]*models.OtelConnection) = []*models.OtelConnection{{TeamSlug: "platform"}}
+		},
+	).Return(nil)
+	updates, err := newRawMetricConverter(database).prepareUpdates(request)
+	if err != nil {
+		t.Fatalf("prepareUpdates() error = %v", err)
+	}
+	if len(updates) != datapointCount {
+		t.Fatalf("prepareUpdates() updates = %d, want every supported datapoint (%d)", len(updates), datapointCount)
+	}
+	for _, update := range updates {
+		if update.temporality != metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_CUMULATIVE {
+			t.Fatalf("%s temporality = %s, want cumulative", update.metric, update.temporality)
+		}
+		if update.organizationID != "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e" || update.connection.TeamSlug != "platform" {
+			t.Fatalf("%s attribution = %q/%q", update.metric, update.organizationID, update.connection.TeamSlug)
+		}
+	}
+}
+
+func TestResolveConnectionUsesEventTimeAcrossRevokedAndRecreatedTeam(t *testing.T) {
+	revokedAt := time.Date(2026, 9, 14, 12, 0, 0, 0, time.UTC)
+	revoked := &models.OtelConnection{Model: common.Model{ID: 1, CreatedAt: revokedAt.Add(-24 * time.Hour)}, TeamSlug: "platform", RevokedAt: &revokedAt}
+	recreated := &models.OtelConnection{Model: common.Model{ID: 2, CreatedAt: revokedAt.Add(time.Hour)}, TeamSlug: "platform"}
+	database := dalmocks.NewDal(t)
+	database.EXPECT().All(mock.AnythingOfType("*[]*models.OtelConnection"), mock.Anything).Run(
+		func(connections interface{}, _ ...dal.Clause) {
+			*connections.(*[]*models.OtelConnection) = []*models.OtelConnection{revoked, recreated}
+		},
+	).Return(nil)
+	converter := newRawMetricConverter(database)
+
+	testCases := []struct {
+		name       string
+		observedAt time.Time
+		wantID     uint64
+		wantCode   string
+	}{
+		{name: "delayed telemetry before revocation", observedAt: revokedAt.Add(-time.Minute), wantID: revoked.ID},
+		{name: "telemetry after recreation", observedAt: revokedAt.Add(2 * time.Hour), wantID: recreated.ID},
+		{name: "telemetry between revocation and recreation", observedAt: revokedAt.Add(time.Minute), wantCode: "connection_not_found"},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			connection, err := converter.resolveConnection("platform", testCase.observedAt)
+			if testCase.wantCode != "" {
+				if conversionErr, ok := err.(*conversionError); !ok || conversionErr.code != testCase.wantCode || !conversionErr.permanent {
+					t.Fatalf("resolveConnection() error = %v, want permanent %s", err, testCase.wantCode)
+				}
+				return
+			}
+			if err != nil || connection.ID != testCase.wantID {
+				t.Fatalf("resolveConnection() = %#v, %v; want connection %d", connection, err, testCase.wantID)
+			}
+		})
+	}
+}
+
 func TestDailyTargetsAggregateTeamsIntoOneOrganizationCandidate(t *testing.T) {
 	organizationID := "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e"
 	accountID := "user_012pKEfgvvBR2CYw6KjnyAW2"
 	hour := time.Date(2026, 9, 14, 10, 0, 0, 0, time.UTC)
 	targets := dailyTargets([]factUpdate{
-		{connection: &models.OtelConnection{OrganizationId: &organizationID, TeamSlug: "backend"}, identity: developerIdentity{key: "acct:" + accountID, accountID: &accountID}, hour: hour},
-		{connection: &models.OtelConnection{OrganizationId: &organizationID, TeamSlug: "frontend"}, identity: developerIdentity{key: "acct:" + accountID, accountID: &accountID}, hour: hour.Add(time.Hour)},
+		{connection: &models.OtelConnection{TeamSlug: "backend"}, organizationID: organizationID, identity: developerIdentity{key: "acct:" + accountID, accountID: &accountID}, hour: hour},
+		{connection: &models.OtelConnection{TeamSlug: "frontend"}, organizationID: organizationID, identity: developerIdentity{key: "acct:" + accountID, accountID: &accountID}, hour: hour.Add(time.Hour)},
 	})
 	if len(targets) != 1 {
 		t.Fatalf("daily targets = %d, want one organization-wide candidate", len(targets))
@@ -147,11 +258,9 @@ func TestDailyTargetsAggregateTeamsIntoOneOrganizationCandidate(t *testing.T) {
 }
 
 func newConverterRequest(observedAt time.Time, organizationID string) *collectormetrics.ExportMetricsServiceRequest {
-	attributes := []*commonv1.KeyValue{
-		stringAttribute(devlakeTeamAttribute, "platform"),
-		stringAttribute(organizationIDAttribute, organizationID),
-	}
+	attributes := []*commonv1.KeyValue{stringAttribute(organizationIDAttribute, organizationID)}
 	pointAttributes := []*commonv1.KeyValue{
+		stringAttribute(devlakeTeamAttribute, "platform"),
 		stringAttribute("user.account_id", "user_012pKEfgvvBR2CYw6KjnyAW2"),
 		stringAttribute("user.account_uuid", "aaaa1111-1111-4111-8111-111111111111"),
 		stringAttribute("user.email", "Developer@example.com"),

@@ -234,8 +234,8 @@ const CanonicalSourceCard = ({ preferences }: { preferences: AiSourcePreference[
   return (
     <Card size="small" title="Canonical analytics source" style={{ marginBottom: 16 }}>
       <Typography.Paragraph style={{ marginBottom: workspaces.length ? 8 : 0 }}>
-        OpenTelemetry is the active source for Claude Code daily analytics. Enterprise analytics remains unavailable until
-        its organization, identity, and completeness checks are validated.
+        OpenTelemetry is the active source for Claude Code daily analytics. Enterprise analytics remains unavailable
+        until its organization, identity, and completeness checks are validated.
       </Typography.Paragraph>
       {workspaces.length > 0 && (
         <Typography.Text type="secondary">

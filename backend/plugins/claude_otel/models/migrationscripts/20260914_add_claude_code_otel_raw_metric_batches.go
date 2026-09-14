@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/apache/incubator-devlake/core/context"
+	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models/migrationscripts/archived"
 	"github.com/apache/incubator-devlake/core/plugin"
@@ -33,6 +34,7 @@ type addClaudeCodeOtelRawMetricBatches struct{}
 
 type otelConnection20260914 struct {
 	archived.Model
+	Status         string     `gorm:"type:varchar(32);index"`
 	RevokedAt      *time.Time `gorm:"index"`
 	OrganizationId *string    `gorm:"type:char(36);index"`
 }
@@ -63,15 +65,54 @@ type otelMetricBatch20260914 struct {
 }
 
 func (otelMetricBatch20260914) TableName() string {
-	return "_raw_claude_code_otel_metric_batches"
+	return "_raw_otel_claude_code_metric_batches"
+}
+
+type otelCredential20260914 struct {
+	archived.Model
+	ConnectionId uint64
+	RevokedAt    *time.Time
+}
+
+func (otelCredential20260914) TableName() string {
+	return "_tool_claude_code_otel_credentials"
 }
 
 func (script *addClaudeCodeOtelRawMetricBatches) Up(basicRes context.BasicRes) errors.Error {
-	return migrationhelper.AutoMigrateTables(
+	if err := migrationhelper.AutoMigrateTables(
 		basicRes,
 		&otelConnection20260914{},
 		&otelMetricBatch20260914{},
-	)
+	); err != nil {
+		return err
+	}
+	return backfillOtelConnectionRevokedAt(basicRes)
+}
+
+func backfillOtelConnectionRevokedAt(basicRes context.BasicRes) errors.Error {
+	database := basicRes.GetDal()
+	connections := make([]*otelConnection20260914, 0)
+	if err := database.All(&connections, dal.Where("status = ? AND revoked_at IS NULL", "revoked")); err != nil {
+		return err
+	}
+	for _, connection := range connections {
+		revokedAt := connection.UpdatedAt
+		credentials := make([]*otelCredential20260914, 0, 1)
+		if err := database.All(&credentials,
+			dal.Where("connection_id = ? AND revoked_at IS NOT NULL", connection.ID),
+			dal.Orderby("revoked_at DESC"),
+			dal.Limit(1),
+		); err != nil {
+			return err
+		}
+		if len(credentials) > 0 {
+			revokedAt = *credentials[0].RevokedAt
+		}
+		if err := database.UpdateColumn(&otelConnection20260914{}, "revoked_at", revokedAt, dal.Where("id = ?", connection.ID)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (*addClaudeCodeOtelRawMetricBatches) Version() uint64 {

@@ -50,11 +50,11 @@ type dailyTarget struct {
 func dailyTargets(updates []factUpdate) []dailyTarget {
 	seen := make(map[string]dailyTarget)
 	for _, update := range updates {
-		if update.connection.OrganizationId == nil || update.identity.accountID == nil {
+		if update.identity.accountID == nil {
 			continue
 		}
 		target := dailyTarget{
-			workspaceKey:  *update.connection.OrganizationId,
+			workspaceKey:  update.organizationID,
 			userKey:       update.identity.key,
 			userAccountID: *update.identity.accountID,
 			date:          update.hour.UTC().Truncate(24 * time.Hour),

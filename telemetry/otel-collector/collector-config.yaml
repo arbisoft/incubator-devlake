@@ -11,6 +11,14 @@ receivers:
           authenticator: basicauth/server
 
 processors:
+  resource/attribution:
+    attributes:
+      # The attributes processor below edits datapoints only. Remove spoofable resource-level
+      # attribution so it cannot reach Prometheus labels or DevLake raw storage.
+      - key: devlake_team
+        action: delete
+      - key: devlake_project
+        action: delete
   attributes/team:
     actions:
       # Stamp the verified credential's team slug instead of trusting client input.
@@ -37,6 +45,7 @@ exporters:
     verbosity: detailed
   otlphttp/claude_raw:
     endpoint: ${env:CLAUDE_OTEL_INGEST_ENDPOINT}
+    compression: none
     headers:
       X-Claude-Otel-Ingest-Token: ${env:CLAUDE_OTEL_INGEST_TOKEN}
     retry_on_failure:
@@ -51,7 +60,9 @@ exporters:
       num_consumers: 1
       sizer: bytes
       queue_size: 536870912
-      block_on_overflow: true
+      # Reject on saturation rather than block the exporter in the known persistent-queue deadlock path.
+      # Monitor enqueue failures and backlog before the bounded queue fills.
+      block_on_overflow: false
       batch:
         sizer: bytes
         min_size: 262144
@@ -76,6 +87,8 @@ extensions:
     fsync: true
     max_size: 1073741824
     compaction:
+      # Keep compaction scratch space on the writable queue volume; the default is not writable.
+      directory: /var/lib/otel/compaction
       on_rebound: true
       rebound_needed_threshold_mib: 128
       rebound_trigger_threshold_mib: 32
@@ -86,11 +99,20 @@ connectors:
   forward/prometheus: {}
 
 service:
+  telemetry:
+    metrics:
+      # Internal Collector metrics expose raw queue size, capacity, and enqueue failures.
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
   extensions: [health_check, basicauth/server, file_storage/claude_raw]
   pipelines:
     metrics:
       receivers: [otlp]
-      processors: [attributes/team]
+      processors: [resource/attribution, attributes/team]
       exporters: [forward/claude_raw, forward/prometheus]
     metrics/claude_raw:
       receivers: [forward/claude_raw]

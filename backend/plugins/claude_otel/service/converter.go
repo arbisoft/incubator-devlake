@@ -20,6 +20,7 @@ package service
 import (
 	"crypto/sha256"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -246,22 +247,23 @@ func converterBackoff(attempt int) time.Duration {
 }
 
 type factUpdate struct {
-	connection  *models.OtelConnection
-	identity    developerIdentity
-	hour        time.Time
-	observedAt  time.Time
-	metric      string
-	model       string
-	query       string
-	tool        string
-	language    string
-	decision    string
-	typeValue   string
-	value       metricNumber
-	temporality metricsv1.AggregationTemporality
-	startNanos  uint64
-	timeNanos   uint64
-	seriesHash  []byte
+	connection     *models.OtelConnection
+	organizationID string
+	identity       developerIdentity
+	hour           time.Time
+	observedAt     time.Time
+	metric         string
+	model          string
+	query          string
+	tool           string
+	language       string
+	decision       string
+	typeValue      string
+	value          metricNumber
+	temporality    metricsv1.AggregationTemporality
+	startNanos     uint64
+	timeNanos      uint64
+	seriesHash     []byte
 }
 
 type developerIdentity struct {
@@ -281,7 +283,6 @@ func (c *rawMetricConverter) prepareUpdates(request *collectormetrics.ExportMetr
 	updates := make([]factUpdate, 0)
 	for _, resourceMetrics := range request.GetResourceMetrics() {
 		resourceAttrs := resourceMetrics.GetResource().GetAttributes()
-		teamSlug := attributeString(resourceAttrs, devlakeTeamAttribute)
 		for _, scopeMetrics := range resourceMetrics.GetScopeMetrics() {
 			for _, metric := range scopeMetrics.GetMetrics() {
 				if !isSupportedMetric(metric.GetName()) {
@@ -292,6 +293,10 @@ func (c *rawMetricConverter) prepareUpdates(request *collectormetrics.ExportMetr
 					return nil, permanentMetricError("unsupported_metric_kind", "supported metric %s is not an OTLP sum", metric.GetName())
 				}
 				for _, point := range sum.GetDataPoints() {
+					teamSlug := attributeString(point.GetAttributes(), devlakeTeamAttribute)
+					if teamSlug == "" {
+						return nil, permanentMetricError("missing_team", "supported metric %s is missing trusted devlake_team attribution", metric.GetName())
+					}
 					observedAt, err := unixNanoTime(point.GetTimeUnixNano())
 					if err != nil {
 						return nil, permanentMetricError("invalid_timestamp", "supported metric %s has an invalid timestamp", metric.GetName())
@@ -300,11 +305,12 @@ func (c *rawMetricConverter) prepareUpdates(request *collectormetrics.ExportMetr
 					if err != nil {
 						return nil, err
 					}
-					identity, err := identityFromAttributes(point.GetAttributes())
+					organizationID, err := organizationIDFromAttributes(resourceAttrs, point.GetAttributes())
 					if err != nil {
 						return nil, err
 					}
-					if err := validateOrganization(resourceAttrs, point.GetAttributes(), connection); err != nil {
+					identity, err := identityFromAttributes(point.GetAttributes())
+					if err != nil {
 						return nil, err
 					}
 					value, err := metricNumberFromPoint(point)
@@ -312,7 +318,7 @@ func (c *rawMetricConverter) prepareUpdates(request *collectormetrics.ExportMetr
 						return nil, permanentMetricError("invalid_value", "supported metric %s has an invalid numeric value", metric.GetName())
 					}
 					update := factUpdate{
-						connection: connection, identity: identity, hour: observedAt.Truncate(time.Hour), observedAt: observedAt,
+						connection: connection, organizationID: organizationID, identity: identity, hour: observedAt.Truncate(time.Hour), observedAt: observedAt,
 						metric: metric.GetName(), model: attributeString(point.GetAttributes(), "model"),
 						query:       defaultDimension(attributeString(point.GetAttributes(), "query_source")),
 						tool:        defaultDimension(attributeString(point.GetAttributes(), "tool_name")),
@@ -356,6 +362,9 @@ func (c *rawMetricConverter) resolveConnection(teamSlug string, observedAt time.
 }
 
 func (c *rawMetricConverter) applyUpdate(tx dal.Transaction, update factUpdate) error {
+	if err := bindConnectionOrganization(tx, update.connection, update.organizationID); err != nil {
+		return err
+	}
 	value, err := c.counterDelta(tx, update)
 	if err != nil || value == nil {
 		return err
@@ -432,17 +441,17 @@ func (c *rawMetricConverter) counterDelta(tx dal.Transaction, update factUpdate)
 
 func upsertActivity(tx dal.Transaction, update factUpdate, column, value string) error {
 	query := fmt.Sprintf("INSERT INTO %s (connection_id, team_slug, organization_id, user_key, user_account_id, user_account_uuid, user_email, hour_start, %s, first_observed_at, last_observed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE %s = %s + VALUES(%s), first_observed_at = LEAST(first_observed_at, VALUES(first_observed_at)), last_observed_at = GREATEST(last_observed_at, VALUES(last_observed_at)), updated_at = NOW()", models.OtelHourlyActivityTable, column, column, column, column)
-	return tx.Exec(query, update.connection.ID, update.connection.TeamSlug, update.connection.OrganizationId, update.identity.key, update.identity.accountID, update.identity.accountUUID, update.identity.email, update.hour, value, update.observedAt, update.observedAt)
+	return tx.Exec(query, update.connection.ID, update.connection.TeamSlug, update.organizationID, update.identity.key, update.identity.accountID, update.identity.accountUUID, update.identity.email, update.hour, value, update.observedAt, update.observedAt)
 }
 
 func upsertModelUsage(tx dal.Transaction, update factUpdate, column, value string) error {
 	query := fmt.Sprintf("INSERT INTO %s (connection_id, team_slug, organization_id, user_key, user_account_id, user_account_uuid, user_email, hour_start, model, query_source, %s, first_observed_at, last_observed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE %s = %s + VALUES(%s), first_observed_at = LEAST(first_observed_at, VALUES(first_observed_at)), last_observed_at = GREATEST(last_observed_at, VALUES(last_observed_at)), updated_at = NOW()", models.OtelHourlyModelUsageTable, column, column, column, column)
-	return tx.Exec(query, update.connection.ID, update.connection.TeamSlug, update.connection.OrganizationId, update.identity.key, update.identity.accountID, update.identity.accountUUID, update.identity.email, update.hour, update.model, update.query, value, update.observedAt, update.observedAt)
+	return tx.Exec(query, update.connection.ID, update.connection.TeamSlug, update.organizationID, update.identity.key, update.identity.accountID, update.identity.accountUUID, update.identity.email, update.hour, update.model, update.query, value, update.observedAt, update.observedAt)
 }
 
 func upsertToolUsage(tx dal.Transaction, update factUpdate, column, value string) error {
 	query := fmt.Sprintf("INSERT INTO %s (connection_id, team_slug, organization_id, user_key, user_account_id, user_account_uuid, user_email, hour_start, tool_name, language, %s, first_observed_at, last_observed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE %s = %s + VALUES(%s), first_observed_at = LEAST(first_observed_at, VALUES(first_observed_at)), last_observed_at = GREATEST(last_observed_at, VALUES(last_observed_at)), updated_at = NOW()", models.OtelHourlyToolUsageTable, column, column, column, column)
-	return tx.Exec(query, update.connection.ID, update.connection.TeamSlug, update.connection.OrganizationId, update.identity.key, update.identity.accountID, update.identity.accountUUID, update.identity.email, update.hour, update.tool, update.language, value, update.observedAt, update.observedAt)
+	return tx.Exec(query, update.connection.ID, update.connection.TeamSlug, update.organizationID, update.identity.key, update.identity.accountID, update.identity.accountUUID, update.identity.email, update.hour, update.tool, update.language, value, update.observedAt, update.observedAt)
 }
 
 func isSupportedMetric(name string) bool {
@@ -505,8 +514,21 @@ func unixNanoTime(value uint64) (time.Time, error) {
 func metricNumberFromPoint(point *metricsv1.NumberDataPoint) (metricNumber, error) {
 	switch value := point.Value.(type) {
 	case *metricsv1.NumberDataPoint_AsInt:
+		if value.AsInt < 0 {
+			return metricNumber{}, fmt.Errorf("negative number")
+		}
 		return metricNumber{integer: true, int64: value.AsInt, decimal: strconv.FormatInt(value.AsInt, 10)}, nil
 	case *metricsv1.NumberDataPoint_AsDouble:
+		if math.IsNaN(value.AsDouble) || math.IsInf(value.AsDouble, 0) || value.AsDouble < 0 {
+			return metricNumber{}, fmt.Errorf("non-finite or negative number")
+		}
+		if value.AsDouble >= math.MaxInt64 {
+			return metricNumber{}, fmt.Errorf("number exceeds supported range")
+		}
+		if math.Trunc(value.AsDouble) == value.AsDouble {
+			integer := int64(value.AsDouble)
+			return metricNumber{integer: true, int64: integer, decimal: strconv.FormatInt(integer, 10)}, nil
+		}
 		return metricNumber{decimal: strconv.FormatFloat(value.AsDouble, 'f', 9, 64)}, nil
 	default:
 		return metricNumber{}, fmt.Errorf("missing number")
@@ -518,15 +540,69 @@ func (m metricNumber) integerString() string {
 	}
 	return strconv.FormatInt(m.int64, 10)
 }
-func validateOrganization(resourceAttrs, pointAttrs []*commonv1.KeyValue, connection *models.OtelConnection) error {
-	organization := attributeString(pointAttrs, organizationIDAttribute)
-	if organization == "" {
-		organization = attributeString(resourceAttrs, organizationIDAttribute)
+
+// organizationIDFromAttributes returns the normalized organization UUID. Claude Code
+// emits organization.id as a datapoint attribute; a resource value is accepted only
+// when it agrees.
+func organizationIDFromAttributes(resourceAttrs, pointAttrs []*commonv1.KeyValue) (string, error) {
+	pointValue := attributeString(pointAttrs, organizationIDAttribute)
+	resourceValue := attributeString(resourceAttrs, organizationIDAttribute)
+	if pointValue == "" && resourceValue == "" {
+		return "", permanentMetricError("missing_organization", "supported metric has no organization.id")
 	}
-	if connection.OrganizationId != nil && organization != *connection.OrganizationId {
+	pointOrganizationID, pointValid := normalizeOrganizationID(pointValue)
+	resourceOrganizationID, resourceValid := normalizeOrganizationID(resourceValue)
+	if (pointValue != "" && !pointValid) || (resourceValue != "" && !resourceValid) {
+		return "", permanentMetricError("invalid_organization", "supported metric has an invalid organization.id")
+	}
+	if pointValue != "" && resourceValue != "" && pointOrganizationID != resourceOrganizationID {
+		return "", permanentMetricError("organization_mismatch", "resource and datapoint organization IDs differ")
+	}
+	organizationID := pointOrganizationID
+	if organizationID == "" {
+		organizationID = resourceOrganizationID
+	}
+	return organizationID, nil
+}
+
+// bindConnectionOrganization binds an unbound connection to its first valid organization
+// and rejects telemetry for any other organization. The conditional update makes
+// concurrent first bindings safe; the locked re-read reports the winning binding.
+func bindConnectionOrganization(tx dal.Transaction, connection *models.OtelConnection, organizationID string) error {
+	if connection.OrganizationId == nil {
+		if err := tx.UpdateColumns(
+			&models.OtelConnection{},
+			[]dal.DalSet{{ColumnName: "organization_id", Value: organizationID}},
+			dal.Where("id = ? AND organization_id IS NULL", connection.ID),
+		); err != nil {
+			return err
+		}
+		boundConnection := &models.OtelConnection{}
+		if err := tx.First(boundConnection, dal.Where("id = ?", connection.ID), dal.Lock(true, false)); err != nil {
+			return err
+		}
+		connection.OrganizationId = boundConnection.OrganizationId
+	}
+	if connection.OrganizationId == nil {
+		return permanentMetricError("organization_mismatch", "telemetry organization does not match its OTel connection")
+	}
+	if boundOrganizationID, _ := normalizeOrganizationID(*connection.OrganizationId); boundOrganizationID != organizationID {
 		return permanentMetricError("organization_mismatch", "telemetry organization does not match its OTel connection")
 	}
 	return nil
+}
+
+// normalizeOrganizationID accepts only the bare hyphenated UUID form and returns it
+// lowercased, so equal organizations compare equal regardless of client casing.
+func normalizeOrganizationID(value string) (string, bool) {
+	if len(value) != len(uuid.Nil.String()) {
+		return "", false
+	}
+	organizationID, err := uuid.Parse(value)
+	if err != nil {
+		return "", false
+	}
+	return organizationID.String(), true
 }
 func metricSeriesHash(update factUpdate, resourceAttrs, pointAttrs []*commonv1.KeyValue, unit string) []byte {
 	values := []string{strconv.FormatUint(update.connection.ID, 10), update.metric, unit}

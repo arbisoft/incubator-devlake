@@ -40,7 +40,7 @@ type otelHourlyActivity20260914 struct {
 	UserEmail         *string   `gorm:"type:varchar(255);index"`
 	HourStart         time.Time `gorm:"primaryKey;index"`
 	SessionCount      int64     `gorm:"not null;default:0"`
-	ActiveTimeSeconds string    `gorm:"type:decimal(20,3);not null"`
+	ActiveTimeSeconds string    `gorm:"type:decimal(20,3);not null;default:0"`
 	LinesAdded        int64     `gorm:"not null;default:0"`
 	LinesRemoved      int64     `gorm:"not null;default:0"`
 	CommitsCreated    int64     `gorm:"not null;default:0"`
@@ -68,7 +68,7 @@ type otelHourlyModelUsage20260914 struct {
 	OutputTokens        int64     `gorm:"not null;default:0"`
 	CacheReadTokens     int64     `gorm:"not null;default:0"`
 	CacheCreationTokens int64     `gorm:"not null;default:0"`
-	EstimatedCostUSD    string    `gorm:"type:decimal(20,8);not null"`
+	EstimatedCostUSD    string    `gorm:"type:decimal(20,8);not null;default:0"`
 	FirstObservedAt     time.Time `gorm:"type:datetime(3)"`
 	LastObservedAt      time.Time `gorm:"type:datetime(3)"`
 	CreatedAt           time.Time

@@ -23,7 +23,6 @@ import (
 	"io"
 	"mime"
 	"net/http"
-	"sort"
 	"strings"
 	"time"
 
@@ -130,12 +129,6 @@ func (s *RawIngestService) Ingest(request *http.Request) (*RawIngestResult, erro
 		}
 		return nil, errors.Unavailable.Wrap(err, "Claude Code OTel raw storage is unavailable")
 	}
-	if err := s.bindResourceOrganizations(tx, metricsRequest.GetResourceMetrics()); err != nil {
-		if rollbackErr := tx.Rollback(); rollbackErr != nil && s.logger != nil {
-			s.logger.Warn(rollbackErr, "failed to roll back Claude Code OTel organization binding")
-		}
-		return nil, err
-	}
 	if err := tx.Commit(); err != nil {
 		return nil, errors.Unavailable.Wrap(err, "failed to commit Claude Code OTel raw batch")
 	}
@@ -193,153 +186,96 @@ func validateOtelMetricsRequest(request *collectormetrics.ExportMetricsServiceRe
 		if resourceMetrics.GetResource() == nil {
 			return 0, 0, errors.BadInput.New("OTLP metrics resource is required")
 		}
-		attributes := resourceMetrics.GetResource().GetAttributes()
-		if attributeString(attributes, devlakeTeamAttribute) == "" {
-			return 0, 0, errors.BadInput.New("OTLP metrics resource is missing trusted devlake_team attribution")
+		datapoints := resourceDatapoints(resourceMetrics)
+		if err := validateTrustedAttribution(resourceMetrics.GetResource().GetAttributes(), datapoints); err != nil {
+			return 0, 0, err
 		}
-		if hasAttribute(attributes, devlakeProjectAttribute) {
-			return 0, 0, errors.BadInput.New("OTLP metrics resource must not include devlake_project attribution")
-		}
-		for _, scopeMetrics := range resourceMetrics.GetScopeMetrics() {
-			for _, metric := range scopeMetrics.GetMetrics() {
-				datapointCount += metricDatapointCount(metric)
-			}
-		}
+		datapointCount += len(datapoints)
 	}
 	return len(resources), datapointCount, nil
 }
 
-func (s *RawIngestService) bindResourceOrganizations(tx dal.Transaction, resourceMetrics []*metricsv1.ResourceMetrics) errors.Error {
-	for _, resourceMetric := range resourceMetrics {
-		attributes := resourceMetric.GetResource().GetAttributes()
-		teamSlug := attributeString(attributes, devlakeTeamAttribute)
-		organizationIDs := resourceOrganizationIDs(resourceMetric)
-		if len(organizationIDs) > 1 {
-			return errors.BadInput.New("OTLP metrics resource has multiple organization.id values")
+// validateTrustedAttribution enforces the Collector contract: the attributes processor
+// stamps devlake_team on every datapoint from one authenticated request, and DevLake
+// attribution is never accepted from the client-controlled resource.
+func validateTrustedAttribution(resourceAttributes []*commonv1.KeyValue, datapoints []otlpDatapoint) errors.Error {
+	if hasAttribute(resourceAttributes, devlakeTeamAttribute) || hasAttribute(resourceAttributes, devlakeProjectAttribute) {
+		return errors.BadInput.New("OTLP metrics resource must not include DevLake attribution")
+	}
+	teamSlug := ""
+	for _, datapoint := range datapoints {
+		attributes := datapoint.GetAttributes()
+		if hasAttribute(attributes, devlakeProjectAttribute) {
+			return errors.BadInput.New("OTLP metrics datapoint must not include devlake_project attribution")
 		}
-		for _, organizationID := range organizationIDs {
-			if !isUUID(organizationID) {
-				return errors.BadInput.New("OTLP metrics resource has an invalid organization.id")
-			}
-
-			connections := make([]*models.OtelConnection, 0)
-			if err := tx.All(
-				&connections,
-				dal.Where("team_slug = ? AND status = ?", teamSlug, models.OtelConnectionStatusActive),
-			); err != nil {
-				return errors.Unavailable.Wrap(err, "failed to resolve Claude Code OTel connection")
-			}
-			if len(connections) != 1 {
-				// Telemetry without one active connection is retained for the Phase 2 event-time resolver.
-				continue
-			}
-			connection := connections[0]
-			if connection.OrganizationId == nil {
-				if err := tx.UpdateColumns(
-					&models.OtelConnection{},
-					[]dal.DalSet{{ColumnName: "organization_id", Value: organizationID}},
-					dal.Where("id = ? AND organization_id IS NULL", connection.ID),
-				); err != nil {
-					return errors.Unavailable.Wrap(err, "failed to bind Claude Code OTel connection organization")
-				}
-				if err := tx.First(connection, dal.Where("id = ?", connection.ID)); err != nil {
-					return errors.Unavailable.Wrap(err, "failed to verify Claude Code OTel connection organization")
-				}
-				if connection.OrganizationId == nil || *connection.OrganizationId != organizationID {
-					return errors.BadInput.New("OTLP metrics organization does not match the Claude Code OTel connection")
-				}
-				continue
-			}
-			if *connection.OrganizationId != organizationID {
-				return errors.BadInput.New("OTLP metrics organization does not match the Claude Code OTel connection")
-			}
+		team := attributeString(attributes, devlakeTeamAttribute)
+		if team == "" {
+			return errors.BadInput.New("OTLP metrics datapoint is missing trusted devlake_team attribution")
 		}
+		if teamSlug != "" && team != teamSlug {
+			return errors.BadInput.New("OTLP metrics resource has inconsistent trusted devlake_team attribution")
+		}
+		teamSlug = team
 	}
 	return nil
 }
 
-func resourceOrganizationIDs(resourceMetric *metricsv1.ResourceMetrics) []string {
-	organizationIDs := map[string]struct{}{}
-	addOrganizationID := func(attributes []*commonv1.KeyValue) {
-		if organizationID := attributeString(attributes, organizationIDAttribute); organizationID != "" {
-			organizationIDs[organizationID] = struct{}{}
-		}
-	}
-	addOrganizationID(resourceMetric.GetResource().GetAttributes())
-	for _, scopeMetrics := range resourceMetric.GetScopeMetrics() {
-		for _, metric := range scopeMetrics.GetMetrics() {
-			if sum := metric.GetSum(); sum != nil {
-				for _, point := range sum.GetDataPoints() {
-					addOrganizationID(point.GetAttributes())
-				}
-			}
-		}
-	}
-	result := make([]string, 0, len(organizationIDs))
-	for organizationID := range organizationIDs {
-		result = append(result, organizationID)
-	}
-	sort.Strings(result)
-	return result
+// otlpDatapoint is the attribute and timestamp contract shared by every OTLP metric
+// datapoint kind.
+type otlpDatapoint interface {
+	GetAttributes() []*commonv1.KeyValue
+	GetTimeUnixNano() uint64
 }
 
-func metricDatapointCount(metric *metricsv1.Metric) int {
+func resourceDatapoints(resourceMetrics *metricsv1.ResourceMetrics) []otlpDatapoint {
+	datapoints := make([]otlpDatapoint, 0)
+	for _, scopeMetrics := range resourceMetrics.GetScopeMetrics() {
+		for _, metric := range scopeMetrics.GetMetrics() {
+			datapoints = appendMetricDatapoints(datapoints, metric)
+		}
+	}
+	return datapoints
+}
+
+func appendMetricDatapoints(datapoints []otlpDatapoint, metric *metricsv1.Metric) []otlpDatapoint {
 	switch data := metric.Data.(type) {
 	case *metricsv1.Metric_Gauge:
-		return len(data.Gauge.GetDataPoints())
+		for _, datapoint := range data.Gauge.GetDataPoints() {
+			datapoints = append(datapoints, datapoint)
+		}
 	case *metricsv1.Metric_Sum:
-		return len(data.Sum.GetDataPoints())
+		for _, datapoint := range data.Sum.GetDataPoints() {
+			datapoints = append(datapoints, datapoint)
+		}
 	case *metricsv1.Metric_Histogram:
-		return len(data.Histogram.GetDataPoints())
+		for _, datapoint := range data.Histogram.GetDataPoints() {
+			datapoints = append(datapoints, datapoint)
+		}
 	case *metricsv1.Metric_ExponentialHistogram:
-		return len(data.ExponentialHistogram.GetDataPoints())
+		for _, datapoint := range data.ExponentialHistogram.GetDataPoints() {
+			datapoints = append(datapoints, datapoint)
+		}
 	case *metricsv1.Metric_Summary:
-		return len(data.Summary.GetDataPoints())
-	default:
-		return 0
+		for _, datapoint := range data.Summary.GetDataPoints() {
+			datapoints = append(datapoints, datapoint)
+		}
 	}
+	return datapoints
 }
 
 func observedTimeRange(resourceMetrics []*metricsv1.ResourceMetrics) (*time.Time, *time.Time) {
 	var minObservedAt, maxObservedAt *time.Time
-	observe := func(timestamp uint64) {
-		if timestamp == 0 || timestamp > uint64(1<<63-1) {
-			return
-		}
-		observedAt := time.Unix(0, int64(timestamp)).UTC()
-		if minObservedAt == nil || observedAt.Before(*minObservedAt) {
-			minObservedAt = &observedAt
-		}
-		if maxObservedAt == nil || observedAt.After(*maxObservedAt) {
-			maxObservedAt = &observedAt
-		}
-	}
-
 	for _, resourceMetric := range resourceMetrics {
-		for _, scopeMetrics := range resourceMetric.GetScopeMetrics() {
-			for _, metric := range scopeMetrics.GetMetrics() {
-				switch data := metric.Data.(type) {
-				case *metricsv1.Metric_Gauge:
-					for _, datapoint := range data.Gauge.GetDataPoints() {
-						observe(datapoint.GetTimeUnixNano())
-					}
-				case *metricsv1.Metric_Sum:
-					for _, datapoint := range data.Sum.GetDataPoints() {
-						observe(datapoint.GetTimeUnixNano())
-					}
-				case *metricsv1.Metric_Histogram:
-					for _, datapoint := range data.Histogram.GetDataPoints() {
-						observe(datapoint.GetTimeUnixNano())
-					}
-				case *metricsv1.Metric_ExponentialHistogram:
-					for _, datapoint := range data.ExponentialHistogram.GetDataPoints() {
-						observe(datapoint.GetTimeUnixNano())
-					}
-				case *metricsv1.Metric_Summary:
-					for _, datapoint := range data.Summary.GetDataPoints() {
-						observe(datapoint.GetTimeUnixNano())
-					}
-				}
+		for _, datapoint := range resourceDatapoints(resourceMetric) {
+			observedAt, err := unixNanoTime(datapoint.GetTimeUnixNano())
+			if err != nil {
+				continue
+			}
+			if minObservedAt == nil || observedAt.Before(*minObservedAt) {
+				minObservedAt = &observedAt
+			}
+			if maxObservedAt == nil || observedAt.After(*maxObservedAt) {
+				maxObservedAt = &observedAt
 			}
 		}
 	}
@@ -363,24 +299,6 @@ func hasAttribute(attributes []*commonv1.KeyValue, key string) bool {
 		}
 	}
 	return false
-}
-
-func isUUID(value string) bool {
-	if len(value) != 36 {
-		return false
-	}
-	for index, character := range value {
-		if index == 8 || index == 13 || index == 18 || index == 23 {
-			if character != '-' {
-				return false
-			}
-			continue
-		}
-		if !(character >= '0' && character <= '9') && !(character >= 'a' && character <= 'f') && !(character >= 'A' && character <= 'F') {
-			return false
-		}
-	}
-	return true
 }
 
 func pointerToString(value string) *string {

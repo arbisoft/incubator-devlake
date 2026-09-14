@@ -24,7 +24,9 @@ import (
 )
 
 const (
-	OtelMetricBatchTable = "_raw_claude_code_otel_metric_batches"
+	// Keep this outside the _raw_claude_* namespace. The legacy Claude scope
+	// cleanup treats that prefix as its own raw-data namespace.
+	OtelMetricBatchTable = "_raw_otel_claude_code_metric_batches"
 
 	OtelMetricBatchStatusPending        = "pending"
 	OtelMetricBatchStatusProcessing     = "processing"

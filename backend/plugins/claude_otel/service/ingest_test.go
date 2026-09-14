@@ -161,67 +161,11 @@ func TestRawIngestAcknowledgesExactDuplicate(t *testing.T) {
 	}
 }
 
-func TestResourceOrganizationIDsIncludesMetricDatapointAttributes(t *testing.T) {
-	organizationID := "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e"
-	resourceMetrics := &metricsv1.ResourceMetrics{
-		Resource: &resourcev1.Resource{Attributes: []*commonv1.KeyValue{stringAttribute(devlakeTeamAttribute, "platform")}},
-		ScopeMetrics: []*metricsv1.ScopeMetrics{{Metrics: []*metricsv1.Metric{{
-			Name: "claude_code.session.count",
-			Data: &metricsv1.Metric_Sum{Sum: &metricsv1.Sum{DataPoints: []*metricsv1.NumberDataPoint{{
-				Attributes: []*commonv1.KeyValue{stringAttribute(organizationIDAttribute, organizationID)},
-			}}}},
-		}}}},
-	}
-	organizationIDs := resourceOrganizationIDs(resourceMetrics)
-	if len(organizationIDs) != 1 || organizationIDs[0] != organizationID {
-		t.Fatalf("resourceOrganizationIDs() = %#v, want %#v", organizationIDs, []string{organizationID})
-	}
-}
-
-func TestRawIngestRejectsOrganizationMismatchWithoutRelabelingConnection(t *testing.T) {
+func TestRawIngestRetainsOrganizationForEventTimeConversion(t *testing.T) {
 	service, database := newRawIngestService(t)
 	transaction := dalmocks.NewTransaction(t)
 	database.EXPECT().Begin().Return(transaction)
 	transaction.EXPECT().Create(mock.AnythingOfType("*models.OtelMetricBatch")).Return(nil)
-	transaction.EXPECT().All(mock.AnythingOfType("*[]*models.OtelConnection"), mock.Anything).Run(
-		func(connections interface{}, _ ...dal.Clause) {
-			organizationID := "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e"
-			*connections.(*[]*models.OtelConnection) = []*models.OtelConnection{{OrganizationId: &organizationID}}
-		},
-	).Return(nil)
-	transaction.EXPECT().Rollback().Return(nil)
-
-	payload := marshalOtelMetricsRequest(t, newOtelMetricsRequest("platform", "11111111-1111-4111-8111-111111111111"))
-	request := httptest.NewRequest(http.MethodPost, "/plugins/claude_otel/otlp/v1/metrics", bytes.NewReader(payload))
-	request.Header.Set("Content-Type", otlpProtobufContentType)
-	request.Header.Set(claudeOtelIngestTokenHeader, "collector-token")
-
-	_, err := service.Ingest(request)
-	if err == nil {
-		t.Fatal("Ingest() error = nil")
-	}
-	if status := err.GetType().GetHttpCode(); status != http.StatusBadRequest {
-		t.Fatalf("Ingest() status = %d, want %d", status, http.StatusBadRequest)
-	}
-}
-
-func TestRawIngestBindsConnectionToFirstOrganization(t *testing.T) {
-	service, database := newRawIngestService(t)
-	transaction := dalmocks.NewTransaction(t)
-	database.EXPECT().Begin().Return(transaction)
-	transaction.EXPECT().Create(mock.AnythingOfType("*models.OtelMetricBatch")).Return(nil)
-	transaction.EXPECT().All(mock.AnythingOfType("*[]*models.OtelConnection"), mock.Anything).Run(
-		func(connections interface{}, _ ...dal.Clause) {
-			*connections.(*[]*models.OtelConnection) = []*models.OtelConnection{{}}
-		},
-	).Return(nil)
-	transaction.EXPECT().UpdateColumns(mock.AnythingOfType("*models.OtelConnection"), mock.Anything, mock.Anything).Return(nil)
-	transaction.EXPECT().First(mock.AnythingOfType("*models.OtelConnection"), mock.Anything).Run(
-		func(connection interface{}, _ ...dal.Clause) {
-			organizationID := "11111111-1111-4111-8111-111111111111"
-			connection.(*models.OtelConnection).OrganizationId = &organizationID
-		},
-	).Return(nil)
 	transaction.EXPECT().Commit().Return(nil)
 
 	payload := marshalOtelMetricsRequest(t, newOtelMetricsRequest("platform", "11111111-1111-4111-8111-111111111111"))
@@ -231,6 +175,16 @@ func TestRawIngestBindsConnectionToFirstOrganization(t *testing.T) {
 
 	if _, err := service.Ingest(request); err != nil {
 		t.Fatalf("Ingest() error = %v", err)
+	}
+}
+
+func TestRawIngestRequiresConsistentDatapointAttribution(t *testing.T) {
+	request := newOtelMetricsRequest("platform", "")
+	points := request.ResourceMetrics[0].ScopeMetrics[0].Metrics[0].GetGauge().GetDataPoints()
+	points = append(points, &metricsv1.NumberDataPoint{Attributes: []*commonv1.KeyValue{stringAttribute(devlakeTeamAttribute, "other")}})
+	request.ResourceMetrics[0].ScopeMetrics[0].Metrics[0].GetGauge().DataPoints = points
+	if _, _, err := validateOtelMetricsRequest(request); err == nil {
+		t.Fatal("validateOtelMetricsRequest() error = nil")
 	}
 }
 
@@ -249,28 +203,25 @@ func newOtelMetricsRequest(teamSlug string, organizationID string) *collectormet
 	}
 	return &collectormetrics.ExportMetricsServiceRequest{
 		ResourceMetrics: []*metricsv1.ResourceMetrics{{
-			Resource: &resourcev1.Resource{Attributes: attributes},
+			Resource: &resourcev1.Resource{},
+			ScopeMetrics: []*metricsv1.ScopeMetrics{{Metrics: []*metricsv1.Metric{{
+				Name: "claude_code.test",
+				Data: &metricsv1.Metric_Gauge{Gauge: &metricsv1.Gauge{DataPoints: []*metricsv1.NumberDataPoint{{Attributes: attributes}}}},
+			}}}},
 		}},
 	}
 }
 
 func newOtelMetricsRequestWithDatapoint(teamSlug string, organizationID string, timestamp uint64) *collectormetrics.ExportMetricsServiceRequest {
 	request := newOtelMetricsRequest(teamSlug, organizationID)
-	request.ResourceMetrics[0].ScopeMetrics = []*metricsv1.ScopeMetrics{{
-		Metrics: []*metricsv1.Metric{{
-			Name: "claude_code.test",
-			Data: &metricsv1.Metric_Gauge{Gauge: &metricsv1.Gauge{DataPoints: []*metricsv1.NumberDataPoint{{
-				TimeUnixNano: timestamp,
-			}}}},
-		}},
-	}}
+	request.ResourceMetrics[0].ScopeMetrics[0].Metrics[0].GetGauge().DataPoints[0].TimeUnixNano = timestamp
 	return request
 }
 
 func newOtelMetricsRequestWithProject(teamSlug string) *collectormetrics.ExportMetricsServiceRequest {
 	request := newOtelMetricsRequest(teamSlug, "")
-	request.ResourceMetrics[0].Resource.Attributes = append(
-		request.ResourceMetrics[0].Resource.Attributes,
+	request.ResourceMetrics[0].ScopeMetrics[0].Metrics[0].GetGauge().DataPoints[0].Attributes = append(
+		request.ResourceMetrics[0].ScopeMetrics[0].Metrics[0].GetGauge().DataPoints[0].Attributes,
 		stringAttribute(devlakeProjectAttribute, "not-trusted"),
 	)
 	return request

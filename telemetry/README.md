@@ -136,7 +136,19 @@ The file-storage extension persists retryable outbound batches in
 `devlake-otel-queue`. It is transport durability, not the analytical source of truth:
 DevLake returns success only after committing the accepted batch to MySQL raw storage.
 The queue is bounded to 512 MiB with a 1 GiB file-storage ceiling, fsync enabled, one
-consumer, indefinite retry, and backpressure on overflow.
+consumer, and indefinite retry. The queue rejects new batches when full
+(`block_on_overflow: false`) because blocking is exposed to a known persistent-queue
+deadlock in the pinned Collector. Alert before capacity is reached; Prometheus scrapes
+the Collector's internal metrics as job `otel-collector-internal`:
+
+```promql
+otelcol_exporter_queue_size{exporter="otlphttp/claude_raw"}
+  / otelcol_exporter_queue_capacity{exporter="otlphttp/claude_raw"} > 0.5
+increase(otelcol_exporter_enqueue_failed_metric_points_total{exporter="otlphttp/claude_raw"}[5m]) > 0
+increase(otelcol_exporter_send_failed_metric_points_total{exporter="otlphttp/claude_raw"}[5m]) > 0
+```
+
+An enqueue failure is data loss for the raw branch; the Prometheus branch is unaffected.
 
 ```bash
 docker run --rm -v devlake-otel-queue:/data:ro busybox:1.36 \
@@ -179,7 +191,7 @@ After the Collector is healthy, use Apply in Config UI to retry the restart. If 
 
 1. Confirm the Collector and Lake are healthy, then inspect Collector exporter metrics
    for queue size, enqueue failures, and export failures.
-2. Inspect `_raw_claude_code_otel_metric_batches` by `status`, `received_at`, and
+2. Inspect `_raw_otel_claude_code_metric_batches` by `status`, `received_at`, and
    `processing_error_code`. Do not log or export `payload_proto` or `payload_json`.
 3. A `permanent_error` is malformed or unsupported telemetry and requires remediation;
    a `retryable_error` indicates downstream recovery/retry work.
