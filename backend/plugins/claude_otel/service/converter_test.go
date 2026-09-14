@@ -161,7 +161,7 @@ func TestCounterDeltaUsesExactCumulativeIncreaseResetAndOrder(t *testing.T) {
 }
 
 func TestRealShapedClaudeCodeExportIsAcceptedAndConverted(t *testing.T) {
-	payload, err := os.ReadFile("testdata/claude_code_cumulative_metrics.json")
+	payload, err := os.ReadFile("testdata/claude_code_delta_metrics.json")
 	if err != nil {
 		t.Fatalf("ReadFile() error = %v", err)
 	}
@@ -183,7 +183,7 @@ func TestRealShapedClaudeCodeExportIsAcceptedAndConverted(t *testing.T) {
 		t.Fatalf("prepareUpdates() updates=%d skipped=%d, want every supported datapoint (%d)", len(prepared.updates), prepared.skippedCount, datapointCount)
 	}
 	for _, update := range prepared.updates {
-		if update.temporality != metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_CUMULATIVE || update.organizationID != testOrganizationID {
+		if update.temporality != metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_DELTA || update.organizationID != testOrganizationID {
 			t.Fatalf("%s temporality/organization = %s/%q", update.metric, update.temporality, update.organizationID)
 		}
 	}
