@@ -144,11 +144,13 @@ the Collector's internal metrics as job `otel-collector-internal`:
 ```promql
 otelcol_exporter_queue_size{exporter="otlphttp/claude_raw"}
   / otelcol_exporter_queue_capacity{exporter="otlphttp/claude_raw"} > 0.5
-increase(otelcol_exporter_enqueue_failed_metric_points_total{exporter="otlphttp/claude_raw"}[5m]) > 0
-increase(otelcol_exporter_send_failed_metric_points_total{exporter="otlphttp/claude_raw"}[5m]) > 0
+increase(otelcol_exporter_enqueue_failed_metric_points{exporter="otlphttp/claude_raw"}[5m]) > 0
+increase(otelcol_exporter_send_failed_metric_points{exporter="otlphttp/claude_raw"}[5m]) > 0
 ```
 
 An enqueue failure is data loss for the raw branch; the Prometheus branch is unaffected.
+The failure counters are created on their first failure, so `increase()` misses that
+first failure; an alert should also fire on a new series (`series unless series offset 10m`).
 
 ```bash
 docker run --rm -v devlake-otel-queue:/data:ro busybox:1.36 \
