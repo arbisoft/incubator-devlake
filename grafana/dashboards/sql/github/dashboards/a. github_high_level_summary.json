@@ -2264,8 +2264,8 @@
         ]
       },
       "gridPos": {
-        "h": 8,
-        "w": 8,
+        "h": 10,
+        "w": 7,
         "x": 0,
         "y": 31
       },
@@ -2382,76 +2382,9 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 8,
-        "y": 31
-      },
-      "id": 33,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "first"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.6.2",
-      "targets": [
-        {
-          "datasource": {
-            "type": "datasource",
-            "uid": "-- Dashboard --"
-          },
-          "panelId": 31,
-          "refId": "A"
-        }
-      ],
-      "title": "Successful Builds",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "datasource",
-        "uid": "-- Dashboard --"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "links": [
-            {
-              "targetBlank": true,
-              "title": "Detail",
-              "url": "https://aperture.arbisoft.com/grafana/d/KXWvOFQnc/i-github-classic?orgId=1&${__all_variables}&${__url_time_range}&var-interval=DAYOFMONTH&viewPanel=panel-109"
-            }
-          ],
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 12,
+        "h": 3,
+        "w": 6,
+        "x": 7,
         "y": 31
       },
       "id": 35,
@@ -2509,6 +2442,73 @@
             "steps": [
               {
                 "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 6,
+        "x": 13,
+        "y": 31
+      },
+      "id": 33,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "first"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 31,
+          "refId": "A"
+        }
+      ],
+      "title": "Successful Builds",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Detail",
+              "url": "https://aperture.arbisoft.com/grafana/d/KXWvOFQnc/i-github-classic?orgId=1&${__all_variables}&${__url_time_range}&var-interval=DAYOFMONTH&viewPanel=panel-109"
+            }
+          ],
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2520,10 +2520,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 8,
-        "y": 35
+        "h": 3,
+        "w": 5,
+        "x": 19,
+        "y": 31
       },
       "id": 34,
       "options": {
@@ -2558,12 +2558,99 @@
       "type": "stat"
     },
     {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 17,
+        "x": 7,
+        "y": 34
+      },
+      "id": 36,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "select pr.title AS `Title`, pr.base_ref as `Release Branch`, pr.head_ref AS `Feature Branch`,   \nREPLACE(\n         COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           NULLIF(TRIM(pr.author_name),     ''),\n           '(unmapped)'\n         ), '-', ' ') AS Author,\n         REPLACE(\n         COALESCE(\n           NULLIF(TRIM(a2.full_name), ''),\n           NULLIF(TRIM(a2.user_name), ''),\n           NULLIF(TRIM(a2.email),     ''),\n           NULLIF(TRIM(pr.merged_by_name),     ''),\n           '(unmapped)'\n         ), '-', ' ') AS `Merged By`\nfrom pull_requests pr\nLEFT JOIN accounts a ON a.id = pr.author_id\nLEFT JOIN accounts a2 ON a2.id = pr.merged_by_id\nwhere pr.id in (\n\tselect prc.pull_request_id from pull_request_commits prc \n\twhere prc.commit_sha  IN (\n\t\tselect cpc.commit_sha \n\t\tfrom cicd_pipeline_commits cpc\n\t\tWHERE exists (\n\t\t\tselect 1 from cicd_pipelines cp \n\t\t\twhere cp.id = cpc.pipeline_id \n\t\t\tand cp.result = 'FAILURE' \n      and cp.cicd_scope_id IN ( ${repo_id} )\n\t\t)\n\t)\n)\nOrder by pr.created_date desc\nlimit 100;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Failed Build PRs",
+      "type": "table"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 39
+        "y": 41
       },
       "id": 30,
       "panels": [],
@@ -2608,7 +2695,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 40
+        "y": 42
       },
       "id": 12,
       "options": {
@@ -2692,7 +2779,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 40
+        "y": 42
       },
       "id": 13,
       "options": {
@@ -2821,8 +2908,8 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "utc",
+  "timezone": "browser",
   "title": "A. GitHub High Level Summary",
   "uid": "efxmn9vz2bv28b",
-  "version": 32
+  "version": 36
 }
