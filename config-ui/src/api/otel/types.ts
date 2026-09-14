@@ -39,6 +39,8 @@ export type OtelConnection = {
   collectorEndpoint: string;
   protocol: string;
   status: OtelConnectionStatus;
+  organizationId?: string;
+  revokedAt?: string;
   createdAt: string;
   updatedAt: string;
 };

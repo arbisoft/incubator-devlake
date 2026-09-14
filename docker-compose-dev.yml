@@ -182,6 +182,7 @@ services:
       OTEL_RESTART_HELPER_URL: "${OTEL_RESTART_HELPER_URL:-http://host.docker.internal:9199}"
       OTEL_RESTART_HELPER_TOKEN: "${OTEL_RESTART_HELPER_TOKEN:-devlake-local-otel-restart-token}"
       OTEL_RESTART_HELPER_TIMEOUT_SECONDS: "${OTEL_RESTART_HELPER_TIMEOUT_SECONDS:-45}"
+      CLAUDE_OTEL_INGEST_TOKEN: "${CLAUDE_OTEL_INGEST_TOKEN:-devlake-local-otel-ingest-token}"
       # The backend returns this public proxy URL after logout when native auth is disabled.
       AUTH_PROXY_LOGOUT_URL: "${AUTH_PROXY_LOGOUT_URL:-}"
       TZ: UTC

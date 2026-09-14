@@ -124,6 +124,7 @@ const CreateModal = ({
       />
       {createError && <Alert type="error" showIcon message={createError} />}
       <Message content="The team name and its derived reporting slug cannot be changed later. Project placement controls dashboard visibility; it is not repository attribution." />
+      <Message content="This connection binds to the first Anthropic organization UUID it receives. Use a separate connection and credential for another organization." />
     </Space>
   </Modal>
 );

@@ -151,7 +151,8 @@ func handlePluginCall(basicRes context.BasicRes, pluginName string, handler plug
 			input.User = user
 		}
 		if c.Request.Body != nil {
-			if strings.HasPrefix(c.Request.Header.Get("Content-Type"), "multipart/form-data;") {
+			contentType := c.Request.Header.Get("Content-Type")
+			if strings.HasPrefix(contentType, "multipart/form-data;") || strings.HasPrefix(contentType, "application/x-protobuf") {
 				input.Request = c.Request
 			} else {
 				shouldBindJSONErr := c.ShouldBindJSON(&input.Body)

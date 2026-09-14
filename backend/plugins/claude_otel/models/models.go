@@ -24,5 +24,6 @@ func GetTablesInfo() []dal.Tabler {
 		&OtelConnection{},
 		&OtelCredential{},
 		&OtelConnectionProject{},
+		&OtelMetricBatch{},
 	}
 }

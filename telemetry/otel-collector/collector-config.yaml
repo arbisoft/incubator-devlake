@@ -28,20 +28,35 @@ processors:
       - key: devlake_auth_username
         action: delete
   delta_to_cumulative: {}
-  batch:
+  batch/prometheus:
     send_batch_size: 1024
     timeout: 5s
 
 exporters:
   debug:
     verbosity: detailed
-  file/metrics:
-    path: /var/lib/otel/claude-metrics.json
-    format: json
-    rotation:
-      max_megabytes: 32
-      max_days: 7
-      max_backups: 14
+  otlphttp/claude_raw:
+    endpoint: ${env:CLAUDE_OTEL_INGEST_ENDPOINT}
+    headers:
+      X-Claude-Otel-Ingest-Token: ${env:CLAUDE_OTEL_INGEST_TOKEN}
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      multiplier: 1.5
+      max_elapsed_time: 0
+    sending_queue:
+      enabled: true
+      storage: file_storage/claude_raw
+      num_consumers: 1
+      sizer: bytes
+      queue_size: 536870912
+      block_on_overflow: true
+      batch:
+        sizer: bytes
+        min_size: 262144
+        max_size: 1048576
+        flush_timeout: 10s
   prometheus:
     endpoint: "0.0.0.0:8889"
     resource_constant_labels:
@@ -55,11 +70,32 @@ extensions:
   basicauth/server:
     htpasswd:
       file: /etc/otelcol-contrib/auth/.htpasswd
+  file_storage/claude_raw:
+    directory: /var/lib/otel/queue
+    create_directory: true
+    fsync: true
+    max_size: 1073741824
+    compaction:
+      on_rebound: true
+      rebound_needed_threshold_mib: 128
+      rebound_trigger_threshold_mib: 32
+      check_interval: 30s
+
+connectors:
+  forward/claude_raw: {}
+  forward/prometheus: {}
 
 service:
-  extensions: [health_check, basicauth/server]
+  extensions: [health_check, basicauth/server, file_storage/claude_raw]
   pipelines:
     metrics:
       receivers: [otlp]
-      processors: [attributes/team, delta_to_cumulative, batch]
-      exporters: [debug, file/metrics, prometheus]
+      processors: [attributes/team]
+      exporters: [forward/claude_raw, forward/prometheus]
+    metrics/claude_raw:
+      receivers: [forward/claude_raw]
+      exporters: [otlphttp/claude_raw]
+    metrics/prometheus:
+      receivers: [forward/prometheus]
+      processors: [delta_to_cumulative, batch/prometheus]
+      exporters: [debug, prometheus]

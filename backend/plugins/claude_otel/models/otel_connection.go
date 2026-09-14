@@ -49,6 +49,8 @@ type OtelConnection struct {
 	UpdatedBy         string     `json:"updatedBy" gorm:"type:varchar(255)"`
 	UpdatedByEmail    string     `json:"updatedByEmail" gorm:"type:varchar(255)"`
 	HiddenAt          *time.Time `json:"hiddenAt" gorm:"index"`
+	RevokedAt         *time.Time `json:"revokedAt" gorm:"index"`
+	OrganizationId    *string    `json:"organizationId" gorm:"type:char(36);index"`
 }
 
 func (c OtelConnection) TableName() string {

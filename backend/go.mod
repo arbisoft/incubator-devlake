@@ -11,7 +11,7 @@ require (
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/go-playground/validator/v10 v10.19.0
 	github.com/gocarina/gocsv v0.0.0-20220707092902-b9da1f06c77e
-	github.com/google/uuid v1.3.0
+	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.6.0 // indirect
 	github.com/lib/pq v1.10.2
 	github.com/libgit2/git2go/v33 v33.0.6
@@ -32,7 +32,7 @@ require (
 	github.com/viant/afs v1.16.0
 	golang.org/x/crypto v0.26.0
 	golang.org/x/exp v0.0.0-20221028150844-83b7d23a625f
-	golang.org/x/oauth2 v0.13.0
+	golang.org/x/oauth2 v0.20.0
 	golang.org/x/sync v0.8.0
 	gorm.io/datatypes v1.0.1
 	gorm.io/driver/mysql v1.5.1
@@ -81,7 +81,7 @@ require (
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/golang/protobuf v1.5.3 // indirect
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.20.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
@@ -118,13 +118,16 @@ require (
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.11 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
+	go.opentelemetry.io/proto/otlp v1.3.1
 	golang.org/x/arch v0.3.0 // indirect
 	golang.org/x/net v0.25.0 // indirect
 	golang.org/x/sys v0.23.0 // indirect
 	golang.org/x/text v0.17.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
-	google.golang.org/appengine v1.6.8 // indirect
-	google.golang.org/protobuf v1.31.0 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240513163218-0867130af1f8 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240513163218-0867130af1f8 // indirect
+	google.golang.org/grpc v1.64.0 // indirect
+	google.golang.org/protobuf v1.34.1
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

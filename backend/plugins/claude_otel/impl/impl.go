@@ -58,6 +58,9 @@ func (p ClaudeOtel) MigrationScripts() []plugin.MigrationScript { return migrati
 
 func (p ClaudeOtel) ApiResources() map[string]map[string]plugin.ApiResourceHandler {
 	return map[string]map[string]plugin.ApiResourceHandler{
+		api.OtlpMetricsResourcePath: {
+			"POST": api.PostOtlpMetrics,
+		},
 		"connections": {
 			"GET":  api.ListConnections,
 			"POST": api.PostConnection,

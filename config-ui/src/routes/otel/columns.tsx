@@ -58,6 +58,11 @@ export const getOtelColumns = (
     ),
   },
   {
+    title: 'Anthropic organization',
+    width: 260,
+    render: (_, record) => record.connection.organizationId || 'Pending first telemetry',
+  },
+  {
     title: 'Endpoint',
     dataIndex: ['connection', 'collectorEndpoint'],
   },
