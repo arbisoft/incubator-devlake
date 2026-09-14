@@ -16,6 +16,7 @@
  *
  */
 
+import { Card } from 'antd';
 import styled from 'styled-components';
 
 export const ManagedSettings = styled.pre`
@@ -28,4 +29,16 @@ export const ManagedSettings = styled.pre`
   border-radius: 6px;
   background: #f7f8fa;
   white-space: pre;
+`;
+
+export const SourceCard = styled(Card)`
+  margin-bottom: 16px;
+
+  .ant-typography {
+    margin-bottom: 0;
+  }
+
+  .ant-typography:not(:last-child) {
+    margin-bottom: 8px;
+  }
 `;

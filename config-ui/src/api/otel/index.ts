@@ -18,25 +18,17 @@
 
 import { request } from '@/utils';
 
-import type { OtelConnectionResponse, OtelProject } from './types';
+import type { AiSourcePreference, OtelConnectionResponse, OtelProject } from './types';
 
 export * from './types';
 
-export type AiSourcePreference = {
-  provider: string;
-  workspaceKey: string;
-  metricFamily: 'core_activity' | 'model_usage' | 'tool_usage';
-  preferredSource: 'otel';
-  fallbackSource?: string;
-  updatedAt: string;
-};
-
 const basePath = '/plugins/claude_otel/connections';
+const sourcePreferencesPath = '/plugins/claude_otel/source-preferences';
 
 export const list = (signal?: AbortSignal): Promise<OtelConnectionResponse[]> => request(basePath, { signal });
 
 export const listSourcePreferences = (signal?: AbortSignal): Promise<AiSourcePreference[]> =>
-  request('/plugins/claude_otel/source-preferences', { signal });
+  request(sourcePreferencesPath, { signal });
 
 export const create = (data: { teamName: string; projectNames: string[] }) =>
   request(basePath, {

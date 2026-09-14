@@ -46,6 +46,20 @@ export const OTEL_PROJECT_PLACEMENT = {
   SHARED: 'shared',
 } as const;
 
+export const OTEL_ORGANIZATION = {
+  PENDING: 'Pending first telemetry',
+  PENDING_HELP: 'This connection binds to the first Anthropic organization UUID it receives.',
+  BOUND_HELP: 'Telemetry for a different Anthropic organization requires a separate connection and credential.',
+  CREATE_NOTICE:
+    'This connection binds to the first Anthropic organization UUID it receives. Use a separate connection and credential for another organization.',
+} as const;
+
+export const OTEL_CANONICAL_SOURCE = {
+  TITLE: 'Canonical analytics source',
+  DESCRIPTION:
+    'OpenTelemetry is the active source for Claude Code daily analytics. Enterprise analytics remains unavailable until its organization, identity, and completeness checks are validated.',
+} as const;
+
 export const OTEL_ATTENTION_CHANGED_EVENT = 'devlake:otel-attention-changed';
 export const OTEL_REFRESH_INTERVAL_MS = 30_000;
 export const OTEL_VISIBILITY_THROTTLE_MS = 10_000;

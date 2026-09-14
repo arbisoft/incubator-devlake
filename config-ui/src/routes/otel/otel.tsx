@@ -19,16 +19,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PlusOutlined } from '@ant-design/icons';
-import { Button, Card, Flex, message, Table, Typography } from 'antd';
+import { Button, Flex, message, Table } from 'antd';
 
 import API from '@/api';
-import { type AiSourcePreference, type OtelConnectionResponse } from '@/api/otel';
+import { type OtelConnectionResponse } from '@/api/otel';
 import { Message, PageHeader } from '@/components';
 import { useRefreshData } from '@/hooks';
 import { operator, type OperateConfig } from '@/utils';
 import { getOtelColumns } from './columns';
 import { OTEL_ERROR, OTEL_LIFECYCLE_ACTION } from './constants';
 import { OTEL_MODAL, OtelModals, type OtelLifecycleAction, type OtelModalState } from './modals';
+import { CanonicalSourceCard } from './source-card';
 import {
   getOtelCreateError,
   getOtelLifecycleError,
@@ -45,10 +46,7 @@ const BREADCRUMBS = [{ name: 'Claude Code OTel', path: OTEL_PATH }];
 type OtelOperationResult<T> = { success: true; data: T } | { success: false; error: unknown };
 
 // Keep OTel lifecycle responses typed without changing the shared legacy operator contract.
-const operateOtel = async <T,>(
-  request: () => Promise<T>,
-  config?: OperateConfig,
-): Promise<OtelOperationResult<T>> => {
+const operateOtel = async <T,>(request: () => Promise<T>, config?: OperateConfig): Promise<OtelOperationResult<T>> => {
   const [success, result] = await operator(request, config);
   return success ? { success: true, data: result as T } : { success: false, error: result };
 };
@@ -66,7 +64,7 @@ export const Otel = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { data, ready } = useRefreshData(() => API.otel.list(), [version]);
   const { data: projectOptions } = useRefreshData(() => API.otel.listProjects(), []);
-  const { data: sourcePreferences } = useRefreshData(() => API.otel.listSourcePreferences(), [version]);
+  const { data: sourcePreferences } = useRefreshData(() => API.otel.listSourcePreferences(), []);
   const dataSource = useMemo(() => data ?? [], [data]);
   const columns = useMemo(
     () =>
@@ -101,7 +99,10 @@ export const Otel = () => {
 
   const handleCreate = async () => {
     setCreateError(undefined);
-    const result = await operateOtel(() => API.otel.create({ teamName, projectNames }), { hideToast: true, setOperating });
+    const result = await operateOtel(() => API.otel.create({ teamName, projectNames }), {
+      hideToast: true,
+      setOperating,
+    });
     if (result.success) {
       setCurrent(result.data);
       setTeamName('');
@@ -226,22 +227,5 @@ export const Otel = () => {
         onUpdateProjects={handleUpdateProjects}
       />
     </PageHeader>
-  );
-};
-
-const CanonicalSourceCard = ({ preferences }: { preferences: AiSourcePreference[] }) => {
-  const workspaces = Array.from(new Set(preferences.map((preference) => preference.workspaceKey)));
-  return (
-    <Card size="small" title="Canonical analytics source" style={{ marginBottom: 16 }}>
-      <Typography.Paragraph style={{ marginBottom: workspaces.length ? 8 : 0 }}>
-        OpenTelemetry is the active source for Claude Code daily analytics. Enterprise analytics remains unavailable
-        until its organization, identity, and completeness checks are validated.
-      </Typography.Paragraph>
-      {workspaces.length > 0 && (
-        <Typography.Text type="secondary">
-          Active for {workspaces.length} Anthropic {workspaces.length === 1 ? 'organization' : 'organizations'}.
-        </Typography.Text>
-      )}
-    </Card>
   );
 };

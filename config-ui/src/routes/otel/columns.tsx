@@ -17,14 +17,14 @@
  */
 
 import { CheckOutlined, DeleteOutlined, ReloadOutlined, StopOutlined, SyncOutlined } from '@ant-design/icons';
-import { Button, Space, Tag, Tooltip } from 'antd';
+import { Button, Space, Tag, Tooltip, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 
 import { OTEL_CONNECTION_STATUS, OTEL_CREDENTIAL_STATUS, type OtelConnectionResponse } from '@/api/otel';
 import { formatTime } from '@/utils';
 import { OTEL_MODAL, type OtelModalState } from './modals';
 import { getOtelConnectionStatus } from './utils';
-import { OTEL_CONNECTION_DISPLAY_STATUS, OTEL_PROJECT_PLACEMENT } from './constants';
+import { OTEL_CONNECTION_DISPLAY_STATUS, OTEL_ORGANIZATION, OTEL_PROJECT_PLACEMENT } from './constants';
 
 export const getOtelColumns = (
   setCurrent: (connection: OtelConnectionResponse) => void,
@@ -60,7 +60,18 @@ export const getOtelColumns = (
   {
     title: 'Anthropic organization',
     width: 260,
-    render: (_, record) => record.connection.organizationId || 'Pending first telemetry',
+    render: (_, record) =>
+      record.connection.organizationId ? (
+        <Tooltip title={OTEL_ORGANIZATION.BOUND_HELP}>
+          <Typography.Text code copyable ellipsis>
+            {record.connection.organizationId}
+          </Typography.Text>
+        </Tooltip>
+      ) : (
+        <Tooltip title={OTEL_ORGANIZATION.PENDING_HELP}>
+          <Tag>{OTEL_ORGANIZATION.PENDING}</Tag>
+        </Tooltip>
+      ),
   },
   {
     title: 'Endpoint',

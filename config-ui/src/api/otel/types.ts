@@ -39,8 +39,8 @@ export type OtelConnection = {
   collectorEndpoint: string;
   protocol: string;
   status: OtelConnectionStatus;
-  organizationId?: string;
-  revokedAt?: string;
+  organizationId: string | null;
+  revokedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -73,4 +73,22 @@ export type OtelConnectionResponse = {
   recoveryRequired: boolean;
   storageNeedsApplying: boolean;
   projects: OtelProject[];
+};
+
+export const AI_METRIC_FAMILY = {
+  CORE_ACTIVITY: 'core_activity',
+  MODEL_USAGE: 'model_usage',
+  TOOL_USAGE: 'tool_usage',
+} as const;
+
+export type AiMetricFamily = (typeof AI_METRIC_FAMILY)[keyof typeof AI_METRIC_FAMILY];
+
+export type AiSourcePreference = {
+  provider: string;
+  workspaceKey: string;
+  metricFamily: AiMetricFamily;
+  preferredSource: string;
+  fallbackSource?: string;
+  createdAt: string;
+  updatedAt: string;
 };
