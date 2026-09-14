@@ -161,6 +161,23 @@ func TestRawIngestAcknowledgesExactDuplicate(t *testing.T) {
 	}
 }
 
+func TestResourceOrganizationIDsIncludesMetricDatapointAttributes(t *testing.T) {
+	organizationID := "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e"
+	resourceMetrics := &metricsv1.ResourceMetrics{
+		Resource: &resourcev1.Resource{Attributes: []*commonv1.KeyValue{stringAttribute(devlakeTeamAttribute, "platform")}},
+		ScopeMetrics: []*metricsv1.ScopeMetrics{{Metrics: []*metricsv1.Metric{{
+			Name: "claude_code.session.count",
+			Data: &metricsv1.Metric_Sum{Sum: &metricsv1.Sum{DataPoints: []*metricsv1.NumberDataPoint{{
+				Attributes: []*commonv1.KeyValue{stringAttribute(organizationIDAttribute, organizationID)},
+			}}}},
+		}}}},
+	}
+	organizationIDs := resourceOrganizationIDs(resourceMetrics)
+	if len(organizationIDs) != 1 || organizationIDs[0] != organizationID {
+		t.Fatalf("resourceOrganizationIDs() = %#v, want %#v", organizationIDs, []string{organizationID})
+	}
+}
+
 func TestRawIngestRejectsOrganizationMismatchWithoutRelabelingConnection(t *testing.T) {
 	service, database := newRawIngestService(t)
 	transaction := dalmocks.NewTransaction(t)

@@ -23,6 +23,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -212,47 +213,74 @@ func (s *RawIngestService) bindResourceOrganizations(tx dal.Transaction, resourc
 	for _, resourceMetric := range resourceMetrics {
 		attributes := resourceMetric.GetResource().GetAttributes()
 		teamSlug := attributeString(attributes, devlakeTeamAttribute)
-		organizationID := attributeString(attributes, organizationIDAttribute)
-		if organizationID == "" {
-			continue
+		organizationIDs := resourceOrganizationIDs(resourceMetric)
+		if len(organizationIDs) > 1 {
+			return errors.BadInput.New("OTLP metrics resource has multiple organization.id values")
 		}
-		if !isUUID(organizationID) {
-			return errors.BadInput.New("OTLP metrics resource has an invalid organization.id")
-		}
+		for _, organizationID := range organizationIDs {
+			if !isUUID(organizationID) {
+				return errors.BadInput.New("OTLP metrics resource has an invalid organization.id")
+			}
 
-		connections := make([]*models.OtelConnection, 0)
-		if err := tx.All(
-			&connections,
-			dal.Where("team_slug = ? AND status = ?", teamSlug, models.OtelConnectionStatusActive),
-		); err != nil {
-			return errors.Unavailable.Wrap(err, "failed to resolve Claude Code OTel connection")
-		}
-		if len(connections) != 1 {
-			// Telemetry without one active connection is retained for the Phase 2 event-time resolver.
-			continue
-		}
-		connection := connections[0]
-		if connection.OrganizationId == nil {
-			if err := tx.UpdateColumns(
-				&models.OtelConnection{},
-				[]dal.DalSet{{ColumnName: "organization_id", Value: organizationID}},
-				dal.Where("id = ? AND organization_id IS NULL", connection.ID),
+			connections := make([]*models.OtelConnection, 0)
+			if err := tx.All(
+				&connections,
+				dal.Where("team_slug = ? AND status = ?", teamSlug, models.OtelConnectionStatusActive),
 			); err != nil {
-				return errors.Unavailable.Wrap(err, "failed to bind Claude Code OTel connection organization")
+				return errors.Unavailable.Wrap(err, "failed to resolve Claude Code OTel connection")
 			}
-			if err := tx.First(connection, dal.Where("id = ?", connection.ID)); err != nil {
-				return errors.Unavailable.Wrap(err, "failed to verify Claude Code OTel connection organization")
+			if len(connections) != 1 {
+				// Telemetry without one active connection is retained for the Phase 2 event-time resolver.
+				continue
 			}
-			if connection.OrganizationId == nil || *connection.OrganizationId != organizationID {
+			connection := connections[0]
+			if connection.OrganizationId == nil {
+				if err := tx.UpdateColumns(
+					&models.OtelConnection{},
+					[]dal.DalSet{{ColumnName: "organization_id", Value: organizationID}},
+					dal.Where("id = ? AND organization_id IS NULL", connection.ID),
+				); err != nil {
+					return errors.Unavailable.Wrap(err, "failed to bind Claude Code OTel connection organization")
+				}
+				if err := tx.First(connection, dal.Where("id = ?", connection.ID)); err != nil {
+					return errors.Unavailable.Wrap(err, "failed to verify Claude Code OTel connection organization")
+				}
+				if connection.OrganizationId == nil || *connection.OrganizationId != organizationID {
+					return errors.BadInput.New("OTLP metrics organization does not match the Claude Code OTel connection")
+				}
+				continue
+			}
+			if *connection.OrganizationId != organizationID {
 				return errors.BadInput.New("OTLP metrics organization does not match the Claude Code OTel connection")
 			}
-			continue
-		}
-		if *connection.OrganizationId != organizationID {
-			return errors.BadInput.New("OTLP metrics organization does not match the Claude Code OTel connection")
 		}
 	}
 	return nil
+}
+
+func resourceOrganizationIDs(resourceMetric *metricsv1.ResourceMetrics) []string {
+	organizationIDs := map[string]struct{}{}
+	addOrganizationID := func(attributes []*commonv1.KeyValue) {
+		if organizationID := attributeString(attributes, organizationIDAttribute); organizationID != "" {
+			organizationIDs[organizationID] = struct{}{}
+		}
+	}
+	addOrganizationID(resourceMetric.GetResource().GetAttributes())
+	for _, scopeMetrics := range resourceMetric.GetScopeMetrics() {
+		for _, metric := range scopeMetrics.GetMetrics() {
+			if sum := metric.GetSum(); sum != nil {
+				for _, point := range sum.GetDataPoints() {
+					addOrganizationID(point.GetAttributes())
+				}
+			}
+		}
+	}
+	result := make([]string, 0, len(organizationIDs))
+	for organizationID := range organizationIDs {
+		result = append(result, organizationID)
+	}
+	sort.Strings(result)
+	return result
 }
 
 func metricDatapointCount(metric *metricsv1.Metric) int {
