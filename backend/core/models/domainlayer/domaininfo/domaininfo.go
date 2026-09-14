@@ -104,5 +104,9 @@ func GetDomainTablesInfo() []dal.Tabler {
 		&qa.QaTestCaseExecution{},
 		// ai
 		&ai.AiActivity{},
+		&ai.AiModelUsage{},
+		&ai.AiToolDecision{},
+		&ai.AiSourcePreference{},
+		&ai.AiSourceSnapshot{},
 	}
 }

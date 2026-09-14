@@ -22,9 +22,21 @@ import type { OtelConnectionResponse, OtelProject } from './types';
 
 export * from './types';
 
+export type AiSourcePreference = {
+  provider: string;
+  workspaceKey: string;
+  metricFamily: 'core_activity' | 'model_usage' | 'tool_usage';
+  preferredSource: 'otel';
+  fallbackSource?: string;
+  updatedAt: string;
+};
+
 const basePath = '/plugins/claude_otel/connections';
 
 export const list = (signal?: AbortSignal): Promise<OtelConnectionResponse[]> => request(basePath, { signal });
+
+export const listSourcePreferences = (signal?: AbortSignal): Promise<AiSourcePreference[]> =>
+  request('/plugins/claude_otel/source-preferences', { signal });
 
 export const create = (data: { teamName: string; projectNames: string[] }) =>
   request(basePath, {

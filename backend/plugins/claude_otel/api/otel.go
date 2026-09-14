@@ -51,6 +51,14 @@ func ListProjectConnections(input *plugin.ApiResourceInput) (*plugin.ApiResource
 	return &plugin.ApiResourceOutput{Body: connections, Status: http.StatusOK}, nil
 }
 
+func ListSourcePreferences(_ *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	preferences, err := service.ListOtelSourcePreferences()
+	if err != nil {
+		return nil, err
+	}
+	return &plugin.ApiResourceOutput{Body: preferences, Status: http.StatusOK}, nil
+}
+
 func PostConnection(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
 	body := &service.OtelConnectionInput{}
 	if err := api.Decode(input.Body, body, nil); err != nil {

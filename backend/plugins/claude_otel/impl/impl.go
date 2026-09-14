@@ -80,6 +80,9 @@ func (p ClaudeOtel) ApiResources() map[string]map[string]plugin.ApiResourceHandl
 		"connections/:connectionId/projects": {
 			"PUT": api.PutConnectionProjects,
 		},
+		"source-preferences": {
+			"GET": api.ListSourcePreferences,
+		},
 		"connections/:connectionId/rotate": {
 			"POST": api.RotateConnection,
 		},

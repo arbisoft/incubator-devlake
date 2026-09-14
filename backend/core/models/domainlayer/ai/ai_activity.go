@@ -70,8 +70,96 @@ type AiActivity struct {
 	InputTokens      int64   `json:"inputTokens"`
 	OutputTokens     int64   `json:"outputTokens"`
 	EstimatedCostUsd float64 `json:"estimatedCostUsd"`
+
+	// Canonical reconciliation metadata is intentionally nullable. Existing writers
+	// retain their legacy contract by leaving these fields unset.
+	WorkspaceKey       *string    `gorm:"type:varchar(255);index" json:"workspaceKey,omitempty"`
+	UserKey            *string    `gorm:"type:varchar(255);index" json:"userKey,omitempty"`
+	UserAccountId      *string    `gorm:"type:varchar(255);index" json:"userAccountId,omitempty"`
+	RecordKind         *string    `gorm:"type:varchar(64);index" json:"recordKind,omitempty"`
+	SourceType         *string    `gorm:"type:varchar(64)" json:"sourceType,omitempty"`
+	SourceConnectionId *uint64    `json:"sourceConnectionId,omitempty"`
+	SourceScopeId      *string    `gorm:"type:varchar(255)" json:"sourceScopeId,omitempty"`
+	SourceUpdatedAt    *time.Time `gorm:"type:datetime(3)" json:"sourceUpdatedAt,omitempty"`
 }
 
 func (AiActivity) TableName() string {
 	return "ai_activities"
 }
+
+// AiModelUsage stores canonical daily model/token/cost facts. It is separate from
+// AiActivity because model is not part of the core activity grain.
+type AiModelUsage struct {
+	domainlayer.DomainEntity
+	Provider            string    `gorm:"type:varchar(100);index" json:"provider"`
+	WorkspaceKey        string    `gorm:"type:varchar(255);index" json:"workspaceKey"`
+	AccountId           string    `gorm:"type:varchar(255);index" json:"accountId"`
+	UserKey             string    `gorm:"type:varchar(255);index" json:"userKey"`
+	UserAccountId       string    `gorm:"type:varchar(255);index" json:"userAccountId"`
+	UserEmail           string    `gorm:"type:varchar(255);index" json:"userEmail"`
+	Date                time.Time `gorm:"type:date;index" json:"date"`
+	Model               string    `gorm:"type:varchar(255)" json:"model"`
+	InputTokens         int64     `json:"inputTokens"`
+	OutputTokens        int64     `json:"outputTokens"`
+	CacheReadTokens     int64     `json:"cacheReadTokens"`
+	CacheCreationTokens int64     `json:"cacheCreationTokens"`
+	EstimatedCostUsd    string    `gorm:"type:decimal(20,8);not null" json:"estimatedCostUsd"`
+	SourceType          string    `gorm:"type:varchar(64)" json:"sourceType"`
+	SourceConnectionId  *uint64   `json:"sourceConnectionId,omitempty"`
+	SourceScopeId       *string   `gorm:"type:varchar(255)" json:"sourceScopeId,omitempty"`
+	SourceUpdatedAt     time.Time `gorm:"type:datetime(3)" json:"sourceUpdatedAt"`
+}
+
+func (AiModelUsage) TableName() string { return "ai_model_usages" }
+
+// AiToolDecision stores canonical daily Claude-style accepted/rejected edit-tool decisions.
+type AiToolDecision struct {
+	domainlayer.DomainEntity
+	Provider           string    `gorm:"type:varchar(100);index" json:"provider"`
+	WorkspaceKey       string    `gorm:"type:varchar(255);index" json:"workspaceKey"`
+	AccountId          string    `gorm:"type:varchar(255);index" json:"accountId"`
+	UserKey            string    `gorm:"type:varchar(255);index" json:"userKey"`
+	UserAccountId      string    `gorm:"type:varchar(255);index" json:"userAccountId"`
+	UserEmail          string    `gorm:"type:varchar(255);index" json:"userEmail"`
+	Date               time.Time `gorm:"type:date;index" json:"date"`
+	ToolName           string    `gorm:"type:varchar(100)" json:"toolName"`
+	AcceptedCount      int64     `json:"acceptedCount"`
+	RejectedCount      int64     `json:"rejectedCount"`
+	SourceType         string    `gorm:"type:varchar(64)" json:"sourceType"`
+	SourceConnectionId *uint64   `json:"sourceConnectionId,omitempty"`
+	SourceScopeId      *string   `gorm:"type:varchar(255)" json:"sourceScopeId,omitempty"`
+	SourceUpdatedAt    time.Time `gorm:"type:datetime(3)" json:"sourceUpdatedAt"`
+}
+
+func (AiToolDecision) TableName() string { return "ai_tool_decisions" }
+
+// AiSourcePreference records an explicit per-workspace source policy. API source
+// values are retained for the deferred Enterprise integration but are not selectable
+// until its completeness contract is implemented.
+type AiSourcePreference struct {
+	Provider        string    `gorm:"type:varchar(100);primaryKey" json:"provider"`
+	WorkspaceKey    string    `gorm:"type:varchar(255);primaryKey" json:"workspaceKey"`
+	MetricFamily    string    `gorm:"type:varchar(64);primaryKey" json:"metricFamily"`
+	PreferredSource string    `gorm:"type:varchar(64)" json:"preferredSource"`
+	FallbackSource  *string   `gorm:"type:varchar(64)" json:"fallbackSource,omitempty"`
+	CreatedAt       time.Time `json:"createdAt"`
+	UpdatedAt       time.Time `json:"updatedAt"`
+}
+
+func (AiSourcePreference) TableName() string { return "ai_source_preferences" }
+
+// AiSourceSnapshot is reserved for the future API completeness contract. OTel-only
+// canonical aggregation deliberately does not infer a day-complete watermark.
+type AiSourceSnapshot struct {
+	Provider        string     `gorm:"type:varchar(100);primaryKey" json:"provider"`
+	WorkspaceKey    string     `gorm:"type:varchar(255);primaryKey" json:"workspaceKey"`
+	SourceType      string     `gorm:"type:varchar(64);primaryKey" json:"sourceType"`
+	MetricFamily    string     `gorm:"type:varchar(64);primaryKey" json:"metricFamily"`
+	Date            time.Time  `gorm:"type:date;primaryKey" json:"date"`
+	CompletedAt     time.Time  `gorm:"type:datetime(3)" json:"completedAt"`
+	SourceUpdatedAt *time.Time `gorm:"type:datetime(3)" json:"sourceUpdatedAt,omitempty"`
+	CreatedAt       time.Time  `json:"createdAt"`
+	UpdatedAt       time.Time  `json:"updatedAt"`
+}
+
+func (AiSourceSnapshot) TableName() string { return "ai_source_snapshots" }

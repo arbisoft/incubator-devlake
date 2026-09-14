@@ -130,6 +130,22 @@ func TestCounterDeltaRejectsOutOfOrderCumulativeSamples(t *testing.T) {
 	}
 }
 
+func TestDailyTargetsAggregateTeamsIntoOneOrganizationCandidate(t *testing.T) {
+	organizationID := "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e"
+	accountID := "user_012pKEfgvvBR2CYw6KjnyAW2"
+	hour := time.Date(2026, 9, 14, 10, 0, 0, 0, time.UTC)
+	targets := dailyTargets([]factUpdate{
+		{connection: &models.OtelConnection{OrganizationId: &organizationID, TeamSlug: "backend"}, identity: developerIdentity{key: "acct:" + accountID, accountID: &accountID}, hour: hour},
+		{connection: &models.OtelConnection{OrganizationId: &organizationID, TeamSlug: "frontend"}, identity: developerIdentity{key: "acct:" + accountID, accountID: &accountID}, hour: hour.Add(time.Hour)},
+	})
+	if len(targets) != 1 {
+		t.Fatalf("daily targets = %d, want one organization-wide candidate", len(targets))
+	}
+	if targets[0].workspaceKey != organizationID || targets[0].userKey != "acct:"+accountID {
+		t.Fatalf("daily target = %#v", targets[0])
+	}
+}
+
 func newConverterRequest(observedAt time.Time, organizationID string) *collectormetrics.ExportMetricsServiceRequest {
 	attributes := []*commonv1.KeyValue{
 		stringAttribute(devlakeTeamAttribute, "platform"),

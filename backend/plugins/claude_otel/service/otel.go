@@ -28,6 +28,7 @@ import (
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/log"
 	"github.com/apache/incubator-devlake/core/models/common"
+	"github.com/apache/incubator-devlake/core/models/domainlayer/ai"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
 )
 
@@ -120,6 +121,19 @@ func buildOtelConnectionResponses(connections []*models.OtelConnection) ([]*mode
 		output = append(output, response)
 	}
 	return output, nil
+}
+
+// ListOtelSourcePreferences exposes the persisted OTel-only canonical policy. Future
+// Enterprise sources remain unavailable until their compatibility checks are complete.
+func ListOtelSourcePreferences() ([]*ai.AiSourcePreference, errors.Error) {
+	preferences := make([]*ai.AiSourcePreference, 0)
+	if err := db.All(&preferences,
+		dal.Where("provider = ?", aiProviderClaude),
+		dal.Orderby("workspace_key ASC, metric_family ASC"),
+	); err != nil {
+		return nil, errors.Default.Wrap(err, "error getting Claude AI source preferences")
+	}
+	return preferences, nil
 }
 
 // HideOtelConnection removes a revoked connection from the management UI while retaining its audit record.

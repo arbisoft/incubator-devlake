@@ -179,6 +179,10 @@ func (c *rawMetricConverter) convert(batch *models.OtelMetricBatch, leaseOwner s
 			return &conversionError{code: "storage_failure", err: fmt.Errorf("write hourly Claude Code OTel facts: %w", err)}
 		}
 	}
+	if err := reconcileOtelDaily(tx, dailyTargets(updates)); err != nil {
+		_ = tx.Rollback()
+		return &conversionError{code: "storage_failure", err: fmt.Errorf("write canonical daily Claude Code OTel facts: %w", err)}
+	}
 	now := c.now().UTC()
 	if err := tx.UpdateColumns(
 		&models.OtelMetricBatch{},
