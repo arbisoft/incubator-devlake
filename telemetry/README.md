@@ -1,6 +1,8 @@
 # Telemetry & Observability
 
-This directory contains the OpenTelemetry Collector and Prometheus configuration used to ingest Claude Code metrics. The Collector receives authenticated OTLP metrics and exposes them for Prometheus to scrape.
+This directory contains the OpenTelemetry Collector and Prometheus configuration used to
+ingest Claude Code metrics. The Collector also durably forwards authenticated OTLP metric
+batches to the DevLake Claude OTel ingest endpoint.
 
 ## Directory Structure
 
@@ -22,7 +24,7 @@ telemetry/
 Claude Code
   -- OTLP/gRPC or OTLP/HTTP with Basic Auth --> OTel Collector
                                                    |
-                                                   +--> file exporter (bounded raw OTLP JSON retention)
+                                                   +--> persistent file-storage queue --> DevLake raw ingestion
                                                    |
                                                    +--> Prometheus exporter :8889
                                                                 |
@@ -31,7 +33,10 @@ Prometheus <---------- scrape every 15 seconds -----------------+
 
 The Collector uses the `basicauth/server` extension with an `htpasswd` file. DevLake generates a high-entropy username and password, stores only the password hash in the shared auth volume, and shows the complete Claude Code settings once. The plaintext password and the encoded `Authorization` header are not persisted by DevLake.
 
-Each credential username embeds an immutable team slug. After Basic Auth succeeds, the Collector derives and stamps the trusted `devlake_team` metric attribute from that username. A client-supplied `devlake_team` attribute is removed first, so it cannot spoof team attribution.
+Each credential username embeds an immutable team slug. After Basic Auth succeeds, the
+Collector derives and stamps the trusted `devlake_team` metric attribute from that
+username. Client-supplied `devlake_team` and `devlake_project` attributes are removed
+first, so they cannot spoof attribution.
 
 The Collector version pinned here does not hot-reload server-side `htpasswd.file` updates. After DevLake creates, rotates, revokes, or finalizes a credential, it requests a restart from `otel-restart-helper`. The helper has Docker socket access; the DevLake backend does not. Its API accepts only an authenticated request to restart the configured Collector, never a caller-provided Docker command or container name.
 
@@ -56,7 +61,12 @@ Endpoints exposed on the local machine:
 | Restart helper | `http://127.0.0.1:9199` | Backend-only restart service |
 | Collector health | `http://localhost:13133/healthz` | Collector health check |
 
-`otel-auth-init` creates an empty `.htpasswd` file in the named `devlake-otel-auth` volume before the Collector starts. DevLake mounts the same volume read-write; the Collector mounts it read-only. The one-shot `otel-file-export-init` grants the Collector's non-root UID access to `devlake-otel-file-export`, where the file exporter writes raw OTLP JSON. Do not run `docker compose down -v` unless deliberately resetting local OTel credentials, Prometheus data, and exported telemetry files.
+`otel-auth-init` creates an empty `.htpasswd` file in the named `devlake-otel-auth`
+volume before the Collector starts. DevLake mounts the same volume read-write; the
+Collector mounts it read-only. `otel-queue-init` grants the Collector's non-root UID
+access to `devlake-otel-queue`, which holds retryable outbound batches. Do not run
+`docker compose down -v` unless deliberately resetting local credentials, Prometheus
+data, and queued telemetry.
 
 The local Compose default helper token is for local development only. Set an explicit high-entropy `OTEL_RESTART_HELPER_TOKEN` before starting the stack when validating backend-to-helper authentication.
 
@@ -120,22 +130,23 @@ sum by (devlake_team, user_email) (claude_code_session_count_total)
 
 Prometheus scrapes the Collector every 15 seconds. A metric accepted immediately after a scrape may not appear in Prometheus until the next scrape.
 
-## File Export Storage Measurement
+## Durable Queue Storage
 
-The Collector also writes received metrics to newline-delimited OTLP JSON in the named
-`devlake-otel-file-export` volume. This is a storage-observation sink only; DevLake does
-not read or process these files. The exporter rotates at 32 MiB and retains files for at
-most seven days and 14 backups, bounding retained raw telemetry to approximately 480 MiB.
-The Collector currently classifies file export for metrics as alpha, so the files are not
-a source of truth or a product data contract.
+The file-storage extension persists retryable outbound batches in
+`devlake-otel-queue`. It is transport durability, not the analytical source of truth:
+DevLake returns success only after committing the accepted batch to MySQL raw storage.
+The queue is bounded to 512 MiB with a 1 GiB file-storage ceiling, fsync enabled, one
+consumer, indefinite retry, and backpressure on overflow.
 
 ```bash
-docker run --rm -v devlake-otel-file-export:/data:ro busybox:1.36 \
+docker run --rm -v devlake-otel-queue:/data:ro busybox:1.36 \
   sh -c 'du -sh /data && ls -lh /data'
 ```
 
-The files contain raw telemetry attributes. Treat the volume as sensitive operational
-data and keep it private to the Docker host.
+The bbolt file can retain allocated disk after the queue drains; rebound compaction
+reclaims space eventually. Keep the queue private to the Docker host. The retired
+`devlake-otel-file-export` volume remains in Compose during the initial rollout and is
+not used by the current Collector configuration.
 
 ## Troubleshooting
 
@@ -164,9 +175,18 @@ After the Collector is healthy, use Apply in Config UI to retry the restart. If 
 3. Check whether the Collector accepted metrics in its logs.
 4. Allow one scrape interval before querying Prometheus.
 
+### MySQL raw backlog grows
+
+1. Confirm the Collector and Lake are healthy, then inspect Collector exporter metrics
+   for queue size, enqueue failures, and export failures.
+2. Inspect `_raw_claude_code_otel_metric_batches` by `status`, `received_at`, and
+   `processing_error_code`. Do not log or export `payload_proto` or `payload_json`.
+3. A `permanent_error` is malformed or unsupported telemetry and requires remediation;
+   a `retryable_error` indicates downstream recovery/retry work.
+
 ### Reset local telemetry state
 
-This removes local credentials, Prometheus data, and exported telemetry files:
+This removes local credentials, Prometheus data, and queued telemetry:
 
 ```bash
 cd telemetry/otel-collector
