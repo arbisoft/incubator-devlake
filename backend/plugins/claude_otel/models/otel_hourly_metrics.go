@@ -31,12 +31,12 @@ const (
 type OtelHourlyActivity struct {
 	ConnectionId      uint64    `gorm:"primaryKey;index"`
 	TeamSlug          string    `gorm:"type:varchar(63);index"`
-	OrganizationId    *string   `gorm:"type:char(36);index"`
-	UserKey           string    `gorm:"type:varchar(255);primaryKey"`
+	OrganizationId    *string   `gorm:"type:char(36);index;index:idx_otel_hourly_activity_daily,priority:1"`
+	UserKey           string    `gorm:"type:varchar(255);primaryKey;index:idx_otel_hourly_activity_daily,priority:2"`
 	UserAccountId     *string   `gorm:"type:varchar(255);index"`
 	UserAccountUUID   *string   `gorm:"type:varchar(255);index"`
 	UserEmail         *string   `gorm:"type:varchar(255);index"`
-	HourStart         time.Time `gorm:"primaryKey;index"`
+	HourStart         time.Time `gorm:"primaryKey;index;index:idx_otel_hourly_activity_daily,priority:3"`
 	SessionCount      int64     `gorm:"not null;default:0"`
 	ActiveTimeSeconds string    `gorm:"type:decimal(20,3);not null;default:0"`
 	LinesAdded        int64     `gorm:"not null;default:0"`
@@ -55,12 +55,12 @@ func (OtelHourlyActivity) TableName() string { return OtelHourlyActivityTable }
 type OtelHourlyModelUsage struct {
 	ConnectionId        uint64    `gorm:"primaryKey;index"`
 	TeamSlug            string    `gorm:"type:varchar(63);index"`
-	OrganizationId      *string   `gorm:"type:char(36);index"`
-	UserKey             string    `gorm:"type:varchar(255);primaryKey"`
+	OrganizationId      *string   `gorm:"type:char(36);index;index:idx_otel_hourly_model_usage_daily,priority:1"`
+	UserKey             string    `gorm:"type:varchar(255);primaryKey;index:idx_otel_hourly_model_usage_daily,priority:2"`
 	UserAccountId       *string   `gorm:"type:varchar(255);index"`
 	UserAccountUUID     *string   `gorm:"type:varchar(255);index"`
 	UserEmail           *string   `gorm:"type:varchar(255);index"`
-	HourStart           time.Time `gorm:"primaryKey;index"`
+	HourStart           time.Time `gorm:"primaryKey;index;index:idx_otel_hourly_model_usage_daily,priority:3"`
 	Model               string    `gorm:"type:varchar(255);primaryKey"`
 	QuerySource         string    `gorm:"type:varchar(64);primaryKey"`
 	InputTokens         int64     `gorm:"not null;default:0"`
@@ -80,12 +80,12 @@ func (OtelHourlyModelUsage) TableName() string { return OtelHourlyModelUsageTabl
 type OtelHourlyToolUsage struct {
 	ConnectionId    uint64    `gorm:"primaryKey;index"`
 	TeamSlug        string    `gorm:"type:varchar(63);index"`
-	OrganizationId  *string   `gorm:"type:char(36);index"`
-	UserKey         string    `gorm:"type:varchar(255);primaryKey"`
+	OrganizationId  *string   `gorm:"type:char(36);index;index:idx_otel_hourly_tool_usage_daily,priority:1"`
+	UserKey         string    `gorm:"type:varchar(255);primaryKey;index:idx_otel_hourly_tool_usage_daily,priority:2"`
 	UserAccountId   *string   `gorm:"type:varchar(255);index"`
 	UserAccountUUID *string   `gorm:"type:varchar(255);index"`
 	UserEmail       *string   `gorm:"type:varchar(255);index"`
-	HourStart       time.Time `gorm:"primaryKey;index"`
+	HourStart       time.Time `gorm:"primaryKey;index;index:idx_otel_hourly_tool_usage_daily,priority:3"`
 	ToolName        string    `gorm:"type:varchar(100);primaryKey"`
 	Language        string    `gorm:"type:varchar(100);primaryKey"`
 	AcceptedCount   int64     `gorm:"not null;default:0"`

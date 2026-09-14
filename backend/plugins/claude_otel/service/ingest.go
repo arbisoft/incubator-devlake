@@ -55,7 +55,7 @@ type RawIngestResult struct {
 }
 
 // RawIngestService owns the authenticated OTLP request-to-raw-record transition.
-// It deliberately does no metric aggregation; conversion starts in Phase 2.
+// It deliberately does no metric aggregation; the raw metric converter derives facts.
 type RawIngestService struct {
 	db     dal.Dal
 	cfg    config.ConfigReader

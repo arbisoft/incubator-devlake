@@ -18,7 +18,7 @@ limitations under the License.
 package service
 
 import (
-	"math"
+	"math/big"
 	"os"
 	"testing"
 	"time"
@@ -33,134 +33,128 @@ import (
 	metricsv1 "go.opentelemetry.io/proto/otlp/metrics/v1"
 	resourcev1 "go.opentelemetry.io/proto/otlp/resource/v1"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
-func TestPrepareUpdatesUsesTypedIdentityAndSeparateFactGrains(t *testing.T) {
-	database := dalmocks.NewDal(t)
-	organizationID := "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e"
-	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
-	database.EXPECT().All(mock.AnythingOfType("*[]*models.OtelConnection"), mock.Anything).Run(
-		func(connections interface{}, _ ...dal.Clause) {
-			*connections.(*[]*models.OtelConnection) = []*models.OtelConnection{{
-				TeamSlug:       "platform",
-				OrganizationId: &organizationID,
-				Model:          common.Model{CreatedAt: observedAt.Add(-time.Hour)},
-			}}
-		},
-	).Return(nil).Times(3)
+const testOrganizationID = "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e"
 
-	converter := newRawMetricConverter(database)
-	request := newConverterRequest(observedAt, organizationID)
-	updates, err := converter.prepareUpdates(request)
+func TestPrepareUpdatesUsesTypedIdentityAndSeparateFactGrains(t *testing.T) {
+	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: observedAt.Add(-time.Hour)}}})
+
+	prepared, err := newRawMetricConverter(database, nil).prepareUpdates(newConverterRequest(observedAt, testOrganizationID))
 	if err != nil {
 		t.Fatalf("prepareUpdates() error = %v", err)
 	}
-	if len(updates) != 3 {
-		t.Fatalf("prepareUpdates() updates = %d, want 3", len(updates))
-	}
-	for _, update := range updates {
-		if update.identity.key != "acct:user_012pKEfgvvBR2CYw6KjnyAW2" {
-			t.Fatalf("identity key = %q", update.identity.key)
+	updates := make(map[hourlyFact]factUpdate)
+	for _, update := range prepared.updates {
+		if update.identity.key != "acct:user_012pKEfgvvBR2CYw6KjnyAW2" || update.hour != observedAt.Truncate(time.Hour) {
+			t.Fatalf("update identity/hour = %q/%s", update.identity.key, update.hour)
 		}
-		if update.hour != observedAt.Truncate(time.Hour) {
-			t.Fatalf("hour = %s, want UTC hour %s", update.hour, observedAt.Truncate(time.Hour))
-		}
+		updates[update.fact] = update
 	}
-	if updates[1].model != "claude-sonnet-4-20250514" || updates[1].query != "main" {
-		t.Fatalf("model update dimensions = %#v", updates[1])
+	if len(prepared.updates) != 3 || len(updates) != 3 {
+		t.Fatalf("prepareUpdates() updates = %#v, want one update per fact grain", prepared.updates)
 	}
-	if updates[2].tool != "Edit" || updates[2].decision != "accept" || updates[2].language != "go" {
-		t.Fatalf("tool update dimensions = %#v", updates[2])
+	if model := updates[hourlyModelUsageFact]; model.model != "claude-sonnet-4-20250514" || model.query != "main" || model.column != "input_tokens" {
+		t.Fatalf("model update = %#v", model)
+	}
+	if tool := updates[hourlyToolUsageFact]; tool.tool != "Edit" || tool.language != "go" || tool.column != "accepted_count" {
+		t.Fatalf("tool update = %#v", tool)
 	}
 }
 
 func TestPrepareUpdatesRejectsMalformedSupportedMetric(t *testing.T) {
-	database := dalmocks.NewDal(t)
 	observedAt := time.Now().UTC()
-	database.EXPECT().All(mock.AnythingOfType("*[]*models.OtelConnection"), mock.Anything).Run(
-		func(connections interface{}, _ ...dal.Clause) {
-			*connections.(*[]*models.OtelConnection) = []*models.OtelConnection{{
-				TeamSlug: "platform",
-				Model:    common.Model{CreatedAt: observedAt.Add(-time.Hour)},
-			}}
-		},
-	).Return(nil)
-	converter := newRawMetricConverter(database)
-	request := newOtelMetricsRequest("platform", "")
-	request.ResourceMetrics[0].ScopeMetrics = []*metricsv1.ScopeMetrics{{Metrics: []*metricsv1.Metric{{
-		Name: metricTokenUsage,
-		Data: &metricsv1.Metric_Sum{Sum: &metricsv1.Sum{DataPoints: []*metricsv1.NumberDataPoint{{
-			TimeUnixNano: uint64(observedAt.UnixNano()),
-			Attributes: []*commonv1.KeyValue{
-				stringAttribute(devlakeTeamAttribute, "platform"),
-				stringAttribute("user.account_id", "user_012pKEfgvvBR2CYw6KjnyAW2"),
-				stringAttribute(organizationIDAttribute, "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e"),
-			},
-			Value: &metricsv1.NumberDataPoint_AsInt{AsInt: 1},
-		}}}},
-	}}}}
-	_, err := converter.prepareUpdates(request)
-	if err == nil {
-		t.Fatal("prepareUpdates() error = nil, want malformed supported metric rejection")
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{CreatedAt: observedAt.Add(-time.Hour)}}})
+	request := newConverterRequest(observedAt, testOrganizationID)
+	metric := request.ResourceMetrics[0].ScopeMetrics[0].Metrics[1]
+	metric.GetSum().DataPoints[0].Attributes = []*commonv1.KeyValue{
+		stringAttribute(devlakeTeamAttribute, "platform"),
+		stringAttribute("user.account_id", "user_012pKEfgvvBR2CYw6KjnyAW2"),
+		stringAttribute(organizationIDAttribute, testOrganizationID),
+		stringAttribute("type", "input"),
 	}
-	if conversionErr, ok := err.(*conversionError); !ok || !conversionErr.permanent || conversionErr.code != "invalid_dimension" {
-		t.Fatalf("prepareUpdates() error = %v, want invalid-dimension permanent conversion error", err)
+
+	_, err := newRawMetricConverter(database, nil).prepareUpdates(request)
+	if conversionErr, ok := err.(*conversionError); !ok || !conversionErr.permanent || conversionErr.code != errorInvalidDimension {
+		t.Fatalf("prepareUpdates() error = %v, want whole-batch permanent invalid_dimension", err)
 	}
 }
 
-func TestCounterDeltaRejectsOutOfOrderCumulativeSamples(t *testing.T) {
-	transaction := dalmocks.NewTransaction(t)
-	converter := newRawMetricConverter(nil)
-	lastValue := "10"
-	transaction.EXPECT().First(mock.AnythingOfType("*models.OtelMetricSeriesState"), mock.Anything).Run(
-		func(state interface{}, _ ...dal.Clause) {
-			stored := state.(*models.OtelMetricSeriesState)
-			stored.LastTimeUnixNano = 20
-			stored.LastNumberValue = &lastValue
-		},
-	).Return(nil)
-	transaction.EXPECT().IsErrorNotFound(nil).Return(false)
-
-	_, err := converter.counterDelta(transaction, factUpdate{
-		metric:      metricSessionCount,
-		value:       metricNumber{integer: true, int64: 12, decimal: "12"},
-		temporality: metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_CUMULATIVE,
-		timeNanos:   20,
-		seriesHash:  make([]byte, 32),
-	})
-	if err == nil {
-		t.Fatal("counterDelta() error = nil, want out-of-order rejection")
+func TestPrepareUpdatesSkipsOnlyResourceGroupsWithAttributionFailures(t *testing.T) {
+	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: observedAt.Add(-time.Hour)}}})
+	request := newConverterRequest(observedAt, testOrganizationID)
+	unknownTeam := proto.Clone(request.ResourceMetrics[0]).(*metricsv1.ResourceMetrics)
+	for _, metric := range unknownTeam.ScopeMetrics[0].Metrics {
+		for _, point := range metric.GetSum().DataPoints {
+			point.Attributes[0] = stringAttribute(devlakeTeamAttribute, "deleted-team")
+		}
 	}
-	conversionErr, ok := err.(*conversionError)
-	if !ok || conversionErr.code != "out_of_order_cumulative" || !conversionErr.permanent {
-		t.Fatalf("counterDelta() error = %#v", err)
+	request.ResourceMetrics = append([]*metricsv1.ResourceMetrics{unknownTeam}, request.ResourceMetrics...)
+
+	prepared, err := newRawMetricConverter(database, nil).prepareUpdates(request)
+	if err != nil {
+		t.Fatalf("prepareUpdates() error = %v", err)
+	}
+	if len(prepared.updates) != 3 || prepared.skippedCount != 1 {
+		t.Fatalf("prepareUpdates() updates=%d skipped=%d, want 3 valid updates and 1 skipped resource", len(prepared.updates), prepared.skippedCount)
+	}
+	for _, update := range prepared.updates {
+		if update.connection.TeamSlug != "platform" {
+			t.Fatalf("update team = %q, want only the valid resource", update.connection.TeamSlug)
+		}
+	}
+	if code := prepared.diagnosticCode(); code == nil || *code != string(diagnosticResourcesSkipped) || prepared.diagnostic() == nil {
+		t.Fatalf("diagnostic = %v/%v, want bounded resources_skipped diagnostic", code, prepared.diagnostic())
 	}
 }
 
-func TestMetricNumberFromPointAcceptsIntegralDoubleAndRejectsInvalidValues(t *testing.T) {
+func TestCounterDeltaUsesExactCumulativeIncreaseResetAndOrder(t *testing.T) {
 	testCases := []struct {
-		name    string
-		value   float64
-		wantInt bool
-		wantErr bool
+		name         string
+		stored       string
+		current      string
+		timeNanos    uint64
+		wantIncrease string
+		wantCode     conversionErrorCode
 	}{
-		{name: "integral", value: 12, wantInt: true},
-		{name: "fractional", value: 1.5},
-		{name: "negative", value: -1, wantErr: true},
-		{name: "not a number", value: math.NaN(), wantErr: true},
-		{name: "infinite", value: math.Inf(1), wantErr: true},
-		{name: "oversized", value: math.MaxFloat64, wantErr: true},
+		{name: "exact decimal increase", stored: "0.092484000", current: "0.192484", timeNanos: 30, wantIncrease: "0.100000000"},
+		{name: "lower value is a reset", stored: "10", current: "3", timeNanos: 30, wantIncrease: "3.000000000"},
+		{name: "out of order sample", stored: "10", current: "12", timeNanos: 20, wantCode: errorOutOfOrderCumulative},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			number, err := metricNumberFromPoint(&metricsv1.NumberDataPoint{
-				Value: &metricsv1.NumberDataPoint_AsDouble{AsDouble: testCase.value},
-			})
-			if (err != nil) != testCase.wantErr {
-				t.Fatalf("metricNumberFromPoint() error = %v, want error=%v", err, testCase.wantErr)
+			transaction := dalmocks.NewTransaction(t)
+			stored := testCase.stored
+			transaction.EXPECT().First(mock.AnythingOfType("*models.OtelMetricSeriesState"), mock.Anything, mock.Anything).Run(
+				func(state interface{}, _ ...dal.Clause) {
+					*state.(*models.OtelMetricSeriesState) = models.OtelMetricSeriesState{LastTimeUnixNano: 20, LastNumberValue: &stored}
+				},
+			).Return(nil)
+			transaction.EXPECT().IsErrorNotFound(nil).Return(false).Maybe()
+			if testCase.wantCode == "" {
+				transaction.EXPECT().CreateOrUpdate(mock.AnythingOfType("*models.OtelMetricSeriesState")).Return(nil)
 			}
-			if err == nil && number.integer != testCase.wantInt {
-				t.Fatalf("metricNumberFromPoint() integer = %v, want %v", number.integer, testCase.wantInt)
+			current, _ := new(big.Rat).SetString(testCase.current)
+
+			increase, err := newRawMetricConverter(nil, nil).counterDelta(transaction, factUpdate{
+				connection:  &models.OtelConnection{},
+				metric:      metricCostUsage,
+				value:       metricNumber{value: current},
+				temporality: metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_CUMULATIVE,
+				timeNanos:   testCase.timeNanos,
+				seriesHash:  make([]byte, 32),
+			})
+			if testCase.wantCode != "" {
+				if conversionErr, ok := err.(*conversionError); !ok || conversionErr.code != testCase.wantCode || !conversionErr.permanent {
+					t.Fatalf("counterDelta() error = %v, want permanent %s", err, testCase.wantCode)
+				}
+				return
+			}
+			if err != nil || increase.decimalString() != testCase.wantIncrease {
+				t.Fatalf("counterDelta() = %v, %v; want %s", increase.value, err, testCase.wantIncrease)
 			}
 		})
 	}
@@ -179,26 +173,18 @@ func TestRealShapedClaudeCodeExportIsAcceptedAndConverted(t *testing.T) {
 	if validationErr != nil {
 		t.Fatalf("validateOtelMetricsRequest() error = %v", validationErr)
 	}
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
 
-	database := dalmocks.NewDal(t)
-	database.EXPECT().All(mock.AnythingOfType("*[]*models.OtelConnection"), mock.Anything).Run(
-		func(connections interface{}, _ ...dal.Clause) {
-			*connections.(*[]*models.OtelConnection) = []*models.OtelConnection{{TeamSlug: "platform"}}
-		},
-	).Return(nil)
-	updates, err := newRawMetricConverter(database).prepareUpdates(request)
+	prepared, err := newRawMetricConverter(database, nil).prepareUpdates(request)
 	if err != nil {
 		t.Fatalf("prepareUpdates() error = %v", err)
 	}
-	if len(updates) != datapointCount {
-		t.Fatalf("prepareUpdates() updates = %d, want every supported datapoint (%d)", len(updates), datapointCount)
+	if len(prepared.updates) != datapointCount || prepared.skippedCount != 0 {
+		t.Fatalf("prepareUpdates() updates=%d skipped=%d, want every supported datapoint (%d)", len(prepared.updates), prepared.skippedCount, datapointCount)
 	}
-	for _, update := range updates {
-		if update.temporality != metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_CUMULATIVE {
-			t.Fatalf("%s temporality = %s, want cumulative", update.metric, update.temporality)
-		}
-		if update.organizationID != "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e" || update.connection.TeamSlug != "platform" {
-			t.Fatalf("%s attribution = %q/%q", update.metric, update.organizationID, update.connection.TeamSlug)
+	for _, update := range prepared.updates {
+		if update.temporality != metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_CUMULATIVE || update.organizationID != testOrganizationID {
+			t.Fatalf("%s temporality/organization = %s/%q", update.metric, update.temporality, update.organizationID)
 		}
 	}
 }
@@ -212,25 +198,24 @@ func TestResolveConnectionUsesEventTimeAcrossRevokedAndRecreatedTeam(t *testing.
 		func(connections interface{}, _ ...dal.Clause) {
 			*connections.(*[]*models.OtelConnection) = []*models.OtelConnection{revoked, recreated}
 		},
-	).Return(nil)
-	converter := newRawMetricConverter(database)
+	).Return(nil).Once()
+	preparer := &batchPreparer{converter: newRawMetricConverter(database, nil), connections: make(map[string][]*models.OtelConnection)}
 
 	testCases := []struct {
 		name       string
 		observedAt time.Time
 		wantID     uint64
-		wantCode   string
 	}{
 		{name: "delayed telemetry before revocation", observedAt: revokedAt.Add(-time.Minute), wantID: revoked.ID},
 		{name: "telemetry after recreation", observedAt: revokedAt.Add(2 * time.Hour), wantID: recreated.ID},
-		{name: "telemetry between revocation and recreation", observedAt: revokedAt.Add(time.Minute), wantCode: "connection_not_found"},
+		{name: "telemetry between revocation and recreation", observedAt: revokedAt.Add(time.Minute)},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			connection, err := converter.resolveConnection("platform", testCase.observedAt)
-			if testCase.wantCode != "" {
-				if conversionErr, ok := err.(*conversionError); !ok || conversionErr.code != testCase.wantCode || !conversionErr.permanent {
-					t.Fatalf("resolveConnection() error = %v, want permanent %s", err, testCase.wantCode)
+			connection, err := preparer.resolveConnection("platform", testCase.observedAt)
+			if testCase.wantID == 0 {
+				if conversionErr, ok := err.(*conversionError); !ok || conversionErr.code != errorConnectionNotFound {
+					t.Fatalf("resolveConnection() error = %v, want connection_not_found", err)
 				}
 				return
 			}
@@ -241,29 +226,79 @@ func TestResolveConnectionUsesEventTimeAcrossRevokedAndRecreatedTeam(t *testing.
 	}
 }
 
+func TestAcquireLeaseRejectsSecondConverterWhileLeaseIsHeld(t *testing.T) {
+	database := dalmocks.NewDal(t)
+	transaction := dalmocks.NewTransaction(t)
+	database.EXPECT().Begin().Return(transaction)
+	transaction.EXPECT().CreateIfNotExist(mock.AnythingOfType("*models.OtelConverterLease")).Return(nil)
+	transaction.EXPECT().UpdateColumns(mock.AnythingOfType("*models.OtelConverterLease"), mock.Anything, mock.Anything).Return(nil)
+	transaction.EXPECT().First(mock.AnythingOfType("*models.OtelConverterLease"), mock.Anything, mock.Anything).Run(
+		func(lease interface{}, _ ...dal.Clause) {
+			lease.(*models.OtelConverterLease).Owner = "first-converter"
+		},
+	).Return(nil)
+	transaction.EXPECT().Commit().Return(nil)
+
+	leader, err := newRawMetricConverter(database, nil).acquireLease()
+	if err != nil || leader {
+		t.Fatalf("acquireLease() = %v, %v; want the second converter to stand by", leader, err)
+	}
+}
+
+func TestClaimNextWaitsBehindRetryDelayedHeadBatch(t *testing.T) {
+	now := time.Date(2026, 9, 14, 10, 0, 0, 0, time.UTC)
+	nextAttemptAt := now.Add(time.Minute)
+	database := dalmocks.NewDal(t)
+	database.EXPECT().First(mock.AnythingOfType("*models.OtelMetricBatch"), mock.Anything, mock.Anything, mock.Anything).Run(
+		func(batch interface{}, _ ...dal.Clause) {
+			*batch.(*models.OtelMetricBatch) = models.OtelMetricBatch{Status: models.OtelMetricBatchStatusRetryableError, NextAttemptAt: &nextAttemptAt}
+		},
+	).Return(nil)
+	converter := newRawMetricConverter(database, nil)
+	converter.now = func() time.Time { return now }
+
+	batch, _, err := converter.claimNext()
+	if err != nil || batch != nil {
+		t.Fatalf("claimNext() = %#v, %v; want no claim while the head batch waits for retry", batch, err)
+	}
+}
+
 func TestDailyTargetsAggregateTeamsIntoOneOrganizationCandidate(t *testing.T) {
-	organizationID := "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e"
 	accountID := "user_012pKEfgvvBR2CYw6KjnyAW2"
 	hour := time.Date(2026, 9, 14, 10, 0, 0, 0, time.UTC)
 	targets := dailyTargets([]factUpdate{
-		{connection: &models.OtelConnection{TeamSlug: "backend"}, organizationID: organizationID, identity: developerIdentity{key: "acct:" + accountID, accountID: &accountID}, hour: hour},
-		{connection: &models.OtelConnection{TeamSlug: "frontend"}, organizationID: organizationID, identity: developerIdentity{key: "acct:" + accountID, accountID: &accountID}, hour: hour.Add(time.Hour)},
+		{connection: &models.OtelConnection{TeamSlug: "backend"}, organizationID: testOrganizationID, identity: developerIdentity{key: "acct:" + accountID, accountID: &accountID}, hour: hour},
+		{connection: &models.OtelConnection{TeamSlug: "frontend"}, organizationID: testOrganizationID, identity: developerIdentity{key: "acct:" + accountID, accountID: &accountID}, hour: hour.Add(time.Hour)},
 	})
 	if len(targets) != 1 {
 		t.Fatalf("daily targets = %d, want one organization-wide candidate", len(targets))
 	}
-	if targets[0].workspaceKey != organizationID || targets[0].userKey != "acct:"+accountID {
+	if targets[0].workspaceKey != testOrganizationID || targets[0].userKey != "acct:"+accountID {
 		t.Fatalf("daily target = %#v", targets[0])
 	}
 }
 
+// newConnectionLookup serves team connections by the team_slug lookup parameter.
+func newConnectionLookup(t *testing.T, connections map[string]*models.OtelConnection) *dalmocks.Dal {
+	database := dalmocks.NewDal(t)
+	database.EXPECT().All(mock.AnythingOfType("*[]*models.OtelConnection"), mock.Anything).Run(
+		func(result interface{}, clauses ...dal.Clause) {
+			teamSlug := clauses[0].Data.(dal.DalClause).Params[0].(string)
+			if connection := connections[teamSlug]; connection != nil {
+				*result.(*[]*models.OtelConnection) = []*models.OtelConnection{connection}
+			}
+		},
+	).Return(nil)
+	return database
+}
+
 func newConverterRequest(observedAt time.Time, organizationID string) *collectormetrics.ExportMetricsServiceRequest {
-	attributes := []*commonv1.KeyValue{stringAttribute(organizationIDAttribute, organizationID)}
 	pointAttributes := []*commonv1.KeyValue{
 		stringAttribute(devlakeTeamAttribute, "platform"),
 		stringAttribute("user.account_id", "user_012pKEfgvvBR2CYw6KjnyAW2"),
 		stringAttribute("user.account_uuid", "aaaa1111-1111-4111-8111-111111111111"),
 		stringAttribute("user.email", "Developer@example.com"),
+		stringAttribute(organizationIDAttribute, organizationID),
 		stringAttribute("model", "claude-sonnet-4-20250514"),
 		stringAttribute("query_source", "main"),
 		stringAttribute("tool_name", "Edit"),
@@ -273,12 +308,18 @@ func newConverterRequest(observedAt time.Time, organizationID string) *collector
 	point := func(value int64, extra ...*commonv1.KeyValue) *metricsv1.NumberDataPoint {
 		return &metricsv1.NumberDataPoint{Attributes: append(append([]*commonv1.KeyValue{}, pointAttributes...), extra...), TimeUnixNano: uint64(observedAt.UnixNano()), Value: &metricsv1.NumberDataPoint_AsInt{AsInt: value}}
 	}
+	sum := func(name string, datapoint *metricsv1.NumberDataPoint) *metricsv1.Metric {
+		return &metricsv1.Metric{Name: name, Data: &metricsv1.Metric_Sum{Sum: &metricsv1.Sum{
+			AggregationTemporality: metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_DELTA,
+			DataPoints:             []*metricsv1.NumberDataPoint{datapoint},
+		}}}
+	}
 	return &collectormetrics.ExportMetricsServiceRequest{ResourceMetrics: []*metricsv1.ResourceMetrics{{
-		Resource: &resourcev1.Resource{Attributes: attributes},
+		Resource: &resourcev1.Resource{Attributes: []*commonv1.KeyValue{stringAttribute("service.name", "claude-code")}},
 		ScopeMetrics: []*metricsv1.ScopeMetrics{{Metrics: []*metricsv1.Metric{
-			{Name: metricSessionCount, Data: &metricsv1.Metric_Sum{Sum: &metricsv1.Sum{AggregationTemporality: metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_DELTA, DataPoints: []*metricsv1.NumberDataPoint{point(1)}}}},
-			{Name: metricTokenUsage, Data: &metricsv1.Metric_Sum{Sum: &metricsv1.Sum{AggregationTemporality: metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_DELTA, DataPoints: []*metricsv1.NumberDataPoint{point(10, stringAttribute("type", "input"))}}}},
-			{Name: metricToolDecision, Data: &metricsv1.Metric_Sum{Sum: &metricsv1.Sum{AggregationTemporality: metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_DELTA, DataPoints: []*metricsv1.NumberDataPoint{point(2)}}}},
+			sum(metricSessionCount, point(1)),
+			sum(metricTokenUsage, point(10, stringAttribute("type", "input"))),
+			sum(metricToolDecision, point(2)),
 		}}},
 	}}}
 }

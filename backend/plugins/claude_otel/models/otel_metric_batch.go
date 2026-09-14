@@ -26,7 +26,8 @@ import (
 const (
 	// Keep this outside the _raw_claude_* namespace. The legacy Claude scope
 	// cleanup treats that prefix as its own raw-data namespace.
-	OtelMetricBatchTable = "_raw_otel_claude_code_metric_batches"
+	OtelMetricBatchTable    = "_raw_otel_claude_code_metric_batches"
+	OtelConverterLeaseTable = "_tool_claude_code_otel_converter_leases"
 
 	OtelMetricBatchStatusPending        = "pending"
 	OtelMetricBatchStatusProcessing     = "processing"
@@ -60,4 +61,17 @@ type OtelMetricBatch struct {
 
 func (OtelMetricBatch) TableName() string {
 	return OtelMetricBatchTable
+}
+
+// OtelConverterLease elects one converter across Lake replicas. Cumulative conversion
+// is stateful, so raw batches must be converted strictly in receipt order.
+type OtelConverterLease struct {
+	Name       string    `gorm:"type:varchar(64);primaryKey"`
+	Owner      string    `gorm:"type:char(36)"`
+	LeaseUntil time.Time `gorm:"type:datetime(3)"`
+	UpdatedAt  time.Time
+}
+
+func (OtelConverterLease) TableName() string {
+	return OtelConverterLeaseTable
 }

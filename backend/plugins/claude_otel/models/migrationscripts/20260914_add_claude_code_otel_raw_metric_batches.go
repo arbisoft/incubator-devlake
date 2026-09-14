@@ -68,6 +68,17 @@ func (otelMetricBatch20260914) TableName() string {
 	return "_raw_otel_claude_code_metric_batches"
 }
 
+type otelConverterLease20260914 struct {
+	Name       string    `gorm:"type:varchar(64);primaryKey"`
+	Owner      string    `gorm:"type:char(36)"`
+	LeaseUntil time.Time `gorm:"type:datetime(3)"`
+	UpdatedAt  time.Time
+}
+
+func (otelConverterLease20260914) TableName() string {
+	return "_tool_claude_code_otel_converter_leases"
+}
+
 type otelCredential20260914 struct {
 	archived.Model
 	ConnectionId uint64
@@ -83,6 +94,7 @@ func (script *addClaudeCodeOtelRawMetricBatches) Up(basicRes context.BasicRes) e
 		basicRes,
 		&otelConnection20260914{},
 		&otelMetricBatch20260914{},
+		&otelConverterLease20260914{},
 	); err != nil {
 		return err
 	}

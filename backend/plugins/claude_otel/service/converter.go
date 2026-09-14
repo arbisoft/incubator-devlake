@@ -18,202 +18,267 @@ limitations under the License.
 package service
 
 import (
-	"crypto/sha256"
 	"fmt"
-	"math"
-	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/core/log"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
 	"github.com/google/uuid"
 	collectormetrics "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
-	commonv1 "go.opentelemetry.io/proto/otlp/common/v1"
-	metricsv1 "go.opentelemetry.io/proto/otlp/metrics/v1"
 	"google.golang.org/protobuf/proto"
 )
 
 const (
-	converterLeaseDuration = 30 * time.Second
-	converterPollInterval  = 2 * time.Second
-	converterRetryLimit    = 8
-
-	metricSessionCount     = "claude_code.session.count"
-	metricActiveTime       = "claude_code.active_time.total"
-	metricActiveTimeLegacy = "claude_code.active_time.seconds"
-	metricLinesOfCode      = "claude_code.lines_of_code.count"
-	metricCommitCount      = "claude_code.commit.count"
-	metricPullRequestCount = "claude_code.pull_request.count"
-	metricTokenUsage       = "claude_code.token.usage"
-	metricTokenUsageLegacy = "claude_code.token.usage.tokens"
-	metricCostUsage        = "claude_code.cost.usage"
-	metricCostUsageLegacy  = "claude_code.cost.usage_USD"
-	metricToolDecision     = "claude_code.code_edit_tool.decision"
+	converterLeaseName          = "raw_metric_converter"
+	converterLeaseDuration      = 30 * time.Second
+	converterPollInterval       = 2 * time.Second
+	converterMaxBackoffExponent = 8
+	// converterMaxAttempts bounds retries of one batch to roughly 40 minutes, after which
+	// it is quarantined so a persistent failure cannot block the ordered queue forever.
+	converterMaxAttempts = 12
 )
 
-type conversionError struct {
-	code      string
-	permanent bool
-	err       error
+var nonterminalBatchStatuses = []string{
+	models.OtelMetricBatchStatusPending,
+	models.OtelMetricBatchStatusProcessing,
+	models.OtelMetricBatchStatusRetryableError,
 }
 
-func (e *conversionError) Error() string { return e.err.Error() }
-
 type rawMetricConverter struct {
-	db  dal.Dal
-	now func() time.Time
+	db       dal.Dal
+	logger   log.Logger
+	now      func() time.Time
+	workerID string
+	// pollErrorLogged suppresses repeated poll failures, such as an unmigrated database
+	// during startup, until a poll succeeds again.
+	pollErrorLogged bool
 }
 
 var converterStartOnce sync.Once
 
-func newRawMetricConverter(db dal.Dal) *rawMetricConverter {
-	return &rawMetricConverter{db: db, now: time.Now}
+func newRawMetricConverter(db dal.Dal, logger log.Logger) *rawMetricConverter {
+	return &rawMetricConverter{db: db, logger: logger, now: time.Now, workerID: uuid.NewString()}
 }
 
-// startRawMetricConverter starts a single logical converter per process. Database claims
-// provide the cross-replica election and preserve raw receipt order.
-func startRawMetricConverter(database dal.Dal) {
+// startRawMetricConverter starts this process's converter loop. Every Lake replica polls,
+// but only the holder of the database-backed converter lease converts batches.
+func startRawMetricConverter(database dal.Dal, logger log.Logger) {
 	if database == nil {
 		return
 	}
 	converterStartOnce.Do(func() {
-		converter := newRawMetricConverter(database)
+		converter := newRawMetricConverter(database, logger)
 		go func() {
 			ticker := time.NewTicker(converterPollInterval)
 			defer ticker.Stop()
 			for range ticker.C {
-				for converter.processNext() {
-				}
+				converter.poll()
 			}
 		}()
 	})
 }
 
-// processNext claims the oldest eligible batch. It returns true when work was claimed,
-// including a batch that was quarantined or scheduled for retry.
-func (c *rawMetricConverter) processNext() bool {
-	batch, leaseOwner, err := c.claimNext()
-	if err != nil || batch == nil {
-		return false
+// poll converts batches in raw receipt order while this process holds the converter lease.
+func (c *rawMetricConverter) poll() {
+	for {
+		processed, err := c.pollOnce()
+		if err != nil {
+			if !c.pollErrorLogged {
+				c.logWarn(err, "Claude Code OTel raw metric converter poll failed")
+				c.pollErrorLogged = true
+			}
+			return
+		}
+		c.pollErrorLogged = false
+		if !processed {
+			return
+		}
 	}
-	if err := c.convert(batch, leaseOwner); err != nil {
-		c.recordFailure(batch, leaseOwner, err)
-	}
-	return true
 }
 
+func (c *rawMetricConverter) pollOnce() (bool, errors.Error) {
+	leader, err := c.acquireLease()
+	if err != nil || !leader {
+		return false, err
+	}
+	return c.processNext()
+}
+
+// acquireLease takes or renews the singleton converter lease. The conditional update
+// succeeds only for the current owner or after the previous owner's lease expired.
+func (c *rawMetricConverter) acquireLease() (bool, errors.Error) {
+	now := c.now().UTC()
+	leaseUntil := now.Add(converterLeaseDuration)
+	tx := c.db.Begin()
+	lease := &models.OtelConverterLease{Name: converterLeaseName, Owner: c.workerID, LeaseUntil: leaseUntil, UpdatedAt: now}
+	if err := tx.CreateIfNotExist(lease); err != nil {
+		c.rollback(tx)
+		return false, errors.Default.Wrap(err, "failed to create Claude Code OTel converter lease")
+	}
+	if err := tx.UpdateColumns(
+		&models.OtelConverterLease{},
+		[]dal.DalSet{
+			{ColumnName: "owner", Value: c.workerID},
+			{ColumnName: "lease_until", Value: leaseUntil},
+			{ColumnName: "updated_at", Value: now},
+		},
+		dal.Where("name = ? AND (owner = ? OR lease_until < ?)", converterLeaseName, c.workerID, now),
+	); err != nil {
+		c.rollback(tx)
+		return false, errors.Default.Wrap(err, "failed to renew Claude Code OTel converter lease")
+	}
+	current := &models.OtelConverterLease{}
+	if err := tx.First(current, dal.Where("name = ?", converterLeaseName), dal.Lock(true, false)); err != nil {
+		c.rollback(tx)
+		return false, errors.Default.Wrap(err, "failed to verify Claude Code OTel converter lease")
+	}
+	if err := tx.Commit(); err != nil {
+		return false, errors.Default.Wrap(err, "failed to commit Claude Code OTel converter lease")
+	}
+	return current.Owner == c.workerID, nil
+}
+
+// processNext claims and converts the head of the raw queue. It returns true when a batch
+// reached a new state, including retry scheduling or quarantine.
+func (c *rawMetricConverter) processNext() (bool, errors.Error) {
+	batch, leaseOwner, err := c.claimNext()
+	if err != nil || batch == nil {
+		return false, err
+	}
+	prepared, conversionErr := c.convert(batch, leaseOwner)
+	if conversionErr != nil {
+		return true, c.recordFailure(batch, leaseOwner, conversionErr)
+	}
+	c.logConverted(batch, prepared)
+	return true, nil
+}
+
+// claimNext claims only the earliest nonterminal batch. A later batch never overtakes a
+// batch that is waiting for retry or held by another lease, because cumulative series
+// state depends on receipt order.
 func (c *rawMetricConverter) claimNext() (*models.OtelMetricBatch, string, errors.Error) {
 	now := c.now().UTC()
-	tx := c.db.Begin()
-	batches := make([]*models.OtelMetricBatch, 0, 1)
-	if err := tx.All(&batches,
-		dal.Where("(status IN (?, ?) AND (next_attempt_at IS NULL OR next_attempt_at <= ?)) OR (status = ? AND lease_until < ?)",
-			models.OtelMetricBatchStatusPending,
-			models.OtelMetricBatchStatusRetryableError,
-			now,
-			models.OtelMetricBatchStatusProcessing,
-			now),
+	head := &models.OtelMetricBatch{}
+	err := c.db.First(head,
+		dal.Select("id, status, attempt_count, next_attempt_at, lease_until"),
+		dal.Where("status IN ?", nonterminalBatchStatuses),
 		dal.Orderby("id ASC"),
-		dal.Limit(1),
-	); err != nil {
-		_ = tx.Rollback()
-		return nil, "", errors.Default.Wrap(err, "failed to find Claude Code OTel raw batches")
+	)
+	if err != nil {
+		if c.db.IsErrorNotFound(err) {
+			return nil, "", nil
+		}
+		return nil, "", errors.Default.Wrap(err, "failed to find the next Claude Code OTel raw batch")
 	}
-	if len(batches) == 0 {
-		_ = tx.Rollback()
+	if !isBatchClaimable(head, now) {
 		return nil, "", nil
 	}
-	batch := batches[0]
 	leaseOwner := uuid.NewString()
-	leaseUntil := now.Add(converterLeaseDuration)
-	if err := tx.UpdateColumns(
+	if err := c.db.UpdateColumns(
 		&models.OtelMetricBatch{},
 		[]dal.DalSet{
 			{ColumnName: "status", Value: models.OtelMetricBatchStatusProcessing},
 			{ColumnName: "lease_owner", Value: leaseOwner},
-			{ColumnName: "lease_until", Value: leaseUntil},
+			{ColumnName: "lease_until", Value: now.Add(converterLeaseDuration)},
 			{ColumnName: "next_attempt_at", Value: nil},
-			{ColumnName: "attempt_count", Value: batch.AttemptCount + 1},
+			{ColumnName: "attempt_count", Value: head.AttemptCount + 1},
 		},
-		dal.Where("id = ? AND (status IN (?, ?) OR (status = ? AND lease_until < ?))",
-			batch.ID,
-			models.OtelMetricBatchStatusPending,
-			models.OtelMetricBatchStatusRetryableError,
-			models.OtelMetricBatchStatusProcessing,
-			now),
+		dal.Where("id = ? AND status = ? AND attempt_count = ?", head.ID, head.Status, head.AttemptCount),
 	); err != nil {
-		_ = tx.Rollback()
 		return nil, "", errors.Default.Wrap(err, "failed to claim Claude Code OTel raw batch")
 	}
-	if err := tx.Commit(); err != nil {
-		return nil, "", errors.Default.Wrap(err, "failed to commit Claude Code OTel raw batch claim")
+	batch := &models.OtelMetricBatch{}
+	if err := c.db.First(batch, dal.Where("id = ? AND lease_owner = ?", head.ID, leaseOwner)); err != nil {
+		if c.db.IsErrorNotFound(err) {
+			return nil, "", nil
+		}
+		return nil, "", errors.Default.Wrap(err, "failed to load claimed Claude Code OTel raw batch")
 	}
 	return batch, leaseOwner, nil
 }
 
-func (c *rawMetricConverter) convert(batch *models.OtelMetricBatch, leaseOwner string) error {
+func isBatchClaimable(batch *models.OtelMetricBatch, now time.Time) bool {
+	switch batch.Status {
+	case models.OtelMetricBatchStatusProcessing:
+		return batch.LeaseUntil == nil || batch.LeaseUntil.Before(now)
+	case models.OtelMetricBatchStatusRetryableError:
+		return batch.NextAttemptAt == nil || !batch.NextAttemptAt.After(now)
+	default:
+		return true
+	}
+}
+
+// convert prepares facts outside a transaction, then verifies the batch lease and commits
+// facts, series state, canonical rows, and raw completion atomically.
+func (c *rawMetricConverter) convert(batch *models.OtelMetricBatch, leaseOwner string) (*preparedBatch, error) {
 	request := &collectormetrics.ExportMetricsServiceRequest{}
 	if err := proto.Unmarshal(batch.PayloadProto, request); err != nil {
-		return &conversionError{code: "invalid_payload", permanent: true, err: fmt.Errorf("decode raw OTLP payload: %w", err)}
+		return nil, &conversionError{code: errorInvalidPayload, permanent: true, err: fmt.Errorf("decode raw OTLP payload: %w", err)}
 	}
-	updates, err := c.prepareUpdates(request)
+	prepared, err := c.prepareUpdates(request)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	tx := c.db.Begin()
 	claimedBatch := &models.OtelMetricBatch{}
 	if err := tx.First(claimedBatch,
+		dal.Select("id"),
 		dal.Where("id = ? AND status = ? AND lease_owner = ?", batch.ID, models.OtelMetricBatchStatusProcessing, leaseOwner),
 		dal.Lock(true, false),
 	); err != nil {
-		_ = tx.Rollback()
-		return &conversionError{code: "lease_lost", err: fmt.Errorf("verify raw batch lease: %w", err)}
+		c.rollback(tx)
+		return nil, &conversionError{code: errorLeaseLost, err: fmt.Errorf("verify raw batch lease: %w", err)}
 	}
-	for _, update := range updates {
-		if err := c.applyUpdate(tx, update); err != nil {
-			_ = tx.Rollback()
-			return &conversionError{code: "storage_failure", err: fmt.Errorf("write hourly Claude Code OTel facts: %w", err)}
-		}
+	if err := c.applyHourlyUpdates(tx, prepared.updates); err != nil {
+		c.rollback(tx)
+		return nil, err
 	}
-	if err := reconcileOtelDaily(tx, dailyTargets(updates)); err != nil {
-		_ = tx.Rollback()
-		return &conversionError{code: "storage_failure", err: fmt.Errorf("write canonical daily Claude Code OTel facts: %w", err)}
+	if err := reconcileOtelDaily(tx, dailyTargets(prepared.updates)); err != nil {
+		c.rollback(tx)
+		return nil, classifyStorageError(fmt.Errorf("write canonical daily Claude Code OTel facts: %w", err))
 	}
-	now := c.now().UTC()
 	if err := tx.UpdateColumns(
 		&models.OtelMetricBatch{},
 		[]dal.DalSet{
 			{ColumnName: "status", Value: models.OtelMetricBatchStatusProcessed},
 			{ColumnName: "lease_owner", Value: nil},
 			{ColumnName: "lease_until", Value: nil},
-			{ColumnName: "processing_error_code", Value: nil},
-			{ColumnName: "processing_error_message", Value: nil},
-			{ColumnName: "processed_at", Value: now},
+			{ColumnName: "processing_error_code", Value: prepared.diagnosticCode()},
+			{ColumnName: "processing_error_message", Value: prepared.diagnostic()},
+			{ColumnName: "processed_at", Value: c.now().UTC()},
 		},
 		dal.Where("id = ? AND status = ? AND lease_owner = ?", batch.ID, models.OtelMetricBatchStatusProcessing, leaseOwner),
 	); err != nil {
-		_ = tx.Rollback()
-		return &conversionError{code: "lease_lost", err: fmt.Errorf("mark raw batch processed: %w", err)}
+		c.rollback(tx)
+		return nil, classifyStorageError(fmt.Errorf("mark raw batch processed: %w", err))
 	}
 	if err := tx.Commit(); err != nil {
-		return &conversionError{code: "storage_failure", err: fmt.Errorf("commit hourly Claude Code OTel facts: %w", err)}
+		return nil, &conversionError{code: errorStorageFailure, err: fmt.Errorf("commit Claude Code OTel conversion: %w", err)}
 	}
-	return nil
+	return prepared, nil
 }
 
-func (c *rawMetricConverter) recordFailure(batch *models.OtelMetricBatch, leaseOwner string, conversionErr error) {
-	errCode, permanent, message := classifyConversionError(conversionErr)
-	now := c.now().UTC()
-	tx := c.db.Begin()
+// recordFailure releases the batch lease with a classified retry or quarantine state. A
+// failure to persist that state is returned; lease expiry keeps the batch reclaimable.
+func (c *rawMetricConverter) recordFailure(batch *models.OtelMetricBatch, leaseOwner string, conversionErr error) errors.Error {
+	code, permanent, message := classifyConversionError(conversionErr)
+	if code == errorLeaseLost {
+		c.logWarn(conversionErr, fmt.Sprintf("Claude Code OTel raw batch %d lease was lost", batch.ID))
+		return nil
+	}
+	if !permanent && batch.AttemptCount >= converterMaxAttempts {
+		message = fmt.Sprintf("%s after %d attempts: %s", code, batch.AttemptCount, message)
+		code, permanent = errorRetryExhausted, true
+	}
 	sets := []dal.DalSet{
 		{ColumnName: "lease_owner", Value: nil},
 		{ColumnName: "lease_until", Value: nil},
-		{ColumnName: "processing_error_code", Value: errCode},
+		{ColumnName: "processing_error_code", Value: string(code)},
 		{ColumnName: "processing_error_message", Value: message},
 	}
 	if permanent {
@@ -221,405 +286,47 @@ func (c *rawMetricConverter) recordFailure(batch *models.OtelMetricBatch, leaseO
 	} else {
 		sets = append(sets,
 			dal.DalSet{ColumnName: "status", Value: models.OtelMetricBatchStatusRetryableError},
-			dal.DalSet{ColumnName: "next_attempt_at", Value: now.Add(converterBackoff(batch.AttemptCount + 1))},
+			dal.DalSet{ColumnName: "next_attempt_at", Value: c.now().UTC().Add(converterBackoff(batch.AttemptCount))},
 		)
 	}
-	if err := tx.UpdateColumns(&models.OtelMetricBatch{}, sets,
-		dal.Where("id = ? AND status = ? AND lease_owner = ?", batch.ID, models.OtelMetricBatchStatusProcessing, leaseOwner)); err == nil {
-		_ = tx.Commit()
-		return
+	if err := c.db.UpdateColumns(&models.OtelMetricBatch{}, sets,
+		dal.Where("id = ? AND status = ? AND lease_owner = ?", batch.ID, models.OtelMetricBatchStatusProcessing, leaseOwner),
+	); err != nil {
+		return errors.Default.Wrap(err, fmt.Sprintf("failed to record Claude Code OTel raw batch %d failure", batch.ID))
 	}
-	_ = tx.Rollback()
-}
-
-func classifyConversionError(err error) (string, bool, string) {
-	if conversionErr, ok := err.(*conversionError); ok {
-		return conversionErr.code, conversionErr.permanent, conversionErr.Error()
-	}
-	return "conversion_failure", false, err.Error()
+	c.logWarn(nil, fmt.Sprintf("Claude Code OTel raw batch %d conversion failed: code=%s permanent=%t attempt=%d", batch.ID, code, permanent, batch.AttemptCount))
+	return nil
 }
 
 func converterBackoff(attempt int) time.Duration {
-	if attempt > converterRetryLimit {
-		attempt = converterRetryLimit
+	if attempt > converterMaxBackoffExponent {
+		attempt = converterMaxBackoffExponent
 	}
 	return time.Second * time.Duration(1<<uint(attempt))
 }
 
-type factUpdate struct {
-	connection     *models.OtelConnection
-	organizationID string
-	identity       developerIdentity
-	hour           time.Time
-	observedAt     time.Time
-	metric         string
-	model          string
-	query          string
-	tool           string
-	language       string
-	decision       string
-	typeValue      string
-	value          metricNumber
-	temporality    metricsv1.AggregationTemporality
-	startNanos     uint64
-	timeNanos      uint64
-	seriesHash     []byte
-}
-
-type developerIdentity struct {
-	key         string
-	accountID   *string
-	accountUUID *string
-	email       *string
-}
-
-type metricNumber struct {
-	integer bool
-	int64   int64
-	decimal string
-}
-
-func (c *rawMetricConverter) prepareUpdates(request *collectormetrics.ExportMetricsServiceRequest) ([]factUpdate, error) {
-	updates := make([]factUpdate, 0)
-	for _, resourceMetrics := range request.GetResourceMetrics() {
-		resourceAttrs := resourceMetrics.GetResource().GetAttributes()
-		for _, scopeMetrics := range resourceMetrics.GetScopeMetrics() {
-			for _, metric := range scopeMetrics.GetMetrics() {
-				if !isSupportedMetric(metric.GetName()) {
-					continue
-				}
-				sum := metric.GetSum()
-				if sum == nil {
-					return nil, permanentMetricError("unsupported_metric_kind", "supported metric %s is not an OTLP sum", metric.GetName())
-				}
-				for _, point := range sum.GetDataPoints() {
-					teamSlug := attributeString(point.GetAttributes(), devlakeTeamAttribute)
-					if teamSlug == "" {
-						return nil, permanentMetricError("missing_team", "supported metric %s is missing trusted devlake_team attribution", metric.GetName())
-					}
-					observedAt, err := unixNanoTime(point.GetTimeUnixNano())
-					if err != nil {
-						return nil, permanentMetricError("invalid_timestamp", "supported metric %s has an invalid timestamp", metric.GetName())
-					}
-					connection, err := c.resolveConnection(teamSlug, observedAt)
-					if err != nil {
-						return nil, err
-					}
-					organizationID, err := organizationIDFromAttributes(resourceAttrs, point.GetAttributes())
-					if err != nil {
-						return nil, err
-					}
-					identity, err := identityFromAttributes(point.GetAttributes())
-					if err != nil {
-						return nil, err
-					}
-					value, err := metricNumberFromPoint(point)
-					if err != nil {
-						return nil, permanentMetricError("invalid_value", "supported metric %s has an invalid numeric value", metric.GetName())
-					}
-					update := factUpdate{
-						connection: connection, organizationID: organizationID, identity: identity, hour: observedAt.Truncate(time.Hour), observedAt: observedAt,
-						metric: metric.GetName(), model: attributeString(point.GetAttributes(), "model"),
-						query:       defaultDimension(attributeString(point.GetAttributes(), "query_source")),
-						tool:        defaultDimension(attributeString(point.GetAttributes(), "tool_name")),
-						language:    defaultDimension(attributeString(point.GetAttributes(), "language")),
-						decision:    attributeString(point.GetAttributes(), "decision"),
-						typeValue:   attributeString(point.GetAttributes(), "type"),
-						value:       value,
-						temporality: sum.GetAggregationTemporality(), startNanos: point.GetStartTimeUnixNano(), timeNanos: point.GetTimeUnixNano(),
-					}
-					if err := validateMetricDimensions(update); err != nil {
-						return nil, err
-					}
-					update.seriesHash = metricSeriesHash(update, resourceAttrs, point.GetAttributes(), metric.GetUnit())
-					updates = append(updates, update)
-				}
-			}
-		}
+func (c *rawMetricConverter) logConverted(batch *models.OtelMetricBatch, prepared *preparedBatch) {
+	if c.logger == nil {
+		return
 	}
-	return updates, nil
-}
-
-func (c *rawMetricConverter) resolveConnection(teamSlug string, observedAt time.Time) (*models.OtelConnection, error) {
-	connections := make([]*models.OtelConnection, 0)
-	if err := c.db.All(&connections, dal.Where("team_slug = ?", teamSlug)); err != nil {
-		return nil, &conversionError{code: "connection_lookup_failed", err: fmt.Errorf("resolve OTel connection: %w", err)}
+	if prepared.skippedCount > 0 {
+		c.logger.Warn(nil, "Claude Code OTel raw batch %d skipped %d resource group(s)", batch.ID, prepared.skippedCount)
 	}
-	var match *models.OtelConnection
-	for _, connection := range connections {
-		if connection.CreatedAt.After(observedAt) || (connection.RevokedAt != nil && !observedAt.Before(*connection.RevokedAt)) {
-			continue
-		}
-		if match != nil {
-			return nil, permanentMetricError("ambiguous_connection", "telemetry for team %q has ambiguous connection history", teamSlug)
-		}
-		match = connection
-	}
-	if match == nil {
-		return nil, permanentMetricError("connection_not_found", "telemetry for team %q has no connection at observed time", teamSlug)
-	}
-	return match, nil
-}
-
-func (c *rawMetricConverter) applyUpdate(tx dal.Transaction, update factUpdate) error {
-	if err := bindConnectionOrganization(tx, update.connection, update.organizationID); err != nil {
-		return err
-	}
-	value, err := c.counterDelta(tx, update)
-	if err != nil || value == nil {
-		return err
-	}
-	switch update.metric {
-	case metricSessionCount:
-		return upsertActivity(tx, update, "session_count", value.integerString())
-	case metricActiveTime, metricActiveTimeLegacy:
-		return upsertActivity(tx, update, "active_time_seconds", value.decimal)
-	case metricLinesOfCode:
-		column := map[string]string{"added": "lines_added", "removed": "lines_removed"}[attributeType(update)]
-		if column == "" {
-			return permanentMetricError("invalid_dimension", "lines metric has invalid type")
-		}
-		return upsertActivity(tx, update, column, value.integerString())
-	case metricCommitCount:
-		return upsertActivity(tx, update, "commits_created", value.integerString())
-	case metricPullRequestCount:
-		return upsertActivity(tx, update, "prs_created", value.integerString())
-	case metricTokenUsage, metricTokenUsageLegacy:
-		column := map[string]string{"input": "input_tokens", "output": "output_tokens", "cacheRead": "cache_read_tokens", "cacheCreation": "cache_creation_tokens"}[attributeType(update)]
-		if column == "" {
-			return permanentMetricError("invalid_dimension", "token metric has invalid type")
-		}
-		return upsertModelUsage(tx, update, column, value.integerString())
-	case metricCostUsage, metricCostUsageLegacy:
-		return upsertModelUsage(tx, update, "estimated_cost_usd", value.decimal)
-	case metricToolDecision:
-		column := map[string]string{"accept": "accepted_count", "reject": "rejected_count"}[update.decision]
-		if column == "" {
-			return permanentMetricError("invalid_dimension", "tool decision metric has invalid decision")
-		}
-		return upsertToolUsage(tx, update, column, value.integerString())
-	default:
-		return nil
+	if len(prepared.unknownMetrics) > 0 {
+		c.logger.Info("Claude Code OTel raw batch %d ignored unmapped metrics: %s", batch.ID, strings.Join(prepared.unknownMetrics, ", "))
 	}
 }
 
-func (c *rawMetricConverter) counterDelta(tx dal.Transaction, update factUpdate) (*metricNumber, error) {
-	if update.temporality == metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_DELTA {
-		return &update.value, nil
+func (c *rawMetricConverter) logWarn(err error, message string) {
+	if c.logger != nil {
+		c.logger.Warn(err, "%s", message)
 	}
-	if update.temporality != metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_CUMULATIVE {
-		return nil, permanentMetricError("unsupported_temporality", "metric %s has unsupported aggregation temporality", update.metric)
-	}
-	state := &models.OtelMetricSeriesState{}
-	err := tx.First(state, dal.Where("series_hash = ?", update.seriesHash), dal.Lock(true, false))
-	if err != nil && !tx.IsErrorNotFound(err) {
-		return nil, err
-	}
-	if !tx.IsErrorNotFound(err) && update.timeNanos <= state.LastTimeUnixNano {
-		return nil, permanentMetricError("out_of_order_cumulative", "metric %s has an out-of-order cumulative sample", update.metric)
-	}
-	delta := update.value
-	if !tx.IsErrorNotFound(err) && state.LastNumberValue != nil && update.startNanos == state.StartTimeUnixNano {
-		previous, parseErr := strconv.ParseFloat(*state.LastNumberValue, 64)
-		current, currentErr := strconv.ParseFloat(update.value.decimal, 64)
-		if parseErr != nil || currentErr != nil {
-			return nil, permanentMetricError("invalid_series_state", "metric %s has invalid cumulative state", update.metric)
-		}
-		if current < previous {
-			delta = update.value
-		} else {
-			delta = metricNumber{integer: update.value.integer, int64: int64(current - previous), decimal: strconv.FormatFloat(current-previous, 'f', 9, 64)}
-		}
-	}
-	last := update.value.decimal
-	state = &models.OtelMetricSeriesState{SeriesHash: update.seriesHash, ConnectionId: update.connection.ID, MetricName: update.metric, Temporality: "cumulative", StartTimeUnixNano: update.startNanos, LastTimeUnixNano: update.timeNanos, LastNumberValue: &last, UpdatedAt: c.now().UTC()}
-	if err := tx.CreateOrUpdate(state); err != nil {
-		return nil, err
-	}
-	return &delta, nil
 }
 
-func upsertActivity(tx dal.Transaction, update factUpdate, column, value string) error {
-	query := fmt.Sprintf("INSERT INTO %s (connection_id, team_slug, organization_id, user_key, user_account_id, user_account_uuid, user_email, hour_start, %s, first_observed_at, last_observed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE %s = %s + VALUES(%s), first_observed_at = LEAST(first_observed_at, VALUES(first_observed_at)), last_observed_at = GREATEST(last_observed_at, VALUES(last_observed_at)), updated_at = NOW()", models.OtelHourlyActivityTable, column, column, column, column)
-	return tx.Exec(query, update.connection.ID, update.connection.TeamSlug, update.organizationID, update.identity.key, update.identity.accountID, update.identity.accountUUID, update.identity.email, update.hour, value, update.observedAt, update.observedAt)
-}
-
-func upsertModelUsage(tx dal.Transaction, update factUpdate, column, value string) error {
-	query := fmt.Sprintf("INSERT INTO %s (connection_id, team_slug, organization_id, user_key, user_account_id, user_account_uuid, user_email, hour_start, model, query_source, %s, first_observed_at, last_observed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE %s = %s + VALUES(%s), first_observed_at = LEAST(first_observed_at, VALUES(first_observed_at)), last_observed_at = GREATEST(last_observed_at, VALUES(last_observed_at)), updated_at = NOW()", models.OtelHourlyModelUsageTable, column, column, column, column)
-	return tx.Exec(query, update.connection.ID, update.connection.TeamSlug, update.organizationID, update.identity.key, update.identity.accountID, update.identity.accountUUID, update.identity.email, update.hour, update.model, update.query, value, update.observedAt, update.observedAt)
-}
-
-func upsertToolUsage(tx dal.Transaction, update factUpdate, column, value string) error {
-	query := fmt.Sprintf("INSERT INTO %s (connection_id, team_slug, organization_id, user_key, user_account_id, user_account_uuid, user_email, hour_start, tool_name, language, %s, first_observed_at, last_observed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE %s = %s + VALUES(%s), first_observed_at = LEAST(first_observed_at, VALUES(first_observed_at)), last_observed_at = GREATEST(last_observed_at, VALUES(last_observed_at)), updated_at = NOW()", models.OtelHourlyToolUsageTable, column, column, column, column)
-	return tx.Exec(query, update.connection.ID, update.connection.TeamSlug, update.organizationID, update.identity.key, update.identity.accountID, update.identity.accountUUID, update.identity.email, update.hour, update.tool, update.language, value, update.observedAt, update.observedAt)
-}
-
-func isSupportedMetric(name string) bool {
-	switch name {
-	case metricSessionCount, metricActiveTime, metricActiveTimeLegacy, metricLinesOfCode, metricCommitCount, metricPullRequestCount, metricTokenUsage, metricTokenUsageLegacy, metricCostUsage, metricCostUsageLegacy, metricToolDecision:
-		return true
+// rollback is best-effort cleanup after a failed transaction step; the caller returns the
+// primary failure.
+func (c *rawMetricConverter) rollback(tx dal.Transaction) {
+	if err := tx.Rollback(); err != nil {
+		c.logWarn(err, "failed to roll back Claude Code OTel converter transaction")
 	}
-	return false
-}
-func permanentMetricError(code, format string, args ...interface{}) error {
-	return &conversionError{code: code, permanent: true, err: fmt.Errorf(format, args...)}
-}
-func defaultDimension(value string) string {
-	if value == "" {
-		return "unknown"
-	}
-	return value
-}
-func attributeType(update factUpdate) string { return update.typeValue }
-func validateMetricDimensions(update factUpdate) error {
-	if update.metric != metricActiveTime && update.metric != metricActiveTimeLegacy && update.metric != metricCostUsage && update.metric != metricCostUsageLegacy && !update.value.integer {
-		return permanentMetricError("invalid_value", "metric %s must have an integer value", update.metric)
-	}
-	if (update.metric == metricTokenUsage || update.metric == metricTokenUsageLegacy || update.metric == metricCostUsage || update.metric == metricCostUsageLegacy) && update.model == "" {
-		return permanentMetricError("invalid_dimension", "metric %s is missing model", update.metric)
-	}
-	return nil
-}
-
-func identityFromAttributes(attributes []*commonv1.KeyValue) (developerIdentity, error) {
-	accountID, accountUUID, email, installID := attributeString(attributes, "user.account_id"), attributeString(attributes, "user.account_uuid"), normalizeEmail(attributeString(attributes, "user.email")), attributeString(attributes, "user.id")
-	identity := developerIdentity{accountID: optionalString(accountID), accountUUID: optionalString(accountUUID), email: optionalString(email)}
-	switch {
-	case accountID != "":
-		identity.key = "acct:" + accountID
-	case accountUUID != "":
-		identity.key = "uuid:" + accountUUID
-	case email != "":
-		identity.key = "email:" + email
-	case installID != "":
-		identity.key = "install:" + installID
-	default:
-		return developerIdentity{}, permanentMetricError("missing_user_identity", "supported metric has no stable user identity")
-	}
-	return identity, nil
-}
-func normalizeEmail(value string) string { return strings.ToLower(strings.TrimSpace(value)) }
-func optionalString(value string) *string {
-	if value == "" {
-		return nil
-	}
-	return &value
-}
-func unixNanoTime(value uint64) (time.Time, error) {
-	if value == 0 || value > uint64(1<<63-1) {
-		return time.Time{}, fmt.Errorf("invalid timestamp")
-	}
-	return time.Unix(0, int64(value)).UTC(), nil
-}
-func metricNumberFromPoint(point *metricsv1.NumberDataPoint) (metricNumber, error) {
-	switch value := point.Value.(type) {
-	case *metricsv1.NumberDataPoint_AsInt:
-		if value.AsInt < 0 {
-			return metricNumber{}, fmt.Errorf("negative number")
-		}
-		return metricNumber{integer: true, int64: value.AsInt, decimal: strconv.FormatInt(value.AsInt, 10)}, nil
-	case *metricsv1.NumberDataPoint_AsDouble:
-		if math.IsNaN(value.AsDouble) || math.IsInf(value.AsDouble, 0) || value.AsDouble < 0 {
-			return metricNumber{}, fmt.Errorf("non-finite or negative number")
-		}
-		if value.AsDouble >= math.MaxInt64 {
-			return metricNumber{}, fmt.Errorf("number exceeds supported range")
-		}
-		if math.Trunc(value.AsDouble) == value.AsDouble {
-			integer := int64(value.AsDouble)
-			return metricNumber{integer: true, int64: integer, decimal: strconv.FormatInt(integer, 10)}, nil
-		}
-		return metricNumber{decimal: strconv.FormatFloat(value.AsDouble, 'f', 9, 64)}, nil
-	default:
-		return metricNumber{}, fmt.Errorf("missing number")
-	}
-}
-func (m metricNumber) integerString() string {
-	if !m.integer {
-		return "0"
-	}
-	return strconv.FormatInt(m.int64, 10)
-}
-
-// organizationIDFromAttributes returns the normalized organization UUID. Claude Code
-// emits organization.id as a datapoint attribute; a resource value is accepted only
-// when it agrees.
-func organizationIDFromAttributes(resourceAttrs, pointAttrs []*commonv1.KeyValue) (string, error) {
-	pointValue := attributeString(pointAttrs, organizationIDAttribute)
-	resourceValue := attributeString(resourceAttrs, organizationIDAttribute)
-	if pointValue == "" && resourceValue == "" {
-		return "", permanentMetricError("missing_organization", "supported metric has no organization.id")
-	}
-	pointOrganizationID, pointValid := normalizeOrganizationID(pointValue)
-	resourceOrganizationID, resourceValid := normalizeOrganizationID(resourceValue)
-	if (pointValue != "" && !pointValid) || (resourceValue != "" && !resourceValid) {
-		return "", permanentMetricError("invalid_organization", "supported metric has an invalid organization.id")
-	}
-	if pointValue != "" && resourceValue != "" && pointOrganizationID != resourceOrganizationID {
-		return "", permanentMetricError("organization_mismatch", "resource and datapoint organization IDs differ")
-	}
-	organizationID := pointOrganizationID
-	if organizationID == "" {
-		organizationID = resourceOrganizationID
-	}
-	return organizationID, nil
-}
-
-// bindConnectionOrganization binds an unbound connection to its first valid organization
-// and rejects telemetry for any other organization. The conditional update makes
-// concurrent first bindings safe; the locked re-read reports the winning binding.
-func bindConnectionOrganization(tx dal.Transaction, connection *models.OtelConnection, organizationID string) error {
-	if connection.OrganizationId == nil {
-		if err := tx.UpdateColumns(
-			&models.OtelConnection{},
-			[]dal.DalSet{{ColumnName: "organization_id", Value: organizationID}},
-			dal.Where("id = ? AND organization_id IS NULL", connection.ID),
-		); err != nil {
-			return err
-		}
-		boundConnection := &models.OtelConnection{}
-		if err := tx.First(boundConnection, dal.Where("id = ?", connection.ID), dal.Lock(true, false)); err != nil {
-			return err
-		}
-		connection.OrganizationId = boundConnection.OrganizationId
-	}
-	if connection.OrganizationId == nil {
-		return permanentMetricError("organization_mismatch", "telemetry organization does not match its OTel connection")
-	}
-	if boundOrganizationID, _ := normalizeOrganizationID(*connection.OrganizationId); boundOrganizationID != organizationID {
-		return permanentMetricError("organization_mismatch", "telemetry organization does not match its OTel connection")
-	}
-	return nil
-}
-
-// normalizeOrganizationID accepts only the bare hyphenated UUID form and returns it
-// lowercased, so equal organizations compare equal regardless of client casing.
-func normalizeOrganizationID(value string) (string, bool) {
-	if len(value) != len(uuid.Nil.String()) {
-		return "", false
-	}
-	organizationID, err := uuid.Parse(value)
-	if err != nil {
-		return "", false
-	}
-	return organizationID.String(), true
-}
-func metricSeriesHash(update factUpdate, resourceAttrs, pointAttrs []*commonv1.KeyValue, unit string) []byte {
-	values := []string{strconv.FormatUint(update.connection.ID, 10), update.metric, unit}
-	values = append(values, prefixedAttributes("resource", resourceAttrs)...)
-	values = append(values, prefixedAttributes("point", pointAttrs)...)
-	sort.Strings(values)
-	hash := sha256.Sum256([]byte(strings.Join(values, "\x00")))
-	return hash[:]
-}
-func prefixedAttributes(prefix string, attributes []*commonv1.KeyValue) []string {
-	values := make([]string, 0, len(attributes))
-	for _, attribute := range attributes {
-		value, err := proto.MarshalOptions{Deterministic: true}.Marshal(attribute.GetValue())
-		if err != nil {
-			continue
-		}
-		values = append(values, prefix+":"+attribute.GetKey()+"="+string(value))
-	}
-	return values
 }

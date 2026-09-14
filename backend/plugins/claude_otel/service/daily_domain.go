@@ -121,7 +121,10 @@ func reconcileOtelDailyTarget(tx dal.Transaction, target dailyTarget) error {
 		return fmt.Errorf("load hourly Claude OTel tool facts: %w", err)
 	}
 
-	accountID, email := resolveDomainAccount(tx, activityRows, modelRows, toolRows)
+	accountID, email, err := resolveDomainAccount(tx, activityRows, modelRows, toolRows)
+	if err != nil {
+		return err
+	}
 	if len(activityRows) > 0 {
 		if err := writeCanonicalActivity(tx, target, accountID, email, activityRows); err != nil {
 			return err
@@ -133,16 +136,21 @@ func reconcileOtelDailyTarget(tx dal.Transaction, target dailyTarget) error {
 	return writeCanonicalToolDecisions(tx, target, accountID, email, toolRows)
 }
 
-func resolveDomainAccount(tx dal.Transaction, activityRows []*models.OtelHourlyActivity, modelRows []*models.OtelHourlyModelUsage, toolRows []*models.OtelHourlyToolUsage) (string, string) {
+// resolveDomainAccount links the canonical row to a DevLake account by email when one
+// exists. A missing account is normal; a lookup failure aborts the conversion.
+func resolveDomainAccount(tx dal.Transaction, activityRows []*models.OtelHourlyActivity, modelRows []*models.OtelHourlyModelUsage, toolRows []*models.OtelHourlyToolUsage) (string, string, error) {
 	email := firstEmail(activityRows, modelRows, toolRows)
 	if email == "" {
-		return "", ""
+		return "", "", nil
 	}
 	account := &crossdomain.Account{}
 	if err := tx.First(account, dal.Where("email = ?", email)); err != nil {
-		return "", email
+		if tx.IsErrorNotFound(err) {
+			return "", email, nil
+		}
+		return "", "", fmt.Errorf("resolve Claude OTel domain account: %w", err)
 	}
-	return account.Id, email
+	return account.Id, email, nil
 }
 
 func firstEmail(activityRows []*models.OtelHourlyActivity, modelRows []*models.OtelHourlyModelUsage, toolRows []*models.OtelHourlyToolUsage) string {
