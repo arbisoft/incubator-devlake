@@ -53,6 +53,9 @@ type rawMetricConverter struct {
 	logger   log.Logger
 	now      func() time.Time
 	workerID string
+	// nextRetentionAt schedules raw retention; it is process-local because only the lease
+	// holder runs it and a new leader may safely run it immediately.
+	nextRetentionAt time.Time
 	// pollErrorLogged suppresses repeated poll failures, such as an unmigrated database
 	// during startup, until a poll succeeds again.
 	pollErrorLogged bool
@@ -82,7 +85,8 @@ func startRawMetricConverter(database dal.Dal, logger log.Logger) {
 	})
 }
 
-// poll converts batches in raw receipt order while this process holds the converter lease.
+// poll runs retention, replay requests, and raw conversion in receipt order while this
+// process holds the converter lease.
 func (c *rawMetricConverter) poll() {
 	for {
 		processed, err := c.pollOnce()
@@ -104,6 +108,12 @@ func (c *rawMetricConverter) pollOnce() (bool, errors.Error) {
 	leader, err := c.acquireLease()
 	if err != nil || !leader {
 		return false, err
+	}
+	if err := c.runRetention(); err != nil {
+		return false, err
+	}
+	if replayed, err := c.processNextReplay(); err != nil || replayed {
+		return replayed, err
 	}
 	return c.processNext()
 }

@@ -194,7 +194,48 @@ After the Collector is healthy, use Apply in Config UI to retry the restart. If 
 2. Inspect `_raw_otel_claude_code_metric_batches` by `status`, `received_at`, and
    `processing_error_code`. Do not log or export `payload_proto` or `payload_json`.
 3. A `permanent_error` is malformed or unsupported telemetry and requires remediation;
-   a `retryable_error` indicates downstream recovery/retry work.
+   a `retryable_error` indicates downstream recovery/retry work. Conversion is strictly
+   ordered, so a retrying head batch delays later batches; it is quarantined as
+   `retry_exhausted` after 12 attempts. A `processed` batch with
+   `processing_error_code = 'resources_skipped'` converted every team except those listed
+   in `processing_error_message`.
+
+```sql
+-- Backlog and age of the oldest unconverted batch
+SELECT status, COUNT(*) AS batches, MIN(received_at) AS oldest_received_at
+FROM _raw_otel_claude_code_metric_batches
+WHERE status IN ('pending', 'processing', 'retryable_error')
+GROUP BY status;
+
+-- Recent quarantined or partially skipped batches
+SELECT id, received_at, status, attempt_count, processing_error_code, processing_error_message
+FROM _raw_otel_claude_code_metric_batches
+WHERE status = 'permanent_error' OR processing_error_code = 'resources_skipped'
+ORDER BY id DESC
+LIMIT 20;
+```
+
+Terminal raw batches are retained for 90 days, then deleted in bounded batches.
+
+### Rebuild MySQL facts after remediation
+
+After fixing the cause of skipped or quarantined telemetry (for example a missing
+connection), rebuild whole UTC days from retained raw batches. Replay is operator-only:
+insert a request, and the elected converter rebuilds hourly facts and canonical daily
+rows for that range in one transaction. A range may cover up to 31 days.
+
+```sql
+INSERT INTO _tool_claude_code_otel_replay_requests (range_start, range_end, status, created_at, updated_at)
+VALUES ('2026-09-01 00:00:00', '2026-09-03 00:00:00', 'pending', UTC_TIMESTAMP(), UTC_TIMESTAMP());
+
+SELECT id, status, replayed_batches, skipped_batches, error_message, completed_at
+FROM _tool_claude_code_otel_replay_requests
+ORDER BY id DESC;
+```
+
+Replay reads the hour before the range to seed cumulative counters and does not change
+live series state. Resetting a single batch to `pending` is not a replay: cumulative
+samples older than live state are rejected as out of order.
 
 ### Reset local telemetry state
 

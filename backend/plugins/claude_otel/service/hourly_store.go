@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"time"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
@@ -43,7 +44,7 @@ func (c *rawMetricConverter) applyHourlyUpdates(tx dal.Transaction, updates []fa
 		if err != nil {
 			return err
 		}
-		if err := upsertHourlyFact(tx, update, value); err != nil {
+		if err := upsertHourlyFact(tx, update, value, update.observedAt); err != nil {
 			return classifyStorageError(fmt.Errorf("write hourly Claude Code OTel facts: %w", err))
 		}
 	}
@@ -78,28 +79,34 @@ func bindConnectionOrganization(tx dal.Transaction, connection *models.OtelConne
 	return nil
 }
 
-// counterDelta returns the usage contributed by one sample. DELTA samples are already
-// usage; a CUMULATIVE sample contributes its increase over the previous sample of the
-// same counter, and a lower value is a counter reset.
+// seriesSample is the last applied sample of one cumulative counter.
+type seriesSample struct {
+	timeNanos uint64
+	value     *big.Rat
+}
+
+// counterDelta returns the usage contributed by one sample and advances the persisted
+// state of its cumulative counter. DELTA samples are already usage.
 func (c *rawMetricConverter) counterDelta(tx dal.Transaction, update factUpdate) (metricNumber, error) {
 	if update.temporality == metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_DELTA {
 		return update.value, nil
 	}
 	state := &models.OtelMetricSeriesState{}
+	var previous *seriesSample
 	loadErr := tx.First(state, dal.Where("series_hash = ?", update.seriesHash), dal.Lock(true, false))
 	if loadErr != nil && !tx.IsErrorNotFound(loadErr) {
 		return metricNumber{}, classifyStorageError(fmt.Errorf("load OTel series state: %w", loadErr))
 	}
-	delta := update.value
-	if loadErr == nil {
-		if update.timeNanos <= state.LastTimeUnixNano {
-			return metricNumber{}, permanentMetricError(errorOutOfOrderCumulative, "metric %s has an out-of-order cumulative sample", update.metric)
+	if loadErr == nil && state.LastNumberValue != nil {
+		lastValue, ok := new(big.Rat).SetString(*state.LastNumberValue)
+		if !ok {
+			return metricNumber{}, permanentMetricError(errorInvalidSeriesState, "metric %s has invalid cumulative state", update.metric)
 		}
-		increase, err := cumulativeIncrease(state, update)
-		if err != nil {
-			return metricNumber{}, err
-		}
-		delta = increase
+		previous = &seriesSample{timeNanos: state.LastTimeUnixNano, value: lastValue}
+	}
+	delta, err := cumulativeIncrease(previous, update)
+	if err != nil {
+		return metricNumber{}, err
 	}
 	lastValue := update.value.decimalString()
 	state = &models.OtelMetricSeriesState{
@@ -118,30 +125,32 @@ func (c *rawMetricConverter) counterDelta(tx dal.Transaction, update factUpdate)
 	return delta, nil
 }
 
-func cumulativeIncrease(state *models.OtelMetricSeriesState, update factUpdate) (metricNumber, error) {
-	if state.LastNumberValue == nil {
+// cumulativeIncrease returns a cumulative sample's increase over the previous sample of the
+// same counter. A first sample counts from the counter start, and a lower value is a reset.
+func cumulativeIncrease(previous *seriesSample, update factUpdate) (metricNumber, error) {
+	if previous == nil {
 		return update.value, nil
 	}
-	previous, ok := new(big.Rat).SetString(*state.LastNumberValue)
-	if !ok {
-		return metricNumber{}, permanentMetricError(errorInvalidSeriesState, "metric %s has invalid cumulative state", update.metric)
+	if update.timeNanos <= previous.timeNanos {
+		return metricNumber{}, permanentMetricError(errorOutOfOrderCumulative, "metric %s has an out-of-order cumulative sample", update.metric)
 	}
-	if update.value.value.Cmp(previous) < 0 {
+	if update.value.value.Cmp(previous.value) < 0 {
 		return update.value, nil
 	}
-	return metricNumber{value: new(big.Rat).Sub(update.value.value, previous)}, nil
+	return metricNumber{value: new(big.Rat).Sub(update.value.value, previous.value)}, nil
 }
 
-// upsertHourlyFact adds one metric value to its hourly fact row. Column names come only
-// from the allowlisted metric mapping, never from telemetry.
-func upsertHourlyFact(tx dal.Transaction, update factUpdate, value metricNumber) error {
+// upsertHourlyFact adds one metric value observed from update.observedAt through
+// lastObservedAt to its hourly fact row. Column names come only from the allowlisted
+// metric mapping, never from telemetry.
+func upsertHourlyFact(tx dal.Transaction, update factUpdate, value metricNumber, lastObservedAt time.Time) error {
 	table, dimensionColumns, dimensionValues := hourlyFactTarget(update)
 	columns := append(append(append([]string{}, hourlyIdentityColumns...), dimensionColumns...), update.column, "first_observed_at", "last_observed_at", "created_at", "updated_at")
 	params := append([]interface{}{
 		update.connection.ID, update.connection.TeamSlug, update.organizationID, update.identity.key,
 		update.identity.accountID, update.identity.accountUUID, update.identity.email, update.hour,
 	}, dimensionValues...)
-	params = append(params, value.sqlString(), update.observedAt, update.observedAt)
+	params = append(params, value.sqlString(), update.observedAt, lastObservedAt)
 	placeholders := strings.TrimSuffix(strings.Repeat("?, ", len(params)), ", ")
 	query := fmt.Sprintf(
 		"INSERT INTO %[1]s (%[2]s) VALUES (%[3]s, NOW(), NOW()) AS incoming "+

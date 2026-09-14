@@ -28,12 +28,18 @@ const (
 	// cleanup treats that prefix as its own raw-data namespace.
 	OtelMetricBatchTable    = "_raw_otel_claude_code_metric_batches"
 	OtelConverterLeaseTable = "_tool_claude_code_otel_converter_leases"
+	OtelReplayRequestTable  = "_tool_claude_code_otel_replay_requests"
 
 	OtelMetricBatchStatusPending        = "pending"
 	OtelMetricBatchStatusProcessing     = "processing"
 	OtelMetricBatchStatusProcessed      = "processed"
 	OtelMetricBatchStatusRetryableError = "retryable_error"
 	OtelMetricBatchStatusPermanentError = "permanent_error"
+
+	OtelReplayRequestStatusPending    = "pending"
+	OtelReplayRequestStatusProcessing = "processing"
+	OtelReplayRequestStatusCompleted  = "completed"
+	OtelReplayRequestStatusFailed     = "failed"
 )
 
 // OtelMetricBatch is the durable, replayable OTLP Metrics request accepted from
@@ -74,4 +80,22 @@ type OtelConverterLease struct {
 
 func (OtelConverterLease) TableName() string {
 	return OtelConverterLeaseTable
+}
+
+// OtelReplayRequest asks the elected converter to rebuild hourly and canonical daily
+// facts for whole UTC days from retained raw batches. Operators insert requests directly;
+// there is intentionally no API or UI trigger.
+type OtelReplayRequest struct {
+	common.Model
+	RangeStart      time.Time  `gorm:"type:datetime(3)"`
+	RangeEnd        time.Time  `gorm:"type:datetime(3)"`
+	Status          string     `gorm:"type:varchar(32);index"`
+	ReplayedBatches int        `gorm:"not null;default:0"`
+	SkippedBatches  int        `gorm:"not null;default:0"`
+	ErrorMessage    *string    `gorm:"type:text"`
+	CompletedAt     *time.Time `gorm:"type:datetime(3)"`
+}
+
+func (OtelReplayRequest) TableName() string {
+	return OtelReplayRequestTable
 }

@@ -79,6 +79,21 @@ func (otelConverterLease20260914) TableName() string {
 	return "_tool_claude_code_otel_converter_leases"
 }
 
+type otelReplayRequest20260914 struct {
+	archived.Model
+	RangeStart      time.Time  `gorm:"type:datetime(3)"`
+	RangeEnd        time.Time  `gorm:"type:datetime(3)"`
+	Status          string     `gorm:"type:varchar(32);index"`
+	ReplayedBatches int        `gorm:"not null;default:0"`
+	SkippedBatches  int        `gorm:"not null;default:0"`
+	ErrorMessage    *string    `gorm:"type:text"`
+	CompletedAt     *time.Time `gorm:"type:datetime(3)"`
+}
+
+func (otelReplayRequest20260914) TableName() string {
+	return "_tool_claude_code_otel_replay_requests"
+}
+
 type otelCredential20260914 struct {
 	archived.Model
 	ConnectionId uint64
@@ -95,6 +110,7 @@ func (script *addClaudeCodeOtelRawMetricBatches) Up(basicRes context.BasicRes) e
 		&otelConnection20260914{},
 		&otelMetricBatch20260914{},
 		&otelConverterLease20260914{},
+		&otelReplayRequest20260914{},
 	); err != nil {
 		return err
 	}
