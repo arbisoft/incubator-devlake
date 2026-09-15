@@ -29,7 +29,6 @@ import { operator, type OperateConfig } from '@/utils';
 import { getOtelColumns } from './columns';
 import { OTEL_ERROR, OTEL_LIFECYCLE_ACTION } from './constants';
 import { OTEL_MODAL, OtelModals, type OtelLifecycleAction, type OtelModalState } from './modals';
-import { CanonicalSourceCard } from './source-card';
 import {
   getOtelCreateError,
   getOtelLifecycleError,
@@ -64,7 +63,6 @@ export const Otel = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { data, ready } = useRefreshData(() => API.otel.list(), [version]);
   const { data: projectOptions } = useRefreshData(() => API.otel.listProjects(), []);
-  const { data: sourcePreferences } = useRefreshData(() => API.otel.listSourcePreferences(), []);
   const dataSource = useMemo(() => data ?? [], [data]);
   const columns = useMemo(
     () =>
@@ -199,7 +197,6 @@ export const Otel = () => {
       {hasStorageNeedsApplying(dataSource) && (
         <Message content="Credential storage differs from the registered credentials. Select Apply to reconcile the telemetry endpoint." />
       )}
-      <CanonicalSourceCard preferences={sourcePreferences ?? []} />
       <Table
         rowKey={(record) => record.connection.id}
         size="middle"
