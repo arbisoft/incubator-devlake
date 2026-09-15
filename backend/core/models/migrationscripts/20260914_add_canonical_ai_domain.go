@@ -122,20 +122,6 @@ type aiSourcePreference20260914 struct {
 
 func (aiSourcePreference20260914) TableName() string { return "ai_source_preferences" }
 
-type aiSourceSnapshot20260914 struct {
-	Provider        string     `gorm:"type:varchar(100);primaryKey"`
-	WorkspaceKey    string     `gorm:"type:varchar(255);primaryKey"`
-	SourceType      string     `gorm:"type:varchar(64);primaryKey"`
-	MetricFamily    string     `gorm:"type:varchar(64);primaryKey"`
-	Date            time.Time  `gorm:"type:date;primaryKey"`
-	CompletedAt     time.Time  `gorm:"type:datetime(3)"`
-	SourceUpdatedAt *time.Time `gorm:"type:datetime(3)"`
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-}
-
-func (aiSourceSnapshot20260914) TableName() string { return "ai_source_snapshots" }
-
 func (script *addCanonicalAiDomain) Up(basicRes context.BasicRes) errors.Error {
 	return migrationhelper.AutoMigrateTables(
 		basicRes,
@@ -143,7 +129,6 @@ func (script *addCanonicalAiDomain) Up(basicRes context.BasicRes) errors.Error {
 		&aiModelUsage20260914{},
 		&aiToolDecision20260914{},
 		&aiSourcePreference20260914{},
-		&aiSourceSnapshot20260914{},
 	)
 }
 

@@ -147,19 +147,3 @@ type AiSourcePreference struct {
 }
 
 func (AiSourcePreference) TableName() string { return "ai_source_preferences" }
-
-// AiSourceSnapshot is reserved for the future API completeness contract. OTel-only
-// canonical aggregation deliberately does not infer a day-complete watermark.
-type AiSourceSnapshot struct {
-	Provider        string     `gorm:"type:varchar(100);primaryKey" json:"provider"`
-	WorkspaceKey    string     `gorm:"type:varchar(255);primaryKey" json:"workspaceKey"`
-	SourceType      string     `gorm:"type:varchar(64);primaryKey" json:"sourceType"`
-	MetricFamily    string     `gorm:"type:varchar(64);primaryKey" json:"metricFamily"`
-	Date            time.Time  `gorm:"type:date;primaryKey" json:"date"`
-	CompletedAt     time.Time  `gorm:"type:datetime(3)" json:"completedAt"`
-	SourceUpdatedAt *time.Time `gorm:"type:datetime(3)" json:"sourceUpdatedAt,omitempty"`
-	CreatedAt       time.Time  `json:"createdAt"`
-	UpdatedAt       time.Time  `json:"updatedAt"`
-}
-
-func (AiSourceSnapshot) TableName() string { return "ai_source_snapshots" }

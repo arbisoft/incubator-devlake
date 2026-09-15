@@ -176,7 +176,7 @@ func (c *rawMetricConverter) claimNext() (*models.OtelMetricBatch, string, error
 	err := c.db.First(head,
 		dal.Select("id, status, attempt_count, next_attempt_at, lease_until"),
 		dal.Where("status IN ?", nonterminalBatchStatuses),
-		dal.Orderby("id ASC"),
+		dal.Orderby("received_at ASC, id ASC"),
 	)
 	if err != nil {
 		if c.db.IsErrorNotFound(err) {

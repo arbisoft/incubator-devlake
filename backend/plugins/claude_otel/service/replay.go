@@ -18,6 +18,7 @@ limitations under the License.
 package service
 
 import (
+	stdErrors "errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -26,6 +27,7 @@ import (
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/ai"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
+	"github.com/google/uuid"
 	collectormetrics "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 	metricsv1 "go.opentelemetry.io/proto/otlp/metrics/v1"
 	"google.golang.org/protobuf/proto"
@@ -38,40 +40,83 @@ const (
 
 var replayableBatchStatuses = []string{models.OtelMetricBatchStatusProcessed, models.OtelMetricBatchStatusPermanentError}
 
-// processNextReplay runs the oldest pending replay request. A request left processing by
-// a previous leader is rerun; a rebuild commits in one transaction and is idempotent.
+var errReplayLeaseLost = stdErrors.New("Claude Code OTel replay lease was lost")
+
+// processNextReplay claims the oldest pending or expired replay request. A request-level
+// lease keeps a long rebuild owned even when the converter's short global lease turns over.
 func (c *rawMetricConverter) processNextReplay() (bool, errors.Error) {
+	request, leaseOwner, found, err := c.claimNextReplay()
+	if err != nil || !found {
+		return false, err
+	}
+	replayed, skipped, replayErr := c.replay(request, leaseOwner)
+	if replayErr != nil {
+		if stdErrors.Is(replayErr, errReplayLeaseLost) {
+			return false, nil
+		}
+		c.logWarn(replayErr, fmt.Sprintf("Claude Code OTel replay request %d failed", request.ID))
+		message := replayErr.Error()
+		return true, c.finishReplay(request.ID, leaseOwner, models.OtelReplayRequestStatusFailed, replayed, skipped, &message)
+	}
+	return true, nil
+}
+
+func (c *rawMetricConverter) claimNextReplay() (*models.OtelReplayRequest, string, bool, errors.Error) {
+	now := c.now().UTC()
 	request := &models.OtelReplayRequest{}
 	err := c.db.First(request,
-		dal.Where("status IN ?", []string{models.OtelReplayRequestStatusPending, models.OtelReplayRequestStatusProcessing}),
+		dal.Where("status = ? OR (status = ? AND (lease_until IS NULL OR lease_until < ?))", models.OtelReplayRequestStatusPending, models.OtelReplayRequestStatusProcessing, now),
 		dal.Orderby("id ASC"),
 	)
 	if err != nil {
 		if c.db.IsErrorNotFound(err) {
-			return false, nil
+			return nil, "", false, nil
 		}
-		return false, errors.Default.Wrap(err, "failed to find Claude Code OTel replay request")
+		return nil, "", false, errors.Default.Wrap(err, "failed to find Claude Code OTel replay request")
 	}
-	if err := c.db.UpdateColumn(&models.OtelReplayRequest{}, "status", models.OtelReplayRequestStatusProcessing, dal.Where("id = ?", request.ID)); err != nil {
-		return false, errors.Default.Wrap(err, "failed to start Claude Code OTel replay request")
+	leaseOwner := uuid.NewString()
+	if err := c.db.UpdateColumns(&models.OtelReplayRequest{}, []dal.DalSet{
+		{ColumnName: "status", Value: models.OtelReplayRequestStatusProcessing},
+		{ColumnName: "lease_owner", Value: leaseOwner},
+		{ColumnName: "lease_until", Value: now.Add(converterLeaseDuration)},
+	}, dal.Where("id = ? AND (status = ? OR (status = ? AND (lease_until IS NULL OR lease_until < ?)))", request.ID, models.OtelReplayRequestStatusPending, models.OtelReplayRequestStatusProcessing, now)); err != nil {
+		return nil, "", false, errors.Default.Wrap(err, "failed to claim Claude Code OTel replay request")
 	}
-	replayed, skipped, replayErr := c.replay(request)
-	if replayErr != nil {
-		c.logWarn(replayErr, fmt.Sprintf("Claude Code OTel replay request %d failed", request.ID))
-		message := replayErr.Error()
-		return true, c.finishReplay(request.ID, models.OtelReplayRequestStatusFailed, replayed, skipped, &message)
+	if err := c.db.First(request, dal.Where("id = ? AND status = ? AND lease_owner = ? AND lease_until > ?", request.ID, models.OtelReplayRequestStatusProcessing, leaseOwner, now)); err != nil {
+		if c.db.IsErrorNotFound(err) {
+			return nil, "", false, nil
+		}
+		return nil, "", false, errors.Default.Wrap(err, "failed to verify Claude Code OTel replay request lease")
 	}
-	return true, c.finishReplay(request.ID, models.OtelReplayRequestStatusCompleted, replayed, skipped, nil)
+	return request, leaseOwner, true, nil
 }
 
-func (c *rawMetricConverter) finishReplay(requestID uint64, status string, replayed, skipped int, message *string) errors.Error {
+func (c *rawMetricConverter) renewReplayLease(requestID uint64, leaseOwner string) error {
+	now := c.now().UTC()
+	if err := c.db.UpdateColumn(&models.OtelReplayRequest{}, "lease_until", now.Add(converterLeaseDuration),
+		dal.Where("id = ? AND status = ? AND lease_owner = ? AND lease_until > ?", requestID, models.OtelReplayRequestStatusProcessing, leaseOwner, now)); err != nil {
+		return fmt.Errorf("renew replay request lease: %w", err)
+	}
+	request := &models.OtelReplayRequest{}
+	if err := c.db.First(request, dal.Where("id = ? AND status = ? AND lease_owner = ? AND lease_until > ?", requestID, models.OtelReplayRequestStatusProcessing, leaseOwner, now)); err != nil {
+		if c.db.IsErrorNotFound(err) {
+			return errReplayLeaseLost
+		}
+		return fmt.Errorf("verify replay request lease: %w", err)
+	}
+	return nil
+}
+
+func (c *rawMetricConverter) finishReplay(requestID uint64, leaseOwner, status string, replayed, skipped int, message *string) errors.Error {
 	err := c.db.UpdateColumns(&models.OtelReplayRequest{}, []dal.DalSet{
 		{ColumnName: "status", Value: status},
+		{ColumnName: "lease_owner", Value: nil},
+		{ColumnName: "lease_until", Value: nil},
 		{ColumnName: "replayed_batches", Value: replayed},
 		{ColumnName: "skipped_batches", Value: skipped},
 		{ColumnName: "error_message", Value: message},
 		{ColumnName: "completed_at", Value: c.now().UTC()},
-	}, dal.Where("id = ?", requestID))
+	}, dal.Where("id = ? AND status = ? AND lease_owner = ?", requestID, models.OtelReplayRequestStatusProcessing, leaseOwner))
 	if err != nil {
 		return errors.Default.Wrap(err, fmt.Sprintf("failed to record Claude Code OTel replay request %d result", requestID))
 	}
@@ -85,6 +130,9 @@ func (c *rawMetricConverter) validateReplayRange(request *models.OtelReplayReque
 	}
 	if !start.Before(end) || end.Sub(start) > replayMaxRange {
 		return fmt.Errorf("replay range must be between one and %d days", int(replayMaxRange.Hours()/24))
+	}
+	if end.After(c.now().UTC().Truncate(24 * time.Hour)) {
+		return fmt.Errorf("replay range must contain completed UTC days only")
 	}
 	if start.Before(c.now().UTC().Add(-rawBatchRetention)) {
 		return fmt.Errorf("replay range starts before retained raw telemetry")
@@ -101,7 +149,7 @@ type hourlyAggregate struct {
 
 // replay rebuilds hourly facts and canonical daily rows for whole UTC days from Claude
 // Code's default DELTA exports. Persisted live series state is left untouched.
-func (c *rawMetricConverter) replay(request *models.OtelReplayRequest) (int, int, error) {
+func (c *rawMetricConverter) replay(request *models.OtelReplayRequest, leaseOwner string) (int, int, error) {
 	if err := c.validateReplayRange(request); err != nil {
 		return 0, 0, err
 	}
@@ -110,6 +158,9 @@ func (c *rawMetricConverter) replay(request *models.OtelReplayRequest) (int, int
 	replayed, skipped := 0, 0
 	var lastBatchID uint64
 	for {
+		if err := c.renewReplayLease(request.ID, leaseOwner); err != nil {
+			return replayed, skipped, err
+		}
 		batches := make([]*models.OtelMetricBatch, 0, replayBatchPage)
 		if err := c.db.All(&batches,
 			dal.Where("id > ? AND status IN ? AND max_observed_at >= ? AND min_observed_at < ?", lastBatchID, replayableBatchStatuses, rangeStart, rangeEnd),
@@ -119,6 +170,9 @@ func (c *rawMetricConverter) replay(request *models.OtelReplayRequest) (int, int
 			return replayed, skipped, fmt.Errorf("load raw batches for replay: %w", err)
 		}
 		for _, batch := range batches {
+			if err := c.renewReplayLease(request.ID, leaseOwner); err != nil {
+				return replayed, skipped, err
+			}
 			lastBatchID = batch.ID
 			processed, replayErr := c.replayBatch(batch, rangeStart, rangeEnd, aggregates)
 			if replayErr != nil {
@@ -134,10 +188,7 @@ func (c *rawMetricConverter) replay(request *models.OtelReplayRequest) (int, int
 			break
 		}
 	}
-	if leader, err := c.acquireLease(); err != nil || !leader {
-		return replayed, skipped, fmt.Errorf("converter lease was lost during replay: %v", err)
-	}
-	return replayed, skipped, c.commitReplay(rangeStart, rangeEnd, aggregates)
+	return replayed, skipped, c.commitReplay(request.ID, leaseOwner, rangeStart, rangeEnd, aggregates, replayed, skipped)
 }
 
 // replayBatch adds one raw batch's in-range increases to the aggregates. It returns false
@@ -184,11 +235,34 @@ func hourlyAggregateKey(update factUpdate) string {
 
 // commitReplay replaces the range's hourly facts and canonical Claude OTel daily rows in
 // one transaction.
-func (c *rawMetricConverter) commitReplay(rangeStart, rangeEnd time.Time, aggregates map[string]*hourlyAggregate) error {
+func (c *rawMetricConverter) commitReplay(requestID uint64, leaseOwner string, rangeStart, rangeEnd time.Time, aggregates map[string]*hourlyAggregate, replayed, skipped int) error {
 	tx := c.db.Begin()
+	request := &models.OtelReplayRequest{}
+	if err := tx.First(request,
+		dal.Where("id = ? AND status = ? AND lease_owner = ? AND lease_until > ?", requestID, models.OtelReplayRequestStatusProcessing, leaseOwner, c.now().UTC()),
+		dal.Lock(true, false),
+	); err != nil {
+		c.rollback(tx)
+		if tx.IsErrorNotFound(err) {
+			return errReplayLeaseLost
+		}
+		return fmt.Errorf("verify replay request lease before commit: %w", err)
+	}
 	if err := c.replaceReplayRange(tx, rangeStart, rangeEnd, aggregates); err != nil {
 		c.rollback(tx)
 		return err
+	}
+	if err := tx.UpdateColumns(&models.OtelReplayRequest{}, []dal.DalSet{
+		{ColumnName: "status", Value: models.OtelReplayRequestStatusCompleted},
+		{ColumnName: "lease_owner", Value: nil},
+		{ColumnName: "lease_until", Value: nil},
+		{ColumnName: "replayed_batches", Value: replayed},
+		{ColumnName: "skipped_batches", Value: skipped},
+		{ColumnName: "error_message", Value: nil},
+		{ColumnName: "completed_at", Value: c.now().UTC()},
+	}, dal.Where("id = ? AND status = ? AND lease_owner = ?", requestID, models.OtelReplayRequestStatusProcessing, leaseOwner)); err != nil {
+		c.rollback(tx)
+		return fmt.Errorf("complete Claude Code OTel replay request: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit Claude Code OTel replay: %w", err)

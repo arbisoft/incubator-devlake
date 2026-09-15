@@ -165,6 +165,62 @@ func TestReplayRejectsCumulativeTelemetryWithoutCheckpoint(t *testing.T) {
 	}
 }
 
+func TestReplayRejectsCurrentUTCDate(t *testing.T) {
+	now := time.Date(2026, 9, 15, 10, 0, 0, 0, time.UTC)
+	converter := newRawMetricConverter(nil, nil)
+	converter.now = func() time.Time { return now }
+	request := &models.OtelReplayRequest{
+		RangeStart: now.Truncate(24 * time.Hour),
+		RangeEnd:   now.Truncate(24 * time.Hour).Add(24 * time.Hour),
+	}
+	if err := converter.validateReplayRange(request); err == nil {
+		t.Fatal("validateReplayRange() error = nil, want current UTC day rejection")
+	}
+}
+
+func TestReplayDeltaBatchesRebuildStableHourlyAggregates(t *testing.T) {
+	firstObservedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
+	secondObservedAt := firstObservedAt.Add(time.Hour)
+	first := newConverterRequest(firstObservedAt, testOrganizationID)
+	second := newConverterRequest(secondObservedAt, testOrganizationID)
+	second.ResourceMetrics[0].ScopeMetrics[0].Metrics[1].GetSum().DataPoints[0].Value = &metricsv1.NumberDataPoint_AsInt{AsInt: 20}
+
+	marshalBatch := func(request *collectormetrics.ExportMetricsServiceRequest) *models.OtelMetricBatch {
+		payload, err := proto.Marshal(request)
+		if err != nil {
+			t.Fatalf("proto.Marshal() error = %v", err)
+		}
+		return &models.OtelMetricBatch{PayloadProto: payload}
+	}
+	batches := []*models.OtelMetricBatch{marshalBatch(first), marshalBatch(second)}
+	rebuild := func() map[string]*hourlyAggregate {
+		aggregates := make(map[string]*hourlyAggregate)
+		database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: firstObservedAt.Add(-time.Hour)}}})
+		converter := newRawMetricConverter(database, nil)
+		for _, batch := range batches {
+			processed, err := converter.replayBatch(batch, firstObservedAt.Truncate(24*time.Hour), firstObservedAt.Truncate(24*time.Hour).Add(24*time.Hour), aggregates)
+			if err != nil || !processed {
+				t.Fatalf("replayBatch() = %t, %v", processed, err)
+			}
+		}
+		return aggregates
+	}
+
+	firstRebuild := rebuild()
+	secondRebuild := rebuild()
+	for _, rebuild := range []map[string]*hourlyAggregate{firstRebuild, secondRebuild} {
+		var total big.Rat
+		for _, aggregate := range rebuild {
+			if aggregate.update.fact == hourlyModelUsageFact && aggregate.update.column == "input_tokens" {
+				total.Add(&total, aggregate.value)
+			}
+		}
+		if total.RatString() != "30" {
+			t.Fatalf("replayed input token total = %s, want 30", total.RatString())
+		}
+	}
+}
+
 func TestCounterDeltaUsesExactCumulativeIncreaseResetAndOrder(t *testing.T) {
 	testCases := []struct {
 		name         string

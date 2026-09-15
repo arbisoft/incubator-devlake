@@ -107,6 +107,5 @@ func GetDomainTablesInfo() []dal.Tabler {
 		&ai.AiModelUsage{},
 		&ai.AiToolDecision{},
 		&ai.AiSourcePreference{},
-		&ai.AiSourceSnapshot{},
 	}
 }

@@ -45,7 +45,7 @@ func (otelConnection20260914) TableName() string {
 
 type otelMetricBatch20260914 struct {
 	archived.Model
-	ReceivedAt             time.Time  `gorm:"index"`
+	ReceivedAt             time.Time  `gorm:"index;index:idx_otel_metric_batch_claim,priority:2"`
 	PayloadSha256          []byte     `gorm:"type:binary(32);uniqueIndex"`
 	PayloadProto           []byte     `gorm:"type:mediumblob"`
 	PayloadJSON            *string    `gorm:"type:json"`
@@ -54,7 +54,7 @@ type otelMetricBatch20260914 struct {
 	DatapointCount         int        `gorm:"not null"`
 	MinObservedAt          *time.Time `gorm:"index"`
 	MaxObservedAt          *time.Time `gorm:"index"`
-	Status                 string     `gorm:"type:varchar(32);index"`
+	Status                 string     `gorm:"type:varchar(32);index;index:idx_otel_metric_batch_claim,priority:1"`
 	AttemptCount           int        `gorm:"not null"`
 	NextAttemptAt          *time.Time `gorm:"index"`
 	LeaseUntil             *time.Time `gorm:"index"`
@@ -84,6 +84,8 @@ type otelReplayRequest20260914 struct {
 	RangeStart      time.Time  `gorm:"type:datetime(3)"`
 	RangeEnd        time.Time  `gorm:"type:datetime(3)"`
 	Status          string     `gorm:"type:varchar(32);index"`
+	LeaseUntil      *time.Time `gorm:"type:datetime(3);index"`
+	LeaseOwner      *string    `gorm:"type:char(36);index"`
 	ReplayedBatches int        `gorm:"not null;default:0"`
 	SkippedBatches  int        `gorm:"not null;default:0"`
 	ErrorMessage    *string    `gorm:"type:text"`
