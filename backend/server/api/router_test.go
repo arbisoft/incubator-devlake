@@ -30,6 +30,9 @@ import (
 	contextimpl "github.com/apache/incubator-devlake/impls/context"
 	"github.com/apache/incubator-devlake/impls/logruslog"
 	"github.com/gin-gonic/gin"
+	rpccode "google.golang.org/genproto/googleapis/rpc/code"
+	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 // TestPluginEndpointPassesProtobufRequestBodyThrough guards the OTLP ingest contract: a
@@ -62,5 +65,21 @@ func TestPluginEndpointPassesProtobufRequestBodyThrough(t *testing.T) {
 
 	if response.Code != http.StatusOK || !bytes.Equal(received, payload) {
 		t.Fatalf("status=%d body=%s received=%x, want 200 and %x", response.Code, response.Body.String(), received, payload)
+	}
+}
+
+func TestOtlpMigrationUnavailableUsesProtobufStatus(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	response := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(response)
+
+	outputOtlpMigrationUnavailable(context, "database migration is in progress")
+
+	status := &rpcstatus.Status{}
+	if err := proto.Unmarshal(response.Body.Bytes(), status); err != nil {
+		t.Fatalf("proto.Unmarshal() error = %v", err)
+	}
+	if response.Code != http.StatusServiceUnavailable || response.Header().Get("Content-Type") != "application/x-protobuf" || status.Code != int32(rpccode.Code_UNAVAILABLE) {
+		t.Fatalf("response=%d/%q/%#v, want 503 protobuf UNAVAILABLE", response.Code, response.Header().Get("Content-Type"), status)
 	}
 }

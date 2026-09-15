@@ -50,7 +50,6 @@ func TestRawIngestRejectsUnauthenticatedAndMalformedRequests(t *testing.T) {
 		{name: "invalid token", contentType: otlpProtobufContentType, token: "incorrect", payload: validPayload, status: http.StatusForbidden},
 		{name: "unsupported content type", contentType: "application/json", token: "collector-token", payload: validPayload, status: http.StatusUnsupportedMediaType},
 		{name: "malformed payload", contentType: otlpProtobufContentType, token: "collector-token", payload: []byte("not protobuf"), status: http.StatusBadRequest},
-		{name: "spoofable project attribution", contentType: otlpProtobufContentType, token: "collector-token", payload: marshalOtelMetricsRequest(t, newOtelMetricsRequestWithProject("platform")), status: http.StatusBadRequest},
 	}
 
 	for _, testCase := range testCases {
@@ -183,8 +182,8 @@ func TestRawIngestRequiresConsistentDatapointAttribution(t *testing.T) {
 	points := request.ResourceMetrics[0].ScopeMetrics[0].Metrics[0].GetGauge().GetDataPoints()
 	points = append(points, &metricsv1.NumberDataPoint{Attributes: []*commonv1.KeyValue{stringAttribute(devlakeTeamAttribute, "other")}})
 	request.ResourceMetrics[0].ScopeMetrics[0].Metrics[0].GetGauge().DataPoints = points
-	if _, _, err := validateOtelMetricsRequest(request); err == nil {
-		t.Fatal("validateOtelMetricsRequest() error = nil")
+	if _, _, err := validateOtelMetricsRequest(request); err != nil {
+		t.Fatalf("validateOtelMetricsRequest() error = %v, want raw retention before conversion", err)
 	}
 }
 
@@ -215,15 +214,6 @@ func newOtelMetricsRequest(teamSlug string, organizationID string) *collectormet
 func newOtelMetricsRequestWithDatapoint(teamSlug string, organizationID string, timestamp uint64) *collectormetrics.ExportMetricsServiceRequest {
 	request := newOtelMetricsRequest(teamSlug, organizationID)
 	request.ResourceMetrics[0].ScopeMetrics[0].Metrics[0].GetGauge().DataPoints[0].TimeUnixNano = timestamp
-	return request
-}
-
-func newOtelMetricsRequestWithProject(teamSlug string) *collectormetrics.ExportMetricsServiceRequest {
-	request := newOtelMetricsRequest(teamSlug, "")
-	request.ResourceMetrics[0].ScopeMetrics[0].Metrics[0].GetGauge().DataPoints[0].Attributes = append(
-		request.ResourceMetrics[0].ScopeMetrics[0].Metrics[0].GetGauge().DataPoints[0].Attributes,
-		stringAttribute(devlakeProjectAttribute, "not-trusted"),
-	)
 	return request
 }
 

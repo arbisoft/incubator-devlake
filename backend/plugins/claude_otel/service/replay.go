@@ -32,12 +32,8 @@ import (
 )
 
 const (
-	replayMaxRange = 31 * 24 * time.Hour
-	// replaySeedLookback replays samples before the range only to seed cumulative
-	// counters. Claude Code exports every live counter each minute, so one hour always
-	// contains a predecessor for a counter that was active when the range starts.
-	replaySeedLookback = time.Hour
-	replayBatchPage    = 100
+	replayMaxRange  = 31 * 24 * time.Hour
+	replayBatchPage = 100
 )
 
 var replayableBatchStatuses = []string{models.OtelMetricBatchStatusProcessed, models.OtelMetricBatchStatusPermanentError}
@@ -90,7 +86,7 @@ func (c *rawMetricConverter) validateReplayRange(request *models.OtelReplayReque
 	if !start.Before(end) || end.Sub(start) > replayMaxRange {
 		return fmt.Errorf("replay range must be between one and %d days", int(replayMaxRange.Hours()/24))
 	}
-	if start.Add(-replaySeedLookback).Before(c.now().UTC().Add(-rawBatchRetention)) {
+	if start.Before(c.now().UTC().Add(-rawBatchRetention)) {
 		return fmt.Errorf("replay range starts before retained raw telemetry")
 	}
 	return nil
@@ -103,23 +99,20 @@ type hourlyAggregate struct {
 	lastObservedAt time.Time
 }
 
-// replay rebuilds hourly facts and canonical daily rows for whole UTC days. It mirrors live
-// conversion in raw receipt order, using in-memory cumulative state seeded from the
-// lookback window, so persisted live series state is left untouched.
+// replay rebuilds hourly facts and canonical daily rows for whole UTC days from Claude
+// Code's default DELTA exports. Persisted live series state is left untouched.
 func (c *rawMetricConverter) replay(request *models.OtelReplayRequest) (int, int, error) {
 	if err := c.validateReplayRange(request); err != nil {
 		return 0, 0, err
 	}
 	rangeStart, rangeEnd := request.RangeStart.UTC(), request.RangeEnd.UTC()
-	seedStart := rangeStart.Add(-replaySeedLookback)
 	aggregates := make(map[string]*hourlyAggregate)
-	series := make(map[string]*seriesSample)
 	replayed, skipped := 0, 0
 	var lastBatchID uint64
 	for {
 		batches := make([]*models.OtelMetricBatch, 0, replayBatchPage)
 		if err := c.db.All(&batches,
-			dal.Where("id > ? AND status IN ? AND max_observed_at >= ? AND min_observed_at < ?", lastBatchID, replayableBatchStatuses, seedStart, rangeEnd),
+			dal.Where("id > ? AND status IN ? AND max_observed_at >= ? AND min_observed_at < ?", lastBatchID, replayableBatchStatuses, rangeStart, rangeEnd),
 			dal.Orderby("id ASC"),
 			dal.Limit(replayBatchPage),
 		); err != nil {
@@ -127,7 +120,11 @@ func (c *rawMetricConverter) replay(request *models.OtelReplayRequest) (int, int
 		}
 		for _, batch := range batches {
 			lastBatchID = batch.ID
-			if c.replayBatch(batch, rangeStart, rangeEnd, seedStart, series, aggregates) {
+			processed, replayErr := c.replayBatch(batch, rangeStart, rangeEnd, aggregates)
+			if replayErr != nil {
+				return replayed, skipped, replayErr
+			}
+			if processed {
 				replayed++
 			} else {
 				skipped++
@@ -144,19 +141,23 @@ func (c *rawMetricConverter) replay(request *models.OtelReplayRequest) (int, int
 }
 
 // replayBatch adds one raw batch's in-range increases to the aggregates. It returns false
-// when the batch cannot be prepared, which live conversion also quarantined.
-func (c *rawMetricConverter) replayBatch(batch *models.OtelMetricBatch, rangeStart, rangeEnd, seedStart time.Time, series map[string]*seriesSample, aggregates map[string]*hourlyAggregate) bool {
+// when the batch cannot be prepared, which live conversion also quarantined. Cumulative
+// replay requires a durable predecessor checkpoint, which v1 does not retain; refusing it
+// is safer than rebuilding a range with an unprovable first increase.
+func (c *rawMetricConverter) replayBatch(batch *models.OtelMetricBatch, rangeStart, rangeEnd time.Time, aggregates map[string]*hourlyAggregate) (bool, error) {
 	request := &collectormetrics.ExportMetricsServiceRequest{}
 	if err := proto.Unmarshal(batch.PayloadProto, request); err != nil {
-		return false
+		return false, nil
 	}
 	prepared, err := c.prepareUpdates(request)
 	if err != nil {
-		return false
+		return false, nil
 	}
 	for _, update := range prepared.updates {
-		increase, ok := replayIncrease(update, seedStart, series)
-		if !ok || update.hour.Before(rangeStart) || !update.hour.Before(rangeEnd) {
+		if update.temporality == metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_CUMULATIVE {
+			return false, fmt.Errorf("replay contains cumulative telemetry; a predecessor checkpoint is required")
+		}
+		if update.hour.Before(rangeStart) || !update.hour.Before(rangeEnd) {
 			continue
 		}
 		key := hourlyAggregateKey(update)
@@ -165,7 +166,7 @@ func (c *rawMetricConverter) replayBatch(batch *models.OtelMetricBatch, rangeSta
 			aggregate = &hourlyAggregate{update: update, value: new(big.Rat), lastObservedAt: update.observedAt}
 			aggregates[key] = aggregate
 		}
-		aggregate.value.Add(aggregate.value, increase.value)
+		aggregate.value.Add(aggregate.value, update.value.value)
 		if update.observedAt.Before(aggregate.update.observedAt) {
 			aggregate.update.observedAt = update.observedAt
 		}
@@ -173,27 +174,7 @@ func (c *rawMetricConverter) replayBatch(batch *models.OtelMetricBatch, rangeSta
 			aggregate.lastObservedAt = update.observedAt
 		}
 	}
-	return true
-}
-
-// replayIncrease applies one sample to in-memory cumulative state. A counter that started
-// before the seed window without a seeded predecessor only seeds state, because live
-// conversion counted its earlier usage outside this replay.
-func replayIncrease(update factUpdate, seedStart time.Time, series map[string]*seriesSample) (metricNumber, bool) {
-	if update.temporality == metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_DELTA {
-		return update.value, true
-	}
-	key := string(update.seriesHash)
-	previous := series[key]
-	increase, err := cumulativeIncrease(previous, update)
-	if err != nil {
-		return metricNumber{}, false
-	}
-	series[key] = &seriesSample{timeNanos: update.timeNanos, value: update.value.value}
-	if previous == nil && update.startNanos < uint64(seedStart.UnixNano()) {
-		return metricNumber{}, false
-	}
-	return increase, true
+	return true, nil
 }
 
 func hourlyAggregateKey(update factUpdate) string {

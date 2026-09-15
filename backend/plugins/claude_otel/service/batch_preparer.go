@@ -113,6 +113,9 @@ func (p *batchPreparer) recordSkip(err *conversionError) {
 // prepareResource converts one resource group. Any attribution failure discards the whole
 // group rather than converting part of one client's export.
 func (p *batchPreparer) prepareResource(resourceMetrics *metricsv1.ResourceMetrics, resourceBindings map[uint64]string) ([]factUpdate, error) {
+	if err := validateResourceAttribution(resourceMetrics); err != nil {
+		return nil, err
+	}
 	updates := make([]factUpdate, 0)
 	resourceAttrs := resourceMetrics.GetResource().GetAttributes()
 	for _, scopeMetrics := range resourceMetrics.GetScopeMetrics() {
@@ -127,7 +130,7 @@ func (p *batchPreparer) prepareResource(resourceMetrics *metricsv1.ResourceMetri
 				return nil, permanentMetricError(errorUnsupportedMetricKind, "supported metric %s is not an OTLP sum", metric.GetName())
 			}
 			for _, point := range sum.GetDataPoints() {
-				update, err := p.prepareDatapoint(metric, mapping, sum.GetAggregationTemporality(), resourceAttrs, point, resourceBindings)
+				update, err := p.prepareDatapoint(metric, mapping, sum.GetAggregationTemporality(), scopeMetrics.GetScope(), resourceAttrs, point, resourceBindings)
 				if err != nil {
 					return nil, err
 				}
@@ -142,6 +145,7 @@ func (p *batchPreparer) prepareDatapoint(
 	metric *metricsv1.Metric,
 	mapping metricMapping,
 	temporality metricsv1.AggregationTemporality,
+	scope *commonv1.InstrumentationScope,
 	resourceAttrs []*commonv1.KeyValue,
 	point *metricsv1.NumberDataPoint,
 	resourceBindings map[uint64]string,
@@ -205,8 +209,43 @@ func (p *batchPreparer) prepareDatapoint(
 	if mapping.fact == hourlyModelUsageFact && update.model == "" {
 		return factUpdate{}, permanentMetricError(errorInvalidDimension, "metric %s is missing model", metric.GetName())
 	}
-	update.seriesHash = metricSeriesHash(connection.ID, metric, resourceAttrs, point)
+	update.seriesHash = metricSeriesHash(connection.ID, scope, metric, resourceAttrs, point)
 	return update, nil
+}
+
+// validateResourceAttribution ensures a Collector resource group contains only its
+// derived team attribution. It runs during conversion so an invalid group is retained
+// for diagnosis but cannot suppress other valid groups from the same OTLP request.
+func validateResourceAttribution(resourceMetrics *metricsv1.ResourceMetrics) error {
+	resourceAttributes := resourceMetrics.GetResource().GetAttributes()
+	if hasAttribute(resourceAttributes, devlakeTeamAttribute) || hasAttribute(resourceAttributes, devlakeProjectAttribute) {
+		return permanentMetricError(errorInvalidAttribution, "OTLP metrics resource must not include DevLake attribution")
+	}
+	teamSlug := ""
+	for _, datapoint := range resourceDatapoints(resourceMetrics) {
+		attributes := datapoint.GetAttributes()
+		if hasAttribute(attributes, devlakeProjectAttribute) {
+			return permanentMetricError(errorInvalidAttribution, "OTLP metrics datapoint must not include devlake_project attribution")
+		}
+		team := attributeString(attributes, devlakeTeamAttribute)
+		if team == "" {
+			return permanentMetricError(errorMissingTeam, "OTLP metrics datapoint is missing trusted devlake_team attribution")
+		}
+		if teamSlug != "" && team != teamSlug {
+			return permanentMetricError(errorInvalidAttribution, "OTLP metrics resource has inconsistent trusted devlake_team attribution")
+		}
+		teamSlug = team
+	}
+	return nil
+}
+
+func hasAttribute(attributes []*commonv1.KeyValue, key string) bool {
+	for _, attribute := range attributes {
+		if attribute.GetKey() == key {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *batchPreparer) recordUnknownMetric(name string) {

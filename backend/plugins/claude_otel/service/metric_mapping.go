@@ -190,8 +190,9 @@ func unixNanoTime(value uint64) (time.Time, error) {
 // OTLP stream identity: attributes such as effort or terminal.type distinguish separate
 // counters. Managed settings omit session.id, so concurrent CLI sessions of one developer
 // share attributes; the counter start time keeps their cumulative counters apart.
-func metricSeriesHash(connectionID uint64, metric *metricsv1.Metric, resourceAttrs []*commonv1.KeyValue, point *metricsv1.NumberDataPoint) []byte {
-	identity := []string{strconv.FormatUint(connectionID, 10), metric.GetName(), metric.GetUnit(), strconv.FormatUint(point.GetStartTimeUnixNano(), 10)}
+func metricSeriesHash(connectionID uint64, scope *commonv1.InstrumentationScope, metric *metricsv1.Metric, resourceAttrs []*commonv1.KeyValue, point *metricsv1.NumberDataPoint) []byte {
+	scopeIdentity, _ := proto.MarshalOptions{Deterministic: true}.Marshal(scope)
+	identity := []string{strconv.FormatUint(connectionID, 10), string(scopeIdentity), metric.GetName(), metric.GetUnit(), strconv.FormatUint(point.GetStartTimeUnixNano(), 10)}
 	attributes := append(prefixedAttributes("resource", resourceAttrs), prefixedAttributes("point", point.GetAttributes())...)
 	sort.Strings(attributes)
 	hash := sha256.Sum256([]byte(strings.Join(append(identity, attributes...), "\x00")))

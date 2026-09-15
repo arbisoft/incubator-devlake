@@ -111,6 +111,60 @@ func TestPrepareUpdatesSkipsOnlyResourceGroupsWithAttributionFailures(t *testing
 	}
 }
 
+func TestPrepareUpdatesSkipsUntrustedProjectAttributionWithoutDroppingOtherResources(t *testing.T) {
+	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: observedAt.Add(-time.Hour)}}})
+	request := newConverterRequest(observedAt, testOrganizationID)
+	invalidResource := proto.Clone(request.ResourceMetrics[0]).(*metricsv1.ResourceMetrics)
+	invalidResource.ScopeMetrics[0].Metrics[0].GetSum().DataPoints[0].Attributes = append(
+		invalidResource.ScopeMetrics[0].Metrics[0].GetSum().DataPoints[0].Attributes,
+		stringAttribute(devlakeProjectAttribute, "spoofed-project"),
+	)
+	request.ResourceMetrics = append([]*metricsv1.ResourceMetrics{invalidResource}, request.ResourceMetrics...)
+
+	prepared, err := newRawMetricConverter(database, nil).prepareUpdates(request)
+	if err != nil {
+		t.Fatalf("prepareUpdates() error = %v", err)
+	}
+	if len(prepared.updates) != 3 || prepared.skippedCount != 1 {
+		t.Fatalf("prepareUpdates() updates=%d skipped=%d, want 3 valid updates and 1 skipped resource", len(prepared.updates), prepared.skippedCount)
+	}
+}
+
+func TestMetricSeriesHashIncludesInstrumentationScope(t *testing.T) {
+	point := &metricsv1.NumberDataPoint{StartTimeUnixNano: 1, Attributes: []*commonv1.KeyValue{stringAttribute("model", "claude-sonnet")}}
+	metric := &metricsv1.Metric{Name: metricTokenUsage}
+	resourceAttributes := []*commonv1.KeyValue{stringAttribute("service.name", "claude-code")}
+	first := metricSeriesHash(1, &commonv1.InstrumentationScope{Name: "claude-code", Version: "1"}, metric, resourceAttributes, point)
+	second := metricSeriesHash(1, &commonv1.InstrumentationScope{Name: "claude-code", Version: "2"}, metric, resourceAttributes, point)
+	if string(first) == string(second) {
+		t.Fatal("metricSeriesHash() merged distinct instrumentation scopes")
+	}
+}
+
+func TestReplayRejectsCumulativeTelemetryWithoutCheckpoint(t *testing.T) {
+	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
+	request := newConverterRequest(observedAt, testOrganizationID)
+	for _, metric := range request.ResourceMetrics[0].ScopeMetrics[0].Metrics {
+		metric.GetSum().AggregationTemporality = metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_CUMULATIVE
+	}
+	payload, err := proto.Marshal(request)
+	if err != nil {
+		t.Fatalf("proto.Marshal() error = %v", err)
+	}
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: observedAt.Add(-time.Hour)}}})
+	converter := newRawMetricConverter(database, nil)
+	processed, replayErr := converter.replayBatch(
+		&models.OtelMetricBatch{PayloadProto: payload},
+		observedAt.Truncate(24*time.Hour),
+		observedAt.Truncate(24*time.Hour).Add(24*time.Hour),
+		make(map[string]*hourlyAggregate),
+	)
+	if processed || replayErr == nil {
+		t.Fatalf("replayBatch() = %t, %v; want cumulative replay to require a checkpoint", processed, replayErr)
+	}
+}
+
 func TestCounterDeltaUsesExactCumulativeIncreaseResetAndOrder(t *testing.T) {
 	testCases := []struct {
 		name         string

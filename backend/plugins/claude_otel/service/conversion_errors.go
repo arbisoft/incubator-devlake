@@ -37,6 +37,7 @@ const (
 	errorOutOfOrderCumulative   conversionErrorCode = "out_of_order_cumulative"
 	errorInvalidSeriesState     conversionErrorCode = "invalid_series_state"
 	errorMissingTeam            conversionErrorCode = "missing_team"
+	errorInvalidAttribution     conversionErrorCode = "invalid_attribution"
 	errorMissingOrganization    conversionErrorCode = "missing_organization"
 	errorInvalidOrganization    conversionErrorCode = "invalid_organization"
 	errorOrganizationMismatch   conversionErrorCode = "organization_mismatch"
@@ -56,6 +57,7 @@ const (
 // valid teams merged into the same Collector request.
 var attributionErrorCodes = map[conversionErrorCode]struct{}{
 	errorMissingTeam:          {},
+	errorInvalidAttribution:   {},
 	errorMissingOrganization:  {},
 	errorInvalidOrganization:  {},
 	errorOrganizationMismatch: {},

@@ -238,7 +238,7 @@ func (c *rawMetricConverter) convert(batch *models.OtelMetricBatch, leaseOwner s
 	claimedBatch := &models.OtelMetricBatch{}
 	if err := tx.First(claimedBatch,
 		dal.Select("id"),
-		dal.Where("id = ? AND status = ? AND lease_owner = ?", batch.ID, models.OtelMetricBatchStatusProcessing, leaseOwner),
+		dal.Where("id = ? AND status = ? AND lease_owner = ? AND lease_until > ?", batch.ID, models.OtelMetricBatchStatusProcessing, leaseOwner, c.now().UTC()),
 		dal.Lock(true, false),
 	); err != nil {
 		c.rollback(tx)

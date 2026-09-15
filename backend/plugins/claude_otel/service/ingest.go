@@ -187,37 +187,15 @@ func validateOtelMetricsRequest(request *collectormetrics.ExportMetricsServiceRe
 			return 0, 0, errors.BadInput.New("OTLP metrics resource is required")
 		}
 		datapoints := resourceDatapoints(resourceMetrics)
-		if err := validateTrustedAttribution(resourceMetrics.GetResource().GetAttributes(), datapoints); err != nil {
-			return 0, 0, err
+		// Attribution is evaluated per resource group by the asynchronous converter.
+		// Persisting an authenticated batch first prevents one malformed group in a
+		// Collector-merged request from dropping valid groups that share the export.
+		if len(datapoints) == 0 {
+			return 0, 0, errors.BadInput.New("OTLP metrics resource contains no datapoints")
 		}
 		datapointCount += len(datapoints)
 	}
 	return len(resources), datapointCount, nil
-}
-
-// validateTrustedAttribution enforces the Collector contract: the attributes processor
-// stamps devlake_team on every datapoint from one authenticated request, and DevLake
-// attribution is never accepted from the client-controlled resource.
-func validateTrustedAttribution(resourceAttributes []*commonv1.KeyValue, datapoints []otlpDatapoint) errors.Error {
-	if hasAttribute(resourceAttributes, devlakeTeamAttribute) || hasAttribute(resourceAttributes, devlakeProjectAttribute) {
-		return errors.BadInput.New("OTLP metrics resource must not include DevLake attribution")
-	}
-	teamSlug := ""
-	for _, datapoint := range datapoints {
-		attributes := datapoint.GetAttributes()
-		if hasAttribute(attributes, devlakeProjectAttribute) {
-			return errors.BadInput.New("OTLP metrics datapoint must not include devlake_project attribution")
-		}
-		team := attributeString(attributes, devlakeTeamAttribute)
-		if team == "" {
-			return errors.BadInput.New("OTLP metrics datapoint is missing trusted devlake_team attribution")
-		}
-		if teamSlug != "" && team != teamSlug {
-			return errors.BadInput.New("OTLP metrics resource has inconsistent trusted devlake_team attribution")
-		}
-		teamSlug = team
-	}
-	return nil
 }
 
 // otlpDatapoint is the attribute and timestamp contract shared by every OTLP metric
@@ -290,15 +268,6 @@ func attributeString(attributes []*commonv1.KeyValue, key string) string {
 		return strings.TrimSpace(attribute.GetValue().GetStringValue())
 	}
 	return ""
-}
-
-func hasAttribute(attributes []*commonv1.KeyValue, key string) bool {
-	for _, attribute := range attributes {
-		if attribute.GetKey() == key {
-			return true
-		}
-	}
-	return false
 }
 
 func pointerToString(value string) *string {

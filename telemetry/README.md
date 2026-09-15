@@ -235,9 +235,11 @@ FROM _tool_claude_code_otel_replay_requests
 ORDER BY id DESC;
 ```
 
-Replay reads the hour before the range to seed cumulative counters and does not change
-live series state. Resetting a single batch to `pending` is not a replay: cumulative
-samples older than live state are rejected as out of order.
+Replay currently supports Claude Code's default DELTA exports and does not change live
+series state. A range containing CUMULATIVE telemetry is rejected until a durable
+predecessor-checkpoint design is added; rebuilding it from an arbitrary lookback can
+misstate the first increase. Resetting a single batch to `pending` is not a replay:
+cumulative samples older than live state are rejected as out of order.
 
 ### Reset local telemetry state
 
