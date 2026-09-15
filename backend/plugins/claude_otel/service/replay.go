@@ -91,6 +91,14 @@ func (c *rawMetricConverter) claimNextReplay() (*models.OtelReplayRequest, strin
 	return request, leaseOwner, true, nil
 }
 
+// renewReplayLease renews the replay request's own row lease and, just as importantly,
+// re-verifies this worker still holds the converter's singleton global lease. A replay's
+// request-row lease and the global converter lease used to be independent: a replay running
+// longer than converterLeaseDuration kept its own lease fresh indefinitely while the global
+// lease silently expired underneath it, letting another replica take over global leadership
+// and start live-converting the same date range while the original replay was still running.
+// Requiring both here makes a replay abort as soon as leadership actually changes, instead of
+// only failing (or, before this fix, not failing at all) once it reaches commitReplay.
 func (c *rawMetricConverter) renewReplayLease(requestID uint64, leaseOwner string) error {
 	now := c.now().UTC()
 	if err := c.db.UpdateColumn(&models.OtelReplayRequest{}, "lease_until", now.Add(converterLeaseDuration),
@@ -103,6 +111,32 @@ func (c *rawMetricConverter) renewReplayLease(requestID uint64, leaseOwner strin
 			return errReplayLeaseLost
 		}
 		return fmt.Errorf("verify replay request lease: %w", err)
+	}
+	leader, err := c.acquireLease()
+	if err != nil {
+		return fmt.Errorf("renew converter lease during replay: %w", err)
+	}
+	if !leader {
+		return errReplayLeaseLost
+	}
+	return nil
+}
+
+// verifyConverterLease re-checks, inside the caller's already-open transaction, that this
+// worker still holds the singleton converter lease, and holds a row lock on it until that
+// transaction commits or rolls back. A replay's own request-row lease can outlive the global
+// lease that originally elected this worker; without this, a replica that lost global
+// leadership mid-replay could still commit a delete-and-replace of the range after a new
+// leader had already written live facts into it. Locking the row (rather than only reading
+// it) also blocks a concurrent acquireLease() from taking over for the short window this
+// transaction is writing, so the two can never interleave.
+func (c *rawMetricConverter) verifyConverterLease(tx dal.Transaction) error {
+	lease := &models.OtelConverterLease{}
+	if err := tx.First(lease, dal.Where("name = ?", converterLeaseName), dal.Lock(true, false)); err != nil {
+		return fmt.Errorf("verify Claude Code OTel converter lease before replay commit: %w", err)
+	}
+	if lease.Owner != c.workerID || !lease.LeaseUntil.After(c.now().UTC()) {
+		return errReplayLeaseLost
 	}
 	return nil
 }
@@ -233,8 +267,14 @@ func hourlyAggregateKey(update factUpdate) string {
 		update.fact, update.connection.ID, update.identity.key, update.hour.Unix(), update.model, update.query, update.tool, update.language, update.column)
 }
 
-// commitReplay replaces the range's hourly facts and canonical Claude OTel daily rows in
-// one transaction.
+// commitReplay replaces the range's hourly facts and canonical Claude OTel daily rows in one
+// transaction. It is fenced on both the replay request's own lease and the converter's global
+// lease: renewReplayLease already checks the global lease throughout the loop above, but that
+// alone only makes loss of leadership likely to be caught before commit, not guaranteed — a
+// leadership change could still land in the gap between the last renewal and this commit. This
+// re-check, inside the same transaction and under a row lock, is the actual guarantee: it
+// cannot observe a stale "still leader" state, and it blocks a concurrent acquireLease() from
+// completing until this transaction is done, so the two can never race past each other.
 func (c *rawMetricConverter) commitReplay(requestID uint64, leaseOwner string, rangeStart, rangeEnd time.Time, aggregates map[string]*hourlyAggregate, replayed, skipped int) error {
 	tx := c.db.Begin()
 	request := &models.OtelReplayRequest{}
@@ -247,6 +287,10 @@ func (c *rawMetricConverter) commitReplay(requestID uint64, leaseOwner string, r
 			return errReplayLeaseLost
 		}
 		return fmt.Errorf("verify replay request lease before commit: %w", err)
+	}
+	if err := c.verifyConverterLease(tx); err != nil {
+		c.rollback(tx)
+		return err
 	}
 	if err := c.replaceReplayRange(tx, rangeStart, rangeEnd, aggregates); err != nil {
 		c.rollback(tx)

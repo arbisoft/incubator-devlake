@@ -18,6 +18,7 @@ limitations under the License.
 package service
 
 import (
+	stdErrors "errors"
 	"math/big"
 	"os"
 	"testing"
@@ -352,6 +353,56 @@ func TestAcquireLeaseRejectsSecondConverterWhileLeaseIsHeld(t *testing.T) {
 	leader, err := newRawMetricConverter(database, nil).acquireLease()
 	if err != nil || leader {
 		t.Fatalf("acquireLease() = %v, %v; want the second converter to stand by", leader, err)
+	}
+}
+
+// TestCommitReplayAbortsWhenConverterLeaseWasTakenOver guards the fix for a real race: a
+// replay's own request-row lease used to be the only thing commitReplay checked, so a replay
+// that outlived the global converterLeaseDuration could still commit its delete-and-replace
+// after another replica had already taken over the global lease and started live-converting
+// the same range. commitReplay must now also fence on the global lease, inside the same
+// transaction, and must never reach replaceReplayRange's deletes once that fence trips.
+func TestCommitReplayAbortsWhenConverterLeaseWasTakenOver(t *testing.T) {
+	now := time.Date(2026, 9, 15, 10, 0, 0, 0, time.UTC)
+	leaseOwner := "replay-lease-owner"
+	requestLeaseUntil := now.Add(time.Minute)
+
+	database := dalmocks.NewDal(t)
+	transaction := dalmocks.NewTransaction(t)
+	database.EXPECT().Begin().Return(transaction)
+	transaction.EXPECT().First(mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything, mock.Anything).Run(
+		func(request interface{}, _ ...dal.Clause) {
+			*request.(*models.OtelReplayRequest) = models.OtelReplayRequest{
+				Model:      common.Model{ID: 1},
+				Status:     models.OtelReplayRequestStatusProcessing,
+				LeaseOwner: &leaseOwner,
+				LeaseUntil: &requestLeaseUntil,
+			}
+		},
+	).Return(nil)
+	// Simulates a second replica having taken over the global converter lease while this
+	// replay was still running, the exact scenario a long replay used to be blind to.
+	transaction.EXPECT().First(mock.AnythingOfType("*models.OtelConverterLease"), mock.Anything, mock.Anything).Run(
+		func(lease interface{}, _ ...dal.Clause) {
+			lease.(*models.OtelConverterLease).Owner = "second-converter"
+			lease.(*models.OtelConverterLease).LeaseUntil = now.Add(time.Minute)
+		},
+	).Return(nil)
+	transaction.EXPECT().Rollback().Return(nil)
+	// No Delete/Exec/UpdateColumns expectations are registered on the transaction: if
+	// commitReplay reached replaceReplayRange despite the lost lease, the mock would fail on
+	// the first unexpected call, so this also proves the delete-and-replace never ran.
+
+	converter := newRawMetricConverter(database, nil)
+	converter.workerID = "first-converter"
+	converter.now = func() time.Time { return now }
+	aggregates := map[string]*hourlyAggregate{
+		"key": {update: factUpdate{connection: &models.OtelConnection{}, fact: hourlyActivityFact}, value: big.NewRat(1, 1)},
+	}
+
+	err := converter.commitReplay(1, leaseOwner, now.Truncate(24*time.Hour), now.Truncate(24*time.Hour).Add(24*time.Hour), aggregates, 1, 0)
+	if !stdErrors.Is(err, errReplayLeaseLost) {
+		t.Fatalf("commitReplay() error = %v, want errReplayLeaseLost", err)
 	}
 }
 
