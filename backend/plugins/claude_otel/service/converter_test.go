@@ -606,6 +606,46 @@ func TestClaimNextWaitsBehindRetryDelayedHeadBatch(t *testing.T) {
 	}
 }
 
+// TestFindClaimHeadPicksEarliestAcrossStatuses guards the per-status query merge in
+// findClaimHead: it must still pick the single earliest row across all nonterminal
+// statuses, exactly as the old combined "status IN (...)" query did, since a later batch
+// must never overtake an earlier one regardless of which status holds it.
+func TestFindClaimHeadPicksEarliestAcrossStatuses(t *testing.T) {
+	pendingReceivedAt := time.Date(2026, 9, 16, 10, 0, 0, 0, time.UTC)
+	processingReceivedAt := time.Date(2026, 9, 16, 11, 0, 0, 0, time.UTC)
+	retryableReceivedAt := time.Date(2026, 9, 16, 9, 0, 0, 0, time.UTC)
+	notFound := devlakeerrors.NotFound.New("not found")
+
+	database := dalmocks.NewDal(t)
+	database.EXPECT().First(mock.AnythingOfType("*models.OtelMetricBatch"), mock.Anything, mock.Anything, mock.Anything).RunAndReturn(
+		func(dst interface{}, clauses ...dal.Clause) devlakeerrors.Error {
+			status := clauses[1].Data.(dal.DalClause).Params[0].(string)
+			batch := dst.(*models.OtelMetricBatch)
+			switch status {
+			case models.OtelMetricBatchStatusPending:
+				*batch = models.OtelMetricBatch{Model: common.Model{ID: 2}, Status: status, ReceivedAt: pendingReceivedAt}
+			case models.OtelMetricBatchStatusProcessing:
+				*batch = models.OtelMetricBatch{Model: common.Model{ID: 3}, Status: status, ReceivedAt: processingReceivedAt}
+			case models.OtelMetricBatchStatusRetryableError:
+				*batch = models.OtelMetricBatch{Model: common.Model{ID: 1}, Status: status, ReceivedAt: retryableReceivedAt}
+			default:
+				return notFound
+			}
+			return nil
+		},
+	)
+	database.EXPECT().IsErrorNotFound(mock.Anything).RunAndReturn(func(err error) bool { return err == notFound }).Maybe()
+
+	converter := newRawMetricConverter(database, nil)
+	head, err := converter.findClaimHead()
+	if err != nil {
+		t.Fatalf("findClaimHead() error = %v", err)
+	}
+	if head == nil || head.ID != 1 || head.Status != models.OtelMetricBatchStatusRetryableError {
+		t.Fatalf("findClaimHead() = %#v, want the retryable_error batch (id=1), the earliest received_at across all three statuses", head)
+	}
+}
+
 func TestDailyTargetsAggregateTeamsIntoOneOrganizationCandidate(t *testing.T) {
 	accountID := "user_012pKEfgvvBR2CYw6KjnyAW2"
 	hour := time.Date(2026, 9, 14, 10, 0, 0, 0, time.UTC)

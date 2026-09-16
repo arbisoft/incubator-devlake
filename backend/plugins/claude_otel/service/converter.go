@@ -170,17 +170,12 @@ func (c *rawMetricConverter) processNext() (bool, errors.Error) {
 // state depends on receipt order.
 func (c *rawMetricConverter) claimNext() (*models.OtelMetricBatch, string, errors.Error) {
 	now := c.now().UTC()
-	head := &models.OtelMetricBatch{}
-	err := c.db.First(head,
-		dal.Select("id, status, attempt_count, next_attempt_at, lease_until"),
-		dal.Where("status IN ?", nonterminalBatchStatuses),
-		dal.Orderby("received_at ASC, id ASC"),
-	)
+	head, err := c.findClaimHead()
 	if err != nil {
-		if c.db.IsErrorNotFound(err) {
-			return nil, "", nil
-		}
-		return nil, "", errors.Default.Wrap(err, "failed to find the next Claude Code OTel raw batch")
+		return nil, "", err
+	}
+	if head == nil {
+		return nil, "", nil
 	}
 	if !isBatchClaimable(head, now) {
 		return nil, "", nil
@@ -207,6 +202,39 @@ func (c *rawMetricConverter) claimNext() (*models.OtelMetricBatch, string, error
 		return nil, "", errors.Default.Wrap(err, "failed to load claimed Claude Code OTel raw batch")
 	}
 	return batch, leaseOwner, nil
+}
+
+// findClaimHead finds the earliest nonterminal batch across all nonterminalBatchStatuses by
+// querying once per status rather than a single WHERE status IN (...) ORDER BY received_at
+// query. MySQL cannot use idx_otel_metric_batch_claim(status, received_at) to satisfy that
+// ORDER BY once the IN-list has more than one value, because a composite index only orders
+// received_at within one status value at a time. Depending on table statistics, the optimizer
+// may instead scan the plain received_at index in full, filtering by status row-by-row; once
+// the table holds a large processed history and the queue head is a contiguous recent block
+// (for example, after the converter was down for a while), that degrades to scanning every
+// already-processed row ahead of the first match, on every poll. Querying per status keeps each
+// query to a single-value index lookup, which MySQL always satisfies with the composite index.
+func (c *rawMetricConverter) findClaimHead() (*models.OtelMetricBatch, errors.Error) {
+	var head *models.OtelMetricBatch
+	for _, status := range nonterminalBatchStatuses {
+		candidate := &models.OtelMetricBatch{}
+		err := c.db.First(candidate,
+			dal.Select("id, status, attempt_count, next_attempt_at, lease_until, received_at"),
+			dal.Where("status = ?", status),
+			dal.Orderby("received_at ASC, id ASC"),
+		)
+		if err != nil {
+			if c.db.IsErrorNotFound(err) {
+				continue
+			}
+			return nil, errors.Default.Wrap(err, "failed to find the next Claude Code OTel raw batch")
+		}
+		if head == nil || candidate.ReceivedAt.Before(head.ReceivedAt) ||
+			(candidate.ReceivedAt.Equal(head.ReceivedAt) && candidate.ID < head.ID) {
+			head = candidate
+		}
+	}
+	return head, nil
 }
 
 func isBatchClaimable(batch *models.OtelMetricBatch, now time.Time) bool {
