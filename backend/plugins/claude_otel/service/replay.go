@@ -269,9 +269,7 @@ func replayDiagnosticReason(code conversionErrorCode) string {
 func boundedReplayErrorMessage(err error) *string {
 	code, _, message := classifyConversionError(err)
 	message = fmt.Sprintf("%s: %s", code, message)
-	if len(message) > replayErrorMessageLimit {
-		message = message[:replayErrorMessageLimit]
-	}
+	message = truncate(message, replayErrorMessageLimit)
 	return &message
 }
 

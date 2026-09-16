@@ -250,9 +250,7 @@ func hasAttribute(attributes []*commonv1.KeyValue, key string) bool {
 }
 
 func (p *batchPreparer) recordUnknownMetric(name string) {
-	if len(name) > maxDiagnosticNameLength {
-		name = name[:maxDiagnosticNameLength]
-	}
+	name = truncate(name, maxDiagnosticNameLength)
 	if _, seen := p.unknownMetricSet[name]; seen || len(p.unknownMetricSet) >= maxUnknownMetricNames {
 		return
 	}

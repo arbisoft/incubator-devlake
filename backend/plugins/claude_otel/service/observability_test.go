@@ -79,6 +79,16 @@ func TestDecodeOtelMetricBatchPayload(t *testing.T) {
 	}
 }
 
+// TestCurrentSchemaVersionIsDecodable guards decodableSchemaVersions being keyed by
+// literal rather than by otelPayloadSchemaVersion: a version bump that forgets to add the
+// new literal here would otherwise make the current write-time schema version silently
+// undecodable, with no compiler error.
+func TestCurrentSchemaVersionIsDecodable(t *testing.T) {
+	if _, ok := decodableSchemaVersions[otelPayloadSchemaVersion]; !ok {
+		t.Fatalf("payload schema version %d must be listed in decodableSchemaVersions", otelPayloadSchemaVersion)
+	}
+}
+
 // withMockDal points the package-level db at a mock for the duration of the test and
 // restores the previous value afterward; observability.go's queries read the package
 // global rather than taking a db parameter.
@@ -145,6 +155,10 @@ func TestOtelRecentPermanentErrorsToleratesMissingProcessedAt(t *testing.T) {
 	}
 }
 
+// assertWhereClauseTolerantOfMissingProcessedAt pins the COALESCE guard against a
+// "simplification" back to bare processed_at >= ?. It matches on SQL text, so it verifies
+// intent rather than behavior: the semantics (a NULL processed_at row with a recent
+// received_at is counted) are only covered by integration testing against a real database.
 func assertWhereClauseTolerantOfMissingProcessedAt(t *testing.T, clauses []dal.Clause) {
 	t.Helper()
 	for _, clause := range clauses {

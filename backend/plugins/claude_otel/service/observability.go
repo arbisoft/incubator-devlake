@@ -202,9 +202,9 @@ func otelConverterLeaseStatus(now time.Time) (*OtelConverterLeaseStatus, errors.
 }
 
 func otelRecentPermanentErrors(now time.Time) (int64, []OtelPermanentErrorReason, errors.Error) {
-	// COALESCE tolerates permanent_error rows quarantined before processed_at was backfilled
-	// on write; processed_at >= ? alone is never true for NULL and would silently zero out
-	// this count for pre-existing rows.
+	// COALESCE covers permanent_error rows quarantined before recordFailure started setting
+	// processed_at on write; those rows have NULL, and processed_at >= ? alone is never true
+	// for NULL, which would silently zero out this count for pre-existing rows.
 	where := dal.Where("status = ? AND COALESCE(processed_at, received_at) >= ?", models.OtelMetricBatchStatusPermanentError, now.Add(-permanentErrorWindow))
 	count, err := db.Count(dal.From(&models.OtelMetricBatch{}), where)
 	if err != nil {
@@ -279,9 +279,12 @@ func decodeOtelMetricBatchPayload(batch *models.OtelMetricBatch) ([]byte, errors
 // decodableSchemaVersions lists every payload_schema_version this build can still decode.
 // Raw batches are retained for 90 days and remain replayable for that whole window, so a
 // version bump must add the new version here while keeping the previous one decodable for
-// at least 90 more days rather than replacing it outright.
+// at least 90 more days rather than replacing it outright. Keyed by literal, not by
+// otelPayloadSchemaVersion: keying it off the constant would make a version bump silently
+// drop the previous version from this set in the same diff, with no compiler error and
+// nothing for a reviewer to catch.
 var decodableSchemaVersions = map[int]struct{}{
-	otelPayloadSchemaVersion: {},
+	1: {},
 }
 
 // decodeOtelMetricBatchRequest is the schema-aware boundary for every stored OTLP payload
