@@ -29,6 +29,7 @@ import (
 	"github.com/apache/incubator-devlake/core/plugin"
 	contextimpl "github.com/apache/incubator-devlake/impls/context"
 	"github.com/apache/incubator-devlake/impls/logruslog"
+	"github.com/apache/incubator-devlake/server/api/access"
 	"github.com/gin-gonic/gin"
 	rpccode "google.golang.org/genproto/googleapis/rpc/code"
 	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
@@ -81,5 +82,67 @@ func TestOtlpMigrationUnavailableUsesProtobufStatus(t *testing.T) {
 	}
 	if response.Code != http.StatusServiceUnavailable || response.Header().Get("Content-Type") != "application/x-protobuf" || status.Code != int32(rpccode.Code_UNAVAILABLE) {
 		t.Fatalf("response=%d/%q/%#v, want 503 protobuf UNAVAILABLE", response.Code, response.Header().Get("Content-Type"), status)
+	}
+}
+
+// TestPluginEndpointComputesIsCustomerAdminFromAccessPrincipal guards handlePluginCall's
+// role check (router.go), the part of the customer-administrator boundary that the
+// handler-level tests in each plugin cannot see: only this wiring decides which
+// principal reaches input.IsCustomerAdmin in the first place.
+func TestPluginEndpointComputesIsCustomerAdminFromAccessPrincipal(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	// access.Init is guarded by a package-level sync.Once, so this must run before any
+	// other test in this binary depends on access.Default() being disabled; no other
+	// test in this package touches the access package.
+	t.Setenv("AUTH_ACCESS_ENABLED", "true")
+	basicRes := contextimpl.NewDefaultBasicRes(config.GetConfig(), logruslog.Global, nil)
+	access.Init(basicRes)
+	if !access.Default().Enabled() {
+		t.Fatal("access.Default().Enabled() = false; want true (AUTH_ACCESS_ENABLED=true for this test)")
+	}
+
+	testCases := []struct {
+		name      string
+		principal *access.Principal
+		want      bool
+	}{
+		{name: "no principal is not customer admin", principal: nil, want: false},
+		{name: "member is not customer admin", principal: &access.Principal{Role: access.RoleMember}, want: false},
+		{name: "customer admin is customer admin", principal: &access.Principal{Role: access.RoleCustomerAdmin}, want: true},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			var handlerCalled bool
+			var gotIsCustomerAdmin bool
+			handler := func(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+				handlerCalled = true
+				gotIsCustomerAdmin = input.IsCustomerAdmin
+				return &plugin.ApiResourceOutput{Status: http.StatusOK}, nil
+			}
+
+			router := gin.New()
+			if testCase.principal != nil {
+				principal := testCase.principal
+				router.Use(func(c *gin.Context) {
+					access.SetPrincipal(c, principal)
+					c.Next()
+				})
+			}
+			registerPluginEndpoints(router, basicRes, "claude_otel", map[string]map[string]plugin.ApiResourceHandler{
+				"probe": {http.MethodGet: handler},
+			})
+
+			request := httptest.NewRequest(http.MethodGet, "/plugins/claude_otel/probe", nil)
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, request)
+
+			if !handlerCalled {
+				t.Fatalf("handler was not reached, status=%d body=%s", response.Code, response.Body.String())
+			}
+			if gotIsCustomerAdmin != testCase.want {
+				t.Fatalf("IsCustomerAdmin = %t, want %t", gotIsCustomerAdmin, testCase.want)
+			}
+		})
 	}
 }

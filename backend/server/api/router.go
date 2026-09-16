@@ -150,6 +150,16 @@ func handlePluginCall(basicRes context.BasicRes, pluginName string, handler plug
 		} else {
 			input.User = user
 		}
+		// When access management is disabled, IsCustomerAdmin stays false for every
+		// request, so every plugin endpoint gated on it (e.g. the Claude Code OTel raw
+		// payload viewer) is permanently forbidden rather than left unrestricted. This is
+		// deliberate: there is no role source of truth to consult otherwise, and failing
+		// closed on a telemetry/data-access boundary is correct even though it makes such
+		// an endpoint unreachable. AUTH_ACCESS_ENABLED only exists as a toggle for
+		// backwards compatibility with deployments that predate the access directory;
+		// once this fork ships as a product it is a permanent fixture; user management,
+		// including the local auth system, ships enabled out of the box, so this
+		// fail-closed branch is expected to stop being reachable at all.
 		if accessService := access.Default(); accessService != nil && accessService.Enabled() {
 			principal, principalErr := accessService.CurrentPrincipal(c)
 			input.IsCustomerAdmin = principalErr == nil && principal.Role == access.RoleCustomerAdmin

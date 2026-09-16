@@ -68,6 +68,9 @@ func GetIngestionStatus(_ *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, 
 }
 
 func GetMetricBatchPayload(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	// IsCustomerAdmin is false, and this stays forbidden, whenever access management is
+	// disabled server-wide; see the fail-closed rationale at handlePluginCall in
+	// server/api/router.go.
 	if !input.IsCustomerAdmin {
 		return nil, errors.Forbidden.New("customer administrator access is required")
 	}
