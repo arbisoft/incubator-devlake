@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/apache/incubator-devlake/core/config"
@@ -35,6 +36,19 @@ import (
 	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/protobuf/proto"
 )
+
+// TestMain gives every test in this package a deterministic, single access.Init call.
+// access.Init is guarded by a package-level sync.Once, so whichever test called it first
+// would otherwise decide access.Default()'s configuration for the rest of the binary,
+// with later tests' t.Setenv restoring the environment variable but not that already-set
+// state. Doing it once, here, makes the ordering explicit instead of convention-dependent.
+func TestMain(m *testing.M) {
+	if err := os.Setenv("AUTH_ACCESS_ENABLED", "true"); err != nil {
+		panic(err)
+	}
+	access.Init(contextimpl.NewDefaultBasicRes(config.GetConfig(), logruslog.Global, nil))
+	os.Exit(m.Run())
+}
 
 // TestPluginEndpointPassesProtobufRequestBodyThrough guards the OTLP ingest contract: a
 // protobuf body must reach the plugin handler unread instead of failing JSON binding.
@@ -91,15 +105,13 @@ func TestOtlpMigrationUnavailableUsesProtobufStatus(t *testing.T) {
 // principal reaches input.IsCustomerAdmin in the first place.
 func TestPluginEndpointComputesIsCustomerAdminFromAccessPrincipal(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	// access.Init is guarded by a package-level sync.Once, so this must run before any
-	// other test in this binary depends on access.Default() being disabled; no other
-	// test in this package touches the access package.
-	t.Setenv("AUTH_ACCESS_ENABLED", "true")
-	basicRes := contextimpl.NewDefaultBasicRes(config.GetConfig(), logruslog.Global, nil)
-	access.Init(basicRes)
+	// TestMain, above, initializes access.Default() with AUTH_ACCESS_ENABLED=true once
+	// for the whole package; this guard fails loudly if that premise is ever broken,
+	// instead of silently asserting nothing below.
 	if !access.Default().Enabled() {
-		t.Fatal("access.Default().Enabled() = false; want true (AUTH_ACCESS_ENABLED=true for this test)")
+		t.Fatal("access.Default().Enabled() = false; want true (TestMain sets AUTH_ACCESS_ENABLED=true)")
 	}
+	basicRes := contextimpl.NewDefaultBasicRes(config.GetConfig(), logruslog.Global, nil)
 
 	testCases := []struct {
 		name      string

@@ -72,7 +72,7 @@ func GetMetricBatchPayload(input *plugin.ApiResourceInput) (*plugin.ApiResourceO
 	// disabled server-wide; see the fail-closed rationale at handlePluginCall in
 	// server/api/router.go.
 	if !input.IsCustomerAdmin {
-		return nil, errors.Forbidden.New("customer administrator access is required")
+		return nil, errors.Forbidden.New(plugin.CustomerAdminRequiredMessage)
 	}
 	id, err := parseId(input.Params["batchId"])
 	if err != nil {
