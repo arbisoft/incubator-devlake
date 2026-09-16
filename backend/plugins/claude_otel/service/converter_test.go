@@ -215,14 +215,55 @@ func TestReplayRejectsCumulativeTelemetryWithoutCheckpoint(t *testing.T) {
 	}
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: observedAt.Add(-time.Hour)}}})
 	converter := newRawMetricConverter(database, nil)
-	processed, replayErr := converter.replayBatch(
+	processed, skippedErr, replayErr := converter.replayBatch(
 		&models.OtelMetricBatch{PayloadProto: payload},
 		observedAt.Truncate(24*time.Hour),
 		observedAt.Truncate(24*time.Hour).Add(24*time.Hour),
 		make(map[string]*hourlyAggregate),
 	)
-	if processed || replayErr == nil {
-		t.Fatalf("replayBatch() = %t, %v; want cumulative replay to require a checkpoint", processed, replayErr)
+	if processed || skippedErr == nil || replayErr != nil {
+		t.Fatalf("replayBatch() = %t, %v, %v; want cumulative replay to be a permanent skip", processed, skippedErr, replayErr)
+	}
+}
+
+func TestReplayBatchClassifiesDecodeAsPermanentSkip(t *testing.T) {
+	processed, skippedErr, replayErr := newRawMetricConverter(nil, nil).replayBatch(
+		&models.OtelMetricBatch{Model: common.Model{ID: 42}, PayloadProto: []byte("not protobuf")},
+		time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC),
+		make(map[string]*hourlyAggregate),
+	)
+	if processed || replayErr != nil {
+		t.Fatalf("replayBatch() = %t, %v, %v; want a permanent decode skip", processed, skippedErr, replayErr)
+	}
+	code, permanent, _ := classifyConversionError(skippedErr)
+	if code != errorInvalidPayload || !permanent {
+		t.Fatalf("decode skip = %s permanent=%t; want %s permanent", code, permanent, errorInvalidPayload)
+	}
+}
+
+func TestReplayBatchAbortsOnRetryablePreparationFailure(t *testing.T) {
+	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
+	request := newConverterRequest(observedAt, testOrganizationID)
+	payload, err := proto.Marshal(request)
+	if err != nil {
+		t.Fatalf("proto.Marshal() error = %v", err)
+	}
+	database := dalmocks.NewDal(t)
+	database.EXPECT().All(mock.AnythingOfType("*[]*models.OtelConnection"), mock.Anything).Return(devlakeerrors.Default.New("database unavailable"))
+
+	processed, skippedErr, replayErr := newRawMetricConverter(database, nil).replayBatch(
+		&models.OtelMetricBatch{PayloadProto: payload},
+		observedAt.Truncate(24*time.Hour),
+		observedAt.Truncate(24*time.Hour).Add(24*time.Hour),
+		make(map[string]*hourlyAggregate),
+	)
+	if processed || skippedErr != nil || replayErr == nil {
+		t.Fatalf("replayBatch() = %t, %v, %v; want retryable preparation abort", processed, skippedErr, replayErr)
+	}
+	_, permanent, _ := classifyConversionError(replayErr)
+	if permanent {
+		t.Fatalf("replay preparation error = %v; want retryable", replayErr)
 	}
 }
 
@@ -259,9 +300,9 @@ func TestReplayDeltaBatchesRebuildStableHourlyAggregates(t *testing.T) {
 		database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: firstObservedAt.Add(-time.Hour)}}})
 		converter := newRawMetricConverter(database, nil)
 		for _, batch := range batches {
-			processed, err := converter.replayBatch(batch, firstObservedAt.Truncate(24*time.Hour), firstObservedAt.Truncate(24*time.Hour).Add(24*time.Hour), aggregates)
-			if err != nil || !processed {
-				t.Fatalf("replayBatch() = %t, %v", processed, err)
+			processed, skippedErr, err := converter.replayBatch(batch, firstObservedAt.Truncate(24*time.Hour), firstObservedAt.Truncate(24*time.Hour).Add(24*time.Hour), aggregates)
+			if err != nil || skippedErr != nil || !processed {
+				t.Fatalf("replayBatch() = %t, %v, %v", processed, skippedErr, err)
 			}
 		}
 		return aggregates
@@ -460,7 +501,7 @@ func TestCommitReplayAbortsWhenConverterLeaseWasTakenOver(t *testing.T) {
 		"key": {update: factUpdate{connection: &models.OtelConnection{}, fact: hourlyActivityFact}, value: big.NewRat(1, 1)},
 	}
 
-	err := converter.commitReplay(1, leaseOwner, now.Truncate(24*time.Hour), now.Truncate(24*time.Hour).Add(24*time.Hour), aggregates, 1, 0)
+	err := converter.commitReplayDay(1, leaseOwner, now.Truncate(24*time.Hour), aggregates, 1, 0, nil)
 	if !stdErrors.Is(err, errReplayLeaseLost) {
 		t.Fatalf("commitReplay() error = %v, want errReplayLeaseLost", err)
 	}
