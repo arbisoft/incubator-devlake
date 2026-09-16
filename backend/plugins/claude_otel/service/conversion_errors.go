@@ -36,6 +36,7 @@ const (
 	errorMissingUserIdentity    conversionErrorCode = "missing_user_identity"
 	errorOutOfOrderCumulative   conversionErrorCode = "out_of_order_cumulative"
 	errorInvalidSeriesState     conversionErrorCode = "invalid_series_state"
+	errorInvalidDecimal         conversionErrorCode = "invalid_decimal"
 	errorMissingTeam            conversionErrorCode = "missing_team"
 	errorInvalidAttribution     conversionErrorCode = "invalid_attribution"
 	errorMissingOrganization    conversionErrorCode = "missing_organization"
@@ -80,7 +81,8 @@ func permanentMetricError(code conversionErrorCode, format string, args ...inter
 }
 
 func classifyConversionError(err error) (conversionErrorCode, bool, string) {
-	if conversionErr, ok := err.(*conversionError); ok {
+	var conversionErr *conversionError
+	if stderrors.As(err, &conversionErr) {
 		return conversionErr.code, conversionErr.permanent, conversionErr.Error()
 	}
 	return errorConversionFailure, false, err.Error()
@@ -101,6 +103,10 @@ var deterministicMySQLDataErrors = map[uint16]struct{}{
 // classifyStorageError marks deterministic MySQL data rejections as permanent so the
 // batch is quarantined for operator replay instead of blocking the ordered queue.
 func classifyStorageError(err error) error {
+	var conversionErr *conversionError
+	if stderrors.As(err, &conversionErr) {
+		return err
+	}
 	var mysqlErr *mysql.MySQLError
 	if stderrors.As(err, &mysqlErr) {
 		if _, deterministic := deterministicMySQLDataErrors[mysqlErr.Number]; deterministic {

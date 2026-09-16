@@ -71,7 +71,11 @@ func bindConnectionOrganization(tx dal.Transaction, connection *models.OtelConne
 	}
 	boundOrganizationID := ""
 	if connection.OrganizationId != nil {
-		boundOrganizationID, _ = normalizeOrganizationID(*connection.OrganizationId)
+		var valid bool
+		boundOrganizationID, valid = normalizeOrganizationID(*connection.OrganizationId)
+		if !valid {
+			return permanentMetricError(errorInvalidOrganization, "OTel connection %d has an invalid stored organization", connection.ID)
+		}
 	}
 	if boundOrganizationID != organizationID {
 		return &conversionError{code: errorOrganizationMismatch, err: fmt.Errorf("OTel connection %d was bound to another organization concurrently", connection.ID)}
@@ -152,6 +156,7 @@ func upsertHourlyFact(tx dal.Transaction, update factUpdate, value metricNumber,
 	}, dimensionValues...)
 	params = append(params, value.sqlString(), update.observedAt, lastObservedAt)
 	placeholders := strings.TrimSuffix(strings.Repeat("?, ", len(params)), ", ")
+	// MySQL 8.0.19+ row aliases are an explicit deployment dependency.
 	query := fmt.Sprintf(
 		"INSERT INTO %[1]s (%[2]s) VALUES (%[3]s, NOW(), NOW()) AS incoming "+
 			"ON DUPLICATE KEY UPDATE %[4]s = %[1]s.%[4]s + incoming.%[4]s, "+

@@ -43,20 +43,17 @@ const (
 type dailyTarget struct {
 	workspaceKey  string
 	userKey       string
-	userAccountID string
+	userAccountID *string
 	date          time.Time
 }
 
 func dailyTargets(updates []factUpdate) []dailyTarget {
 	seen := make(map[string]dailyTarget)
 	for _, update := range updates {
-		if update.identity.accountID == nil {
-			continue
-		}
 		target := dailyTarget{
 			workspaceKey:  update.organizationID,
 			userKey:       update.identity.key,
-			userAccountID: *update.identity.accountID,
+			userAccountID: update.identity.accountID,
 			date:          update.hour.UTC().Truncate(24 * time.Hour),
 		}
 		seen[dailyTargetKey(target)] = target
@@ -144,7 +141,7 @@ func resolveDomainAccount(tx dal.Transaction, activityRows []*models.OtelHourlyA
 		return "", "", nil
 	}
 	account := &crossdomain.Account{}
-	if err := tx.First(account, dal.Where("email = ?", email)); err != nil {
+	if err := tx.First(account, dal.Where("email = ?", email), dal.Orderby("id ASC")); err != nil {
 		if tx.IsErrorNotFound(err) {
 			return "", email, nil
 		}
@@ -196,7 +193,7 @@ func writeCanonicalActivity(tx dal.Transaction, target dailyTarget, accountID, e
 		NumSessions:   int(sessions), LinesAdded: int(linesAdded), LinesRemoved: int(linesRemoved), CommitsCreated: int(commits), PrsCreated: int(prs),
 		WorkspaceKey:       stringPointer(target.workspaceKey),
 		UserKey:            stringPointer(target.userKey),
-		UserAccountId:      stringPointer(target.userAccountID),
+		UserAccountId:      target.userAccountID,
 		RecordKind:         stringPointer(ai.CanonicalActivityRecordKind),
 		SourceType:         stringPointer(aiSourceOtel),
 		SourceConnectionId: soleConnectionID(connections),
@@ -226,7 +223,11 @@ func writeCanonicalModelUsage(tx dal.Transaction, target dailyTarget, accountID,
 		usage.OutputTokens += row.OutputTokens
 		usage.CacheReadTokens += row.CacheReadTokens
 		usage.CacheCreationTokens += row.CacheCreationTokens
-		usage.EstimatedCostUsd = addDecimal(usage.EstimatedCostUsd, row.EstimatedCostUSD, 8)
+		cost, err := addDecimal(usage.EstimatedCostUsd, row.EstimatedCostUSD, 8)
+		if err != nil {
+			return permanentMetricError(errorInvalidDecimal, "aggregate canonical Claude model cost: %v", err)
+		}
+		usage.EstimatedCostUsd = cost
 		usage.SourceUpdatedAt = latestTime(usage.SourceUpdatedAt, row.LastObservedAt)
 		connections[row.Model][row.ConnectionId] = struct{}{}
 	}
@@ -266,13 +267,13 @@ func writeCanonicalToolDecisions(tx dal.Transaction, target dailyTarget, account
 	return nil
 }
 
-func addDecimal(left, right string, scale int) string {
+func addDecimal(left, right string, scale int) (string, error) {
 	l, lok := new(big.Rat).SetString(left)
 	r, rok := new(big.Rat).SetString(right)
 	if !lok || !rok {
-		return left
+		return "", fmt.Errorf("invalid decimal value")
 	}
-	return new(big.Rat).Add(l, r).FloatString(scale)
+	return new(big.Rat).Add(l, r).FloatString(scale), nil
 }
 
 func latestTime(current, candidate time.Time) time.Time {

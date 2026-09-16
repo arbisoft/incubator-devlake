@@ -73,7 +73,7 @@ type aiModelUsage20260914 struct {
 	WorkspaceKey        string    `gorm:"type:varchar(255);index"`
 	AccountId           string    `gorm:"type:varchar(255);index"`
 	UserKey             string    `gorm:"type:varchar(255);index"`
-	UserAccountId       string    `gorm:"type:varchar(255);index"`
+	UserAccountId       *string   `gorm:"type:varchar(255);index"`
 	UserEmail           string    `gorm:"type:varchar(255);index"`
 	Date                time.Time `gorm:"type:date;index"`
 	Model               string    `gorm:"type:varchar(255)"`
@@ -96,7 +96,7 @@ type aiToolDecision20260914 struct {
 	WorkspaceKey       string    `gorm:"type:varchar(255);index"`
 	AccountId          string    `gorm:"type:varchar(255);index"`
 	UserKey            string    `gorm:"type:varchar(255);index"`
-	UserAccountId      string    `gorm:"type:varchar(255);index"`
+	UserAccountId      *string   `gorm:"type:varchar(255);index"`
 	UserEmail          string    `gorm:"type:varchar(255);index"`
 	Date               time.Time `gorm:"type:date;index"`
 	ToolName           string    `gorm:"type:varchar(100)"`

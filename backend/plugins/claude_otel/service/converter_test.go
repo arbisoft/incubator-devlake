@@ -19,12 +19,14 @@ package service
 
 import (
 	stdErrors "errors"
+	"fmt"
 	"math/big"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/apache/incubator-devlake/core/dal"
+	devlakeerrors "github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models/common"
 	dalmocks "github.com/apache/incubator-devlake/mocks/core/dal"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
@@ -62,6 +64,64 @@ func TestPrepareUpdatesUsesTypedIdentityAndSeparateFactGrains(t *testing.T) {
 	}
 	if tool := updates[hourlyToolUsageFact]; tool.tool != "Edit" || tool.language != "go" || tool.column != "accepted_count" {
 		t.Fatalf("tool update = %#v", tool)
+	}
+}
+
+func TestClassifyConversionErrorUnwrapsPermanentErrors(t *testing.T) {
+	err := fmt.Errorf("context: %w", permanentMetricError(errorInvalidOrganization, "invalid stored organization"))
+	code, permanent, _ := classifyConversionError(err)
+	if code != errorInvalidOrganization || !permanent {
+		t.Fatalf("classifyConversionError() = %q, %t; want %q, true", code, permanent, errorInvalidOrganization)
+	}
+}
+
+func TestCheckOrganizationBindingRejectsInvalidStoredOrganization(t *testing.T) {
+	invalidOrganization := "not-a-uuid"
+	preparer := &batchPreparer{pendingBindings: make(map[uint64]string)}
+	err := preparer.checkOrganizationBinding(
+		&models.OtelConnection{OrganizationId: &invalidOrganization},
+		testOrganizationID,
+		make(map[uint64]string),
+	)
+	code, permanent, _ := classifyConversionError(err)
+	if code != errorInvalidOrganization || !permanent {
+		t.Fatalf("checkOrganizationBinding() = %v; want permanent invalid organization", err)
+	}
+}
+
+func TestDailyTargetsRetainFallbackIdentityWithoutAccountID(t *testing.T) {
+	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
+	targets := dailyTargets([]factUpdate{{
+		organizationID: testOrganizationID,
+		identity:       developerIdentity{key: "email:developer@example.com"},
+		hour:           observedAt,
+	}})
+	if len(targets) != 1 || targets[0].userAccountID != nil || targets[0].userKey != "email:developer@example.com" {
+		t.Fatalf("dailyTargets() = %#v; want fallback target with nil account ID", targets)
+	}
+}
+
+func TestAddDecimalRejectsInvalidPersistedValue(t *testing.T) {
+	if _, err := addDecimal("not-a-number", "1.00000000", 8); err == nil {
+		t.Fatal("addDecimal() error = nil; want invalid persisted decimal error")
+	}
+}
+
+func TestRunRetentionBacksOffAfterFailure(t *testing.T) {
+	database := dalmocks.NewDal(t)
+	converter := newRawMetricConverter(database, nil)
+	now := time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC)
+	converter.now = func() time.Time { return now }
+	database.On("Pluck", "id", mock.Anything, mock.Anything).Return(devlakeerrors.Default.New("retention lookup failed")).Once()
+
+	if err := converter.runRetention(); err == nil {
+		t.Fatal("runRetention() error = nil; want lookup failure")
+	}
+	if !converter.nextRetentionAt.Equal(now.Add(retentionInterval)) {
+		t.Fatalf("nextRetentionAt = %s; want %s", converter.nextRetentionAt, now.Add(retentionInterval))
+	}
+	if err := converter.runRetention(); err != nil {
+		t.Fatalf("runRetention() during backoff = %v; want nil", err)
 	}
 }
 

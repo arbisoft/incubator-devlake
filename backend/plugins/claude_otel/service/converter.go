@@ -37,7 +37,7 @@ const (
 	converterLeaseDuration      = 30 * time.Second
 	converterPollInterval       = 2 * time.Second
 	converterMaxBackoffExponent = 8
-	// converterMaxAttempts bounds retries of one batch to roughly 40 minutes, after which
+	// converterMaxAttempts bounds retries of one batch to roughly 21 minutes, after which
 	// it is quarantined so a persistent failure cannot block the ordered queue forever.
 	converterMaxAttempts = 12
 )
@@ -110,7 +110,7 @@ func (c *rawMetricConverter) pollOnce() (bool, errors.Error) {
 		return false, err
 	}
 	if err := c.runRetention(); err != nil {
-		return false, err
+		c.logWarn(err, "Claude Code OTel raw metric retention failed; conversion will continue")
 	}
 	if replayed, err := c.processNextReplay(); err != nil || replayed {
 		return replayed, err

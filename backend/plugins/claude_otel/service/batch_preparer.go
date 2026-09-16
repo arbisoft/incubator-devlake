@@ -18,6 +18,7 @@ limitations under the License.
 package service
 
 import (
+	stderrors "errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -88,8 +89,8 @@ func (c *rawMetricConverter) prepareUpdates(request *collectormetrics.ExportMetr
 			}
 			continue
 		}
-		conversionErr, ok := err.(*conversionError)
-		if !ok {
+		var conversionErr *conversionError
+		if !stderrors.As(err, &conversionErr) {
 			return nil, err
 		}
 		if _, attribution := attributionErrorCodes[conversionErr.code]; !attribution {
@@ -294,7 +295,11 @@ func (p *batchPreparer) checkOrganizationBinding(connection *models.OtelConnecti
 		boundOrganizationID = resourceBindings[connection.ID]
 	}
 	if connection.OrganizationId != nil {
-		boundOrganizationID, _ = normalizeOrganizationID(*connection.OrganizationId)
+		var valid bool
+		boundOrganizationID, valid = normalizeOrganizationID(*connection.OrganizationId)
+		if !valid {
+			return permanentMetricError(errorInvalidOrganization, "OTel connection %d has an invalid stored organization", connection.ID)
+		}
 	}
 	if boundOrganizationID == "" {
 		resourceBindings[connection.ID] = organizationID

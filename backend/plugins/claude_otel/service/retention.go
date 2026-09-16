@@ -45,6 +45,16 @@ func (c *rawMetricConverter) runRetention() errors.Error {
 	if now.Before(c.nextRetentionAt) {
 		return nil
 	}
+	// Schedule before cleanup so a failure does not turn retention into a two-second
+	// retry loop that starves conversion.
+	c.nextRetentionAt = now.Add(retentionInterval)
+	if err := c.deleteExpiredRawBatches(now); err != nil {
+		return err
+	}
+	return c.deleteExpiredSeriesState(now)
+}
+
+func (c *rawMetricConverter) deleteExpiredRawBatches(now time.Time) errors.Error {
 	for deletes := 0; deletes < retentionMaxDeleteBatches; deletes++ {
 		batchIDs := make([]uint64, 0, retentionDeleteBatch)
 		if err := c.db.Pluck("id", &batchIDs,
@@ -65,9 +75,29 @@ func (c *rawMetricConverter) runRetention() errors.Error {
 			break
 		}
 	}
-	if err := c.db.Delete(&models.OtelMetricSeriesState{}, dal.Where("updated_at < ?", now.Add(-seriesStateRetention))); err != nil {
-		return errors.Default.Wrap(err, fmt.Sprintf("failed to delete Claude Code OTel series state idle since %s", now.Add(-seriesStateRetention).Format(time.RFC3339)))
+	return nil
+}
+
+func (c *rawMetricConverter) deleteExpiredSeriesState(now time.Time) errors.Error {
+	for deletes := 0; deletes < retentionMaxDeleteBatches; deletes++ {
+		stateHashes := make([][]byte, 0, retentionDeleteBatch)
+		if err := c.db.Pluck("series_hash", &stateHashes,
+			dal.From(&models.OtelMetricSeriesState{}),
+			dal.Where("updated_at < ?", now.Add(-seriesStateRetention)),
+			dal.Orderby("series_hash ASC"),
+			dal.Limit(retentionDeleteBatch),
+		); err != nil {
+			return errors.Default.Wrap(err, fmt.Sprintf("failed to find Claude Code OTel series state idle since %s", now.Add(-seriesStateRetention).Format(time.RFC3339)))
+		}
+		if len(stateHashes) == 0 {
+			break
+		}
+		if err := c.db.Delete(&models.OtelMetricSeriesState{}, dal.Where("series_hash IN ?", stateHashes)); err != nil {
+			return errors.Default.Wrap(err, fmt.Sprintf("failed to delete Claude Code OTel series state idle since %s", now.Add(-seriesStateRetention).Format(time.RFC3339)))
+		}
+		if len(stateHashes) < retentionDeleteBatch {
+			break
+		}
 	}
-	c.nextRetentionAt = now.Add(retentionInterval)
 	return nil
 }

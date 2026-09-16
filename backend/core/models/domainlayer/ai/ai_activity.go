@@ -91,11 +91,13 @@ func (AiActivity) TableName() string {
 // AiActivity because model is not part of the core activity grain.
 type AiModelUsage struct {
 	domainlayer.DomainEntity
-	Provider            string    `gorm:"type:varchar(100);index" json:"provider"`
-	WorkspaceKey        string    `gorm:"type:varchar(255);index" json:"workspaceKey"`
-	AccountId           string    `gorm:"type:varchar(255);index" json:"accountId"`
-	UserKey             string    `gorm:"type:varchar(255);index" json:"userKey"`
-	UserAccountId       string    `gorm:"type:varchar(255);index" json:"userAccountId"`
+	Provider     string `gorm:"type:varchar(100);index" json:"provider"`
+	WorkspaceKey string `gorm:"type:varchar(255);index" json:"workspaceKey"`
+	AccountId    string `gorm:"type:varchar(255);index" json:"accountId"`
+	UserKey      string `gorm:"type:varchar(255);index" json:"userKey"`
+	// UserAccountId is absent for valid typed fallback identities (uuid:, email:, install:).
+	// Those identities intentionally remain separate until a verified cross-source match exists.
+	UserAccountId       *string   `gorm:"type:varchar(255);index" json:"userAccountId,omitempty"`
 	UserEmail           string    `gorm:"type:varchar(255);index" json:"userEmail"`
 	Date                time.Time `gorm:"type:date;index" json:"date"`
 	Model               string    `gorm:"type:varchar(255)" json:"model"`
@@ -115,11 +117,13 @@ func (AiModelUsage) TableName() string { return "ai_model_usages" }
 // AiToolDecision stores canonical daily Claude-style accepted/rejected edit-tool decisions.
 type AiToolDecision struct {
 	domainlayer.DomainEntity
-	Provider           string    `gorm:"type:varchar(100);index" json:"provider"`
-	WorkspaceKey       string    `gorm:"type:varchar(255);index" json:"workspaceKey"`
-	AccountId          string    `gorm:"type:varchar(255);index" json:"accountId"`
-	UserKey            string    `gorm:"type:varchar(255);index" json:"userKey"`
-	UserAccountId      string    `gorm:"type:varchar(255);index" json:"userAccountId"`
+	Provider     string `gorm:"type:varchar(100);index" json:"provider"`
+	WorkspaceKey string `gorm:"type:varchar(255);index" json:"workspaceKey"`
+	AccountId    string `gorm:"type:varchar(255);index" json:"accountId"`
+	UserKey      string `gorm:"type:varchar(255);index" json:"userKey"`
+	// UserAccountId is absent for valid typed fallback identities (uuid:, email:, install:).
+	// Those identities intentionally remain separate until a verified cross-source match exists.
+	UserAccountId      *string   `gorm:"type:varchar(255);index" json:"userAccountId,omitempty"`
 	UserEmail          string    `gorm:"type:varchar(255);index" json:"userEmail"`
 	Date               time.Time `gorm:"type:date;index" json:"date"`
 	ToolName           string    `gorm:"type:varchar(100)" json:"toolName"`
