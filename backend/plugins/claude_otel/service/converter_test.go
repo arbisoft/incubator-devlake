@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -240,7 +241,8 @@ func TestReplayRejectsCumulativeTelemetryWithoutMutatingDay(t *testing.T) {
 	}
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: observedAt.Add(-time.Hour)}}})
 	converter := newRawMetricConverter(database, nil)
-	aggregates := make(map[string]*hourlyAggregate)
+	existing := &hourlyAggregate{value: big.NewRat(99, 1)}
+	aggregates := map[string]*hourlyAggregate{"existing": existing}
 	processed, skippedErr, replayErr := converter.replayBatch(
 		&models.OtelMetricBatch{PayloadProto: payload, PayloadSchemaVersion: otelPayloadSchemaVersion, Status: models.OtelMetricBatchStatusProcessed},
 		observedAt.Truncate(24*time.Hour),
@@ -250,7 +252,7 @@ func TestReplayRejectsCumulativeTelemetryWithoutMutatingDay(t *testing.T) {
 	if processed || skippedErr != nil || replayErr == nil {
 		t.Fatalf("replayBatch() = %t, %v, %v; want cumulative replay abort", processed, skippedErr, replayErr)
 	}
-	if len(aggregates) != 0 {
+	if len(aggregates) != 1 || aggregates["existing"] != existing || existing.value.RatString() != "99" {
 		t.Fatalf("replayBatch() mutated aggregates before rejecting cumulative telemetry: %#v", aggregates)
 	}
 }
@@ -269,6 +271,23 @@ func TestReplayBatchAbortsForUnreadableProcessedPayload(t *testing.T) {
 	if code != errorInvalidPayload || !permanent {
 		t.Fatalf("decode abort = %s permanent=%t; want %s permanent", code, permanent, errorInvalidPayload)
 	}
+
+	t.Run("unsupported schema", func(t *testing.T) {
+		existing := &hourlyAggregate{value: big.NewRat(99, 1)}
+		aggregates := map[string]*hourlyAggregate{"existing": existing}
+		processed, skippedErr, replayErr := newRawMetricConverter(nil, nil).replayBatch(
+			&models.OtelMetricBatch{Model: common.Model{ID: 43}, PayloadProto: []byte("validity is irrelevant before schema validation"), PayloadSchemaVersion: otelPayloadSchemaVersion + 1, Status: models.OtelMetricBatchStatusProcessed},
+			time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC),
+			time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC),
+			aggregates,
+		)
+		if processed || skippedErr != nil || replayErr == nil {
+			t.Fatalf("replayBatch() = %t, %v, %v; want unsupported-schema abort", processed, skippedErr, replayErr)
+		}
+		if len(aggregates) != 1 || aggregates["existing"] != existing || existing.value.RatString() != "99" {
+			t.Fatalf("replayBatch() mutated aggregates before rejecting unsupported schema: %#v", aggregates)
+		}
+	})
 }
 
 func TestReplayBatchSkipsUnreadablePermanentErrorPayload(t *testing.T) {
@@ -280,6 +299,12 @@ func TestReplayBatchSkipsUnreadablePermanentErrorPayload(t *testing.T) {
 	)
 	if processed || skippedErr == nil || replayErr != nil {
 		t.Fatalf("replayBatch() = %t, %v, %v; want permanently quarantined decode skip", processed, skippedErr, replayErr)
+	}
+	diagnostics := replayDiagnostics{}
+	diagnostics.add(42, skippedErr)
+	message := diagnostics.message()
+	if message == nil || !strings.Contains(*message, "batch=42 code=invalid_payload reason=stored payload could not be decoded") || strings.Contains(*message, "not protobuf") {
+		t.Fatalf("replay diagnostic = %v; want bounded safe batch/code/reason details", message)
 	}
 }
 
