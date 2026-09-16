@@ -60,6 +60,7 @@ var basicRes context.BasicRes
 
 func Init() {
 	services.Init()
+	services.InitExecuteMigration()
 	basicRes = services.GetBasicRes()
 	access.Init(basicRes)
 	auth.Init(basicRes)
@@ -79,7 +80,6 @@ func InjectCustomService(pipelineNotifier services.PipelineNotificationService, 
 func CreateAndRunApiServer() {
 	// Setup and run the server
 	Init()
-	services.InitExecuteMigration()
 	router := CreateApiServer()
 	SetupApiServer(router)
 	RunApiServer(router)
