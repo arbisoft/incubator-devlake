@@ -27,7 +27,9 @@ import { Message, PageHeader } from '@/components';
 import { useRefreshData } from '@/hooks';
 import { operator, type OperateConfig } from '@/utils';
 import { getOtelColumns } from './columns';
-import { OTEL_ERROR, OTEL_LIFECYCLE_ACTION } from './constants';
+import { OtelIngestionHealth } from './ingestion-health';
+import { OtelSourcePolicy } from './source-policy';
+import { OTEL_ERROR, OTEL_LIFECYCLE_ACTION, OTEL_REFRESH_INTERVAL_MS } from './constants';
 import { OTEL_MODAL, OtelModals, type OtelLifecycleAction, type OtelModalState } from './modals';
 import {
   getOtelCreateError,
@@ -63,6 +65,11 @@ export const Otel = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { data, ready } = useRefreshData(() => API.otel.list(), [version]);
   const { data: projectOptions } = useRefreshData(() => API.otel.listProjects(), []);
+  const { data: ingestionStatus, ready: ingestionStatusReady } = useRefreshData(
+    () => API.otel.ingestionStatus(),
+    [version],
+  );
+  const { data: sourcePreferences } = useRefreshData(() => API.otel.listSourcePreferences(), [version]);
   const dataSource = useMemo(() => data ?? [], [data]);
   const columns = useMemo(
     () =>
@@ -88,6 +95,11 @@ export const Otel = () => {
     setModal(OTEL_MODAL.CREATE);
     setSearchParams({}, { replace: true });
   }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    const interval = window.setInterval(refresh, OTEL_REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(interval);
+  }, []);
 
   const closeModal = () => {
     setLifecycleError(undefined);
@@ -197,6 +209,8 @@ export const Otel = () => {
       {hasStorageNeedsApplying(dataSource) && (
         <Message content="Credential storage differs from the registered credentials. Select Apply to reconcile the telemetry endpoint." />
       )}
+      <OtelSourcePolicy preferences={sourcePreferences} />
+      <OtelIngestionHealth loading={!ingestionStatusReady} status={ingestionStatus} />
       <Table
         rowKey={(record) => record.connection.id}
         size="middle"

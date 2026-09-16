@@ -59,6 +59,26 @@ func ListSourcePreferences(_ *plugin.ApiResourceInput) (*plugin.ApiResourceOutpu
 	return &plugin.ApiResourceOutput{Body: preferences, Status: http.StatusOK}, nil
 }
 
+func GetIngestionStatus(_ *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	status, err := service.GetOtelIngestionStatus()
+	if err != nil {
+		return nil, err
+	}
+	return &plugin.ApiResourceOutput{Body: status, Status: http.StatusOK}, nil
+}
+
+func GetMetricBatchPayload(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	id, err := parseId(input.Params["batchId"])
+	if err != nil {
+		return nil, err
+	}
+	payload, err := service.DecodeOtelMetricBatchPayload(id)
+	if err != nil {
+		return nil, err
+	}
+	return &plugin.ApiResourceOutput{Body: payload, Status: http.StatusOK, ContentType: "application/json"}, nil
+}
+
 func PostConnection(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
 	body := &service.OtelConnectionInput{}
 	if err := api.Decode(input.Body, body, nil); err != nil {

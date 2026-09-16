@@ -49,7 +49,6 @@ type OtelMetricBatch struct {
 	ReceivedAt             time.Time  `gorm:"index;index:idx_otel_metric_batch_claim,priority:2"`
 	PayloadSha256          []byte     `gorm:"type:binary(32);uniqueIndex"`
 	PayloadProto           []byte     `gorm:"type:mediumblob"`
-	PayloadJSON            *string    `gorm:"type:json"`
 	PayloadSchemaVersion   int        `gorm:"not null"`
 	ResourceCount          int        `gorm:"not null"`
 	DatapointCount         int        `gorm:"not null"`

@@ -18,7 +18,7 @@
 
 import { request } from '@/utils';
 
-import type { AiSourcePreference, OtelConnectionResponse, OtelProject } from './types';
+import type { AiSourcePreference, OtelConnectionResponse, OtelIngestionStatus, OtelProject } from './types';
 
 export * from './types';
 
@@ -29,6 +29,12 @@ export const list = (signal?: AbortSignal): Promise<OtelConnectionResponse[]> =>
 
 export const listSourcePreferences = (signal?: AbortSignal): Promise<AiSourcePreference[]> =>
   request(sourcePreferencesPath, { signal });
+
+export const ingestionStatus = (signal?: AbortSignal): Promise<OtelIngestionStatus> =>
+  request('/plugins/claude_otel/ingestion-status', { signal });
+
+export const metricBatchPayload = (id: ID): Promise<unknown> =>
+  request(`/plugins/claude_otel/metric-batches/${id}/payload`);
 
 export const create = (data: { teamName: string; projectNames: string[] }) =>
   request(basePath, {

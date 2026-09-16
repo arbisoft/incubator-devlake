@@ -92,3 +92,40 @@ export type AiSourcePreference = {
   createdAt: string;
   updatedAt: string;
 };
+
+export const OTEL_INGESTION_STATE = {
+  HEALTHY: 'healthy',
+  DEGRADED: 'degraded',
+  UNHEALTHY: 'unhealthy',
+} as const;
+
+export type OtelIngestionState = (typeof OTEL_INGESTION_STATE)[keyof typeof OTEL_INGESTION_STATE];
+
+export type OtelMetricBatchSummary = {
+  id: ID;
+  receivedAt: string;
+  status: string;
+  resourceCount: number;
+  datapointCount: number;
+  processingErrorCode?: string;
+  processedAt?: string;
+};
+
+export type OtelIngestionStatus = {
+  contractVersion: number;
+  state: OtelIngestionState;
+  reasons: string[];
+  batchCounts: Record<string, number>;
+  oldestNonterminal?: {
+    receivedAt: string;
+    ageSeconds: number;
+  };
+  converterLease?: {
+    leaseUntil: string;
+    updatedAt: string;
+    ageSeconds: number;
+  };
+  recentPermanentErrors: number;
+  permanentErrorReasons: Array<{ code: string; count: number }>;
+  recentBatches: OtelMetricBatchSummary[];
+};

@@ -83,6 +83,12 @@ func (p ClaudeOtel) ApiResources() map[string]map[string]plugin.ApiResourceHandl
 		"source-preferences": {
 			"GET": api.ListSourcePreferences,
 		},
+		"ingestion-status": {
+			"GET": api.GetIngestionStatus,
+		},
+		"metric-batches/:batchId/payload": {
+			"GET": api.GetMetricBatchPayload,
+		},
 		"connections/:connectionId/rotate": {
 			"POST": api.RotateConnection,
 		},

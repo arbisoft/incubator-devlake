@@ -34,7 +34,6 @@ import (
 	collectormetrics "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 	commonv1 "go.opentelemetry.io/proto/otlp/common/v1"
 	metricsv1 "go.opentelemetry.io/proto/otlp/metrics/v1"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -99,18 +98,12 @@ func (s *RawIngestService) Ingest(request *http.Request) (*RawIngestResult, erro
 	if marshalErr != nil {
 		return nil, errors.Default.Wrap(marshalErr, "failed to canonicalize OTLP metrics payload")
 	}
-	payloadJSON, marshalErr := protojson.MarshalOptions{UseProtoNames: true}.Marshal(metricsRequest)
-	if marshalErr != nil {
-		return nil, errors.Default.Wrap(marshalErr, "failed to create OTLP metrics diagnostic projection")
-	}
-
 	now := s.now().UTC()
 	payloadHash := sha256.Sum256(deterministicPayload)
 	batch := &models.OtelMetricBatch{
 		ReceivedAt:           now,
 		PayloadSha256:        payloadHash[:],
 		PayloadProto:         deterministicPayload,
-		PayloadJSON:          pointerToString(string(payloadJSON)),
 		PayloadSchemaVersion: otelPayloadSchemaVersion,
 		ResourceCount:        resourceCount,
 		DatapointCount:       datapointCount,
@@ -268,8 +261,4 @@ func attributeString(attributes []*commonv1.KeyValue, key string) string {
 		return strings.TrimSpace(attribute.GetValue().GetStringValue())
 	}
 	return ""
-}
-
-func pointerToString(value string) *string {
-	return &value
 }
