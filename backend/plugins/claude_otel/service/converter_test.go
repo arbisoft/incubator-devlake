@@ -125,6 +125,32 @@ func TestRunRetentionBacksOffAfterFailure(t *testing.T) {
 	}
 }
 
+func TestRecordPermanentFailureMarksTerminalTime(t *testing.T) {
+	database := dalmocks.NewDal(t)
+	converter := newRawMetricConverter(database, nil)
+	now := time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC)
+	converter.now = func() time.Time { return now }
+	database.EXPECT().UpdateColumns(mock.Anything, mock.Anything, mock.Anything).Run(
+		func(_ interface{}, sets []dal.DalSet, _ ...dal.Clause) {
+			for _, set := range sets {
+				if set.ColumnName == "processed_at" && set.Value == now {
+					return
+				}
+			}
+			t.Fatalf("recordFailure() did not record terminal processed_at: %#v", sets)
+		},
+	).Return(nil).Once()
+
+	err := converter.recordFailure(
+		&models.OtelMetricBatch{Model: common.Model{ID: 12}, AttemptCount: 1},
+		"worker",
+		permanentMetricError(errorInvalidPayload, "invalid payload"),
+	)
+	if err != nil {
+		t.Fatalf("recordFailure() error = %v", err)
+	}
+}
+
 func TestPrepareUpdatesRejectsMalformedSupportedMetric(t *testing.T) {
 	observedAt := time.Now().UTC()
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{CreatedAt: observedAt.Add(-time.Hour)}}})
@@ -203,42 +229,57 @@ func TestMetricSeriesHashIncludesInstrumentationScope(t *testing.T) {
 	}
 }
 
-func TestReplayRejectsCumulativeTelemetryWithoutCheckpoint(t *testing.T) {
+func TestReplayRejectsCumulativeTelemetryWithoutMutatingDay(t *testing.T) {
 	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
 	request := newConverterRequest(observedAt, testOrganizationID)
-	for _, metric := range request.ResourceMetrics[0].ScopeMetrics[0].Metrics {
-		metric.GetSum().AggregationTemporality = metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_CUMULATIVE
-	}
+	metrics := request.ResourceMetrics[0].ScopeMetrics[0].Metrics
+	metrics[len(metrics)-1].GetSum().AggregationTemporality = metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_CUMULATIVE
 	payload, err := proto.Marshal(request)
 	if err != nil {
 		t.Fatalf("proto.Marshal() error = %v", err)
 	}
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: observedAt.Add(-time.Hour)}}})
 	converter := newRawMetricConverter(database, nil)
+	aggregates := make(map[string]*hourlyAggregate)
 	processed, skippedErr, replayErr := converter.replayBatch(
-		&models.OtelMetricBatch{PayloadProto: payload},
+		&models.OtelMetricBatch{PayloadProto: payload, PayloadSchemaVersion: otelPayloadSchemaVersion, Status: models.OtelMetricBatchStatusProcessed},
 		observedAt.Truncate(24*time.Hour),
 		observedAt.Truncate(24*time.Hour).Add(24*time.Hour),
-		make(map[string]*hourlyAggregate),
+		aggregates,
 	)
-	if processed || skippedErr == nil || replayErr != nil {
-		t.Fatalf("replayBatch() = %t, %v, %v; want cumulative replay to be a permanent skip", processed, skippedErr, replayErr)
+	if processed || skippedErr != nil || replayErr == nil {
+		t.Fatalf("replayBatch() = %t, %v, %v; want cumulative replay abort", processed, skippedErr, replayErr)
+	}
+	if len(aggregates) != 0 {
+		t.Fatalf("replayBatch() mutated aggregates before rejecting cumulative telemetry: %#v", aggregates)
 	}
 }
 
-func TestReplayBatchClassifiesDecodeAsPermanentSkip(t *testing.T) {
+func TestReplayBatchAbortsForUnreadableProcessedPayload(t *testing.T) {
 	processed, skippedErr, replayErr := newRawMetricConverter(nil, nil).replayBatch(
-		&models.OtelMetricBatch{Model: common.Model{ID: 42}, PayloadProto: []byte("not protobuf")},
+		&models.OtelMetricBatch{Model: common.Model{ID: 42}, PayloadProto: []byte("not protobuf"), PayloadSchemaVersion: otelPayloadSchemaVersion, Status: models.OtelMetricBatchStatusProcessed},
 		time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC),
 		time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC),
 		make(map[string]*hourlyAggregate),
 	)
-	if processed || replayErr != nil {
-		t.Fatalf("replayBatch() = %t, %v, %v; want a permanent decode skip", processed, skippedErr, replayErr)
+	if processed || skippedErr != nil || replayErr == nil {
+		t.Fatalf("replayBatch() = %t, %v, %v; want processed decode abort", processed, skippedErr, replayErr)
 	}
-	code, permanent, _ := classifyConversionError(skippedErr)
+	code, permanent, _ := classifyConversionError(replayErr)
 	if code != errorInvalidPayload || !permanent {
-		t.Fatalf("decode skip = %s permanent=%t; want %s permanent", code, permanent, errorInvalidPayload)
+		t.Fatalf("decode abort = %s permanent=%t; want %s permanent", code, permanent, errorInvalidPayload)
+	}
+}
+
+func TestReplayBatchSkipsUnreadablePermanentErrorPayload(t *testing.T) {
+	processed, skippedErr, replayErr := newRawMetricConverter(nil, nil).replayBatch(
+		&models.OtelMetricBatch{Model: common.Model{ID: 42}, PayloadProto: []byte("not protobuf"), PayloadSchemaVersion: otelPayloadSchemaVersion, Status: models.OtelMetricBatchStatusPermanentError},
+		time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC),
+		make(map[string]*hourlyAggregate),
+	)
+	if processed || skippedErr == nil || replayErr != nil {
+		t.Fatalf("replayBatch() = %t, %v, %v; want permanently quarantined decode skip", processed, skippedErr, replayErr)
 	}
 }
 
@@ -253,7 +294,7 @@ func TestReplayBatchAbortsOnRetryablePreparationFailure(t *testing.T) {
 	database.EXPECT().All(mock.AnythingOfType("*[]*models.OtelConnection"), mock.Anything).Return(devlakeerrors.Default.New("database unavailable"))
 
 	processed, skippedErr, replayErr := newRawMetricConverter(database, nil).replayBatch(
-		&models.OtelMetricBatch{PayloadProto: payload},
+		&models.OtelMetricBatch{PayloadProto: payload, PayloadSchemaVersion: otelPayloadSchemaVersion, Status: models.OtelMetricBatchStatusProcessed},
 		observedAt.Truncate(24*time.Hour),
 		observedAt.Truncate(24*time.Hour).Add(24*time.Hour),
 		make(map[string]*hourlyAggregate),
@@ -292,7 +333,7 @@ func TestReplayDeltaBatchesRebuildStableHourlyAggregates(t *testing.T) {
 		if err != nil {
 			t.Fatalf("proto.Marshal() error = %v", err)
 		}
-		return &models.OtelMetricBatch{PayloadProto: payload}
+		return &models.OtelMetricBatch{PayloadProto: payload, PayloadSchemaVersion: otelPayloadSchemaVersion, Status: models.OtelMetricBatchStatusProcessed}
 	}
 	batches := []*models.OtelMetricBatch{marshalBatch(first), marshalBatch(second)}
 	rebuild := func() map[string]*hourlyAggregate {

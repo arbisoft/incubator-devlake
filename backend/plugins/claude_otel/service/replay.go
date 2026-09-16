@@ -28,9 +28,7 @@ import (
 	"github.com/apache/incubator-devlake/core/models/domainlayer/ai"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
 	"github.com/google/uuid"
-	collectormetrics "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 	metricsv1 "go.opentelemetry.io/proto/otlp/metrics/v1"
-	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -228,12 +226,12 @@ type replayDiagnostics struct {
 	samples []string
 }
 
-func (d *replayDiagnostics) add(err error) {
+func (d *replayDiagnostics) add(batchID uint64, err error) {
 	if len(d.samples) >= replayDiagnosticSampleLimit {
 		return
 	}
 	code, _, _ := classifyConversionError(err)
-	d.samples = append(d.samples, string(code))
+	d.samples = append(d.samples, fmt.Sprintf("batch=%d code=%s reason=%s", batchID, code, replayDiagnosticReason(code)))
 }
 
 func (d *replayDiagnostics) message() *string {
@@ -242,6 +240,17 @@ func (d *replayDiagnostics) message() *string {
 	}
 	message := fmt.Sprintf("permanent replay skips: %v", d.samples)
 	return &message
+}
+
+func replayDiagnosticReason(code conversionErrorCode) string {
+	switch code {
+	case errorInvalidPayload:
+		return "stored payload could not be decoded"
+	case errorUnsupportedTemporality:
+		return "stored payload cannot be replayed safely"
+	default:
+		return "batch was permanently quarantined"
+	}
 }
 
 func boundedReplayErrorMessage(err error) *string {
@@ -278,7 +287,7 @@ func (c *rawMetricConverter) prepareReplayDay(requestID uint64, leaseOwner strin
 				return replayed, skipped, nil, err
 			}
 			if skipErr != nil {
-				diagnostics.add(skipErr)
+				diagnostics.add(batch.ID, skipErr)
 				skipped++
 				continue
 			}
@@ -292,25 +301,30 @@ func (c *rawMetricConverter) prepareReplayDay(requestID uint64, leaseOwner strin
 	}
 }
 
-// replayBatch adds one raw batch's DELTA increases to one day's aggregates. Historical
-// malformed data is a permanent skip; a transient preparation failure aborts before delete.
+// replayBatch adds one raw batch's DELTA increases to one day's aggregates. A permanently
+// quarantined raw batch never contributed facts and can be skipped; every failure for a
+// processed batch aborts before the caller deletes its existing day.
 func (c *rawMetricConverter) replayBatch(batch *models.OtelMetricBatch, rangeStart, rangeEnd time.Time, aggregates map[string]*hourlyAggregate) (bool, error, error) {
-	request := &collectormetrics.ExportMetricsServiceRequest{}
-	if err := proto.Unmarshal(batch.PayloadProto, request); err != nil {
-		return false, permanentMetricError(errorInvalidPayload, "decode replay batch %d: %v", batch.ID, err), nil
+	request, decodeErr := decodeOtelMetricBatchRequest(batch)
+	if decodeErr != nil {
+		return c.replayBatchFailure(batch, permanentMetricError(errorInvalidPayload, "decode replay batch %d: %v", batch.ID, decodeErr))
 	}
 	prepared, err := c.prepareUpdates(request)
 	if err != nil {
 		_, permanent, _ := classifyConversionError(err)
 		if permanent {
-			return false, err, nil
+			return c.replayBatchFailure(batch, err)
 		}
 		return false, nil, fmt.Errorf("prepare replay batch %d: %w", batch.ID, err)
 	}
+	// Validate the full batch before mutating aggregates. A mixed Delta/Cumulative batch
+	// cannot be replayed safely without predecessor state, and must leave the day untouched.
 	for _, update := range prepared.updates {
 		if update.temporality == metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_CUMULATIVE {
-			return false, permanentMetricError(errorUnsupportedTemporality, "replay batch %d contains cumulative telemetry; a predecessor checkpoint is required", batch.ID), nil
+			return c.replayBatchFailure(batch, permanentMetricError(errorUnsupportedTemporality, "replay batch %d contains cumulative telemetry; a predecessor checkpoint is required", batch.ID))
 		}
+	}
+	for _, update := range prepared.updates {
 		if update.hour.Before(rangeStart) || !update.hour.Before(rangeEnd) {
 			continue
 		}
@@ -329,6 +343,13 @@ func (c *rawMetricConverter) replayBatch(batch *models.OtelMetricBatch, rangeSta
 		}
 	}
 	return true, nil, nil
+}
+
+func (c *rawMetricConverter) replayBatchFailure(batch *models.OtelMetricBatch, err error) (bool, error, error) {
+	if batch.Status == models.OtelMetricBatchStatusPermanentError {
+		return false, err, nil
+	}
+	return false, nil, fmt.Errorf("cannot safely replay processed batch %d: %w", batch.ID, err)
 }
 
 func hourlyAggregateKey(update factUpdate) string {

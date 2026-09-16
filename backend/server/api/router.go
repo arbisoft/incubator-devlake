@@ -150,6 +150,10 @@ func handlePluginCall(basicRes context.BasicRes, pluginName string, handler plug
 		} else {
 			input.User = user
 		}
+		if accessService := access.Default(); accessService != nil && accessService.Enabled() {
+			principal, principalErr := accessService.CurrentPrincipal(c)
+			input.IsCustomerAdmin = principalErr == nil && principal.Role == access.RoleCustomerAdmin
+		}
 		if c.Request.Body != nil {
 			contentType := c.Request.Header.Get("Content-Type")
 			if strings.HasPrefix(contentType, "multipart/form-data;") || strings.HasPrefix(contentType, "application/x-protobuf") {

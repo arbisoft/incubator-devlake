@@ -68,6 +68,9 @@ func GetIngestionStatus(_ *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, 
 }
 
 func GetMetricBatchPayload(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	if !input.IsCustomerAdmin {
+		return nil, errors.Forbidden.New("customer administrator access is required")
+	}
 	id, err := parseId(input.Params["batchId"])
 	if err != nil {
 		return nil, err
@@ -76,7 +79,12 @@ func GetMetricBatchPayload(input *plugin.ApiResourceInput) (*plugin.ApiResourceO
 	if err != nil {
 		return nil, err
 	}
-	return &plugin.ApiResourceOutput{Body: payload, Status: http.StatusOK, ContentType: "application/json"}, nil
+	return &plugin.ApiResourceOutput{
+		Body:        payload,
+		Status:      http.StatusOK,
+		ContentType: "application/json",
+		Header:      http.Header{"Cache-Control": []string{"no-store"}},
+	}, nil
 }
 
 func PostConnection(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {

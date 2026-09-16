@@ -197,7 +197,7 @@ func otelConverterLeaseStatus(now time.Time) (*OtelConverterLeaseStatus, errors.
 }
 
 func otelRecentPermanentErrors(now time.Time) (int64, []OtelPermanentErrorReason, errors.Error) {
-	where := dal.Where("status = ? AND received_at >= ?", models.OtelMetricBatchStatusPermanentError, now.Add(-permanentErrorWindow))
+	where := dal.Where("status = ? AND processed_at >= ?", models.OtelMetricBatchStatusPermanentError, now.Add(-permanentErrorWindow))
 	count, err := db.Count(dal.From(&models.OtelMetricBatch{}), where)
 	if err != nil {
 		return 0, nil, errors.Default.Wrap(err, "failed to count recent Claude Code OTel permanent errors")
@@ -254,6 +254,24 @@ func DecodeOtelMetricBatchPayload(id uint64) ([]byte, errors.Error) {
 }
 
 func decodeOtelMetricBatchPayload(batch *models.OtelMetricBatch) ([]byte, errors.Error) {
+	request, decodeErr := decodeOtelMetricBatchRequest(batch)
+	if decodeErr != nil {
+		return nil, decodeErr
+	}
+	payload, marshalErr := protojson.MarshalOptions{UseProtoNames: true}.Marshal(request)
+	if marshalErr != nil {
+		return nil, errors.Default.Wrap(marshalErr, "failed to decode Claude Code OTel payload")
+	}
+	if len(payload) > maxDecodedPayloadBytes {
+		return nil, errors.HttpStatus(http.StatusRequestEntityTooLarge).New("decoded Claude Code OTel payload is too large")
+	}
+	return payload, nil
+}
+
+// decodeOtelMetricBatchRequest is the schema-aware boundary for every stored OTLP payload
+// consumer. Raw bytes remain authoritative; rendering and replay must agree on what they can
+// safely interpret.
+func decodeOtelMetricBatchRequest(batch *models.OtelMetricBatch) (*collectormetrics.ExportMetricsServiceRequest, errors.Error) {
 	if batch == nil {
 		return nil, errors.BadInput.New("Claude Code OTel raw batch is required")
 	}
@@ -264,14 +282,7 @@ func decodeOtelMetricBatchPayload(batch *models.OtelMetricBatch) ([]byte, errors
 	if err := proto.Unmarshal(batch.PayloadProto, request); err != nil {
 		return nil, errors.BadInput.New("stored Claude Code OTel payload is invalid")
 	}
-	payload, err := protojson.MarshalOptions{UseProtoNames: true}.Marshal(request)
-	if err != nil {
-		return nil, errors.Default.Wrap(err, "failed to decode Claude Code OTel payload")
-	}
-	if len(payload) > maxDecodedPayloadBytes {
-		return nil, errors.HttpStatus(http.StatusRequestEntityTooLarge).New("decoded Claude Code OTel payload is too large")
-	}
-	return payload, nil
+	return request, nil
 }
 
 func classifyOtelIngestionHealth(oldest *OtelOldestNonterminalBatch, permanentErrors int64) (string, []string) {

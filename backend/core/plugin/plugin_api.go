@@ -32,7 +32,8 @@ type ApiResourceInput struct {
 	Body    map[string]interface{} // json body
 	Request *http.Request
 
-	User *common.User
+	User            *common.User
+	IsCustomerAdmin bool // assigned only by the server's access-control boundary
 }
 
 // GetPlugin get the plugin in context

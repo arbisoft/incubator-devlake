@@ -36,6 +36,11 @@ const formatAge = (seconds?: number) => {
   return `${Math.floor(seconds / 60)}m`;
 };
 
+const converterState = (status: OtelIngestionStatus) => {
+  if (!status.converterLease) return 'Unavailable';
+  return new Date(status.converterLease.leaseUntil).getTime() > Date.now() ? 'Active' : 'Lease expired';
+};
+
 type OtelIngestionHealthProps = {
   loading: boolean;
   status?: OtelIngestionStatus;
@@ -91,6 +96,7 @@ export const OtelIngestionHealth = ({ loading, status }: OtelIngestionHealthProp
             {formatAge(status.oldestNonterminal?.ageSeconds)}
           </Descriptions.Item>
           <Descriptions.Item label="Permanent errors (24h)">{status.recentPermanentErrors}</Descriptions.Item>
+          <Descriptions.Item label="Converter">{converterState(status)}</Descriptions.Item>
         </Descriptions>
       ) : (
         <Typography.Text type="secondary">

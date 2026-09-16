@@ -28,8 +28,6 @@ import (
 	"github.com/apache/incubator-devlake/core/log"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
 	"github.com/google/uuid"
-	collectormetrics "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
-	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -225,9 +223,9 @@ func isBatchClaimable(batch *models.OtelMetricBatch, now time.Time) bool {
 // convert prepares facts outside a transaction, then verifies the batch lease and commits
 // facts, series state, canonical rows, and raw completion atomically.
 func (c *rawMetricConverter) convert(batch *models.OtelMetricBatch, leaseOwner string) (*preparedBatch, error) {
-	request := &collectormetrics.ExportMetricsServiceRequest{}
-	if err := proto.Unmarshal(batch.PayloadProto, request); err != nil {
-		return nil, &conversionError{code: errorInvalidPayload, permanent: true, err: fmt.Errorf("decode raw OTLP payload: %w", err)}
+	request, decodeErr := decodeOtelMetricBatchRequest(batch)
+	if decodeErr != nil {
+		return nil, &conversionError{code: errorInvalidPayload, permanent: true, err: fmt.Errorf("decode raw OTLP payload: %w", decodeErr)}
 	}
 	prepared, err := c.prepareUpdates(request)
 	if err != nil {
@@ -277,6 +275,7 @@ func (c *rawMetricConverter) convert(batch *models.OtelMetricBatch, leaseOwner s
 // failure to persist that state is returned; lease expiry keeps the batch reclaimable.
 func (c *rawMetricConverter) recordFailure(batch *models.OtelMetricBatch, leaseOwner string, conversionErr error) errors.Error {
 	code, permanent, message := classifyConversionError(conversionErr)
+	now := c.now().UTC()
 	if code == errorLeaseLost {
 		c.logWarn(conversionErr, fmt.Sprintf("Claude Code OTel raw batch %d lease was lost", batch.ID))
 		return nil
@@ -292,11 +291,14 @@ func (c *rawMetricConverter) recordFailure(batch *models.OtelMetricBatch, leaseO
 		{ColumnName: "processing_error_message", Value: message},
 	}
 	if permanent {
-		sets = append(sets, dal.DalSet{ColumnName: "status", Value: models.OtelMetricBatchStatusPermanentError})
+		sets = append(sets,
+			dal.DalSet{ColumnName: "status", Value: models.OtelMetricBatchStatusPermanentError},
+			dal.DalSet{ColumnName: "processed_at", Value: now},
+		)
 	} else {
 		sets = append(sets,
 			dal.DalSet{ColumnName: "status", Value: models.OtelMetricBatchStatusRetryableError},
-			dal.DalSet{ColumnName: "next_attempt_at", Value: c.now().UTC().Add(converterBackoff(batch.AttemptCount))},
+			dal.DalSet{ColumnName: "next_attempt_at", Value: now.Add(converterBackoff(batch.AttemptCount))},
 		)
 	}
 	if err := c.db.UpdateColumns(&models.OtelMetricBatch{}, sets,
