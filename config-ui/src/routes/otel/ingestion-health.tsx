@@ -38,7 +38,7 @@ const formatAge = (seconds?: number) => {
 
 const converterState = (status: OtelIngestionStatus) => {
   if (!status.converterLease) return 'Unavailable';
-  return new Date(status.converterLease.leaseUntil).getTime() > Date.now() ? 'Active' : 'Lease expired';
+  return status.converterLease.active ? 'Active' : 'Lease expired';
 };
 
 type OtelIngestionHealthProps = {

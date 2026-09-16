@@ -134,7 +134,10 @@ func TestRecordPermanentFailureMarksTerminalTime(t *testing.T) {
 	database.EXPECT().UpdateColumns(mock.Anything, mock.Anything, mock.Anything).Run(
 		func(_ interface{}, sets []dal.DalSet, _ ...dal.Clause) {
 			for _, set := range sets {
-				if set.ColumnName == "processed_at" && set.Value == now {
+				if set.ColumnName != "processed_at" {
+					continue
+				}
+				if actual, ok := set.Value.(time.Time); ok && actual.Equal(now) {
 					return
 				}
 			}
@@ -303,8 +306,20 @@ func TestReplayBatchSkipsUnreadablePermanentErrorPayload(t *testing.T) {
 	diagnostics := replayDiagnostics{}
 	diagnostics.add(42, skippedErr)
 	message := diagnostics.message()
-	if message == nil || !strings.Contains(*message, "batch=42 code=invalid_payload reason=stored payload could not be decoded") || strings.Contains(*message, "not protobuf") {
-		t.Fatalf("replay diagnostic = %v; want bounded safe batch/code/reason details", message)
+	if message == nil ||
+		!strings.Contains(*message, "batch=42 code=invalid_payload reason=stored payload could not be decoded detail=") ||
+		strings.Contains(*message, "not protobuf") {
+		t.Fatalf("replay diagnostic = %v; want bounded safe batch/code/reason/detail with no payload content", message)
+	}
+}
+
+func TestTruncateBoundsDiagnosticDetail(t *testing.T) {
+	if got := truncate("short", 120); got != "short" {
+		t.Fatalf("truncate() = %q, want unchanged string under the limit", got)
+	}
+	long := strings.Repeat("x", 200)
+	if got := truncate(long, replayDiagnosticDetailLimit); len([]rune(got)) != replayDiagnosticDetailLimit {
+		t.Fatalf("truncate() length = %d, want %d", len([]rune(got)), replayDiagnosticDetailLimit)
 	}
 }
 

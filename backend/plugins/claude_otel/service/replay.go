@@ -226,12 +226,25 @@ type replayDiagnostics struct {
 	samples []string
 }
 
+const replayDiagnosticDetailLimit = 120
+
 func (d *replayDiagnostics) add(batchID uint64, err error) {
 	if len(d.samples) >= replayDiagnosticSampleLimit {
 		return
 	}
-	code, _, _ := classifyConversionError(err)
-	d.samples = append(d.samples, fmt.Sprintf("batch=%d code=%s reason=%s", batchID, code, replayDiagnosticReason(code)))
+	code, _, message := classifyConversionError(err)
+	d.samples = append(d.samples, fmt.Sprintf("batch=%d code=%s reason=%s detail=%s",
+		batchID, code, replayDiagnosticReason(code), truncate(message, replayDiagnosticDetailLimit)))
+}
+
+// truncate bounds a diagnostic detail string to at most n runes so replay diagnostics
+// stay short and predictable regardless of how long an underlying error message is.
+func truncate(s string, n int) string {
+	runes := []rune(s)
+	if len(runes) <= n {
+		return s
+	}
+	return string(runes[:n])
 }
 
 func (d *replayDiagnostics) message() *string {

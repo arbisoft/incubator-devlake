@@ -67,6 +67,10 @@ type OtelConverterLeaseStatus struct {
 	LeaseUntil time.Time `json:"leaseUntil"`
 	UpdatedAt  time.Time `json:"updatedAt"`
 	AgeSeconds int64     `json:"ageSeconds"`
+	// Active is computed server-side because leaseUntil is a server timestamp; comparing
+	// it against the browser clock produces false readings under any clock skew larger
+	// than converterLeaseDuration.
+	Active bool `json:"active"`
 }
 
 type OtelPermanentErrorReason struct {
@@ -193,11 +197,15 @@ func otelConverterLeaseStatus(now time.Time) (*OtelConverterLeaseStatus, errors.
 		LeaseUntil: lease.LeaseUntil,
 		UpdatedAt:  lease.UpdatedAt,
 		AgeSeconds: int64(maxDuration(now.Sub(lease.UpdatedAt), 0).Seconds()),
+		Active:     lease.LeaseUntil.After(now),
 	}, nil
 }
 
 func otelRecentPermanentErrors(now time.Time) (int64, []OtelPermanentErrorReason, errors.Error) {
-	where := dal.Where("status = ? AND processed_at >= ?", models.OtelMetricBatchStatusPermanentError, now.Add(-permanentErrorWindow))
+	// COALESCE tolerates permanent_error rows quarantined before processed_at was backfilled
+	// on write; processed_at >= ? alone is never true for NULL and would silently zero out
+	// this count for pre-existing rows.
+	where := dal.Where("status = ? AND COALESCE(processed_at, received_at) >= ?", models.OtelMetricBatchStatusPermanentError, now.Add(-permanentErrorWindow))
 	count, err := db.Count(dal.From(&models.OtelMetricBatch{}), where)
 	if err != nil {
 		return 0, nil, errors.Default.Wrap(err, "failed to count recent Claude Code OTel permanent errors")
@@ -268,6 +276,14 @@ func decodeOtelMetricBatchPayload(batch *models.OtelMetricBatch) ([]byte, errors
 	return payload, nil
 }
 
+// decodableSchemaVersions lists every payload_schema_version this build can still decode.
+// Raw batches are retained for 90 days and remain replayable for that whole window, so a
+// version bump must add the new version here while keeping the previous one decodable for
+// at least 90 more days rather than replacing it outright.
+var decodableSchemaVersions = map[int]struct{}{
+	otelPayloadSchemaVersion: {},
+}
+
 // decodeOtelMetricBatchRequest is the schema-aware boundary for every stored OTLP payload
 // consumer. Raw bytes remain authoritative; rendering and replay must agree on what they can
 // safely interpret.
@@ -275,7 +291,7 @@ func decodeOtelMetricBatchRequest(batch *models.OtelMetricBatch) (*collectormetr
 	if batch == nil {
 		return nil, errors.BadInput.New("Claude Code OTel raw batch is required")
 	}
-	if batch.PayloadSchemaVersion != otelPayloadSchemaVersion {
+	if _, decodable := decodableSchemaVersions[batch.PayloadSchemaVersion]; !decodable {
 		return nil, errors.BadInput.New(fmt.Sprintf("unsupported Claude Code OTel payload schema version %d", batch.PayloadSchemaVersion))
 	}
 	request := &collectormetrics.ExportMetricsServiceRequest{}

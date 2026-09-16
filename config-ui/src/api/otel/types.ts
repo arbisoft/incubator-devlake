@@ -124,6 +124,7 @@ export type OtelIngestionStatus = {
     leaseUntil: string;
     updatedAt: string;
     ageSeconds: number;
+    active: boolean;
   };
   recentPermanentErrors: number;
   permanentErrorReasons: Array<{ code: string; count: number }>;
