@@ -107,7 +107,11 @@ export const OtelIngestionHealth = ({ loading, status }: OtelIngestionHealthProp
       <Table<OtelMetricBatchSummary>
         size="small"
         rowKey="id"
-        pagination={false}
+        pagination={{
+          defaultPageSize: 10,
+          pageSizeOptions: [10, 20, 50, 100],
+          showSizeChanger: true,
+        }}
         loading={loading}
         dataSource={status?.recentBatches ?? []}
         columns={columns}

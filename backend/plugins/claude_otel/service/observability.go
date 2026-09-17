@@ -32,7 +32,7 @@ import (
 
 const (
 	ingestionStatusContractVersion  = 1
-	ingestionStatusRecentBatchLimit = 20
+	ingestionStatusRecentBatchLimit = 100
 	permanentErrorWindow            = 24 * time.Hour
 	healthDegradedBacklogAge        = 5 * time.Minute
 	healthUnhealthyBacklogAge       = 30 * time.Minute
