@@ -58,6 +58,9 @@ func (p ClaudeOtel) MigrationScripts() []plugin.MigrationScript { return migrati
 
 func (p ClaudeOtel) ApiResources() map[string]map[string]plugin.ApiResourceHandler {
 	return map[string]map[string]plugin.ApiResourceHandler{
+		api.OtlpMetricsResourcePath: {
+			"POST": api.PostOtlpMetrics,
+		},
 		"connections": {
 			"GET":  api.ListConnections,
 			"POST": api.PostConnection,
@@ -76,6 +79,15 @@ func (p ClaudeOtel) ApiResources() map[string]map[string]plugin.ApiResourceHandl
 		},
 		"connections/:connectionId/projects": {
 			"PUT": api.PutConnectionProjects,
+		},
+		"source-preferences": {
+			"GET": api.ListSourcePreferences,
+		},
+		"ingestion-status": {
+			"GET": api.GetIngestionStatus,
+		},
+		"metric-batches/:batchId/payload": {
+			"GET": api.GetMetricBatchPayload,
 		},
 		"connections/:connectionId/rotate": {
 			"POST": api.RotateConnection,

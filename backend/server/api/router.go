@@ -150,8 +150,18 @@ func handlePluginCall(basicRes context.BasicRes, pluginName string, handler plug
 		} else {
 			input.User = user
 		}
+		// When access management is disabled, IsCustomerAdmin stays false for every
+		// request, so every plugin endpoint gated on it is permanently forbidden rather
+		// than left unrestricted. This is deliberate: there is no role source of truth
+		// to consult otherwise, and failing closed on a data-access boundary is correct
+		// even though it makes such an endpoint unreachable.
+		if accessService := access.Default(); accessService != nil && accessService.Enabled() {
+			principal, principalErr := accessService.CurrentPrincipal(c)
+			input.IsCustomerAdmin = principalErr == nil && principal.Role == access.RoleCustomerAdmin
+		}
 		if c.Request.Body != nil {
-			if strings.HasPrefix(c.Request.Header.Get("Content-Type"), "multipart/form-data;") {
+			contentType := c.Request.Header.Get("Content-Type")
+			if strings.HasPrefix(contentType, "multipart/form-data;") || strings.HasPrefix(contentType, "application/x-protobuf") {
 				input.Request = c.Request
 			} else {
 				shouldBindJSONErr := c.ShouldBindJSON(&input.Body)

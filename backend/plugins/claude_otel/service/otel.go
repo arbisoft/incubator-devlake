@@ -28,6 +28,7 @@ import (
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/log"
 	"github.com/apache/incubator-devlake/core/models/common"
+	"github.com/apache/incubator-devlake/core/models/domainlayer/ai"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
 )
 
@@ -52,9 +53,10 @@ const (
 )
 
 var (
-	cfg    config.ConfigReader
-	db     dal.Dal
-	logger log.Logger
+	cfg       config.ConfigReader
+	db        dal.Dal
+	logger    log.Logger
+	rawIngest *RawIngestService
 	// lifecycleMu serializes file and collector updates for a single backend instance.
 	lifecycleMu sync.Mutex
 )
@@ -63,6 +65,8 @@ func Init(basicRes corecontext.BasicRes) {
 	cfg = basicRes.GetConfigReader()
 	db = basicRes.GetDal()
 	logger = basicRes.GetLogger()
+	rawIngest = NewRawIngestService(db, cfg, logger)
+	startRawMetricConverter(db, logger)
 }
 
 type OtelConnectionInput struct {
@@ -117,6 +121,19 @@ func buildOtelConnectionResponses(connections []*models.OtelConnection) ([]*mode
 		output = append(output, response)
 	}
 	return output, nil
+}
+
+// ListOtelSourcePreferences exposes the persisted OTel-only canonical policy. Future
+// Enterprise sources remain unavailable until their compatibility checks are complete.
+func ListOtelSourcePreferences() ([]*ai.AiSourcePreference, errors.Error) {
+	preferences := make([]*ai.AiSourcePreference, 0)
+	if err := db.All(&preferences,
+		dal.Where("provider = ?", aiProviderClaude),
+		dal.Orderby("workspace_key ASC, metric_family ASC"),
+	); err != nil {
+		return nil, errors.Default.Wrap(err, "error getting Claude AI source preferences")
+	}
+	return preferences, nil
 }
 
 // HideOtelConnection removes a revoked connection from the management UI while retaining its audit record.
@@ -315,6 +332,8 @@ func removeOtelConnectionForRollback(connection *models.OtelConnection) errors.E
 	} else {
 		deleteErr := errors.Default.Wrap(err, fmt.Sprintf("error removing otel connection %d during rollback", connection.ID))
 		connection.Status = models.OtelConnectionStatusRevoked
+		revokedAt := time.Now()
+		connection.RevokedAt = &revokedAt
 		if updateErr := db.Update(connection); updateErr == nil {
 			return nil
 		} else {
@@ -484,6 +503,7 @@ func RevokeOtelConnection(user *common.User, id uint64) (*models.OtelConnectionW
 		return nil, err
 	}
 	connection.Status = models.OtelConnectionStatusRevoked
+	connection.RevokedAt = &now
 	setOtelActor(user, connection, false)
 	if err := db.Update(connection); err != nil {
 		return nil, errors.Default.Wrap(err, "error revoking otel connection")

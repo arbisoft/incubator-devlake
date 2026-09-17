@@ -11,6 +11,14 @@ receivers:
           authenticator: basicauth/server
 
 processors:
+  resource/attribution:
+    attributes:
+      # The attributes processor below edits datapoints only. Remove spoofable resource-level
+      # attribution so it cannot reach Prometheus labels or DevLake raw storage.
+      - key: devlake_team
+        action: delete
+      - key: devlake_project
+        action: delete
   attributes/team:
     actions:
       # Stamp the verified credential's team slug instead of trusting client input.
@@ -34,19 +42,37 @@ processors:
 
   delta_to_cumulative: {}
 
-  batch:
+  batch/prometheus:
     send_batch_size: 16384
     timeout: 500ms
     send_batch_max_size: 32768
 
 exporters:
-  file/metrics:
-    path: /var/lib/otel/claude-metrics.json
-    format: json
-    rotation:
-      max_megabytes: 32
-      max_days: 7
-      max_backups: 14
+  otlphttp/claude_raw:
+    endpoint: ${env:CLAUDE_OTEL_INGEST_ENDPOINT}
+    compression: none
+    headers:
+      X-Claude-Otel-Ingest-Token: ${env:CLAUDE_OTEL_INGEST_TOKEN}
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      multiplier: 1.5
+      max_elapsed_time: 0
+    sending_queue:
+      enabled: true
+      storage: file_storage/claude_raw
+      num_consumers: 1
+      sizer: bytes
+      queue_size: 536870912
+      # Reject on saturation rather than block the exporter in the known persistent-queue deadlock path.
+      # Monitor enqueue failures and backlog before the bounded queue fills.
+      block_on_overflow: false
+      batch:
+        sizer: bytes
+        min_size: 262144
+        max_size: 1048576
+        flush_timeout: 10s
   prometheus:
     endpoint: 0.0.0.0:8889
     resource_constant_labels:
@@ -58,11 +84,43 @@ extensions:
   basicauth/server:
     htpasswd:
       file: /etc/otelcol-contrib/auth/.htpasswd
+  file_storage/claude_raw:
+    directory: /var/lib/otel/queue
+    create_directory: true
+    fsync: true
+    max_size: 1073741824
+    compaction:
+      # Keep compaction scratch space on the writable queue volume; the default is not writable.
+      directory: /var/lib/otel/compaction
+      on_rebound: true
+      rebound_needed_threshold_mib: 128
+      rebound_trigger_threshold_mib: 32
+      check_interval: 30s
+
+connectors:
+  forward/claude_raw: {}
+  forward/prometheus: {}
 
 service:
-  extensions: [health_check, basicauth/server]
+  telemetry:
+    metrics:
+      # Internal Collector metrics expose raw queue size, capacity, and enqueue failures.
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
+  extensions: [health_check, basicauth/server, file_storage/claude_raw]
   pipelines:
     metrics:
       receivers: [otlp]
-      processors: [memory_limiter, attributes/team, delta_to_cumulative, batch]
-      exporters: [file/metrics, prometheus]
+      processors: [memory_limiter, resource/attribution, attributes/team]
+      exporters: [forward/claude_raw, forward/prometheus]
+    metrics/claude_raw:
+      receivers: [forward/claude_raw]
+      exporters: [otlphttp/claude_raw]
+    metrics/prometheus:
+      receivers: [forward/prometheus]
+      processors: [delta_to_cumulative, batch/prometheus]
+      exporters: [prometheus]

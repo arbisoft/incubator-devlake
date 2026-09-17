@@ -23,7 +23,7 @@ import { Alert, Button, Flex, Input, message, Modal, Select, Space } from 'antd'
 
 import type { OtelConnectionResponse, OtelProject } from '@/api/otel';
 import { ExternalLink, Message } from '@/components';
-import { OTEL_LIFECYCLE_ACTION } from './constants';
+import { OTEL_LIFECYCLE_ACTION, OTEL_ORGANIZATION } from './constants';
 import { ManagedSettings } from './styled';
 
 export const OTEL_MODAL = {
@@ -58,9 +58,17 @@ type OtelModalProps = {
   onUpdateProjects: () => void;
 };
 
-type OtelProjectSelectProps = Pick<OtelModalProps, 'projectNames' | 'projectOptions' | 'onProjectNamesChange' | 'onClearCreateError'>;
+type OtelProjectSelectProps = Pick<
+  OtelModalProps,
+  'projectNames' | 'projectOptions' | 'onProjectNamesChange' | 'onClearCreateError'
+>;
 
-const OtelProjectSelect = ({ projectNames, projectOptions, onProjectNamesChange, onClearCreateError }: OtelProjectSelectProps) => (
+const OtelProjectSelect = ({
+  projectNames,
+  projectOptions,
+  onProjectNamesChange,
+  onClearCreateError,
+}: OtelProjectSelectProps) => (
   <Select
     style={{ width: '100%' }}
     mode="multiple"
@@ -124,6 +132,7 @@ const CreateModal = ({
       />
       {createError && <Alert type="error" showIcon message={createError} />}
       <Message content="The team name and its derived reporting slug cannot be changed later. Project placement controls dashboard visibility; it is not repository attribution." />
+      <Message content={OTEL_ORGANIZATION.CREATE_NOTICE} />
     </Space>
   </Modal>
 );

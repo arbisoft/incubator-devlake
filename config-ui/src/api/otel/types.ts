@@ -39,6 +39,8 @@ export type OtelConnection = {
   collectorEndpoint: string;
   protocol: string;
   status: OtelConnectionStatus;
+  organizationId: string | null;
+  revokedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -71,4 +73,60 @@ export type OtelConnectionResponse = {
   recoveryRequired: boolean;
   storageNeedsApplying: boolean;
   projects: OtelProject[];
+};
+
+export const AI_METRIC_FAMILY = {
+  CORE_ACTIVITY: 'core_activity',
+  MODEL_USAGE: 'model_usage',
+  TOOL_USAGE: 'tool_usage',
+} as const;
+
+export type AiMetricFamily = (typeof AI_METRIC_FAMILY)[keyof typeof AI_METRIC_FAMILY];
+
+export type AiSourcePreference = {
+  provider: string;
+  workspaceKey: string;
+  metricFamily: AiMetricFamily;
+  preferredSource: string;
+  fallbackSource?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const OTEL_INGESTION_STATE = {
+  HEALTHY: 'healthy',
+  DEGRADED: 'degraded',
+  UNHEALTHY: 'unhealthy',
+} as const;
+
+export type OtelIngestionState = (typeof OTEL_INGESTION_STATE)[keyof typeof OTEL_INGESTION_STATE];
+
+export type OtelMetricBatchSummary = {
+  id: ID;
+  receivedAt: string;
+  status: string;
+  resourceCount: number;
+  datapointCount: number;
+  processingErrorCode?: string;
+  processedAt?: string;
+};
+
+export type OtelIngestionStatus = {
+  contractVersion: number;
+  state: OtelIngestionState;
+  reasons: string[];
+  batchCounts: Record<string, number>;
+  oldestNonterminal?: {
+    receivedAt: string;
+    ageSeconds: number;
+  };
+  converterLease?: {
+    leaseUntil: string;
+    updatedAt: string;
+    ageSeconds: number;
+    active: boolean;
+  };
+  recentPermanentErrors: number;
+  permanentErrorReasons: Array<{ code: string; count: number }>;
+  recentBatches: OtelMetricBatchSummary[];
 };

@@ -51,6 +51,45 @@ func ListProjectConnections(input *plugin.ApiResourceInput) (*plugin.ApiResource
 	return &plugin.ApiResourceOutput{Body: connections, Status: http.StatusOK}, nil
 }
 
+func ListSourcePreferences(_ *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	preferences, err := service.ListOtelSourcePreferences()
+	if err != nil {
+		return nil, err
+	}
+	return &plugin.ApiResourceOutput{Body: preferences, Status: http.StatusOK}, nil
+}
+
+func GetIngestionStatus(_ *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	status, err := service.GetOtelIngestionStatus()
+	if err != nil {
+		return nil, err
+	}
+	return &plugin.ApiResourceOutput{Body: status, Status: http.StatusOK}, nil
+}
+
+func GetMetricBatchPayload(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	// IsCustomerAdmin is false, and this stays forbidden, whenever access management is
+	// disabled server-wide; see the fail-closed rationale at handlePluginCall in
+	// server/api/router.go.
+	if !input.IsCustomerAdmin {
+		return nil, errors.Forbidden.New(plugin.CustomerAdminRequiredMessage)
+	}
+	id, err := parseId(input.Params["batchId"])
+	if err != nil {
+		return nil, err
+	}
+	payload, err := service.DecodeOtelMetricBatchPayload(id)
+	if err != nil {
+		return nil, err
+	}
+	return &plugin.ApiResourceOutput{
+		Body:        payload,
+		Status:      http.StatusOK,
+		ContentType: "application/json",
+		Header:      http.Header{"Cache-Control": []string{"no-store"}},
+	}, nil
+}
+
 func PostConnection(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
 	body := &service.OtelConnectionInput{}
 	if err := api.Decode(input.Body, body, nil); err != nil {

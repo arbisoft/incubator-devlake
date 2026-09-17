@@ -43,6 +43,9 @@ import (
 	"github.com/apache/incubator-devlake/server/api/shared"
 	"github.com/apache/incubator-devlake/server/api/version"
 	"github.com/apache/incubator-devlake/server/services"
+	rpccode "google.golang.org/genproto/googleapis/rpc/code"
+	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 const DB_MIGRATION_REQUIRED = `
@@ -57,6 +60,7 @@ var basicRes context.BasicRes
 
 func Init() {
 	services.Init()
+	services.InitExecuteMigration()
 	basicRes = services.GetBasicRes()
 	access.Init(basicRes)
 	auth.Init(basicRes)
@@ -76,7 +80,6 @@ func InjectCustomService(pipelineNotifier services.PipelineNotificationService, 
 func CreateAndRunApiServer() {
 	// Setup and run the server
 	Init()
-	services.InitExecuteMigration()
 	router := CreateApiServer()
 	SetupApiServer(router)
 	RunApiServer(router)
@@ -144,6 +147,13 @@ func SetupApiServer(router *gin.Engine) {
 	// Restrict access if database migration is required
 	router.Use(func(ctx *gin.Context) {
 		serviceStatus := services.CurrentStatus()
+		// The OTLP Collector permanently drops 428 responses; 503 keeps its batch queued.
+		if ctx.Request.URL.Path == auth.PathClaudeOtelMetrics &&
+			(serviceStatus == services.SERVICE_STATUS_WAIT_CONFIRM || serviceStatus == services.SERVICE_STATUS_MIGRATING) {
+			outputOtlpMigrationUnavailable(ctx, DB_MIGRATING)
+			ctx.Abort()
+			return
+		}
 		if serviceStatus == services.SERVICE_STATUS_WAIT_CONFIRM {
 			// Return error response
 			shared.ApiOutputError(
@@ -171,6 +181,17 @@ func SetupApiServer(router *gin.Engine) {
 	}
 	// Register API endpoints
 	RegisterRouter(router, basicRes)
+}
+
+// outputOtlpMigrationUnavailable keeps the Collector-only endpoint compliant with
+// OTLP/HTTP even when the generic migration middleware handles the request first.
+func outputOtlpMigrationUnavailable(ctx *gin.Context, message string) {
+	body, err := proto.Marshal(&rpcstatus.Status{Code: int32(rpccode.Code_UNAVAILABLE), Message: message})
+	if err != nil {
+		shared.ApiOutputError(ctx, errors.Unavailable.Wrap(err, "failed to encode OTLP migration response"))
+		return
+	}
+	ctx.Data(http.StatusServiceUnavailable, "application/x-protobuf", body)
 }
 
 func RunApiServer(router *gin.Engine) {

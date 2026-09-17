@@ -6,11 +6,11 @@ services:
       - otel-auth:/auth
     restart: "no"
 
-  otel-file-export-init:
+  otel-queue-init:
     image: busybox:1.36
     command: ["sh", "-c", "chown -R 10001:10001 /data && chmod 750 /data"]
     volumes:
-      - otel-file-export:/data
+      - otel-queue:/data
     restart: "no"
 
   otel-collector:
@@ -20,7 +20,7 @@ services:
     volumes:
       - ./collector-config-production.yaml:/etc/otelcol-contrib/config.yaml
       - otel-auth:/etc/otelcol-contrib/auth:ro
-      - otel-file-export:/var/lib/otel
+      - otel-queue:/var/lib/otel
     ports:
       # OTLP ingest - exposed so clients (e.g. Claude Code) can send telemetry.
       # Restrict via firewall/security group to trusted sources in production.
@@ -30,6 +30,8 @@ services:
       - "127.0.0.1:8889:8889"
     environment:
       - GOGC=80
+      - CLAUDE_OTEL_INGEST_ENDPOINT=${CLAUDE_OTEL_INGEST_ENDPOINT:?set CLAUDE_OTEL_INGEST_ENDPOINT}
+      - CLAUDE_OTEL_INGEST_TOKEN=${CLAUDE_OTEL_INGEST_TOKEN:?set CLAUDE_OTEL_INGEST_TOKEN}
     deploy:
       resources:
         limits:
@@ -42,7 +44,7 @@ services:
     depends_on:
       otel-auth-init:
         condition: service_completed_successfully
-      otel-file-export-init:
+      otel-queue-init:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:13133/healthz"]
@@ -111,4 +113,6 @@ volumes:
   prometheus-data:
     driver: local
   otel-file-export:
+    driver: local
+  otel-queue:
     driver: local

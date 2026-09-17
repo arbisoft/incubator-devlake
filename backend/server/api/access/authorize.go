@@ -24,6 +24,7 @@ import (
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/core/plugin"
 )
 
 const identityContextKey = "devlake_access_identity"
@@ -360,7 +361,7 @@ func (s *Service) RequireAdmin(c *gin.Context) (*Principal, errors.Error) {
 		return nil, err
 	}
 	if principal.Role != RoleCustomerAdmin {
-		return nil, errors.Forbidden.New("customer administrator access is required")
+		return nil, errors.Forbidden.New(plugin.CustomerAdminRequiredMessage)
 	}
 	return principal, nil
 }

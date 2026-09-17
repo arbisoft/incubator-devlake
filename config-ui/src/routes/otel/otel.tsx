@@ -27,7 +27,9 @@ import { Message, PageHeader } from '@/components';
 import { useRefreshData } from '@/hooks';
 import { operator, type OperateConfig } from '@/utils';
 import { getOtelColumns } from './columns';
-import { OTEL_ERROR, OTEL_LIFECYCLE_ACTION } from './constants';
+import { OtelIngestionHealth } from './ingestion-health';
+import { OtelSourcePolicy } from './source-policy';
+import { OTEL_ERROR, OTEL_LIFECYCLE_ACTION, OTEL_REFRESH_INTERVAL_MS } from './constants';
 import { OTEL_MODAL, OtelModals, type OtelLifecycleAction, type OtelModalState } from './modals';
 import {
   getOtelCreateError,
@@ -45,10 +47,7 @@ const BREADCRUMBS = [{ name: 'Claude Code OTel', path: OTEL_PATH }];
 type OtelOperationResult<T> = { success: true; data: T } | { success: false; error: unknown };
 
 // Keep OTel lifecycle responses typed without changing the shared legacy operator contract.
-const operateOtel = async <T,>(
-  request: () => Promise<T>,
-  config?: OperateConfig,
-): Promise<OtelOperationResult<T>> => {
+const operateOtel = async <T,>(request: () => Promise<T>, config?: OperateConfig): Promise<OtelOperationResult<T>> => {
   const [success, result] = await operator(request, config);
   return success ? { success: true, data: result as T } : { success: false, error: result };
 };
@@ -66,6 +65,11 @@ export const Otel = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { data, ready } = useRefreshData(() => API.otel.list(), [version]);
   const { data: projectOptions } = useRefreshData(() => API.otel.listProjects(), []);
+  const { data: ingestionStatus, ready: ingestionStatusReady } = useRefreshData(
+    () => API.otel.ingestionStatus(),
+    [version],
+  );
+  const { data: sourcePreferences } = useRefreshData(() => API.otel.listSourcePreferences(), [version]);
   const dataSource = useMemo(() => data ?? [], [data]);
   const columns = useMemo(
     () =>
@@ -92,6 +96,11 @@ export const Otel = () => {
     setSearchParams({}, { replace: true });
   }, [searchParams, setSearchParams]);
 
+  useEffect(() => {
+    const interval = window.setInterval(refresh, OTEL_REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(interval);
+  }, []);
+
   const closeModal = () => {
     setLifecycleError(undefined);
     setCreateError(undefined);
@@ -100,7 +109,10 @@ export const Otel = () => {
 
   const handleCreate = async () => {
     setCreateError(undefined);
-    const result = await operateOtel(() => API.otel.create({ teamName, projectNames }), { hideToast: true, setOperating });
+    const result = await operateOtel(() => API.otel.create({ teamName, projectNames }), {
+      hideToast: true,
+      setOperating,
+    });
     if (result.success) {
       setCurrent(result.data);
       setTeamName('');
@@ -197,6 +209,8 @@ export const Otel = () => {
       {hasStorageNeedsApplying(dataSource) && (
         <Message content="Credential storage differs from the registered credentials. Select Apply to reconcile the telemetry endpoint." />
       )}
+      <OtelSourcePolicy preferences={sourcePreferences} />
+      <OtelIngestionHealth loading={!ingestionStatusReady} status={ingestionStatus} />
       <Table
         rowKey={(record) => record.connection.id}
         size="middle"

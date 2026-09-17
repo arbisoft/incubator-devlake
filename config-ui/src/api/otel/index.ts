@@ -18,13 +18,23 @@
 
 import { request } from '@/utils';
 
-import type { OtelConnectionResponse, OtelProject } from './types';
+import type { AiSourcePreference, OtelConnectionResponse, OtelIngestionStatus, OtelProject } from './types';
 
 export * from './types';
 
 const basePath = '/plugins/claude_otel/connections';
+const sourcePreferencesPath = '/plugins/claude_otel/source-preferences';
 
 export const list = (signal?: AbortSignal): Promise<OtelConnectionResponse[]> => request(basePath, { signal });
+
+export const listSourcePreferences = (signal?: AbortSignal): Promise<AiSourcePreference[]> =>
+  request(sourcePreferencesPath, { signal });
+
+export const ingestionStatus = (signal?: AbortSignal): Promise<OtelIngestionStatus> =>
+  request('/plugins/claude_otel/ingestion-status', { signal });
+
+export const metricBatchPayload = (id: ID): Promise<unknown> =>
+  request(`/plugins/claude_otel/metric-batches/${id}/payload`);
 
 export const create = (data: { teamName: string; projectNames: string[] }) =>
   request(basePath, {
