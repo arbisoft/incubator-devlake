@@ -33,7 +33,6 @@ export const OtelSourcePolicy = ({ preferences }: OtelSourcePolicyProps) => {
       <Typography.Title level={5} style={{ margin: 0 }}>
         {OTEL_SOURCE_POLICY.TITLE}
       </Typography.Title>
-      <Typography.Text type="secondary">{OTEL_SOURCE_POLICY.OTEL_ONLY}</Typography.Text>
       {active.length > 0 && (
         <Descriptions bordered size="small" column={{ xs: 1, sm: 3 }}>
           {active.map((preference) => (

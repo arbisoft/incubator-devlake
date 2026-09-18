@@ -56,8 +56,6 @@ export const OTEL_ORGANIZATION = {
 
 export const OTEL_SOURCE_POLICY = {
   TITLE: 'Canonical daily data',
-  OTEL_ONLY:
-    'OTel is the active source. Enterprise Analytics remains unavailable until its compatibility checks are complete.',
 } as const;
 
 export const OTEL_ATTENTION_CHANGED_EVENT = 'devlake:otel-attention-changed';
