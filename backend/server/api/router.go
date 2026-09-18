@@ -25,6 +25,7 @@ import (
 	"github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/impls/logruslog"
+	"github.com/apache/incubator-devlake/server/api/access"
 	"github.com/apache/incubator-devlake/server/api/apikeys"
 	"github.com/apache/incubator-devlake/server/api/auth"
 	"github.com/apache/incubator-devlake/server/api/store"
@@ -89,12 +90,11 @@ func RegisterRouter(r *gin.Engine, basicRes context.BasicRes) {
 	r.PUT("/api-keys/:apiKeyId", apikeys.PutApiKey)
 	r.DELETE("/api-keys/:apiKeyId", apikeys.DeleteApiKey)
 
-	// auth (OIDC user login)
-	r.GET(auth.PathMethods, auth.GetMethods)
-	r.GET(auth.PathLogin, auth.LoginInit)
-	r.GET(auth.PathCallback, auth.Callback)
-	r.POST(auth.PathLogout, auth.Logout)
-	r.GET(auth.PathUserInfo, auth.UserInfo)
+	// auth (OIDC and local user login)
+	auth.RegisterRoutes(r)
+
+	// fork-owned native OIDC access directory
+	access.RegisterRoutes(r)
 
 	// user project mapping api
 	//

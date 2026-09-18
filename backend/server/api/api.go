@@ -35,6 +35,7 @@ import (
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/impls/logruslog"
+	"github.com/apache/incubator-devlake/server/api/access"
 	"github.com/apache/incubator-devlake/server/api/auth"
 	_ "github.com/apache/incubator-devlake/server/api/docs"
 	"github.com/apache/incubator-devlake/server/api/grafanarole"
@@ -56,7 +57,9 @@ var basicRes context.BasicRes
 
 func Init() {
 	services.Init()
+	services.InitExecuteMigration()
 	basicRes = services.GetBasicRes()
+	access.Init(basicRes)
 	auth.Init(basicRes)
 	grafanarole.Init(basicRes)
 }
@@ -74,7 +77,6 @@ func InjectCustomService(pipelineNotifier services.PipelineNotificationService, 
 func CreateAndRunApiServer() {
 	// Setup and run the server
 	Init()
-	services.InitExecuteMigration()
 	router := CreateApiServer()
 	SetupApiServer(router)
 	RunApiServer(router)
@@ -108,12 +110,16 @@ func CreateApiServer() *gin.Engine {
 	router.GET("/version", version.Get)
 
 	// Auth chain order matters: REST API key first (its own short-circuit),
-	// then OIDC session, then oauth2-proxy header (only sets USER if not yet
-	// set), then the terminal 401 gate, finally CSRF on unsafe methods.
+	// then OIDC session, then the terminal 401 gate, finally CSRF on unsafe
+	// methods. Legacy proxy/Basic identity fallback is incompatible with the
+	// access directory because it cannot prove directory admission.
 	router.Use(RestAuthentication(router, basicRes))
 	router.Use(auth.OIDCAuthentication())
-	router.Use(OAuth2ProxyAuthentication(basicRes))
+	if access.Default() == nil || !access.Default().Enabled() {
+		router.Use(OAuth2ProxyAuthentication(basicRes))
+	}
 	router.Use(auth.RequireAuth())
+	router.Use(auth.RequirePasswordChange())
 	router.Use(auth.CSRFProtect())
 
 	return router

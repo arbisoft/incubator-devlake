@@ -22,6 +22,8 @@ const PATH_PREFIX = import.meta.env.DEVLAKE_PATH_PREFIX ?? '';
 
 export const PATHS = {
   ROOT: () => `${PATH_PREFIX}/`,
+  LOGIN: () => `${PATH_PREFIX}/login`,
+  CHANGE_PASSWORD: () => `${PATH_PREFIX}/change-password`,
   CONNECTIONS: () => `${PATH_PREFIX}/connections`,
   CONNECTION: (plugin: string, connectionId: ID) => `${PATH_PREFIX}/connections/${plugin}/${connectionId}`,
   PROJECTS: () => `${PATH_PREFIX}/projects`,

@@ -21,6 +21,7 @@ import {
   ProjectOutlined,
   ExperimentOutlined,
   KeyOutlined,
+  SafetyCertificateOutlined,
   DashboardOutlined,
   FileSearchOutlined,
   ApiOutlined,
@@ -29,8 +30,10 @@ import {
 } from '@ant-design/icons';
 
 import { DOC_URL } from '@/release';
+import { ACCESS_PATH } from '@/routes/access/constants';
 
 const PATH_PREFIX = import.meta.env.DEVLAKE_PATH_PREFIX ?? '';
+export { ACCESS_PATH };
 
 type MenuItem = {
   key: string;
@@ -70,6 +73,11 @@ export const menuItems: MenuItem[] = [
     label: 'API Keys',
     icon: <KeyOutlined />,
   },
+  {
+    key: ACCESS_PATH,
+    label: 'User Management',
+    icon: <SafetyCertificateOutlined />,
+  },
 ];
 
 const getMenuMatchs = (items: MenuItem[], parentKey?: string) => {
@@ -89,9 +97,15 @@ const getMenuMatchs = (items: MenuItem[], parentKey?: string) => {
 
 export const menuItemsMatch = getMenuMatchs(menuItems);
 
-export const headerItems = [
+type HeaderItem = {
+  link: string;
+  label: string;
+  icon: React.ReactNode;
+};
+
+export const headerItems: HeaderItem[] = [
   {
-    link: import.meta.env.DEV ? `${window.location.protocol}//${window.location.hostname}:3002` : `/grafana`,
+    link: '/api/access/grafana-login',
     label: 'Dashboards',
     icon: <DashboardOutlined />,
   },

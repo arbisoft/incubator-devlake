@@ -20,6 +20,7 @@ import { redirect } from 'react-router-dom';
 import { intersection } from 'lodash';
 
 import API from '@/api';
+import { PATHS } from '@/config';
 import { getRegisterPlugins } from '@/plugins';
 
 type Props = {
@@ -27,6 +28,12 @@ type Props = {
 };
 
 export const layoutLoader = async ({ request }: Props) => {
+  const user = await API.auth.userinfo().catch(() => null);
+
+  if (user?.authenticated && user.mustChangePassword) {
+    return redirect(PATHS.CHANGE_PASSWORD());
+  }
+
   const onboard = await API.store.get('onboard');
 
   if (!onboard) {
@@ -39,10 +46,10 @@ export const layoutLoader = async ({ request }: Props) => {
     fePlugins = fePlugins.filter((plugin) => !envPlugins.length || envPlugins.includes(plugin));
   } catch (err) {}
 
-  const [bePlugins, res, user] = await Promise.all([
+  const [bePlugins, res, access] = await Promise.all([
     API.plugin.list(),
     API.version(request.signal),
-    API.auth.userinfo().catch(() => null),
+    API.access.current().catch(() => null),
   ]);
 
   return {
@@ -52,5 +59,6 @@ export const layoutLoader = async ({ request }: Props) => {
       bePlugins.map((it) => it.plugin),
     ),
     user,
+    access,
   };
 };

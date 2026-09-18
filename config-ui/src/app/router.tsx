@@ -25,6 +25,7 @@ import {
   Layout,
   layoutLoader,
   Login,
+  ChangePassword,
   Connections,
   Connection,
   ProjectHomePage,
@@ -35,6 +36,8 @@ import {
   Pipelines,
   Pipeline,
   ApiKeys,
+  Access,
+  accessLoader,
   NotFound,
 } from '@/routes';
 
@@ -52,6 +55,10 @@ export const router = createBrowserRouter([
   {
     path: `${PATH_PREFIX}/login`,
     element: <Login />,
+  },
+  {
+    path: `${PATH_PREFIX}/change-password`,
+    element: <ChangePassword />,
   },
   {
     path: `${PATH_PREFIX}/onboard`,
@@ -115,6 +122,11 @@ export const router = createBrowserRouter([
       {
         path: 'keys',
         element: <ApiKeys />,
+      },
+      {
+        path: 'access',
+        element: <Access />,
+        loader: accessLoader,
       },
     ],
   },

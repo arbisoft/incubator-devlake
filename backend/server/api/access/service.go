@@ -1,0 +1,240 @@
+/*
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package access
+
+import (
+	"fmt"
+	"strings"
+	"sync"
+
+	"github.com/apache/incubator-devlake/core/context"
+	"github.com/apache/incubator-devlake/core/dal"
+	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/core/log"
+	"github.com/apache/incubator-devlake/helpers/oidchelper"
+)
+
+type Config struct {
+	Enabled             bool
+	BootstrapAdminEmail string
+	AuthPublicURL       string
+	GrafanaPublicURL    string
+}
+
+// SessionRevoker persists revocations in the same transaction as an access-user
+// disable. It returns the affected session IDs so the auth service can update its
+// in-memory cache only after the transaction commits.
+type SessionRevoker interface {
+	RevokePersistentSessions(tx dal.Transaction, providerKeys []string, subject string) ([]string, errors.Error)
+	RevokeLocalSessions(tx dal.Transaction, userID uint64) ([]string, errors.Error)
+	CacheRevokedSessions(ids []string)
+}
+
+// LocalCredentialGenerator is implemented by auth, which owns password policy,
+// entropy generation, and Argon2id hashing. Access owns the durable directory
+// transition and receives only the generated material required to persist it.
+type LocalCredentialGenerator interface {
+	PrepareLocalCredential(loginName string) (*LocalCredentialMaterial, errors.Error)
+}
+
+// LocalCredentialMaterial contains a one-time password only until the access
+// API writes its response. It must not be logged, audited, or persisted beyond
+// PasswordHash.
+type LocalCredentialMaterial struct {
+	LoginName         string
+	PasswordHash      string
+	TemporaryPassword string
+}
+
+// OIDCMethodChecker lets access preserve the "at least one interactive login
+// method" invariant without reading auth runtime state directly.
+type OIDCMethodChecker interface {
+	HasEnabledOIDCProvider() bool
+}
+
+// LocalMethodChecker lets OIDC lifecycle transitions preserve the interactive
+// login-method invariant without coupling access to auth runtime state.
+type LocalMethodChecker interface {
+	LocalPasswordEnabled() bool
+}
+
+type Service struct {
+	cfg             Config
+	db              dal.Dal
+	logger          log.Logger
+	oidcLifecycleMu sync.Mutex
+	sessionRevoker  SessionRevoker
+	localGenerator  LocalCredentialGenerator
+	oidcMethods     OIDCMethodChecker
+	localMethods    LocalMethodChecker
+	oidcRuntime     OIDCProviderRuntime
+	grafanaSSO      *GrafanaSSOClient
+}
+
+var (
+	defaultService *Service
+	initOnce       sync.Once
+)
+
+func Init(basicRes context.BasicRes) {
+	initOnce.Do(func() {
+		cfg := basicRes.GetConfigReader()
+		defaultService = &Service{
+			cfg: Config{
+				Enabled:             cfg.GetBool("AUTH_ACCESS_ENABLED"),
+				BootstrapAdminEmail: normalizeEmail(cfg.GetString("AUTH_BOOTSTRAP_ADMIN_EMAIL")),
+				AuthPublicURL:       strings.TrimRight(strings.TrimSpace(cfg.GetString("AUTH_PUBLIC_URL")), "/"),
+				GrafanaPublicURL:    strings.TrimRight(strings.TrimSpace(cfg.GetString("GRAFANA_PUBLIC_URL")), "/"),
+			},
+			db:     basicRes.GetDal(),
+			logger: basicRes.GetLogger(),
+		}
+		grafanaClient, err := NewGrafanaSSOClient(
+			cfg.GetString("GRAFANA_INTERNAL_URL"),
+			cfg.GetString("GRAFANA_MANAGEMENT_USER"),
+			cfg.GetString("GRAFANA_MANAGEMENT_PASSWORD"),
+			nil,
+		)
+		if err == nil {
+			defaultService.grafanaSSO = grafanaClient
+		} else if defaultService.cfg.Enabled {
+			// The constructor error deliberately contains no supplied values. This
+			// warns operators without exposing backend-only Grafana credentials.
+			defaultService.logger.Warn(err, "access: Grafana SSO administration is unavailable; configure the private Grafana URL and management credentials")
+		}
+	})
+}
+
+func (s *Service) oidcProviderCallbacks() (string, string, errors.Error) {
+	if s.cfg.AuthPublicURL == "" || s.cfg.GrafanaPublicURL == "" {
+		return "", "", errors.Unavailable.New("OIDC provider public URLs are not configured", errors.WithData(ErrCodeProviderBlocked))
+	}
+	return s.cfg.AuthPublicURL + authOIDCCallbackPath, s.cfg.GrafanaPublicURL, nil
+}
+
+// OIDCProviderCallbacks intentionally returns the DevLake callback URL and
+// callback URLs for every supported Grafana target. This allows the new-provider
+// creation form in Config UI to display the exact callback URL needed for IDP
+// configuration as soon as the administrator selects a target.
+func (s *Service) OIDCProviderCallbacks() (*OIDCProviderCallbacksResponse, errors.Error) {
+	devLakeCallbackURL, grafanaPublicURL, err := s.oidcProviderCallbacks()
+	if err != nil {
+		return nil, err
+	}
+	callbackURLs := make(map[GrafanaProviderKind]string, 6)
+	for _, target := range []GrafanaProviderKind{
+		GrafanaProviderNone,
+		GrafanaProviderGoogle,
+		GrafanaProviderAzureAD,
+		GrafanaProviderOkta,
+		GrafanaProviderGitLab,
+		GrafanaProviderGenericOAuth,
+	} {
+		callbackURLs[target] = grafanaPublicURL + grafanaLoginPath(target)
+	}
+	return &OIDCProviderCallbacksResponse{
+		DevLakeCallbackURL:  devLakeCallbackURL,
+		GrafanaCallbackURLs: callbackURLs,
+		AllowLocalOIDC:      oidchelper.AllowsLocalOIDCURL(s.cfg.AuthPublicURL),
+	}, nil
+}
+
+func (s *Service) decorateOIDCProviderResponse(response *OIDCProviderResponse) *OIDCProviderResponse {
+	if response == nil {
+		return nil
+	}
+	response.AllowLocalOIDC = oidchelper.AllowsLocalOIDCURL(s.cfg.AuthPublicURL)
+	devLakeCallbackURL, grafanaPublicURL, err := s.oidcProviderCallbacks()
+	if err == nil {
+		response.DevLakeCallbackURL = devLakeCallbackURL
+		response.GrafanaCallbackURL = grafanaPublicURL + grafanaLoginPath(response.GrafanaTarget)
+	}
+	return response
+}
+
+func Default() *Service { return defaultService }
+
+func SetSessionRevoker(revoker SessionRevoker) {
+	if defaultService != nil {
+		defaultService.sessionRevoker = revoker
+	}
+}
+
+func SetLocalCredentialGenerator(generator LocalCredentialGenerator) {
+	if defaultService != nil {
+		defaultService.localGenerator = generator
+	}
+}
+
+func SetOIDCMethodChecker(checker OIDCMethodChecker) {
+	if defaultService != nil {
+		defaultService.oidcMethods = checker
+	}
+}
+
+func SetLocalMethodChecker(checker LocalMethodChecker) {
+	if defaultService != nil {
+		defaultService.localMethods = checker
+	}
+}
+
+func SetOIDCProviderRuntime(runtime OIDCProviderRuntime) {
+	if defaultService != nil {
+		defaultService.oidcRuntime = runtime
+	}
+}
+
+func (s *Service) Enabled() bool { return s != nil && s.cfg.Enabled }
+
+// ValidateConfiguration ensures access-directory admission is backed by native
+// OIDC and/or local-password authentication, never a legacy proxy identity that
+// cannot consult the directory.
+func ValidateConfiguration(authEnabled, oidcEnabled, localEnabled bool, forwardedUserSecret string) error {
+	if !authEnabled {
+		return fmt.Errorf("AUTH_ACCESS_ENABLED=true requires AUTH_ENABLED=true")
+	}
+	if !oidcEnabled && !localEnabled {
+		return fmt.Errorf("AUTH_ACCESS_ENABLED=true requires OIDC_ENABLED=true or AUTH_LOCAL_ENABLED=true")
+	}
+	if strings.TrimSpace(forwardedUserSecret) != "" {
+		return fmt.Errorf("AUTH_ACCESS_ENABLED=true cannot be combined with FORWARDED_USER_SECRET; remove trusted oauth2-proxy forwarded identity authentication before enabling the access directory")
+	}
+	return nil
+}
+
+func (s *Service) withTransaction(operation string, action func(tx dal.Transaction) errors.Error) errors.Error {
+	tx := s.db.Begin()
+	committed := false
+	defer func() {
+		if !committed {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				if s.logger != nil {
+					s.logger.Error(rollbackErr, "access: rollback %s", operation)
+				}
+			}
+		}
+	}()
+	if err := action(tx); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return errors.Default.Wrap(err, fmt.Sprintf("error committing %s", operation))
+	}
+	committed = true
+	return nil
+}

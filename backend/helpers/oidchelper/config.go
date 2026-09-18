@@ -19,6 +19,7 @@ package oidchelper
 
 import (
 	"fmt"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -52,6 +53,7 @@ type ProviderConfig struct {
 	RedirectURL  string
 	Scopes       []string
 	DisplayName  string
+	HTTPClient   *http.Client
 
 	// UseWorkloadIdentity authenticates the code exchange with an Azure
 	// Workload Identity federated assertion (read from the SA token file)
@@ -62,10 +64,20 @@ type ProviderConfig struct {
 // Config is the typed view of the auth-related env vars. Build it once at boot.
 type Config struct {
 	AuthEnabled bool
+	// PublicURL is the canonical browser origin used to derive database-backed
+	// OIDC callbacks. Environment providers retain their explicit RedirectURL.
+	PublicURL string
+	// AuthProxyLogoutURL is used when an external auth proxy owns the browser session.
+	AuthProxyLogoutURL string
 
 	OIDCEnabled    bool
 	Providers      map[string]*ProviderConfig
 	LogoutRedirect bool
+
+	// Optional OIDC authorization restrictions.
+	// Empty means no restriction.
+	AllowEmails  map[string]struct{}
+	AllowDomains map[string]struct{}
 
 	SessionSecret []byte
 	SessionTTL    time.Duration
@@ -87,14 +99,16 @@ func (c *Config) ProviderNames() []string {
 	return out
 }
 
-// LoadConfig reads auth env vars via Viper and validates required fields.
-// Returns Config{AuthEnabled:false} when AUTH_ENABLED=false (the default,
-// preserves historical behavior).
+// LoadConfig reads auth env vars via Viper and validates required fields. It returns
+// the environment bootstrap configuration used only by auth.NewService to resolve the
+// authoritative database provider source. Returns Config{AuthEnabled:false} when
+// AUTH_ENABLED=false (the default, preserves historical behavior).
 func LoadConfig(basicRes context.BasicRes) (*Config, error) {
 	cfg := basicRes.GetConfigReader()
+	authProxyLogoutURL := strings.TrimSpace(cfg.GetString("AUTH_PROXY_LOGOUT_URL"))
 
 	if !cfg.GetBool("AUTH_ENABLED") {
-		return &Config{AuthEnabled: false}, nil
+		return &Config{AuthEnabled: false, AuthProxyLogoutURL: authProxyLogoutURL}, nil
 	}
 
 	sessionSecret := strings.TrimSpace(cfg.GetString("SESSION_SECRET"))
@@ -120,14 +134,18 @@ func LoadConfig(basicRes context.BasicRes) (*Config, error) {
 	}
 
 	out := &Config{
-		AuthEnabled:    true,
-		OIDCEnabled:    cfg.GetBool("OIDC_ENABLED"),
-		Providers:      map[string]*ProviderConfig{},
-		LogoutRedirect: cfg.GetBool("OIDC_LOGOUT_REDIRECT"),
-		SessionSecret:  []byte(sessionSecret),
-		SessionTTL:     ttl,
-		CookieDomain:   strings.TrimSpace(cfg.GetString("COOKIE_DOMAIN")),
-		CookieSecure:   cookieSecure,
+		AuthEnabled:        true,
+		PublicURL:          strings.TrimRight(strings.TrimSpace(cfg.GetString("AUTH_PUBLIC_URL")), "/"),
+		AuthProxyLogoutURL: authProxyLogoutURL,
+		OIDCEnabled:        cfg.GetBool("OIDC_ENABLED"),
+		Providers:          map[string]*ProviderConfig{},
+		LogoutRedirect:     cfg.GetBool("OIDC_LOGOUT_REDIRECT"),
+		AllowEmails:        parseStringSet(cfg.GetString("OIDC_ALLOW_EMAILS")),
+		AllowDomains:       parseStringSet(cfg.GetString("OIDC_ALLOW_DOMAINS")),
+		SessionSecret:      []byte(sessionSecret),
+		SessionTTL:         ttl,
+		CookieDomain:       strings.TrimSpace(cfg.GetString("COOKIE_DOMAIN")),
+		CookieSecure:       cookieSecure,
 	}
 
 	if !out.OIDCEnabled {
@@ -136,7 +154,10 @@ func LoadConfig(basicRes context.BasicRes) (*Config, error) {
 
 	names := parseProviderNames(cfg.GetString("OIDC_PROVIDERS"))
 	if len(names) == 0 {
-		return nil, fmt.Errorf("OIDC_ENABLED=true but OIDC_PROVIDERS is empty")
+		// Auth resolves the database-backed source after this bootstrap config is
+		// loaded. It preserves the historical environment-mode validation when no
+		// database source is active.
+		return out, nil
 	}
 	for _, name := range names {
 		prefix := "OIDC_" + strings.ToUpper(name) + "_"
@@ -197,6 +218,23 @@ func parseProviderNames(raw string) []string {
 		seen[n] = struct{}{}
 		out = append(out, n)
 	}
+
+	return out
+}
+
+func parseStringSet(raw string) map[string]struct{} {
+	out := make(map[string]struct{})
+
+	for _, v := range strings.Split(raw, ",") {
+		v = strings.ToLower(strings.TrimSpace(v))
+
+		if v == "" {
+			continue
+		}
+
+		out[v] = struct{}{}
+	}
+
 	return out
 }
 

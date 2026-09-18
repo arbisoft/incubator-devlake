@@ -20,7 +20,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useLoaderData, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { Layout as AntdLayout, Menu, Divider, Dropdown, Button } from 'antd';
-import { UserOutlined, LogoutOutlined } from '@ant-design/icons';
+import { UserOutlined } from '@ant-design/icons';
 
 import API from '@/api';
 import { PageLoading, Logo, ExternalLink } from '@/components';
@@ -28,7 +28,10 @@ import { init, selectError, selectStatus } from '@/features';
 import { OnboardCard } from '@/routes/onboard/components';
 import { useAppDispatch, useAppSelector } from '@/hooks';
 
-import { menuItems, menuItemsMatch, headerItems } from './config';
+import { ACCESS_PATH, menuItems, menuItemsMatch, headerItems } from './config';
+import type { AccessCurrent } from '@/api/access';
+import { canManageAccess } from '@/routes/access/guard';
+import { useAccountMenu, useIdentityLinkNotification } from '@/routes/access/use-account-menu';
 
 const { Sider, Header, Content, Footer } = AntdLayout;
 
@@ -38,11 +41,17 @@ export const Layout = () => {
   const [openKeys, setOpenKeys] = useState<string[]>([]);
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
 
-  const { version, plugins, user } = useLoaderData() as {
+  const { version, plugins, user, access } = useLoaderData() as {
     version: string;
     plugins: string[];
-    user: { authenticated: boolean; name: string; email: string } | null;
+    user: { authenticated: boolean; name: string; email: string; authenticationMethod: 'local' | 'oidc' | '' } | null;
+    access: AccessCurrent | null;
   };
+
+  const visibleMenuItems = useMemo(
+    () => menuItems.filter((item) => item.key !== ACCESS_PATH || canManageAccess(access)),
+    [access],
+  );
 
   const handleLogout = async () => {
     try {
@@ -56,6 +65,9 @@ export const Layout = () => {
     }
     window.location.href = '/login';
   };
+
+  const { accountMenuItems, loadLinkableProviders } = useAccountMenu({ user: user ?? undefined, access, handleLogout });
+  useIdentityLinkNotification();
 
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -121,7 +133,7 @@ export const Layout = () => {
         <Menu
           mode="inline"
           theme="dark"
-          items={menuItems}
+          items={visibleMenuItems}
           openKeys={openKeys}
           selectedKeys={selectedKeys}
           onClick={({ key }) => navigate(key)}
@@ -147,28 +159,18 @@ export const Layout = () => {
               import.meta.env.DEVLAKE_COPYRIGHT_HIDE ? !['Dashboards', 'GitHub', 'Slack'].includes(item.label) : true,
             )
             .map((item, i, arr) => (
-              <ExternalLink key={item.label} link={item.link} style={{ display: 'flex', alignItems: 'center' }}>
-                {item.icon}
-                <span style={{ marginLeft: 4 }}>{item.label}</span>
+              <span key={item.label} style={{ display: 'flex', alignItems: 'center' }}>
+                <ExternalLink link={item.link} style={{ display: 'flex', alignItems: 'center' }}>
+                  {item.icon}
+                  <span style={{ marginLeft: 4 }}>{item.label}</span>
+                </ExternalLink>
                 {i !== arr.length - 1 && <Divider type="vertical" />}
-              </ExternalLink>
+              </span>
             ))}
           {user?.authenticated && (
             <>
               <Divider type="vertical" />
-              <Dropdown
-                menu={{
-                  items: [
-                    {
-                      key: 'logout',
-                      icon: <LogoutOutlined />,
-                      label: 'Sign out',
-                      onClick: handleLogout,
-                    },
-                  ],
-                }}
-                placement="bottomRight"
-              >
+              <Dropdown menu={{ items: accountMenuItems }} placement="bottomRight" onOpenChange={loadLinkableProviders}>
                 <Button type="text" icon={<UserOutlined />}>
                   {user.name || user.email || 'Account'}
                 </Button>

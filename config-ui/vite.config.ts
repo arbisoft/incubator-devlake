@@ -39,6 +39,13 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\//, ''),
       },
+      // The production header points at /grafana/login/generic_oauth. Local
+      // Grafana serves at root, so remove only the proxy prefix for this route.
+      '/grafana/login/generic_oauth': {
+        target: grafanaOrigin,
+        changeOrigin: grafanaChangeOrigin,
+        rewrite: () => '/login/generic_oauth',
+      },
       '/grafana': {
         target: grafanaOrigin,
         changeOrigin: grafanaChangeOrigin,
