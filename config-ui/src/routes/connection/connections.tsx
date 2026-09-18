@@ -19,6 +19,7 @@
 import { Fragment, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { theme, Badge, Modal } from 'antd';
+import { WarningOutlined } from '@ant-design/icons';
 
 import { selectPlugins, selectAllConnections, selectWebhooks } from '@/features/connections';
 import API from '@/api';
@@ -91,6 +92,9 @@ export const Connections = () => {
   );
 
   const filterWebhookPlugins = plugins.filter((p) => p !== 'webhook');
+  const deprecatedPlugin = filterWebhookPlugins
+    .map((plugin) => getPluginConfig(plugin))
+    .find((config) => config?.isDeprecated && config.deprecationMessage);
 
   const [firstPlugins, secondPlugins] = useMemo(
     () => splitPluginsByInitial(filterWebhookPlugins, (plugin) => getPluginConfig(plugin)?.name ?? plugin),
@@ -159,6 +163,16 @@ export const Connections = () => {
       </h5>
       <h2>Data Connections</h2>
       <h5>You can create and manage data connections for the following data sources and use them in your Projects.</h5>
+      {deprecatedPlugin?.deprecationMessage && (
+        <S.DeprecationAlert
+          closable
+          showIcon
+          type="warning"
+          icon={<WarningOutlined />}
+          message="Plugin deprecation notice"
+          description={deprecatedPlugin.deprecationMessage}
+        />
+      )}
       <h4>A-N</h4>
       <ul>
         {firstPlugins.map((plugin) => {
@@ -171,9 +185,6 @@ export const Connections = () => {
                 {pluginConfig.isDeprecated && <span className="deprecated">Deprecated</span>}
                 <span className="logo">{pluginConfig.icon({ color: colorPrimary })}</span>
                 <span className="name">{pluginConfig.name}</span>
-                {pluginConfig.isDeprecated && pluginConfig.deprecationMessage && (
-                  <span className="deprecation-note">{pluginConfig.deprecationMessage}</span>
-                )}
                 <span className="count">
                   {connectionCount ? (
                     <Badge color={colorPrimary} text={`${connectionCount} connections`} />
@@ -199,9 +210,6 @@ export const Connections = () => {
               {pluginConfig.isDeprecated && <span className="deprecated">Deprecated</span>}
               <span className="logo">{pluginConfig.icon({ color: colorPrimary })}</span>
               <span className="name">{pluginConfig.name}</span>
-              {pluginConfig.isDeprecated && pluginConfig.deprecationMessage && (
-                <span className="deprecation-note">{pluginConfig.deprecationMessage}</span>
-              )}
               <span className="count">
                 {connectionCount ? (
                   <Badge color={colorPrimary} text={`${connectionCount} connections`} />
