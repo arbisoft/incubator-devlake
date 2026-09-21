@@ -1,0 +1,636 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "**Scope & caveats:**\n\n- \u201cInput\u201d/\u201cOutput\u201d figures (tokens, sessions, active hours, AI lines) are company-wide \u2014 AI activity carries no project association in the schema. \u201cDelivery Outcomes\u201d figures (PRs/commits/lines never merged, PR abandonment) are scoped to the selected project(s).\n- **Active Hours is Claude Code OTel-only.** Session duration isn't rolled up into the shared AI-activity table for any provider \u2014 Cursor has no comparable duration concept at all \u2014 so this is queried directly from Claude Code's OTel telemetry.\n- **Commits/lines never merged are inflated by squash-merge workflows.** A squash-merged PR keeps only its final squashed commit in the ingested history \u2014 the original branch commits never show up as \u201cmerged\u201d even though the code did ship. Read this row as an upper bound on abandoned work, not an exact measurement.\n- **PR Abandonment Rate** is the delivery-outcome view of the same problem: no field links an AI session to the branch or PR it produced, so a dollar/token cost can't be attached to abandoned work directly. This table measures it a different way instead \u2014 PR-level: (PRs authored that closed without merging) \u00f7 (all PRs authored) \u2014 as an outcome-based proxy for wasted effort, not an AI-cost-denominated one.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.0.0",
+      "title": "About this dashboard",
+      "type": "text",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1
+    },
+    {
+      "datasource": "mysql",
+      "description": "Total AI tokens consumed, company-wide. Combines legacy activity records with Claude Code (OTel) usage records into one total.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH ai_tokens_daily AS (\n  SELECT date, (input_tokens + output_tokens) AS tokens\n  FROM ai_activities WHERE record_kind IS NULL\n  UNION ALL\n  SELECT date, (input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens) AS tokens\n  FROM ai_model_usages\n)\nSELECT SUM(tokens) AS \"Tokens Burned\" FROM ai_tokens_daily WHERE $__timeFilter(date)",
+          "refId": "A"
+        }
+      ],
+      "title": "Tokens Burned (Company-wide)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 8
+      },
+      "id": 2
+    },
+    {
+      "datasource": "mysql",
+      "description": "Total AI coding sessions across all providers, company-wide (`SUM(ai_activities.num_sessions)`).",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT SUM(num_sessions) AS \"Sessions\" FROM ai_activities WHERE $__timeFilter(date)",
+          "refId": "A"
+        }
+      ],
+      "title": "Claude Sessions (Company-wide)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 8,
+        "y": 8
+      },
+      "id": 3
+    },
+    {
+      "datasource": "mysql",
+      "description": "Total active engineering hours logged by Claude Code, from OTel telemetry. Not available at the domain layer for any provider, and Cursor has no comparable duration metric at all. This is the one AI-volume panel on this dashboard that responds to the Project filter: Claude Code OTel is the only AI source that registers a connection-to-project mapping, and hours are joined through that mapping. A connection mapped to more than one project would double-count its hours if all of those projects were selected together.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ROUND(SUM(ha.active_time_seconds) / 3600.0, 1) AS \"Active Hours\"\nFROM _tool_claude_code_otel_hourly_activity ha\nJOIN _tool_claude_code_otel_connection_projects cp ON cp.connection_id = ha.connection_id\nWHERE cp.project_name IN ($project) AND $__timeFilter(ha.hour_start)",
+          "refId": "A"
+        }
+      ],
+      "title": "Active Hours (Claude Code OTel, Project-scoped)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 8
+      },
+      "id": 4
+    },
+    {
+      "datasource": "mysql",
+      "description": "Total lines added by AI sessions, company-wide (`SUM(ai_activities.lines_added)`).",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT SUM(lines_added) AS \"Lines Added\" FROM ai_activities WHERE $__timeFilter(date)",
+          "refId": "A"
+        }
+      ],
+      "title": "AI Lines Added (Company-wide)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 12
+      },
+      "id": 5
+    },
+    {
+      "datasource": "mysql",
+      "description": "Total lines removed by AI sessions, company-wide (`SUM(ai_activities.lines_removed)`).",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT SUM(lines_removed) AS \"Lines Removed\" FROM ai_activities WHERE $__timeFilter(date)",
+          "refId": "A"
+        }
+      ],
+      "title": "AI Lines Removed (Company-wide)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 8,
+        "y": 12
+      },
+      "id": 6
+    },
+    {
+      "datasource": "mysql",
+      "description": "Merged pull requests, scoped to the selected project(s).",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS \"PRs Merged\"\nFROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\nWHERE ppm.project_name IN ($project) AND $__timeFilter(pr.merged_date)",
+          "refId": "A"
+        }
+      ],
+      "title": "PRs Merged",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 12
+      },
+      "id": 7
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 8,
+      "panels": [],
+      "title": "Delivery Outcomes (project-scoped)",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Pull requests closed without ever merging, scoped to the selected project(s).",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS \"PRs Closed, Never Merged\"\nFROM pull_requests pr\nJOIN project_mapping pm ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\nWHERE pm.project_name IN ($project) AND pr.status = 'CLOSED' AND $__timeFilter(pr.closed_date)",
+          "refId": "A"
+        }
+      ],
+      "title": "PRs Closed, Never Merged",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 17
+      },
+      "id": 9
+    },
+    {
+      "datasource": "mysql",
+      "description": "Commits with no record of ever landing in a merged pull request, scoped to the selected project(s). Inflated by squash-merge workflows \u2014 see the caveat above; read as an upper bound, not an exact count.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT c.sha) AS \"Commits Never Merged\"\nFROM commits c\nJOIN repo_commits rc ON rc.commit_sha = c.sha\nJOIN project_mapping pm ON pm.row_id = rc.repo_id AND pm.`table` = 'repos'\nLEFT JOIN pull_request_commits prc ON prc.commit_sha = c.sha\nLEFT JOIN pull_requests pr ON pr.id = prc.pull_request_id AND pr.status = 'MERGED'\nWHERE pm.project_name IN ($project) AND pr.id IS NULL AND $__timeFilter(c.committed_date)",
+          "refId": "A"
+        }
+      ],
+      "title": "Commits Never Merged",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 8,
+        "y": 17
+      },
+      "id": 10
+    },
+    {
+      "datasource": "mysql",
+      "description": "Additions + deletions summed over the same never-merged commit set above. Inflated by squash-merge workflows for the same reason \u2014 read as an upper bound, not a precise figure.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT SUM(c.additions + c.deletions) AS \"Lines Never Merged\"\nFROM commits c\nJOIN repo_commits rc ON rc.commit_sha = c.sha\nJOIN project_mapping pm ON pm.row_id = rc.repo_id AND pm.`table` = 'repos'\nLEFT JOIN pull_request_commits prc ON prc.commit_sha = c.sha\nLEFT JOIN pull_requests pr ON pr.id = prc.pull_request_id AND pr.status = 'MERGED'\nWHERE pm.project_name IN ($project) AND pr.id IS NULL AND $__timeFilter(c.committed_date)",
+          "refId": "A"
+        }
+      ],
+      "title": "Lines Never Merged",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 17
+      },
+      "id": 11
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 21
+      },
+      "id": 12,
+      "panels": [],
+      "title": "PR Abandonment by Contributor",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "PR-level, not commit/branch-level: (PRs authored that closed without merging) \u00f7 (all PRs authored), scoped to the selected project(s), minimum 5 PRs authored in range to avoid noisy small-sample rates. Measures delivery outcome, not AI-specific cost.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(NULLIF(a.full_name,''), pr.author_name) AS \"Contributor\",\n  COUNT(*) AS \"Total PRs\",\n  SUM(pr.status = 'CLOSED') AS \"Abandoned (Closed, Never Merged)\",\n  ROUND(100.0 * SUM(pr.status = 'CLOSED') / COUNT(*), 1) AS \"Abandonment Rate %\"\nFROM pull_requests pr\nLEFT JOIN accounts a ON a.id = pr.author_id\nJOIN project_mapping pm ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\nWHERE pm.project_name IN ($project) AND pr.status IN ('CLOSED', 'MERGED') AND $__timeFilter(COALESCE(pr.merged_date, pr.closed_date))\nGROUP BY COALESCE(NULLIF(a.full_name,''), pr.author_name)\nHAVING COUNT(*) >= 5\nORDER BY 4 DESC\nLIMIT 25",
+          "refId": "A"
+        }
+      ],
+      "title": "PR Abandonment Rate by Contributor",
+      "type": "table",
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
+      "id": 13
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 38,
+  "tags": [
+    "unified",
+    "devlake",
+    "ai",
+    "dashboard"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT project_name FROM project_pr_metrics ORDER BY 1",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Project",
+        "multi": false,
+        "name": "project",
+        "options": [],
+        "query": "SELECT DISTINCT project_name FROM project_pr_metrics ORDER BY 1",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6M",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "AI Raw Volume & Delivery Outcomes",
+  "uid": "ai_raw_volume",
+  "version": 1,
+  "weekStart": ""
+}
