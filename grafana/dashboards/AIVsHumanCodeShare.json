@@ -1,0 +1,602 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "**Scope & caveats:**\n\n- **No Project filter on this dashboard.** AI activity carries no project or repo association in the schema, so every AI-vs-human comparison here is necessarily company-wide.\n- **AI-Attributed Share of Lines Changed** compares two different populations: AI-session activity counts lines touched *inside* AI tool sessions (whether or not that code is ever committed or merged), while the human side counts lines in *merged* PR diffs only. This structurally overstates AI's share, since AI-touched lines aren't verified as AI-authored and can be edited or discarded by a developer before ever being committed. Read the percentage as an upper bound on AI's contribution, not a precise attribution.\n- **AI-Attributed Volume by Language is Claude Code OTel-only.** Cursor's usage data has no language dimension, and the unified AI-tool-decisions table drops the language column that OTel's raw telemetry carries \u2014 so this panel is queried directly from that OTel table rather than the shared domain layer, and reflects Claude Code usage only.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.0.0",
+      "title": "About this dashboard",
+      "type": "text",
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1
+    },
+    {
+      "datasource": "mysql",
+      "description": "AI-session lines added \u00f7 (AI-session lines added + merged-PR additions), company-wide. Compares two different populations \u2014 see the caveat above \u2014 so read this as an upper bound on AI's contribution, not an exact attribution.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ROUND(100.0 * ai.ai_lines / NULLIF(ai.ai_lines + human.human_lines, 0), 1) AS \"AI-Attributed Share %\"\nFROM\n  (SELECT SUM(lines_added) AS ai_lines FROM ai_activities WHERE $__timeFilter(date)) ai,\n  (SELECT SUM(additions) AS human_lines FROM pull_requests WHERE status = 'MERGED' AND $__timeFilter(merged_date)) human",
+          "refId": "A"
+        }
+      ],
+      "title": "AI-Attributed Share of Lines Changed (Company-wide)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 6
+      },
+      "id": 2
+    },
+    {
+      "datasource": "mysql",
+      "description": "Distinct engineers with AI activity \u00f7 distinct name-deduplicated PR-merging contributors, company-wide. The two counts aren't cross-matched to the same identity \u2014 an AI user isn't verified to also be a PR-merging contributor \u2014 so this is a directional adoption trend rather than an exact percentage, and can read above 100% when the two populations diverge.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ROUND(100.0 * ai.n / NULLIF(c.n, 0), 1) AS \"Engineers Adopted %\"\nFROM\n  (SELECT COUNT(DISTINCT user_email) n FROM ai_activities WHERE $__timeFilter(date) AND user_email != '') ai,\n  (SELECT COUNT(DISTINCT COALESCE(NULLIF(a.full_name,''), pr.author_name)) n FROM pull_requests pr LEFT JOIN accounts a ON a.id = pr.author_id WHERE pr.status = 'MERGED' AND $__timeFilter(pr.merged_date)) c",
+          "refId": "A"
+        }
+      ],
+      "title": "Engineers Adopted % (Company-wide)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 6
+      },
+      "id": 3
+    },
+    {
+      "datasource": "mysql",
+      "description": "Total lines added inside AI tool sessions, company-wide (`SUM(ai_activities.lines_added)`).",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT SUM(lines_added) AS \"AI Lines Added\" FROM ai_activities WHERE $__timeFilter(date)",
+          "refId": "A"
+        }
+      ],
+      "title": "AI Lines Added (Company-wide)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 6
+      },
+      "id": 4
+    },
+    {
+      "datasource": "mysql",
+      "description": "Accepted AI code suggestions \u00f7 suggestions offered, company-wide. Cursor records offered/accepted counts directly on its activity rows; Claude Code (OTel) records them on a separate tool-decisions table \u2014 both are combined into one acceptance rate.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH ai_acceptance_daily AS (\n  SELECT date, provider, user_email, suggestions_count AS offered, acceptance_count AS accepted\n  FROM ai_activities WHERE record_kind IS NULL AND suggestions_count IS NOT NULL\n  UNION ALL\n  SELECT date, provider, user_email, (accepted_count + rejected_count) AS offered, accepted_count AS accepted\n  FROM ai_tool_decisions\n)\nSELECT ROUND(100.0 * SUM(accepted) / NULLIF(SUM(offered), 0), 1) AS \"Edit Acceptance %\"\nFROM ai_acceptance_daily WHERE $__timeFilter(date)",
+          "refId": "A"
+        }
+      ],
+      "title": "Edit Acceptance % (Company-wide)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 6
+      },
+      "id": 5
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "id": 6,
+      "panels": [],
+      "title": "Share of Lines Changed, With Adoption",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Monthly share of lines changed attributed to AI sessions vs. merged human PR diffs, stacked to 100%. Engineers Adopted % is overlaid as a dashed line for reference, on its own scale since adoption typically runs well above code-share percentage. Carries the same population caveat as the AI-Attributed Share of Lines Changed KPI above.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI-attributed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#2a78d6",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Human"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#888780",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Engineers adopted"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "line"
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 5
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "always"
+              },
+              {
+                "id": "custom.stacking",
+                "value": {
+                  "group": "line_overlay",
+                  "mode": "none"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#eb6834",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH months AS (\n  SELECT DISTINCT DATE_FORMAT(date, '%Y-%m-01') AS month FROM ai_activities WHERE $__timeFilter(date)\n  UNION\n  SELECT DISTINCT DATE_FORMAT(merged_date, '%Y-%m-01') FROM pull_requests WHERE status = 'MERGED' AND $__timeFilter(merged_date)\n),\nai_m AS (SELECT DATE_FORMAT(date, '%Y-%m-01') month, SUM(lines_added) v FROM ai_activities WHERE $__timeFilter(date) GROUP BY 1),\nhu_m AS (SELECT DATE_FORMAT(merged_date, '%Y-%m-01') month, SUM(additions) v FROM pull_requests WHERE status = 'MERGED' AND $__timeFilter(merged_date) GROUP BY 1),\nai_users_m AS (SELECT DATE_FORMAT(date, '%Y-%m-01') month, COUNT(DISTINCT user_email) n FROM ai_activities WHERE $__timeFilter(date) AND user_email != '' GROUP BY 1),\ncontrib_m AS (SELECT DATE_FORMAT(merged_date, '%Y-%m-01') month, COUNT(DISTINCT COALESCE(NULLIF(a.full_name,''), pr.author_name)) n FROM pull_requests pr LEFT JOIN accounts a ON a.id = pr.author_id WHERE pr.status = 'MERGED' AND $__timeFilter(pr.merged_date) GROUP BY 1)\nSELECT STR_TO_DATE(m.month, '%Y-%m-%d') AS time, 'AI-attributed' AS metric,\n  ROUND(100.0 * COALESCE(ai_m.v, 0) / NULLIF(COALESCE(ai_m.v, 0) + COALESCE(hu_m.v, 0), 0), 1) AS value\nFROM months m LEFT JOIN ai_m ON ai_m.month = m.month LEFT JOIN hu_m ON hu_m.month = m.month\nUNION ALL\nSELECT STR_TO_DATE(m.month, '%Y-%m-%d'), 'Human',\n  ROUND(100.0 * COALESCE(hu_m.v, 0) / NULLIF(COALESCE(ai_m.v, 0) + COALESCE(hu_m.v, 0), 0), 1)\nFROM months m LEFT JOIN ai_m ON ai_m.month = m.month LEFT JOIN hu_m ON hu_m.month = m.month\nUNION ALL\nSELECT STR_TO_DATE(m.month, '%Y-%m-%d'), 'Engineers adopted',\n  ROUND(100.0 * COALESCE(au.n, 0) / NULLIF(COALESCE(c.n, 0), 0), 1)\nFROM months m LEFT JOIN ai_users_m au ON au.month = m.month LEFT JOIN contrib_m c ON c.month = m.month\nORDER BY time, metric",
+          "refId": "A"
+        }
+      ],
+      "title": "AI vs Human Share of Lines Changed (monthly), With Adoption",
+      "transformations": [
+        {
+          "id": "prepareTimeSeries",
+          "options": {
+            "format": "many"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^value (.+)$",
+            "renamePattern": "$1"
+          }
+        }
+      ],
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 11
+      },
+      "id": 7
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 19
+      },
+      "id": 8,
+      "panels": [],
+      "title": "AI-Attributed Volume by Language (Claude Code OTel only)",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Monthly accepted-edit volume by programming language, from Claude Code OTel telemetry. OTel-only, plugin-internal source \u2014 neither the shared AI-tool-decisions table nor Cursor carry a language dimension, so this reflects Claude Code usage only.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "axisLabel": "Accepted edits"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT STR_TO_DATE(DATE_FORMAT(hour_start, '%Y-%m-01'), '%Y-%m-%d') AS time, language AS metric, SUM(accepted_count) AS value\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start)\nGROUP BY 1, 2\nORDER BY metric, time",
+          "refId": "A"
+        }
+      ],
+      "title": "Accepted Edits by Language (monthly)",
+      "transformations": [
+        {
+          "id": "prepareTimeSeries",
+          "options": {
+            "format": "many"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^value (.+)$",
+            "renamePattern": "$1"
+          }
+        }
+      ],
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "id": 9
+    },
+    {
+      "datasource": "mysql",
+      "description": "Exact accepted/rejected edit totals by language from the same Claude Code OTel source as the chart above, with a per-language acceptance-rate column.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT language AS \"Language\", SUM(accepted_count) AS \"Accepted Edits\", SUM(rejected_count) AS \"Rejected Edits\",\n  ROUND(100.0 * SUM(accepted_count) / NULLIF(SUM(accepted_count) + SUM(rejected_count), 0), 1) AS \"Acceptance %\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start)\nGROUP BY language\nORDER BY SUM(accepted_count) DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Accepted / Rejected Edits by Language (totals)",
+      "type": "table",
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "id": 10
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 38,
+  "tags": [
+    "unified",
+    "devlake",
+    "ai",
+    "dashboard"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6M",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "AI vs Human Code Share & Volume",
+  "uid": "ai_vs_human_code_share",
+  "version": 1,
+  "weekStart": ""
+}
