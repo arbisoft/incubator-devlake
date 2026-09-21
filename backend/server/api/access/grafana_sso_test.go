@@ -115,4 +115,7 @@ func TestGrafanaSSOSettingsOmitsEmptyURLs(t *testing.T) {
 	if strings.Contains(jsonStr, "authUrl") || strings.Contains(jsonStr, "tokenUrl") || strings.Contains(jsonStr, "apiUrl") {
 		t.Fatalf("expected empty URLs to be omitted from JSON, got %s", jsonStr)
 	}
+	if !strings.Contains(jsonStr, `"useRefreshToken":false`) {
+		t.Fatalf("expected refresh-token policy to be sent explicitly, got %s", jsonStr)
+	}
 }
