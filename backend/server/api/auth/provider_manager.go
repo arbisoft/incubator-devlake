@@ -75,15 +75,16 @@ func (s *Service) PrepareOIDCProvider(ctx stdctx.Context, provider *access.OIDCP
 	}
 
 	prepared.GrafanaSettings = access.GrafanaSSOSettings{
-		Name:         provider.DisplayName,
-		ClientID:     provider.ClientID,
-		ClientSecret: clientSecret,
-		AuthURL:      authURL,
-		TokenURL:     tokenURL,
-		APIURL:       apiURL,
-		Scopes:       provider.Scopes,
-		AllowSignUp:  false,
-		AutoLogin:    false,
+		Name:            provider.DisplayName,
+		ClientID:        provider.ClientID,
+		ClientSecret:    clientSecret,
+		AuthURL:         authURL,
+		TokenURL:        tokenURL,
+		APIURL:          apiURL,
+		Scopes:          provider.Scopes,
+		AllowSignUp:     false,
+		AutoLogin:       false,
+		UseRefreshToken: false,
 	}
 	if prepared.GrafanaSettings.ClientSecret == "" {
 		secret, decryptErr := s.providerSecret(provider)
