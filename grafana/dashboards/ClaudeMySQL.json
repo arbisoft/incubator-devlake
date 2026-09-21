@@ -18,13 +18,12 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 26,
   "links": [],
   "panels": [
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "type": "mysql",
+        "uid": "devlake-mysql"
       },
       "description": "Number of distinct users active with Claude Code in the selected time range",
       "fieldConfig": {
@@ -83,8 +82,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "type": "mysql",
+        "uid": "devlake-mysql"
       },
       "description": "Total lines of code added by Claude Code sessions",
       "fieldConfig": {
@@ -143,8 +142,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "type": "mysql",
+        "uid": "devlake-mysql"
       },
       "description": "PRs attributed to Claude Code in the selected time range",
       "fieldConfig": {
@@ -203,8 +202,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "type": "mysql",
+        "uid": "devlake-mysql"
       },
       "description": "Total estimated API spend for the selected time range",
       "fieldConfig": {
@@ -272,8 +271,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "type": "mysql",
+        "uid": "devlake-mysql"
       },
       "description": "Daily count of distinct users who used Claude Code",
       "fieldConfig": {
@@ -364,8 +363,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "type": "mysql",
+        "uid": "devlake-mysql"
       },
       "description": "Commits and PRs attributed to Claude over time",
       "fieldConfig": {
@@ -466,8 +465,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "type": "mysql",
+        "uid": "devlake-mysql"
       },
       "description": "Estimated spend per model over time – shows Sonnet vs Opus cost allocation",
       "fieldConfig": {
@@ -559,8 +558,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "type": "mysql",
+        "uid": "devlake-mysql"
       },
       "description": "Ratio of lines removed (refactoring) vs lines added (new feature work) over time. Higher removal ratio signals active code cleanup.",
       "fieldConfig": {
@@ -671,8 +670,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "type": "mysql",
+        "uid": "devlake-mysql"
       },
       "description": "Top developers ranked by Claude Code usage (lines added + PRs)",
       "fieldConfig": {
@@ -734,8 +733,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "type": "mysql",
+        "uid": "devlake-mysql"
       },
       "description": "Cost per model with lines-of-code context for ROI analysis",
       "fieldConfig": {
@@ -797,8 +796,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "type": "mysql",
+        "uid": "devlake-mysql"
       },
       "description": "Per-tool accepted vs rejected action counts from _tool_claude_usage. Shows which Claude tool types get the most approval.",
       "fieldConfig": {
@@ -959,8 +958,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "type": "mysql",
+        "uid": "devlake-mysql"
       },
       "description": "Anthropic prompt-cache token breakdown. High cache_read_tokens relative to cache_creation_tokens means effective prompt reuse and lower cost.",
       "fieldConfig": {
@@ -1061,8 +1060,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "type": "mysql",
+        "uid": "devlake-mysql"
       },
       "description": "Acceptance rates across all tool types.",
       "fieldConfig": {
@@ -1191,8 +1190,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "type": "mysql",
+        "uid": "devlake-mysql"
       },
       "description": "How effectively the model hits the cache.",
       "fieldConfig": {
@@ -1260,8 +1259,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "type": "mysql",
+        "uid": "devlake-mysql"
       },
       "description": "Total tokens spent between each interval",
       "fieldConfig": {
@@ -1331,8 +1330,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "type": "mysql",
+        "uid": "devlake-mysql"
       },
       "description": "Edit/Write/MultiEdit/NotebookEdit calls grouped by file language",
       "fieldConfig": {
@@ -1427,8 +1426,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "type": "mysql",
+        "uid": "devlake-mysql"
       },
       "description": "Average active coding time across all sessions in the selected time range",
       "fieldConfig": {
@@ -1561,6 +1560,5 @@
   "timezone": "utceditIndex=1",
   "title": "Claude - MySQL",
   "uid": "claude_adoption_mysql",
-  "version": 26,
   "description": "Durable hourly Claude Code OTel metrics from MySQL. Project membership filters the distinct linked OTel teams."
 }
