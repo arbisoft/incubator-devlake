@@ -31,16 +31,17 @@ import (
 const grafanaSSOSettingsPathPrefix = "/api/v1/sso-settings/"
 
 type GrafanaSSOSettings struct {
-	Name         string `json:"name"`
-	ClientID     string `json:"clientId"`
-	ClientSecret string `json:"clientSecret"`
-	AuthURL      string `json:"authUrl,omitempty"`
-	TokenURL     string `json:"tokenUrl,omitempty"`
-	APIURL       string `json:"apiUrl,omitempty"`
-	Scopes       string `json:"scopes"`
-	Enabled      bool   `json:"enabled"`
-	AllowSignUp  bool   `json:"allowSignUp"`
-	AutoLogin    bool   `json:"autoLogin"`
+	Name            string `json:"name"`
+	ClientID        string `json:"clientId"`
+	ClientSecret    string `json:"clientSecret"`
+	AuthURL         string `json:"authUrl,omitempty"`
+	TokenURL        string `json:"tokenUrl,omitempty"`
+	APIURL          string `json:"apiUrl,omitempty"`
+	Scopes          string `json:"scopes"`
+	Enabled         bool   `json:"enabled"`
+	AllowSignUp     bool   `json:"allowSignUp"`
+	AutoLogin       bool   `json:"autoLogin"`
+	UseRefreshToken bool   `json:"useRefreshToken"`
 }
 
 type GrafanaSSOClient struct {
