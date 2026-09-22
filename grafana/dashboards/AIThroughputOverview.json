@@ -32,7 +32,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "**How to read this dashboard**\n\n- **Escaped Defect Rate** only counts issues classified as `BUG`/`INCIDENT` in the connected trackers. In practice that means Jira \u2014 GitHub and GitLab issues here don't carry a type classification yet, so a GitHub/GitLab-only project will show a rate near zero, which reflects missing classification rather than an absence of defects. Check the \"Defect-Rate Coverage by Project\" table below before reading this metric for a given project.\n- **Contributors** is deduplicated by `accounts.full_name` (falling back to the PR author name when no account matches), because one engineer can accumulate several `accounts` rows as their git client runs from different machines and IPs. This narrows the overcount but doesn't fully collapse it \u2014 see the \"Distinct-Account Sanity Check\" table below for the residual gap.\n- **AI Spend and Cost per Merged PR are company-wide by design.** AI activity carries no project or repo association in the schema, so scoping the PR side to a single project while leaving spend company-wide would inflate the ratio. Both sides stay pinned to all projects so the number means the same thing no matter what the Project filter above is set to.\n- AI Spend combines two sources: legacy Cursor / Claude-platform activity records cost directly, while Claude Code (OTel) records cost on a separate usage table. Both are combined into one company-wide total.",
+        "content": "**How to read this dashboard**\n\n- **Escaped Defect Rate** only counts issues classified as `BUG`/`INCIDENT` in the connected trackers. In practice that means Jira — GitHub and GitLab issues here don't carry a type classification yet, so a GitHub/GitLab-only project will show a rate near zero, which reflects missing classification rather than an absence of defects. Check the \"Defect-Rate Coverage by Project\" table below before reading this metric for a given project.\n- **Contributors** is deduplicated by `accounts.full_name` (falling back to the PR author name when no account matches), because one engineer can accumulate several `accounts` rows as their git client runs from different machines and IPs. This narrows the overcount but doesn't fully collapse it — see the \"Distinct-Account Sanity Check\" table below for the residual gap.\n- **AI Spend and Cost per Merged PR are company-wide by design.** AI activity carries no project or repo association in the schema, so scoping the PR side to a single project while leaving spend company-wide would inflate the ratio. Both sides stay pinned to all projects so the number means the same thing no matter what the Project filter above is set to.\n- AI Spend combines two sources: legacy Cursor / Claude-platform activity records cost directly, while Claude Code (OTel) records cost on a separate usage table. Both are combined into one company-wide total.",
         "mode": "markdown"
       },
       "pluginVersion": "11.0.0",
@@ -153,7 +153,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Counts issues where `type IN ('TASK','SUBTASK')` and `resolution_date IS NOT NULL`. resolution_date is used as the \u201cdone\u201d signal instead of matching status strings, because status values aren't normalized across connected trackers \u2014 Jira gives DONE/TODO/IN_PROGRESS, while other sources leak in stray values like Closed/New/Ready for test/In progress. resolution_date correlates closely with a DONE-equivalent status and is rarely set on non-terminal issues, making it a more reliable completion signal across sources.",
+      "description": "Counts issues where `type IN ('TASK','SUBTASK')` and `resolution_date IS NOT NULL`. resolution_date is used as the “done” signal instead of matching status strings, because status values aren't normalized across connected trackers — Jira gives DONE/TODO/IN_PROGRESS, while other sources leak in stray values like Closed/New/Ready for test/In progress. resolution_date correlates closely with a DONE-equivalent status and is rarely set on non-terminal issues, making it a more reliable completion signal across sources.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -205,7 +205,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Distinct pull request authors, scoped to the selected project(s) and deduplicated by `accounts.full_name` (falling back to the PR author name when no account matches). This narrows but doesn't fully eliminate the overcount from fragmented accounts \u2014 see the Distinct-Account Sanity Check table below.",
+      "description": "Distinct pull request authors, scoped to the selected project(s) and deduplicated by `accounts.full_name` (falling back to the PR author name when no account matches). This narrows but doesn't fully eliminate the overcount from fragmented accounts — see the Distinct-Account Sanity Check table below.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -257,7 +257,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "PRs Merged \u00f7 Contributors, both scoped to the selected project(s).",
+      "description": "PRs Merged ÷ Contributors, both scoped to the selected project(s).",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -309,7 +309,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Tasks Done \u00f7 Contributors. The numerator is scoped by the issue tracker's board, the denominator by PR authorship \u2014 the two contributor pools aren't identical, so this is a directional ratio rather than an exact one.",
+      "description": "Tasks Done ÷ Contributors. The numerator is scoped by the issue tracker's board, the denominator by PR authorship — the two contributor pools aren't identical, so this is a directional ratio rather than an exact one.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -361,7 +361,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "(BUG/INCIDENT issues opened within 14 days of a production deployment) \u00f7 (PRs merged in the same window) \u00d7 100, scoped to the selected project(s). A deployment counts as production when its environment field contains \"prod\" (matched case-insensitively, since environment names vary by project \u2014 production, Prod, hks-prod, etc.). See the \"Defect-Rate Coverage by Project\" table below for which projects currently have defect-type data to compute this from.",
+      "description": "(BUG/INCIDENT issues opened within 14 days of a production deployment) ÷ (PRs merged in the same window) × 100, scoped to the selected project(s). A deployment counts as production when its environment field contains \"prod\" (matched case-insensitively, since environment names vary by project — production, Prod, hks-prod, etc.). See the \"Defect-Rate Coverage by Project\" table below for which projects currently have defect-type data to compute this from.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -397,7 +397,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH prod_deploys AS (\n  SELECT pm.project_name, cdc.finished_date\n  FROM cicd_deployment_commits cdc\n  JOIN project_mapping pm ON pm.row_id = cdc.cicd_scope_id AND pm.`table` = 'cicd_scopes'\n  WHERE pm.project_name IN ($project) AND LOWER(cdc.environment) LIKE '%prod%' AND cdc.result = 'SUCCESS' AND $__timeFilter(cdc.finished_date)\n),\ndefects AS (\n  SELECT DISTINCT i.id\n  FROM issues i\n  JOIN board_issues bi ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n  JOIN prod_deploys pd ON pd.project_name = pm.project_name\n    AND i.created_date BETWEEN pd.finished_date AND DATE_ADD(pd.finished_date, INTERVAL 14 DAY)\n  WHERE pm.project_name IN ($project) AND i.type IN ('BUG','INCIDENT')\n),\nprs AS (\n  SELECT pr.id FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN ($project) AND $__timeFilter(pr.merged_date)\n)\nSELECT ROUND((SELECT COUNT(*) FROM defects) * 100.0 / NULLIF((SELECT COUNT(*) FROM prs), 0), 2) AS \"Escaped Defect Rate (per 100 PRs)\"",
+          "rawSql": "WITH prod_deploys AS (\n  SELECT pm.project_name, cdc.finished_date\n  FROM cicd_deployment_commits cdc\n  JOIN project_mapping pm ON pm.row_id = cdc.cicd_scope_id AND pm.`table` = 'cicd_scopes'\n  WHERE pm.project_name IN ($project) AND LOWER(cdc.environment) LIKE '%prod%' AND cdc.result = 'SUCCESS' AND $__timeFilter(cdc.finished_date)\n),\ndefects AS (\n  SELECT DISTINCT i.id\n  FROM issues i\n  JOIN board_issues bi ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n  JOIN prod_deploys pd ON pd.project_name = pm.project_name\n    AND i.created_date BETWEEN pd.finished_date AND DATE_ADD(pd.finished_date, INTERVAL 14 DAY)\n  WHERE pm.project_name IN ($project) AND i.type IN ('BUG','INCIDENT') AND $__timeFilter(i.created_date)\n),\nprs AS (\n  SELECT pr.id FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN ($project) AND $__timeFilter(pr.merged_date)\n)\nSELECT ROUND((SELECT COUNT(*) FROM defects) * 100.0 / NULLIF((SELECT COUNT(*) FROM prs), 0), 2) AS \"Escaped Defect Rate (per 100 PRs)\"",
           "refId": "A"
         }
       ],
@@ -413,7 +413,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "AI Spend \u00f7 PRs Merged, both company-wide. Kept unscoped on both sides deliberately \u2014 since AI Spend has no project association, scoping only the PR side would shrink the denominator and inflate the ratio whenever a single project is selected.",
+      "description": "AI Spend ÷ PRs Merged, both company-wide. Kept unscoped on both sides deliberately — since AI Spend has no project association, scoping only the PR side would shrink the denominator and inflate the ratio whenever a single project is selected.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -612,7 +612,7 @@
           "refId": "A"
         }
       ],
-      "title": "AI Cost (Company-wide) / PRs Merged / Tasks Done / Contributors \u2014 Indexed",
+      "title": "AI Cost (Company-wide) / PRs Merged / Tasks Done / Contributors — Indexed",
       "type": "barchart",
       "gridPos": {
         "h": 9,
@@ -624,7 +624,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Indexes the monthly count of escaped defects (BUG/INCIDENT issues matched to a production deployment within 14 days \u2014 see the Escaped Defect Rate KPI above) to its own first non-zero month. Shows trend shape only: it tracks the raw monthly defect count, not the precise per-100-PR rate shown in the KPI card.",
+      "description": "Indexes the monthly count of escaped defects (BUG/INCIDENT issues created within 14 days of a successful production deployment on the same project — see the Escaped Defect Rate KPI above) to its first plotted month. Shows trend shape only: it tracks the raw monthly defect count, not the precise per-100-PR rate shown in the KPI card.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -722,11 +722,11 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH monthly AS (\n  SELECT DATE_FORMAT(i.created_date, '%Y-%m-01') AS month, 'Escaped defects (count, unindexed ratio)' AS metric, COUNT(DISTINCT i.id) AS value\n  FROM issues i JOIN board_issues bi ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n  WHERE pm.project_name IN ($project) AND i.type IN ('BUG','INCIDENT') AND $__timeFilter(i.created_date)\n  GROUP BY 1\n)\nSELECT STR_TO_DATE(month, '%Y-%m-%d') AS time, metric,\n  ROUND(value * 100.0 / FIRST_VALUE(value) OVER (ORDER BY month), 1) AS value\nFROM monthly\nORDER BY time",
+          "rawSql": "WITH prod_deploys AS (\n  SELECT pm.project_name, cdc.finished_date\n  FROM cicd_deployment_commits cdc\n  JOIN project_mapping pm ON pm.row_id = cdc.cicd_scope_id AND pm.`table` = 'cicd_scopes'\n  WHERE pm.project_name IN ($project) AND LOWER(cdc.environment) LIKE '%prod%' AND cdc.result = 'SUCCESS' AND $__timeFilter(cdc.finished_date)\n),\nmonthly AS (\n  SELECT DATE_FORMAT(i.created_date, '%Y-%m-01') AS month, 'Escaped defects (count, unindexed ratio)' AS metric, COUNT(DISTINCT i.id) AS value\n  FROM issues i\n  JOIN board_issues bi ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n  JOIN prod_deploys pd ON pd.project_name = pm.project_name\n    AND i.created_date BETWEEN pd.finished_date AND DATE_ADD(pd.finished_date, INTERVAL 14 DAY)\n  WHERE pm.project_name IN ($project) AND i.type IN ('BUG','INCIDENT') AND $__timeFilter(i.created_date)\n  GROUP BY 1\n)\nSELECT STR_TO_DATE(month, '%Y-%m-%d') AS time, metric,\n  ROUND(value * 100.0 / FIRST_VALUE(value) OVER (ORDER BY month), 1) AS value\nFROM monthly\nORDER BY time",
           "refId": "A"
         }
       ],
-      "title": "Escaped Defects \u2014 Indexed (trend shape only)",
+      "title": "Escaped Defects — Indexed (trend shape only)",
       "transformations": [
         {
           "id": "prepareTimeSeries",
@@ -815,7 +815,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Shows which selected project(s) actually have BUG/INCIDENT-typed issues to compute a real escaped-defect rate from. A project marked \"Not classified\" doesn't have a zero defect rate \u2014 it means the underlying data isn't available to measure it yet for that project.",
+      "description": "Shows which selected project(s) actually have BUG/INCIDENT-typed issues to compute a real escaped-defect rate from. A project marked \"Not classified\" doesn't have a zero defect rate — it means the underlying data isn't available to measure it yet for that project.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -876,19 +876,23 @@
     "list": [
       {
         "current": {
-          "selected": false,
-          "text": "All",
-          "value": "$__all"
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
         },
         "datasource": "mysql",
-        "definition": "SELECT DISTINCT project_name FROM project_pr_metrics ORDER BY 1",
+        "definition": "select distinct name from projects",
         "hide": 0,
         "includeAll": true,
         "label": "Project",
-        "multi": false,
+        "multi": true,
         "name": "project",
         "options": [],
-        "query": "SELECT DISTINCT project_name FROM project_pr_metrics ORDER BY 1",
+        "query": "select distinct name from projects",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,

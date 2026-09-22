@@ -1724,7 +1724,7 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "utceditIndex=1",
+  "timezone": "utc",
   "title": "Claude - Prometheus",
   "uid": "claude_adoption_prometheus",
   "version": 26
