@@ -575,7 +575,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(NULLIF(a.full_name,''), pr.author_name) AS \"Contributor\",\n  COUNT(*) AS \"Total PRs\",\n  SUM(pr.status = 'CLOSED') AS \"Abandoned (Closed, Never Merged)\",\n  ROUND(100.0 * SUM(pr.status = 'CLOSED') / COUNT(*), 1) AS \"Abandonment Rate %\"\nFROM pull_requests pr\nLEFT JOIN accounts a ON a.id = pr.author_id\nJOIN project_mapping pm ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\nWHERE pm.project_name IN ($project) AND pr.status IN ('CLOSED', 'MERGED') AND $__timeFilter(COALESCE(pr.merged_date, pr.closed_date))\nGROUP BY COALESCE(NULLIF(a.full_name,''), pr.author_name)\nHAVING COUNT(*) >= 5\nORDER BY 4 DESC\nLIMIT 25",
+          "rawSql": "SELECT COALESCE(NULLIF(a.full_name,''), pr.author_name) AS \"Contributor\",\n  COUNT(*) AS \"Total PRs\",\n  SUM(pr.status = 'CLOSED') AS \"Abandoned (Closed, Never Merged)\",\n  ROUND(100.0 * SUM(pr.status = 'CLOSED') / COUNT(*), 1) AS \"Abandonment Rate %\"\nFROM pull_requests pr\nLEFT JOIN accounts a ON a.id = pr.author_id\nJOIN project_mapping pm ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\nWHERE pm.project_name IN ($project) AND pr.status IN ('CLOSED', 'MERGED') AND COALESCE(pr.merged_date, pr.closed_date) BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY COALESCE(NULLIF(a.full_name,''), pr.author_name)\nHAVING COUNT(*) >= 5\nORDER BY 4 DESC\nLIMIT 25",
           "refId": "A"
         }
       ],
