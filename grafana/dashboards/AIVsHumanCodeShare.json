@@ -409,7 +409,7 @@
           "refId": "A"
         }
       ],
-      "title": "AI vs Human Share of Lines Changed (monthly), With Adoption",
+      "title": "AI vs Human Share of Lines Changed (Company-wide, monthly), With Adoption",
       "transformations": [
         {
           "id": "prepareTimeSeries",
@@ -503,7 +503,7 @@
           "refId": "A"
         }
       ],
-      "title": "Accepted Edits by Language (monthly)",
+      "title": "Accepted Edits by Language (Company-wide, monthly)",
       "transformations": [
         {
           "id": "prepareTimeSeries",
@@ -567,7 +567,7 @@
           "refId": "A"
         }
       ],
-      "title": "Accepted / Rejected Edits by Language (totals)",
+      "title": "Accepted / Rejected Edits by Language (Company-wide, totals)",
       "type": "table",
       "gridPos": {
         "h": 6,
