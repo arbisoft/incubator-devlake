@@ -1,0 +1,1266 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "grafana"
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "## Claude Unified Reporting (Platform + Enterprise)\nMerges only the metrics that are semantically equivalent between the sibling [`claude`](../../backend/plugins/claude/) plugin (Provider `claude`, Claude Code only, `_tool_claude_usage` -> `ai_activities`) and the [`claude_enterprise`](../../backend/plugins/claude_enterprise/) plugin (Provider `claude_enterprise`, `ai_activities` + `_tool_claude_enterprise_usage_reports` / `_tool_claude_enterprise_cost_reports`).\n\nUse the **Source** variable above to filter every panel to Platform only, Enterprise only, or both combined (`All`).\n\n**Sections:**\n1. *Unified Claude Code Activity* -- sessions, lines, commits, PRs, tool suggestions/acceptance. Both sources report these for Claude Code (`type = 'CODE_EDIT'`) at the same connection+date+user grain.\n2. *Unified Tokens & Cost (Claude Code Only)* -- token and USD cost totals, restricted to the Claude Code product on both sides so the comparison stays apples-to-apples (Enterprise also reports Chat/Cowork spend that the Platform plugin never collects; that broader breakdown stays on `ClaudeEnterpriseAdoption.json`, not here).\n3. *Enterprise-Only Adoption* -- seats, DAU/WAU/MAU, and chat conversations. The Platform plugin has no equivalent for these, so they are never merged into a cross-source total; they still honor the Source filter and read as zero when Source = `claude`.\n\n**Known limitation carried over from the Platform plugin:** `claude`-side activity metrics (sessions/lines/commits/PRs/tool actions) are de-duplicated per (date, user) before summing, because `_tool_claude_usage` repeats those daily totals on every per-model row (see implementation-plan.md Section 11, defect #2). Token and cost figures are **not** de-duplicated because they are genuinely distinct per model row.",
+        "mode": "markdown"
+      },
+      "title": "About",
+      "type": "text"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 3
+      },
+      "id": 2,
+      "panels": [],
+      "title": "Unified Claude Code Activity (Platform + Enterprise)",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Unified across Platform (`claude`) and Enterprise (`claude_enterprise`) Claude Code activity (`type = 'CODE_EDIT'`). Platform rows are de-duplicated per (date, user) before aggregation because `_tool_claude_usage` repeats this value on every per-model row (Section 11 defect #2); Enterprise rows already carry no model-level duplication (Section 9). Filter with the Source variable. Counts a user once even if active on both sources.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 4
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH claude_activity AS (\n  SELECT DISTINCT date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM ai_activities\n  WHERE provider = 'claude' AND type = 'CODE_EDIT'\n),\nenterprise_activity AS (\n  SELECT date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM ai_activities\n  WHERE provider = 'claude_enterprise' AND type = 'CODE_EDIT'\n),\nunified_activity AS (\n  SELECT 'claude' AS source, date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM claude_activity\n  UNION ALL\n  SELECT 'claude_enterprise' AS source, date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM enterprise_activity\n)\nSELECT COUNT(DISTINCT user_email) AS \"Code-Active Users\"\nFROM unified_activity\nWHERE $__timeFilter(date)\n  AND ('$source' = 'All' OR source = '$source')",
+          "refId": "A"
+        }
+      ],
+      "title": "Code-Active Users (Period)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Unified across Platform (`claude`) and Enterprise (`claude_enterprise`) Claude Code activity (`type = 'CODE_EDIT'`). Platform rows are de-duplicated per (date, user) before aggregation because `_tool_claude_usage` repeats this value on every per-model row (Section 11 defect #2); Enterprise rows already carry no model-level duplication (Section 9). Filter with the Source variable.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 4
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH claude_activity AS (\n  SELECT DISTINCT date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM ai_activities\n  WHERE provider = 'claude' AND type = 'CODE_EDIT'\n),\nenterprise_activity AS (\n  SELECT date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM ai_activities\n  WHERE provider = 'claude_enterprise' AND type = 'CODE_EDIT'\n),\nunified_activity AS (\n  SELECT 'claude' AS source, date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM claude_activity\n  UNION ALL\n  SELECT 'claude_enterprise' AS source, date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM enterprise_activity\n)\nSELECT SUM(lines_added) AS \"Lines Added\"\nFROM unified_activity\nWHERE $__timeFilter(date)\n  AND ('$source' = 'All' OR source = '$source')",
+          "refId": "A"
+        }
+      ],
+      "title": "Lines Added (Period)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Unified across Platform (`claude`) and Enterprise (`claude_enterprise`) Claude Code activity (`type = 'CODE_EDIT'`). Platform rows are de-duplicated per (date, user) before aggregation because `_tool_claude_usage` repeats this value on every per-model row (Section 11 defect #2); Enterprise rows already carry no model-level duplication (Section 9). Filter with the Source variable.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 4
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH claude_activity AS (\n  SELECT DISTINCT date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM ai_activities\n  WHERE provider = 'claude' AND type = 'CODE_EDIT'\n),\nenterprise_activity AS (\n  SELECT date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM ai_activities\n  WHERE provider = 'claude_enterprise' AND type = 'CODE_EDIT'\n),\nunified_activity AS (\n  SELECT 'claude' AS source, date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM claude_activity\n  UNION ALL\n  SELECT 'claude_enterprise' AS source, date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM enterprise_activity\n)\nSELECT SUM(commits_created) AS \"Commits\"\nFROM unified_activity\nWHERE $__timeFilter(date)\n  AND ('$source' = 'All' OR source = '$source')",
+          "refId": "A"
+        }
+      ],
+      "title": "Commits Created (Period)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Unified across Platform (`claude`) and Enterprise (`claude_enterprise`) Claude Code activity (`type = 'CODE_EDIT'`). Platform rows are de-duplicated per (date, user) before aggregation because `_tool_claude_usage` repeats this value on every per-model row (Section 11 defect #2); Enterprise rows already carry no model-level duplication (Section 9). Filter with the Source variable.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 4
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH claude_activity AS (\n  SELECT DISTINCT date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM ai_activities\n  WHERE provider = 'claude' AND type = 'CODE_EDIT'\n),\nenterprise_activity AS (\n  SELECT date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM ai_activities\n  WHERE provider = 'claude_enterprise' AND type = 'CODE_EDIT'\n),\nunified_activity AS (\n  SELECT 'claude' AS source, date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM claude_activity\n  UNION ALL\n  SELECT 'claude_enterprise' AS source, date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM enterprise_activity\n)\nSELECT SUM(prs_created) AS \"PRs\"\nFROM unified_activity\nWHERE $__timeFilter(date)\n  AND ('$source' = 'All' OR source = '$source')",
+          "refId": "A"
+        }
+      ],
+      "title": "PRs Created (Period)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Unified across Platform (`claude`) and Enterprise (`claude_enterprise`) Claude Code activity (`type = 'CODE_EDIT'`). Platform rows are de-duplicated per (date, user) before aggregation because `_tool_claude_usage` repeats this value on every per-model row (Section 11 defect #2); Enterprise rows already carry no model-level duplication (Section 9). Filter with the Source variable.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 4
+      },
+      "id": 7,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH claude_activity AS (\n  SELECT DISTINCT date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM ai_activities\n  WHERE provider = 'claude' AND type = 'CODE_EDIT'\n),\nenterprise_activity AS (\n  SELECT date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM ai_activities\n  WHERE provider = 'claude_enterprise' AND type = 'CODE_EDIT'\n),\nunified_activity AS (\n  SELECT 'claude' AS source, date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM claude_activity\n  UNION ALL\n  SELECT 'claude_enterprise' AS source, date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM enterprise_activity\n)\nSELECT SUM(suggestions_count) AS \"Suggestions\"\nFROM unified_activity\nWHERE $__timeFilter(date)\n  AND ('$source' = 'All' OR source = '$source')",
+          "refId": "A"
+        }
+      ],
+      "title": "Tool Suggestions Shown (Period)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Unified across Platform (`claude`) and Enterprise (`claude_enterprise`) Claude Code activity (`type = 'CODE_EDIT'`). Platform rows are de-duplicated per (date, user) before aggregation because `_tool_claude_usage` repeats this value on every per-model row (Section 11 defect #2); Enterprise rows already carry no model-level duplication (Section 9). Filter with the Source variable.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 4
+      },
+      "id": 8,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH claude_activity AS (\n  SELECT DISTINCT date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM ai_activities\n  WHERE provider = 'claude' AND type = 'CODE_EDIT'\n),\nenterprise_activity AS (\n  SELECT date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM ai_activities\n  WHERE provider = 'claude_enterprise' AND type = 'CODE_EDIT'\n),\nunified_activity AS (\n  SELECT 'claude' AS source, date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM claude_activity\n  UNION ALL\n  SELECT 'claude_enterprise' AS source, date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM enterprise_activity\n)\nSELECT COALESCE(ROUND(SUM(acceptance_count) * 100.0 / NULLIF(SUM(suggestions_count), 0), 1), 0) AS \"Acceptance Rate %\"\nFROM unified_activity\nWHERE $__timeFilter(date)\n  AND ('$source' = 'All' OR source = '$source')",
+          "refId": "A"
+        }
+      ],
+      "title": "Tool Acceptance Rate % (Period)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Distinct Claude Code users per day, split by source. De-duplication and Source filtering as described above.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH claude_activity AS (\n  SELECT DISTINCT date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM ai_activities\n  WHERE provider = 'claude' AND type = 'CODE_EDIT'\n),\nenterprise_activity AS (\n  SELECT date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM ai_activities\n  WHERE provider = 'claude_enterprise' AND type = 'CODE_EDIT'\n),\nunified_activity AS (\n  SELECT 'claude' AS source, date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM claude_activity\n  UNION ALL\n  SELECT 'claude_enterprise' AS source, date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM enterprise_activity\n)\nSELECT date AS time,\n  source AS metric,\n  COUNT(DISTINCT user_email) AS value\nFROM unified_activity\nWHERE $__timeFilter(date)\n  AND ('$source' = 'All' OR source = '$source')\nGROUP BY date, source\nORDER BY date",
+          "refId": "A"
+        }
+      ],
+      "title": "Code-Active Users Over Time by Source",
+      "type": "timeseries",
+      "transformations": [
+        {
+          "id": "prepareTimeSeries",
+          "options": {
+            "format": "many"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^value (.+)$",
+            "renamePattern": "$1"
+          }
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "description": "Daily lines added attributed to Claude Code, split by source. De-duplication and Source filtering as described above.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH claude_activity AS (\n  SELECT DISTINCT date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM ai_activities\n  WHERE provider = 'claude' AND type = 'CODE_EDIT'\n),\nenterprise_activity AS (\n  SELECT date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM ai_activities\n  WHERE provider = 'claude_enterprise' AND type = 'CODE_EDIT'\n),\nunified_activity AS (\n  SELECT 'claude' AS source, date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM claude_activity\n  UNION ALL\n  SELECT 'claude_enterprise' AS source, date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM enterprise_activity\n)\nSELECT date AS time,\n  source AS metric,\n  SUM(lines_added) AS value\nFROM unified_activity\nWHERE $__timeFilter(date)\n  AND ('$source' = 'All' OR source = '$source')\nGROUP BY date, source\nORDER BY date",
+          "refId": "A"
+        }
+      ],
+      "title": "Lines Added Over Time by Source",
+      "type": "timeseries",
+      "transformations": [
+        {
+          "id": "prepareTimeSeries",
+          "options": {
+            "format": "many"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^value (.+)$",
+            "renamePattern": "$1"
+          }
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "description": "Daily commits and PRs attributed to Claude Code, split by source and metric (e.g. \"claude - Commits\", \"claude_enterprise - PRs\"). De-duplication and Source filtering as described above.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH claude_activity AS (\n  SELECT DISTINCT date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM ai_activities\n  WHERE provider = 'claude' AND type = 'CODE_EDIT'\n),\nenterprise_activity AS (\n  SELECT date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM ai_activities\n  WHERE provider = 'claude_enterprise' AND type = 'CODE_EDIT'\n),\nunified_activity AS (\n  SELECT 'claude' AS source, date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM claude_activity\n  UNION ALL\n  SELECT 'claude_enterprise' AS source, date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM enterprise_activity\n)\nSELECT date AS time, CONCAT(source, ' - Commits') AS metric, SUM(commits_created) AS value\nFROM unified_activity\nWHERE $__timeFilter(date)\n  AND ('$source' = 'All' OR source = '$source')\nGROUP BY date, source\nUNION ALL\nSELECT date AS time, CONCAT(source, ' - PRs') AS metric, SUM(prs_created) AS value\nFROM unified_activity\nWHERE $__timeFilter(date)\n  AND ('$source' = 'All' OR source = '$source')\nGROUP BY date, source\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "title": "Commits & PRs Over Time by Source",
+      "type": "timeseries",
+      "transformations": [
+        {
+          "id": "prepareTimeSeries",
+          "options": {
+            "format": "many"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^value (.+)$",
+            "renamePattern": "$1"
+          }
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "description": "Users ranked by lines added, split by source so a user active on both sources appears as two rows (one per source) rather than being merged into a single blended total.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 12,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH claude_activity AS (\n  SELECT DISTINCT date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM ai_activities\n  WHERE provider = 'claude' AND type = 'CODE_EDIT'\n),\nenterprise_activity AS (\n  SELECT date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM ai_activities\n  WHERE provider = 'claude_enterprise' AND type = 'CODE_EDIT'\n),\nunified_activity AS (\n  SELECT 'claude' AS source, date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM claude_activity\n  UNION ALL\n  SELECT 'claude_enterprise' AS source, date, user_email, num_sessions, lines_added, lines_removed,\n    commits_created, prs_created, suggestions_count, acceptance_count\n  FROM enterprise_activity\n)\nSELECT source AS \"Source\",\n  COALESCE(NULLIF(user_email, ''), 'Unknown User') AS \"User\",\n  COUNT(DISTINCT date) AS \"Active Days\",\n  SUM(num_sessions) AS \"Sessions\",\n  SUM(lines_added) AS \"Lines Added\",\n  SUM(commits_created) AS \"Commits\",\n  SUM(prs_created) AS \"PRs\"\nFROM unified_activity\nWHERE $__timeFilter(date)\n  AND ('$source' = 'All' OR source = '$source')\nGROUP BY source, COALESCE(NULLIF(user_email, ''), 'Unknown User')\nORDER BY SUM(lines_added) DESC\nLIMIT 25",
+          "refId": "A"
+        }
+      ],
+      "title": "Top Users - Unified Code Activity",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "id": 13,
+      "panels": [],
+      "title": "Unified Tokens & Cost (Claude Code Only)",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Unified Claude Code token usage. Platform tokens come from `ai_activities` (provider='claude', legitimately per-model, no de-duplication needed -- only the activity totals are duplicated per model row, not tokens). Enterprise tokens come from `_tool_claude_enterprise_usage_reports` (tokens are never converted into `ai_activities` for Enterprise -- see Section 9), restricted to `product = 'claude_code'` so the comparison excludes Enterprise Chat/Cowork usage that has no Platform equivalent.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 0,
+        "y": 25
+      },
+      "id": 14,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH claude_tokens AS (\n  SELECT date, model, input_tokens, output_tokens\n  FROM ai_activities\n  WHERE provider = 'claude' AND type = 'CODE_EDIT'\n),\nenterprise_tokens AS (\n  SELECT DATE(STR_TO_DATE(starting_at, '%Y-%m-%dT%H:%i:%sZ')) AS date, model, input_tokens, output_tokens\n  FROM _tool_claude_enterprise_usage_reports\n  WHERE LOWER(product) IN ('claude_code', 'claude-code', 'code')\n),\nunified_tokens AS (\n  SELECT 'claude' AS source, date, model, input_tokens, output_tokens FROM claude_tokens\n  UNION ALL\n  SELECT 'claude_enterprise' AS source, date, model, input_tokens, output_tokens FROM enterprise_tokens\n)\nSELECT COALESCE(SUM(input_tokens + output_tokens), 0) AS \"Total Tokens\"\nFROM unified_tokens\nWHERE $__timeFilter(date)\n  AND ('$source' = 'All' OR source = '$source')",
+          "refId": "A"
+        }
+      ],
+      "title": "Claude Code Tokens (Period)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Unified Claude Code USD cost. Platform cost comes from `ai_activities` (provider='claude', legitimately per-model). Enterprise cost comes from `_tool_claude_enterprise_cost_reports` (amounts are decimal strings cast to DECIMAL, USD rows only), restricted to `product = 'claude_code'` for the same reason as tokens above.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 12,
+        "y": 25
+      },
+      "id": 15,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH claude_cost AS (\n  SELECT date, model, estimated_cost_usd AS amount\n  FROM ai_activities\n  WHERE provider = 'claude' AND type = 'CODE_EDIT'\n),\nenterprise_cost AS (\n  SELECT DATE(STR_TO_DATE(starting_at, '%Y-%m-%dT%H:%i:%sZ')) AS date, model, CAST(amount AS DECIMAL(20,4)) AS amount\n  FROM _tool_claude_enterprise_cost_reports\n  WHERE LOWER(product) IN ('claude_code', 'claude-code', 'code')\n    AND UPPER(currency) = 'USD'\n),\nunified_cost AS (\n  SELECT 'claude' AS source, date, model, amount FROM claude_cost\n  UNION ALL\n  SELECT 'claude_enterprise' AS source, date, model, amount FROM enterprise_cost\n)\nSELECT COALESCE(ROUND(SUM(amount), 2), 0) AS \"Total Cost (USD)\"\nFROM unified_cost\nWHERE $__timeFilter(date)\n  AND ('$source' = 'All' OR source = '$source')",
+          "refId": "A"
+        }
+      ],
+      "title": "Claude Code Cost USD (Period)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Unified Claude Code token usage. Platform tokens come from `ai_activities` (provider='claude', legitimately per-model, no de-duplication needed -- only the activity totals are duplicated per model row, not tokens). Enterprise tokens come from `_tool_claude_enterprise_usage_reports` (tokens are never converted into `ai_activities` for Enterprise -- see Section 9), restricted to `product = 'claude_code'` so the comparison excludes Enterprise Chat/Cowork usage that has no Platform equivalent.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 29
+      },
+      "id": 16,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH claude_tokens AS (\n  SELECT date, model, input_tokens, output_tokens\n  FROM ai_activities\n  WHERE provider = 'claude' AND type = 'CODE_EDIT'\n),\nenterprise_tokens AS (\n  SELECT DATE(STR_TO_DATE(starting_at, '%Y-%m-%dT%H:%i:%sZ')) AS date, model, input_tokens, output_tokens\n  FROM _tool_claude_enterprise_usage_reports\n  WHERE LOWER(product) IN ('claude_code', 'claude-code', 'code')\n),\nunified_tokens AS (\n  SELECT 'claude' AS source, date, model, input_tokens, output_tokens FROM claude_tokens\n  UNION ALL\n  SELECT 'claude_enterprise' AS source, date, model, input_tokens, output_tokens FROM enterprise_tokens\n)\nSELECT date AS time,\n  source AS metric,\n  SUM(input_tokens + output_tokens) AS value\nFROM unified_tokens\nWHERE $__timeFilter(date)\n  AND ('$source' = 'All' OR source = '$source')\nGROUP BY date, source\nORDER BY date",
+          "refId": "A"
+        }
+      ],
+      "title": "Tokens Over Time by Source",
+      "type": "timeseries",
+      "transformations": [
+        {
+          "id": "prepareTimeSeries",
+          "options": {
+            "format": "many"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^value (.+)$",
+            "renamePattern": "$1"
+          }
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "description": "Unified Claude Code USD cost. Platform cost comes from `ai_activities` (provider='claude', legitimately per-model). Enterprise cost comes from `_tool_claude_enterprise_cost_reports` (amounts are decimal strings cast to DECIMAL, USD rows only), restricted to `product = 'claude_code'` for the same reason as tokens above.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 29
+      },
+      "id": 17,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH claude_cost AS (\n  SELECT date, model, estimated_cost_usd AS amount\n  FROM ai_activities\n  WHERE provider = 'claude' AND type = 'CODE_EDIT'\n),\nenterprise_cost AS (\n  SELECT DATE(STR_TO_DATE(starting_at, '%Y-%m-%dT%H:%i:%sZ')) AS date, model, CAST(amount AS DECIMAL(20,4)) AS amount\n  FROM _tool_claude_enterprise_cost_reports\n  WHERE LOWER(product) IN ('claude_code', 'claude-code', 'code')\n    AND UPPER(currency) = 'USD'\n),\nunified_cost AS (\n  SELECT 'claude' AS source, date, model, amount FROM claude_cost\n  UNION ALL\n  SELECT 'claude_enterprise' AS source, date, model, amount FROM enterprise_cost\n)\nSELECT date AS time,\n  source AS metric,\n  SUM(amount) AS value\nFROM unified_cost\nWHERE $__timeFilter(date)\n  AND ('$source' = 'All' OR source = '$source')\nGROUP BY date, source\nORDER BY date",
+          "refId": "A"
+        }
+      ],
+      "title": "Cost (USD) Over Time by Source",
+      "type": "timeseries",
+      "transformations": [
+        {
+          "id": "prepareTimeSeries",
+          "options": {
+            "format": "many"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^value (.+)$",
+            "renamePattern": "$1"
+          }
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "description": "Unified Claude Code USD cost. Platform cost comes from `ai_activities` (provider='claude', legitimately per-model). Enterprise cost comes from `_tool_claude_enterprise_cost_reports` (amounts are decimal strings cast to DECIMAL, USD rows only), restricted to `product = 'claude_code'` for the same reason as tokens above. Grouped by source and model so totals are never blended across the two plugins.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 37
+      },
+      "id": 18,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH claude_cost AS (\n  SELECT date, model, estimated_cost_usd AS amount\n  FROM ai_activities\n  WHERE provider = 'claude' AND type = 'CODE_EDIT'\n),\nenterprise_cost AS (\n  SELECT DATE(STR_TO_DATE(starting_at, '%Y-%m-%dT%H:%i:%sZ')) AS date, model, CAST(amount AS DECIMAL(20,4)) AS amount\n  FROM _tool_claude_enterprise_cost_reports\n  WHERE LOWER(product) IN ('claude_code', 'claude-code', 'code')\n    AND UPPER(currency) = 'USD'\n),\nunified_cost AS (\n  SELECT 'claude' AS source, date, model, amount FROM claude_cost\n  UNION ALL\n  SELECT 'claude_enterprise' AS source, date, model, amount FROM enterprise_cost\n)\nSELECT source AS \"Source\",\n  COALESCE(NULLIF(model, ''), 'Unknown') AS \"Model\",\n  ROUND(SUM(amount), 2) AS \"Cost (USD)\"\nFROM unified_cost\nWHERE $__timeFilter(date)\n  AND ('$source' = 'All' OR source = '$source')\nGROUP BY source, COALESCE(NULLIF(model, ''), 'Unknown')\nORDER BY SUM(amount) DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Cost by Model (by Source)",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 45
+      },
+      "id": 19,
+      "panels": [],
+      "title": "Enterprise-Only Adoption (No Claude Platform Equivalent)",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Enterprise-only: the Platform (`claude`) plugin has no seats/adoption concept, so this is never merged into a unified total. Reads as zero when Source = claude. Uses the latest summary row per (connection, scope) in range, matching ClaudeEnterpriseAdoption.json.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 0,
+        "y": 46
+      },
+      "id": 20,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH latest_summary AS (\n  SELECT s.*\n  FROM _tool_claude_enterprise_summaries s\n  INNER JOIN (\n    SELECT connection_id, scope_id, MAX(date) AS max_date\n    FROM _tool_claude_enterprise_summaries\n    WHERE $__timeFilter(STR_TO_DATE(date, '%Y-%m-%d'))\n      AND ('$source' = 'All' OR '$source' = 'claude_enterprise')\n    GROUP BY connection_id, scope_id\n  ) latest\n    ON latest.connection_id = s.connection_id\n   AND latest.scope_id = s.scope_id\n   AND latest.max_date = s.date\n)\nSELECT COALESCE(SUM(assigned_seats), 0) AS \"Assigned Seats\"\nFROM latest_summary",
+          "refId": "A"
+        }
+      ],
+      "title": "Assigned Seats (Latest, Enterprise-only)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Enterprise-only: the Platform (`claude`) plugin has no seats/adoption concept, so this is never merged into a unified total. Reads as zero when Source = claude. Uses the latest summary row per (connection, scope) in range, matching ClaudeEnterpriseAdoption.json.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 12,
+        "y": 46
+      },
+      "id": 21,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH latest_summary AS (\n  SELECT s.*\n  FROM _tool_claude_enterprise_summaries s\n  INNER JOIN (\n    SELECT connection_id, scope_id, MAX(date) AS max_date\n    FROM _tool_claude_enterprise_summaries\n    WHERE $__timeFilter(STR_TO_DATE(date, '%Y-%m-%d'))\n      AND ('$source' = 'All' OR '$source' = 'claude_enterprise')\n    GROUP BY connection_id, scope_id\n  ) latest\n    ON latest.connection_id = s.connection_id\n   AND latest.scope_id = s.scope_id\n   AND latest.max_date = s.date\n)\nSELECT COALESCE(ROUND(SUM(daily_active_users) * 100.0 / NULLIF(SUM(assigned_seats), 0), 1), 0) AS \"DAU / Seats %\"\nFROM latest_summary",
+          "refId": "A"
+        }
+      ],
+      "title": "DAU / Seats Adoption Rate % (Latest, Enterprise-only)",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Enterprise-only: the Platform (`claude`) plugin has no seats/adoption concept, so this is never merged into a unified total. Reads as zero when Source = claude. Uses the latest summary row per (connection, scope) in range, matching ClaudeEnterpriseAdoption.json.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 50
+      },
+      "id": 22,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT STR_TO_DATE(date, '%Y-%m-%d') AS time,\n  SUM(daily_active_users) AS \"Daily Active Users\",\n  SUM(weekly_active_users) AS \"Weekly Active Users\",\n  SUM(monthly_active_users) AS \"Monthly Active Users\"\nFROM _tool_claude_enterprise_summaries\nWHERE $__timeFilter(STR_TO_DATE(date, '%Y-%m-%d'))\n  AND ('$source' = 'All' OR '$source' = 'claude_enterprise')\nGROUP BY date\nORDER BY date",
+          "refId": "A"
+        }
+      ],
+      "title": "DAU / WAU / MAU Trend (Enterprise-only)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Enterprise-only: the Platform (`claude`) plugin only ever tracks Claude Code, never chat, so this has no unified equivalent. Reads as zero when Source = claude.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 50
+      },
+      "id": 23,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT date AS time,\n  SUM(num_sessions) AS \"Chat Conversations\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude_enterprise'\n  AND type = 'CHAT'\n  AND ('$source' = 'All' OR '$source' = 'claude_enterprise')\nGROUP BY date\nORDER BY date",
+          "refId": "A"
+        }
+      ],
+      "title": "Chat Conversations Over Time (Enterprise-only)",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 38,
+  "tags": [
+    "claude",
+    "claude_enterprise",
+    "anthropic",
+    "devlake",
+    "ai",
+    "unified"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "All"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Source",
+        "multi": false,
+        "name": "source",
+        "options": [
+          {
+            "selected": true,
+            "text": "All",
+            "value": "All"
+          },
+          {
+            "selected": false,
+            "text": "Claude Platform (claude)",
+            "value": "claude"
+          },
+          {
+            "selected": false,
+            "text": "Claude Enterprise (claude_enterprise)",
+            "value": "claude_enterprise"
+          }
+        ],
+        "query": "All : All, Claude Platform (claude) : claude, Claude Enterprise (claude_enterprise) : claude_enterprise",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-90d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "Claude Unified Reporting (Platform + Enterprise)",
+  "uid": "claude_unified_reporting",
+  "version": 1,
+  "weekStart": ""
+}
