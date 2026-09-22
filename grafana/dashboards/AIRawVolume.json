@@ -32,7 +32,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "**Scope & caveats:**\n\n- \u201cInput\u201d/\u201cOutput\u201d figures (tokens, sessions, active hours, AI lines) are company-wide \u2014 AI activity carries no project association in the schema. \u201cDelivery Outcomes\u201d figures (PRs/commits/lines never merged, PR abandonment) are scoped to the selected project(s).\n- **Active Hours is Claude Code OTel-only.** Session duration isn't rolled up into the shared AI-activity table for any provider \u2014 Cursor has no comparable duration concept at all \u2014 so this is queried directly from Claude Code's OTel telemetry.\n- **Commits/lines never merged are inflated by squash-merge workflows.** A squash-merged PR keeps only its final squashed commit in the ingested history \u2014 the original branch commits never show up as \u201cmerged\u201d even though the code did ship. Read this row as an upper bound on abandoned work, not an exact measurement.\n- **PR Abandonment Rate** is the delivery-outcome view of the same problem: no field links an AI session to the branch or PR it produced, so a dollar/token cost can't be attached to abandoned work directly. This table measures it a different way instead \u2014 PR-level: (PRs authored that closed without merging) \u00f7 (all PRs authored) \u2014 as an outcome-based proxy for wasted effort, not an AI-cost-denominated one.",
+        "content": "**Scope & caveats:**\n\n- “Input”/“Output” figures (tokens, sessions, active hours, AI lines) are company-wide — AI activity carries no project association in the schema. “Delivery Outcomes” figures (PRs/commits/lines never merged, PR abandonment) are scoped to the selected project(s).\n- **Active Hours is Claude Code OTel-only.** Session duration isn't rolled up into the shared AI-activity table for any provider — Cursor has no comparable duration concept at all — so this is queried directly from Claude Code's OTel telemetry.\n- **Commits/lines never merged are inflated by squash-merge workflows.** A squash-merged PR keeps only its final squashed commit in the ingested history — the original branch commits never show up as “merged” even though the code did ship. Read this row as an upper bound on abandoned work, not an exact measurement.\n- **PR Abandonment Rate** is the delivery-outcome view of the same problem: no field links an AI session to the branch or PR it produced, so a dollar/token cost can't be attached to abandoned work directly. This table measures it a different way instead — PR-level: (PRs authored that closed without merging) ÷ (all PRs authored) — as an outcome-based proxy for wasted effort, not an AI-cost-denominated one.",
         "mode": "markdown"
       },
       "pluginVersion": "11.0.0",
@@ -136,7 +136,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT SUM(num_sessions) AS \"Sessions\" FROM ai_activities WHERE $__timeFilter(date)",
+          "rawSql": "SELECT SUM(num_sessions) AS \"Sessions\" FROM ai_activities WHERE NOT (provider = 'claude' AND record_kind IS NULL) AND $__timeFilter(date)",
           "refId": "A"
         }
       ],
@@ -188,7 +188,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT ROUND(SUM(ha.active_time_seconds) / 3600.0, 1) AS \"Active Hours\"\nFROM _tool_claude_code_otel_hourly_activity ha\nJOIN _tool_claude_code_otel_connection_projects cp ON cp.connection_id = ha.connection_id\nWHERE cp.project_name IN ($project) AND $__timeFilter(ha.hour_start)",
+          "rawSql": "SELECT ROUND(SUM(ha.active_time_seconds) / 3600.0, 1) AS \"Active Hours\"\nFROM _tool_claude_code_otel_hourly_activity ha\nWHERE ha.connection_id IN (\n  SELECT connection_id FROM _tool_claude_code_otel_connection_projects\n  WHERE project_name IN ($project)\n)\nAND $__timeFilter(ha.hour_start)",
           "refId": "A"
         }
       ],
@@ -240,7 +240,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT SUM(lines_added) AS \"Lines Added\" FROM ai_activities WHERE $__timeFilter(date)",
+          "rawSql": "SELECT SUM(lines_added) AS \"Lines Added\" FROM ai_activities WHERE NOT (provider = 'claude' AND record_kind IS NULL) AND $__timeFilter(date)",
           "refId": "A"
         }
       ],
@@ -292,7 +292,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT SUM(lines_removed) AS \"Lines Removed\" FROM ai_activities WHERE $__timeFilter(date)",
+          "rawSql": "SELECT SUM(lines_removed) AS \"Lines Removed\" FROM ai_activities WHERE NOT (provider = 'claude' AND record_kind IS NULL) AND $__timeFilter(date)",
           "refId": "A"
         }
       ],
@@ -425,7 +425,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Commits with no record of ever landing in a merged pull request, scoped to the selected project(s). Inflated by squash-merge workflows \u2014 see the caveat above; read as an upper bound, not an exact count.",
+      "description": "Commits with no record of ever landing in a merged pull request, scoped to the selected project(s). Inflated by squash-merge workflows — see the caveat above; read as an upper bound, not an exact count.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -477,7 +477,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Additions + deletions summed over the same never-merged commit set above. Inflated by squash-merge workflows for the same reason \u2014 read as an upper bound, not a precise figure.",
+      "description": "Additions + deletions summed over the same never-merged commit set above. Inflated by squash-merge workflows for the same reason — read as an upper bound, not a precise figure.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -513,7 +513,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT SUM(c.additions + c.deletions) AS \"Lines Never Merged\"\nFROM commits c\nJOIN repo_commits rc ON rc.commit_sha = c.sha\nJOIN project_mapping pm ON pm.row_id = rc.repo_id AND pm.`table` = 'repos'\nLEFT JOIN pull_request_commits prc ON prc.commit_sha = c.sha\nLEFT JOIN pull_requests pr ON pr.id = prc.pull_request_id AND pr.status = 'MERGED'\nWHERE pm.project_name IN ($project) AND pr.id IS NULL AND $__timeFilter(c.committed_date)",
+          "rawSql": "SELECT SUM(sz) AS \"Lines Never Merged\" FROM (\n  SELECT DISTINCT c.sha, (c.additions + c.deletions) AS sz\n  FROM commits c\n  JOIN repo_commits rc ON rc.commit_sha = c.sha\n  JOIN project_mapping pm ON pm.row_id = rc.repo_id AND pm.`table` = 'repos'\n  LEFT JOIN pull_request_commits prc ON prc.commit_sha = c.sha\n  LEFT JOIN pull_requests pr ON pr.id = prc.pull_request_id AND pr.status = 'MERGED'\n  WHERE pm.project_name IN ($project) AND pr.id IS NULL AND $__timeFilter(c.committed_date)\n) x",
           "refId": "A"
         }
       ],
@@ -542,7 +542,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "PR-level, not commit/branch-level: (PRs authored that closed without merging) \u00f7 (all PRs authored), scoped to the selected project(s), minimum 5 PRs authored in range to avoid noisy small-sample rates. Measures delivery outcome, not AI-specific cost.",
+      "description": "PR-level, not commit/branch-level: (PRs authored that closed without merging) ÷ (all PRs authored), scoped to the selected project(s), minimum 5 PRs authored in range to avoid noisy small-sample rates. Measures delivery outcome, not AI-specific cost.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -602,19 +602,23 @@
     "list": [
       {
         "current": {
-          "selected": false,
-          "text": "All",
-          "value": "$__all"
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
         },
         "datasource": "mysql",
-        "definition": "SELECT DISTINCT project_name FROM project_pr_metrics ORDER BY 1",
+        "definition": "select distinct name from projects",
         "hide": 0,
         "includeAll": true,
         "label": "Project",
-        "multi": false,
+        "multi": true,
         "name": "project",
         "options": [],
-        "query": "SELECT DISTINCT project_name FROM project_pr_metrics ORDER BY 1",
+        "query": "select distinct name from projects",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
