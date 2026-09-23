@@ -70,7 +70,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 11,
+        "h": 23,
         "w": 24,
         "x": 0,
         "y": 0
@@ -182,10 +182,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 10,
+        "h": 11,
         "w": 24,
         "x": 0,
-        "y": 11
+        "y": 23
       },
       "id": 2,
       "options": {
@@ -297,7 +297,7 @@
         "h": 12,
         "w": 24,
         "x": 0,
-        "y": 21
+        "y": 34
       },
       "id": 3,
       "options": {
@@ -468,5 +468,5 @@
   "timezone": "utc",
   "title": "H. GitHub Basics",
   "uid": "ffxtv9s62t9moe",
-  "version": 22
+  "version": 23
 }

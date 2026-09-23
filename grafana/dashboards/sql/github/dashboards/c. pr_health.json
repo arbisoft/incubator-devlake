@@ -755,28 +755,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "PR Count",
-            "axisPlacement": "auto",
-            "fillOpacity": 80,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineWidth": 1,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
+            "mode": "thresholds"
           },
           "mappings": [],
           "thresholds": {
@@ -784,10 +763,6 @@
             "steps": [
               {
                 "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           }
@@ -802,26 +777,28 @@
       },
       "id": 6,
       "options": {
-        "barRadius": 0,
-        "barWidth": 0.97,
-        "fullHighlight": false,
-        "groupWidth": 0.7,
+        "displayMode": "gradient",
         "legend": {
           "calcs": [],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": false
         },
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
         "orientation": "auto",
-        "showValue": "auto",
-        "stacking": "none",
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
         },
-        "xTickLabelRotation": 0,
-        "xTickLabelSpacing": 0
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
       },
       "pluginVersion": "11.6.2",
       "targets": [
@@ -834,7 +811,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH pr_size AS (\n  SELECT pr.id,\n         SUM(c.additions + c.deletions) AS lines_changed\n  FROM pull_requests pr\n  JOIN pull_request_commits prc ON prc.pull_request_id = pr.id\n  JOIN commits c                ON c.sha = prc.commit_sha\n  WHERE pr.id LIKE 'github:%'\n    AND $__timeFilter(pr.created_date)\n    AND pr.base_repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN ( ${project} ))\n    AND EXISTS (\n      SELECT 1\n      FROM accounts a where a.id IN ( $developer_id  )\n      OR a.id = c.author_email or a.email = c.author_email\n    )\n  GROUP BY pr.id\n),\nbucketed AS (\n  SELECT CASE\n           WHEN lines_changed <  200 THEN '1. < 200'\n           WHEN lines_changed <  500 THEN '2. 200-499'\n           WHEN lines_changed < 1000 THEN '3. 500-999'\n           ELSE                           '4. 1000+'\n         END      AS bucket,\n         COUNT(*) AS prs\n  FROM pr_size\n  GROUP BY bucket\n)\nSELECT bucket,\n       prs AS 'PR Count',\n       CONCAT(ROUND(100.0 * prs / SUM(prs) OVER (), 1), '%') AS Percentage\nFROM bucketed\nORDER BY bucket;",
+          "rawSql": "WITH pr_size AS (\n  SELECT pr.id,\n         SUM(c.additions + c.deletions) AS lines_changed\n  FROM pull_requests pr\n  JOIN pull_request_commits prc ON prc.pull_request_id = pr.id\n  JOIN commits c                ON c.sha = prc.commit_sha\n  WHERE pr.id LIKE 'github:%'\n    AND $__timeFilter(pr.created_date)\n    AND pr.base_repo_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN ( ${project} ))\n    AND EXISTS (\n      SELECT 1\n      FROM accounts a where a.id IN ( $developer_id  )\n      OR a.id = c.author_email or a.email = c.author_email\n    )\n  GROUP BY pr.id\n),\nbucketed AS (\n  SELECT CASE\n           WHEN lines_changed <  200 THEN '1. < 200 LOC'\n           WHEN lines_changed <  500 THEN '2. 200-499 LOC'\n           WHEN lines_changed < 1000 THEN '3. 500-999 LOC'\n           ELSE                           '4. 1000+ LOC'\n         END      AS bucket,\n         COUNT(*) AS prs\n  FROM pr_size\n  GROUP BY bucket\n)\nSELECT bucket,\n       prs AS 'PR Count',\n       CONCAT(ROUND(100.0 * prs / SUM(prs) OVER (), 1), '%') AS Percentage\nFROM bucketed\nORDER BY bucket;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -856,7 +833,7 @@
         }
       ],
       "title": "PR Size",
-      "type": "barchart"
+      "type": "bargauge"
     },
     {
       "datasource": {
@@ -1161,5 +1138,5 @@
   "timezone": "utc",
   "title": "C. PR Health & Contributions",
   "uid": "efxmt33dl16gwf",
-  "version": 26
+  "version": 28
 }
