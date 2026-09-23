@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/apache/incubator-devlake/core/context"
+	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models/migrationscripts/archived"
 	"github.com/apache/incubator-devlake/helpers/migrationhelper"
@@ -50,6 +51,63 @@ func (teambitionScopeConfig20260727) TableName() string {
 
 type addMissingScopeConfigColumns struct{}
 
+// generatedPrimaryKeyColumn20260727 returns the name of a server-generated
+// invisible AUTO_INCREMENT primary key on the table, or "" if there is none.
+//
+// MySQL and its forks add one of these to a table created without a primary
+// key: MySQL 8.0.30+ calls it `my_row_id` (`sql_generate_invisible_primary_key`),
+// and Percona / Group Replication deployments call it `_gr_pk`. The column is
+// always INVISIBLE, which is what separates it from a column anyone meant to
+// keep, so that — together with it being the primary key — is the test used
+// here rather than matching either vendor's name.
+func generatedPrimaryKeyColumn20260727(db dal.Dal, table string) (string, errors.Error) {
+	rows, err := db.RawCursor(`
+		SELECT COLUMN_NAME
+		  FROM information_schema.COLUMNS
+		 WHERE TABLE_SCHEMA = DATABASE()
+		   AND TABLE_NAME = ?
+		   AND COLUMN_KEY = 'PRI'
+		   AND EXTRA LIKE '%auto_increment%'
+		   AND EXTRA LIKE '%INVISIBLE%'`, table)
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return "", nil
+	}
+	var column string
+	if scanErr := rows.Scan(&column); scanErr != nil {
+		return "", errors.Default.Wrap(scanErr, "failed to read generated primary key column")
+	}
+	return column, nil
+}
+
+// addIDColumnDDL20260727 builds the statement that installs `id` as the table's
+// auto-increment primary key. generatedPK names a server-generated invisible
+// primary key to replace, or is "" when the table has no primary key at all.
+func addIDColumnDDL20260727(dialect, table, generatedPK string) string {
+	if dialect != "mysql" {
+		return fmt.Sprintf("ALTER TABLE %s ADD COLUMN id BIGSERIAL PRIMARY KEY", table)
+	}
+	if generatedPK == "" {
+		return fmt.Sprintf(
+			"ALTER TABLE %s ADD COLUMN id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY",
+			table,
+		)
+	}
+	// Dropping the generated key and installing the real one must happen in a
+	// single statement. MySQL permits only one auto-increment column, so the two
+	// cannot coexist even briefly; and a table left momentarily without a primary
+	// key is exactly what makes the server generate another one.
+	return fmt.Sprintf(
+		"ALTER TABLE %s DROP COLUMN `%s`, "+
+			"ADD COLUMN id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT FIRST, "+
+			"ADD PRIMARY KEY (id)",
+		table, generatedPK,
+	)
+}
+
 // Up adds the columns of the embedded common.Model that the runtime model
 // expects.
 //
@@ -57,23 +115,28 @@ type addMissingScopeConfigColumns struct{}
 // to an existing table: it emits a plain `ADD COLUMN ... AUTO_INCREMENT`, which
 // MySQL rejects with "Incorrect table definition; there can be only one auto
 // column and it must be defined as a key". The column is therefore added with
-// explicit DDL (the table has no primary key so far), letting the database
-// backfill ids for existing rows and keep the sequence/counter in sync. The
-// remaining columns (`created_at`, `updated_at`) and the indexes are then
-// created by AutoMigrate as usual.
+// explicit DDL, letting the database backfill ids for existing rows and keep
+// the sequence/counter in sync. The remaining columns (`created_at`,
+// `updated_at`) and the indexes are then created by AutoMigrate as usual.
+//
+// The table may already carry a primary key even though no migration created
+// one: servers that generate an invisible AUTO_INCREMENT key for primary-key-less
+// tables (Percona's `_gr_pk`, MySQL 8.0.30+'s `my_row_id`) will have added one.
+// That column occupies the single auto-increment slot, so it has to be dropped
+// in the same statement that installs `id` — otherwise this migration fails with
+// error 1075 on exactly the deployments that most need it.
 func (script *addMissingScopeConfigColumns) Up(basicRes context.BasicRes) errors.Error {
 	db := basicRes.GetDal()
 	if !db.HasColumn(teambitionScopeConfigTable20260727, "id") {
-		ddl := fmt.Sprintf(
-			"ALTER TABLE %s ADD COLUMN id BIGSERIAL PRIMARY KEY",
-			teambitionScopeConfigTable20260727,
-		)
+		generatedPK := ""
 		if db.Dialect() == "mysql" {
-			ddl = fmt.Sprintf(
-				"ALTER TABLE %s ADD COLUMN id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY",
-				teambitionScopeConfigTable20260727,
-			)
+			var err errors.Error
+			generatedPK, err = generatedPrimaryKeyColumn20260727(db, teambitionScopeConfigTable20260727)
+			if err != nil {
+				return err
+			}
 		}
+		ddl := addIDColumnDDL20260727(db.Dialect(), teambitionScopeConfigTable20260727, generatedPK)
 		if err := db.Exec(ddl); err != nil {
 			return err
 		}
