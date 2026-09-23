@@ -32,6 +32,7 @@ export const CONNECTION_FORM_FIELDS = [
   'accessToken',
   'refreshToken',
   'appId',
+  'cloudId',
   'clientId',
   'secretKey',
   'clientSecret',

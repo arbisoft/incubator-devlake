@@ -130,6 +130,7 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: Props) => {
                 ? undefined
                 : values.refreshToken,
               appId: isEqual(selectedConnection?.appId, values.appId) ? undefined : values.appId,
+              cloudId: isEqual((selectedConnection as any)?.cloudId, values.cloudId) ? undefined : values.cloudId,
               clientId: isEqual((selectedConnection as any)?.clientId, values.clientId) ? undefined : values.clientId,
               secretKey: isEqual(selectedConnection?.secretKey, values.secretKey) ? undefined : values.secretKey,
               clientSecret: isEqual((selectedConnection as any)?.clientSecret, values.clientSecret)
@@ -182,6 +183,7 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: Props) => {
                 'authMethod',
                 'authMode',
                 'appId',
+                'cloudId',
                 'clientId',
                 'secretKey',
                 'clientSecret',
