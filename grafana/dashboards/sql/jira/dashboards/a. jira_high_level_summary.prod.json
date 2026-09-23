@@ -1,0 +1,4628 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 95,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 24,
+      "panels": [],
+      "title": "Issues Stats",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
+            }
+          ],
+          "mappings": [],
+          "noValue": "No data available against provided filters",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 1
+      },
+      "id": 1,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.75,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "never",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  i.type, COUNT(i.id) AS `Count`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.status <> 'DONE'\n  #AND i.creator_id IN ( $developer_id )\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )\nGROUP BY i.type",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Jira Issues Summary",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Ticket Count",
+            "axisPlacement": "auto",
+            "fillOpacity": 71,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 1
+      },
+      "id": 53,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.5,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \n  i.priority, count(i.id) AS `Count`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.priority = 'Highest'\n  AND i.status <> 'DONE'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )\n  AND CASE WHEN '__all' IN ($developer_id) THEN 1 = 1 ELSE i.assignee_id IN ($developer_id) END\nGROUP BY Priority\nUNION\nSELECT \n  i.priority, count(i.id) AS `Count`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.priority = 'High'\n  AND i.status <> 'DONE'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )\n  AND CASE WHEN '__all' IN ($developer_id) THEN 1 = 1 ELSE i.assignee_id IN ($developer_id) END\nGROUP BY Priority\nUNION\nSELECT \n  i.priority, count(i.id) AS `Count`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.priority = 'Medium'\n  AND i.status <> 'DONE'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )\n  AND CASE WHEN '__all' IN ($developer_id) THEN 1 = 1 ELSE i.assignee_id IN ($developer_id) END\nGROUP BY Priority\nUNION\nSELECT \n  i.priority, count(i.id) AS `Count`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.priority = 'Low'\n  AND i.status <> 'DONE'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )\n  AND CASE WHEN '__all' IN ($developer_id) THEN 1 = 1 ELSE i.assignee_id IN ($developer_id) END\nGROUP BY Priority\nUNION\nSELECT \n  i.priority, count(i.id) AS `Count`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.priority = 'Lowest'\n  AND i.status <> 'DONE'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )\n  AND CASE WHEN '__all' IN ($developer_id) THEN 1 = 1 ELSE i.assignee_id IN ($developer_id) END\nGROUP BY Priority\nUNION\nSELECT \n  'None', count(i.id) AS `Count`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.priority = ''\n  AND i.status <> 'DONE'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )\n  AND CASE WHEN '__all' IN ($developer_id) THEN 1 = 1 ELSE i.assignee_id IN ($developer_id) END\nGROUP BY Priority",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Priority Breakdown",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-6"
+            }
+          ],
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 1
+      },
+      "id": 54,
+      "options": {
+        "displayLabels": [
+          "percent",
+          "name"
+        ],
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "value"
+          ]
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  SUM(CASE WHEN i.status LIKE 'DONE' THEN 1 ELSE 0 END) AS `Done`,\n  SUM(CASE WHEN i.status LIKE 'IN_PROGRESS' THEN 1 ELSE 0 END) AS `In Progress`,\n  SUM(CASE WHEN i.status LIKE 'TODO' THEN 1 ELSE 0 END) AS `To Do`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date)\n  AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Status Overview",
+      "type": "piechart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Overview ticket statuses of top 10 Epics sorted descending on ticket count",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 50,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "links": [],
+          "mappings": [],
+          "noValue": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 0,
+        "y": 9
+      },
+      "id": 55,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.75,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "percent",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH RECURSIVE\nscoped AS (\n    SELECT i.id, i.status, i.epic_key, i.parent_issue_id,\n           SUBSTRING_INDEX(i.id, ':', 3) AS conn   -- 'jira:JiraIssue:<connectionId>'\n    FROM issues i\n    WHERE i.id LIKE 'jira:%'\n      AND COALESCE(i.original_type, '') <> 'Epic'\n      AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))\n      AND EXISTS (SELECT 1 FROM board_issues bi\n                  WHERE bi.issue_id = i.id AND bi.board_id IN ( $board_id ))\n),\nclimb AS (\n    -- One row per (issue, ancestor). Anchor = the issue itself, never an epic.\n    -- Column types are fixed by the anchor, hence the CASTs.\n    SELECT s.id                       AS issue_id,\n           s.parent_issue_id          AS cur_parent,\n           0                          AS cur_is_epic,\n           CAST('' AS CHAR(255))      AS cur_key,\n           CAST('' AS CHAR(255))      AS cur_title,\n           0                          AS depth\n    FROM scoped s\n    UNION ALL\n    SELECT c.issue_id,\n           p.parent_issue_id,\n           p.type = 'EPIC' OR COALESCE(p.original_type, '') = 'Epic',\n           p.issue_key,\n           p.title,\n           c.depth + 1\n    FROM climb c\n    JOIN issues p ON p.id = c.cur_parent\n    WHERE c.cur_is_epic = 0\n      AND c.depth < 10                -- guard against a cyclic or pathological parent chain\n),\nepic_of AS (\n    SELECT issue_id, cur_key AS epic_key, cur_title AS epic_title\n    FROM climb\n    WHERE cur_is_epic = 1\n),\nlabeled AS (\n    SELECT COALESCE(eo.epic_key, fb.issue_key, '')    AS epic_key,\n           COALESCE(eo.epic_title, fb.title, 'None')  AS epic_title,\n           s.status\n    FROM scoped s\n    LEFT JOIN epic_of eo ON eo.issue_id = s.id\n    -- fallback: the classic-project epic link, used only when the parent chain found no epic\n    LEFT JOIN issues fb ON eo.issue_id IS NULL\n                       AND COALESCE(s.epic_key, '') <> ''\n                       AND fb.issue_key = s.epic_key\n                       AND SUBSTRING_INDEX(fb.id, ':', 3) = s.conn\n                       AND (fb.type = 'EPIC' OR COALESCE(fb.original_type, '') = 'Epic')\n)\n-- OTHER / unmapped statuses count as To Do, the way the Jira overview bar does.\nSELECT epic_key AS `Epic`,\n       SUM(status =  'DONE')                                          AS `Done`,\n       SUM(status =  'IN_PROGRESS')                                   AS `In Progress`,\n       SUM(status = ('TODO'))                     AS `To Do`\nFROM labeled\nWHERE epic_key IS NOT NULL AND epic_key <> ''\nGROUP BY epic_key, epic_title\nORDER BY (`To Do` + `In Progress` + `Done`) DESC\nLIMIT 10\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Epic Progress",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Detail",
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-5"
+            }
+          ],
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 5,
+        "x": 9,
+        "y": 9
+      },
+      "id": 7,
+      "options": {
+        "displayLabels": [
+          "percent",
+          "name"
+        ],
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  SUM(CASE WHEN i.status LIKE 'DONE' THEN 1 ELSE 0 END) AS `Done`,\n  SUM(CASE WHEN i.status LIKE 'IN_PROGRESS' THEN 1 ELSE 0 END) AS `In Progress`,\n  SUM(CASE WHEN i.status LIKE 'TODO' THEN 1 ELSE 0 END) AS `To Do`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND i.original_type like '%story%'\n  AND $__timeFilter(i.created_date)\n  AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Stories Status Overview",
+      "type": "piechart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-6"
+            }
+          ],
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 5,
+        "x": 14,
+        "y": 9
+      },
+      "id": 8,
+      "options": {
+        "displayLabels": [
+          "percent",
+          "name"
+        ],
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  SUM(CASE WHEN i.status LIKE 'DONE' THEN 1 ELSE 0 END) AS `Done`,\n  SUM(CASE WHEN i.status LIKE 'IN_PROGRESS' THEN 1 ELSE 0 END) AS `In Progress`,\n  SUM(CASE WHEN i.status LIKE 'TODO' THEN 1 ELSE 0 END) AS `To Do`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND i.type like '%task%'\n  AND $__timeFilter(i.created_date)\n  AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Tasks Status Overview",
+      "type": "piechart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-3"
+            }
+          ],
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 5,
+        "x": 19,
+        "y": 9
+      },
+      "id": 6,
+      "options": {
+        "displayLabels": [
+          "percent",
+          "name"
+        ],
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  SUM(CASE WHEN i.status LIKE 'DONE' THEN 1 ELSE 0 END) AS `Done`,\n  SUM(CASE WHEN i.status LIKE 'IN_PROGRESS' THEN 1 ELSE 0 END) AS `In Progress`,\n  SUM(CASE WHEN i.status LIKE 'TODO' THEN 1 ELSE 0 END) AS `To Do`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND i.original_type like '%bug%'\n  AND $__timeFilter(i.created_date)\n  AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Bug Status Overview",
+      "type": "piechart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-12"
+            }
+          ],
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 500
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 17
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "first"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  COUNT(i.id) AS `Epics`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND i.type LIKE 'EPIC'\n  AND $__timeFilter(i.created_date)\n  AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  );",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "New Epics Created",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-11"
+            }
+          ],
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 500
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 17
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "first"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  COUNT(i.id) AS `Stories`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND i.original_type LIKE '%story%'\n  AND $__timeFilter(i.created_date)\n  AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  );",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "New Stories Created",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-16"
+            }
+          ],
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 500
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 17
+      },
+      "id": 15,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "first"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 7,
+          "refId": "A"
+        }
+      ],
+      "title": "Stories in Progress",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "In Progress"
+              ]
+            }
+          }
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-15"
+            }
+          ],
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 17
+      },
+      "id": 11,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "first"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 7,
+          "refId": "A"
+        }
+      ],
+      "title": "Stories in To Do List",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "To Do"
+              ]
+            }
+          }
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-9"
+            }
+          ],
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 17
+      },
+      "id": 13,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "first"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 6,
+          "refId": "A"
+        }
+      ],
+      "title": "Bugs Done",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Done"
+              ]
+            }
+          }
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [],
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 17
+      },
+      "id": 19,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "first"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  COUNT(i.id) AS `Stories`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND i.original_type LIKE '%story%'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )\n  AND $__timeFilter(i.created_date)\n  AND (i.assignee_id IS NULL OR i.assignee_id = '');",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Unassigned Stories",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Distinct number of non-Epic tickets which are reopened in the provided time span.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Detail",
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-21"
+            }
+          ],
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 21
+      },
+      "id": 36,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH curated AS (\n    -- Keep this list byte-identical to the one in the bar chart query.\n    SELECT * FROM (\n        SELECT 'In Progress'  AS original_status, 'Active Work' AS status_class UNION ALL\n        SELECT 'In Review',    'Waiting'                                        UNION ALL\n        SELECT 'Ready for QA', 'Waiting'                                        UNION ALL\n        SELECT 'Blocked',      'Waiting'\n    ) m WHERE 1 = 1\n),\nscoped AS (\n    SELECT i.id\n    FROM issues i\n    JOIN board_issues bi    ON bi.issue_id = i.id\n    JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n    WHERE i.id LIKE 'jira:%'\n      AND pm.project_name IN ( $project )\n      AND bi.board_id     IN ( $board_id )\n      AND COALESCE(i.original_type, '') <> 'Epic'\n      AND COALESCE(i.is_subtask, 0) = 0\n      AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))\n),\nhist AS (\n    SELECT h.issue_id,\n           COALESCE(NULLIF(TRIM(h.original_status), ''), '(blank)') AS st,\n           h.status AS std,\n           h.start_date AS sd\n    FROM issue_status_history h\n    JOIN scoped s ON s.id = h.issue_id\n),\nclassified AS (\n    SELECT h.issue_id, h.st, h.sd,\n           COALESCE(cu.status_class,\n                    CASE h.std WHEN 'IN_PROGRESS' THEN 'Active Work'\n                               WHEN 'TODO'        THEN 'Waiting'\n                               WHEN 'DONE'        THEN 'Done'\n                               ELSE 'UNCLASSIFIED' END) AS cls\n    FROM hist h\n    LEFT JOIN curated cu ON LOWER(TRIM(cu.original_status)) = LOWER(h.st)\n),\nflagged AS (\n    -- One flag per status period: was the ticket finished during it?\n    SELECT issue_id, sd,\n           CASE WHEN cls = 'Done' OR st = 'Done' THEN 1 ELSE 0 END AS is_done\n    FROM classified\n),\nseq AS (\n    SELECT issue_id, sd, is_done,\n           LEAD(is_done) OVER (PARTITION BY issue_id ORDER BY sd) AS next_is_done,\n           LEAD(sd)      OVER (PARTITION BY issue_id ORDER BY sd) AS next_sd\n    FROM flagged\n),\nevents AS (\n    -- A Done period followed directly by a not-Done one. Tickets still sitting in Done have a\n    -- NULL next_is_done and are correctly excluded.\n    SELECT issue_id, next_sd AS reopened_at\n    FROM seq\n    WHERE is_done = 1\n      AND next_is_done = 0\n      AND next_sd BETWEEN $__timeFrom() AND $__timeTo()\n)\nSELECT COUNT(DISTINCT issue_id) AS `Reopened Tickets`\nFROM events;\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Reopened Count",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-14"
+            }
+          ],
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 21
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "first"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  COUNT(i.id) AS `Bugs`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND i.original_type LIKE '%bug%'\n  AND $__timeFilter(i.created_date)\n  AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  );",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Bugs Reported",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-8"
+            }
+          ],
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 500
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 21
+      },
+      "id": 12,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "first"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 6,
+          "refId": "A"
+        }
+      ],
+      "title": "Bugs in Progress",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "In Progress"
+              ]
+            }
+          }
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-7"
+            }
+          ],
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 21
+      },
+      "id": 9,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "first"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 6,
+          "refId": "A"
+        }
+      ],
+      "title": "Bugs in To Do List",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "To Do"
+              ]
+            }
+          }
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-17"
+            }
+          ],
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 500
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 21
+      },
+      "id": 18,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "first"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 7,
+          "refId": "A"
+        }
+      ],
+      "title": "Stories Done",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Done"
+              ]
+            }
+          }
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-10"
+            }
+          ],
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 21
+      },
+      "id": 16,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "first"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  COUNT(i.id) AS `Tasks`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND i.original_type LIKE '%bug%'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )\n  AND $__timeFilter(i.created_date)\n  AND (i.assignee_id IS NULL OR i.assignee_id = '');",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Unassigned Bugs",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Percentage of distinct number of non-Epic tickets which are reopened in the provided time span.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Detail",
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-21"
+            }
+          ],
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 25
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 25
+      },
+      "id": 38,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH curated AS (\n    -- Keep this list byte-identical to the one in the bar chart query.\n    SELECT * FROM (\n        SELECT 'In Progress'  AS original_status, 'Active Work' AS status_class UNION ALL\n        SELECT 'In Review',    'Waiting'                                        UNION ALL\n        SELECT 'Ready for QA', 'Waiting'                                        UNION ALL\n        SELECT 'Blocked',      'Waiting'\n    ) m WHERE 1 = 1\n),\nscoped AS (\n    SELECT i.id\n    FROM issues i\n    JOIN board_issues bi    ON bi.issue_id = i.id\n    JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n    WHERE i.id LIKE 'jira:%'\n      AND pm.project_name IN ( $project )\n      AND bi.board_id     IN ( $board_id )\n      AND COALESCE(i.original_type, '') <> 'Epic'\n      AND COALESCE(i.is_subtask, 0) = 0\n      AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))\n),\nhist AS (\n    SELECT h.issue_id,\n           COALESCE(NULLIF(TRIM(h.original_status), ''), '(blank)') AS st,\n           h.status AS std,\n           h.start_date AS sd\n    FROM issue_status_history h\n    JOIN scoped s ON s.id = h.issue_id\n),\nclassified AS (\n    SELECT h.issue_id, h.st, h.sd,\n           COALESCE(cu.status_class,\n                    CASE h.std WHEN 'IN_PROGRESS' THEN 'Active Work'\n                               WHEN 'TODO'        THEN 'Waiting'\n                               WHEN 'DONE'        THEN 'Done'\n                               ELSE 'UNCLASSIFIED' END) AS cls\n    FROM hist h\n    LEFT JOIN curated cu ON LOWER(TRIM(cu.original_status)) = LOWER(h.st)\n),\nflagged AS (\n    SELECT issue_id, sd,\n           CASE WHEN cls = 'Done' OR st = 'Done' THEN 1 ELSE 0 END AS is_done\n    FROM classified\n),\nseq AS (\n    SELECT issue_id, sd, is_done,\n           LEAD(is_done) OVER (PARTITION BY issue_id ORDER BY sd) AS next_is_done,\n           LEAD(sd)      OVER (PARTITION BY issue_id ORDER BY sd) AS next_sd\n    FROM flagged\n),\nfirst_done AS (\n    -- Anchor the cohort on the FIRST close. Using the latest close instead would quietly exclude\n    -- every ticket that was reopened and then closed again - i.e. exactly the failures we measure.\n    SELECT issue_id, MIN(sd) AS first_closed_at\n    FROM flagged\n    WHERE is_done = 1\n    GROUP BY issue_id\n),\ncohort AS (\n    SELECT issue_id, first_closed_at\n    FROM first_done\n    WHERE first_closed_at BETWEEN $__timeFrom() AND $__timeTo()\n),\nreopen_events AS (\n    -- Deliberately unbounded in time: a reopen after the range still counts against its cohort.\n    SELECT issue_id, next_sd AS reopened_at\n    FROM seq\n    WHERE is_done = 1\n      AND next_is_done = 0\n),\ncohort_reopened AS (\n    SELECT DISTINCT c.issue_id\n    FROM cohort c\n    JOIN reopen_events r ON r.issue_id = c.issue_id\n                        AND r.reopened_at > c.first_closed_at\n)\nSELECT \n       ROUND(100.0 * (SELECT COUNT(*) FROM cohort_reopened)\n                   / NULLIF((SELECT COUNT(*) FROM cohort), 0), 1)           AS `Reopen Ratio %`;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Reopen Percentage",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-13"
+            }
+          ],
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 1000
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 25
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "first"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  COUNT(i.id) AS `Tasks`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND i.type LIKE '%task%'\n  AND $__timeFilter(i.created_date)\n  AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  );",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "New Tasks Created",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-18"
+            }
+          ],
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 25
+      },
+      "id": 10,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "first"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 8,
+          "refId": "A"
+        }
+      ],
+      "title": "Tasks in To Do List",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "To Do"
+              ]
+            }
+          }
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-19"
+            }
+          ],
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 500
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 25
+      },
+      "id": 14,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "first"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 8,
+          "refId": "A"
+        }
+      ],
+      "title": "Tasks in Progress",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "In Progress"
+              ]
+            }
+          }
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&var-project=$__all&var-board_id=$__all&var-developer_id=$__all&from=now-30d&to=now&viewPanel=panel-20"
+            }
+          ],
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 500
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 25
+      },
+      "id": 20,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "first"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 8,
+          "refId": "A"
+        }
+      ],
+      "title": "Tasks Done",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Done"
+              ]
+            }
+          }
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [],
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 25
+      },
+      "id": 17,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "first"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  COUNT(i.id) AS `Tasks`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND i.type LIKE '%task%'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )\n  AND $__timeFilter(i.created_date)\n  AND (i.assignee_id IS NULL OR i.assignee_id = '');",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Unassigned Tasks",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Averages lead_time_minutes converted to days across resolved non-bug issues assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 15
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 29
+      },
+      "id": 21,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT AVG(i.lead_time_minutes/1440) AS avg_days_to_resolve\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND i.type LIKE '%bug%'\n  AND i.resolution_date IS NOT NULL\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )\n  AND $__timeFilter(i.resolution_date)\n  AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Average Bug Resolution Time (Days)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Averages lead_time_minutes converted to days across resolved non-bug issues assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 15
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 8,
+        "y": 29
+      },
+      "id": 23,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT AVG(i.lead_time_minutes/1440) AS avg_days_to_resolve\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND i.type LIKE '%story%'\n  AND i.resolution_date IS NOT NULL\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )\n  AND $__timeFilter(i.resolution_date)\n  AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Average Story Completion Time (Days)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Averages lead_time_minutes converted to days across resolved non-bug issues assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 15
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 29
+      },
+      "id": 22,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT AVG(i.lead_time_minutes/1440) AS avg_days_to_resolve\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND i.type LIKE '%task%'\n  AND i.resolution_date IS NOT NULL\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )\n  AND $__timeFilter(i.resolution_date)\n  AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Average Task Completion Time (Days)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Number of bugs reported over tasks delivered in the selected period.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/bfyfs8x6mh4owf/d-tickets-overview?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&var-interval=1w&viewPanel=panel-6"
+            }
+          ],
+          "mappings": [],
+          "noValue": "Infinity",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 33
+      },
+      "id": 35,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT (\n  SELECT \n  COUNT(i.id)\n  FROM issues i\n  WHERE i.id LIKE '%jira:%'\n    AND i.type LIKE '%bug%'\n    AND $__timeFilter(i.created_date) \n  AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n    )\n  ) / (\n  SELECT \n   CASE WHEN COUNT(i.id) = 0 THEN 1 ELSE COUNT(i.id) END\n  FROM issues i\n  WHERE i.id LIKE '%jira:%'\n    AND i.type LIKE 'TASK' \n    AND i.status LIKE 'DONE'\n    AND $__timeFilter(i.resolution_date) \n  AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n    )\n  );",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Bugs Ratio (Kanban)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Number of bugs reported over tasks created and delivered in the selected period.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/bfyfs8x6mh4owf/d-tickets-overview?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&var-interval=1w&viewPanel=panel-7"
+            }
+          ],
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 33
+      },
+      "id": 34,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT (bugs / CASE WHEN tasks = 0 THEN 1 ELSE tasks END) as Ratio\nFROM \n(\n  SELECT \n    SUM(CASE WHEN i.type LIKE '%bug%' THEN 1 ELSE 0 END) AS bugs,\n    SUM(CASE WHEN i.type LIKE 'TASK' AND i.status LIKE 'DONE' THEN 1 ELSE 0 END) AS tasks\n  FROM issues i\n  WHERE i.id LIKE '%jira:%'\n    AND $__timeFilter(i.created_date) \n  AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n    )\n) base",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Bugs Ratio (Scrum)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 16,
+        "x": 8,
+        "y": 33
+      },
+      "id": 37,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH curated AS (\n    -- Keep this list byte-identical to the one in the bar chart query.\n    SELECT * FROM (\n        SELECT 'In Progress'  AS original_status, 'Active Work' AS status_class UNION ALL\n        SELECT 'In Review',    'Waiting'                                        UNION ALL\n        SELECT 'Ready for QA', 'Waiting'                                        UNION ALL\n        SELECT 'Blocked',      'Waiting'\n    ) m WHERE 1 = 1\n),\nscoped AS (\n    SELECT i.id\n    FROM issues i\n    JOIN board_issues bi    ON bi.issue_id = i.id\n    JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n    WHERE i.id LIKE 'jira:%'\n      AND pm.project_name IN ( $project )\n      AND bi.board_id     IN ( $board_id )\n      AND COALESCE(i.original_type, '') <> 'Epic'\n      AND COALESCE(i.is_subtask, 0) = 0\n      AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))\n),\nhist AS (\n    SELECT h.issue_id,\n           COALESCE(NULLIF(TRIM(h.original_status), ''), '(blank)') AS st,\n           h.status AS std,\n           h.start_date AS sd,\n           ROW_NUMBER() OVER (PARTITION BY h.issue_id ORDER BY h.start_date DESC) AS rn_desc\n    FROM issue_status_history h\n    JOIN scoped s ON s.id = h.issue_id\n),\nclassified AS (\n    SELECT h.issue_id, h.st, h.sd, h.rn_desc,\n           COALESCE(cu.status_class,\n                    CASE h.std WHEN 'IN_PROGRESS' THEN 'Active Work'\n                               WHEN 'TODO'        THEN 'Waiting'\n                               WHEN 'DONE'        THEN 'Done'\n                               ELSE 'UNCLASSIFIED' END) AS cls\n    FROM hist h\n    LEFT JOIN curated cu ON LOWER(TRIM(cu.original_status)) = LOWER(h.st)\n),\nwork_started AS (\n    SELECT issue_id, MIN(sd) AS ws\n    FROM classified\n    WHERE cls = 'Active Work'\n    GROUP BY issue_id\n),\ncurrent_state AS (\n    SELECT issue_id, st, cls, sd AS entered_current\n    FROM classified\n    WHERE rn_desc = 1\n),\ncompleted AS (\n    SELECT TIMESTAMPDIFF(HOUR, w.ws, c.entered_current) / 24 AS cycle_days\n    FROM current_state c\n    JOIN work_started w ON w.issue_id = c.issue_id\n    WHERE (c.cls = 'Done' OR c.st = 'Done')\n      AND c.entered_current > w.ws\n      AND c.entered_current BETWEEN $__timeFrom() AND $__timeTo()\n)\n-- Nearest-rank percentiles; MySQL has no PERCENTILE_CONT.\nSELECT ROUND(MAX(CASE WHEN rn <= CEIL(0.50 * cnt) THEN cycle_days END), 1) AS `p50 Cycle Time (days)`,\n       ROUND(MAX(CASE WHEN rn <= CEIL(0.85 * cnt) THEN cycle_days END), 1) AS `p85 Cycle Time (days)`,\n       ROUND(MAX(CASE WHEN rn <= CEIL(0.95 * cnt) THEN cycle_days END), 1) AS `p95 Cycle Time (days)`,\n       MAX(cnt)                                                            AS `Completed Issues`\nFROM (\n    SELECT cycle_days,\n           ROW_NUMBER() OVER (ORDER BY cycle_days) AS rn,\n           COUNT(*)    OVER ()                     AS cnt\n    FROM completed\n) ranked;\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Cycle Time",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 37
+      },
+      "id": 28,
+      "panels": [],
+      "title": "Ticket Grooming",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Monthly Distribution",
+              "url": "/d/cfybfjtw5xc00c/z-jira-ticket-grooming-dashboard?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-5"
+            }
+          ],
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 14,
+        "x": 0,
+        "y": 38
+      },
+      "id": 32,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "select\n  SUM(CASE WHEN i.description NOT LIKE '%context%' THEN 1 ELSE 0 END) as `No Context`,\n  SUM(CASE WHEN i.description NOT LIKE '%user story%' THEN 1 ELSE 0 END) as `No User Story`,\n  SUM(CASE WHEN i.description NOT LIKE '%acceptance criteria%' THEN 1 ELSE 0 END) as `No Acceptance Criteria`,\n  SUM(CASE WHEN i.description LIKE '%context%' THEN 1 ELSE 0 END) as `With Context`,\n  SUM(CASE WHEN i.description LIKE '%user story%' THEN 1 ELSE 0 END) as `With User Story`,\n  SUM(CASE WHEN i.description LIKE '%acceptance criteria%' THEN 1 ELSE 0 END) as `With Acceptance Criteria`\nfrom issues i\nWHERE i.id LIKE '%jira:%'\n  AND $__timeFilter(i.created_date)\n  AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  );",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Tickets Grooming Distribution",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 10,
+        "x": 14,
+        "y": 38
+      },
+      "id": 31,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "last"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "select\n  COUNT(i.id) as `Total Issues`\nfrom issues i\nWHERE i.id LIKE '%jira:%'\n  AND $__timeFilter(i.created_date)\n  AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  );",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Total Tickets",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/cfybfjtw5xc00c/z-jira-ticket-grooming-dashboard?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-3"
+            }
+          ],
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 5,
+        "x": 14,
+        "y": 44
+      },
+      "id": 33,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 32,
+          "refId": "A"
+        }
+      ],
+      "title": "Tickets without Acceptance Criteria",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "No Acceptance Criteria"
+              ]
+            }
+          }
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Detail",
+              "url": "/d/cfybfjtw5xc00c/z-jira-ticket-grooming-dashboard?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
+            }
+          ],
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 5,
+        "x": 19,
+        "y": 44
+      },
+      "id": 29,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 32,
+          "refId": "A"
+        }
+      ],
+      "title": "Tickets without Context heading",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "No Context"
+              ]
+            }
+          }
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 50
+      },
+      "id": 46,
+      "panels": [],
+      "title": "Ticket Hygiene Stats",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-13"
+            }
+          ],
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 8,
+        "x": 0,
+        "y": 51
+      },
+      "id": 39,
+      "options": {
+        "displayLabels": [
+          "percent",
+          "name"
+        ],
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": false,
+          "values": [
+            "percent",
+            "value"
+          ]
+        },
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \n  SUM(CASE WHEN i.story_point > 0 AND i.story_point <= 13 THEN 1 ELSE 0 END) AS `Correct Story Points`,\n  SUM(CASE WHEN i.story_point > 13 THEN 1 ELSE 0 END) AS `Above Story Point Threshold`,\n  SUM(CASE WHEN i.story_point = 0 THEN 1 ELSE 0 END) AS `Missing Story Points`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.type <> 'EPIC'\n  AND i.story_point = 0\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN ( $board_id )\n  ) \n  AND ('__all' IN ($developer_id) OR i.creator_id IN ( $developer_id ))",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Ticket Hygiene by Story Points",
+      "type": "piechart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-14"
+            }
+          ],
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 8,
+        "x": 8,
+        "y": 51
+      },
+      "id": 40,
+      "options": {
+        "displayLabels": [
+          "percent",
+          "name"
+        ],
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": false,
+          "values": [
+            "percent",
+            "value"
+          ]
+        },
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \n  SUM(CASE WHEN i.original_estimate_minutes IS NOT NULL AND i.original_estimate_minutes > 0 THEN 1 ELSE 0 END) AS `Compliant`,\n  SUM(CASE WHEN i.original_estimate_minutes IS NULL OR i.original_estimate_minutes = 0 THEN 1 ELSE 0 END) AS `No Estimates`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.type <> 'EPIC'\n  AND i.story_point = 0\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN ( $board_id )\n  ) \n  AND ('__all' IN ($developer_id) OR i.creator_id IN ( $developer_id ))",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Ticket Hygiene by Estimates",
+      "type": "piechart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-10"
+            }
+          ],
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 8,
+        "x": 16,
+        "y": 51
+      },
+      "id": 47,
+      "options": {
+        "displayLabels": [
+          "percent",
+          "name"
+        ],
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \n  SUM(CASE WHEN i.description IS NOT NULL AND CHAR_LENGTH(i.description) >= 100 THEN 1 ELSE 0 END) AS `Compliant Descriptions`,\n  SUM(CASE WHEN (i.description IS NULL OR TRIM(i.description) = '') THEN 1 ELSE 0 END) AS `No Description`,\n  SUM(CASE WHEN i.description IS NOT NULL AND CHAR_LENGTH(i.description) < 100 THEN 1 ELSE 0 END) AS `Description Length below Threshold`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.type <> 'EPIC'\n  AND ('__all' IN ($developer_id) OR i.creator_id IN ( $developer_id ))\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN ($board_id)\n  )",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Ticket Hygiene by Description",
+      "type": "piechart"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
+            }
+          ],
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 61
+      },
+      "id": 43,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 39,
+          "refId": "A"
+        }
+      ],
+      "title": "Tickets Missing Story Points",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Missing Story Points"
+              ]
+            }
+          }
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Detail",
+              "url": "/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-4"
+            }
+          ],
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 61
+      },
+      "id": 45,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 40,
+          "refId": "A"
+        }
+      ],
+      "title": "Tickets Without Estimates",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "No Estimates"
+              ]
+            }
+          }
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-6"
+            }
+          ],
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 61
+      },
+      "id": 41,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS `Unassigned while In Progress`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.type NOT IN ('EPIC', 'BUG')\n  AND i.status = 'IN_PROGRESS'\n  AND ('__all' IN ($developer_id) OR i.creator_id IN ( $developer_id ))\n  AND (i.assignee_id IS NULL OR TRIM(i.assignee_id) = '')\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN ($board_id)\n  ) ",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Unassigned in Progress Tickets",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-8"
+            }
+          ],
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 61
+      },
+      "id": 50,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 47,
+          "refId": "A"
+        }
+      ],
+      "title": "Tickets Without Description",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "No Description"
+              ]
+            }
+          }
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-3"
+            }
+          ],
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 65
+      },
+      "id": 44,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 39,
+          "refId": "A"
+        }
+      ],
+      "title": "Tickets Above Story Points Threshold",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Above Story Point Threshold"
+              ]
+            }
+          }
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-5"
+            }
+          ],
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 65
+      },
+      "id": 42,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS `No Activity while In Progress`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.status = 'IN_PROGRESS'\n  AND DATEDIFF(CURDATE(), i.updated_date) > 14\n  AND ('__all' IN ($developer_id) OR i.creator_id IN ( $developer_id ))\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN ($board_id)\n  ) ",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Stale in Progress Tickets",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-6"
+            }
+          ],
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 65
+      },
+      "id": 48,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \n  SUM(CASE WHEN i.parent_issue_id IS NULL OR TRIM(i.parent_issue_id) = '' THEN 1 ELSE 0 END) AS `No Parent`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.type NOT IN ('EPIC', 'BUG')\n  AND ('__all' IN ($developer_id) OR i.creator_id IN ( $developer_id ))\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN ($board_id)\n  )",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Tickets without Parent",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-9"
+            }
+          ],
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 65
+      },
+      "id": 51,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 47,
+          "refId": "A"
+        }
+      ],
+      "title": "Tickets with Description below Threshold",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Description Length below Threshold"
+              ]
+            }
+          }
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Details",
+              "url": "/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-12"
+            }
+          ],
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 69
+      },
+      "id": 52,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(1) AS `Small Titles`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date)\n  AND CHAR_LENGTH(TRIM(i.title)) < 15\n  AND ('__all' IN ($developer_id) OR i.creator_id IN ( $developer_id ))\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN ($board_id)\n  ) ",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Ticket Title Length below Threshold",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 73
+      },
+      "id": 25,
+      "panels": [],
+      "title": "Workload",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Lists up to 10 developers assigned more than 125% of the team's per-head average issue count (fair share) for issues created in the window, scoped to boards mapped to the selected project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 74
+      },
+      "id": 26,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "Select \n  member as Assignee, \n  Tasks AS `Issues Assigned`, \n  100 * Tasks/`Total Work` AS `Workload Percentage`, \n  `Total Work`  from (\nWITH scoped AS (\n  SELECT\n    i.id,\n    COALESCE(NULLIF(TRIM(i.assignee_name), ''), 'Unassigned') AS member\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date)\n    AND i.status <> 'DONE'\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n    )\n    AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))\n),\nper_member AS (\n  SELECT member, COUNT(id) AS tasks\n  FROM scoped\n  WHERE member IS NOT NULL\n  GROUP BY member\n),\ntotals AS (\n  SELECT SUM(tasks) AS total_tasks, COUNT(*) AS headcount FROM per_member\n)\nSELECT\n  p.member                                              AS `Member`,\n  p.tasks                                               AS `Tasks`,\n  t.total_tasks                                         AS `Total Work`,\n  ROUND(t.total_tasks / t.headcount, 1)                 AS `Fair share`,\n  ROUND(p.tasks - (t.total_tasks / t.headcount), 1)     AS `Deviation`,\n  ROUND((p.tasks - (t.total_tasks / t.headcount))\n        * 100.0 / NULLIF(t.total_tasks / t.headcount, 0), 0) AS `Pct vs fair`,\n  CASE\n    WHEN p.tasks > (t.total_tasks / t.headcount) * 1.25 THEN 'Overloaded'\n    WHEN p.tasks < (t.total_tasks / t.headcount) * 0.75 THEN 'Underloaded'\n    ELSE 'Balanced'\n  END                                                   AS `Status`\nFROM per_member p\nCROSS JOIN totals t\nORDER BY p.tasks DESC\n) base\nlimit 10;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Team Workload",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "super-light-green",
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 50,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 74
+      },
+      "id": 56,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.75,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "never",
+        "stacking": "normal",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "asc"
+        },
+        "xField": "Assignee",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "Select \n  member as Assignee, \n  Tasks AS `Issues Assigned`,\n  (`Total Work` - Tasks) AS `Remaining Load`\nFROM (\nWITH scoped AS (\n  SELECT\n    i.id,\n    COALESCE(NULLIF(TRIM(i.assignee_name), ''), 'Unassigned') AS member\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date)\n    AND i.status <> 'DONE'\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n    )\n    AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))\n),\nper_member AS (\n  SELECT member, COUNT(id) AS tasks\n  FROM scoped\n  WHERE member IS NOT NULL\n  GROUP BY member\n),\ntotals AS (\n  SELECT SUM(tasks) AS total_tasks, COUNT(*) AS headcount FROM per_member\n)\nSELECT\n  p.member                                              AS `Member`,\n  p.tasks                                               AS `Tasks`,\n  t.total_tasks                                         AS `Total Work`,\n  ROUND(t.total_tasks / t.headcount, 1)                 AS `Fair share`,\n  ROUND(p.tasks - (t.total_tasks / t.headcount), 1)     AS `Deviation`,\n  ROUND((p.tasks - (t.total_tasks / t.headcount))\n        * 100.0 / NULLIF(t.total_tasks / t.headcount, 0), 0) AS `Pct vs fair`,\n  CASE\n    WHEN p.tasks > (t.total_tasks / t.headcount) * 1.25 THEN 'Overloaded'\n    WHEN p.tasks < (t.total_tasks / t.headcount) * 0.75 THEN 'Underloaded'\n    ELSE 'Balanced'\n  END                                                   AS `Status`\nFROM per_member p\nCROSS JOIN totals t\nORDER BY p.tasks DESC\n) base\nlimit 10;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Team Workload Overview",
+      "type": "barchart"
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 41,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "devlake-mysql"
+        },
+        "definition": "SELECT DISTINCT pm.project_name\nFROM project_mapping pm\nWHERE pm.`table` = 'boards' AND pm.row_id LIKE 'jira:%'\nORDER BY pm.project_name",
+        "includeAll": true,
+        "label": "Project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "SELECT DISTINCT pm.project_name\nFROM project_mapping pm\nWHERE pm.`table` = 'boards' AND pm.row_id LIKE 'jira:%'\nORDER BY pm.project_name",
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "devlake-mysql"
+        },
+        "definition": "SELECT CONCAT(b.name, '--', b.id) AS text\nFROM project_mapping pm\nJOIN boards b ON b.id = pm.row_id\nWHERE pm.`table` = 'boards' AND pm.row_id LIKE 'jira:%'\n  AND pm.project_name IN ( $project )\nORDER BY text",
+        "description": "",
+        "includeAll": true,
+        "label": "Board",
+        "multi": true,
+        "name": "board_id",
+        "options": [],
+        "query": "SELECT CONCAT(b.name, '--', b.id) AS text\nFROM project_mapping pm\nJOIN boards b ON b.id = pm.row_id\nWHERE pm.`table` = 'boards' AND pm.row_id LIKE 'jira:%'\n  AND pm.project_name IN ( $project )\nORDER BY text",
+        "refresh": 1,
+        "regex": "/^(?<text>.*)--(?<value>.*)$/",
+        "type": "query"
+      },
+      {
+        "allValue": "'__all'",
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "devlake-mysql"
+        },
+        "definition": "WITH scoped_issues AS (\n  SELECT bi.issue_id\n  FROM board_issues bi\n  WHERE bi.board_id IN ( ${board_id} )\n    AND bi.board_id LIKE 'jira:%'\n),\nscoped_accounts AS (\n  SELECT ia.assignee_id AS account_id\n  FROM issue_assignees ia\n  JOIN scoped_issues si ON si.issue_id = ia.issue_id\n  WHERE ia.assignee_id LIKE 'jira:%'\n  UNION\n  SELECT i.creator_id\n  FROM issues i\n  JOIN scoped_issues si ON si.issue_id = i.id\n  WHERE i.creator_id LIKE 'jira:%'\n  UNION\n  SELECT ic.author_id\n  FROM issue_changelogs ic\n  JOIN scoped_issues si ON si.issue_id = ic.issue_id\n  WHERE ic.author_id LIKE 'jira:%'\n  UNION\n  SELECT w.author_id\n  FROM issue_worklogs w\n  JOIN scoped_issues si ON si.issue_id = w.issue_id\n  WHERE w.author_id LIKE 'jira:%'\n)\nSELECT CONCAT(\n         REPLACE(COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           '(unmapped)'\n         ), '-', ' '),\n         '--', a.id) AS Name\nFROM accounts a\nJOIN scoped_accounts sa ON sa.account_id = a.id\nGROUP BY Name\nORDER BY Name;",
+        "includeAll": true,
+        "label": "Developer",
+        "multi": true,
+        "name": "developer_id",
+        "options": [],
+        "query": "WITH scoped_issues AS (\n  SELECT bi.issue_id\n  FROM board_issues bi\n  WHERE bi.board_id IN ( ${board_id} )\n    AND bi.board_id LIKE 'jira:%'\n),\nscoped_accounts AS (\n  SELECT ia.assignee_id AS account_id\n  FROM issue_assignees ia\n  JOIN scoped_issues si ON si.issue_id = ia.issue_id\n  WHERE ia.assignee_id LIKE 'jira:%'\n  UNION\n  SELECT i.creator_id\n  FROM issues i\n  JOIN scoped_issues si ON si.issue_id = i.id\n  WHERE i.creator_id LIKE 'jira:%'\n  UNION\n  SELECT ic.author_id\n  FROM issue_changelogs ic\n  JOIN scoped_issues si ON si.issue_id = ic.issue_id\n  WHERE ic.author_id LIKE 'jira:%'\n  UNION\n  SELECT w.author_id\n  FROM issue_worklogs w\n  JOIN scoped_issues si ON si.issue_id = w.issue_id\n  WHERE w.author_id LIKE 'jira:%'\n)\nSELECT CONCAT(\n         REPLACE(COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           '(unmapped)'\n         ), '-', ' '),\n         '--', a.id) AS Name\nFROM accounts a\nJOIN scoped_accounts sa ON sa.account_id = a.id\nGROUP BY Name\nORDER BY Name;",
+        "refresh": 1,
+        "regex": "/^(?<text>.*)--(?<value>.*)$/",
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "A. Jira High Level Summary",
+  "uid": "dfy7sh5aww35sc",
+  "version": 343
+}
