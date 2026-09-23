@@ -1,0 +1,1059 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "**How to read this dashboard**\n\n- **All AI figures on this dashboard are Claude Code OTel-only**, scoped to the Project and Claude Code OTel Teams filters above. Legacy Claude Admin-API and Cursor activity are excluded — neither carries a reliable per-project mapping. Every \"per merged PR\" ratio below (AI Lines/PR, Tokens/PR, Cost/PR) now scopes the PR side to the same Project filter as the AI side, so the ratio stays meaningful at any Project selection. PR Size (p85/median) has no AI-mixing problem and stays scoped to the Project filter as normal.\n- AI spend and tokens come solely from `ai_model_usages`, which only Claude Code OTel writes to.\n- MySQL has no built-in percentile function; p85/median below are computed exactly via row-numbering over the full distribution, not approximated.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.0.0",
+      "title": "About this dashboard",
+      "type": "text",
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1
+    },
+    {
+      "datasource": "mysql",
+      "description": "Total AI-generated lines added, Claude Code OTel-only, scoped to the selected project(s)/team(s) (`SUM(ai_activities.lines_added)`).",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT SUM(lines_added) AS \"AI Lines Generated\"\nFROM ai_activities\nWHERE record_kind = 'canonical_activity'\n  AND source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n  )\n  AND $__timeFilter(date)",
+          "refId": "A"
+        }
+      ],
+      "title": "AI Lines Generated",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 7
+      },
+      "id": 2
+    },
+    {
+      "datasource": "mysql",
+      "description": "Total AI tokens consumed, Claude Code OTel-only, scoped to the selected project(s)/team(s) (`SUM(ai_model_usages.*_tokens)`).",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT SUM(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens) AS \"Tokens Burned\"\nFROM ai_model_usages\nWHERE source_connection_id IN (\n  SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n  INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n  WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n)\nAND $__timeFilter(date)",
+          "refId": "A"
+        }
+      ],
+      "title": "Tokens Burned",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 7
+      },
+      "id": 3
+    },
+    {
+      "datasource": "mysql",
+      "description": "Total estimated AI spend, Claude Code OTel-only, scoped to the selected project(s)/team(s) (`SUM(ai_model_usages.estimated_cost_usd)`).",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ROUND(SUM(estimated_cost_usd), 2) AS \"Cost\"\nFROM ai_model_usages\nWHERE source_connection_id IN (\n  SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n  INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n  WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n)\nAND $__timeFilter(date)",
+          "refId": "A"
+        }
+      ],
+      "title": "Cost",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 7
+      },
+      "id": 4
+    },
+    {
+      "datasource": "mysql",
+      "description": "Merged pull requests, scoped to the selected project(s).",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS \"PRs Merged\"\nFROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\nWHERE ppm.project_name IN ($project) AND $__timeFilter(pr.merged_date)",
+          "refId": "A"
+        }
+      ],
+      "title": "PRs Merged",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 7
+      },
+      "id": 5
+    },
+    {
+      "datasource": "mysql",
+      "description": "AI lines added ÷ PRs merged, both sides scoped to the selected project(s)/team(s).",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ROUND(ai.n / NULLIF(prs.n, 0), 1) AS \"AI Lines / PR\"\nFROM\n  (SELECT SUM(lines_added) n FROM ai_activities\n   WHERE record_kind = 'canonical_activity'\n     AND source_connection_id IN (\n       SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n       INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n       WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n     )\n     AND $__timeFilter(date)) ai,\n  (SELECT COUNT(*) n FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n   WHERE ppm.project_name IN ($project) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date)) prs",
+          "refId": "A"
+        }
+      ],
+      "title": "AI Lines / PR",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 11
+      },
+      "id": 6
+    },
+    {
+      "datasource": "mysql",
+      "description": "AI tokens consumed ÷ PRs merged, both sides scoped to the selected project(s)/team(s).",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ROUND(tok.n / NULLIF(prs.n, 0), 0) AS \"Tokens / PR\"\nFROM\n  (SELECT SUM(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens) n FROM ai_model_usages\n   WHERE source_connection_id IN (\n     SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n     INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n     WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n   )\n   AND $__timeFilter(date)) tok,\n  (SELECT COUNT(*) n FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n   WHERE ppm.project_name IN ($project) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date)) prs",
+          "refId": "A"
+        }
+      ],
+      "title": "Tokens / PR",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 11
+      },
+      "id": 7
+    },
+    {
+      "datasource": "mysql",
+      "description": "AI spend ÷ PRs merged, both sides scoped to the selected project(s)/team(s).",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ROUND(spend.cost / NULLIF(prs.n, 0), 2) AS \"Cost / PR\"\nFROM\n  (SELECT SUM(estimated_cost_usd) cost FROM ai_model_usages\n   WHERE source_connection_id IN (\n     SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n     INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n     WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n   )\n   AND $__timeFilter(date)) spend,\n  (SELECT COUNT(*) n FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n   WHERE ppm.project_name IN ($project) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date)) prs",
+          "refId": "A"
+        }
+      ],
+      "title": "Cost / PR",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 11
+      },
+      "id": 8
+    },
+    {
+      "datasource": "mysql",
+      "description": "The 85th percentile of merged PR size (additions + deletions), scoped to the selected project(s). Computed exactly via row-numbering over the full size distribution, not approximated.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "yellow",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH sizes AS (\n  SELECT (pr.additions + pr.deletions) AS sz,\n    ROW_NUMBER() OVER (ORDER BY (pr.additions + pr.deletions)) AS rn,\n    COUNT(*) OVER () AS total\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN ($project) AND $__timeFilter(pr.merged_date)\n)\nSELECT sz AS \"PR Size p85\" FROM sizes WHERE rn = CEIL(0.85 * total) LIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "title": "PR Size p85 (lines changed)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 11
+      },
+      "id": 9
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 15
+      },
+      "id": 10,
+      "panels": [],
+      "title": "Efficiency per Merged PR",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Weekly Cost/PR, Tokens/PR, and AI Lines/PR (real values, not indexed to a baseline), each with a week-over-week % change and direction arrow combined into the same cell. Both sides of every ratio (AI-side numerator, PR-side denominator) are scoped to the selected project(s)/team(s). This is the primary view for this panel group — see the trend-shape chart below for a normalized, at-a-glance version of the same data.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cost / PR"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^(.*▲.*)$",
+                      "result": {
+                        "index": 0,
+                        "color": "green",
+                        "text": "$1"
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^(.*▼.*)$",
+                      "result": {
+                        "index": 1,
+                        "color": "red",
+                        "text": "$1"
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^(.*▬.*)$",
+                      "result": {
+                        "index": 2,
+                        "color": "text",
+                        "text": "$1"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tokens / PR"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^(.*▲.*)$",
+                      "result": {
+                        "index": 0,
+                        "color": "green",
+                        "text": "$1"
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^(.*▼.*)$",
+                      "result": {
+                        "index": 1,
+                        "color": "red",
+                        "text": "$1"
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^(.*▬.*)$",
+                      "result": {
+                        "index": 2,
+                        "color": "text",
+                        "text": "$1"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI Lines / PR"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^(.*▲.*)$",
+                      "result": {
+                        "index": 0,
+                        "color": "green",
+                        "text": "$1"
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^(.*▼.*)$",
+                      "result": {
+                        "index": 1,
+                        "color": "red",
+                        "text": "$1"
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^(.*▬.*)$",
+                      "result": {
+                        "index": 2,
+                        "color": "text",
+                        "text": "$1"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Week"
+          }
+        ]
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH weekly_prs AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') AS week, COUNT(*) AS n\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN ($project) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date)\n  GROUP BY 1\n),\nweekly_spend AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week, SUM(estimated_cost_usd) AS v\n  FROM ai_model_usages\n  WHERE source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n  )\n  AND $__timeFilter(date)\n  GROUP BY 1\n),\nweekly_tok AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week, SUM(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens) AS v\n  FROM ai_model_usages\n  WHERE source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n  )\n  AND $__timeFilter(date)\n  GROUP BY 1\n),\nweekly_lines AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week, SUM(lines_added) AS v\n  FROM ai_activities\n  WHERE record_kind = 'canonical_activity'\n    AND source_connection_id IN (\n      SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n    )\n    AND $__timeFilter(date)\n  GROUP BY 1\n),\nweeks AS (\n  SELECT week FROM weekly_prs\n  UNION SELECT week FROM weekly_spend\n  UNION SELECT week FROM weekly_tok\n  UNION SELECT week FROM weekly_lines\n),\nfilled AS (\n  SELECT w.week,\n    COALESCE(s.v, 0) / NULLIF(p.n, 0) AS cost_per_pr,\n    COALESCE(t.v, 0) / NULLIF(p.n, 0) AS tok_per_pr,\n    COALESCE(l.v, 0) / NULLIF(p.n, 0) AS lines_per_pr\n  FROM weeks w\n  LEFT JOIN weekly_prs p ON p.week = w.week\n  LEFT JOIN weekly_spend s ON s.week = w.week\n  LEFT JOIN weekly_tok t ON t.week = w.week\n  LEFT JOIN weekly_lines l ON l.week = w.week\n),\nrounded AS (\n  SELECT week,\n    ROUND(cost_per_pr, 2) AS cost_per_pr,\n    ROUND(tok_per_pr, 0) AS tok_per_pr,\n    ROUND(lines_per_pr, 1) AS lines_per_pr\n  FROM filled\n),\nlagged AS (\n  SELECT week, cost_per_pr, tok_per_pr, lines_per_pr,\n    LAG(cost_per_pr) OVER (ORDER BY week) AS cost_per_pr_prev,\n    LAG(tok_per_pr) OVER (ORDER BY week) AS tok_per_pr_prev,\n    LAG(lines_per_pr) OVER (ORDER BY week) AS lines_per_pr_prev\n  FROM rounded\n)\nSELECT week AS \"Week\",\n  CONCAT(CONCAT('$', FORMAT(cost_per_pr,2)),\n    CASE\n      WHEN cost_per_pr_prev IS NULL THEN ''\n      WHEN cost_per_pr_prev = 0 AND cost_per_pr = 0 THEN '        ▬0.0%'\n      WHEN cost_per_pr_prev = 0 THEN '        ▲ new'\n      WHEN cost_per_pr > cost_per_pr_prev THEN CONCAT('        ▲', ROUND(100.0*(cost_per_pr-cost_per_pr_prev)/cost_per_pr_prev,1), '%')\n      WHEN cost_per_pr < cost_per_pr_prev THEN CONCAT('        ▼', ROUND(100.0*(cost_per_pr_prev-cost_per_pr)/cost_per_pr_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"Cost / PR\",\n  CONCAT(FORMAT(tok_per_pr,0),\n    CASE\n      WHEN tok_per_pr_prev IS NULL THEN ''\n      WHEN tok_per_pr_prev = 0 AND tok_per_pr = 0 THEN '        ▬0.0%'\n      WHEN tok_per_pr_prev = 0 THEN '        ▲ new'\n      WHEN tok_per_pr > tok_per_pr_prev THEN CONCAT('        ▲', ROUND(100.0*(tok_per_pr-tok_per_pr_prev)/tok_per_pr_prev,1), '%')\n      WHEN tok_per_pr < tok_per_pr_prev THEN CONCAT('        ▼', ROUND(100.0*(tok_per_pr_prev-tok_per_pr)/tok_per_pr_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"Tokens / PR\",\n  CONCAT(lines_per_pr,\n    CASE\n      WHEN lines_per_pr_prev IS NULL THEN ''\n      WHEN lines_per_pr_prev = 0 AND lines_per_pr = 0 THEN '        ▬0.0%'\n      WHEN lines_per_pr_prev = 0 THEN '        ▲ new'\n      WHEN lines_per_pr > lines_per_pr_prev THEN CONCAT('        ▲', ROUND(100.0*(lines_per_pr-lines_per_pr_prev)/lines_per_pr_prev,1), '%')\n      WHEN lines_per_pr < lines_per_pr_prev THEN CONCAT('        ▼', ROUND(100.0*(lines_per_pr_prev-lines_per_pr)/lines_per_pr_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"AI Lines / PR\"\nFROM lagged\nORDER BY week DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Cost / Tokens / AI Lines per PR — Weekly, with WoW % Change",
+      "type": "table",
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 14
+    },
+    {
+      "datasource": "mysql",
+      "description": "Each metric here is indexed to its own first non-zero week in the selected range, which is forced to exactly 100 — every other week is shown as a percentage of that one week's value, not as a real number. This makes the chart fragile whenever that first week happens to have a tiny real denominator: a first week with just 1 merged PR, for example, would make a completely normal later week with 17 PRs show as 1700%. Read this chart for trend shape only — use the table above for the real weekly values.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cost / PR"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#eb6834",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tokens / PR"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#eda100",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI lines / PR"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#2a78d6",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.7,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xField": "week",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH weekly_prs AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') AS week, COUNT(*) AS n\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN ($project) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date)\n  GROUP BY 1\n),\nweekly_spend AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week, SUM(estimated_cost_usd) AS v\n  FROM ai_model_usages\n  WHERE source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n  )\n  AND $__timeFilter(date)\n  GROUP BY 1\n),\nweekly_tok AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week, SUM(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens) AS v\n  FROM ai_model_usages\n  WHERE source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n  )\n  AND $__timeFilter(date)\n  GROUP BY 1\n),\nweekly_lines AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week, SUM(lines_added) AS v\n  FROM ai_activities\n  WHERE record_kind = 'canonical_activity'\n    AND source_connection_id IN (\n      SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n    )\n    AND $__timeFilter(date)\n  GROUP BY 1\n),\nweeks AS (\n  SELECT week FROM weekly_prs\n  UNION SELECT week FROM weekly_spend\n  UNION SELECT week FROM weekly_tok\n  UNION SELECT week FROM weekly_lines\n),\nfilled AS (\n  SELECT w.week,\n    COALESCE(s.v, 0) / NULLIF(p.n, 0) AS cost_per_pr,\n    COALESCE(t.v, 0) / NULLIF(p.n, 0) AS tok_per_pr,\n    COALESCE(l.v, 0) / NULLIF(p.n, 0) AS lines_per_pr\n  FROM weeks w\n  LEFT JOIN weekly_prs p ON p.week = w.week\n  LEFT JOIN weekly_spend s ON s.week = w.week\n  LEFT JOIN weekly_tok t ON t.week = w.week\n  LEFT JOIN weekly_lines l ON l.week = w.week\n)\nSELECT week,\n  ROUND(cost_per_pr * 100.0 / NULLIF((SELECT cost_per_pr FROM filled f WHERE f.cost_per_pr > 0 ORDER BY f.week LIMIT 1), 0), 1) AS `Cost / PR`,\n  ROUND(tok_per_pr * 100.0 / NULLIF((SELECT tok_per_pr FROM filled f WHERE f.tok_per_pr > 0 ORDER BY f.week LIMIT 1), 0), 1) AS `Tokens / PR`,\n  ROUND(lines_per_pr * 100.0 / NULLIF((SELECT lines_per_pr FROM filled f WHERE f.lines_per_pr > 0 ORDER BY f.week LIMIT 1), 0), 1) AS `AI lines / PR`\nFROM filled\nORDER BY week",
+          "refId": "A"
+        }
+      ],
+      "title": "Cost / Tokens / AI Lines per PR — Indexed (Weekly, Trend Shape Only)",
+      "type": "barchart",
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 25
+      },
+      "id": 11
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 30
+      },
+      "id": 12,
+      "panels": [],
+      "title": "PR Size Distribution",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Monthly p85 (solid) and median (dashed) of merged PR size (additions + deletions), scoped to the selected project(s). A widening gap between the two lines means a small number of oversized PRs are pulling the p85 up while the typical PR stays small — a signal worth watching for review-quality risk.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p85"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#eda100",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "median"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "line"
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 5
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "always"
+              },
+              {
+                "id": "custom.stacking",
+                "value": {
+                  "group": "line_overlay",
+                  "mode": "none"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#2a78d6",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH sizes AS (\n  SELECT DATE_FORMAT(pr.merged_date, '%Y-%m-01') AS month, (pr.additions + pr.deletions) AS sz\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN ($project) AND $__timeFilter(pr.merged_date)\n),\nranked AS (\n  SELECT month, sz,\n    ROW_NUMBER() OVER (PARTITION BY month ORDER BY sz) AS rn,\n    COUNT(*) OVER (PARTITION BY month) AS total\n  FROM sizes\n)\nSELECT STR_TO_DATE(month, '%Y-%m-%d') AS time, 'p85' AS metric, sz AS value FROM ranked WHERE rn = CEIL(0.85 * total)\nUNION ALL\nSELECT STR_TO_DATE(month, '%Y-%m-%d'), 'median', sz FROM ranked WHERE rn = CEIL(0.5 * total)\nORDER BY time, metric",
+          "refId": "A"
+        }
+      ],
+      "title": "PR Size: p85 vs Median (lines changed, monthly)",
+      "transformations": [
+        {
+          "id": "prepareTimeSeries",
+          "options": {
+            "format": "many"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^value (.+)$",
+            "renamePattern": "$1"
+          }
+        }
+      ],
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 31
+      },
+      "id": 13
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 38,
+  "tags": [
+    "unified",
+    "devlake",
+    "ai",
+    "dashboard"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nWHERE c.status = 'active'\nORDER BY p.name;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nWHERE c.status = 'active'\nORDER BY p.name;",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND cp.project_name REGEXP '^(${project:regex})$'\nORDER BY c.team_slug;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Claude Code OTel teams",
+        "multi": true,
+        "name": "otel_teams",
+        "options": [],
+        "query": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND cp.project_name REGEXP '^(${project:regex})$'\nORDER BY c.team_slug;",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "PR Size, Cost & Efficiency",
+  "uid": "pr_size_cost_efficiency",
+  "version": 1,
+  "weekStart": ""
+}

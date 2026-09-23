@@ -1,0 +1,653 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "**Scope & caveats:**\n\n- **All AI figures on this dashboard are Claude Code OTel-only**, scoped to the Project and Claude Code OTel Teams filters above. Legacy Claude Admin-API and Cursor activity are excluded — neither carries a reliable per-project mapping, so mixing them in would make these comparisons incomparable to the project-scoped panels elsewhere in the AI dashboard set. The human (merged-PR) side of every comparison below is scoped to the same Project filter, so both sides of each ratio move together.\n- **AI-Attributed Share of Lines Changed** compares two different populations: AI-session activity counts lines touched *inside* AI tool sessions (whether or not that code is ever committed or merged), while the human side counts lines in *merged* PR diffs only. This structurally overstates AI's share, since AI-touched lines aren't verified as AI-authored and can be edited or discarded by a developer before ever being committed. Read the percentage as an upper bound on AI's contribution, not a precise attribution.\n- **AI-Attributed Volume by Language** is queried directly from Claude Code's raw OTel telemetry rather than the shared domain layer — the unified AI-tool-decisions table drops the language column that OTel's raw telemetry carries.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.0.0",
+      "title": "About this dashboard",
+      "type": "text",
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1
+    },
+    {
+      "datasource": "mysql",
+      "description": "AI-session lines added ÷ (AI-session lines added + merged-PR additions), both sides scoped to the selected project(s)/team(s). Compares two different populations — see the caveat above — so read this as an upper bound on AI's contribution, not an exact attribution.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ROUND(100.0 * ai.ai_lines / NULLIF(ai.ai_lines + human.human_lines, 0), 1) AS \"AI-Attributed Share %\"\nFROM\n  (SELECT SUM(lines_added) AS ai_lines FROM ai_activities\n   WHERE record_kind = 'canonical_activity'\n     AND source_connection_id IN (\n       SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n       INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n       WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n     )\n     AND $__timeFilter(date)) ai,\n  (SELECT SUM(pr.additions) AS human_lines FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n   WHERE ppm.project_name IN ($project) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date)) human",
+          "refId": "A"
+        }
+      ],
+      "title": "AI-Attributed Share of Lines Changed",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 6
+      },
+      "id": 2
+    },
+    {
+      "datasource": "mysql",
+      "description": "Distinct engineers with Claude Code OTel activity ÷ distinct name-deduplicated PR-merging contributors, both sides scoped to the selected project(s)/team(s). The two counts aren't cross-matched to the same identity — an AI user isn't verified to also be a PR-merging contributor — so this is a directional adoption trend rather than an exact percentage, and can read above 100% when the two populations diverge.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ROUND(100.0 * ai.n / NULLIF(c.n, 0), 1) AS \"Engineers Adopted %\"\nFROM\n  (SELECT COUNT(DISTINCT user_email) n FROM ai_activities\n   WHERE record_kind = 'canonical_activity'\n     AND source_connection_id IN (\n       SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n       INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n       WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n     )\n     AND $__timeFilter(date) AND user_email != '') ai,\n  (SELECT COUNT(DISTINCT COALESCE(NULLIF(a.full_name,''), pr.author_name)) n FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id LEFT JOIN accounts a ON a.id = pr.author_id WHERE ppm.project_name IN ($project) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date)) c",
+          "refId": "A"
+        }
+      ],
+      "title": "Engineers Adopted %",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 6
+      },
+      "id": 3
+    },
+    {
+      "datasource": "mysql",
+      "description": "Total lines added inside Claude Code OTel sessions, scoped to the selected project(s)/team(s) (`SUM(ai_activities.lines_added)`).",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT SUM(lines_added) AS \"AI Lines Added\"\nFROM ai_activities\nWHERE record_kind = 'canonical_activity'\n  AND source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n  )\n  AND $__timeFilter(date)",
+          "refId": "A"
+        }
+      ],
+      "title": "AI Lines Added",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 6
+      },
+      "id": 4
+    },
+    {
+      "datasource": "mysql",
+      "description": "Accepted Claude Code OTel edit-tool decisions ÷ decisions offered, scoped to the selected project(s)/team(s) (`ai_tool_decisions`, which only Claude Code OTel writes to).",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ROUND(100.0 * SUM(accepted_count) / NULLIF(SUM(accepted_count) + SUM(rejected_count), 0), 1) AS \"Edit Acceptance %\"\nFROM ai_tool_decisions\nWHERE source_connection_id IN (\n  SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n  INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n  WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n)\nAND $__timeFilter(date)",
+          "refId": "A"
+        }
+      ],
+      "title": "Edit Acceptance %",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 6
+      },
+      "id": 5
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "id": 6,
+      "panels": [],
+      "title": "Share of Lines Changed, With Adoption",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Weekly share of lines changed attributed to AI sessions vs. merged human PR diffs, stacked to 100%, both sides scoped to the selected project(s)/team(s). Engineers Adopted % is overlaid as a dashed line for reference, on its own scale since adoption typically runs well above code-share percentage. Bucketed weekly rather than monthly since Claude Code OTel history is currently short. Carries the same population caveat as the AI-Attributed Share of Lines Changed KPI above.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI-attributed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#2a78d6",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Human"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#888780",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Engineers adopted"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "line"
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 5
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "always"
+              },
+              {
+                "id": "custom.stacking",
+                "value": {
+                  "group": "line_overlay",
+                  "mode": "none"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#eb6834",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH weeks AS (\n  SELECT DISTINCT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week\n  FROM ai_activities\n  WHERE record_kind = 'canonical_activity'\n    AND source_connection_id IN (\n      SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n      INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n      WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n    )\n    AND $__timeFilter(date)\n  UNION\n  SELECT DISTINCT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d')\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN ($project) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date)\n),\nai_w AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') week, SUM(lines_added) v\n  FROM ai_activities\n  WHERE record_kind = 'canonical_activity'\n    AND source_connection_id IN (\n      SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n      INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n      WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n    )\n    AND $__timeFilter(date)\n  GROUP BY 1\n),\nhu_w AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') week, SUM(pr.additions) v\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN ($project) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date)\n  GROUP BY 1\n),\nai_users_w AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') week, COUNT(DISTINCT user_email) n\n  FROM ai_activities\n  WHERE record_kind = 'canonical_activity'\n    AND source_connection_id IN (\n      SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n      INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n      WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n    )\n    AND $__timeFilter(date) AND user_email != ''\n  GROUP BY 1\n),\ncontrib_w AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') week, COUNT(DISTINCT COALESCE(NULLIF(a.full_name,''), pr.author_name)) n\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id LEFT JOIN accounts a ON a.id = pr.author_id\n  WHERE ppm.project_name IN ($project) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date)\n  GROUP BY 1\n)\nSELECT STR_TO_DATE(w.week, '%Y-%m-%d') AS time, 'AI-attributed' AS metric,\n  ROUND(100.0 * COALESCE(ai_w.v, 0) / NULLIF(COALESCE(ai_w.v, 0) + COALESCE(hu_w.v, 0), 0), 1) AS value\nFROM weeks w LEFT JOIN ai_w ON ai_w.week = w.week LEFT JOIN hu_w ON hu_w.week = w.week\nUNION ALL\nSELECT STR_TO_DATE(w.week, '%Y-%m-%d'), 'Human',\n  ROUND(100.0 * COALESCE(hu_w.v, 0) / NULLIF(COALESCE(ai_w.v, 0) + COALESCE(hu_w.v, 0), 0), 1)\nFROM weeks w LEFT JOIN ai_w ON ai_w.week = w.week LEFT JOIN hu_w ON hu_w.week = w.week\nUNION ALL\nSELECT STR_TO_DATE(w.week, '%Y-%m-%d'), 'Engineers adopted',\n  ROUND(100.0 * COALESCE(au.n, 0) / NULLIF(COALESCE(c.n, 0), 0), 1)\nFROM weeks w LEFT JOIN ai_users_w au ON au.week = w.week LEFT JOIN contrib_w c ON c.week = w.week\nORDER BY time, metric",
+          "refId": "A"
+        }
+      ],
+      "title": "AI vs Human Share of Lines Changed (Weekly), With Adoption",
+      "transformations": [
+        {
+          "id": "prepareTimeSeries",
+          "options": {
+            "format": "many"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^value (.+)$",
+            "renamePattern": "$1"
+          }
+        }
+      ],
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 11
+      },
+      "id": 7
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 19
+      },
+      "id": 8,
+      "panels": [],
+      "title": "AI-Attributed Volume by Language (Claude Code OTel only)",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Weekly accepted-edit volume by programming language, from Claude Code OTel telemetry, scoped to the selected project(s)/team(s). Plugin-internal source — the shared AI-tool-decisions table doesn't carry a language dimension. Bucketed weekly rather than monthly since Claude Code OTel history is currently short.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "axisLabel": "Accepted edits"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT DATE_SUB(DATE(hour_start), INTERVAL WEEKDAY(hour_start) DAY) AS time, language AS metric, SUM(accepted_count) AS value\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start)\n  AND team_slug REGEXP '^(${otel_teams:regex})$'\n  AND connection_id IN (\n    SELECT connection_id FROM _tool_claude_code_otel_connection_projects WHERE project_name IN ($project)\n  )\nGROUP BY 1, 2\nORDER BY metric, time",
+          "refId": "A"
+        }
+      ],
+      "title": "Accepted Edits by Language (Weekly)",
+      "transformations": [
+        {
+          "id": "prepareTimeSeries",
+          "options": {
+            "format": "many"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^value (.+)$",
+            "renamePattern": "$1"
+          }
+        }
+      ],
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "id": 9
+    },
+    {
+      "datasource": "mysql",
+      "description": "Exact accepted/rejected edit totals by language from the same Claude Code OTel source as the chart above, scoped to the selected project(s)/team(s), with a per-language acceptance-rate column.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT language AS \"Language\", SUM(accepted_count) AS \"Accepted Edits\", SUM(rejected_count) AS \"Rejected Edits\",\n  ROUND(100.0 * SUM(accepted_count) / NULLIF(SUM(accepted_count) + SUM(rejected_count), 0), 1) AS \"Acceptance %\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start)\n  AND team_slug REGEXP '^(${otel_teams:regex})$'\n  AND connection_id IN (\n    SELECT connection_id FROM _tool_claude_code_otel_connection_projects WHERE project_name IN ($project)\n  )\nGROUP BY language\nORDER BY SUM(accepted_count) DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Accepted / Rejected Edits by Language (Totals)",
+      "type": "table",
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "id": 10
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 38,
+  "tags": [
+    "unified",
+    "devlake",
+    "ai",
+    "dashboard"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nWHERE c.status = 'active'\nORDER BY p.name;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nWHERE c.status = 'active'\nORDER BY p.name;",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND cp.project_name REGEXP '^(${project:regex})$'\nORDER BY c.team_slug;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Claude Code OTel teams",
+        "multi": true,
+        "name": "otel_teams",
+        "options": [],
+        "query": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND cp.project_name REGEXP '^(${project:regex})$'\nORDER BY c.team_slug;",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "AI vs Human Code Share & Volume",
+  "uid": "ai_vs_human_code_share",
+  "version": 1,
+  "weekStart": ""
+}

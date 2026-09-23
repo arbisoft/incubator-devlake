@@ -18,14 +18,10 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 26,
   "links": [],
   "panels": [
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
+      "datasource": "mysql",
       "description": "Number of distinct users active with Claude Code in the selected time range",
       "fieldConfig": {
         "defaults": {
@@ -68,12 +64,10 @@
       "pluginVersion": "11.6.2",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "expr": "count(count by (user_account_uuid) (max_over_time(claude_code_session_count_total{devlake_team=~\"${otel_teams:regex}\"}[$__range])))",
-          "legendFormat": "Active Users",
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "SELECT COUNT(DISTINCT user_key) AS \"Active Users\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND team_slug REGEXP '^(${otel_teams:regex})$'",
           "refId": "A"
         }
       ],
@@ -81,10 +75,7 @@
       "type": "stat"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
+      "datasource": "mysql",
       "description": "Total lines of code added by Claude Code sessions",
       "fieldConfig": {
         "defaults": {
@@ -127,12 +118,10 @@
       "pluginVersion": "11.6.2",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "expr": "sum(max_over_time(claude_code_lines_of_code_count_total{devlake_team=~\"${otel_teams:regex}\",type=\"added\"}[$__range]))",
-          "legendFormat": "Lines Added",
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "SELECT SUM(lines_added) AS \"Lines Added\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND team_slug REGEXP '^(${otel_teams:regex})$'",
           "refId": "A"
         }
       ],
@@ -140,10 +129,7 @@
       "type": "stat"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
+      "datasource": "mysql",
       "description": "PRs attributed to Claude Code in the selected time range",
       "fieldConfig": {
         "defaults": {
@@ -186,12 +172,10 @@
       "pluginVersion": "11.6.2",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "expr": "sum(max_over_time(claude_code_pull_request_count_total{devlake_team=~\"${otel_teams:regex}\"}[$__range]))",
-          "legendFormat": "PRs by Claude",
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "SELECT SUM(prs_created) AS \"PRs by Claude\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND team_slug REGEXP '^(${otel_teams:regex})$'",
           "refId": "A"
         }
       ],
@@ -199,10 +183,7 @@
       "type": "stat"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
+      "datasource": "mysql",
       "description": "Total estimated API spend for the selected time range",
       "fieldConfig": {
         "defaults": {
@@ -254,12 +235,10 @@
       "pluginVersion": "11.6.2",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "expr": "sum(max_over_time(claude_code_cost_usage_USD_total{devlake_team=~\"${otel_teams:regex}\"}[$__range]))",
-          "legendFormat": "Estimated Cost (USD)",
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "SELECT SUM(estimated_cost_usd) AS \"Estimated Cost (USD)\"\nFROM _tool_claude_code_otel_hourly_model_usage\nWHERE $__timeFilter(hour_start)\n  AND team_slug REGEXP '^(${otel_teams:regex})$'",
           "refId": "A"
         }
       ],
@@ -267,10 +246,7 @@
       "type": "stat"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
+      "datasource": "mysql",
       "description": "Daily count of distinct users who used Claude Code",
       "fieldConfig": {
         "defaults": {
@@ -345,12 +321,10 @@
       "pluginVersion": "11.6.2",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "expr": "count(count by (user_account_uuid) (increase(claude_code_session_count_total{devlake_team=~\"${otel_teams:regex}\"}[$__interval]) > 0))",
-          "legendFormat": "Daily Active Users",
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawSql": "SELECT UNIX_TIMESTAMP(DATE(hour_start)) AS time,\n  COUNT(DISTINCT user_key) AS \"Daily Active Users\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND team_slug REGEXP '^(${otel_teams:regex})$'\n  AND session_count > 0\nGROUP BY UNIX_TIMESTAMP(DATE(hour_start))\nORDER BY time",
           "refId": "A"
         }
       ],
@@ -358,10 +332,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
+      "datasource": "mysql",
       "description": "Commits and PRs attributed to Claude over time",
       "fieldConfig": {
         "defaults": {
@@ -436,21 +407,17 @@
       "pluginVersion": "11.6.2",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "expr": "sum(increase(claude_code_pull_request_count_total{devlake_team=~\"${otel_teams:regex}\"}[$__interval]))",
-          "legendFormat": "PRs by Claude",
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time,\n  SUM(prs_created) AS \"PRs by Claude\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND team_slug REGEXP '^(${otel_teams:regex})$'\nGROUP BY hour_start\nORDER BY time",
           "refId": "A"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "expr": "sum(increase(claude_code_commit_count_total{devlake_team=~\"${otel_teams:regex}\"}[$__interval]))",
-          "legendFormat": "Commits by Claude",
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time,\n  SUM(commits_created) AS \"Commits by Claude\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND team_slug REGEXP '^(${otel_teams:regex})$'\nGROUP BY hour_start\nORDER BY time",
           "refId": "B"
         }
       ],
@@ -458,10 +425,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
+      "datasource": "mysql",
       "description": "Estimated spend per model over time – shows Sonnet vs Opus cost allocation",
       "fieldConfig": {
         "defaults": {
@@ -537,12 +501,10 @@
       "pluginVersion": "11.6.2",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "expr": "sum by (model_group) (label_replace(label_replace(label_replace(label_replace(increase(claude_code_cost_usage_USD_total{devlake_team=~\"${otel_teams:regex}\"}[$__interval]), \"model_group\", \"$1\", \"model\", \"(.*)\"), \"model_group\", \"Opus\", \"model\", \"(?i).*opus.*\"), \"model_group\", \"Sonnet\", \"model\", \"(?i).*sonnet.*\"), \"model_group\", \"Haiku\", \"model\", \"(?i).*haiku.*\"))",
-          "legendFormat": "{{model_group}}",
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time,\n  CASE\n    WHEN LOWER(model) LIKE '%opus%' THEN 'Opus'\n    WHEN LOWER(model) LIKE '%sonnet%' THEN 'Sonnet'\n    WHEN LOWER(model) LIKE '%haiku%' THEN 'Haiku'\n    ELSE model\n  END AS metric,\n  SUM(estimated_cost_usd) AS value\nFROM _tool_claude_code_otel_hourly_model_usage\nWHERE $__timeFilter(hour_start)\n  AND team_slug REGEXP '^(${otel_teams:regex})$'\nGROUP BY hour_start, metric\nORDER BY time",
           "refId": "A"
         }
       ],
@@ -550,10 +512,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
+      "datasource": "mysql",
       "description": "Ratio of lines removed (refactoring) vs lines added (new feature work) over time. Higher removal ratio signals active code cleanup.",
       "fieldConfig": {
         "defaults": {
@@ -628,30 +587,24 @@
       "pluginVersion": "11.6.2",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "expr": "sum(increase(claude_code_lines_of_code_count_total{devlake_team=~\"${otel_teams:regex}\",type=\"added\"}[$__interval]))",
-          "legendFormat": "Lines Added (Features)",
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time,\n  SUM(lines_added) AS \"Lines Added (Features)\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND team_slug REGEXP '^(${otel_teams:regex})$'\nGROUP BY hour_start\nORDER BY time",
           "refId": "A"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "expr": "sum(increase(claude_code_lines_of_code_count_total{devlake_team=~\"${otel_teams:regex}\",type=\"removed\"}[$__interval]))",
-          "legendFormat": "Lines Removed (Refactoring)",
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time,\n  SUM(lines_removed) AS \"Lines Removed (Refactoring)\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND team_slug REGEXP '^(${otel_teams:regex})$'\nGROUP BY hour_start\nORDER BY time",
           "refId": "B"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "expr": "sum(increase(claude_code_lines_of_code_count_total{devlake_team=~\"${otel_teams:regex}\",type=\"removed\"}[$__interval])) / sum(increase(claude_code_lines_of_code_count_total{devlake_team=~\"${otel_teams:regex}\",type=\"added\"}[$__interval]))",
-          "legendFormat": "Refactor Ratio",
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time,\n  SUM(lines_removed) / NULLIF(SUM(lines_added), 0) AS \"Refactor Ratio\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND team_slug REGEXP '^(${otel_teams:regex})$'\nGROUP BY hour_start\nORDER BY time",
           "refId": "C"
         }
       ],
@@ -659,11 +612,8 @@
       "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "description": "Top developers ranked by Claude Code usage (lines added + PRs)",
+      "datasource": "mysql",
+      "description": "Top developers ranked by Claude Code session count and estimated spend in the selected time range and team scope.",
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -707,55 +657,20 @@
       "pluginVersion": "11.6.2",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
+          "datasource": "mysql",
           "editorMode": "code",
-          "expr": "count by (user_email) (max_over_time(claude_code_session_count_total{devlake_team=~\"${otel_teams:regex}\"}[$__range]))",
           "format": "table",
-          "instant": true,
-          "legendFormat": "Sessions",
+          "rawSql": "SELECT user AS \"User\", SUM(sessions) AS \"Sessions\", SUM(cost_usd) AS \"Cost (USD)\"\nFROM (\n  SELECT COALESCE(user_email, user_key) AS user, SUM(session_count) AS sessions, 0 AS cost_usd\n  FROM _tool_claude_code_otel_hourly_activity\n  WHERE $__timeFilter(hour_start) AND team_slug REGEXP '^(${otel_teams:regex})$'\n  GROUP BY COALESCE(user_email, user_key)\n  UNION ALL\n  SELECT COALESCE(user_email, user_key) AS user, 0 AS sessions, SUM(estimated_cost_usd) AS cost_usd\n  FROM _tool_claude_code_otel_hourly_model_usage\n  WHERE $__timeFilter(hour_start) AND team_slug REGEXP '^(${otel_teams:regex})$'\n  GROUP BY COALESCE(user_email, user_key)\n) AS user_usage\nGROUP BY user\nORDER BY SUM(sessions) DESC, SUM(cost_usd) DESC",
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "sum by (user_email) (max_over_time(claude_code_cost_usage_USD_total{devlake_team=~\"${otel_teams:regex}\"}[$__range]))",
-          "format": "table",
-          "instant": true,
-          "legendFormat": "Cost (USD)",
-          "refId": "B"
         }
       ],
       "title": "Top Developers by Claude Usage",
-      "transformations": [
-        {
-          "id": "merge",
-          "options": {}
-        },
-        {
-          "id": "organize",
-          "options": {
-            "renameByName": {
-              "Value #A": "Sessions",
-              "Value #B": "Cost (USD)",
-              "user_account_uuid": "User"
-            }
-          }
-        }
-      ],
+      "transformations": [],
       "type": "table"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "description": "Cost per model with lines-of-code context for ROI analysis",
+      "datasource": "mysql",
+      "description": "Input/output tokens and estimated cost per user, model, and query source in the selected time range — use it to see which combinations are driving spend.",
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -799,72 +714,20 @@
       "pluginVersion": "11.6.2",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
+          "datasource": "mysql",
           "editorMode": "code",
-          "expr": "sum by (model,user_email,query_source) (max_over_time(claude_code_token_usage_tokens_total{devlake_team=~\"${otel_teams:regex}\",type=\"input\"}[$__range]))",
           "format": "table",
-          "instant": true,
-          "legendFormat": "Input Tokens",
+          "rawSql": "SELECT COALESCE(user_email, user_key) AS \"User\",\n  model AS \"Model\",\n  query_source AS \"Source\",\n  SUM(input_tokens) AS \"Input Tokens\",\n  SUM(output_tokens) AS \"Output Tokens\",\n  SUM(estimated_cost_usd) AS \"Total Cost (USD)\"\nFROM _tool_claude_code_otel_hourly_model_usage\nWHERE $__timeFilter(hour_start)\n  AND team_slug REGEXP '^(${otel_teams:regex})$'\nGROUP BY COALESCE(user_email, user_key), model, query_source\nORDER BY SUM(estimated_cost_usd) DESC",
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "sum by (model, user_email,query_source) (max_over_time(claude_code_token_usage_tokens_total{devlake_team=~\"${otel_teams:regex}\",type=\"output\"}[$__range]))",
-          "format": "table",
-          "instant": true,
-          "legendFormat": "Output Tokens",
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "sum by (model, user_email,query_source) (max_over_time(claude_code_cost_usage_USD_total{devlake_team=~\"${otel_teams:regex}\"}[$__range]))",
-          "format": "table",
-          "instant": true,
-          "legendFormat": "Total Cost (USD)",
-          "refId": "C"
         }
       ],
       "title": "Cost Efficiency – Model ROI Breakdown",
-      "transformations": [
-        {
-          "id": "merge",
-          "options": {}
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {},
-            "includeByName": {},
-            "indexByName": {},
-            "renameByName": {
-              "Value #A": "Input Tokens",
-              "Value #B": "Output Tokens",
-              "Value #C": "Total Cost (USD)",
-              "model": "Model",
-              "query_source": "Source"
-            }
-          }
-        }
-      ],
+      "transformations": [],
       "type": "table"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "description": "Per-tool accepted vs rejected action counts from _tool_claude_usage. Shows which Claude tool types get the most approval.",
+      "datasource": "mysql",
+      "description": "Per-tool accepted vs rejected action counts from Claude Code's hourly tool-usage telemetry. Shows which Claude tool types get the most approval.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -938,91 +801,59 @@
       "pluginVersion": "11.6.2",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
+          "datasource": "mysql",
           "editorMode": "code",
-          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{devlake_team=~\"${otel_teams:regex}\",tool_name=\"Edit\", decision=\"accept\"}[$__interval]))",
-          "legendFormat": "Edit Accepted",
-          "range": true,
+          "format": "time_series",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(accepted_count) AS \"Edit accepted\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start) AND team_slug REGEXP '^(${otel_teams:regex})$' AND tool_name = 'Edit'\nGROUP BY hour_start ORDER BY time",
           "refId": "A"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
+          "datasource": "mysql",
           "editorMode": "code",
-          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{devlake_team=~\"${otel_teams:regex}\",tool_name=\"Edit\", decision=\"reject\"}[$__interval]))",
-          "legendFormat": "Edit Rejected",
-          "range": true,
+          "format": "time_series",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(rejected_count) AS \"Edit rejected\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start) AND team_slug REGEXP '^(${otel_teams:regex})$' AND tool_name = 'Edit'\nGROUP BY hour_start ORDER BY time",
           "refId": "B"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
+          "datasource": "mysql",
           "editorMode": "code",
-          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{devlake_team=~\"${otel_teams:regex}\",tool_name=\"MultiEdit\", decision=\"accept\"}[$__interval]))",
-          "legendFormat": "Multi-Edit Accepted",
-          "range": true,
+          "format": "time_series",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(accepted_count) AS \"MultiEdit accepted\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start) AND team_slug REGEXP '^(${otel_teams:regex})$' AND tool_name = 'MultiEdit'\nGROUP BY hour_start ORDER BY time",
           "refId": "C"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
+          "datasource": "mysql",
           "editorMode": "code",
-          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{devlake_team=~\"${otel_teams:regex}\",tool_name=\"MultiEdit\", decision=\"reject\"}[$__interval]))",
-          "legendFormat": "Multi-Edit Rejected",
-          "range": true,
+          "format": "time_series",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(rejected_count) AS \"MultiEdit rejected\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start) AND team_slug REGEXP '^(${otel_teams:regex})$' AND tool_name = 'MultiEdit'\nGROUP BY hour_start ORDER BY time",
           "refId": "D"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
+          "datasource": "mysql",
           "editorMode": "code",
-          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{devlake_team=~\"${otel_teams:regex}\",tool_name=\"Write\", decision=\"accept\"}[$__interval]))",
-          "legendFormat": "Write Accepted",
-          "range": true,
+          "format": "time_series",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(accepted_count) AS \"Write accepted\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start) AND team_slug REGEXP '^(${otel_teams:regex})$' AND tool_name = 'Write'\nGROUP BY hour_start ORDER BY time",
           "refId": "E"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
+          "datasource": "mysql",
           "editorMode": "code",
-          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{devlake_team=~\"${otel_teams:regex}\",tool_name=\"Write\", decision=\"reject\"}[$__interval]))",
-          "legendFormat": "Write Rejected",
-          "range": true,
+          "format": "time_series",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(rejected_count) AS \"Write rejected\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start) AND team_slug REGEXP '^(${otel_teams:regex})$' AND tool_name = 'Write'\nGROUP BY hour_start ORDER BY time",
           "refId": "F"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
+          "datasource": "mysql",
           "editorMode": "code",
-          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{devlake_team=~\"${otel_teams:regex}\",tool_name=\"NotebookEdit\", decision=\"accept\"}[$__interval]))",
-          "legendFormat": "Notebook Accepted",
-          "range": true,
+          "format": "time_series",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(accepted_count) AS \"NotebookEdit accepted\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start) AND team_slug REGEXP '^(${otel_teams:regex})$' AND tool_name = 'NotebookEdit'\nGROUP BY hour_start ORDER BY time",
           "refId": "G"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
+          "datasource": "mysql",
           "editorMode": "code",
-          "expr": "sum(increase(claude_code_code_edit_tool_decision_total{devlake_team=~\"${otel_teams:regex}\",tool_name=\"NotebookEdit\", decision=\"reject\"}[$__interval]))",
-          "legendFormat": "Notebook Rejected",
-          "range": true,
+          "format": "time_series",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(rejected_count) AS \"NotebookEdit rejected\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start) AND team_slug REGEXP '^(${otel_teams:regex})$' AND tool_name = 'NotebookEdit'\nGROUP BY hour_start ORDER BY time",
           "refId": "H"
         }
       ],
@@ -1030,10 +861,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
+      "datasource": "mysql",
       "description": "Anthropic prompt-cache token breakdown. High cache_read_tokens relative to cache_creation_tokens means effective prompt reuse and lower cost.",
       "fieldConfig": {
         "defaults": {
@@ -1108,21 +936,17 @@
       "pluginVersion": "11.6.2",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "expr": "sum(increase(claude_code_token_usage_tokens_total{devlake_team=~\"${otel_teams:regex}\",type=\"cacheRead\"}[$__interval]))",
-          "legendFormat": "Cache Read Tokens",
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(cache_read_tokens) AS \"Cache Read\"\nFROM _tool_claude_code_otel_hourly_model_usage\nWHERE $__timeFilter(hour_start) AND team_slug REGEXP '^(${otel_teams:regex})$'\nGROUP BY hour_start ORDER BY time",
           "refId": "A"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "expr": "sum(increase(claude_code_token_usage_tokens_total{devlake_team=~\"${otel_teams:regex}\",type=\"cacheCreation\"}[$__interval]))",
-          "legendFormat": "Cache Creation Tokens",
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time, SUM(cache_creation_tokens) AS \"Cache Creation\"\nFROM _tool_claude_code_otel_hourly_model_usage\nWHERE $__timeFilter(hour_start) AND team_slug REGEXP '^(${otel_teams:regex})$'\nGROUP BY hour_start ORDER BY time",
           "refId": "B"
         }
       ],
@@ -1130,10 +954,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
+      "datasource": "mysql",
       "description": "Acceptance rates across all tool types.",
       "fieldConfig": {
         "defaults": {
@@ -1245,78 +1066,19 @@
       "pluginVersion": "11.6.2",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
+          "datasource": "mysql",
           "editorMode": "code",
-          "expr": "sum by (tool_name) (max_over_time(claude_code_code_edit_tool_decision_total{devlake_team=~\"${otel_teams:regex}\",decision=\"accept\"}[$__range]))",
           "format": "table",
-          "instant": true,
-          "legendFormat": "Accepted",
+          "rawSql": "SELECT tool_name AS \"Tool\",\n  SUM(accepted_count) AS \"Accepted\",\n  SUM(rejected_count) AS \"Rejected\",\n  100 * SUM(accepted_count) / NULLIF(SUM(accepted_count) + SUM(rejected_count), 0) AS \"Acceptance Rate %\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start)\n  AND team_slug REGEXP '^(${otel_teams:regex})$'\nGROUP BY tool_name\nORDER BY SUM(accepted_count) / NULLIF(SUM(accepted_count) + SUM(rejected_count), 0) DESC",
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "sum by (tool_name) (max_over_time(claude_code_code_edit_tool_decision_total{devlake_team=~\"${otel_teams:regex}\",decision=\"reject\"}[$__range]))",
-          "format": "table",
-          "instant": true,
-          "legendFormat": "Rejected",
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "100 *\nsum by (tool_name) (\n  increase(\n    claude_code_code_edit_tool_decision_total{\n      devlake_team=~\"${otel_teams:regex}\",\n      decision=\"accept\"\n    }[$__range]\n  )\n)\n/\nsum by (tool_name) (\n  increase(\n    claude_code_code_edit_tool_decision_total{\n      devlake_team=~\"${otel_teams:regex}\",\n      decision=~\"accept|reject\"\n    }[$__range]\n  )\n)",
-          "format": "table",
-          "instant": true,
-          "legendFormat": "Cache Hit %",
-          "refId": "C"
         }
       ],
       "title": "Tool-Type Acceptance Rate",
-      "transformations": [
-        {
-          "id": "merge",
-          "options": {}
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {},
-            "includeByName": {},
-            "indexByName": {},
-            "renameByName": {
-              "Value #A": "Accepted",
-              "Value #B": "Rejected",
-              "Value #C": "Acceptance Rate %",
-              "model": "Model",
-              "tool": "Tool"
-            }
-          }
-        },
-        {
-          "id": "joinByField",
-          "options": {
-            "byField": "tool_name",
-            "mode": "inner"
-          }
-        }
-      ],
+      "transformations": [],
       "type": "table"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
+      "datasource": "mysql",
       "description": "How effectively the model hits the cache.",
       "fieldConfig": {
         "defaults": {
@@ -1367,46 +1129,19 @@
       "pluginVersion": "11.6.2",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
+          "datasource": "mysql",
           "editorMode": "code",
-          "expr": "(\n  sum by (model) (\n    max_over_time(\n      claude_code_token_usage_tokens_total{\n        devlake_team=~\"${otel_teams:regex}\",\n        type=\"cacheRead\"\n      }[$__range]\n    )\n  )\n/\n  (\n    sum by (model) (\n      max_over_time(\n        claude_code_token_usage_tokens_total{\n          devlake_team=~\"${otel_teams:regex}\",\n          type=\"cacheRead\"\n        }[$__range]\n      )\n    )\n    +\n    sum by (model) (\n      max_over_time(\n        claude_code_token_usage_tokens_total{\n          devlake_team=~\"${otel_teams:regex}\",\n          type=\"cacheCreation\"\n        }[$__range]\n      )\n    )\n  )\n) * 100",
           "format": "table",
-          "instant": true,
-          "legendFormat": "__auto",
+          "rawSql": "SELECT model AS \"Model\",\n  100 * SUM(cache_read_tokens) / NULLIF(SUM(cache_read_tokens) + SUM(cache_creation_tokens), 0) AS \"Cache Hit %\"\nFROM _tool_claude_code_otel_hourly_model_usage\nWHERE $__timeFilter(hour_start)\n  AND team_slug REGEXP '^(${otel_teams:regex})$'\nGROUP BY model\nORDER BY SUM(cache_read_tokens) / NULLIF(SUM(cache_read_tokens) + SUM(cache_creation_tokens), 0) DESC",
           "refId": "C"
         }
       ],
       "title": "Cache Token Efficiency by Model",
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true
-            },
-            "includeByName": {},
-            "indexByName": {},
-            "renameByName": {
-              "Value": "Cache Hit %",
-              "Value #A": "Accepted",
-              "Value #B": "Rejected",
-              "Value #C": "Acceptance Rate %",
-              "model": "Model",
-              "tool": "Tool"
-            }
-          }
-        }
-      ],
+      "transformations": [],
       "type": "table"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
+      "datasource": "mysql",
       "description": "Total tokens spent between each interval",
       "fieldConfig": {
         "defaults": {
@@ -1459,28 +1194,19 @@
       "pluginVersion": "11.6.2",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
+          "datasource": "mysql",
           "editorMode": "code",
-          "exemplar": false,
-          "expr": "sum(increase(claude_code_token_usage_tokens_total{devlake_team=~\"${otel_teams:regex}\"}[$__interval]))",
-          "instant": false,
-          "interval": "10m",
-          "legendFormat": "Total Tokens",
-          "range": true,
+          "format": "table",
+          "rawSql": "SELECT UNIX_TIMESTAMP(hour_start) AS time,\n  SUM(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens) AS \"Total Tokens\"\nFROM _tool_claude_code_otel_hourly_model_usage\nWHERE $__timeFilter(hour_start)\n  AND team_slug REGEXP '^(${otel_teams:regex})$'\nGROUP BY hour_start\nORDER BY time",
           "refId": "A"
         }
       ],
       "title": "Tokens per Interval",
-      "type": "table"
+      "type": "table",
+      "transformations": []
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
+      "datasource": "mysql",
       "description": "Edit/Write/MultiEdit/NotebookEdit calls grouped by file language",
       "fieldConfig": {
         "defaults": {
@@ -1558,42 +1284,19 @@
       "pluginVersion": "11.6.2",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
+          "datasource": "mysql",
           "editorMode": "code",
-          "exemplar": false,
-          "expr": "topk(10, sum by (language) (increase(claude_code_code_edit_tool_decision_total{devlake_team=~\"${otel_teams:regex}\"}[$__range])))",
           "format": "table",
-          "instant": true,
-          "legendFormat": "{{query_source}}",
-          "range": false,
+          "rawSql": "SELECT language AS \"Language\",\n  SUM(accepted_count + rejected_count) AS \"Edits\"\nFROM _tool_claude_code_otel_hourly_tool_usage\nWHERE $__timeFilter(hour_start)\n  AND team_slug REGEXP '^(${otel_teams:regex})$'\n  AND language <> 'unknown'\nGROUP BY language\nORDER BY edits DESC\nLIMIT 10",
           "refId": "A"
         }
       ],
       "title": "Top Languages Edited (Period)",
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {},
-            "includeByName": {},
-            "indexByName": {},
-            "renameByName": {
-              "Value": "Edits",
-              "language": "Language"
-            }
-          }
-        }
-      ],
+      "transformations": [],
       "type": "table"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
+      "datasource": "mysql",
       "description": "Average active coding time across all sessions in the selected time range",
       "fieldConfig": {
         "defaults": {
@@ -1644,15 +1347,10 @@
       "pluginVersion": "11.6.2",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
+          "datasource": "mysql",
           "editorMode": "code",
-          "expr": "avg(sum by (user_account_uuid) (increase(claude_code_active_time_seconds_total{devlake_team=~\"${otel_teams:regex}\"}[$__range]))) / 3600",
-          "instant": false,
-          "legendFormat": "Avg Active Hours / User",
-          "range": true,
+          "format": "table",
+          "rawSql": "SELECT SUM(active_time_seconds) / NULLIF(COUNT(DISTINCT user_key), 0) / 3600 AS \"Average Active Coding Hours\"\nFROM _tool_claude_code_otel_hourly_activity\nWHERE $__timeFilter(hour_start)\n  AND team_slug REGEXP '^(${otel_teams:regex})$'",
           "refId": "A"
         }
       ],
@@ -1661,14 +1359,13 @@
     }
   ],
   "preload": false,
-  "refresh": "1m",
+  "refresh": "",
   "schemaVersion": 41,
   "tags": [
     "claude",
     "anthropic",
     "devlake",
-    "ai",
-    "prometheus"
+    "ai"
   ],
   "templating": {
     "list": [
@@ -1680,10 +1377,7 @@
             "$__all"
           ]
         },
-        "datasource": {
-          "type": "mysql",
-          "uid": "devlake-mysql"
-        },
+        "datasource": "mysql",
         "definition": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nWHERE c.status = 'active'\nORDER BY p.name;",
         "includeAll": true,
         "label": "DevLake project",
@@ -1702,17 +1396,14 @@
             "$__all"
           ]
         },
-        "datasource": {
-          "type": "mysql",
-          "uid": "devlake-mysql"
-        },
-        "definition": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND cp.project_name REGEXP '${project:regex}'\nORDER BY c.team_slug;",
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND cp.project_name REGEXP '^(${project:regex})$'\nORDER BY c.team_slug;",
         "includeAll": true,
         "label": "Claude Code OTel teams",
         "multi": true,
         "name": "otel_teams",
         "options": [],
-        "query": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND cp.project_name REGEXP '${project:regex}'\nORDER BY c.team_slug;",
+        "query": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND cp.project_name REGEXP '^(${project:regex})$'\nORDER BY c.team_slug;",
         "refresh": 1,
         "sort": 1,
         "type": "query"
@@ -1725,7 +1416,7 @@
   },
   "timepicker": {},
   "timezone": "utc",
-  "title": "Claude - Prometheus",
-  "uid": "claude_adoption_prometheus",
-  "version": 26
+  "title": "Claude - MySQL",
+  "uid": "claude_adoption_mysql",
+  "description": "Durable hourly Claude Code OTel metrics from MySQL. Project membership filters the distinct linked OTel teams."
 }
