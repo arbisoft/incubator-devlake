@@ -32,7 +32,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "**How to read this dashboard**\n\n- **Escaped Defect Rate** only counts issues classified as `BUG`/`INCIDENT` in the connected trackers. In practice that means Jira — GitHub and GitLab issues here don't carry a type classification yet, so a GitHub/GitLab-only project will show a rate near zero, which reflects missing classification rather than an absence of defects. Check the \"Defect-Rate Coverage by Project\" table below before reading this metric for a given project.\n- **Contributors** is deduplicated by `accounts.full_name` (falling back to the PR author name when no account matches), because one engineer can accumulate several `accounts` rows as their git client runs from different machines and IPs. This narrows the overcount but doesn't fully collapse it — see the \"Distinct-Account Sanity Check\" table below for the residual gap.\n- **AI Spend and Cost per Merged PR are company-wide by design.** AI activity carries no project or repo association in the schema, so scoping the PR side to a single project while leaving spend company-wide would inflate the ratio. Both sides stay pinned to all projects so the number means the same thing no matter what the Project filter above is set to.\n- AI Spend combines two sources: legacy Cursor / Claude-platform activity records cost directly, while Claude Code (OTel) records cost on a separate usage table. Both are combined into one company-wide total.",
+        "content": "**How to read this dashboard**\n\n- **Escaped Defect Rate** only counts issues classified as `BUG`/`INCIDENT` in the connected trackers. In practice that means Jira — GitHub and GitLab issues here don't carry a type classification yet, so a GitHub/GitLab-only project will show a rate near zero, which reflects missing classification rather than an absence of defects. Check the \"Defect-Rate Coverage by Project\" table below before reading this metric for a given project.\n- **Contributors** is deduplicated by `accounts.full_name` (falling back to the PR author name when no account matches), because one engineer can accumulate several `accounts` rows as their git client runs from different machines and IPs. This narrows the overcount but doesn't fully collapse it — see the \"Distinct-Account Sanity Check\" table below for the residual gap.\n- **AI Spend and Cost per Merged PR are Claude Code OTel-only** (`ai_model_usages`, which only Claude Code OTel writes to) and scoped to the Project and Claude Code OTel Teams filters above — both the spend side and the PR-count side now use the same project scope, so the ratio stays meaningful at any Project selection.",
         "mode": "markdown"
       },
       "pluginVersion": "11.0.0",
@@ -48,7 +48,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Total estimated AI spend across all connected AI tools and providers, company-wide. Combines legacy Cursor/Claude-platform cost with Claude Code (OTel) usage cost into one daily total.",
+      "description": "Total estimated AI spend, Claude Code OTel-only, scoped to the selected project(s)/team(s) (`SUM(ai_model_usages.estimated_cost_usd)`).",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -85,11 +85,11 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH ai_spend_daily AS (\n  SELECT date, provider, user_email, account_id, estimated_cost_usd AS cost\n  FROM ai_activities WHERE record_kind IS NULL\n  UNION ALL\n  SELECT date, provider, user_email, account_id, estimated_cost_usd AS cost\n  FROM ai_model_usages\n)\nSELECT SUM(cost) AS \"AI Spend\" FROM ai_spend_daily WHERE $__timeFilter(date)",
+          "rawSql": "SELECT SUM(estimated_cost_usd) AS \"AI Spend\"\nFROM ai_model_usages\nWHERE source_connection_id IN (\n  SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n  INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n  WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n)\nAND $__timeFilter(date)",
           "refId": "A"
         }
       ],
-      "title": "AI Spend (Company-wide)",
+      "title": "AI Spend",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -413,7 +413,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "AI Spend ÷ PRs Merged, both company-wide. Kept unscoped on both sides deliberately — since AI Spend has no project association, scoping only the PR side would shrink the denominator and inflate the ratio whenever a single project is selected.",
+      "description": "AI Spend ÷ PRs Merged, both scoped to the selected project(s)/team(s) — Claude Code OTel spend now carries a real project association, so both sides move together.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -450,11 +450,11 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH ai_spend_daily AS (\n  SELECT date, provider, user_email, account_id, estimated_cost_usd AS cost\n  FROM ai_activities WHERE record_kind IS NULL\n  UNION ALL\n  SELECT date, provider, user_email, account_id, estimated_cost_usd AS cost\n  FROM ai_model_usages\n)\nSELECT ROUND(spend.cost / NULLIF(prs.n, 0), 2) AS \"Cost per Merged PR\"\nFROM\n  (SELECT SUM(cost) AS cost FROM ai_spend_daily WHERE $__timeFilter(date)) spend,\n  (SELECT COUNT(*) n FROM pull_requests pr WHERE pr.status = 'MERGED' AND $__timeFilter(pr.merged_date)) prs",
+          "rawSql": "SELECT ROUND(spend.cost / NULLIF(prs.n, 0), 2) AS \"Cost per Merged PR\"\nFROM\n  (SELECT SUM(estimated_cost_usd) AS cost FROM ai_model_usages\n   WHERE source_connection_id IN (\n     SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n     INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n     WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n   )\n   AND $__timeFilter(date)) spend,\n  (SELECT COUNT(*) n FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n   WHERE ppm.project_name IN ($project) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date)) prs",
           "refId": "A"
         }
       ],
-      "title": "Cost per Merged PR (Company-wide)",
+      "title": "Cost per Merged PR",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -474,37 +474,20 @@
       },
       "id": 10,
       "panels": [],
-      "title": "Indexed Trend (baseline = first month in range = 100)",
+      "title": "Indexed Trends (Weekly)",
       "type": "row"
     },
     {
       "datasource": "mysql",
-      "description": "Each metric indexed to its own first non-zero month in range (baseline = 100), so all four can be compared on the same trend scale even though they're sourced from different tables that don't necessarily start in the same month. AI Cost is company-wide; PRs Merged, Tasks Done, and Contributors are scoped to the selected project(s).",
+      "description": "Weekly AI Cost, PRs Merged, Tasks Done, Contributors, and Escaped Defects (raw values, not indexed) with a week-over-week % change and direction arrow combined into the same cell. AI Cost is Claude Code OTel-only, scoped to the selected project(s)/team(s); the other four are scoped to the selected project(s). Escaped Defects counts BUG/INCIDENT issues created within 14 days of a successful production deployment on the same project (see the Escaped Defect Rate KPI above) — it tracks trend shape, not the precise per-100-PR rate shown in that KPI card. Up (green ▲) isn't necessarily \"good\" for every metric here — for Escaped Defects specifically, an increase is the bad direction, the coloring doesn't distinguish that. Bucketed weekly rather than monthly since Claude Code OTel history is currently short. Previously indexed each metric to its first non-zero week (baseline = 100); dropped that in favor of raw values because a first week with a tiny real count (e.g. 1 PR) could blow later weeks up to 1000%+ against an unstable baseline — week-over-week % change doesn't have that problem since it always compares two real adjacent weeks.",
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
           "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "fillOpacity": 80,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
             },
-            "lineWidth": 1,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
+            "inspect": false
           },
           "mappings": [],
           "thresholds": {
@@ -521,45 +504,156 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "AI cost"
+              "options": "AI Cost"
             },
             "properties": [
               {
-                "id": "color",
+                "id": "custom.cellOptions",
                 "value": {
-                  "fixedColor": "#eb6834",
-                  "mode": "fixed"
+                  "type": "color-text"
                 }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^(.*▲.*)$",
+                      "result": {
+                        "index": 0,
+                        "color": "green",
+                        "text": "$1"
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^(.*▼.*)$",
+                      "result": {
+                        "index": 1,
+                        "color": "red",
+                        "text": "$1"
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^(.*▬.*)$",
+                      "result": {
+                        "index": 2,
+                        "color": "text",
+                        "text": "$1"
+                      }
+                    }
+                  }
+                ]
               }
             ]
           },
           {
             "matcher": {
               "id": "byName",
-              "options": "PRs merged"
+              "options": "PRs Merged"
             },
             "properties": [
               {
-                "id": "color",
+                "id": "custom.cellOptions",
                 "value": {
-                  "fixedColor": "#1baf7a",
-                  "mode": "fixed"
+                  "type": "color-text"
                 }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^(.*▲.*)$",
+                      "result": {
+                        "index": 0,
+                        "color": "green",
+                        "text": "$1"
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^(.*▼.*)$",
+                      "result": {
+                        "index": 1,
+                        "color": "red",
+                        "text": "$1"
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^(.*▬.*)$",
+                      "result": {
+                        "index": 2,
+                        "color": "text",
+                        "text": "$1"
+                      }
+                    }
+                  }
+                ]
               }
             ]
           },
           {
             "matcher": {
               "id": "byName",
-              "options": "Tasks done"
+              "options": "Tasks Done"
             },
             "properties": [
               {
-                "id": "color",
+                "id": "custom.cellOptions",
                 "value": {
-                  "fixedColor": "#2a78d6",
-                  "mode": "fixed"
+                  "type": "color-text"
                 }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^(.*▲.*)$",
+                      "result": {
+                        "index": 0,
+                        "color": "green",
+                        "text": "$1"
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^(.*▼.*)$",
+                      "result": {
+                        "index": 1,
+                        "color": "red",
+                        "text": "$1"
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^(.*▬.*)$",
+                      "result": {
+                        "index": 2,
+                        "color": "text",
+                        "text": "$1"
+                      }
+                    }
+                  }
+                ]
               }
             ]
           },
@@ -570,37 +664,121 @@
             },
             "properties": [
               {
-                "id": "color",
+                "id": "custom.cellOptions",
                 "value": {
-                  "fixedColor": "#888780",
-                  "mode": "fixed"
+                  "type": "color-text"
                 }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^(.*▲.*)$",
+                      "result": {
+                        "index": 0,
+                        "color": "green",
+                        "text": "$1"
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^(.*▼.*)$",
+                      "result": {
+                        "index": 1,
+                        "color": "red",
+                        "text": "$1"
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^(.*▬.*)$",
+                      "result": {
+                        "index": 2,
+                        "color": "text",
+                        "text": "$1"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Escaped Defects"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^(.*▲.*)$",
+                      "result": {
+                        "index": 0,
+                        "color": "green",
+                        "text": "$1"
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^(.*▼.*)$",
+                      "result": {
+                        "index": 1,
+                        "color": "red",
+                        "text": "$1"
+                      }
+                    }
+                  },
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^(.*▬.*)$",
+                      "result": {
+                        "index": 2,
+                        "color": "text",
+                        "text": "$1"
+                      }
+                    }
+                  }
+                ]
               }
             ]
           }
         ]
       },
       "options": {
-        "barRadius": 0,
-        "barWidth": 0.7,
-        "fullHighlight": false,
-        "groupWidth": 0.7,
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "reducer": [
+            "sum"
+          ],
+          "show": false
         },
-        "orientation": "auto",
-        "showValue": "auto",
-        "stacking": "none",
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        },
-        "xField": "month",
-        "xTickLabelRotation": 0,
-        "xTickLabelSpacing": 0
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Week"
+          }
+        ]
       },
       "pluginVersion": "11.0.0",
       "targets": [
@@ -608,14 +786,14 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH ai_spend_daily AS (\n  SELECT date, provider, user_email, account_id, estimated_cost_usd AS cost\n  FROM ai_activities WHERE record_kind IS NULL\n  UNION ALL\n  SELECT date, provider, user_email, account_id, estimated_cost_usd AS cost\n  FROM ai_model_usages\n),\nmonthly_cost AS (SELECT DATE_FORMAT(date, '%Y-%m-01') AS month, SUM(cost) AS v FROM ai_spend_daily WHERE $__timeFilter(date) GROUP BY 1),\nmonthly_prs AS (\n  SELECT DATE_FORMAT(pr.merged_date, '%Y-%m-01') AS month, COUNT(*) AS v\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN ($project) AND $__timeFilter(pr.merged_date) GROUP BY 1\n),\nmonthly_tasks AS (\n  SELECT DATE_FORMAT(i.resolution_date, '%Y-%m-01') AS month, COUNT(*) AS v\n  FROM issues i JOIN board_issues bi ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n  WHERE pm.project_name IN ($project) AND i.type IN ('TASK','SUBTASK') AND i.resolution_date IS NOT NULL AND $__timeFilter(i.resolution_date)\n  GROUP BY 1\n),\nmonthly_contrib AS (\n  SELECT DATE_FORMAT(pr.merged_date, '%Y-%m-01') AS month, COUNT(DISTINCT COALESCE(NULLIF(a.full_name,''), pr.author_name)) AS v\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id LEFT JOIN accounts a ON a.id = pr.author_id\n  WHERE ppm.project_name IN ($project) AND $__timeFilter(pr.merged_date) GROUP BY 1\n),\nmonths AS (\n  SELECT month FROM monthly_cost UNION SELECT month FROM monthly_prs\n  UNION SELECT month FROM monthly_tasks UNION SELECT month FROM monthly_contrib\n),\nfilled AS (\n  SELECT m.month,\n    COALESCE(c.v, 0) AS cost, COALESCE(p.v, 0) AS prs, COALESCE(t.v, 0) AS tasks, COALESCE(ct.v, 0) AS contrib\n  FROM months m\n  LEFT JOIN monthly_cost c ON c.month = m.month\n  LEFT JOIN monthly_prs p ON p.month = m.month\n  LEFT JOIN monthly_tasks t ON t.month = m.month\n  LEFT JOIN monthly_contrib ct ON ct.month = m.month\n)\nSELECT month,\n  ROUND(cost * 100.0 / NULLIF((SELECT cost FROM filled f WHERE f.cost > 0 ORDER BY f.month LIMIT 1), 0), 1) AS `AI cost`,\n  ROUND(prs * 100.0 / NULLIF((SELECT prs FROM filled f WHERE f.prs > 0 ORDER BY f.month LIMIT 1), 0), 1) AS `PRs merged`,\n  ROUND(tasks * 100.0 / NULLIF((SELECT tasks FROM filled f WHERE f.tasks > 0 ORDER BY f.month LIMIT 1), 0), 1) AS `Tasks done`,\n  ROUND(contrib * 100.0 / NULLIF((SELECT contrib FROM filled f WHERE f.contrib > 0 ORDER BY f.month LIMIT 1), 0), 1) AS `Contributors`\nFROM filled\nORDER BY month",
+          "rawSql": "WITH weekly_cost AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week, SUM(estimated_cost_usd) AS v\n  FROM ai_model_usages\n  WHERE source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n  )\n  AND $__timeFilter(date)\n  GROUP BY 1\n),\nweekly_prs AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') AS week, COUNT(*) AS v\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN ($project) AND $__timeFilter(pr.merged_date) GROUP BY 1\n),\nweekly_tasks AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(i.resolution_date), INTERVAL WEEKDAY(i.resolution_date) DAY), '%Y-%m-%d') AS week, COUNT(*) AS v\n  FROM issues i JOIN board_issues bi ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n  WHERE pm.project_name IN ($project) AND i.type IN ('TASK','SUBTASK') AND i.resolution_date IS NOT NULL AND $__timeFilter(i.resolution_date)\n  GROUP BY 1\n),\nweekly_contrib AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') AS week, COUNT(DISTINCT COALESCE(NULLIF(a.full_name,''), pr.author_name)) AS v\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id LEFT JOIN accounts a ON a.id = pr.author_id\n  WHERE ppm.project_name IN ($project) AND $__timeFilter(pr.merged_date) GROUP BY 1\n),\nprod_deploys AS (\n  SELECT pm.project_name, cdc.finished_date\n  FROM cicd_deployment_commits cdc\n  JOIN project_mapping pm ON pm.row_id = cdc.cicd_scope_id AND pm.`table` = 'cicd_scopes'\n  WHERE pm.project_name IN ($project) AND LOWER(cdc.environment) LIKE '%prod%' AND cdc.result = 'SUCCESS' AND $__timeFilter(cdc.finished_date)\n),\nweekly_defects AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(i.created_date), INTERVAL WEEKDAY(i.created_date) DAY), '%Y-%m-%d') AS week, COUNT(DISTINCT i.id) AS v\n  FROM issues i\n  JOIN board_issues bi ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n  JOIN prod_deploys pd ON pd.project_name = pm.project_name\n    AND i.created_date BETWEEN pd.finished_date AND DATE_ADD(pd.finished_date, INTERVAL 14 DAY)\n  WHERE pm.project_name IN ($project) AND i.type IN ('BUG','INCIDENT') AND $__timeFilter(i.created_date)\n  GROUP BY 1\n),\nweeks AS (\n  SELECT week FROM weekly_cost UNION SELECT week FROM weekly_prs\n  UNION SELECT week FROM weekly_tasks UNION SELECT week FROM weekly_contrib\n  UNION SELECT week FROM weekly_defects\n),\nfilled AS (\n  SELECT w.week,\n    COALESCE(c.v, 0) AS cost, COALESCE(p.v, 0) AS prs, COALESCE(t.v, 0) AS tasks,\n    COALESCE(ct.v, 0) AS contrib, COALESCE(d.v, 0) AS defects\n  FROM weeks w\n  LEFT JOIN weekly_cost c ON c.week = w.week\n  LEFT JOIN weekly_prs p ON p.week = w.week\n  LEFT JOIN weekly_tasks t ON t.week = w.week\n  LEFT JOIN weekly_contrib ct ON ct.week = w.week\n  LEFT JOIN weekly_defects d ON d.week = w.week\n),\nlagged AS (\n  SELECT week, cost, prs, tasks, contrib, defects,\n    LAG(cost) OVER (ORDER BY week) AS cost_prev,\n    LAG(prs) OVER (ORDER BY week) AS prs_prev,\n    LAG(tasks) OVER (ORDER BY week) AS tasks_prev,\n    LAG(contrib) OVER (ORDER BY week) AS contrib_prev,\n    LAG(defects) OVER (ORDER BY week) AS defects_prev\n  FROM filled\n)\nSELECT week AS \"Week\",\n  CONCAT(CONCAT('$', FORMAT(cost,2)),\n    CASE\n      WHEN cost_prev IS NULL THEN ''\n      WHEN cost_prev = 0 AND cost = 0 THEN '        ▬0.0%'\n      WHEN cost_prev = 0 THEN '        ▲ new'\n      WHEN cost > cost_prev THEN CONCAT('        ▲', ROUND(100.0*(cost-cost_prev)/cost_prev,1), '%')\n      WHEN cost < cost_prev THEN CONCAT('        ▼', ROUND(100.0*(cost_prev-cost)/cost_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"AI Cost\",\n  CONCAT(prs,\n    CASE\n      WHEN prs_prev IS NULL THEN ''\n      WHEN prs_prev = 0 AND prs = 0 THEN '        ▬0.0%'\n      WHEN prs_prev = 0 THEN '        ▲ new'\n      WHEN prs > prs_prev THEN CONCAT('        ▲', ROUND(100.0*(prs-prs_prev)/prs_prev,1), '%')\n      WHEN prs < prs_prev THEN CONCAT('        ▼', ROUND(100.0*(prs_prev-prs)/prs_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"PRs Merged\",\n  CONCAT(tasks,\n    CASE\n      WHEN tasks_prev IS NULL THEN ''\n      WHEN tasks_prev = 0 AND tasks = 0 THEN '        ▬0.0%'\n      WHEN tasks_prev = 0 THEN '        ▲ new'\n      WHEN tasks > tasks_prev THEN CONCAT('        ▲', ROUND(100.0*(tasks-tasks_prev)/tasks_prev,1), '%')\n      WHEN tasks < tasks_prev THEN CONCAT('        ▼', ROUND(100.0*(tasks_prev-tasks)/tasks_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"Tasks Done\",\n  CONCAT(contrib,\n    CASE\n      WHEN contrib_prev IS NULL THEN ''\n      WHEN contrib_prev = 0 AND contrib = 0 THEN '        ▬0.0%'\n      WHEN contrib_prev = 0 THEN '        ▲ new'\n      WHEN contrib > contrib_prev THEN CONCAT('        ▲', ROUND(100.0*(contrib-contrib_prev)/contrib_prev,1), '%')\n      WHEN contrib < contrib_prev THEN CONCAT('        ▼', ROUND(100.0*(contrib_prev-contrib)/contrib_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"Contributors\",\n  CONCAT(defects,\n    CASE\n      WHEN defects_prev IS NULL THEN ''\n      WHEN defects_prev = 0 AND defects = 0 THEN '        ▬0.0%'\n      WHEN defects_prev = 0 THEN '        ▲ new'\n      WHEN defects > defects_prev THEN CONCAT('        ▲', ROUND(100.0*(defects-defects_prev)/defects_prev,1), '%')\n      WHEN defects < defects_prev THEN CONCAT('        ▼', ROUND(100.0*(defects_prev-defects)/defects_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"Escaped Defects\"\nFROM lagged\nORDER BY week DESC",
           "refId": "A"
         }
       ],
-      "title": "AI Cost (Company-wide) / PRs Merged / Tasks Done / Contributors — Indexed",
-      "type": "barchart",
+      "title": "AI Cost / PRs Merged / Tasks Done / Contributors / Escaped Defects — Weekly, with WoW % Change",
+      "type": "table",
       "gridPos": {
-        "h": 9,
+        "h": 10,
         "w": 24,
         "x": 0,
         "y": 17
@@ -623,141 +801,12 @@
       "id": 11
     },
     {
-      "datasource": "mysql",
-      "description": "Indexes the monthly count of escaped defects (BUG/INCIDENT issues created within 14 days of a successful production deployment on the same project — see the Escaped Defect Rate KPI above) to its first plotted month. Shows trend shape only: it tracks the raw monthly defect count, not the precise per-100-PR rate shown in the KPI card.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineWidth": 2,
-            "pointSize": 5,
-            "showPoints": "never",
-            "spanNulls": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Escaped defects (count, unindexed ratio)"
-            },
-            "properties": [
-              {
-                "id": "custom.drawStyle",
-                "value": "line"
-              },
-              {
-                "id": "custom.lineStyle",
-                "value": {
-                  "fill": "dash",
-                  "dash": [
-                    10,
-                    10
-                  ]
-                }
-              },
-              {
-                "id": "custom.fillOpacity",
-                "value": 0
-              },
-              {
-                "id": "custom.lineWidth",
-                "value": 2
-              },
-              {
-                "id": "custom.pointSize",
-                "value": 5
-              },
-              {
-                "id": "custom.showPoints",
-                "value": "always"
-              },
-              {
-                "id": "custom.stacking",
-                "value": {
-                  "group": "line_overlay",
-                  "mode": "none"
-                }
-              },
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#e34948",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "11.0.0",
-      "targets": [
-        {
-          "datasource": "mysql",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "WITH prod_deploys AS (\n  SELECT pm.project_name, cdc.finished_date\n  FROM cicd_deployment_commits cdc\n  JOIN project_mapping pm ON pm.row_id = cdc.cicd_scope_id AND pm.`table` = 'cicd_scopes'\n  WHERE pm.project_name IN ($project) AND LOWER(cdc.environment) LIKE '%prod%' AND cdc.result = 'SUCCESS' AND $__timeFilter(cdc.finished_date)\n),\nmonthly AS (\n  SELECT DATE_FORMAT(i.created_date, '%Y-%m-01') AS month, 'Escaped defects (count, unindexed ratio)' AS metric, COUNT(DISTINCT i.id) AS value\n  FROM issues i\n  JOIN board_issues bi ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n  JOIN prod_deploys pd ON pd.project_name = pm.project_name\n    AND i.created_date BETWEEN pd.finished_date AND DATE_ADD(pd.finished_date, INTERVAL 14 DAY)\n  WHERE pm.project_name IN ($project) AND i.type IN ('BUG','INCIDENT') AND $__timeFilter(i.created_date)\n  GROUP BY 1\n)\nSELECT STR_TO_DATE(month, '%Y-%m-%d') AS time, metric,\n  ROUND(value * 100.0 / FIRST_VALUE(value) OVER (ORDER BY month), 1) AS value\nFROM monthly\nORDER BY time",
-          "refId": "A"
-        }
-      ],
-      "title": "Escaped Defects — Indexed (trend shape only)",
-      "transformations": [
-        {
-          "id": "prepareTimeSeries",
-          "options": {
-            "format": "many"
-          }
-        },
-        {
-          "id": "renameByRegex",
-          "options": {
-            "regex": "^value (.+)$",
-            "renamePattern": "$1"
-          }
-        }
-      ],
-      "type": "timeseries",
-      "gridPos": {
-        "h": 5,
-        "w": 24,
-        "x": 0,
-        "y": 26
-      },
-      "id": 12
-    },
-    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 31
+        "y": 27
       },
       "id": 13,
       "panels": [],
@@ -809,7 +858,7 @@
         "h": 6,
         "w": 12,
         "x": 0,
-        "y": 32
+        "y": 28
       },
       "id": 14
     },
@@ -858,7 +907,7 @@
         "h": 6,
         "w": 12,
         "x": 12,
-        "y": 32
+        "y": 28
       },
       "id": 15
     }
@@ -885,14 +934,39 @@
           ]
         },
         "datasource": "mysql",
-        "definition": "select distinct name from projects",
+        "definition": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nWHERE c.status = 'active'\nORDER BY p.name;",
         "hide": 0,
         "includeAll": true,
         "label": "Project",
         "multi": true,
         "name": "project",
         "options": [],
-        "query": "select distinct name from projects",
+        "query": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nWHERE c.status = 'active'\nORDER BY p.name;",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND cp.project_name REGEXP '^(${project:regex})$'\nORDER BY c.team_slug;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Claude Code OTel teams",
+        "multi": true,
+        "name": "otel_teams",
+        "options": [],
+        "query": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND cp.project_name REGEXP '^(${project:regex})$'\nORDER BY c.team_slug;",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
@@ -902,7 +976,7 @@
     ]
   },
   "time": {
-    "from": "now-6M",
+    "from": "now-30d",
     "to": "now"
   },
   "timepicker": {},
