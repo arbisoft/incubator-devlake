@@ -4557,13 +4557,13 @@
           "type": "mysql",
           "uid": "devlake-mysql"
         },
-        "definition": "SELECT DISTINCT pm.project_name\nFROM project_mapping pm\nWHERE pm.`table` = 'boards' AND pm.row_id LIKE 'jira:%'\nORDER BY pm.project_name",
+        "definition": "select DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'boards' AND pm.row_id like 'jira:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY pm.project_name ",
         "includeAll": true,
         "label": "Project",
         "multi": true,
         "name": "project",
         "options": [],
-        "query": "SELECT DISTINCT pm.project_name\nFROM project_mapping pm\nWHERE pm.`table` = 'boards' AND pm.row_id LIKE 'jira:%'\nORDER BY pm.project_name",
+        "query": "select DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'boards' AND pm.row_id like 'jira:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY pm.project_name ",
         "refresh": 1,
         "regex": "",
         "type": "query"
