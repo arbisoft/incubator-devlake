@@ -2845,13 +2845,13 @@
           "type": "mysql",
           "uid": "devlake-mysql"
         },
-        "definition": "select distinct upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY pm.project_name ",
+        "definition": "select distinct upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name ",
         "includeAll": true,
         "label": "Project",
         "multi": true,
         "name": "project",
         "options": [],
-        "query": "select distinct upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY pm.project_name ",
+        "query": "select distinct upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name ",
         "refresh": 1,
         "regex": "",
         "type": "query"
@@ -2911,6 +2911,6 @@
   "timepicker": {},
   "timezone": "utc",
   "title": "A. GitHub High Level Summary",
-  "uid": "gr4rs4t5vt0bad",
+  "uid": "efxmn9vz2bv28b",
   "version": 41
 }

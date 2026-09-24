@@ -4108,14 +4108,14 @@
           "type": "mysql",
           "uid": "devlake-mysql"
         },
-        "definition": "select DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY pm.project_name ",
+        "definition": "select DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name ",
         "description": "",
         "includeAll": true,
         "label": "Project",
         "multi": true,
         "name": "project",
         "options": [],
-        "query": "select DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY pm.project_name ",
+        "query": "select DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name ",
         "refresh": 1,
         "regex": "",
         "type": "query"
