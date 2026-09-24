@@ -44,6 +44,15 @@ type ResponsePipelines struct {
 	Pipelines []*models.Pipeline `json:"pipelines"`
 }
 
+// safeErrorMessage returns the top-level message only; Error() leaks the
+// error library's internal debug formatting, which must not reach clients.
+func safeErrorMessage(e errors.Error) string {
+	if message := e.Messages().Get(); message != "" {
+		return message
+	}
+	return "an unexpected error occurred"
+}
+
 // ApiOutputErrorWithCustomCode writes a JSON error message to the HTTP response body
 func ApiOutputErrorWithCustomCode(c *gin.Context, code int, err error) {
 	if e, ok := err.(errors.Error); ok {
@@ -51,7 +60,7 @@ func ApiOutputErrorWithCustomCode(c *gin.Context, code int, err error) {
 		messages := e.Messages()
 		c.JSON(e.GetType().GetHttpCode(), &ApiBody{
 			Success: false,
-			Message: e.Error(),
+			Message: safeErrorMessage(e),
 			Code:    code,
 			Causes:  messages.Causes(),
 		})
@@ -73,7 +82,7 @@ func ApiOutputAdvancedErrorWithCustomCode(c *gin.Context, httpStatusCode, custom
 		messages := e.Messages()
 		c.JSON(e.GetType().GetHttpCode(), &ApiBody{
 			Success: false,
-			Message: e.Error(),
+			Message: safeErrorMessage(e),
 			Code:    customBusinessCode,
 			Causes:  messages.Causes(),
 		})
@@ -95,7 +104,7 @@ func ApiOutputError(c *gin.Context, err error) {
 		messages := e.Messages()
 		c.JSON(e.GetType().GetHttpCode(), &ApiBody{
 			Success: false,
-			Message: e.Error(),
+			Message: safeErrorMessage(e),
 			Causes:  messages.Causes(),
 		})
 	} else {

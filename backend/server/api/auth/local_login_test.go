@@ -38,10 +38,11 @@ import (
 
 type testLocalDirectory struct {
 	testAccessAuthorizer
-	localUserID uint64
-	credential  *access.LocalCredential
-	user        *access.AccessUser
-	replaced    bool
+	localUserID  uint64
+	authorizeErr errors.Error
+	credential   *access.LocalCredential
+	user         *access.AccessUser
+	replaced     bool
 }
 
 func (d *testLocalDirectory) BootstrapLocalAdministrator(access.LocalBootstrapInput) (*access.AccessUser, bool, errors.Error) {
@@ -63,6 +64,9 @@ func (d *testLocalDirectory) ResolveActiveLocalCredentialByUserID(uint64) (*acce
 }
 
 func (d *testLocalDirectory) AuthorizeLocalSession(userID uint64) (*access.Principal, errors.Error) {
+	if d.authorizeErr != nil {
+		return nil, d.authorizeErr
+	}
 	if userID != d.localUserID {
 		return nil, errors.Unauthorized.New("unexpected local user")
 	}
@@ -123,6 +127,39 @@ func TestLocalSessionAdmissionAndForcedChangeBoundary(t *testing.T) {
 	}
 	if !response.Authenticated || !response.MustChangePassword || response.AuthenticationMethod != "local" {
 		t.Fatalf("userinfo = %#v, want authenticated forced-change local user", response)
+	}
+}
+
+// TestLocalSessionTreatsTransientAuthorizationErrorAsRetryableNotLoggedOut
+// mirrors TestOIDCAuthenticationTreatsTransientAuthorizationErrorAsRetryableNotLoggedOut
+// for the local-password session path: a transient AuthorizeLocalSession
+// failure (for example a database error) must not be treated the same as an
+// invalid session. It must leave the session cookie alone and respond
+// retryable, not silently fall through to an indistinguishable-from-logout 401.
+func TestLocalSessionTreatsTransientAuthorizationErrorAsRetryableNotLoggedOut(t *testing.T) {
+	idp := newFakeIdP(t)
+	service, _ := newTestService(t, idp)
+	directory := &testLocalDirectory{localUserID: 42, authorizeErr: errors.Default.New("database is unavailable")}
+	service.access = directory
+	service.local = newTestLocalRuntime(t)
+	router := newTestRouter(service)
+	router.GET("/protected", func(c *gin.Context) { c.Status(http.StatusNoContent) })
+
+	session, _, err := oidchelper.IssueSession(service.runtimeCfg, "local-transient-error-session", localSessionProvider, "42", "", "Local Admin")
+	if err != nil {
+		t.Fatalf("IssueSession: %v", err)
+	}
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	request.AddCookie(&http.Cookie{Name: oidchelper.SessionCookieName, Value: session})
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 for a transient local authorization failure, got %d: %s", response.Code, response.Body.String())
+	}
+	if got := response.Header().Get("Set-Cookie"); got != "" {
+		t.Fatalf("a transient local authorization failure must not clear a valid session cookie, got Set-Cookie: %q", got)
 	}
 }
 

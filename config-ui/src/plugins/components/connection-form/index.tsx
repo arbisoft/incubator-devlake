@@ -49,36 +49,36 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: Props) => {
   const connection = useAppSelector((state) => selectConnection(state, `${plugin}-${connectionId}`));
   const selectedConnection = connectionDetail ?? connection;
 
-  useEffect(() => {
+  // Reset during render, not in an effect: an effect-based reset ran after
+  // field components' own mount effects and silently wiped their defaults.
+  const resetKey = `${plugin}:${connectionId ?? ''}`;
+  const [lastResetKey, setLastResetKey] = useState<string | null>(null);
+  if (lastResetKey !== resetKey) {
+    setLastResetKey(resetKey);
     setType(connectionId ? 'update' : 'create');
-  }, [connectionId]);
-
-  useEffect(() => {
-    let canceled = false;
-
     setConnectionDetail(undefined);
     setErrors({});
+    setValues(connectionId && connection ? pick(connection, CONNECTION_FORM_FIELDS) : {});
+  }
 
+  // Async refetch stays in an effect; it only adds real saved values on top
+  // of the already-reset state above, so it can't reintroduce the race.
+  useEffect(() => {
     if (!connectionId) {
-      setValues({});
       return;
     }
-
-    setValues(connection ? pick(connection, CONNECTION_FORM_FIELDS) : {});
-
+    let canceled = false;
     API.connection
       .get(plugin, connectionId)
       .then((res) => {
         if (canceled) {
           return;
         }
-
         setConnectionDetail(res);
         setValues(pick(res, CONNECTION_FORM_FIELDS));
         setErrors({});
       })
       .catch(() => undefined);
-
     return () => {
       canceled = true;
     };
@@ -122,6 +122,7 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: Props) => {
               organization: isEqual(selectedConnection?.organization, values.organization)
                 ? undefined
                 : values.organization,
+              org: isEqual(selectedConnection?.org, values.org) ? undefined : values.org,
               organizationId: isEqual(selectedConnection?.organizationId, values.organizationId)
                 ? undefined
                 : values.organizationId,
@@ -171,6 +172,7 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: Props) => {
                 'dbUrl',
                 'companyId',
                 'organization',
+                'org',
                 'organizationId',
                 'loginUrl',
                 'instanceUrl',

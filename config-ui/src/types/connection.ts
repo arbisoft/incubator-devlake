@@ -39,6 +39,7 @@ export interface IConnectionAPI {
   rateLimitPerHour?: number;
   organization?: string;
   organizationId?: string;
+  org?: string;
   loginUrl?: string;
   instanceUrl?: string;
   apiVersion?: string;
@@ -105,6 +106,7 @@ export interface IConnection {
   rateLimitPerHour?: number;
   organization?: string;
   organizationId?: string;
+  org?: string;
   loginUrl?: string;
   instanceUrl?: string;
   apiVersion?: string;
