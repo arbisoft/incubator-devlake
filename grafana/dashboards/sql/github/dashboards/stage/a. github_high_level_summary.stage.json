@@ -56,7 +56,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
+              "url": "/grafana/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
             }
           ],
           "mappings": [],
@@ -151,7 +151,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
+              "url": "/grafana/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
             }
           ],
           "mappings": [],
@@ -240,7 +240,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
+              "url": "/grafana/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
             }
           ],
           "mappings": [],
@@ -321,7 +321,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
+              "url": "/grafana/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
             }
           ],
           "mappings": [],
@@ -402,7 +402,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
+              "url": "/grafana/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
             }
           ],
           "mappings": [],
@@ -483,7 +483,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-8"
+              "url": "/grafana/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-8"
             }
           ],
           "mappings": [],
@@ -573,7 +573,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&${__all_variables}&${__url_time_range}&viewPanel=panel-6"
+              "url": "/grafana/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&${__all_variables}&${__url_time_range}&viewPanel=panel-6"
             }
           ],
           "mappings": [],
@@ -663,7 +663,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-4"
+              "url": "/grafana/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-4"
             }
           ],
           "mappings": [],
@@ -855,7 +855,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-4"
+              "url": "/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-4"
             }
           ],
           "mappings": [],
@@ -955,7 +955,7 @@
             {
               "targetBlank": true,
               "title": "Detail",
-              "url": "/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
             }
           ],
           "mappings": []
@@ -1051,7 +1051,7 @@
             {
               "targetBlank": true,
               "title": "Detail",
-              "url": "/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
             }
           ],
           "mappings": []
@@ -1140,7 +1140,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/cfxmvb4cu2gw0d/d-issue-overview?orgId=1&var-interval=1w&timezone=browser&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/grafana/d/cfxmvb4cu2gw0d/d-issue-overview?orgId=1&var-interval=1w&timezone=browser&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
             }
           ],
           "mappings": [],
@@ -1226,7 +1226,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/cfxmvb4cu2gw0d/d-issue-overview?orgId=1&var-interval=1w&timezone=browser&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/grafana/d/cfxmvb4cu2gw0d/d-issue-overview?orgId=1&var-interval=1w&timezone=browser&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
             }
           ],
           "mappings": [],
@@ -1310,7 +1310,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
             }
           ],
           "mappings": [],
@@ -1395,7 +1395,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
             }
           ],
           "mappings": [],
@@ -1480,7 +1480,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
             }
           ],
           "mappings": [],
@@ -1565,7 +1565,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
             }
           ],
           "mappings": [],
@@ -1650,7 +1650,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
             }
           ],
           "mappings": [],
@@ -1821,7 +1821,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
             }
           ],
           "mappings": [],
@@ -2184,7 +2184,7 @@
             {
               "targetBlank": true,
               "title": "Detail",
-              "url": "/d/KXWvOFQnc/i-github-classic?orgId=1&${__all_variables}&${__url_time_range}&var-interval=DAYOFMONTH&viewPanel=panel-109"
+              "url": "/grafana/d/KXWvOFQnc/i-github-classic?orgId=1&${__all_variables}&${__url_time_range}&var-interval=DAYOFMONTH&viewPanel=panel-109"
             }
           ],
           "mappings": [],
@@ -2366,7 +2366,7 @@
             {
               "targetBlank": true,
               "title": "Detail",
-              "url": "/d/KXWvOFQnc/i-github-classic?orgId=1&${__all_variables}&${__url_time_range}&var-interval=DAYOFMONTH&viewPanel=panel-109"
+              "url": "/grafana/d/KXWvOFQnc/i-github-classic?orgId=1&${__all_variables}&${__url_time_range}&var-interval=DAYOFMONTH&viewPanel=panel-109"
             }
           ],
           "mappings": [],
@@ -2433,7 +2433,7 @@
             {
               "targetBlank": true,
               "title": "Detail",
-              "url": "/d/KXWvOFQnc/i-github-classic?orgId=1&${__all_variables}&${__url_time_range}&var-interval=DAYOFMONTH&viewPanel=panel-109"
+              "url": "/grafana/d/KXWvOFQnc/i-github-classic?orgId=1&${__all_variables}&${__url_time_range}&var-interval=DAYOFMONTH&viewPanel=panel-109"
             }
           ],
           "mappings": [],
@@ -2500,7 +2500,7 @@
             {
               "targetBlank": true,
               "title": "Detail",
-              "url": "/d/KXWvOFQnc/i-github-classic?orgId=1&${__all_variables}&${__url_time_range}&var-interval=DAYOFMONTH&viewPanel=panel-109"
+              "url": "/grafana/d/KXWvOFQnc/i-github-classic?orgId=1&${__all_variables}&${__url_time_range}&var-interval=DAYOFMONTH&viewPanel=panel-109"
             }
           ],
           "mappings": [],
@@ -2832,6 +2832,7 @@
   "templating": {
     "list": [
       {
+        "allowCustomValue": false,
         "current": {
           "text": [
             "DevLake - Pilot"
@@ -2844,13 +2845,13 @@
           "type": "mysql",
           "uid": "devlake-mysql"
         },
-        "definition": "SELECT DISTINCT pm.project_name  \nFROM project_mapping pm \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nORDER BY pm.project_name ",
+        "definition": "select distinct upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY pm.project_name ",
         "includeAll": true,
         "label": "Project",
         "multi": true,
         "name": "project",
         "options": [],
-        "query": "SELECT DISTINCT pm.project_name  \nFROM project_mapping pm \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nORDER BY pm.project_name ",
+        "query": "select distinct upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY pm.project_name ",
         "refresh": 1,
         "regex": "",
         "type": "query"
@@ -2908,8 +2909,8 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "browser",
+  "timezone": "utc",
   "title": "A. GitHub High Level Summary",
   "uid": "efxmn9vz2bv28b",
-  "version": 39
+  "version": 41
 }
