@@ -69,7 +69,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
             }
           ],
           "mappings": [],
@@ -281,7 +281,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-6"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-6"
             }
           ],
           "mappings": []
@@ -488,7 +488,7 @@
             {
               "targetBlank": true,
               "title": "Detail",
-              "url": "/grafana/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-5"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-5"
             }
           ],
           "mappings": []
@@ -582,7 +582,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-6"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-6"
             }
           ],
           "mappings": []
@@ -676,7 +676,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-3"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-3"
             }
           ],
           "mappings": []
@@ -764,7 +764,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-12"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-12"
             }
           ],
           "mappings": [],
@@ -858,7 +858,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-11"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-11"
             }
           ],
           "mappings": [],
@@ -952,7 +952,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-16"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-16"
             }
           ],
           "mappings": [],
@@ -1037,7 +1037,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-15"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-15"
             }
           ],
           "mappings": [],
@@ -1122,7 +1122,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-9"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-9"
             }
           ],
           "mappings": [],
@@ -1295,7 +1295,7 @@
             {
               "targetBlank": true,
               "title": "Detail",
-              "url": "/grafana/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-21"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-21"
             }
           ],
           "mappings": [],
@@ -1388,7 +1388,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-14"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-14"
             }
           ],
           "mappings": [],
@@ -1482,7 +1482,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-8"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-8"
             }
           ],
           "mappings": [],
@@ -1567,7 +1567,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-7"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-7"
             }
           ],
           "mappings": [],
@@ -1652,7 +1652,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-17"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-17"
             }
           ],
           "mappings": [],
@@ -1737,7 +1737,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-10"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-10"
             }
           ],
           "mappings": [],
@@ -1831,7 +1831,7 @@
             {
               "targetBlank": true,
               "title": "Detail",
-              "url": "/grafana/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-21"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-21"
             }
           ],
           "mappings": [],
@@ -1926,7 +1926,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-13"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-13"
             }
           ],
           "mappings": [],
@@ -2020,7 +2020,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-18"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-18"
             }
           ],
           "mappings": [],
@@ -2105,7 +2105,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-19"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-19"
             }
           ],
           "mappings": [],
@@ -2190,7 +2190,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&var-project=$__all&var-board_id=$__all&var-developer_id=$__all&from=now-30d&to=now&viewPanel=panel-20"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&var-project=$__all&var-board_id=$__all&var-developer_id=$__all&from=now-30d&to=now&viewPanel=panel-20"
             }
           ],
           "mappings": [],
@@ -2624,7 +2624,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/bfyfs8x6mh4owf/d-tickets-overview?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&var-interval=1w&viewPanel=panel-6"
+              "url": "/d/bfyfs8x6mh4owf/d-tickets-overview?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&var-interval=1w&viewPanel=panel-6"
             }
           ],
           "mappings": [],
@@ -2718,7 +2718,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/bfyfs8x6mh4owf/d-tickets-overview?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&var-interval=1w&viewPanel=panel-7"
+              "url": "/d/bfyfs8x6mh4owf/d-tickets-overview?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&var-interval=1w&viewPanel=panel-7"
             }
           ],
           "mappings": [],
@@ -2908,7 +2908,7 @@
             {
               "targetBlank": true,
               "title": "Monthly Distribution",
-              "url": "/grafana/d/cfybfjtw5xc00c/z-jira-ticket-grooming-dashboard?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-5"
+              "url": "/d/cfybfjtw5xc00c/z-jira-ticket-grooming-dashboard?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-5"
             }
           ],
           "mappings": [],
@@ -3088,7 +3088,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/cfybfjtw5xc00c/z-jira-ticket-grooming-dashboard?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-3"
+              "url": "/d/cfybfjtw5xc00c/z-jira-ticket-grooming-dashboard?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-3"
             }
           ],
           "mappings": [],
@@ -3171,7 +3171,7 @@
             {
               "targetBlank": true,
               "title": "Detail",
-              "url": "/grafana/d/cfybfjtw5xc00c/z-jira-ticket-grooming-dashboard?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
+              "url": "/d/cfybfjtw5xc00c/z-jira-ticket-grooming-dashboard?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
             }
           ],
           "mappings": [],
@@ -3274,7 +3274,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-13"
+              "url": "/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-13"
             }
           ],
           "mappings": []
@@ -3372,7 +3372,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-14"
+              "url": "/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-14"
             }
           ],
           "mappings": []
@@ -3470,7 +3470,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-10"
+              "url": "/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-10"
             }
           ],
           "mappings": []
@@ -3556,7 +3556,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
+              "url": "/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
             }
           ],
           "mappings": [],
@@ -3639,7 +3639,7 @@
             {
               "targetBlank": true,
               "title": "Detail",
-              "url": "/grafana/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-4"
+              "url": "/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-4"
             }
           ],
           "mappings": [],
@@ -3722,7 +3722,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-6"
+              "url": "/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-6"
             }
           ],
           "mappings": [],
@@ -3813,7 +3813,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-8"
+              "url": "/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-8"
             }
           ],
           "mappings": [],
@@ -3896,7 +3896,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-3"
+              "url": "/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-3"
             }
           ],
           "mappings": [],
@@ -3979,7 +3979,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-5"
+              "url": "/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-5"
             }
           ],
           "mappings": [],
@@ -4070,7 +4070,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-6"
+              "url": "/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-6"
             }
           ],
           "mappings": [],
@@ -4163,7 +4163,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-9"
+              "url": "/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-9"
             }
           ],
           "mappings": [],
@@ -4246,7 +4246,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/grafana/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-12"
+              "url": "/d/afyj7pcwm99tsa/c-ticket-hygiene?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-12"
             }
           ],
           "mappings": [],

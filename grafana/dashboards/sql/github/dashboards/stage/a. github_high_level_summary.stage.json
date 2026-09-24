@@ -56,7 +56,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
+              "url": "/grafana/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
             }
           ],
           "mappings": [],
@@ -151,7 +151,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
+              "url": "/grafana/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
             }
           ],
           "mappings": [],
@@ -240,7 +240,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
+              "url": "/grafana/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
             }
           ],
           "mappings": [],
@@ -321,7 +321,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
+              "url": "/grafana/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
             }
           ],
           "mappings": [],
@@ -402,7 +402,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
+              "url": "/grafana/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
             }
           ],
           "mappings": [],
@@ -483,7 +483,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-8"
+              "url": "/grafana/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1m&${__all_variables}&${__url_time_range}&viewPanel=panel-8"
             }
           ],
           "mappings": [],
@@ -573,7 +573,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&${__all_variables}&${__url_time_range}&viewPanel=panel-6"
+              "url": "/grafana/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&${__all_variables}&${__url_time_range}&viewPanel=panel-6"
             }
           ],
           "mappings": [],
@@ -663,7 +663,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-4"
+              "url": "/grafana/d/efxmt33dl16gwf/c-pr-health?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-4"
             }
           ],
           "mappings": [],
@@ -855,7 +855,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-4"
+              "url": "/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-4"
             }
           ],
           "mappings": [],
@@ -955,7 +955,7 @@
             {
               "targetBlank": true,
               "title": "Detail",
-              "url": "/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
             }
           ],
           "mappings": []
@@ -1051,7 +1051,7 @@
             {
               "targetBlank": true,
               "title": "Detail",
-              "url": "/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
             }
           ],
           "mappings": []
@@ -1140,7 +1140,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/cfxmvb4cu2gw0d/d-issue-overview?orgId=1&var-interval=1w&timezone=browser&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/grafana/d/cfxmvb4cu2gw0d/d-issue-overview?orgId=1&var-interval=1w&timezone=browser&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
             }
           ],
           "mappings": [],
@@ -1226,7 +1226,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/cfxmvb4cu2gw0d/d-issue-overview?orgId=1&var-interval=1w&timezone=browser&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/grafana/d/cfxmvb4cu2gw0d/d-issue-overview?orgId=1&var-interval=1w&timezone=browser&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
             }
           ],
           "mappings": [],
@@ -1310,7 +1310,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
             }
           ],
           "mappings": [],
@@ -1395,7 +1395,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
             }
           ],
           "mappings": [],
@@ -1480,7 +1480,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
             }
           ],
           "mappings": [],
@@ -1565,7 +1565,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
             }
           ],
           "mappings": [],
@@ -1650,7 +1650,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
             }
           ],
           "mappings": [],
@@ -1821,7 +1821,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/grafana/d/efxmw34cjhszkc/e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
             }
           ],
           "mappings": [],
@@ -2184,7 +2184,7 @@
             {
               "targetBlank": true,
               "title": "Detail",
-              "url": "/d/KXWvOFQnc/i-github-classic?orgId=1&${__all_variables}&${__url_time_range}&var-interval=DAYOFMONTH&viewPanel=panel-109"
+              "url": "/grafana/d/KXWvOFQnc/i-github-classic?orgId=1&${__all_variables}&${__url_time_range}&var-interval=DAYOFMONTH&viewPanel=panel-109"
             }
           ],
           "mappings": [],
@@ -2366,7 +2366,7 @@
             {
               "targetBlank": true,
               "title": "Detail",
-              "url": "/d/KXWvOFQnc/i-github-classic?orgId=1&${__all_variables}&${__url_time_range}&var-interval=DAYOFMONTH&viewPanel=panel-109"
+              "url": "/grafana/d/KXWvOFQnc/i-github-classic?orgId=1&${__all_variables}&${__url_time_range}&var-interval=DAYOFMONTH&viewPanel=panel-109"
             }
           ],
           "mappings": [],
@@ -2433,7 +2433,7 @@
             {
               "targetBlank": true,
               "title": "Detail",
-              "url": "/d/KXWvOFQnc/i-github-classic?orgId=1&${__all_variables}&${__url_time_range}&var-interval=DAYOFMONTH&viewPanel=panel-109"
+              "url": "/grafana/d/KXWvOFQnc/i-github-classic?orgId=1&${__all_variables}&${__url_time_range}&var-interval=DAYOFMONTH&viewPanel=panel-109"
             }
           ],
           "mappings": [],
@@ -2500,7 +2500,7 @@
             {
               "targetBlank": true,
               "title": "Detail",
-              "url": "/d/KXWvOFQnc/i-github-classic?orgId=1&${__all_variables}&${__url_time_range}&var-interval=DAYOFMONTH&viewPanel=panel-109"
+              "url": "/grafana/d/KXWvOFQnc/i-github-classic?orgId=1&${__all_variables}&${__url_time_range}&var-interval=DAYOFMONTH&viewPanel=panel-109"
             }
           ],
           "mappings": [],
