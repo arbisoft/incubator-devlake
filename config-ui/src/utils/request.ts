@@ -41,7 +41,36 @@ export type RequestConfig = {
 
 const isLoginRoute = () => window.location.pathname.replace(/\/+$/, '').endsWith('/login');
 
-let redirectingToLogin = false;
+type SessionStatus = { authenticated?: boolean };
+
+let verifyingSession = false;
+
+// A 401 on one request does not by itself prove the session is dead: it can
+// also be a bug local to that one endpoint (a wrong identity check, or a
+// transient error re-authorizing an otherwise valid session), which is
+// otherwise indistinguishable from a real logout here. Confirm against the
+// session's own source of truth - /auth/userinfo, which always answers
+// gracefully instead of 401ing - before forcing a full redirect, so one
+// endpoint's bug can no longer sign an otherwise-authenticated user out.
+const redirectToLoginIfSessionIsReallyGone = async () => {
+  if (verifyingSession || isLoginRoute()) {
+    return;
+  }
+  verifyingSession = true;
+  try {
+    const status = await instance.get<SessionStatus>('/auth/userinfo').then((res) => res.data);
+    if (status?.authenticated !== false) {
+      return;
+    }
+  } catch {
+    // Could not confirm either way; do not redirect on ambiguous evidence.
+    return;
+  } finally {
+    verifyingSession = false;
+  }
+  const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+  window.location.replace(`/login?return_url=${returnUrl}`);
+};
 
 instance.interceptors.response.use(
   (response) => response,
@@ -52,10 +81,8 @@ instance.interceptors.response.use(
       window.location.replace('/db-migrate');
     }
 
-    if (status === 401 && !isLoginRoute() && !redirectingToLogin) {
-      redirectingToLogin = true;
-      const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
-      window.location.replace(`/login?return_url=${returnUrl}`);
+    if (status === 401 && !isLoginRoute()) {
+      void redirectToLoginIfSessionIsReallyGone();
     }
 
     return Promise.reject(error);

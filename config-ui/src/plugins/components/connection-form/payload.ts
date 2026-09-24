@@ -40,6 +40,7 @@ export const CONNECTION_FORM_FIELDS = [
   'companyId',
   'organization',
   'organizationId',
+  'org',
   'workspaceSlug',
   'loginUrl',
   'instanceUrl',

@@ -119,11 +119,12 @@ func (s *Service) OIDCAuthentication() gin.HandlerFunc {
 			if accessErr != nil {
 				if accessErr.GetType() == errors.Unauthorized || accessErr.GetType() == errors.Forbidden {
 					s.logger.Info("native session denied: local user_id=%d", userID)
-				} else {
-					s.logger.Error(accessErr, "native session authorization failed local user_id=%d", userID)
+					oidchelper.ClearSessionCookie(c, cfg)
+					c.Next()
+					return
 				}
-				oidchelper.ClearSessionCookie(c, cfg)
-				c.Next()
+				s.logger.Error(accessErr, "native session authorization failed local user_id=%d", userID)
+				s.abortSessionVerificationUnavailable(c, accessErr)
 				return
 			}
 			c.Set(common.USER, &common.User{Name: claims.Name, Email: claims.Email})
@@ -149,10 +150,11 @@ func (s *Service) OIDCAuthentication() gin.HandlerFunc {
 				if accessErr.GetType() == errors.Unauthorized || accessErr.GetType() == errors.Forbidden {
 					s.logger.Info("native session denied: provider=%s email=%s", claims.Provider, claims.Email)
 					oidchelper.ClearSessionCookie(c, cfg)
-				} else {
-					s.logger.Error(accessErr, "native session authorization failed provider=%s email=%s", claims.Provider, claims.Email)
+					c.Next()
+					return
 				}
-				c.Next()
+				s.logger.Error(accessErr, "native session authorization failed provider=%s email=%s", claims.Provider, claims.Email)
+				s.abortSessionVerificationUnavailable(c, accessErr)
 				return
 			}
 			access.SetPrincipal(c, principal)
@@ -170,6 +172,18 @@ func (s *Service) OIDCAuthentication() gin.HandlerFunc {
 		s.bumpLastSeen(claims.ID)
 		c.Next()
 	}
+}
+
+// abortSessionVerificationUnavailable responds to a transient failure while
+// re-authorizing an otherwise well-formed session (for example, a database
+// error looking up the access user). This must not be treated the same as an
+// invalid or expired session: the caller's cookie is left intact and the
+// client should retry, not be signed out. It terminates the middleware chain
+// itself so RequireAuth never sees a missing user and turns this into an
+// unrelated 401 that the frontend cannot distinguish from a real logout.
+func (s *Service) abortSessionVerificationUnavailable(c *gin.Context, err errors.Error) {
+	shared.ApiOutputError(c, errors.Unavailable.Wrap(err, "unable to verify session, please retry"))
+	c.Abort()
 }
 
 func sessionClaims(c *gin.Context) (*oidchelper.SessionClaims, bool) {

@@ -164,7 +164,7 @@ func (s *Service) LocalLogin(c *gin.Context) {
 	}
 	loginName, err := normalizeLocalUsername(input.LoginName)
 	if err != nil || !validLocalLoginPassword(input.Password) {
-		fail(c, http.StatusBadRequest, "invalid local login request", err)
+		localLoginFailure(c)
 		return
 	}
 	reservation, allowed, throttleErr := s.reserveLocalLoginAttempt(loginName, c.ClientIP())

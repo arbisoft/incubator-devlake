@@ -41,7 +41,7 @@ export const Organization = ({ initialValues, values, setValues, setErrors }: Pr
     setErrors({
       org: values.endpoint !== 'https://sonarcloud.io/api/' || values.org ? '' : 'organization is required',
     });
-  }, [values.org]);
+  }, [values.org, values.endpoint]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setValues({
