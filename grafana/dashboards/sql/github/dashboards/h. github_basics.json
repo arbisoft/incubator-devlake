@@ -1,0 +1,472 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 89,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "-- Averages lead_time_minutes converted to days per assignee for issues created in the window, scoped to boards mapped to the selected project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 23,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.75,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT replace(COALESCE(\n      NULLIF(TRIM(a.full_name), ''),\n      NULLIF(TRIM(a.user_name), ''),\n      NULLIF(TRIM(ia.assignee_name), ''),\n      NULLIF(TRIM(a.email), ''),\n      '(unmapped)'\n    ), '-', ' ') AS member, \n    avg(i.lead_time_minutes / 1440.0) AS `Days`\nFROM issue_assignees ia\nJOIN issues i        ON i.id = ia.issue_id\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                      AND pm.`table` = 'boards'\n                      AND pm.project_name IN (${project})\nJOIN accounts a       ON a.id = ia.assignee_id\nWHERE i.id LIKE 'github:%'\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.created_date)\n  AND ia.assignee_id IN ( $developer_id )\nGROUP BY member\norder by `Days` desc\nLIMIT 100",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Average Time for Issue Resolution (By Individual)",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Per assignee, counts issues created in the window split into Task versus Bug by whether original_type contains 'bug', scoped to boards mapped to the selected project, top 20 by total issues.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
+      "id": 2,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.75,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "normal",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  REPLACE(COALESCE(\n    NULLIF(TRIM(a.full_name), ''),\n    NULLIF(TRIM(a.user_name), ''),\n    NULLIF(TRIM(a.email), ''),\n    NULLIF(TRIM(ia.assignee_name), ''),\n    'unassigned'\n  ), '-', ' ') AS assignee,\n  SUM(CASE WHEN i.original_type not like '%bug%' THEN 1 ELSE 0 END) AS Task,\n  SUM(CASE WHEN i.original_type like '%bug%' THEN 1 ELSE 0 END) AS Bug\nFROM issue_assignees ia\nJOIN issues i           ON i.id = ia.issue_id\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project:sqlstring})\nJOIN accounts a       ON a.id = ia.assignee_id\nWHERE i.id LIKE 'github:%'\n  AND bi.board_id IN (${repo_id:sqlstring})\n  AND $__timeFilter(i.created_date)\n  AND ia.assignee_id IN ( $developer_id )\nGROUP BY assignee\nORDER BY (Bug + Task) DESC\nLIMIT 20;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Work Allocation by Tasks and Bugs",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Per assignee, counts bugs created in the window split into Done versus Pending by status, scoped to boards mapped to the selected project, top 20 by total issues.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      },
+      "id": 3,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.75,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "normal",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  replace(COALESCE(\n    NULLIF(TRIM(a.full_name), ''),\n    NULLIF(TRIM(a.user_name), ''),\n    NULLIF(TRIM(ia.assignee_name), ''),\n    'unassigned'\n  ), '-', ' ') AS assignee,\n  SUM(CASE WHEN i.status = 'DONE' THEN 1 ELSE 0 END) AS Done,\n  SUM(CASE WHEN i.status <> 'DONE' THEN 1 ELSE 0 END) AS Pending\nFROM issue_assignees ia\nJOIN issues i           ON i.id = ia.issue_id\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nJOIN accounts a       ON a.id = ia.assignee_id \nWHERE i.id LIKE 'github:%'\n  AND i.original_type like '%bug%'\n  AND bi.board_id IN (${repo_id}) \n  AND $__timeFilter(i.created_date)\n  AND ia.assignee_id IN ( $developer_id )\nGROUP BY assignee\nORDER BY (Done + Pending) DESC\nLIMIT 20;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Bug Allocation (Done/Pending Distribution)",
+      "type": "barchart"
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 41,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "1m",
+          "value": "1m"
+        },
+        "label": "Time Interval",
+        "name": "interval",
+        "options": [
+          {
+            "selected": true,
+            "text": "Month",
+            "value": "1m"
+          },
+          {
+            "selected": false,
+            "text": "Week",
+            "value": "1w"
+          },
+          {
+            "selected": false,
+            "text": "Day",
+            "value": "1d"
+          }
+        ],
+        "query": "Month : 1m, Week : 1w, Day : 1d",
+        "type": "custom"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "devlake-mysql"
+        },
+        "definition": "select DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name ",
+        "includeAll": true,
+        "label": "Project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "select DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name ",
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "devlake-mysql"
+        },
+        "definition": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nAND pm.project_name IN ( $project )\nORDER BY text",
+        "includeAll": true,
+        "label": "Repo",
+        "multi": true,
+        "name": "repo_id",
+        "options": [],
+        "query": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nAND pm.project_name IN ( $project )\nORDER BY text",
+        "refresh": 1,
+        "regex": "/^(?<text>.*)--(?<value>.*)$/",
+        "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "devlake-mysql"
+        },
+        "definition": "WITH scoped_repos AS (\n  SELECT r.id\n  FROM repos r\n  WHERE r.id LIKE 'github:%'\n    AND r.deleted = 0\n    AND r.id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = r.id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN ( ${project} ))\n),\nscoped_accounts AS (\n  -- PR authors\n  SELECT pr.author_id AS account_id\n  FROM pull_requests pr\n  JOIN scoped_repos sr ON sr.id = pr.base_repo_id\n  WHERE pr.author_id LIKE 'github:%'\n  UNION\n  -- reviewers and commenters\n  SELECT cmt.account_id\n  FROM pull_request_comments cmt\n  JOIN pull_requests pr ON pr.id = cmt.pull_request_id\n  JOIN scoped_repos sr  ON sr.id = pr.base_repo_id\n  WHERE cmt.account_id LIKE 'github:%'\n  UNION\n  -- issue assignees, scoped through boards (github board ids match repo ids)\n  SELECT ia.assignee_id\n  FROM issue_assignees ia\n  JOIN board_issues bi ON bi.issue_id = ia.issue_id\n  WHERE ia.assignee_id LIKE 'github:%'\n    AND bi.board_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = bi.board_id\n                   AND pm.`table` = 'boards'\n                   AND pm.project_name IN ( ${project} ))\n)\nSELECT CONCAT(\n         REPLACE(COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           '(unmapped)'\n         ), '-', ' '),\n         '--', a.id) AS Name\nFROM accounts a\nJOIN scoped_accounts sa ON sa.account_id = a.id\nGROUP BY Name\nORDER BY Name",
+        "description": "",
+        "includeAll": true,
+        "label": "Developer",
+        "multi": true,
+        "name": "developer_id",
+        "options": [],
+        "query": "WITH scoped_repos AS (\n  SELECT r.id\n  FROM repos r\n  WHERE r.id LIKE 'github:%'\n    AND r.deleted = 0\n    AND r.id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = r.id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN ( ${project} ))\n),\nscoped_accounts AS (\n  -- PR authors\n  SELECT pr.author_id AS account_id\n  FROM pull_requests pr\n  JOIN scoped_repos sr ON sr.id = pr.base_repo_id\n  WHERE pr.author_id LIKE 'github:%'\n  UNION\n  -- reviewers and commenters\n  SELECT cmt.account_id\n  FROM pull_request_comments cmt\n  JOIN pull_requests pr ON pr.id = cmt.pull_request_id\n  JOIN scoped_repos sr  ON sr.id = pr.base_repo_id\n  WHERE cmt.account_id LIKE 'github:%'\n  UNION\n  -- issue assignees, scoped through boards (github board ids match repo ids)\n  SELECT ia.assignee_id\n  FROM issue_assignees ia\n  JOIN board_issues bi ON bi.issue_id = ia.issue_id\n  WHERE ia.assignee_id LIKE 'github:%'\n    AND bi.board_id IN ( ${repo_id} )\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id  = bi.board_id\n                   AND pm.`table` = 'boards'\n                   AND pm.project_name IN ( ${project} ))\n)\nSELECT CONCAT(\n         REPLACE(COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           '(unmapped)'\n         ), '-', ' '),\n         '--', a.id) AS Name\nFROM accounts a\nJOIN scoped_accounts sa ON sa.account_id = a.id\nGROUP BY Name\nORDER BY Name",
+        "refresh": 1,
+        "regex": "/^(?<text>.*)--(?<value>.*)$/",
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "H. GitHub Basics",
+  "uid": "ffxtv9s62t9moe",
+  "version": 23
+}

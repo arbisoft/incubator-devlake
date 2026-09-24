@@ -1,0 +1,1853 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 98,
+  "links": [],
+  "panels": [
+    {
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "# Tickets Overview",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.6.2",
+      "title": "Dashboard D",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Per time bucket, unions issue creation events (by creator) and DONE resolution events (by assignee) and counts each side.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 3
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH ev AS (\n  SELECT i.created_date AS ts, 1 AS opened, 0 AS closed\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter( i.created_date ) \n    AND i.type <> 'EPIC'\n    AND i.assignee_id IN ( $developer_id )\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n    )\n  UNION ALL\n  SELECT i.resolution_date, 0, 1\n  FROM issues i\n  \nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter( i.created_date ) \n  AND i.type <> 'EPIC'\n  AND i.assignee_id IN ( $developer_id )\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )\n  AND i.status = 'DONE'\n  AND i.resolution_date IS NOT NULL\n)\nSELECT $__timeGroup(ts, $interval)                                        AS time,\n       SUM(opened)                                                   AS Opened,\n       SUM(closed)                                                   AS Closed\nFROM ev\nGROUP BY time\nORDER BY time;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Created VS Closed Trend",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroup(i.created_date, $interval)     AS time,\n  SUM(CASE WHEN i.type = 'BUG' THEN 1 ELSE 0 END) AS Bugs,\n  SUM(CASE WHEN i.type = 'TASK' THEN 1 ELSE 0 END) AS Tasks,\n  SUM(CASE WHEN i.type = 'STORY' THEN 1 ELSE 0 END) AS Stories,\n  SUM(CASE WHEN i.type = 'SUBTASK' THEN 1 ELSE 0 END) AS `Sub Tasks`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.assignee_id IN ( $developer_id )AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )\nGROUP BY time\nORDER BY time;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Ticket Type Mix Trend",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 21
+      },
+      "id": 4,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH d AS (\n  SELECT i.type                                        AS type,\n         COALESCE(NULLIF(TRIM(i.priority), ''), '(none)')   AS priority,\n         i.lead_time_minutes / 1440.0                       AS days\n  FROM issues i\n  WHERE i.status = 'DONE'\n    AND i.lead_time_minutes IS NOT NULL\n    AND i.lead_time_minutes > 0\n    AND i.id LIKE 'jira:%'\n    AND $__timeFilter(i.resolution_date)\n    AND i.assignee_id IN ( $developer_id )\n    AND i.type <> 'EPIC'\n),\nranked AS (\n  SELECT type, priority, days,\n         CUME_DIST() OVER (PARTITION BY type, priority ORDER BY days) AS cd\n  FROM d\n)\nSELECT type AS Type,\n       priority AS Priority,\n       COUNT(*)                                            AS `Total Issues`,\n       ROUND(MIN(CASE WHEN cd >= 0.50 THEN days END), 1)  AS `Median Days`,\n       ROUND(MIN(CASE WHEN cd >= 0.75 THEN days END), 1)  AS `P75 Days`\nFROM ranked\nGROUP BY type, priority\nHAVING `Total Issues` >= 3\nORDER BY type, `Median Days` DESC;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Tickets Lead Time",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Lists in progress tickets not updated in over 14 days with their assignee and days since the last update.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URL"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Open in Jira",
+                    "url": "${__data.fields.URL}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Issue"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 522
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Lead Time Days"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 134
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Developer"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 262
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 30
+      },
+      "id": 5,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT i.assignee_name AS Developer, \n  i.title AS Issue,\n  DATEDIFF(CURDATE(), i.updated_date) AS `Lead Time Days`,\n  i.url AS URL\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND i.status = 'IN_PROGRESS'\n  AND DATEDIFF(CURDATE(), i.updated_date) > 14\n  AND $__timeFilter(i.updated_date) \n  AND i.assignee_id IN ($developer_id )\n  AND i.type <> 'EPIC'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )\nORDER BY `Lead Time Days` DESC",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Aging Work In Progress",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroup(i.created_date, $interval) as time,\n  COUNT(1) AS `Bug Reported`,\n  0 AS `Ticket Delivered`\nFROM issues i \nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date) \n  AND i.type = 'BUG'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN ( $board_id )\n  )\nGROUP BY time\nUNION\nSELECT $__timeGroup(i.created_date, $interval) as time,\n  0 AS `Bug Reported`,\n  COUNT(1) AS `Ticket Delivered`\nFROM issues i \nWHERE i.id LIKE 'jira:%'\n  AND i.status = 'DONE'\n  AND i.resolution_date IS NOT NULL\n  AND $__timeFilter(i.resolution_date) \n  AND i.type = 'TASK'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN ( $board_id )\n  )\nGROUP BY time",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Bugs Reported vs Tickets Delivered (Scrum)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 50
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroup(i.created_date, $interval) as time,\n  COUNT(1) AS `Bug Reported`,\n  0 AS `Ticket Delivered`\nFROM issues i \nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date) \n  AND i.type = 'BUG'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN ( $board_id )\n  )\nGROUP BY time\nUNION\nSELECT $__timeGroup(i.created_date, $interval) as time,\n  0 AS `Bug Reported`,\n  COUNT(1) AS `Ticket Delivered`\nFROM issues i \nWHERE i.id LIKE 'jira:%'\n  AND i.status = 'DONE'\n  AND i.resolution_date IS NOT NULL\n  AND $__timeFilter(i.resolution_date) \n  AND i.type = 'TASK'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN ( $board_id )\n  )\nGROUP BY time",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Bugs Reported vs Tickets Delivered (Kanban)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Link"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Show in Jira",
+                    "url": "${__data.fields.Link}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "No."
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 52
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Issue Key"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 124
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Title"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 290
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Type"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 171
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 143
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 60
+      },
+      "id": 8,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n    ROW_NUMBER() OVER (ORDER BY i.id ASC) AS `No.`,\n  CASE WHEN i.type LIKE '%TASK' THEN CONCAT('✅ ', i.issue_key) \n    WHEN i.type = 'STORY' THEN CONCAT('🔰 ', i.issue_key) \n    WHEN i.type = 'BUG' THEN CONCAT('🐞 ', i.issue_key)\n    WHEN i.type = 'EPIC' THEN CONCAT('⚡️ ', i.issue_key)\n    ELSE i.issue_key END \n  AS `Issue Key`,\n  i.title AS `Title`,\n  i.original_status AS `Status`,\n  i.creator_name AS `Creator`,\n  COALESCE(NULLIF(TRIM(i.assignee_name), ''), 'Unassigned') AS `Assignee`,\n  i.url AS Link\n\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.assignee_id IN ( $developer_id )\n  AND i.status IN ('TODO', 'IN_PROGRESS')\n  AND i.priority = 'Highest'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Highest Priority Tickets",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Link"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Show in Jira",
+                    "url": "${__data.fields.Link}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "No."
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 52
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Issue Key"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 124
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Title"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 291
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Type"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 171
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 144
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 70
+      },
+      "id": 10,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  ROW_NUMBER() OVER (ORDER BY i.id ASC) AS `No.`,\n  CASE WHEN i.type LIKE '%TASK' THEN CONCAT('✅ ', i.issue_key) \n    WHEN i.type = 'STORY' THEN CONCAT('🔰 ', i.issue_key) \n    WHEN i.type = 'BUG' THEN CONCAT('🐞 ', i.issue_key)\n    WHEN i.type = 'EPIC' THEN CONCAT('⚡️ ', i.issue_key)\n    ELSE i.issue_key END \n  AS `Issue Key`,\n  i.title AS `Title`,\n  i.original_status AS `Status`,\n  i.creator_name AS `Creator`,\n  COALESCE(NULLIF(TRIM(i.assignee_name), ''), 'Unassigned') AS `Assignee`,\n  i.url AS Link\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.status IN ('TODO', 'IN_PROGRESS')\n  AND i.priority = 'High'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "High Priority Tickets",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Link"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Show in Jira",
+                    "url": "${__data.fields.Link}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "No."
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 52
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Issue Key"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 124
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Title"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 293
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Type"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 171
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 144
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 80
+      },
+      "id": 9,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  ROW_NUMBER() OVER (ORDER BY i.id ASC) AS `No.`,\n  CASE WHEN i.type LIKE '%TASK' THEN CONCAT('✅ ', i.issue_key) \n    WHEN i.type = 'STORY' THEN CONCAT('🔰 ', i.issue_key) \n    WHEN i.type = 'BUG' THEN CONCAT('🐞 ', i.issue_key)\n    WHEN i.type = 'EPIC' THEN CONCAT('⚡️ ', i.issue_key)\n    ELSE i.issue_key END \n  AS `Issue Key`,\n  i.title AS `Title`,\n  i.original_status AS `Status`,\n  i.creator_name AS `Creator`,\n  COALESCE(NULLIF(TRIM(i.assignee_name), ''), 'Unassigned') AS `Assignee`,\n  i.url AS Link\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.status IN ('TODO', 'IN_PROGRESS')\n  AND i.priority = 'Medium'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Medium Priority Tickets",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Link"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Show in Jira",
+                    "url": "${__data.fields.Link}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "No."
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 52
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Issue Key"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 124
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Title"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 294
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Type"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 171
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 146
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 90
+      },
+      "id": 11,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n   ROW_NUMBER() OVER (ORDER BY i.id ASC) AS `No.`,\n  CASE WHEN i.type LIKE '%TASK' THEN CONCAT('✅ ', i.issue_key) \n    WHEN i.type = 'STORY' THEN CONCAT('🔰 ', i.issue_key) \n    WHEN i.type = 'BUG' THEN CONCAT('🐞 ', i.issue_key)\n    WHEN i.type = 'EPIC' THEN CONCAT('⚡️ ', i.issue_key)\n    ELSE i.issue_key END \n  AS `Issue Key`,\n  i.title AS `Title`,\n  i.original_status AS `Status`,\n  i.creator_name AS `Creator`,\n  COALESCE(NULLIF(TRIM(i.assignee_name), ''), 'Unassigned') AS `Assignee`,\n  i.url AS Link\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.assignee_id IN ( $developer_id )\n  AND i.status IN ('TODO', 'IN_PROGRESS')\n  AND i.priority = 'Low'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Low Priority Tickets",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Link"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Show in Jira",
+                    "url": "${__data.fields.Link}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "No."
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 52
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Issue Key"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 124
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Title"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 296
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Type"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 171
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 149
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 100
+      },
+      "id": 12,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n    ROW_NUMBER() OVER (ORDER BY i.id ASC) AS `No.`,\n  CASE WHEN i.type LIKE '%TASK' THEN CONCAT('✅ ', i.issue_key) \n    WHEN i.type = 'STORY' THEN CONCAT('🔰 ', i.issue_key) \n    WHEN i.type = 'BUG' THEN CONCAT('🐞 ', i.issue_key)\n    WHEN i.type = 'EPIC' THEN CONCAT('⚡️ ', i.issue_key)\n    ELSE i.issue_key END \n  AS `Issue Key`,\n  i.title AS `Title`,\n  i.original_status AS `Status`,\n  i.creator_name AS `Creator`,\n  COALESCE(NULLIF(TRIM(i.assignee_name), ''), 'Unassigned') AS `Assignee`,\n  i.url AS Link\n\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.assignee_id IN ( $developer_id )\n  AND i.status <> 'DONE'\n  AND i.priority = 'Lowest'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Lowest Priority Tickets",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Link"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Show in Jira",
+                    "url": "${__data.fields.Link}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "No."
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 52
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Issue Key"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 124
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Title"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 297
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Type"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 171
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 152
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 110
+      },
+      "id": 13,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n    ROW_NUMBER() OVER (ORDER BY i.id ASC) AS `No.`,\n  CASE WHEN i.type LIKE '%TASK' THEN CONCAT('✅ ', i.issue_key) \n    WHEN i.type = 'STORY' THEN CONCAT('🔰 ', i.issue_key) \n    WHEN i.type = 'BUG' THEN CONCAT('🐞 ', i.issue_key)\n    WHEN i.type = 'EPIC' THEN CONCAT('⚡️ ', i.issue_key)\n    ELSE i.issue_key END \n  AS `Issue Key`,\n  i.title AS `Title`,\n  i.original_status AS `Status`,\n  i.creator_name AS `Creator`,\n  COALESCE(NULLIF(TRIM(i.assignee_name), ''), 'Unassigned') AS `Assignee`,\n  i.url AS Link\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.status <> 'DONE'\n  AND i.priority = ''\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Tickets without Priority",
+      "type": "table"
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 41,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "devlake-mysql"
+        },
+        "definition": "select DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'boards' AND pm.row_id like 'jira:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name ",
+        "includeAll": true,
+        "label": "Project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "select DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'boards' AND pm.row_id like 'jira:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name ",
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "devlake-mysql"
+        },
+        "definition": "SELECT CONCAT(b.name, '--', b.id) AS text\nFROM project_mapping pm\nJOIN boards b ON b.id = pm.row_id\nWHERE pm.`table` = 'boards' AND pm.row_id LIKE 'jira:%'\n  AND pm.project_name IN ( $project )\nORDER BY text",
+        "description": "",
+        "includeAll": true,
+        "label": "Board",
+        "multi": true,
+        "name": "board_id",
+        "options": [],
+        "query": "SELECT CONCAT(b.name, '--', b.id) AS text\nFROM project_mapping pm\nJOIN boards b ON b.id = pm.row_id\nWHERE pm.`table` = 'boards' AND pm.row_id LIKE 'jira:%'\n  AND pm.project_name IN ( $project )\nORDER BY text",
+        "refresh": 1,
+        "regex": "/^(?<text>.*)--(?<value>.*)$/",
+        "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "devlake-mysql"
+        },
+        "definition": "WITH scoped_issues AS (\n  SELECT bi.issue_id\n  FROM board_issues bi\n  WHERE bi.board_id IN ( ${board_id} )\n    AND bi.board_id LIKE 'jira:%'\n),\nscoped_accounts AS (\n  SELECT ia.assignee_id AS account_id\n  FROM issue_assignees ia\n  JOIN scoped_issues si ON si.issue_id = ia.issue_id\n  WHERE ia.assignee_id LIKE 'jira:%'\n  UNION\n  SELECT i.creator_id\n  FROM issues i\n  JOIN scoped_issues si ON si.issue_id = i.id\n  WHERE i.creator_id LIKE 'jira:%'\n  UNION\n  SELECT ic.author_id\n  FROM issue_changelogs ic\n  JOIN scoped_issues si ON si.issue_id = ic.issue_id\n  WHERE ic.author_id LIKE 'jira:%'\n  UNION\n  SELECT w.author_id\n  FROM issue_worklogs w\n  JOIN scoped_issues si ON si.issue_id = w.issue_id\n  WHERE w.author_id LIKE 'jira:%'\n)\nSELECT CONCAT(\n         REPLACE(COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           '(unmapped)'\n         ), '-', ' '),\n         '--', a.id) AS Name\nFROM accounts a\nJOIN scoped_accounts sa ON sa.account_id = a.id\nGROUP BY Name\nORDER BY Name;",
+        "includeAll": true,
+        "label": "Developer",
+        "multi": true,
+        "name": "developer_id",
+        "options": [],
+        "query": "WITH scoped_issues AS (\n  SELECT bi.issue_id\n  FROM board_issues bi\n  WHERE bi.board_id IN ( ${board_id} )\n    AND bi.board_id LIKE 'jira:%'\n),\nscoped_accounts AS (\n  SELECT ia.assignee_id AS account_id\n  FROM issue_assignees ia\n  JOIN scoped_issues si ON si.issue_id = ia.issue_id\n  WHERE ia.assignee_id LIKE 'jira:%'\n  UNION\n  SELECT i.creator_id\n  FROM issues i\n  JOIN scoped_issues si ON si.issue_id = i.id\n  WHERE i.creator_id LIKE 'jira:%'\n  UNION\n  SELECT ic.author_id\n  FROM issue_changelogs ic\n  JOIN scoped_issues si ON si.issue_id = ic.issue_id\n  WHERE ic.author_id LIKE 'jira:%'\n  UNION\n  SELECT w.author_id\n  FROM issue_worklogs w\n  JOIN scoped_issues si ON si.issue_id = w.issue_id\n  WHERE w.author_id LIKE 'jira:%'\n)\nSELECT CONCAT(\n         REPLACE(COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           '(unmapped)'\n         ), '-', ' '),\n         '--', a.id) AS Name\nFROM accounts a\nJOIN scoped_accounts sa ON sa.account_id = a.id\nGROUP BY Name\nORDER BY Name;",
+        "refresh": 1,
+        "regex": "/^(?<text>.*)--(?<value>.*)$/",
+        "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "1M",
+          "value": "1M"
+        },
+        "description": "",
+        "label": "Time Interval",
+        "name": "interval",
+        "options": [
+          {
+            "selected": true,
+            "text": "Month",
+            "value": "1M"
+          },
+          {
+            "selected": false,
+            "text": "Week",
+            "value": "1w"
+          },
+          {
+            "selected": false,
+            "text": "Day",
+            "value": "1d"
+          }
+        ],
+        "query": "Month : 1M, Week : 1w, Day : 1d",
+        "type": "custom"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "D. Tickets Overview",
+  "uid": "bfyfs8x6mh4owf",
+  "version": 48
+}
