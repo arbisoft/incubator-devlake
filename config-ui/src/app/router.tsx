@@ -26,6 +26,7 @@ import {
   Layout,
   layoutLoader,
   Login,
+  ChangePassword,
   Connections,
   Connection,
   ProjectHomePage,
@@ -55,6 +56,10 @@ export const router = createBrowserRouter([
   {
     path: `${PATH_PREFIX}/login`,
     element: <Login />,
+  },
+  {
+    path: `${PATH_PREFIX}/change-password`,
+    element: <ChangePassword />,
   },
   {
     path: `${PATH_PREFIX}/onboard`,

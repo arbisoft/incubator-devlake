@@ -32,8 +32,15 @@ type ApiResourceInput struct {
 	Body    map[string]interface{} // json body
 	Request *http.Request
 
-	User *common.User
+	User            *common.User
+	IsCustomerAdmin bool // assigned only by the server's access-control boundary
 }
+
+// CustomerAdminRequiredMessage is the error message returned when an endpoint gated on
+// IsCustomerAdmin, or the server's own access.Service.RequireAdmin, is reached by a
+// non-admin. Shared here, rather than duplicated as a literal, because plugins cannot
+// import the server's access package to reuse its check directly.
+const CustomerAdminRequiredMessage = "customer administrator access is required"
 
 // GetPlugin get the plugin in context
 func (input *ApiResourceInput) GetPlugin() string {

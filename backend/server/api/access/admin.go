@@ -38,7 +38,33 @@ func (s *Service) ListUsers(query PageQuery) (*PaginatedUsers, errors.Error) {
 	if err := s.db.All(&users, dal.Where("hidden_at IS NULL"), dal.Orderby("email ASC"), dal.Offset(query.Offset()), dal.Limit(query.PageSize)); err != nil {
 		return nil, errors.Default.Wrap(err, "error listing access users")
 	}
+	if err := s.decorateLocalCredentials(users); err != nil {
+		return nil, err
+	}
 	return &PaginatedUsers{Users: users, Count: count, Page: query.Page, PageSize: query.PageSize}, nil
+}
+
+func (s *Service) decorateLocalCredentials(users []AccessUser) errors.Error {
+	if len(users) == 0 {
+		return nil
+	}
+	userIDs := make([]uint64, 0, len(users))
+	usersByID := make(map[uint64]*AccessUser, len(users))
+	for index := range users {
+		userIDs = append(userIDs, users[index].ID)
+		usersByID[users[index].ID] = &users[index]
+	}
+	credentials := make([]LocalCredential, 0)
+	if err := s.db.All(&credentials, dal.Where("access_user_id IN (?)", userIDs)); err != nil {
+		return errors.Default.Wrap(err, "error listing local credentials")
+	}
+	for _, credential := range credentials {
+		if user, ok := usersByID[credential.AccessUserID]; ok {
+			user.LocalLoginName = credential.LoginName
+			user.HasLocalCredential = true
+		}
+	}
+	return nil
 }
 
 func (s *Service) ListDomains(query PageQuery) (*PaginatedDomains, errors.Error) {
@@ -171,65 +197,73 @@ func (s *Service) updateUser(actor string, id uint64, role, status string, hide 
 	if !hide && (!validRole(role) || !validStatus(status)) {
 		return nil, errors.BadInput.New("provide a valid role and status", errors.WithData(ErrCodeInvalidUser))
 	}
-	tx := s.db.Begin()
-	committed := false
-	defer func() {
-		if !committed {
-			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				s.logger.Error(rollbackErr, "access: rollback user change id=%d", id)
+	user := &AccessUser{}
+	var revokedSessionIDs []string
+	err := s.withTransaction("user change", func(tx dal.Transaction) errors.Error {
+		if err := tx.First(user, dal.Where("id = ? AND hidden_at IS NULL", id)); err != nil {
+			if tx.IsErrorNotFound(err) {
+				return errors.NotFound.New("access user not found")
+			}
+			return errors.Default.Wrap(err, "error looking up access user")
+		}
+		if hide {
+			role = user.Role
+			status = StatusDisabled
+		}
+		removesActiveAdmin := user.Role == RoleCustomerAdmin && user.Status == StatusActive && (status == StatusDisabled || role != RoleCustomerAdmin)
+		if removesActiveAdmin {
+			activeAdmins, err := tx.Count(dal.From(&AccessUser{}), dal.Where("role = ? AND status = ? AND hidden_at IS NULL", RoleCustomerAdmin, StatusActive))
+			if err != nil {
+				return errors.Default.Wrap(err, "error checking customer administrators")
+			}
+			if activeAdmins <= 1 {
+				return errors.BadInput.New("keep at least one active customer administrator")
 			}
 		}
-	}()
-
-	user := &AccessUser{}
-	if err := tx.First(user, dal.Where("id = ? AND hidden_at IS NULL", id)); err != nil {
-		if tx.IsErrorNotFound(err) {
-			return nil, errors.NotFound.New("access user not found")
+		user.Role = role
+		user.Status = status
+		if status == StatusDisabled {
+			now := time.Now()
+			user.DisabledAt = &now
+		} else {
+			user.DisabledAt = nil
 		}
-		return nil, errors.Default.Wrap(err, "error looking up access user")
-	}
-	if hide {
-		role = user.Role
-		status = StatusDisabled
-	}
-	removesActiveAdmin := user.Role == RoleCustomerAdmin && user.Status == StatusActive && (status == StatusDisabled || role != RoleCustomerAdmin)
-	if removesActiveAdmin {
-		activeAdmins, err := tx.Count(dal.From(&AccessUser{}), dal.Where("role = ? AND status = ? AND hidden_at IS NULL", RoleCustomerAdmin, StatusActive))
-		if err != nil {
-			return nil, errors.Default.Wrap(err, "error checking customer administrators")
+		if hide {
+			now := time.Now()
+			user.HiddenAt = &now
 		}
-		if activeAdmins <= 1 {
-			return nil, errors.BadInput.New("keep at least one active customer administrator")
+		if err := tx.Update(user); err != nil {
+			return errors.Default.Wrap(err, "error saving access user")
 		}
-	}
-	user.Role = role
-	user.Status = status
-	if status == StatusDisabled {
-		now := time.Now()
-		user.DisabledAt = &now
-	} else {
-		user.DisabledAt = nil
-	}
-	if hide {
-		now := time.Now()
-		user.HiddenAt = &now
-	}
-	if err := tx.Update(user); err != nil {
-		return nil, errors.Default.Wrap(err, "error saving access user")
-	}
-	var revokedSessionIDs []string
-	if status == StatusDisabled && s.sessionRevoker != nil {
-		ids, err := s.sessionRevoker.RevokePersistentSessions(tx, user.Issuer, user.Subject)
-		if err != nil {
-			s.logger.Error(err, "access: revoke sessions for disabled user id=%d email=%s", user.ID, user.Email)
-			return nil, errors.Default.Wrap(err, "error revoking sessions for disabled access user")
+		if status == StatusDisabled && s.sessionRevoker != nil {
+			identities := make([]AccessIdentity, 0)
+			if err := tx.All(&identities, dal.Where("access_user_id = ?", user.ID)); err != nil {
+				return errors.Default.Wrap(err, "error reading access identities for disabled user")
+			}
+			for _, identity := range identities {
+				providerKeys, err := s.providerKeysForIssuer(tx, identity.Issuer)
+				if err != nil {
+					return err
+				}
+				ids, err := s.sessionRevoker.RevokePersistentSessions(tx, providerKeys, identity.Subject)
+				if err != nil {
+					s.logger.Error(err, "access: revoke sessions for disabled user id=%d email=%s", user.ID, user.Email)
+					return errors.Default.Wrap(err, "error revoking sessions for disabled access user")
+				}
+				revokedSessionIDs = append(revokedSessionIDs, ids...)
+			}
+			localIDs, err := s.sessionRevoker.RevokeLocalSessions(tx, user.ID)
+			if err != nil {
+				s.logger.Error(err, "access: revoke local sessions for disabled user id=%d", user.ID)
+				return errors.Default.Wrap(err, "error revoking local sessions for disabled access user")
+			}
+			revokedSessionIDs = append(revokedSessionIDs, localIDs...)
 		}
-		revokedSessionIDs = ids
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
-	if err := tx.Commit(); err != nil {
-		return nil, errors.Default.Wrap(err, "error committing access user change")
-	}
-	committed = true
 	if s.sessionRevoker != nil && len(revokedSessionIDs) > 0 {
 		s.sessionRevoker.CacheRevokedSessions(revokedSessionIDs)
 	}
@@ -261,4 +295,16 @@ func (s *Service) HideDomain(actor string, id uint64) (*AccessDomain, errors.Err
 	}
 	s.audit(actor, "domain.hidden", nil, domainAuditDetail(domain.Domain))
 	return domain, nil
+}
+
+func (s *Service) providerKeysForIssuer(tx dal.Transaction, issuer string) ([]string, errors.Error) {
+	providers := make([]OIDCProvider, 0)
+	if err := tx.All(&providers, dal.Where("issuer_url = ?", issuer)); err != nil {
+		return nil, errors.Default.Wrap(err, "error reading providers for issuer")
+	}
+	keys := make([]string, 0, len(providers))
+	for _, p := range providers {
+		keys = append(keys, p.ProviderKey)
+	}
+	return keys, nil
 }

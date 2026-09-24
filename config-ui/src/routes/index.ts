@@ -20,6 +20,8 @@ export * from './api-keys';
 export * from './access';
 export * from './blueprint';
 export * from './connection';
+
+export * from './change-password';
 export * from './db-migrate';
 export * from './error';
 export * from './layout';

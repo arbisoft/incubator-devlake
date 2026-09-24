@@ -29,8 +29,14 @@ import (
 )
 
 type testAccessAuthorizer struct {
-	err        errors.Error
-	identities []access.Identity
+	err            errors.Error
+	identities     []access.Identity
+	linkStateID    string
+	linkUserID     uint64
+	linkProvider   string
+	linkedStateID  string
+	linkedProvider string
+	linkedIdentity access.Identity
 }
 
 func (a *testAccessAuthorizer) Enabled() bool { return true }
@@ -47,6 +53,22 @@ func (a *testAccessAuthorizer) AuthorizeSession(identity access.Identity) (*acce
 	return &access.Principal{UserID: 1, Role: access.RoleCustomerAdmin}, nil
 }
 
+func (a *testAccessAuthorizer) BeginIdentityLink(userID uint64, providerKey string) (string, errors.Error) {
+	a.linkUserID = userID
+	a.linkProvider = providerKey
+	if a.linkStateID == "" {
+		a.linkStateID = "test-link-state"
+	}
+	return a.linkStateID, a.err
+}
+
+func (a *testAccessAuthorizer) CompleteIdentityLink(stateID, providerKey string, identity access.Identity) errors.Error {
+	a.linkedStateID = stateID
+	a.linkedProvider = providerKey
+	a.linkedIdentity = identity
+	return a.err
+}
+
 func TestOIDCAuthenticationRejectsUnauthorizedAccessSession(t *testing.T) {
 	idp := newFakeIdP(t)
 	service, _ := newTestService(t, idp)
@@ -54,7 +76,7 @@ func TestOIDCAuthenticationRejectsUnauthorizedAccessSession(t *testing.T) {
 	service.access = authorizer
 	router := newTestRouter(service)
 
-	session, _, err := oidchelper.IssueSession(service.cfg, "disabled-session", "test", idp.subject, idp.email, idp.name)
+	session, _, err := oidchelper.IssueSession(service.runtimeCfg, "disabled-session", "test", idp.subject, idp.email, idp.name)
 	if err != nil {
 		t.Fatalf("issue session: %v", err)
 	}
@@ -81,6 +103,37 @@ func TestOIDCAuthenticationRejectsUnauthorizedAccessSession(t *testing.T) {
 	}
 }
 
+// TestOIDCAuthenticationTreatsTransientAuthorizationErrorAsRetryableNotLoggedOut
+// guards against a regression where any AuthorizeSession failure - including a
+// transient one unrelated to the session's validity, such as a database error -
+// was treated the same as "this identity is not allowed": the request fell
+// through to RequireAuth as unauthenticated, producing a 401 indistinguishable
+// from a real logout to callers. A transient failure must leave the session
+// cookie alone and respond retryable instead.
+func TestOIDCAuthenticationTreatsTransientAuthorizationErrorAsRetryableNotLoggedOut(t *testing.T) {
+	idp := newFakeIdP(t)
+	service, _ := newTestService(t, idp)
+	authorizer := &testAccessAuthorizer{err: errors.Default.New("database is unavailable")}
+	service.access = authorizer
+	router := newTestRouter(service)
+
+	session, _, err := oidchelper.IssueSession(service.runtimeCfg, "transient-error-session", "test", idp.subject, idp.email, idp.name)
+	if err != nil {
+		t.Fatalf("issue session: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodGet, PathUserInfo, nil)
+	req.AddCookie(&http.Cookie{Name: oidchelper.SessionCookieName, Value: session})
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, req)
+
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 for a transient authorization failure, got %d: %s", response.Code, response.Body.String())
+	}
+	if got := response.Header().Get("Set-Cookie"); got != "" {
+		t.Fatalf("a transient authorization failure must not clear a valid session cookie, got Set-Cookie: %q", got)
+	}
+}
+
 func TestOIDCAuthenticationRejectsUnknownProviderSession(t *testing.T) {
 	idp := newFakeIdP(t)
 	service, _ := newTestService(t, idp)
@@ -88,7 +141,7 @@ func TestOIDCAuthenticationRejectsUnknownProviderSession(t *testing.T) {
 	service.access = authorizer
 	router := newTestRouter(service)
 
-	session, _, err := oidchelper.IssueSession(service.cfg, "unknown-provider-session", "retired", idp.subject, idp.email, idp.name)
+	session, _, err := oidchelper.IssueSession(service.runtimeCfg, "unknown-provider-session", "retired", idp.subject, idp.email, idp.name)
 	if err != nil {
 		t.Fatalf("issue session: %v", err)
 	}

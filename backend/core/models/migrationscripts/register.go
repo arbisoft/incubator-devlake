@@ -149,5 +149,10 @@ func All() []plugin.MigrationScript {
 		new(addUserActivities),
 		new(addUserProjectMapping),
 		new(addAuthAccessDirectory),
+		new(addAuthOIDCProviderConfiguration),
+		new(addAuthOIDCMultiProviderIdentities),
+		new(addAuthLocalCredentials),
+		new(addAuthLocalLoginReservations),
+		new(addCanonicalAiDomain),
 	}
 }

@@ -35,6 +35,61 @@ func ListConnections(_ *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, err
 	return &plugin.ApiResourceOutput{Body: connections, Status: http.StatusOK}, nil
 }
 
+func ListProjects(_ *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	projects, err := service.ListOtelProjects()
+	if err != nil {
+		return nil, err
+	}
+	return &plugin.ApiResourceOutput{Body: projects, Status: http.StatusOK}, nil
+}
+
+func ListProjectConnections(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	connections, err := service.ListOtelConnectionsForProject(input.Params["projectName"])
+	if err != nil {
+		return nil, err
+	}
+	return &plugin.ApiResourceOutput{Body: connections, Status: http.StatusOK}, nil
+}
+
+func ListSourcePreferences(_ *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	preferences, err := service.ListOtelSourcePreferences()
+	if err != nil {
+		return nil, err
+	}
+	return &plugin.ApiResourceOutput{Body: preferences, Status: http.StatusOK}, nil
+}
+
+func GetIngestionStatus(_ *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	status, err := service.GetOtelIngestionStatus()
+	if err != nil {
+		return nil, err
+	}
+	return &plugin.ApiResourceOutput{Body: status, Status: http.StatusOK}, nil
+}
+
+func GetMetricBatchPayload(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	// IsCustomerAdmin is false, and this stays forbidden, whenever access management is
+	// disabled server-wide; see the fail-closed rationale at handlePluginCall in
+	// server/api/router.go.
+	if !input.IsCustomerAdmin {
+		return nil, errors.Forbidden.New(plugin.CustomerAdminRequiredMessage)
+	}
+	id, err := parseId(input.Params["batchId"])
+	if err != nil {
+		return nil, err
+	}
+	payload, err := service.DecodeOtelMetricBatchPayload(id)
+	if err != nil {
+		return nil, err
+	}
+	return &plugin.ApiResourceOutput{
+		Body:        payload,
+		Status:      http.StatusOK,
+		ContentType: "application/json",
+		Header:      http.Header{"Cache-Control": []string{"no-store"}},
+	}, nil
+}
+
 func PostConnection(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
 	body := &service.OtelConnectionInput{}
 	if err := api.Decode(input.Body, body, nil); err != nil {
@@ -105,6 +160,36 @@ func ApplyConnection(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput,
 		return nil, err
 	}
 	return &plugin.ApiResourceOutput{Body: connection, Status: http.StatusOK}, nil
+}
+
+func PutConnectionProjects(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	id, err := parseId(input.Params["connectionId"])
+	if err != nil {
+		return nil, err
+	}
+	body := &service.OtelConnectionInput{}
+	if err := api.Decode(input.Body, body, nil); err != nil {
+		return nil, err
+	}
+	projects, err := service.ReplaceOtelConnectionProjects(id, body.ProjectNames)
+	if err != nil {
+		return nil, err
+	}
+	return &plugin.ApiResourceOutput{Body: projects, Status: http.StatusOK}, nil
+}
+
+func ValidateProjectRemoval(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	if err := service.ValidateOtelProjectRemoval(input.Params["projectName"]); err != nil {
+		return nil, err
+	}
+	return &plugin.ApiResourceOutput{Status: http.StatusNoContent}, nil
+}
+
+func DeleteProjectPlacements(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	if err := service.RemoveOtelProjectPlacements(input.Params["projectName"]); err != nil {
+		return nil, err
+	}
+	return &plugin.ApiResourceOutput{Status: http.StatusNoContent}, nil
 }
 
 func parseId(raw string) (uint64, errors.Error) {

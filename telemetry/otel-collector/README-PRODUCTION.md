@@ -7,7 +7,7 @@ This directory provides a production-shaped, single-host Docker Compose deployme
 | Service | Purpose |
 | --- | --- |
 | `otel-auth-init` | Creates the shared `.htpasswd` file before the Collector starts. |
-| `otel-collector` | Authenticates OTLP traffic, derives the trusted team label, and exposes Prometheus metrics. |
+| `otel-collector` | Authenticates OTLP traffic, derives the trusted team label, persistently forwards raw batches to DevLake, and exposes Prometheus metrics. |
 | `prometheus` | Scrapes the Collector every 15 seconds and retains data for 30 days. |
 | `otel-restart-helper` | Accepts only an authenticated backend request and restarts the configured Collector. |
 
@@ -18,6 +18,8 @@ DevLake writes the `htpasswd` file through a shared volume. The Collector mounts
 - Docker Engine and Docker Compose.
 - A TLS-capable reverse proxy for the public OTLP/gRPC endpoint.
 - A high-entropy `OTEL_RESTART_HELPER_TOKEN` injected into both the DevLake backend and `otel-restart-helper`. Do not inject it into Config UI.
+- A high-entropy `CLAUDE_OTEL_INGEST_TOKEN` injected only into DevLake and the Collector.
+- An internal `CLAUDE_OTEL_INGEST_ENDPOINT` reachable from the Collector.
 - A public HTTPS collector URL configured for the DevLake backend as `OTEL_PUBLIC_ENDPOINT`, for example `https://otel.customer.example.com:4317`.
 
 The restart helper has Docker socket access and must remain private to the host. It is bound to `127.0.0.1:9199` by default. The public proxy must expose only the required OTLP ports and must not expose Prometheus or the helper.
@@ -31,7 +33,9 @@ docker compose -f docker-compose-production.yml up -d --build
 docker compose -f docker-compose-production.yml ps
 ```
 
-The Compose file requires the helper token and will fail early when it is unset. `OTEL_PUBLIC_ENDPOINT` is not read by this Compose file; configure it in the DevLake backend deployment.
+The Compose file requires the helper token, ingest endpoint, and ingest token and will
+fail early when any are unset. `OTEL_PUBLIC_ENDPOINT` is not read by this Compose file;
+configure it in the DevLake backend deployment.
 
 ## Network and TLS
 
@@ -70,7 +74,15 @@ The Compose configuration sets the following resource limits:
 | Collector | 2 | 1 GiB | 1 | 512 MiB |
 | Prometheus | 2 | 2 GiB | 1 | 1 GiB |
 
-The production Collector enables a memory limiter, delta-to-cumulative conversion, and a larger batch configuration. Prometheus retains data for 30 days. Adjust these only after observing metric volume, label cardinality, query patterns, and host capacity.
+The production Collector enables a memory limiter and a separate raw branch before the
+Prometheus-only delta-to-cumulative conversion. The raw branch uses a one-consumer,
+fsync-enabled persistent queue: 512 MiB configured queue capacity and a 1 GiB
+file-storage ceiling. A full queue rejects new raw batches rather than blocking
+(`block_on_overflow: false` avoids a known persistent-queue deadlock), so alert on
+`otelcol_exporter_queue_size`, `otelcol_exporter_queue_capacity`, and
+`otelcol_exporter_enqueue_failed_metric_points` from the `otel-collector-internal`
+scrape job. Prometheus retains data for 30 days. Adjust limits only after observing queue
+size, enqueue failures, exporter failures, label cardinality, and host capacity.
 
 ## Credential Operations
 
@@ -87,14 +99,21 @@ The helper accepts one restart at a time. While a restart is underway it returns
 docker compose -f docker-compose-production.yml ps
 docker stats otel-collector-prod prometheus-prod
 
+# Persistent queue volume (contains retryable telemetry batches)
+docker run --rm -v otel-queue:/data:ro busybox:1.36 \
+  sh -c 'du -sh /data && ls -lh /data'
+
 # Stop services without deleting data
 docker compose -f docker-compose-production.yml down
 
-# Destructive: remove auth and Prometheus volumes
+# Destructive: remove auth, Prometheus, and queued telemetry volumes
 docker compose -f docker-compose-production.yml down -v
 ```
 
-Deleting volumes removes all credential verifiers and telemetry retained by this Compose deployment. Do so only when resetting the installation.
+Deleting volumes removes all credential verifiers and queued telemetry. A drained bbolt
+queue can retain allocated disk until rebound compaction runs, so `du` is not live queue
+occupancy. Keep the queue volume private. The legacy `otel-file-export` volume is kept
+during the initial rollout only and is not used by the current Collector configuration.
 
 ## Kubernetes Migration
 

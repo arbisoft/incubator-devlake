@@ -23,5 +23,13 @@ func GetTablesInfo() []dal.Tabler {
 	return []dal.Tabler{
 		&OtelConnection{},
 		&OtelCredential{},
+		&OtelConnectionProject{},
+		&OtelMetricBatch{},
+		&OtelConverterLease{},
+		&OtelReplayRequest{},
+		&OtelHourlyActivity{},
+		&OtelHourlyModelUsage{},
+		&OtelHourlyToolUsage{},
+		&OtelMetricSeriesState{},
 	}
 }

@@ -30,7 +30,7 @@
       "type": "panel",
       "id": "volkovlabs-form-panel",
       "name": "Business Forms",
-      "version": "6.0.0"
+      "version": "6.3.5"
     }
   ],
   "annotations": {
@@ -76,19 +76,9 @@
           "method": "-"
         },
         "update": {
-          "method": "POST",
-          "url": "/api/user-project-mappings/${userLogin}",
-          "header": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "contentType": "application/json",
+          "method": "-",
           "confirm": false,
-          "payloadMode": "custom",
-          "getPayload": "return { projectName: '${project}' };",
-          "code": "if (context.panel.response && context.panel.response.ok) { context.grafana.notifySuccess(['Mapping Added', '${userLogin} \u2192 ${project}']); context.grafana.refresh(); } else { context.grafana.notifyError(['Error', 'Failed to add mapping. Check DevLake API URL and try again.']); }"
+          "code": "// Grafana's API root: \"\" on prod, \"/grafana\" on staging.\nconst base = window.grafanaBootData?.settings?.appSubUrl || '';\nconst path = base + '/api/datasources/proxy/uid/devlake-api/rest/user-project-mappings/';\n\n// Calls go via Grafana's datasource proxy, which attaches the DevLake API key\n// server-side and strips cookies. See provisioning/datasources/datasource.yml.\n//\n// Variables are read at runtime, not interpolated: values reach this source before\n// it compiles, so a quote or backslash in one is a syntax error. Keep the name\n// split across the + or this line becomes a variable reference itself.\nconst readVar = (name) => context.grafana.templateService.replace('${' + name + '}');\nconst userLogin = readVar('userLogin');\nconst project = readVar('project');\n\nreturn (async () => {\n  const res = await fetch(path + encodeURIComponent(userLogin), {\n    method: 'POST',\n    credentials: 'same-origin',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify({ projectName: project }),\n  });\n\n  if (res.ok) {\n    context.grafana.notifySuccess(['Mapping Added', userLogin + ' \u2192 ' + project]);\n    context.grafana.refresh();\n  } else {\n    context.grafana.notifyError(['Error', 'HTTP ' + res.status + ': ' + (await res.text())]);\n  }\n})();"
         },
         "resetAction": "initial",
         "layout": {
@@ -140,13 +130,9 @@
           "method": "-"
         },
         "update": {
-          "method": "DELETE",
-          "url": "/api/user-project-mappings/${userLogin}/${project}",
-          "header": [],
-          "contentType": "application/json",
+          "method": "-",
           "confirm": false,
-          "payloadMode": "all",
-          "code": "if (context.panel.response && context.panel.response.ok) { context.grafana.notifySuccess(['Mapping Removed', '${userLogin} \u2192 ${project}']); context.grafana.refresh(); } else { context.grafana.notifyError(['Error', 'Failed to remove mapping.']); }"
+          "code": "// Grafana's API root: \"\" on prod, \"/grafana\" on staging.\nconst base = window.grafanaBootData?.settings?.appSubUrl || '';\nconst path = base + '/api/datasources/proxy/uid/devlake-api/rest/user-project-mappings/';\n\n// Calls go via Grafana's datasource proxy, which attaches the DevLake API key\n// server-side and strips cookies. See provisioning/datasources/datasource.yml.\n//\n// Variables are read at runtime, not interpolated: values reach this source before\n// it compiles, so a quote or backslash in one is a syntax error. Keep the name\n// split across the + or this line becomes a variable reference itself.\nconst readVar = (name) => context.grafana.templateService.replace('${' + name + '}');\nconst userLogin = readVar('userLogin');\nconst project = readVar('project');\n\nreturn (async () => {\n  const res = await fetch(\n    path + encodeURIComponent(userLogin) + '/' + encodeURIComponent(project),\n    { method: 'DELETE', credentials: 'same-origin' },\n  );\n\n  if (res.ok) {\n    context.grafana.notifySuccess(['Mapping Removed', userLogin + ' \u2192 ' + project]);\n    context.grafana.refresh();\n  } else {\n    context.grafana.notifyError(['Error', 'HTTP ' + res.status + ': ' + (await res.text())]);\n  }\n})();"
         },
         "resetAction": "initial",
         "layout": {

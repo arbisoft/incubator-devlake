@@ -19,9 +19,13 @@ package api
 
 import (
 	"github.com/apache/incubator-devlake/core/context"
+	"github.com/apache/incubator-devlake/core/log"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/service"
 )
 
+var logger log.Logger
+
 func Init(basicRes context.BasicRes) {
+	logger = basicRes.GetLogger()
 	service.Init(basicRes)
 }

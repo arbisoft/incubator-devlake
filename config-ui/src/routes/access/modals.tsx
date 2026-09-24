@@ -16,7 +16,9 @@
  *
  */
 
-import { Input, Modal, Select } from 'antd';
+import { Button, Input, Modal, Select } from 'antd';
+import { CopyOutlined } from '@ant-design/icons';
+import { CopyToClipboard } from 'react-copy-to-clipboard';
 
 import type { AccessRole } from '@/api/access';
 import { Block, Message } from '@/components';
@@ -71,6 +73,145 @@ export const CreateUserModal = ({
         <Select value={role} options={ROLE_OPTIONS} onChange={onRoleChange} style={{ width: '100%' }} />
       </Block>
       <Message content="The person is authorized after their first verified sign-in with the configured OIDC provider." />
+    </Modal>
+  );
+};
+
+export type CreateLocalUserModalProps = {
+  open: boolean;
+  loginName: string;
+  displayName: string;
+  role: AccessRole;
+  loginNameError?: string;
+  operating: boolean;
+  onLoginNameChange: (loginName: string) => void;
+  onDisplayNameChange: (displayName: string) => void;
+  onRoleChange: (role: AccessRole) => void;
+  onCancel: () => void;
+  onSubmit: () => void;
+};
+
+export const CreateLocalUserModal = ({
+  open,
+  loginName,
+  displayName,
+  role,
+  loginNameError,
+  operating,
+  onLoginNameChange,
+  onDisplayNameChange,
+  onRoleChange,
+  onCancel,
+  onSubmit,
+}: CreateLocalUserModalProps) => {
+  if (!open) return null;
+
+  return (
+    <Modal
+      open
+      title="Add local DevLake user"
+      onCancel={onCancel}
+      onOk={onSubmit}
+      okText="Create"
+      okButtonProps={{ loading: operating, disabled: Boolean(loginNameError) || !loginName }}
+    >
+      <Block title="Username" required>
+        <Input
+          value={loginName}
+          placeholder="person"
+          status={loginNameError ? 'error' : undefined}
+          onChange={(event) => onLoginNameChange(event.target.value)}
+        />
+      </Block>
+      {loginNameError && <Message content={loginNameError} />}
+      <Block title="Name">
+        <Input value={displayName} onChange={(event) => onDisplayNameChange(event.target.value)} />
+      </Block>
+      <Block title="Role" required>
+        <Select value={role} options={ROLE_OPTIONS} onChange={onRoleChange} style={{ width: '100%' }} />
+      </Block>
+      <Message content="DevLake generates a temporary password. The person must change it after their first sign-in." />
+    </Modal>
+  );
+};
+
+export type AddLocalCredentialModalProps = {
+  open: boolean;
+  loginName: string;
+  loginNameError?: string;
+  operating: boolean;
+  onLoginNameChange: (loginName: string) => void;
+  onCancel: () => void;
+  onSubmit: () => void;
+};
+
+export const AddLocalCredentialModal = ({
+  open,
+  loginName,
+  loginNameError,
+  operating,
+  onLoginNameChange,
+  onCancel,
+  onSubmit,
+}: AddLocalCredentialModalProps) => {
+  if (!open) return null;
+  return (
+    <Modal
+      open
+      title="Add local password"
+      onCancel={onCancel}
+      onOk={onSubmit}
+      okText="Generate password"
+      okButtonProps={{ loading: operating, disabled: Boolean(loginNameError) || !loginName }}
+    >
+      <Block title="Username" required>
+        <Input
+          value={loginName}
+          placeholder="person"
+          status={loginNameError ? 'error' : undefined}
+          onChange={(event) => onLoginNameChange(event.target.value)}
+        />
+      </Block>
+      {loginNameError && <Message content={loginNameError} />}
+      <Message content="DevLake generates a temporary password. The person must change it after their first sign-in." />
+    </Modal>
+  );
+};
+
+export type TemporaryPasswordModalProps = {
+  open: boolean;
+  loginName: string;
+  temporaryPassword: string;
+  onClose: () => void;
+};
+
+export const TemporaryPasswordModal = ({
+  open,
+  loginName,
+  temporaryPassword,
+  onClose,
+}: TemporaryPasswordModalProps) => {
+  if (!open) return null;
+  return (
+    <Modal
+      open
+      title="Temporary password"
+      footer={<Button onClick={onClose}>Done</Button>}
+      closable={false}
+      maskClosable={false}
+    >
+      <Message content="Copy this password now. It is shown only once and must be changed after sign-in." />
+      <Block title={`Password for ${loginName}`}>
+        <Input
+          readOnly
+          value={temporaryPassword}
+          addonAfter={
+            <CopyToClipboard text={temporaryPassword}>
+              <Button type="text" icon={<CopyOutlined />} aria-label="Copy temporary password" />
+            </CopyToClipboard>
+          }
+        />
+      </Block>
     </Modal>
   );
 };

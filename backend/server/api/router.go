@@ -33,6 +33,7 @@ import (
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/server/api/blueprints"
 	"github.com/apache/incubator-devlake/server/api/domainlayer"
+	"github.com/apache/incubator-devlake/server/api/grafanarole"
 	"github.com/apache/incubator-devlake/server/api/pipelines"
 	"github.com/apache/incubator-devlake/server/api/plugininfo"
 	"github.com/apache/incubator-devlake/server/api/project"
@@ -89,30 +90,24 @@ func RegisterRouter(r *gin.Engine, basicRes context.BasicRes) {
 	r.PUT("/api-keys/:apiKeyId", apikeys.PutApiKey)
 	r.DELETE("/api-keys/:apiKeyId", apikeys.DeleteApiKey)
 
-	// auth (OIDC user login)
-	r.GET(auth.PathMethods, auth.GetMethods)
-	r.GET(auth.PathLogin, auth.LoginInit)
-	r.GET(auth.PathCallback, auth.Callback)
-	r.POST(auth.PathLogout, auth.Logout)
-	r.GET(auth.PathUserInfo, auth.UserInfo)
+	// auth (OIDC and local user login)
+	auth.RegisterRoutes(r)
 
 	// fork-owned native OIDC access directory
-	r.GET("/access/me", access.GetCurrent)
-	r.GET("/access/users", access.ListUsers)
-	r.POST("/access/users", access.PostUser)
-	r.PATCH("/access/users/:id", access.PatchUser)
-	r.POST("/access/users/:id/hide", access.HideUser)
-	r.GET("/access/domains", access.ListDomains)
-	r.POST("/access/domains", access.PostDomain)
-	r.PATCH("/access/domains/:id", access.PatchDomain)
-	r.POST("/access/domains/:id/hide", access.HideDomain)
-	r.GET("/access/audit-events", access.ListAuditEvents)
+	access.RegisterRoutes(r)
 
 	// user project mapping api
-	r.GET("/user-project-mappings", userprojectmapping.GetAllMappings)
-	r.GET("/user-project-mappings/:userLogin", userprojectmapping.GetMappingsByUser)
-	r.POST("/user-project-mappings/:userLogin", userprojectmapping.PostMapping)
-	r.DELETE("/user-project-mappings/:userLogin/:projectName", userprojectmapping.DeleteMapping)
+	//
+	// Reachable from config-ui with a session, and from the Grafana admin dashboard
+	// through Grafana's datasource proxy with a scoped API key. RequireGrafanaAdmin
+	// constrains only the latter: that proxy admits any signed-in Grafana user, so
+	// without it a Viewer could grant themselves any project. Session callers are
+	// unaffected; gating those is tracked separately.
+	grafanaAdmin := grafanarole.RequireGrafanaAdmin()
+	r.GET("/user-project-mappings", grafanaAdmin, userprojectmapping.GetAllMappings)
+	r.GET("/user-project-mappings/:userLogin", grafanaAdmin, userprojectmapping.GetMappingsByUser)
+	r.POST("/user-project-mappings/:userLogin", grafanaAdmin, userprojectmapping.PostMapping)
+	r.DELETE("/user-project-mappings/:userLogin/:projectName", grafanaAdmin, userprojectmapping.DeleteMapping)
 
 	// mount all api resources for all plugins
 	resources, err := services.GetPluginsApiResources()
@@ -155,8 +150,18 @@ func handlePluginCall(basicRes context.BasicRes, pluginName string, handler plug
 		} else {
 			input.User = user
 		}
+		// When access management is disabled, IsCustomerAdmin stays false for every
+		// request, so every plugin endpoint gated on it is permanently forbidden rather
+		// than left unrestricted. This is deliberate: there is no role source of truth
+		// to consult otherwise, and failing closed on a data-access boundary is correct
+		// even though it makes such an endpoint unreachable.
+		if accessService := access.Default(); accessService != nil && accessService.Enabled() {
+			principal, principalErr := accessService.CurrentPrincipal(c)
+			input.IsCustomerAdmin = principalErr == nil && principal.Role == access.RoleCustomerAdmin
+		}
 		if c.Request.Body != nil {
-			if strings.HasPrefix(c.Request.Header.Get("Content-Type"), "multipart/form-data;") {
+			contentType := c.Request.Header.Get("Content-Type")
+			if strings.HasPrefix(contentType, "multipart/form-data;") || strings.HasPrefix(contentType, "application/x-protobuf") {
 				input.Request = c.Request
 			} else {
 				shouldBindJSONErr := c.ShouldBindJSON(&input.Body)

@@ -18,6 +18,7 @@ limitations under the License.
 package access
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -40,19 +41,32 @@ type currentResponse struct {
 func outputError(c *gin.Context, err errors.Error) {
 	status := err.GetType().GetHttpCode()
 	message := "unable to process access request"
-	var code string
-	if status >= http.StatusBadRequest && status < http.StatusInternalServerError {
-		if errData := err.GetData(); errData != nil {
-			if c, ok := errData.(string); ok {
-				code = c
-			}
-		}
+	code := accessErrorCode(err)
+	if safeAccessError(status, code) {
 		if safeMessage := err.Messages().Get(); safeMessage != "" {
 			message = strings.TrimSuffix(safeMessage, fmt.Sprintf(" (%d)", status))
 		}
+	} else {
+		code = ""
 	}
 	logruslog.Global.Error(err, "HTTP %d access API error", status)
 	c.JSON(status, &ApiErrorResponse{Success: false, Message: message, Code: code})
+}
+
+func accessErrorCode(err errors.Error) string {
+	if errData := err.GetData(); errData != nil {
+		if code, ok := errData.(string); ok {
+			return code
+		}
+	}
+	return ""
+}
+
+func safeAccessError(status int, code string) bool {
+	if status >= http.StatusBadRequest && status < http.StatusInternalServerError {
+		return true
+	}
+	return status == http.StatusServiceUnavailable && code == ErrCodeProviderBlocked
 }
 
 func GetCurrent(c *gin.Context) {
@@ -67,6 +81,51 @@ func GetCurrent(c *gin.Context) {
 		return
 	}
 	shared.ApiOutputSuccess(c, currentResponse{Enabled: true, Role: principal.Role}, http.StatusOK)
+}
+
+func GetGrafanaLogin(c *gin.Context) {
+	service := Default()
+	fallbackURL := "/grafana/"
+	if service != nil && service.cfg.GrafanaPublicURL != "" {
+		fallbackURL = service.cfg.GrafanaPublicURL + "/login"
+	}
+	fallbackRedirect := func() {
+		c.Redirect(http.StatusFound, fallbackURL)
+	}
+	if service == nil || !service.Enabled() {
+		fallbackRedirect()
+		return
+	}
+	identity, ok := GetIdentity(c)
+	if !ok {
+		fallbackRedirect()
+		return
+	}
+	response, err := service.GrafanaLoginURL(identity)
+	if err != nil {
+		fallbackRedirect()
+		return
+	}
+	c.Redirect(http.StatusFound, response.URL)
+}
+
+func ListLinkableOIDCProviders(c *gin.Context) {
+	service := Default()
+	if service == nil || !service.Enabled() {
+		outputError(c, errors.Unauthorized.New("native OIDC authentication is required"))
+		return
+	}
+	principal, ok := GetPrincipal(c)
+	if !ok {
+		outputError(c, errors.Unauthorized.New("native authentication is required"))
+		return
+	}
+	providers, err := service.LinkableOIDCProviders(principal.UserID)
+	if err != nil {
+		outputError(c, err)
+		return
+	}
+	shared.ApiOutputSuccess(c, providers, http.StatusOK)
 }
 
 func ListUsers(c *gin.Context) {
@@ -94,13 +153,29 @@ func PostUser(c *gin.Context) {
 		outputError(c, errors.BadInput.Wrap(err, "invalid access user", errors.WithData(ErrCodeInvalidUser)))
 		return
 	}
-	actor, _ := GetIdentity(c)
-	user, err := Default().CreateUser(actor.Email, input.Email, input.Role)
+	user, err := Default().CreateUser(actorLabel(c), input.Email, input.Role)
 	if err != nil {
 		outputError(c, err)
 		return
 	}
 	shared.ApiOutputSuccess(c, user, http.StatusCreated)
+}
+
+func PostLocalUser(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	input := CreateLocalUserInput{}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		outputError(c, errors.BadInput.Wrap(err, "invalid local access user", errors.WithData(ErrCodeInvalidUser)))
+		return
+	}
+	response, err := Default().CreateLocalUser(actorLabel(c), input)
+	if err != nil {
+		outputError(c, err)
+		return
+	}
+	outputLocalCredential(c, response, http.StatusCreated)
 }
 
 func ListDomains(c *gin.Context) {
@@ -140,8 +215,7 @@ func PostDomain(c *gin.Context) {
 		outputError(c, errors.BadInput.Wrap(err, "invalid access domain", errors.WithData(ErrCodeInvalidDomain)))
 		return
 	}
-	actor, _ := GetIdentity(c)
-	domain, err := Default().CreateDomain(actor.Email, AccessDomain{Domain: input.Domain, DefaultRole: input.DefaultRole})
+	domain, err := Default().CreateDomain(actorLabel(c), AccessDomain{Domain: input.Domain, DefaultRole: input.DefaultRole})
 	if err != nil {
 		outputError(c, err)
 		return
@@ -162,8 +236,7 @@ func PatchDomain(c *gin.Context) {
 		outputError(c, errors.BadInput.Wrap(err, "invalid access domain update", errors.WithData(ErrCodeInvalidDomain)))
 		return
 	}
-	actor, _ := GetIdentity(c)
-	domain, err := Default().UpdateDomain(actor.Email, id, input.DefaultRole, input.Status)
+	domain, err := Default().UpdateDomain(actorLabel(c), id, input.DefaultRole, input.Status)
 	if err != nil {
 		outputError(c, err)
 		return
@@ -179,8 +252,7 @@ func HideDomain(c *gin.Context) {
 	if !ok {
 		return
 	}
-	actor, _ := GetIdentity(c)
-	domain, err := Default().HideDomain(actor.Email, id)
+	domain, err := Default().HideDomain(actorLabel(c), id)
 	if err != nil {
 		outputError(c, err)
 		return
@@ -201,8 +273,7 @@ func PatchUser(c *gin.Context) {
 		outputError(c, errors.BadInput.Wrap(err, "invalid access user update", errors.WithData(ErrCodeInvalidUser)))
 		return
 	}
-	actor, _ := GetIdentity(c)
-	user, err := Default().UpdateUser(actor.Email, id, input.Role, input.Status)
+	user, err := Default().UpdateUser(actorLabel(c), id, input.Role, input.Status)
 	if err != nil {
 		outputError(c, err)
 		return
@@ -218,13 +289,212 @@ func HideUser(c *gin.Context) {
 	if !ok {
 		return
 	}
-	actor, _ := GetIdentity(c)
-	user, err := Default().HideUser(actor.Email, id)
+	user, err := Default().HideUser(actorLabel(c), id)
 	if err != nil {
 		outputError(c, err)
 		return
 	}
 	shared.ApiOutputSuccess(c, user, http.StatusOK)
+}
+
+func PostLocalCredential(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	id, ok := accessID(c, "user")
+	if !ok {
+		return
+	}
+	input := LocalCredentialInput{}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		outputError(c, errors.BadInput.Wrap(err, "invalid local credential", errors.WithData(ErrCodeInvalidUser)))
+		return
+	}
+	response, err := Default().AddLocalCredential(actorLabel(c), id, input.LoginName)
+	if err != nil {
+		outputError(c, err)
+		return
+	}
+	outputLocalCredential(c, response, http.StatusCreated)
+}
+
+func ResetLocalCredential(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	id, ok := accessID(c, "user")
+	if !ok {
+		return
+	}
+	response, err := Default().ResetLocalCredential(actorLabel(c), id)
+	if err != nil {
+		outputError(c, err)
+		return
+	}
+	outputLocalCredential(c, response, http.StatusOK)
+}
+
+func DeleteLocalCredential(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	id, ok := accessID(c, "user")
+	if !ok {
+		return
+	}
+	user, err := Default().RemoveLocalCredential(actorLabel(c), id)
+	if err != nil {
+		outputError(c, err)
+		return
+	}
+	shared.ApiOutputSuccess(c, user, http.StatusOK)
+}
+
+func RegisterRoutes(r *gin.Engine) {
+	r.GET("/access/me", GetCurrent)
+	r.GET("/access/grafana-login", GetGrafanaLogin)
+	r.GET("/access/oidc-providers/linkable", ListLinkableOIDCProviders)
+	r.GET("/access/users", ListUsers)
+	r.POST("/access/users", PostUser)
+	r.POST("/access/local-users", PostLocalUser)
+	r.PATCH("/access/users/:id", PatchUser)
+	r.POST("/access/users/:id/hide", HideUser)
+	r.POST("/access/users/:id/local-credential", PostLocalCredential)
+	r.POST("/access/users/:id/local-credential/reset", ResetLocalCredential)
+	r.DELETE("/access/users/:id/local-credential", DeleteLocalCredential)
+	r.GET("/access/domains", ListDomains)
+	r.POST("/access/domains", PostDomain)
+	r.PATCH("/access/domains/:id", PatchDomain)
+	r.POST("/access/domains/:id/hide", HideDomain)
+	r.GET("/access/audit-events", ListAuditEvents)
+	r.GET("/access/oidc-providers/callbacks", GetOIDCProviderCallbacks)
+	r.GET("/access/oidc-providers", ListOIDCProviders)
+	r.POST("/access/oidc-providers/validate", ValidateOIDCProvider)
+	r.POST("/access/oidc-providers", SaveOIDCProvider)
+	r.POST("/access/oidc-providers/:providerKey/activate", ActivateOIDCProviderByKey)
+	r.POST("/access/oidc-providers/:providerKey/enable", EnableOIDCProviderByKey)
+	r.POST("/access/oidc-providers/:providerKey/disable", DisableOIDCProviderByKey)
+	r.DELETE("/access/oidc-providers/:providerKey", RetireOIDCProviderByKey)
+	r.POST("/access/oidc-providers/:providerKey/grafana/retry", RetryGrafanaOIDCProviderSyncByKey)
+	r.POST("/access/oidc-providers/:providerKey/grafana/select-generic", SelectGenericOIDCProvider)
+}
+
+func ListOIDCProviders(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	providers, err := Default().GetOIDCProviders()
+	if err != nil {
+		outputError(c, err)
+		return
+	}
+	for _, provider := range providers {
+		Default().decorateOIDCProviderResponse(provider)
+	}
+	shared.ApiOutputSuccess(c, providers, http.StatusOK)
+}
+
+func GetOIDCProviderCallbacks(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	callbacks, err := Default().OIDCProviderCallbacks()
+	if err != nil {
+		outputError(c, err)
+		return
+	}
+	shared.ApiOutputSuccess(c, callbacks, http.StatusOK)
+}
+
+func ValidateOIDCProvider(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	input, ok := oidcProviderInput(c)
+	if !ok {
+		return
+	}
+	if err := Default().ValidateOIDCProvider(c.Request.Context(), input); err != nil {
+		outputError(c, err)
+		return
+	}
+	shared.ApiOutputSuccess(c, nil, http.StatusNoContent)
+}
+
+func SaveOIDCProvider(c *gin.Context) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	input, ok := oidcProviderInput(c)
+	if !ok {
+		return
+	}
+	provider, err := Default().SaveOIDCProvider(c.Request.Context(), actorLabel(c), input)
+	if err != nil {
+		outputError(c, err)
+		return
+	}
+	shared.ApiOutputSuccess(c, Default().decorateOIDCProviderResponse(provider), http.StatusOK)
+}
+
+type oidcProviderAction func(context.Context, string, string) (*OIDCProviderResponse, errors.Error)
+
+func ActivateOIDCProviderByKey(c *gin.Context) {
+	runOIDCProviderAction(c, Default().ActivateOIDCProvider)
+}
+
+func EnableOIDCProviderByKey(c *gin.Context) {
+	runOIDCProviderAction(c, Default().EnableOIDCProvider)
+}
+
+func DisableOIDCProviderByKey(c *gin.Context) {
+	runOIDCProviderAction(c, Default().DisableOIDCProvider)
+}
+
+func RetireOIDCProviderByKey(c *gin.Context) {
+	runOIDCProviderAction(c, Default().RetireOIDCProvider)
+}
+
+func RetryGrafanaOIDCProviderSyncByKey(c *gin.Context) {
+	runOIDCProviderAction(c, Default().RetryGrafanaOIDCProviderSync)
+}
+
+func SelectGenericOIDCProvider(c *gin.Context) {
+	runOIDCProviderAction(c, Default().SelectGenericOIDCProvider)
+}
+
+func runOIDCProviderAction(c *gin.Context, action oidcProviderAction) {
+	if _, ok := requireAdmin(c); !ok {
+		return
+	}
+	providerKey, ok := pathProviderKey(c)
+	if !ok {
+		return
+	}
+	provider, err := action(c.Request.Context(), actorLabel(c), providerKey)
+	if err != nil {
+		outputError(c, err)
+		return
+	}
+	shared.ApiOutputSuccess(c, Default().decorateOIDCProviderResponse(provider), http.StatusOK)
+}
+
+func pathProviderKey(c *gin.Context) (string, bool) {
+	providerKey, err := normalizeOIDCProviderKey(c.Param("providerKey"))
+	if err != nil {
+		outputError(c, err)
+		return "", false
+	}
+	return providerKey, true
+}
+
+func oidcProviderInput(c *gin.Context) (OIDCProviderInput, bool) {
+	input := OIDCProviderInput{}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		outputError(c, errors.BadInput.Wrap(err, "invalid OIDC provider settings", errors.WithData(ErrCodeInvalidProvider)))
+		return OIDCProviderInput{}, false
+	}
+	return input, true
 }
 
 func requireAdmin(c *gin.Context) (*Principal, bool) {
@@ -234,6 +504,23 @@ func requireAdmin(c *gin.Context) (*Principal, bool) {
 		return nil, false
 	}
 	return principal, true
+}
+
+func actorLabel(c *gin.Context) string {
+	if identity, ok := GetIdentity(c); ok {
+		return identity.Email
+	}
+	if principal, ok := GetPrincipal(c); ok {
+		return localActorLabel(principal.UserID)
+	}
+	return ""
+}
+
+// outputLocalCredential marks the one-time password response as uncacheable at
+// browser and intermediary layers. The plaintext must not survive the response.
+func outputLocalCredential(c *gin.Context, response *LocalCredentialResponse, status int) {
+	c.Header("Cache-Control", "no-store")
+	shared.ApiOutputSuccess(c, response, status)
 }
 
 func listQuery(c *gin.Context) (PageQuery, bool) {

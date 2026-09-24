@@ -1,6 +1,8 @@
 # Telemetry & Observability
 
-This directory contains the OpenTelemetry Collector and Prometheus configuration used to ingest Claude Code metrics. The Collector receives authenticated OTLP metrics and exposes them for Prometheus to scrape.
+This directory contains the OpenTelemetry Collector and Prometheus configuration used to
+ingest Claude Code metrics. The Collector also durably forwards authenticated OTLP metric
+batches to the DevLake Claude OTel ingest endpoint.
 
 ## Directory Structure
 
@@ -22,6 +24,8 @@ telemetry/
 Claude Code
   -- OTLP/gRPC or OTLP/HTTP with Basic Auth --> OTel Collector
                                                    |
+                                                   +--> persistent file-storage queue --> DevLake raw ingestion
+                                                   |
                                                    +--> Prometheus exporter :8889
                                                                 |
 Prometheus <---------- scrape every 15 seconds -----------------+
@@ -29,7 +33,10 @@ Prometheus <---------- scrape every 15 seconds -----------------+
 
 The Collector uses the `basicauth/server` extension with an `htpasswd` file. DevLake generates a high-entropy username and password, stores only the password hash in the shared auth volume, and shows the complete Claude Code settings once. The plaintext password and the encoded `Authorization` header are not persisted by DevLake.
 
-Each credential username embeds an immutable team slug. After Basic Auth succeeds, the Collector derives and stamps the trusted `devlake_team` metric attribute from that username. A client-supplied `devlake_team` attribute is removed first, so it cannot spoof team attribution.
+Each credential username embeds an immutable team slug. After Basic Auth succeeds, the
+Collector derives and stamps the trusted `devlake_team` metric attribute from that
+username. Client-supplied `devlake_team` and `devlake_project` attributes are removed
+first, so they cannot spoof attribution.
 
 The Collector version pinned here does not hot-reload server-side `htpasswd.file` updates. After DevLake creates, rotates, revokes, or finalizes a credential, it requests a restart from `otel-restart-helper`. The helper has Docker socket access; the DevLake backend does not. Its API accepts only an authenticated request to restart the configured Collector, never a caller-provided Docker command or container name.
 
@@ -54,7 +61,12 @@ Endpoints exposed on the local machine:
 | Restart helper | `http://127.0.0.1:9199` | Backend-only restart service |
 | Collector health | `http://localhost:13133/healthz` | Collector health check |
 
-`otel-auth-init` creates an empty `.htpasswd` file in the named `devlake-otel-auth` volume before the Collector starts. DevLake mounts the same volume read-write; the Collector mounts it read-only. Do not run `docker compose down -v` unless deliberately resetting local OTel credentials and Prometheus data.
+`otel-auth-init` creates an empty `.htpasswd` file in the named `devlake-otel-auth`
+volume before the Collector starts. DevLake mounts the same volume read-write; the
+Collector mounts it read-only. `otel-queue-init` grants the Collector's non-root UID
+access to `devlake-otel-queue`, which holds retryable outbound batches. Do not run
+`docker compose down -v` unless deliberately resetting local credentials, Prometheus
+data, and queued telemetry.
 
 The local Compose default helper token is for local development only. Set an explicit high-entropy `OTEL_RESTART_HELPER_TOKEN` before starting the stack when validating backend-to-helper authentication.
 
@@ -118,6 +130,38 @@ sum by (devlake_team, user_email) (claude_code_session_count_total)
 
 Prometheus scrapes the Collector every 15 seconds. A metric accepted immediately after a scrape may not appear in Prometheus until the next scrape.
 
+## Durable Queue Storage
+
+The file-storage extension persists retryable outbound batches in
+`devlake-otel-queue`. It is transport durability, not the analytical source of truth:
+DevLake returns success only after committing the accepted batch to MySQL raw storage.
+The queue is bounded to 512 MiB with a 1 GiB file-storage ceiling, fsync enabled, one
+consumer, and indefinite retry. The queue rejects new batches when full
+(`block_on_overflow: false`) because blocking is exposed to a known persistent-queue
+deadlock in the pinned Collector. Alert before capacity is reached; Prometheus scrapes
+the Collector's internal metrics as job `otel-collector-internal`:
+
+```promql
+otelcol_exporter_queue_size{exporter="otlphttp/claude_raw"}
+  / otelcol_exporter_queue_capacity{exporter="otlphttp/claude_raw"} > 0.5
+increase(otelcol_exporter_enqueue_failed_metric_points{exporter="otlphttp/claude_raw"}[5m]) > 0
+increase(otelcol_exporter_send_failed_metric_points{exporter="otlphttp/claude_raw"}[5m]) > 0
+```
+
+An enqueue failure is data loss for the raw branch; the Prometheus branch is unaffected.
+The failure counters are created on their first failure, so `increase()` misses that
+first failure; an alert should also fire on a new series (`series unless series offset 10m`).
+
+```bash
+docker run --rm -v devlake-otel-queue:/data:ro busybox:1.36 \
+  sh -c 'du -sh /data && ls -lh /data'
+```
+
+The bbolt file can retain allocated disk after the queue drains; rebound compaction
+reclaims space eventually. Keep the queue private to the Docker host. The retired
+`devlake-otel-file-export` volume remains in Compose during the initial rollout and is
+not used by the current Collector configuration.
+
 ## Troubleshooting
 
 ### The Collector rejects telemetry
@@ -145,9 +189,61 @@ After the Collector is healthy, use Apply in Config UI to retry the restart. If 
 3. Check whether the Collector accepted metrics in its logs.
 4. Allow one scrape interval before querying Prometheus.
 
+### MySQL raw backlog grows
+
+1. Confirm the Collector and Lake are healthy, then inspect Collector exporter metrics
+   for queue size, enqueue failures, and export failures.
+2. Inspect `_raw_otel_claude_code_metric_batches` by `status`, `received_at`, and
+   `processing_error_code`. Do not log or export `payload_proto` or `payload_json`.
+3. A `permanent_error` is malformed or unsupported telemetry and requires remediation;
+   a `retryable_error` indicates downstream recovery/retry work. Conversion is strictly
+   ordered, so a retrying head batch delays later batches; it is quarantined as
+   `retry_exhausted` after 12 attempts. A `processed` batch with
+   `processing_error_code = 'resources_skipped'` converted every team except those listed
+   in `processing_error_message`.
+
+```sql
+-- Backlog and age of the oldest unconverted batch
+SELECT status, COUNT(*) AS batches, MIN(received_at) AS oldest_received_at
+FROM _raw_otel_claude_code_metric_batches
+WHERE status IN ('pending', 'processing', 'retryable_error')
+GROUP BY status;
+
+-- Recent quarantined or partially skipped batches
+SELECT id, received_at, status, attempt_count, processing_error_code, processing_error_message
+FROM _raw_otel_claude_code_metric_batches
+WHERE status = 'permanent_error' OR processing_error_code = 'resources_skipped'
+ORDER BY id DESC
+LIMIT 20;
+```
+
+Terminal raw batches are retained for 90 days, then deleted in bounded batches.
+
+### Rebuild MySQL facts after remediation
+
+After fixing the cause of skipped or quarantined telemetry (for example a missing
+connection), rebuild whole UTC days from retained raw batches. Replay is operator-only:
+insert a request, and the elected converter rebuilds hourly facts and canonical daily
+rows for that range in one transaction. A range may cover up to 31 days.
+
+```sql
+INSERT INTO _tool_claude_code_otel_replay_requests (range_start, range_end, status, created_at, updated_at)
+VALUES ('2026-09-01 00:00:00', '2026-09-03 00:00:00', 'pending', UTC_TIMESTAMP(), UTC_TIMESTAMP());
+
+SELECT id, status, replayed_batches, skipped_batches, error_message, completed_at
+FROM _tool_claude_code_otel_replay_requests
+ORDER BY id DESC;
+```
+
+Replay currently supports Claude Code's default DELTA exports and does not change live
+series state. A range containing CUMULATIVE telemetry is rejected until a durable
+predecessor-checkpoint design is added; rebuilding it from an arbitrary lookback can
+misstate the first increase. Resetting a single batch to `pending` is not a replay:
+cumulative samples older than live state are rejected as out of order.
+
 ### Reset local telemetry state
 
-This removes local credentials and Prometheus data:
+This removes local credentials, Prometheus data, and queued telemetry:
 
 ```bash
 cd telemetry/otel-collector

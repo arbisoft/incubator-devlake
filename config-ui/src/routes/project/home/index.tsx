@@ -19,9 +19,10 @@
 import { useState, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PlusOutlined, SettingOutlined } from '@ant-design/icons';
-import { Flex, Table, Button, Modal, Input } from 'antd';
+import { Flex, Table, Button, Modal, Input, Space, Tooltip } from 'antd';
 
 import API from '@/api';
+import { type OtelConnectionResponse } from '@/api/otel';
 import { PageHeader, Block, IconButton } from '@/components';
 import { getCron, PATHS } from '@/config';
 import { ConnectionName } from '@/features';
@@ -30,6 +31,21 @@ import { OnboardTour } from '@/routes/onboard/components';
 import { formatTime, operator } from '@/utils';
 import { PipelineStatus } from '@/routes/pipeline';
 import { IBlueprint } from '@/types';
+
+import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?react';
+
+type ClaudeCodeOtelConnectionNameProps = {
+  connection: OtelConnectionResponse;
+};
+
+const ClaudeCodeOtelConnectionName = ({ connection }: ClaudeCodeOtelConnectionNameProps) => (
+  <Space size={4}>
+    <ClaudeCodeOtelIcon width={24} height={24} />
+    <Tooltip title={connection.connection.name}>
+      <span>{connection.connection.name}</span>
+    </Tooltip>
+  </Space>
+);
 
 export const ProjectHomePage = () => {
   const [version, setVersion] = useState(1);
@@ -50,6 +66,7 @@ export const ProjectHomePage = () => {
     () => API.project.list({ page, pageSize, ...(searchKeyword.trim() && { keyword: searchKeyword.trim() }) }),
     [version, page, pageSize, searchKeyword],
   );
+  const { data: otelConnections } = useRefreshData(() => API.otel.list(), []);
 
   const navigate = useNavigate();
 
@@ -59,6 +76,9 @@ export const ProjectHomePage = () => {
         return {
           name: it.name,
           connections: it.blueprint?.connections,
+          otelConnections: otelConnections?.filter((connection) =>
+            connection.projects.some((project) => project.name === it.name),
+          ),
           isManual: it.blueprint?.isManual,
           cronConfig: it.blueprint?.cronConfig,
           createdAt: it.createdAt,
@@ -68,7 +88,7 @@ export const ProjectHomePage = () => {
       }),
       data?.count ?? 0,
     ],
-    [data],
+    [data, otelConnections],
   );
 
   const handleShowDialog = () => setOpen(true);
@@ -161,14 +181,19 @@ export const ProjectHomePage = () => {
             title: 'Data Connections',
             dataIndex: 'connections',
             key: 'connections',
-            render: (val: IBlueprint['connections']) =>
-              !val || !val.length ? (
+            render: (val: IBlueprint['connections'], record) =>
+              !val?.length && !record.otelConnections?.length ? (
                 'N/A'
               ) : (
                 <ul ref={connectionRef}>
-                  {val.map((it) => (
+                  {val?.map((it) => (
                     <li key={`${it.pluginName}-${it.connectionId}`}>
                       <ConnectionName plugin={it.pluginName} connectionId={it.connectionId} />
+                    </li>
+                  ))}
+                  {record.otelConnections?.map((connection) => (
+                    <li key={`claude_otel-${connection.connection.id}`}>
+                      <ClaudeCodeOtelConnectionName connection={connection} />
                     </li>
                   ))}
                 </ul>

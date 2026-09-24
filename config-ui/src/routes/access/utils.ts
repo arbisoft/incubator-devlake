@@ -18,14 +18,36 @@
 
 import axios, { HttpStatusCode } from 'axios';
 
-import { ACCESS_ERROR_CODE, type AccessApiErrorResponse } from '../../api/access';
+import {
+  ACCESS_ERROR_CODE,
+  GRAFANA_PROVIDER_KIND,
+  OIDC_PROVIDER_SYNC_STATUS,
+  type AccessApiErrorResponse,
+  type OIDCProvider,
+  type OIDCProviderInput,
+} from '../../api/access';
+import { AUTHENTICATION_STATE, OIDC_PROVIDER_STATUS } from './constants';
 
 export const ACCESS_ERROR = {
   DUPLICATE_DOMAIN: 'This domain already has a DevLake access policy.',
   DUPLICATE_USER: 'This email already has a DevLake access entry.',
   INVALID_DOMAIN: 'Enter a valid email domain and role, then try again.',
   INVALID_USER: 'Enter a valid email and role, then try again.',
+  LOCAL_CREDENTIAL_MISSING: 'This person does not have a local password.',
+  LAST_LOGIN_METHOD: 'Keep at least one interactive login method enabled.',
   REQUEST_FAILED: 'Unable to update access settings. Please try again.',
+  INVALID_OIDC_PROVIDER: 'Enter valid OIDC provider settings and include the openid scope.',
+  OIDC_PROVIDER_BLOCKED: 'OIDC provider settings cannot be applied until the deployment prerequisites are available.',
+  OIDC_PROVIDER_FAILED: 'OIDC provider settings could not be completed. Please try again.',
+  OIDC_PROVIDER_STALE: 'This provider changed. Refresh the page before saving it.',
+  GRAFANA_TARGET_CONFLICT: 'Another provider already controls this Grafana sign-in option.',
+  GRAFANA_SYNC_FAILED:
+    'OIDC provider was saved, but Grafana OAuth synchronization failed. Use Retry Grafana to complete synchronization.',
+} as const;
+
+export const LOCAL_CREDENTIAL_ERROR = {
+  DUPLICATE_USER: 'This username already has a DevLake local password.',
+  INVALID_USER: 'Enter a valid username, then try again.',
 } as const;
 
 export const normalizeDomain = (value: string) => value.trim().toLowerCase();
@@ -48,11 +70,28 @@ export const isValidEmail = (value: string) => {
   return at > 0 && at === email.lastIndexOf('@') && isValidDomain(email.slice(at + 1)) && !/\s/.test(email);
 };
 
+export const isValidLocalLoginName = (value: string) => /^[a-z0-9][a-z0-9._-]{2,63}$/i.test(value.trim());
+
 const extractErrorCode = (error: unknown): string | undefined => {
   if (!axios.isAxiosError<AccessApiErrorResponse>(error) || error.response?.status !== HttpStatusCode.BadRequest) {
     return undefined;
   }
   return typeof error.response.data?.code === 'string' ? error.response.data.code : undefined;
+};
+
+const extractLocalCredentialErrorCode = (error: unknown): string | undefined => {
+  if (!axios.isAxiosError<AccessApiErrorResponse>(error)) return undefined;
+  const response = error.response;
+  if (response?.status !== HttpStatusCode.BadRequest && response?.status !== HttpStatusCode.NotFound) return undefined;
+  return typeof response.data?.code === 'string' ? response.data.code : undefined;
+};
+
+const extractOIDCProviderErrorCode = (error: unknown): string | undefined => {
+  if (!axios.isAxiosError<AccessApiErrorResponse>(error)) return undefined;
+  const response = error.response;
+  const status = response?.status;
+  if (status !== HttpStatusCode.BadRequest && status !== HttpStatusCode.ServiceUnavailable) return undefined;
+  return typeof response?.data?.code === 'string' ? response.data.code : undefined;
 };
 
 const serverMessage = (error: unknown) => {
@@ -66,10 +105,21 @@ export const getCreateUserError = (error: unknown) => {
   const code = extractErrorCode(error);
   if (code === ACCESS_ERROR_CODE.DUPLICATE_USER) return ACCESS_ERROR.DUPLICATE_USER;
   if (code === ACCESS_ERROR_CODE.INVALID_USER) return ACCESS_ERROR.INVALID_USER;
+  if (code === ACCESS_ERROR_CODE.LOCAL_CREDENTIAL_MISSING) return ACCESS_ERROR.LOCAL_CREDENTIAL_MISSING;
+  if (code === ACCESS_ERROR_CODE.LAST_LOGIN_METHOD) return ACCESS_ERROR.LAST_LOGIN_METHOD;
 
   const message = serverMessage(error);
   if (message.includes('this email already has a DevLake access entry')) return ACCESS_ERROR.DUPLICATE_USER;
   return message ? ACCESS_ERROR.INVALID_USER : ACCESS_ERROR.REQUEST_FAILED;
+};
+
+export const getLocalCredentialError = (error: unknown) => {
+  const code = extractLocalCredentialErrorCode(error);
+  if (code === ACCESS_ERROR_CODE.LOCAL_CREDENTIAL_MISSING) return ACCESS_ERROR.LOCAL_CREDENTIAL_MISSING;
+  if (code === ACCESS_ERROR_CODE.LAST_LOGIN_METHOD) return ACCESS_ERROR.LAST_LOGIN_METHOD;
+  if (code === ACCESS_ERROR_CODE.DUPLICATE_USER) return LOCAL_CREDENTIAL_ERROR.DUPLICATE_USER;
+  if (code === ACCESS_ERROR_CODE.INVALID_USER) return LOCAL_CREDENTIAL_ERROR.INVALID_USER;
+  return ACCESS_ERROR.REQUEST_FAILED;
 };
 
 export const getCreateDomainError = (error: unknown) => {
@@ -81,3 +131,107 @@ export const getCreateDomainError = (error: unknown) => {
   if (message.includes('this domain already has a DevLake access policy')) return ACCESS_ERROR.DUPLICATE_DOMAIN;
   return message ? ACCESS_ERROR.INVALID_DOMAIN : ACCESS_ERROR.REQUEST_FAILED;
 };
+
+export const normalizeOIDCProviderInput = (provider: OIDCProviderInput): OIDCProviderInput => ({
+  providerKey: provider.providerKey.trim().toLowerCase(),
+  displayName: provider.displayName.trim(),
+  issuerUrl: provider.issuerUrl.trim(),
+  clientId: provider.clientId.trim(),
+  clientSecret: provider.clientSecret.trim(),
+  scopes: provider.scopes
+    .split(/[\s,]+/)
+    .filter(Boolean)
+    .filter((scope, index, scopes) => scopes.indexOf(scope) === index)
+    .join(' '),
+  grafanaTarget: provider.grafanaTarget,
+  confirmDevlakeOnly: provider.confirmDevlakeOnly,
+  revision: provider.revision,
+});
+
+export const formFromOIDCProvider = (provider?: OIDCProvider): OIDCProviderInput => ({
+  providerKey: provider?.providerKey ?? '',
+  displayName: provider?.displayName ?? '',
+  issuerUrl: provider?.issuerUrl ?? '',
+  clientId: provider?.clientId ?? '',
+  clientSecret: '',
+  scopes: provider?.scopes ?? 'openid profile email',
+  grafanaTarget: provider?.grafanaTarget ?? GRAFANA_PROVIDER_KIND.NONE,
+  confirmDevlakeOnly: provider ? provider.grafanaTarget === GRAFANA_PROVIDER_KIND.NONE : false,
+  revision: provider?.providerRevision,
+});
+
+export const isValidOIDCProviderInput = (
+  provider: OIDCProviderInput,
+  configuredProvider?: OIDCProvider,
+  allowLocalOidc = false,
+) => {
+  const normalized = normalizeOIDCProviderInput(provider);
+  let issuer: URL;
+  try {
+    issuer = new URL(normalized.issuerUrl);
+  } catch {
+    return false;
+  }
+  const isLocalHTTP =
+    issuer.protocol === 'http:' && (issuer.hostname === 'localhost' || issuer.hostname === '127.0.0.1');
+  const requiresReplacementSecret =
+    !configuredProvider?.secretConfigured || normalized.clientId !== configuredProvider.clientId;
+  return (
+    /^[a-z0-9_-]{1,64}$/.test(normalized.providerKey) &&
+    normalized.displayName.length > 0 &&
+    normalized.clientId.length > 0 &&
+    (!requiresReplacementSecret || normalized.clientSecret.length > 0) &&
+    (issuer.protocol === 'https:' || (allowLocalOidc && isLocalHTTP)) &&
+    normalized.scopes.split(' ').includes('openid') &&
+    (normalized.grafanaTarget !== GRAFANA_PROVIDER_KIND.NONE || normalized.confirmDevlakeOnly)
+  );
+};
+
+export const getOIDCProviderError = (error: unknown) => {
+  const code = extractOIDCProviderErrorCode(error);
+  if (code === ACCESS_ERROR_CODE.INVALID_OIDC_PROVIDER) return ACCESS_ERROR.INVALID_OIDC_PROVIDER;
+  if (code === ACCESS_ERROR_CODE.OIDC_PROVIDER_BLOCKED || code === ACCESS_ERROR_CODE.OIDC_PROVIDER_MISSING) {
+    return ACCESS_ERROR.OIDC_PROVIDER_BLOCKED;
+  }
+  if (code === ACCESS_ERROR_CODE.OIDC_PROVIDER_REVISION_CONFLICT) return ACCESS_ERROR.OIDC_PROVIDER_STALE;
+  if (code === ACCESS_ERROR_CODE.GRAFANA_TARGET_CONFLICT) return ACCESS_ERROR.GRAFANA_TARGET_CONFLICT;
+  if (code === ACCESS_ERROR_CODE.GRAFANA_SYNC_FAILED) return ACCESS_ERROR.GRAFANA_SYNC_FAILED;
+  return ACCESS_ERROR.OIDC_PROVIDER_FAILED;
+};
+
+export const getOIDCProviderErrorCode = (error: unknown) => extractOIDCProviderErrorCode(error);
+
+export const getOIDCProviderStatus = (provider?: OIDCProvider) => {
+  if (!provider) return OIDC_PROVIDER_STATUS.CONFIGURED;
+  if (provider.retiredAt) return OIDC_PROVIDER_STATUS.RETIRED;
+  if (provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.COMPENSATION_FAILED)
+    return OIDC_PROVIDER_STATUS.RECOVERY;
+  if (provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.COMPENSATED)
+    return OIDC_PROVIDER_STATUS.COMPENSATED;
+  if (provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.FAILED) return OIDC_PROVIDER_STATUS.FAILED;
+  if (!provider.enabled) return OIDC_PROVIDER_STATUS.DISABLED;
+  if (provider.grafanaTarget === GRAFANA_PROVIDER_KIND.NONE) return OIDC_PROVIDER_STATUS.DEVLAKE_ONLY;
+  if (provider.providerRevision > provider.grafanaSyncedRevision) return OIDC_PROVIDER_STATUS.PENDING;
+  return OIDC_PROVIDER_STATUS.ACTIVE;
+};
+
+export const getAuthenticationState = (providers: OIDCProvider[]) => {
+  if (providers.length === 0) return AUTHENTICATION_STATE.NO_MANAGED_OIDC;
+  if (providers.some((provider) => provider.databaseSourceActive && provider.enabled)) {
+    return AUTHENTICATION_STATE.OIDC_ACTIVE;
+  }
+  if (providers.some((provider) => provider.hasCandidate)) return AUTHENTICATION_STATE.ACTIVATION_REQUIRED;
+  return AUTHENTICATION_STATE.NO_ACTIVE_OIDC;
+};
+
+export const canActivateOIDCProvider = (provider?: OIDCProvider) => {
+  if (!provider?.providerKey || provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.COMPENSATION_FAILED)
+    return false;
+  return !provider.databaseSourceActive || provider.hasCandidate;
+};
+
+export const canSelectGenericOIDCProvider = (provider: OIDCProvider) =>
+  provider.enabled &&
+  !provider.hasCandidate &&
+  provider.grafanaTarget === GRAFANA_PROVIDER_KIND.NONE &&
+  provider.grafanaSyncStatus !== OIDC_PROVIDER_SYNC_STATUS.COMPENSATION_FAILED;

@@ -48,6 +48,15 @@ func NewProvider(cfg *ProviderConfig) *Provider {
 
 func (p *Provider) Name() string { return p.cfg.Name }
 
+// HTTPContext applies the configured restricted transport to token exchange.
+// Discovery/JWKS use it internally; OAuth2 Exchange needs the caller context too.
+func (p *Provider) HTTPContext(ctx context.Context) context.Context {
+	if p.cfg.HTTPClient == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, oauth2.HTTPClient, p.cfg.HTTPClient)
+}
+
 func (p *Provider) OIDC(ctx context.Context) (*oidc.Provider, error) {
 	p.mu.RLock()
 	cached := p.provider
@@ -67,6 +76,7 @@ func (p *Provider) refresh(ctx context.Context) (*oidc.Provider, error) {
 	if p.provider != nil && time.Since(p.lastRefresh) < minRefreshInterval {
 		return p.provider, nil
 	}
+	ctx = p.HTTPContext(ctx)
 	prov, err := oidc.NewProvider(ctx, p.cfg.IssuerURL)
 	if err != nil {
 		return nil, fmt.Errorf("oidc discovery (%s): %w", p.cfg.IssuerURL, err)

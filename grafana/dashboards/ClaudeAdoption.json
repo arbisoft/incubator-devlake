@@ -65,7 +65,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(DISTINCT user_email) AS \"Active Users\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude'",
+          "rawSql": "SELECT COUNT(DISTINCT user_email) AS \"Active Users\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude'\n  AND record_kind IS NULL",
           "refId": "A"
         }
       ],
@@ -117,7 +117,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT SUM(lines_added) AS \"Lines Added\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude'",
+          "rawSql": "SELECT SUM(lines_added) AS \"Lines Added\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude'\n  AND record_kind IS NULL",
           "refId": "A"
         }
       ],
@@ -169,7 +169,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT SUM(prs_created) AS \"PRs by Claude\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude'",
+          "rawSql": "SELECT SUM(prs_created) AS \"PRs by Claude\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude'\n  AND record_kind IS NULL",
           "refId": "A"
         }
       ],
@@ -230,7 +230,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT ROUND(SUM(estimated_cost_usd), 2) AS \"Estimated Cost (USD)\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude'",
+          "rawSql": "SELECT ROUND(SUM(estimated_cost_usd), 2) AS \"Estimated Cost (USD)\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude'\n  AND record_kind IS NULL",
           "refId": "A"
         }
       ],
@@ -291,7 +291,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT date AS time,\n  COUNT(DISTINCT user_email) AS \"Daily Active Users\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude'\nGROUP BY date\nORDER BY date",
+          "rawSql": "SELECT date AS time,\n  COUNT(DISTINCT user_email) AS \"Daily Active Users\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude'\n  AND record_kind IS NULL\nGROUP BY date\nORDER BY date",
           "refId": "A"
         }
       ],
@@ -352,7 +352,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT date AS time,\n  SUM(prs_created) AS \"PRs by Claude\",\n  SUM(commits_created) AS \"Commits by Claude\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude'\nGROUP BY date\nORDER BY date",
+          "rawSql": "SELECT date AS time,\n  SUM(prs_created) AS \"PRs by Claude\",\n  SUM(commits_created) AS \"Commits by Claude\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude'\n  AND record_kind IS NULL\nGROUP BY date\nORDER BY date",
           "refId": "A"
         }
       ],
@@ -415,7 +415,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT date AS time,\n  CASE\n    WHEN model LIKE '%sonnet%' OR model LIKE '%Sonnet%' THEN 'Sonnet'\n    WHEN model LIKE '%opus%'   OR model LIKE '%Opus%'   THEN 'Opus'\n    WHEN model LIKE '%haiku%'  OR model LIKE '%Haiku%'  THEN 'Haiku'\n    ELSE COALESCE(NULLIF(model,''), 'Unknown')\n  END AS metric,\n  SUM(estimated_cost_usd) AS value\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude'\nGROUP BY date, metric\nORDER BY date",
+          "rawSql": "SELECT date AS time,\n  CASE\n    WHEN model LIKE '%sonnet%' OR model LIKE '%Sonnet%' THEN 'Sonnet'\n    WHEN model LIKE '%opus%'   OR model LIKE '%Opus%'   THEN 'Opus'\n    WHEN model LIKE '%haiku%'  OR model LIKE '%Haiku%'  THEN 'Haiku'\n    ELSE COALESCE(NULLIF(model,''), 'Unknown')\n  END AS metric,\n  SUM(estimated_cost_usd) AS value\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude'\n  AND record_kind IS NULL\nGROUP BY date, metric\nORDER BY date",
           "refId": "A"
         }
       ],
@@ -491,7 +491,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT date AS time,\n  SUM(lines_added)   AS \"Lines Added (Features)\",\n  SUM(lines_removed) AS \"Lines Removed (Refactoring)\",\n  ROUND(SUM(lines_removed) / NULLIF(SUM(lines_added), 0), 2) AS \"Refactor Ratio\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude'\nGROUP BY date\nORDER BY date",
+          "rawSql": "SELECT date AS time,\n  SUM(lines_added)   AS \"Lines Added (Features)\",\n  SUM(lines_removed) AS \"Lines Removed (Refactoring)\",\n  ROUND(SUM(lines_removed) / NULLIF(SUM(lines_added), 0), 2) AS \"Refactor Ratio\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude'\n  AND record_kind IS NULL\nGROUP BY date\nORDER BY date",
           "refId": "A"
         }
       ],
@@ -540,7 +540,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT user_email AS \"User\",\n  COUNT(DISTINCT date) AS \"Active Days\",\n  SUM(num_sessions) AS \"Sessions\",\n  SUM(lines_added) AS \"Lines Added\",\n  SUM(lines_removed) AS \"Lines Removed\",\n  SUM(commits_created) AS \"Commits\",\n  SUM(prs_created) AS \"PRs\",\n  ROUND(SUM(estimated_cost_usd), 2) AS \"Cost (USD)\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude'\nGROUP BY user_email\nORDER BY SUM(lines_added) DESC\nLIMIT 25",
+          "rawSql": "SELECT user_email AS \"User\",\n  COUNT(DISTINCT date) AS \"Active Days\",\n  SUM(num_sessions) AS \"Sessions\",\n  SUM(lines_added) AS \"Lines Added\",\n  SUM(lines_removed) AS \"Lines Removed\",\n  SUM(commits_created) AS \"Commits\",\n  SUM(prs_created) AS \"PRs\",\n  ROUND(SUM(estimated_cost_usd), 2) AS \"Cost (USD)\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude'\n  AND record_kind IS NULL\nGROUP BY user_email\nORDER BY SUM(lines_added) DESC\nLIMIT 25",
           "refId": "A"
         }
       ],
@@ -589,7 +589,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(NULLIF(model,''), 'Unknown') AS \"Model\",\n  SUM(input_tokens) AS \"Input Tokens\",\n  SUM(output_tokens) AS \"Output Tokens\",\n  SUM(lines_added) AS \"Lines Added\",\n  ROUND(SUM(estimated_cost_usd), 2) AS \"Total Cost (USD)\",\n  ROUND(SUM(estimated_cost_usd) / NULLIF(SUM(lines_added), 0), 4) AS \"Cost per Line (USD)\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude'\nGROUP BY model\nORDER BY SUM(estimated_cost_usd) DESC",
+          "rawSql": "SELECT COALESCE(NULLIF(model,''), 'Unknown') AS \"Model\",\n  SUM(input_tokens) AS \"Input Tokens\",\n  SUM(output_tokens) AS \"Output Tokens\",\n  SUM(lines_added) AS \"Lines Added\",\n  ROUND(SUM(estimated_cost_usd), 2) AS \"Total Cost (USD)\",\n  ROUND(SUM(estimated_cost_usd) / NULLIF(SUM(lines_added), 0), 4) AS \"Cost per Line (USD)\"\nFROM ai_activities\nWHERE $__timeFilter(date)\n  AND provider = 'claude'\n  AND record_kind IS NULL\nGROUP BY model\nORDER BY SUM(estimated_cost_usd) DESC",
           "refId": "A"
         }
       ],

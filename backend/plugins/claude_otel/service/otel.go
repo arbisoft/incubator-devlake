@@ -28,6 +28,7 @@ import (
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/log"
 	"github.com/apache/incubator-devlake/core/models/common"
+	"github.com/apache/incubator-devlake/core/models/domainlayer/ai"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
 )
 
@@ -52,9 +53,10 @@ const (
 )
 
 var (
-	cfg    config.ConfigReader
-	db     dal.Dal
-	logger log.Logger
+	cfg       config.ConfigReader
+	db        dal.Dal
+	logger    log.Logger
+	rawIngest *RawIngestService
 	// lifecycleMu serializes file and collector updates for a single backend instance.
 	lifecycleMu sync.Mutex
 )
@@ -63,10 +65,13 @@ func Init(basicRes corecontext.BasicRes) {
 	cfg = basicRes.GetConfigReader()
 	db = basicRes.GetDal()
 	logger = basicRes.GetLogger()
+	rawIngest = NewRawIngestService(db, cfg, logger)
+	startRawMetricConverter(db, logger)
 }
 
 type OtelConnectionInput struct {
-	TeamName string `json:"teamName"`
+	TeamName     string   `json:"teamName"`
+	ProjectNames []string `json:"projectNames"`
 }
 
 func ListOtelConnections() ([]*models.OtelConnectionWithCredentials, errors.Error) {
@@ -79,13 +84,19 @@ func ListOtelConnections() ([]*models.OtelConnectionWithCredentials, errors.Erro
 	if err != nil {
 		return nil, errors.Default.Wrap(err, "error getting otel connections")
 	}
+	output, err := buildOtelConnectionResponses(connections)
+	if err != nil {
+		return nil, err
+	}
+	return output, nil
+}
+
+// buildOtelConnectionResponses keeps all OTel management surfaces on one response contract.
+func buildOtelConnectionResponses(connections []*models.OtelConnection) ([]*models.OtelConnectionWithCredentials, errors.Error) {
 	storageNeedsApplying, err := htpasswdHasUnexpectedUsernames()
 	if err != nil {
 		return nil, err
 	}
-
-	// Enrich each connection with its credential records and UI state: pending collector restarts,
-	// the related activation hint, and whether an active or retiring credential lacks its htpasswd verifier.
 	output := make([]*models.OtelConnectionWithCredentials, 0, len(connections))
 	for _, connection := range connections {
 		credentials, err := getOtelCredentials(connection.ID)
@@ -96,16 +107,33 @@ func ListOtelConnections() ([]*models.OtelConnectionWithCredentials, errors.Erro
 		if err != nil {
 			return nil, err
 		}
-		output = append(output, &models.OtelConnectionWithCredentials{
+		response := &models.OtelConnectionWithCredentials{
 			Connection:           connection,
 			Credentials:          credentials,
 			RestartRequired:      hasPendingCollectorRestart(credentials) || storageNeedsApplying,
 			RestartHint:          firstNonEmpty(restartHint(credentials), storageApplyHint(storageNeedsApplying)),
 			RecoveryRequired:     recoveryRequired,
 			StorageNeedsApplying: storageNeedsApplying,
-		})
+		}
+		if err := attachOtelProjects(response); err != nil {
+			return nil, err
+		}
+		output = append(output, response)
 	}
 	return output, nil
+}
+
+// ListOtelSourcePreferences exposes the persisted OTel-only canonical policy. Future
+// Enterprise sources remain unavailable until their compatibility checks are complete.
+func ListOtelSourcePreferences() ([]*ai.AiSourcePreference, errors.Error) {
+	preferences := make([]*ai.AiSourcePreference, 0)
+	if err := db.All(&preferences,
+		dal.Where("provider = ?", aiProviderClaude),
+		dal.Orderby("workspace_key ASC, metric_family ASC"),
+	); err != nil {
+		return nil, errors.Default.Wrap(err, "error getting Claude AI source preferences")
+	}
+	return preferences, nil
 }
 
 // HideOtelConnection removes a revoked connection from the management UI while retaining its audit record.
@@ -133,7 +161,11 @@ func HideOtelConnection(user *common.User, id uint64) (*models.OtelConnectionWit
 	if err != nil {
 		return nil, err
 	}
-	return &models.OtelConnectionWithCredentials{Connection: connection, Credentials: credentials}, nil
+	response := &models.OtelConnectionWithCredentials{Connection: connection, Credentials: credentials}
+	if err := attachOtelProjects(response); err != nil {
+		return nil, err
+	}
+	return response, nil
 }
 
 func CreateOtelConnection(user *common.User, input *OtelConnectionInput) (*models.OtelConnectionWithCredentials, errors.Error) {
@@ -142,6 +174,10 @@ func CreateOtelConnection(user *common.User, input *OtelConnectionInput) (*model
 
 	if input == nil {
 		input = &OtelConnectionInput{}
+	}
+	projectNames, err := validateOtelProjectNames(input.ProjectNames)
+	if err != nil {
+		return nil, err
 	}
 	endpoint := firstNonEmpty(cfg.GetString("OTEL_PUBLIC_ENDPOINT"), defaultOtelPublicEndpoint)
 	protocol := firstNonEmpty(cfg.GetString("OTEL_DEFAULT_PROTOCOL"), defaultOtelProtocol)
@@ -172,9 +208,17 @@ func CreateOtelConnection(user *common.User, input *OtelConnectionInput) (*model
 	}
 	setOtelActor(user, connection, true)
 
-	err = db.Create(connection)
-	if err != nil {
+	tx := db.Begin()
+	if err := tx.Create(connection); err != nil {
+		_ = tx.Rollback()
 		return nil, errors.Default.Wrap(err, "error creating otel connection")
+	}
+	if err := createOtelConnectionProjects(tx, connection.ID, projectNames); err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, errors.Default.Wrap(err, "error committing Claude Code OTel connection")
 	}
 
 	credential, password, err := createOtelCredential(connection.ID, connection.TeamSlug)
@@ -202,11 +246,16 @@ func CreateOtelConnection(user *common.User, input *OtelConnectionInput) (*model
 		// Keep the credential usable after the next successful apply, while recording the helper outage for operators.
 		logger.Warn(applyErr, "OTel collector activation is pending for connection %d", connection.ID)
 	}
-	return responseWithSettings(connection, credentials, credential, password), nil
+	response := responseWithSettings(connection, credentials, credential, password)
+	response.Projects = projectSummariesFromNames(projectNames)
+	return response, nil
 }
 
 // deleteOtelConnectionAfterFailedCreate keeps failed-create cleanup best-effort without hiding the original error.
 func deleteOtelConnectionAfterFailedCreate(connection *models.OtelConnection) {
+	if err := db.Delete(&models.OtelConnectionProject{}, dal.Where("connection_id = ?", connection.ID)); err != nil && logger != nil {
+		logger.Warn(err, "failed to clean up Claude Code OTel project placements for connection %d after create failure", connection.ID)
+	}
 	if err := db.Delete(connection); err != nil && logger != nil {
 		logger.Warn(err, "failed to clean up OTel connection %d after create failure", connection.ID)
 	}
@@ -275,11 +324,16 @@ func removeOtelCredentialForRollback(credential *models.OtelCredential) (bool, e
 }
 
 func removeOtelConnectionForRollback(connection *models.OtelConnection) errors.Error {
+	if err := db.Delete(&models.OtelConnectionProject{}, dal.Where("connection_id = ?", connection.ID)); err != nil {
+		return errors.Default.Wrap(err, fmt.Sprintf("error removing Claude Code OTel project placements for connection %d during rollback", connection.ID))
+	}
 	if err := db.Delete(connection); err == nil {
 		return nil
 	} else {
 		deleteErr := errors.Default.Wrap(err, fmt.Sprintf("error removing otel connection %d during rollback", connection.ID))
 		connection.Status = models.OtelConnectionStatusRevoked
+		revokedAt := time.Now()
+		connection.RevokedAt = &revokedAt
 		if updateErr := db.Update(connection); updateErr == nil {
 			return nil
 		} else {
@@ -327,6 +381,10 @@ func RotateOtelConnection(user *common.User, id uint64) (*models.OtelConnectionW
 		return nil, errors.BadInput.New("otel connection is not active")
 	}
 	if err := validateOtelSettings(connection.CollectorEndpoint, connection.Protocol); err != nil {
+		return nil, err
+	}
+	projects, err := getOtelConnectionProjects(connection.ID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -387,7 +445,9 @@ func RotateOtelConnection(user *common.User, id uint64) (*models.OtelConnectionW
 			rollbackErr,
 		)
 	}
-	return responseWithSettings(connection, affectedCredentials, newCredential, password), nil
+	response := responseWithSettings(connection, affectedCredentials, newCredential, password)
+	response.Projects = projects
+	return response, nil
 }
 
 // persistOtelRotation makes the retiring-state update and replacement credential creation atomic.
@@ -443,6 +503,7 @@ func RevokeOtelConnection(user *common.User, id uint64) (*models.OtelConnectionW
 		return nil, err
 	}
 	connection.Status = models.OtelConnectionStatusRevoked
+	connection.RevokedAt = &now
 	setOtelActor(user, connection, false)
 	if err := db.Update(connection); err != nil {
 		return nil, errors.Default.Wrap(err, "error revoking otel connection")
@@ -490,12 +551,16 @@ func applyOtelLifecycleUpdate(connection *models.OtelConnection, credentials []*
 	if err != nil {
 		return nil, err
 	}
-	return &models.OtelConnectionWithCredentials{
+	response := &models.OtelConnectionWithCredentials{
 		Connection:      connection,
 		Credentials:     allCredentials,
 		RestartRequired: applyErr != nil,
 		RestartHint:     restartHint(allCredentials),
-	}, nil
+	}
+	if err := attachOtelProjects(response); err != nil {
+		return nil, err
+	}
+	return response, nil
 }
 
 // ApplyOtelConnection retries a pending file reload without generating another credential.
@@ -522,10 +587,14 @@ func ApplyOtelConnection(user *common.User, id uint64) (*models.OtelConnectionWi
 	if err := db.Update(connection); err != nil {
 		return nil, errors.Default.Wrap(err, "error updating otel connection")
 	}
-	return &models.OtelConnectionWithCredentials{
+	response := &models.OtelConnectionWithCredentials{
 		Connection:      connection,
 		Credentials:     allCredentials,
 		RestartRequired: applyErr != nil || hasPendingCollectorRestart(allCredentials),
 		RestartHint:     restartHint(allCredentials),
-	}, nil
+	}
+	if err := attachOtelProjects(response); err != nil {
+		return nil, err
+	}
+	return response, nil
 }

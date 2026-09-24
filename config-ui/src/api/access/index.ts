@@ -37,6 +37,15 @@ export const ACCESS_ERROR_CODE = {
   DUPLICATE_DOMAIN: 'DUPLICATE_DOMAIN',
   INVALID_USER: 'INVALID_USER',
   INVALID_DOMAIN: 'INVALID_DOMAIN',
+  INVALID_OIDC_PROVIDER: 'INVALID_OIDC_PROVIDER',
+  LOCAL_CREDENTIAL_MISSING: 'LOCAL_CREDENTIAL_MISSING',
+  LAST_LOGIN_METHOD: 'LAST_LOGIN_METHOD',
+  OIDC_PROVIDER_BLOCKED: 'OIDC_PROVIDER_BLOCKED',
+  OIDC_PROVIDER_MISSING: 'OIDC_PROVIDER_MISSING',
+  OIDC_PROVIDER_REVISION_CONFLICT: 'OIDC_PROVIDER_REVISION_CONFLICT',
+  GRAFANA_TARGET_CONFLICT: 'GRAFANA_TARGET_CONFLICT',
+  OIDC_IDENTITY_LINKED: 'OIDC_IDENTITY_LINKED',
+  GRAFANA_SYNC_FAILED: 'GRAFANA_SYNC_FAILED',
 } as const;
 
 export type AccessErrorCode = (typeof ACCESS_ERROR_CODE)[keyof typeof ACCESS_ERROR_CODE];
@@ -52,17 +61,24 @@ export type AccessCurrent = {
   role?: AccessRole;
 };
 
-
 export type AccessUser = {
   id: ID;
   issuer: string;
   subject: string;
-  email: string;
+  email?: string;
   displayName: string;
   role: AccessRole;
   status: AccessStatus;
   lastLoginAt?: string;
   disabledAt?: string;
+  localLoginName?: string;
+  hasLocalCredential: boolean;
+};
+
+export type LocalCredentialResponse = {
+  user: AccessUser;
+  loginName: string;
+  temporaryPassword: string;
 };
 
 export type AccessDomain = {
@@ -80,6 +96,62 @@ export type AccessAuditEvent = {
   detail: string;
   createdAt: string;
 };
+
+export const OIDC_PROVIDER_SYNC_STATUS = {
+  PENDING: 'pending',
+  SYNCHRONIZED: 'synchronized',
+  FAILED: 'failed',
+  COMPENSATED: 'compensated',
+  COMPENSATION_FAILED: 'compensation_failed',
+  NOT_APPLICABLE: 'not_applicable',
+} as const;
+
+export type OIDCProviderSyncStatus = (typeof OIDC_PROVIDER_SYNC_STATUS)[keyof typeof OIDC_PROVIDER_SYNC_STATUS];
+
+export const GRAFANA_PROVIDER_KIND = {
+  NONE: 'none',
+  GOOGLE: 'google',
+  AZURE_AD: 'azuread',
+  OKTA: 'okta',
+  GITLAB: 'gitlab',
+  GENERIC_OAUTH: 'generic_oauth',
+} as const;
+
+export type GrafanaProviderKind = (typeof GRAFANA_PROVIDER_KIND)[keyof typeof GRAFANA_PROVIDER_KIND];
+
+export type OIDCProviderInput = {
+  providerKey: string;
+  displayName: string;
+  issuerUrl: string;
+  clientId: string;
+  clientSecret: string;
+  scopes: string;
+  grafanaTarget: GrafanaProviderKind;
+  confirmDevlakeOnly: boolean;
+  revision?: number;
+};
+
+export type OIDCProvider = Omit<OIDCProviderInput, 'clientSecret' | 'confirmDevlakeOnly' | 'revision'> & {
+  enabled: boolean;
+  retiredAt?: string;
+  secretConfigured: boolean;
+  databaseSourceActive: boolean;
+  grafanaSyncStatus: OIDCProviderSyncStatus;
+  grafanaSyncedRevision: number;
+  providerRevision: number;
+  hasCandidate: boolean;
+  devlakeCallbackUrl: string;
+  grafanaCallbackUrl: string;
+  allowLocalOidc: boolean;
+};
+
+export type OIDCCallbacks = {
+  devlakeCallbackUrl: string;
+  grafanaCallbackUrls: Record<GrafanaProviderKind, string>;
+  allowLocalOidc: boolean;
+};
+
+export type LinkableOIDCProvider = Pick<OIDCProvider, 'providerKey' | 'displayName'>;
 
 export type AccessPagination = {
   page: number;
@@ -110,6 +182,17 @@ export const createUser = (data: { email: string; role: AccessRole }): Promise<A
 export const updateUser = (id: ID, data: { role: AccessRole; status: AccessStatus }): Promise<AccessUser> =>
   request(`${basePath}/users/${id}`, { method: 'PATCH', data });
 export const hideUser = (id: ID): Promise<AccessUser> => request(`${basePath}/users/${id}/hide`, { method: 'POST' });
+export const createLocalUser = (data: {
+  loginName: string;
+  displayName: string;
+  role: AccessRole;
+}): Promise<LocalCredentialResponse> => request(`${basePath}/local-users`, { method: 'POST', data });
+export const addLocalCredential = (id: ID, data: { loginName: string }): Promise<LocalCredentialResponse> =>
+  request(`${basePath}/users/${id}/local-credential`, { method: 'POST', data });
+export const resetLocalCredential = (id: ID): Promise<LocalCredentialResponse> =>
+  request(`${basePath}/users/${id}/local-credential/reset`, { method: 'POST' });
+export const removeLocalCredential = (id: ID): Promise<AccessUser> =>
+  request(`${basePath}/users/${id}/local-credential`, { method: 'DELETE' });
 export const listDomains = (params: AccessPagination): Promise<PaginatedAccessDomains> =>
   request(`${basePath}/domains`, { data: params });
 export const createDomain = (data: { domain: string; defaultRole: AccessRole }): Promise<AccessDomain> =>
@@ -119,3 +202,23 @@ export const updateDomain = (id: ID, data: { defaultRole: AccessRole; status: Ac
 export const hideDomain = (id: ID): Promise<AccessDomain> =>
   request(`${basePath}/domains/${id}/hide`, { method: 'POST' });
 export const listAuditEvents = (): Promise<AccessAuditEvent[]> => request(`${basePath}/audit-events`);
+export const getOIDCCallbacks = (): Promise<OIDCCallbacks> => request(`${basePath}/oidc-providers/callbacks`);
+export const listOIDCProviders = (): Promise<OIDCProvider[]> => request(`${basePath}/oidc-providers`);
+export const listLinkableOIDCProviders = (): Promise<LinkableOIDCProvider[]> =>
+  request(`${basePath}/oidc-providers/linkable`);
+export const validateOIDCProvider = (data: OIDCProviderInput): Promise<void> =>
+  request(`${basePath}/oidc-providers/validate`, { method: 'POST', data });
+export const saveOIDCProvider = (data: OIDCProviderInput): Promise<OIDCProvider> =>
+  request(`${basePath}/oidc-providers`, { method: 'POST', data });
+export const activateOIDCProvider = (providerKey: string): Promise<OIDCProvider> =>
+  request(`${basePath}/oidc-providers/${encodeURIComponent(providerKey)}/activate`, { method: 'POST' });
+export const enableOIDCProvider = (providerKey: string): Promise<OIDCProvider> =>
+  request(`${basePath}/oidc-providers/${encodeURIComponent(providerKey)}/enable`, { method: 'POST' });
+export const disableOIDCProvider = (providerKey: string): Promise<OIDCProvider> =>
+  request(`${basePath}/oidc-providers/${encodeURIComponent(providerKey)}/disable`, { method: 'POST' });
+export const retireOIDCProvider = (providerKey: string): Promise<OIDCProvider> =>
+  request(`${basePath}/oidc-providers/${encodeURIComponent(providerKey)}`, { method: 'DELETE' });
+export const retryGrafanaOIDCProviderSync = (providerKey: string): Promise<OIDCProvider> =>
+  request(`${basePath}/oidc-providers/${encodeURIComponent(providerKey)}/grafana/retry`, { method: 'POST' });
+export const selectGenericOIDCProvider = (providerKey: string): Promise<OIDCProvider> =>
+  request(`${basePath}/oidc-providers/${encodeURIComponent(providerKey)}/grafana/select-generic`, { method: 'POST' });

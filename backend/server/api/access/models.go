@@ -21,8 +21,11 @@ limitations under the License.
 package access
 
 import (
+	"context"
 	"time"
 
+	"github.com/apache/incubator-devlake/core/dal"
+	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models/common"
 )
 
@@ -41,10 +44,43 @@ const (
 
 	invalidPageSizeMessage = "pageSize must be 10, 25, or 50"
 
-	ErrCodeDuplicateUser   = "DUPLICATE_USER"
-	ErrCodeDuplicateDomain = "DUPLICATE_DOMAIN"
-	ErrCodeInvalidUser     = "INVALID_USER"
-	ErrCodeInvalidDomain   = "INVALID_DOMAIN"
+	ErrCodeDuplicateUser            = "DUPLICATE_USER"
+	ErrCodeDuplicateDomain          = "DUPLICATE_DOMAIN"
+	ErrCodeInvalidUser              = "INVALID_USER"
+	ErrCodeInvalidDomain            = "INVALID_DOMAIN"
+	ErrCodeInvalidProvider          = "INVALID_OIDC_PROVIDER"
+	ErrCodeProviderBlocked          = "OIDC_PROVIDER_BLOCKED"
+	ErrCodeProviderMissing          = "OIDC_PROVIDER_MISSING"
+	ErrCodeProviderRevisionConflict = "OIDC_PROVIDER_REVISION_CONFLICT"
+	ErrCodeGrafanaTargetConflict    = "GRAFANA_TARGET_CONFLICT"
+	ErrCodeIdentityLinked           = "OIDC_IDENTITY_LINKED"
+	ErrCodeLocalCredentialMissing   = "LOCAL_CREDENTIAL_MISSING"
+	ErrCodeLastLoginMethod          = "LAST_LOGIN_METHOD"
+
+	OIDCProviderSourceKey                = "default"
+	OIDCProviderStatusPending            = "pending"
+	OIDCProviderStatusSynchronized       = "synchronized"
+	OIDCProviderStatusFailed             = "failed"
+	OIDCProviderStatusCompensated        = "compensated"
+	OIDCProviderStatusCompensationFailed = "compensation_failed"
+	OIDCProviderStatusNotApplicable      = "not_applicable"
+
+	authOIDCCallbackPath = "/api/auth/callback"
+)
+
+// GrafanaProviderKind is the closed set of Grafana OSS SSO providers that this
+// integration may configure. It is intentionally distinct from a DevLake OIDC
+// provider key: a customer may name its provider freely, but cannot cause Lake
+// to call an arbitrary Grafana settings endpoint.
+type GrafanaProviderKind string
+
+const (
+	GrafanaProviderNone         GrafanaProviderKind = "none"
+	GrafanaProviderGoogle       GrafanaProviderKind = "google"
+	GrafanaProviderAzureAD      GrafanaProviderKind = "azuread"
+	GrafanaProviderOkta         GrafanaProviderKind = "okta"
+	GrafanaProviderGitLab       GrafanaProviderKind = "gitlab"
+	GrafanaProviderGenericOAuth GrafanaProviderKind = "generic_oauth"
 )
 
 type ApiErrorResponse struct {
@@ -53,20 +89,84 @@ type ApiErrorResponse struct {
 	Code    string `json:"code,omitempty"`
 }
 
+// OIDCProviderRuntime is implemented by auth. Access owns administrative state
+// transitions, while auth retains ownership of OIDC discovery, encryption, runtime
+// execution, and persistent-session semantics.
+type OIDCProviderRuntime interface {
+	PrepareOIDCProvider(ctx context.Context, provider *OIDCProvider, clientSecret string) (*PreparedOIDCProvider, errors.Error)
+	RefreshOIDCProvider(ctx context.Context) errors.Error
+	RevokeProviderSessions(tx dal.Transaction, providerKey string) ([]string, errors.Error)
+	CacheRevokedSessions(ids []string)
+}
+
+// PreparedOIDCProvider is deliberately internal to the backend boundary. It carries
+// a write-only secret only long enough to persist ciphertext and synchronize Grafana.
+type PreparedOIDCProvider struct {
+	EncryptedClientSecret []byte
+	ClientSecretNonce     []byte
+	ClientSecretKeyID     string
+	GrafanaSettings       GrafanaSSOSettings
+}
+
 type AccessUser struct {
 	common.Model
-	Issuer      string     `gorm:"type:varchar(512);uniqueIndex:idx_auth_access_identity" json:"issuer"`
-	Subject     string     `gorm:"type:varchar(255);uniqueIndex:idx_auth_access_identity" json:"subject"`
-	Email       string     `gorm:"type:varchar(255);index:idx_auth_access_email" json:"email"`
-	DisplayName string     `gorm:"type:varchar(255)" json:"displayName"`
-	Role        string     `gorm:"type:varchar(32)" json:"role"`
-	Status      string     `gorm:"type:varchar(32);index" json:"status"`
-	LastLoginAt *time.Time `json:"lastLoginAt,omitempty"`
-	DisabledAt  *time.Time `json:"disabledAt,omitempty"`
-	HiddenAt    *time.Time `json:"hiddenAt,omitempty"`
+	Issuer             string     `gorm:"type:varchar(512);uniqueIndex:idx_auth_access_identity" json:"issuer"`
+	Subject            string     `gorm:"type:varchar(255);uniqueIndex:idx_auth_access_identity" json:"subject"`
+	Email              string     `gorm:"type:varchar(255);index:idx_auth_access_email" json:"email"`
+	DisplayName        string     `gorm:"type:varchar(255)" json:"displayName"`
+	Role               string     `gorm:"type:varchar(32)" json:"role"`
+	Status             string     `gorm:"type:varchar(32);index" json:"status"`
+	LastLoginAt        *time.Time `json:"lastLoginAt,omitempty"`
+	DisabledAt         *time.Time `json:"disabledAt,omitempty"`
+	HiddenAt           *time.Time `json:"hiddenAt,omitempty"`
+	LocalLoginName     string     `gorm:"-" json:"localLoginName,omitempty"`
+	HasLocalCredential bool       `gorm:"-" json:"hasLocalCredential"`
 }
 
 func (AccessUser) TableName() string { return "auth_access_users" }
+
+// AccessIdentity is one verified OIDC identity owned by an access-directory user.
+// AccessUser remains the authorization, role, and audit owner; parent AccessUser
+// status and hidden state govern identity admission, so child identities do not carry
+// separate disable timestamps.
+type AccessIdentity struct {
+	common.Model
+	AccessUserID  uint64     `gorm:"index:idx_auth_access_identity_user" json:"accessUserId"`
+	Issuer        string     `gorm:"type:varchar(512);uniqueIndex:idx_auth_access_identity_issuer_subject" json:"issuer"`
+	Subject       string     `gorm:"type:varchar(255);uniqueIndex:idx_auth_access_identity_issuer_subject" json:"subject"`
+	VerifiedEmail string     `gorm:"type:varchar(255);index:idx_auth_access_identity_email" json:"verifiedEmail"`
+	DisplayName   string     `gorm:"type:varchar(255)" json:"displayName"`
+	LinkedAt      time.Time  `json:"linkedAt"`
+	LastLoginAt   *time.Time `json:"lastLoginAt,omitempty"`
+}
+
+func (AccessIdentity) TableName() string { return "auth_access_identities" }
+
+// IdentityLinkState is a one-time server-side record for a fresh OIDC callback
+// that attaches an additional verified identity to an already authenticated user.
+// It intentionally stores neither OAuth tokens nor client secrets.
+type IdentityLinkState struct {
+	ID           string     `gorm:"primaryKey;type:varchar(36)"`
+	AccessUserID uint64     `gorm:"index:idx_auth_access_identity_link_user"`
+	ProviderKey  string     `gorm:"type:varchar(64);index:idx_auth_access_identity_link_provider"`
+	ExpiresAt    time.Time  `gorm:"index"`
+	ConsumedAt   *time.Time `gorm:"index"`
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+func (IdentityLinkState) TableName() string { return "auth_access_identity_link_states" }
+
+// IdentityLinkClaim makes link-state consumption durable and unique. DAL mutation
+// methods do not expose affected-row counts, so this unique insert gives concurrent
+// callback attempts an unambiguous single-use result.
+type IdentityLinkClaim struct {
+	StateID   string `gorm:"primaryKey;type:varchar(36)"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (IdentityLinkClaim) TableName() string { return "auth_access_identity_link_claims" }
 
 // BootstrapClaim records that the configured bootstrap administrator has been
 // consumed. Its unique key makes the first-admin transition safe across API
@@ -77,6 +177,43 @@ type BootstrapClaim struct {
 }
 
 func (BootstrapClaim) TableName() string { return "auth_access_bootstrap_claims" }
+
+// LocalCredential is the single local-password authentication method associated
+// with an access-directory user. PasswordHash is intentionally write-only.
+type LocalCredential struct {
+	common.Model
+	AccessUserID       uint64     `gorm:"uniqueIndex:idx_auth_local_credentials_access_user" json:"accessUserId"`
+	LoginName          string     `gorm:"type:varchar(64);uniqueIndex:idx_auth_local_credentials_login_name" json:"loginName"`
+	PasswordHash       string     `gorm:"type:text" json:"-"`
+	PasswordChangedAt  *time.Time `json:"passwordChangedAt,omitempty"`
+	MustChangePassword bool       `json:"mustChangePassword"`
+}
+
+func (LocalCredential) TableName() string { return "auth_local_credentials" }
+
+// LocalLoginAttempt holds a privacy-preserving, rate-limit bucket. BucketKey is
+// an HMAC digest, never a raw login name or client address.
+type LocalLoginAttempt struct {
+	common.Model
+	BucketKind           string     `gorm:"type:varchar(32);uniqueIndex:idx_auth_local_login_attempt_bucket"`
+	BucketKey            string     `gorm:"type:char(64);uniqueIndex:idx_auth_local_login_attempt_bucket"`
+	FailureCount         uint       `gorm:"not null"`
+	WindowStartedAt      time.Time  `gorm:"not null"`
+	BlockedUntil         *time.Time `gorm:"index"`
+	ReservationCount     uint       `gorm:"not null"`
+	ReservationExpiresAt *time.Time
+}
+
+func (LocalLoginAttempt) TableName() string { return "auth_local_login_attempts" }
+
+// LocalBootstrapClaim makes one-time local bootstrap durable and independent
+// from the existing OIDC bootstrap transition.
+type LocalBootstrapClaim struct {
+	common.Model
+	Key string `gorm:"type:varchar(64);uniqueIndex:idx_auth_local_bootstrap_claim_key"`
+}
+
+func (LocalBootstrapClaim) TableName() string { return "auth_local_bootstrap_claims" }
 
 type AccessDomain struct {
 	common.Model
@@ -98,6 +235,70 @@ type AuditEvent struct {
 }
 
 func (AuditEvent) TableName() string { return "auth_access_audit_events" }
+
+// OIDCProviderConfiguration makes the database OIDC source explicit. Its presence
+// means environment providers are no longer authoritative; phase-two activation sets
+// ActivatedAt only after Grafana accepts the matching provider revision.
+type OIDCProviderConfiguration struct {
+	ID                    string     `gorm:"primaryKey;type:varchar(64)"`
+	ActivatedAt           *time.Time `json:"activatedAt,omitempty"`
+	ProviderRevision      uint64     `gorm:"not null;default:0"`
+	CandidateProviderID   uint64     `gorm:"index:idx_auth_oidc_provider_candidate"`
+	GrafanaSyncStatus     string     `gorm:"type:varchar(32);not null;default:'pending'"`
+	GrafanaSyncedRevision uint64     `gorm:"not null;default:0"`
+	GrafanaLastSyncedAt   *time.Time `json:"grafanaLastSyncedAt,omitempty"`
+	GrafanaLastErrorCode  string     `gorm:"type:varchar(64)"`
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+}
+
+func (OIDCProviderConfiguration) TableName() string { return "auth_oidc_provider_configuration" }
+
+// OIDCProvider stores customer-managed OIDC metadata. ClientSecret fields are never
+// serialized and are encrypted by the auth credential protector before persistence.
+type OIDCProvider struct {
+	common.Model
+	ProviderKey           string              `gorm:"type:varchar(64);uniqueIndex:idx_auth_oidc_provider_key" json:"providerKey"`
+	DisplayName           string              `gorm:"type:varchar(255)" json:"displayName"`
+	IssuerURL             string              `gorm:"type:varchar(512);index:idx_auth_oidc_provider_issuer" json:"issuerUrl"`
+	ClientID              string              `gorm:"type:varchar(512)" json:"clientId"`
+	EncryptedClientSecret []byte              `json:"-"`
+	ClientSecretNonce     []byte              `json:"-"`
+	ClientSecretKeyID     string              `gorm:"type:varchar(64)" json:"-"`
+	Scopes                string              `gorm:"type:text" json:"scopes"`
+	Enabled               bool                `gorm:"index:idx_auth_oidc_provider_enabled" json:"enabled"`
+	Revision              uint64              `gorm:"not null;default:0" json:"revision"`
+	RetiredAt             *time.Time          `gorm:"index:idx_auth_oidc_provider_retired" json:"retiredAt,omitempty"`
+	GrafanaTarget         GrafanaProviderKind `gorm:"type:varchar(32);not null;default:'none';index:idx_auth_oidc_provider_grafana_target" json:"grafanaTarget"`
+	GrafanaSyncStatus     string              `gorm:"type:varchar(32);not null;default:'pending'" json:"grafanaSyncStatus"`
+	GrafanaSyncedRevision uint64              `gorm:"not null;default:0" json:"grafanaSyncedRevision"`
+	GrafanaLastSyncedAt   *time.Time          `json:"grafanaLastSyncedAt,omitempty"`
+	GrafanaLastErrorCode  string              `gorm:"type:varchar(64)" json:"grafanaLastErrorCode,omitempty"`
+}
+
+func (OIDCProvider) TableName() string { return "auth_oidc_providers" }
+
+// OIDCProviderCandidate holds a pending revision separately from the active provider.
+// It keeps an authenticated source live while a replacement is validated and staged,
+// and is synchronized to Grafana upon activation. Candidates are retained after promotion
+// for audit/recovery rather than hard-deleted.
+type OIDCProviderCandidate struct {
+	common.Model
+	ProviderID            uint64 `gorm:"index:idx_auth_oidc_provider_candidate_provider"`
+	ProviderKey           string `gorm:"type:varchar(64);index:idx_auth_oidc_provider_candidate_key"`
+	DisplayName           string `gorm:"type:varchar(255)"`
+	IssuerURL             string `gorm:"type:varchar(512)"`
+	ClientID              string `gorm:"type:varchar(512)"`
+	EncryptedClientSecret []byte
+	ClientSecretNonce     []byte
+	ClientSecretKeyID     string              `gorm:"type:varchar(64)"`
+	Scopes                string              `gorm:"type:text"`
+	Revision              uint64              `gorm:"not null"`
+	PromotedAt            *time.Time          `gorm:"index"`
+	GrafanaTarget         GrafanaProviderKind `gorm:"type:varchar(32);not null;default:'none'"`
+}
+
+func (OIDCProviderCandidate) TableName() string { return "auth_oidc_provider_candidates" }
 
 type Identity struct {
 	Issuer      string
@@ -152,6 +353,27 @@ type CreateUserInput struct {
 	Role  string `json:"role"`
 }
 
+// CreateLocalUserInput creates a directory user and its initial local
+// credential together. The temporary password is generated server-side and is
+// deliberately not accepted from an administrator or persisted in this type.
+type CreateLocalUserInput struct {
+	LoginName   string `json:"loginName"`
+	DisplayName string `json:"displayName"`
+	Role        string `json:"role"`
+}
+
+type LocalCredentialInput struct {
+	LoginName string `json:"loginName"`
+}
+
+// LocalCredentialResponse returns a generated temporary password exactly once.
+// It must remain an API response only and must never be stored in audit data.
+type LocalCredentialResponse struct {
+	User              *AccessUser `json:"user"`
+	LoginName         string      `json:"loginName"`
+	TemporaryPassword string      `json:"temporaryPassword"`
+}
+
 type UpdateUserInput struct {
 	Role   string `json:"role"`
 	Status string `json:"status"`
@@ -165,4 +387,56 @@ type CreateDomainInput struct {
 type UpdateDomainInput struct {
 	DefaultRole string `json:"defaultRole"`
 	Status      string `json:"status"`
+}
+
+type OIDCProviderInput struct {
+	ProviderKey        string              `json:"providerKey"`
+	DisplayName        string              `json:"displayName"`
+	IssuerURL          string              `json:"issuerUrl"`
+	ClientID           string              `json:"clientId"`
+	ClientSecret       string              `json:"clientSecret"`
+	Scopes             string              `json:"scopes"`
+	GrafanaTarget      GrafanaProviderKind `json:"grafanaTarget"`
+	ConfirmDevLakeOnly bool                `json:"confirmDevlakeOnly"`
+	Revision           uint64              `json:"revision"`
+}
+
+type OIDCProviderResponse struct {
+	ProviderKey           string              `json:"providerKey"`
+	DisplayName           string              `json:"displayName"`
+	IssuerURL             string              `json:"issuerUrl"`
+	ClientID              string              `json:"clientId"`
+	Scopes                string              `json:"scopes"`
+	Enabled               bool                `json:"enabled"`
+	RetiredAt             *time.Time          `json:"retiredAt,omitempty"`
+	SecretConfigured      bool                `json:"secretConfigured"`
+	DatabaseSourceActive  bool                `json:"databaseSourceActive"`
+	GrafanaSyncStatus     string              `json:"grafanaSyncStatus"`
+	GrafanaSyncedRevision uint64              `json:"grafanaSyncedRevision"`
+	ProviderRevision      uint64              `json:"providerRevision"`
+	HasCandidate          bool                `json:"hasCandidate"`
+	GrafanaTarget         GrafanaProviderKind `json:"grafanaTarget"`
+	DevLakeCallbackURL    string              `json:"devlakeCallbackUrl"`
+	GrafanaCallbackURL    string              `json:"grafanaCallbackUrl"`
+	AllowLocalOIDC        bool                `json:"allowLocalOidc"`
+}
+
+// OIDCProviderCallbacksResponse exposes deployment-derived redirect URIs before
+// an OIDC provider has been persisted. It contains no provider credentials.
+type OIDCProviderCallbacksResponse struct {
+	DevLakeCallbackURL  string                         `json:"devlakeCallbackUrl"`
+	GrafanaCallbackURLs map[GrafanaProviderKind]string `json:"grafanaCallbackUrls"`
+	AllowLocalOIDC      bool                           `json:"allowLocalOidc"`
+}
+
+type GrafanaLoginResponse struct {
+	URL string `json:"url"`
+}
+
+// LinkableOIDCProviderResponse is the deliberately minimal provider view for an
+// authenticated person adding another sign-in method. It never exposes provider
+// configuration or identity-link state.
+type LinkableOIDCProviderResponse struct {
+	ProviderKey string `json:"providerKey"`
+	DisplayName string `json:"displayName"`
 }

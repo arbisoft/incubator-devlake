@@ -24,19 +24,21 @@ func TestValidateConfiguration(t *testing.T) {
 		name                string
 		authEnabled         bool
 		oidcEnabled         bool
+		localEnabled        bool
 		forwardedUserSecret string
 		wantError           bool
 	}{
 		{name: "native OIDC", authEnabled: true, oidcEnabled: true},
 		{name: "whitespace only", authEnabled: true, oidcEnabled: true, forwardedUserSecret: " \t\n"},
 		{name: "auth disabled", oidcEnabled: true, wantError: true},
-		{name: "OIDC disabled", authEnabled: true, wantError: true},
+		{name: "both login methods disabled", authEnabled: true, wantError: true},
+		{name: "local password", authEnabled: true, localEnabled: true},
 		{name: "forwarded secret configured", authEnabled: true, oidcEnabled: true, forwardedUserSecret: "shared-secret", wantError: true},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			err := ValidateConfiguration(testCase.authEnabled, testCase.oidcEnabled, testCase.forwardedUserSecret)
+			err := ValidateConfiguration(testCase.authEnabled, testCase.oidcEnabled, testCase.localEnabled, testCase.forwardedUserSecret)
 			if (err != nil) != testCase.wantError {
 				t.Fatalf("ValidateConfiguration() error = %v, wantError %v", err, testCase.wantError)
 			}

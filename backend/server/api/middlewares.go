@@ -231,6 +231,13 @@ func CheckAuthorizationHeader(c *gin.Context, logger log.Logger, db dal.Dal, api
 
 	logger.Info("redirect path: %s to: %s", c.Request.URL.Path, path)
 	c.Request.URL.Path = path
+	// UseRawPath=true (SetupApiServer) makes HandleContext re-route on RawPath
+	// whenever it is set, which net/url does for escapes Go's own encodePath would
+	// not produce: %40 in an email login, %2F in a segment. Leave RawPath prefixed
+	// and the replay below matches no route and 404s.
+	if c.Request.URL.RawPath != "" {
+		c.Request.URL.RawPath = strings.TrimPrefix(c.Request.URL.RawPath, "/rest")
+	}
 	user := &common.User{
 		Name:  apiKey.Creator.Creator,
 		Email: apiKey.Creator.CreatorEmail,

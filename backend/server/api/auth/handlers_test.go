@@ -190,12 +190,13 @@ func newTestService(t *testing.T, idp *fakeIdP) (*Service, *mockdal.Dal) {
 	db.On("Delete", mock.Anything, mock.Anything).Return(nil)
 
 	s := &Service{
-		cfg:       cfg,
-		providers: map[string]*oidchelper.Provider{"test": oidchelper.NewProvider(pc)},
-		logger:    logruslog.Global,
-		db:        db,
-		revoked:   newRevocationCache(),
-		lastSeen:  map[string]time.Time{},
+		bootstrapCfg: cfg,
+		runtimeCfg:   cfg,
+		providers:    map[string]*oidchelper.Provider{"test": oidchelper.NewProvider(pc)},
+		logger:       logruslog.Global,
+		db:           db,
+		revoked:      newRevocationCache(),
+		lastSeen:     map[string]time.Time{},
 	}
 	return s, db
 }
@@ -205,9 +206,14 @@ func newTestRouter(s *Service) *gin.Engine {
 	r := gin.New()
 	r.Use(s.OIDCAuthentication())
 	r.Use(s.RequireAuth())
+	r.Use(s.RequirePasswordChange())
 	r.Use(s.CSRFProtect())
+	r.GET(PathMethods, s.GetMethods)
 	r.GET(PathLogin, s.LoginInit)
+	r.GET(PathLinkIdentity, s.LinkIdentityInit)
 	r.GET(PathCallback, s.Callback)
+	r.POST(PathLocalLogin, s.LocalLogin)
+	r.POST(PathLocalChangePassword, s.LocalChangePassword)
 	r.GET(PathUserInfo, s.UserInfo)
 	r.POST(PathLogout, s.Logout)
 	return r
@@ -259,6 +265,80 @@ func TestLoginInitSetsStateCookieAndRedirects(t *testing.T) {
 	}
 }
 
+func TestLinkIdentityFlowBindsStateToAuthenticatedUserAndProvider(t *testing.T) {
+	idp := newFakeIdP(t)
+	s, _ := newTestService(t, idp)
+	authorizer := &testAccessAuthorizer{linkStateID: "link-state-123"}
+	s.access = authorizer
+	r := newTestRouter(s)
+
+	cfg, _ := s.providerState()
+	session, _, err := oidchelper.IssueSession(cfg, "link-session", "test", idp.subject, idp.email, idp.name)
+	if err != nil {
+		t.Fatalf("issue session: %v", err)
+	}
+	startRequest := httptest.NewRequest(http.MethodGet, PathLinkIdentity+"?provider=test&return_url=/access", nil)
+	startRequest.AddCookie(&http.Cookie{Name: oidchelper.SessionCookieName, Value: session})
+	startResponse := httptest.NewRecorder()
+	r.ServeHTTP(startResponse, startRequest)
+	if startResponse.Code != http.StatusSeeOther {
+		t.Fatalf("link start: expected 303, got %d: %s", startResponse.Code, startResponse.Body.String())
+	}
+	stateCookie := extractCookie(t, startResponse.Result(), oidchelper.StateCookieName)
+	state, err := oidchelper.DecodeState(cfg.SessionSecret, stateCookie.Value)
+	if err != nil {
+		t.Fatalf("decode link state: %v", err)
+	}
+	if state.Provider != "test" || state.IdentityLinkStateID != authorizer.linkStateID {
+		t.Fatalf("link state = %+v, want provider=%q state=%q", state, "test", authorizer.linkStateID)
+	}
+
+	callbackRequest := httptest.NewRequest(http.MethodGet,
+		PathCallback+"?code=fake-code&state="+url.QueryEscape(state.Nonce), nil)
+	callbackRequest.AddCookie(stateCookie)
+	callbackResponse := httptest.NewRecorder()
+	r.ServeHTTP(callbackResponse, callbackRequest)
+	if callbackResponse.Code != http.StatusSeeOther {
+		t.Fatalf("link callback: expected 303, got %d: %s", callbackResponse.Code, callbackResponse.Body.String())
+	}
+	if callbackResponse.Header().Get("Location") != "/access?identity_link=linked" {
+		t.Fatalf("link callback location = %q, want successful link return", callbackResponse.Header().Get("Location"))
+	}
+	if authorizer.linkProvider != "test" || authorizer.linkedProvider != "test" || authorizer.linkedStateID != authorizer.linkStateID {
+		t.Fatalf("link binding = start provider=%q callback provider=%q state=%q", authorizer.linkProvider, authorizer.linkedProvider, authorizer.linkedStateID)
+	}
+	if authorizer.linkedIdentity.Issuer != idp.issuer || authorizer.linkedIdentity.Subject != idp.subject {
+		t.Fatalf("linked identity = %+v, want IdP identity", authorizer.linkedIdentity)
+	}
+}
+
+func TestLocalSessionCanStartIdentityLinkFlow(t *testing.T) {
+	idp := newFakeIdP(t)
+	s, _ := newTestService(t, idp)
+	directory := &testLocalDirectory{localUserID: 42}
+	directory.linkStateID = "local-link-state-123"
+	s.access = directory
+	s.local = newTestLocalRuntime(t)
+	r := newTestRouter(s)
+
+	cfg, _ := s.providerState()
+	session, _, err := oidchelper.IssueSession(cfg, "local-link-session", localSessionProvider, "42", "", "Local Admin")
+	if err != nil {
+		t.Fatalf("issue local session: %v", err)
+	}
+	request := httptest.NewRequest(http.MethodGet, PathLinkIdentity+"?provider=test", nil)
+	request.AddCookie(&http.Cookie{Name: oidchelper.SessionCookieName, Value: session})
+	response := httptest.NewRecorder()
+	r.ServeHTTP(response, request)
+
+	if response.Code != http.StatusSeeOther {
+		t.Fatalf("local identity-link start: expected 303, got %d: %s", response.Code, response.Body.String())
+	}
+	if directory.linkUserID != 42 || directory.linkProvider != "test" {
+		t.Fatalf("local identity link = user %d provider %q, want user 42 provider test", directory.linkUserID, directory.linkProvider)
+	}
+}
+
 func TestFullLoginCallbackFlow(t *testing.T) {
 	idp := newFakeIdP(t)
 	s, db := newTestService(t, idp)
@@ -271,7 +351,7 @@ func TestFullLoginCallbackFlow(t *testing.T) {
 		t.Fatalf("login: expected 303, got %d", loginW.Code)
 	}
 	stateCookie := extractCookie(t, loginW.Result(), oidchelper.StateCookieName)
-	nonce := stateNonceFromCookie(t, s.cfg.SessionSecret, stateCookie.Value)
+	nonce := stateNonceFromCookie(t, s.runtimeCfg.SessionSecret, stateCookie.Value)
 
 	// 2. /auth/callback: must succeed and set session + csrf cookies.
 	cbReq := httptest.NewRequest(http.MethodGet,
@@ -301,7 +381,7 @@ func TestFullLoginCallbackFlow(t *testing.T) {
 	if err := json.Unmarshal(uiW.Body.Bytes(), &userResp); err != nil {
 		t.Fatalf("decode userinfo: %v: %s", err, uiW.Body.String())
 	}
-	if !userResp.Authenticated || userResp.Email != idp.email {
+	if !userResp.Authenticated || userResp.Email != idp.email || userResp.AuthenticationMethod != "oidc" {
 		t.Fatalf("unexpected userinfo: %+v body=%s", userResp, uiW.Body.String())
 	}
 
@@ -343,7 +423,7 @@ func TestCallbackRejectsUnverifiedDirectoryEmail(t *testing.T) {
 	loginW := httptest.NewRecorder()
 	r.ServeHTTP(loginW, httptest.NewRequest(http.MethodGet, PathLogin+"?provider=test", nil))
 	stateCookie := extractCookie(t, loginW.Result(), oidchelper.StateCookieName)
-	nonce := stateNonceFromCookie(t, s.cfg.SessionSecret, stateCookie.Value)
+	nonce := stateNonceFromCookie(t, s.runtimeCfg.SessionSecret, stateCookie.Value)
 
 	callbackW := httptest.NewRecorder()
 	callbackReq := httptest.NewRequest(http.MethodGet, PathCallback+"?code=fake-code&state="+url.QueryEscape(nonce), nil)
@@ -367,7 +447,7 @@ func TestCallbackRedirectsUnexpectedDirectoryFailure(t *testing.T) {
 	loginW := httptest.NewRecorder()
 	r.ServeHTTP(loginW, httptest.NewRequest(http.MethodGet, PathLogin+"?provider=test", nil))
 	stateCookie := extractCookie(t, loginW.Result(), oidchelper.StateCookieName)
-	nonce := stateNonceFromCookie(t, s.cfg.SessionSecret, stateCookie.Value)
+	nonce := stateNonceFromCookie(t, s.runtimeCfg.SessionSecret, stateCookie.Value)
 
 	callbackW := httptest.NewRecorder()
 	callbackReq := httptest.NewRequest(http.MethodGet, PathCallback+"?code=fake-code&state="+url.QueryEscape(nonce), nil)
@@ -429,7 +509,7 @@ func TestCSRFRequiredOnUnsafeMethod(t *testing.T) {
 	loginW := httptest.NewRecorder()
 	r.ServeHTTP(loginW, httptest.NewRequest(http.MethodGet, PathLogin+"?provider=test", nil))
 	stateCookie := extractCookie(t, loginW.Result(), oidchelper.StateCookieName)
-	nonce := stateNonceFromCookie(t, s.cfg.SessionSecret, stateCookie.Value)
+	nonce := stateNonceFromCookie(t, s.runtimeCfg.SessionSecret, stateCookie.Value)
 
 	cbReq := httptest.NewRequest(http.MethodGet,
 		PathCallback+"?code=c&state="+url.QueryEscape(nonce), nil)

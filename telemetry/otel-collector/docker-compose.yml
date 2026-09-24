@@ -6,19 +6,34 @@ services:
       - otel-auth:/auth
     restart: "no"
 
+  otel-queue-init:
+    image: busybox:1.36
+    command: ["sh", "-c", "chown -R 10001:10001 /data && chmod 750 /data"]
+    volumes:
+      - otel-queue:/data
+    restart: "no"
+
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.157.0
+    image: otel/opentelemetry-collector-contrib:0.160.0
     container_name: otel-collector
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    environment:
+      CLAUDE_OTEL_INGEST_ENDPOINT: "${CLAUDE_OTEL_INGEST_ENDPOINT:-http://host.docker.internal:8080/plugins/claude_otel/otlp}"
+      CLAUDE_OTEL_INGEST_TOKEN: "${CLAUDE_OTEL_INGEST_TOKEN:-devlake-local-otel-ingest-token}"
     volumes:
       - ./collector-config.yaml:/etc/otelcol-contrib/config.yaml
       - otel-auth:/etc/otelcol-contrib/auth:ro
+      - otel-queue:/var/lib/otel
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "4317:4317"
       - "4318:4318"
       - "8889:8889"
     depends_on:
       otel-auth-init:
+        condition: service_completed_successfully
+      otel-queue-init:
         condition: service_completed_successfully
   prometheus:
     image: prom/prometheus:latest
@@ -52,3 +67,7 @@ volumes:
   otel-auth:
     name: devlake-otel-auth
   prometheus-data:
+  otel-file-export:
+    name: devlake-otel-file-export
+  otel-queue:
+    name: devlake-otel-queue
