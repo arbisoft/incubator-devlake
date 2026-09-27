@@ -32,6 +32,7 @@ import { CodexConfig } from './codex';
 import { CursorConfig } from './cursor';
 import { GhCopilotConfig } from './gh-copilot';
 import { GitLabConfig } from './gitlab';
+import { GrafanaIrmConfig } from './grafana_irm';
 import { IncidentioConfig } from './incidentio';
 import { JenkinsConfig } from './jenkins';
 import { JiraConfig } from './jira';
@@ -71,6 +72,7 @@ export const pluginConfigs: IPluginConfig[] = [
   GhCopilotConfig,
   GitLabConfig,
   HubspotConfig,
+  GrafanaIrmConfig,
   IncidentioConfig,
   JenkinsConfig,
   JiraConfig,
