@@ -113,7 +113,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -165,7 +166,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -217,7 +219,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -269,7 +272,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -321,7 +325,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -373,7 +378,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -498,7 +504,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": [
           {
@@ -786,7 +793,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH weekly_cost AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week, SUM(estimated_cost_usd) AS v\n  FROM ai_model_usages\n  WHERE source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n  )\n  AND $__timeFilter(date)\n  GROUP BY 1\n),\nweekly_prs AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') AS week, COUNT(*) AS v\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN ($project) AND $__timeFilter(pr.merged_date) GROUP BY 1\n),\nweekly_tasks AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(i.resolution_date), INTERVAL WEEKDAY(i.resolution_date) DAY), '%Y-%m-%d') AS week, COUNT(*) AS v\n  FROM issues i JOIN board_issues bi ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n  WHERE pm.project_name IN ($project) AND i.type IN ('TASK','SUBTASK') AND i.resolution_date IS NOT NULL AND $__timeFilter(i.resolution_date)\n  GROUP BY 1\n),\nweekly_contrib AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') AS week, COUNT(DISTINCT COALESCE(NULLIF(a.full_name,''), pr.author_name)) AS v\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id LEFT JOIN accounts a ON a.id = pr.author_id\n  WHERE ppm.project_name IN ($project) AND $__timeFilter(pr.merged_date) GROUP BY 1\n),\nprod_deploys AS (\n  SELECT pm.project_name, cdc.finished_date\n  FROM cicd_deployment_commits cdc\n  JOIN project_mapping pm ON pm.row_id = cdc.cicd_scope_id AND pm.`table` = 'cicd_scopes'\n  WHERE pm.project_name IN ($project) AND LOWER(cdc.environment) LIKE '%prod%' AND cdc.result = 'SUCCESS' AND $__timeFilter(cdc.finished_date)\n),\nweekly_defects AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(i.created_date), INTERVAL WEEKDAY(i.created_date) DAY), '%Y-%m-%d') AS week, COUNT(DISTINCT i.id) AS v\n  FROM issues i\n  JOIN board_issues bi ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n  JOIN prod_deploys pd ON pd.project_name = pm.project_name\n    AND i.created_date BETWEEN pd.finished_date AND DATE_ADD(pd.finished_date, INTERVAL 14 DAY)\n  WHERE pm.project_name IN ($project) AND i.type IN ('BUG','INCIDENT') AND $__timeFilter(i.created_date)\n  GROUP BY 1\n),\nweeks AS (\n  SELECT week FROM weekly_cost UNION SELECT week FROM weekly_prs\n  UNION SELECT week FROM weekly_tasks UNION SELECT week FROM weekly_contrib\n  UNION SELECT week FROM weekly_defects\n),\nfilled AS (\n  SELECT w.week,\n    COALESCE(c.v, 0) AS cost, COALESCE(p.v, 0) AS prs, COALESCE(t.v, 0) AS tasks,\n    COALESCE(ct.v, 0) AS contrib, COALESCE(d.v, 0) AS defects\n  FROM weeks w\n  LEFT JOIN weekly_cost c ON c.week = w.week\n  LEFT JOIN weekly_prs p ON p.week = w.week\n  LEFT JOIN weekly_tasks t ON t.week = w.week\n  LEFT JOIN weekly_contrib ct ON ct.week = w.week\n  LEFT JOIN weekly_defects d ON d.week = w.week\n),\nlagged AS (\n  SELECT week, cost, prs, tasks, contrib, defects,\n    LAG(cost) OVER (ORDER BY week) AS cost_prev,\n    LAG(prs) OVER (ORDER BY week) AS prs_prev,\n    LAG(tasks) OVER (ORDER BY week) AS tasks_prev,\n    LAG(contrib) OVER (ORDER BY week) AS contrib_prev,\n    LAG(defects) OVER (ORDER BY week) AS defects_prev\n  FROM filled\n)\nSELECT week AS \"Week\",\n  CONCAT(CONCAT('$', FORMAT(cost,2)),\n    CASE\n      WHEN cost_prev IS NULL THEN ''\n      WHEN cost_prev = 0 AND cost = 0 THEN '        ▬0.0%'\n      WHEN cost_prev = 0 THEN '        ▲ new'\n      WHEN cost > cost_prev THEN CONCAT('        ▲', ROUND(100.0*(cost-cost_prev)/cost_prev,1), '%')\n      WHEN cost < cost_prev THEN CONCAT('        ▼', ROUND(100.0*(cost_prev-cost)/cost_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"AI Cost\",\n  CONCAT(prs,\n    CASE\n      WHEN prs_prev IS NULL THEN ''\n      WHEN prs_prev = 0 AND prs = 0 THEN '        ▬0.0%'\n      WHEN prs_prev = 0 THEN '        ▲ new'\n      WHEN prs > prs_prev THEN CONCAT('        ▲', ROUND(100.0*(prs-prs_prev)/prs_prev,1), '%')\n      WHEN prs < prs_prev THEN CONCAT('        ▼', ROUND(100.0*(prs_prev-prs)/prs_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"PRs Merged\",\n  CONCAT(tasks,\n    CASE\n      WHEN tasks_prev IS NULL THEN ''\n      WHEN tasks_prev = 0 AND tasks = 0 THEN '        ▬0.0%'\n      WHEN tasks_prev = 0 THEN '        ▲ new'\n      WHEN tasks > tasks_prev THEN CONCAT('        ▲', ROUND(100.0*(tasks-tasks_prev)/tasks_prev,1), '%')\n      WHEN tasks < tasks_prev THEN CONCAT('        ▼', ROUND(100.0*(tasks_prev-tasks)/tasks_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"Tasks Done\",\n  CONCAT(contrib,\n    CASE\n      WHEN contrib_prev IS NULL THEN ''\n      WHEN contrib_prev = 0 AND contrib = 0 THEN '        ▬0.0%'\n      WHEN contrib_prev = 0 THEN '        ▲ new'\n      WHEN contrib > contrib_prev THEN CONCAT('        ▲', ROUND(100.0*(contrib-contrib_prev)/contrib_prev,1), '%')\n      WHEN contrib < contrib_prev THEN CONCAT('        ▼', ROUND(100.0*(contrib_prev-contrib)/contrib_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"Contributors\",\n  CONCAT(defects,\n    CASE\n      WHEN defects_prev IS NULL THEN ''\n      WHEN defects_prev = 0 AND defects = 0 THEN '        ▬0.0%'\n      WHEN defects_prev = 0 THEN '        ▲ new'\n      WHEN defects > defects_prev THEN CONCAT('        ▲', ROUND(100.0*(defects-defects_prev)/defects_prev,1), '%')\n      WHEN defects < defects_prev THEN CONCAT('        ▼', ROUND(100.0*(defects_prev-defects)/defects_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"Escaped Defects\"\nFROM lagged\nORDER BY week DESC",
+          "rawSql": "WITH weekly_cost AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week, SUM(estimated_cost_usd) AS v\n  FROM ai_model_usages\n  WHERE source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n  )\n  AND $__timeFilter(date)\n  GROUP BY 1\n),\nweekly_prs AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') AS week, COUNT(*) AS v\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN ($project) AND $__timeFilter(pr.merged_date) GROUP BY 1\n),\nweekly_tasks AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(i.resolution_date), INTERVAL WEEKDAY(i.resolution_date) DAY), '%Y-%m-%d') AS week, COUNT(*) AS v\n  FROM issues i JOIN board_issues bi ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n  WHERE pm.project_name IN ($project) AND i.type IN ('TASK','SUBTASK') AND i.resolution_date IS NOT NULL AND $__timeFilter(i.resolution_date)\n  GROUP BY 1\n),\nweekly_contrib AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') AS week, COUNT(DISTINCT COALESCE(NULLIF(a.full_name,''), pr.author_name)) AS v\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id LEFT JOIN accounts a ON a.id = pr.author_id\n  WHERE ppm.project_name IN ($project) AND $__timeFilter(pr.merged_date) GROUP BY 1\n),\nprod_deploys AS (\n  SELECT pm.project_name, cdc.finished_date\n  FROM cicd_deployment_commits cdc\n  JOIN project_mapping pm ON pm.row_id = cdc.cicd_scope_id AND pm.`table` = 'cicd_scopes'\n  WHERE pm.project_name IN ($project) AND LOWER(cdc.environment) LIKE '%prod%' AND cdc.result = 'SUCCESS' AND $__timeFilter(cdc.finished_date)\n),\nweekly_defects AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(i.created_date), INTERVAL WEEKDAY(i.created_date) DAY), '%Y-%m-%d') AS week, COUNT(DISTINCT i.id) AS v\n  FROM issues i\n  JOIN board_issues bi ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n  JOIN prod_deploys pd ON pd.project_name = pm.project_name\n    AND i.created_date BETWEEN pd.finished_date AND DATE_ADD(pd.finished_date, INTERVAL 14 DAY)\n  WHERE pm.project_name IN ($project) AND i.type IN ('BUG','INCIDENT') AND $__timeFilter(i.created_date)\n  GROUP BY 1\n),\nweeks AS (\n  SELECT week FROM weekly_cost UNION SELECT week FROM weekly_prs\n  UNION SELECT week FROM weekly_tasks UNION SELECT week FROM weekly_contrib\n  UNION SELECT week FROM weekly_defects\n),\nfilled AS (\n  SELECT w.week,\n    COALESCE(c.v, 0) AS cost, COALESCE(p.v, 0) AS prs, COALESCE(t.v, 0) AS tasks,\n    COALESCE(ct.v, 0) AS contrib, COALESCE(d.v, 0) AS defects\n  FROM weeks w\n  LEFT JOIN weekly_cost c ON c.week = w.week\n  LEFT JOIN weekly_prs p ON p.week = w.week\n  LEFT JOIN weekly_tasks t ON t.week = w.week\n  LEFT JOIN weekly_contrib ct ON ct.week = w.week\n  LEFT JOIN weekly_defects d ON d.week = w.week\n),\nlagged AS (\n  SELECT week, cost, prs, tasks, contrib, defects,\n    LAG(cost) OVER (ORDER BY week) AS cost_prev,\n    LAG(prs) OVER (ORDER BY week) AS prs_prev,\n    LAG(tasks) OVER (ORDER BY week) AS tasks_prev,\n    LAG(contrib) OVER (ORDER BY week) AS contrib_prev,\n    LAG(defects) OVER (ORDER BY week) AS defects_prev\n  FROM filled\n)\nSELECT week AS \"Week\",\n  CONCAT(CONCAT('$', CASE WHEN ABS(cost) >= 1000000000 THEN CONCAT(FORMAT(cost / 1000000000, 1), 'B') WHEN ABS(cost) >= 1000000 THEN CONCAT(FORMAT(cost / 1000000, 1), 'M') WHEN ABS(cost) >= 1000 THEN CONCAT(FORMAT(cost / 1000, 1), 'K') ELSE FORMAT(cost, 2) END),\n    CASE\n      WHEN cost_prev IS NULL THEN ''\n      WHEN cost_prev = 0 AND cost = 0 THEN '        ▬0.0%'\n      WHEN cost_prev = 0 THEN '        ▲ new'\n      WHEN cost > cost_prev THEN CONCAT('        ▲', ROUND(100.0*(cost-cost_prev)/cost_prev,1), '%')\n      WHEN cost < cost_prev THEN CONCAT('        ▼', ROUND(100.0*(cost_prev-cost)/cost_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"AI Cost\",\n  CONCAT(CASE WHEN ABS(prs) >= 1000000000 THEN CONCAT(FORMAT(prs / 1000000000, 1), 'B') WHEN ABS(prs) >= 1000000 THEN CONCAT(FORMAT(prs / 1000000, 1), 'M') WHEN ABS(prs) >= 1000 THEN CONCAT(FORMAT(prs / 1000, 1), 'K') ELSE FORMAT(prs, 0) END,\n    CASE\n      WHEN prs_prev IS NULL THEN ''\n      WHEN prs_prev = 0 AND prs = 0 THEN '        ▬0.0%'\n      WHEN prs_prev = 0 THEN '        ▲ new'\n      WHEN prs > prs_prev THEN CONCAT('        ▲', ROUND(100.0*(prs-prs_prev)/prs_prev,1), '%')\n      WHEN prs < prs_prev THEN CONCAT('        ▼', ROUND(100.0*(prs_prev-prs)/prs_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"PRs Merged\",\n  CONCAT(CASE WHEN ABS(tasks) >= 1000000000 THEN CONCAT(FORMAT(tasks / 1000000000, 1), 'B') WHEN ABS(tasks) >= 1000000 THEN CONCAT(FORMAT(tasks / 1000000, 1), 'M') WHEN ABS(tasks) >= 1000 THEN CONCAT(FORMAT(tasks / 1000, 1), 'K') ELSE FORMAT(tasks, 0) END,\n    CASE\n      WHEN tasks_prev IS NULL THEN ''\n      WHEN tasks_prev = 0 AND tasks = 0 THEN '        ▬0.0%'\n      WHEN tasks_prev = 0 THEN '        ▲ new'\n      WHEN tasks > tasks_prev THEN CONCAT('        ▲', ROUND(100.0*(tasks-tasks_prev)/tasks_prev,1), '%')\n      WHEN tasks < tasks_prev THEN CONCAT('        ▼', ROUND(100.0*(tasks_prev-tasks)/tasks_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"Tasks Done\",\n  CONCAT(CASE WHEN ABS(contrib) >= 1000000000 THEN CONCAT(FORMAT(contrib / 1000000000, 1), 'B') WHEN ABS(contrib) >= 1000000 THEN CONCAT(FORMAT(contrib / 1000000, 1), 'M') WHEN ABS(contrib) >= 1000 THEN CONCAT(FORMAT(contrib / 1000, 1), 'K') ELSE FORMAT(contrib, 0) END,\n    CASE\n      WHEN contrib_prev IS NULL THEN ''\n      WHEN contrib_prev = 0 AND contrib = 0 THEN '        ▬0.0%'\n      WHEN contrib_prev = 0 THEN '        ▲ new'\n      WHEN contrib > contrib_prev THEN CONCAT('        ▲', ROUND(100.0*(contrib-contrib_prev)/contrib_prev,1), '%')\n      WHEN contrib < contrib_prev THEN CONCAT('        ▼', ROUND(100.0*(contrib_prev-contrib)/contrib_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"Contributors\",\n  CONCAT(CASE WHEN ABS(defects) >= 1000000000 THEN CONCAT(FORMAT(defects / 1000000000, 1), 'B') WHEN ABS(defects) >= 1000000 THEN CONCAT(FORMAT(defects / 1000000, 1), 'M') WHEN ABS(defects) >= 1000 THEN CONCAT(FORMAT(defects / 1000, 1), 'K') ELSE FORMAT(defects, 0) END,\n    CASE\n      WHEN defects_prev IS NULL THEN ''\n      WHEN defects_prev = 0 AND defects = 0 THEN '        ▬0.0%'\n      WHEN defects_prev = 0 THEN '        ▲ new'\n      WHEN defects > defects_prev THEN CONCAT('        ▲', ROUND(100.0*(defects-defects_prev)/defects_prev,1), '%')\n      WHEN defects < defects_prev THEN CONCAT('        ▼', ROUND(100.0*(defects_prev-defects)/defects_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"Escaped Defects\"\nFROM lagged\nORDER BY week DESC",
           "refId": "A"
         }
       ],
@@ -827,7 +834,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -876,7 +884,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },

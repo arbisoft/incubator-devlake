@@ -60,7 +60,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -112,7 +113,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -217,7 +219,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -269,7 +272,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -321,7 +325,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -426,7 +431,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -498,7 +504,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": [
           {
@@ -682,7 +689,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH weekly_prs AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') AS week, COUNT(*) AS n\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN ($project) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date)\n  GROUP BY 1\n),\nweekly_spend AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week, SUM(estimated_cost_usd) AS v\n  FROM ai_model_usages\n  WHERE source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n  )\n  AND $__timeFilter(date)\n  GROUP BY 1\n),\nweekly_tok AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week, SUM(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens) AS v\n  FROM ai_model_usages\n  WHERE source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n  )\n  AND $__timeFilter(date)\n  GROUP BY 1\n),\nweekly_lines AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week, SUM(lines_added) AS v\n  FROM ai_activities\n  WHERE record_kind = 'canonical_activity'\n    AND source_connection_id IN (\n      SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n    )\n    AND $__timeFilter(date)\n  GROUP BY 1\n),\nweeks AS (\n  SELECT week FROM weekly_prs\n  UNION SELECT week FROM weekly_spend\n  UNION SELECT week FROM weekly_tok\n  UNION SELECT week FROM weekly_lines\n),\nfilled AS (\n  SELECT w.week,\n    COALESCE(s.v, 0) / NULLIF(p.n, 0) AS cost_per_pr,\n    COALESCE(t.v, 0) / NULLIF(p.n, 0) AS tok_per_pr,\n    COALESCE(l.v, 0) / NULLIF(p.n, 0) AS lines_per_pr\n  FROM weeks w\n  LEFT JOIN weekly_prs p ON p.week = w.week\n  LEFT JOIN weekly_spend s ON s.week = w.week\n  LEFT JOIN weekly_tok t ON t.week = w.week\n  LEFT JOIN weekly_lines l ON l.week = w.week\n),\nrounded AS (\n  SELECT week,\n    ROUND(cost_per_pr, 2) AS cost_per_pr,\n    ROUND(tok_per_pr, 0) AS tok_per_pr,\n    ROUND(lines_per_pr, 1) AS lines_per_pr\n  FROM filled\n),\nlagged AS (\n  SELECT week, cost_per_pr, tok_per_pr, lines_per_pr,\n    LAG(cost_per_pr) OVER (ORDER BY week) AS cost_per_pr_prev,\n    LAG(tok_per_pr) OVER (ORDER BY week) AS tok_per_pr_prev,\n    LAG(lines_per_pr) OVER (ORDER BY week) AS lines_per_pr_prev\n  FROM rounded\n)\nSELECT week AS \"Week\",\n  CONCAT(CONCAT('$', FORMAT(cost_per_pr,2)),\n    CASE\n      WHEN cost_per_pr_prev IS NULL THEN ''\n      WHEN cost_per_pr_prev = 0 AND cost_per_pr = 0 THEN '        ▬0.0%'\n      WHEN cost_per_pr_prev = 0 THEN '        ▲ new'\n      WHEN cost_per_pr > cost_per_pr_prev THEN CONCAT('        ▲', ROUND(100.0*(cost_per_pr-cost_per_pr_prev)/cost_per_pr_prev,1), '%')\n      WHEN cost_per_pr < cost_per_pr_prev THEN CONCAT('        ▼', ROUND(100.0*(cost_per_pr_prev-cost_per_pr)/cost_per_pr_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"Cost / PR\",\n  CONCAT(FORMAT(tok_per_pr,0),\n    CASE\n      WHEN tok_per_pr_prev IS NULL THEN ''\n      WHEN tok_per_pr_prev = 0 AND tok_per_pr = 0 THEN '        ▬0.0%'\n      WHEN tok_per_pr_prev = 0 THEN '        ▲ new'\n      WHEN tok_per_pr > tok_per_pr_prev THEN CONCAT('        ▲', ROUND(100.0*(tok_per_pr-tok_per_pr_prev)/tok_per_pr_prev,1), '%')\n      WHEN tok_per_pr < tok_per_pr_prev THEN CONCAT('        ▼', ROUND(100.0*(tok_per_pr_prev-tok_per_pr)/tok_per_pr_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"Tokens / PR\",\n  CONCAT(lines_per_pr,\n    CASE\n      WHEN lines_per_pr_prev IS NULL THEN ''\n      WHEN lines_per_pr_prev = 0 AND lines_per_pr = 0 THEN '        ▬0.0%'\n      WHEN lines_per_pr_prev = 0 THEN '        ▲ new'\n      WHEN lines_per_pr > lines_per_pr_prev THEN CONCAT('        ▲', ROUND(100.0*(lines_per_pr-lines_per_pr_prev)/lines_per_pr_prev,1), '%')\n      WHEN lines_per_pr < lines_per_pr_prev THEN CONCAT('        ▼', ROUND(100.0*(lines_per_pr_prev-lines_per_pr)/lines_per_pr_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"AI Lines / PR\"\nFROM lagged\nORDER BY week DESC",
+          "rawSql": "WITH weekly_prs AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') AS week, COUNT(*) AS n\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN ($project) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date)\n  GROUP BY 1\n),\nweekly_spend AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week, SUM(estimated_cost_usd) AS v\n  FROM ai_model_usages\n  WHERE source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n  )\n  AND $__timeFilter(date)\n  GROUP BY 1\n),\nweekly_tok AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week, SUM(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens) AS v\n  FROM ai_model_usages\n  WHERE source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n  )\n  AND $__timeFilter(date)\n  GROUP BY 1\n),\nweekly_lines AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week, SUM(lines_added) AS v\n  FROM ai_activities\n  WHERE record_kind = 'canonical_activity'\n    AND source_connection_id IN (\n      SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n    )\n    AND $__timeFilter(date)\n  GROUP BY 1\n),\nweeks AS (\n  SELECT week FROM weekly_prs\n  UNION SELECT week FROM weekly_spend\n  UNION SELECT week FROM weekly_tok\n  UNION SELECT week FROM weekly_lines\n),\nfilled AS (\n  SELECT w.week,\n    COALESCE(s.v, 0) / NULLIF(p.n, 0) AS cost_per_pr,\n    COALESCE(t.v, 0) / NULLIF(p.n, 0) AS tok_per_pr,\n    COALESCE(l.v, 0) / NULLIF(p.n, 0) AS lines_per_pr\n  FROM weeks w\n  LEFT JOIN weekly_prs p ON p.week = w.week\n  LEFT JOIN weekly_spend s ON s.week = w.week\n  LEFT JOIN weekly_tok t ON t.week = w.week\n  LEFT JOIN weekly_lines l ON l.week = w.week\n),\nrounded AS (\n  SELECT week,\n    ROUND(cost_per_pr, 2) AS cost_per_pr,\n    ROUND(tok_per_pr, 0) AS tok_per_pr,\n    ROUND(lines_per_pr, 1) AS lines_per_pr\n  FROM filled\n),\nlagged AS (\n  SELECT week, cost_per_pr, tok_per_pr, lines_per_pr,\n    LAG(cost_per_pr) OVER (ORDER BY week) AS cost_per_pr_prev,\n    LAG(tok_per_pr) OVER (ORDER BY week) AS tok_per_pr_prev,\n    LAG(lines_per_pr) OVER (ORDER BY week) AS lines_per_pr_prev\n  FROM rounded\n)\nSELECT week AS \"Week\",\n  CONCAT(CONCAT('$', CASE WHEN ABS(cost_per_pr) >= 1000000000 THEN CONCAT(FORMAT(cost_per_pr / 1000000000, 1), 'B') WHEN ABS(cost_per_pr) >= 1000000 THEN CONCAT(FORMAT(cost_per_pr / 1000000, 1), 'M') WHEN ABS(cost_per_pr) >= 1000 THEN CONCAT(FORMAT(cost_per_pr / 1000, 1), 'K') ELSE FORMAT(cost_per_pr, 2) END),\n    CASE\n      WHEN cost_per_pr_prev IS NULL THEN ''\n      WHEN cost_per_pr_prev = 0 AND cost_per_pr = 0 THEN '        ▬0.0%'\n      WHEN cost_per_pr_prev = 0 THEN '        ▲ new'\n      WHEN cost_per_pr > cost_per_pr_prev THEN CONCAT('        ▲', ROUND(100.0*(cost_per_pr-cost_per_pr_prev)/cost_per_pr_prev,1), '%')\n      WHEN cost_per_pr < cost_per_pr_prev THEN CONCAT('        ▼', ROUND(100.0*(cost_per_pr_prev-cost_per_pr)/cost_per_pr_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"Cost / PR\",\n  CONCAT(CASE WHEN ABS(tok_per_pr) >= 1000000000 THEN CONCAT(FORMAT(tok_per_pr / 1000000000, 1), 'B') WHEN ABS(tok_per_pr) >= 1000000 THEN CONCAT(FORMAT(tok_per_pr / 1000000, 1), 'M') WHEN ABS(tok_per_pr) >= 1000 THEN CONCAT(FORMAT(tok_per_pr / 1000, 1), 'K') ELSE FORMAT(tok_per_pr, 0) END,\n    CASE\n      WHEN tok_per_pr_prev IS NULL THEN ''\n      WHEN tok_per_pr_prev = 0 AND tok_per_pr = 0 THEN '        ▬0.0%'\n      WHEN tok_per_pr_prev = 0 THEN '        ▲ new'\n      WHEN tok_per_pr > tok_per_pr_prev THEN CONCAT('        ▲', ROUND(100.0*(tok_per_pr-tok_per_pr_prev)/tok_per_pr_prev,1), '%')\n      WHEN tok_per_pr < tok_per_pr_prev THEN CONCAT('        ▼', ROUND(100.0*(tok_per_pr_prev-tok_per_pr)/tok_per_pr_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"Tokens / PR\",\n  CONCAT(CASE WHEN ABS(lines_per_pr) >= 1000000000 THEN CONCAT(FORMAT(lines_per_pr / 1000000000, 1), 'B') WHEN ABS(lines_per_pr) >= 1000000 THEN CONCAT(FORMAT(lines_per_pr / 1000000, 1), 'M') WHEN ABS(lines_per_pr) >= 1000 THEN CONCAT(FORMAT(lines_per_pr / 1000, 1), 'K') ELSE FORMAT(lines_per_pr, 1) END,\n    CASE\n      WHEN lines_per_pr_prev IS NULL THEN ''\n      WHEN lines_per_pr_prev = 0 AND lines_per_pr = 0 THEN '        ▬0.0%'\n      WHEN lines_per_pr_prev = 0 THEN '        ▲ new'\n      WHEN lines_per_pr > lines_per_pr_prev THEN CONCAT('        ▲', ROUND(100.0*(lines_per_pr-lines_per_pr_prev)/lines_per_pr_prev,1), '%')\n      WHEN lines_per_pr < lines_per_pr_prev THEN CONCAT('        ▼', ROUND(100.0*(lines_per_pr_prev-lines_per_pr)/lines_per_pr_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"AI Lines / PR\"\nFROM lagged\nORDER BY week DESC",
           "refId": "A"
         }
       ],
@@ -734,7 +741,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": [
           {
@@ -864,7 +872,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": [
           {
