@@ -1,0 +1,1105 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 10,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "# Ticket Delivery and Flows",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.6.2",
+      "title": "Dashboard B",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 3
+      },
+      "id": 9,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH per_ticket AS (\n    SELECT i.id,\n           i.lead_time_minutes / 1440.0 AS lead_days\n    FROM issues i\n    WHERE i.id LIKE 'jira:%'\n      AND i.lead_time_minutes IS NOT NULL\n      AND $__timeFilter(i.resolution_date)\n      AND i.type <> 'EPIC'\n      AND EXISTS (\n        SELECT 1\n        FROM board_issues bi\n        WHERE bi.issue_id = i.id AND bi.board_id IN ($board_id)\n      ) \n),\nranked AS (\n    SELECT lead_days,\n           ROW_NUMBER() OVER (ORDER BY lead_days) AS rn,\n           COUNT(*)     OVER ()                   AS cnt\n    FROM per_ticket\n)\nSELECT ROUND(MAX(CASE WHEN rn <= CEIL(0.50 * cnt) THEN lead_days END), 1) AS `p50 Lead Time`,\n       ROUND(MAX(CASE WHEN rn <= CEIL(0.85 * cnt) THEN lead_days END), 1) AS `p85 Lead Time`,\n       ROUND(MAX(CASE WHEN rn <= CEIL(0.95 * cnt) THEN lead_days END), 1) AS `p95 Lead Time`\nFROM ranked;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Mean Issue Lead Time in days",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 11
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroup(s.started_date, 1w) as time, \n  COUNT(1) as committed, \n  SUM(CASE WHEN i.resolution_date IS NOT NULL\n\t\tAND i.resolution_date >= s.started_date \n\t\tAND i.resolution_date <= s.ended_date\n\t\tTHEN 1 ELSE 0 END) AS Delivered\nFROM sprint_issues si \nJOIN sprints s ON s.id = si.sprint_id \nJOIN issues i ON i.id = si.issue_id \nWHERE s.id LIKE 'jira:%'\n  AND $__timeFilter(s.started_date)\nGROUP BY time",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Ticket Delivery Rate Over Time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT time, SUM(Opened) as Opened, SUM(Closed) as Closed\nFROM\n(\n  SELECT $__timeGroup(i.created_date, $interval)   AS time,\n    COUNT(i.id) AS Opened,\n    0 AS Closed\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date)\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id and bi.board_id IN ($board_id)\n    )\n  GROUP BY time\n  UNION\n  SELECT $__timeGroup(i.resolution_date, $interval)   AS time,\n    0 AS Opened,\n    COUNT(i.id) AS Closed\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND i.resolution_date IS NOT NULL\n    AND $__timeFilter(i.resolution_date)\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id and bi.board_id IN ($board_id)\n    )\n  GROUP BY time\n) base\nGROUP BY time",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Tickets Delivery Stats",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 50,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 29
+      },
+      "id": 6,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.75,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "normal",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT DATE_FORMAT(ts, '%b %y') as `Month`, sum(opened) as `Opened`, sum(closed) as `Closed`\nFROM (\n  SELECT DATE_FORMAT(i.created_date, '%Y-%m-01') as ts,\n    count(*) as opened,\n    0 as closed\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date) \n    AND EXISTS (\n      SELECT 1 FROM board_issues bi\n      WHERE bi.issue_id = i.id AND bi.board_id IN ( $board_id )\n    )\n  GROUP BY ts\n  UNION\n  SELECT DATE_FORMAT(i.resolution_date, '%Y-%m-01') as ts,\n    0 as opened,\n    count(*) as closed\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.resolution_date) \n    AND EXISTS (\n      SELECT 1 FROM board_issues bi\n      WHERE bi.issue_id = i.id AND bi.board_id IN ( $board_id )\n    )\n  GROUP BY ts\n) base\nGROUP BY ts\nORDER BY ts",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Issue Status Distribution",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Tickets in an Active Work status at the end of each UTC day, broken down by status.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-RdYlGr"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 39
+      },
+      "id": 1,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Work In Progress. Count of tickets sitting in an Active Work status at the end of each day,\n-- broken down by status, reconstructed from issue_status_history rather than sampled.\n-- Day boundary: end of day, i.e. 00:00 of the following day, in UTC.\n-- Epics and sub-tasks are excluded; edit the `curated` list to match the team's agreed taxonomy.\nWITH RECURSIVE days AS (\n  SELECT\n    DATE($__timeFrom()) AS d\n  UNION\n  ALL\n  SELECT\n    d + INTERVAL 1 DAY\n  FROM\n    days\n  WHERE\n    d + INTERVAL 1 DAY <= DATE($__timeTo())\n),\ncurated AS (\n  -- Team-curated status classes. Anything not listed falls back to DevLake's standard split.\n  SELECT\n    *\n  FROM\n    (\n      SELECT\n        'In Progress' AS original_status,\n        'Active Work' AS status_class\n      UNION\n      ALL\n      SELECT\n        'In Review',\n        'Waiting'\n      UNION\n      ALL\n      SELECT\n        'Ready for QA',\n        'Waiting'\n      UNION\n      ALL\n      SELECT\n        'Blocked',\n        'Waiting'\n    ) m\n  WHERE\n    1 = 1\n),\nscoped AS (\n  SELECT\n    i.id\n  FROM\n    issues i\n    JOIN board_issues bi ON bi.issue_id = i.id AND bi.board_id IN ($board_id)\n  WHERE\n    i.id LIKE 'jira:%'\n    AND COALESCE(i.original_type, '') <> 'Epic'\n    AND COALESCE(i.is_subtask, 0) = 0\n    AND i.original_type IN ($issue_type)\n),\nhist AS (\n  -- The last interval of every issue is treated as still open and re-ended at \"now\", because\n  -- issue_trace freezes end_date at conversion time and leaves is_current_status = 0 on issues\n  -- that never had a status changelog.\n  SELECT\n    h.issue_id,\n    COALESCE(NULLIF(TRIM(h.original_status), ''), '(blank)') AS st,\n    h.status AS std,\n    h.start_date AS sd,\n    CASE\n      WHEN ROW_NUMBER() OVER (\n        PARTITION BY h.issue_id\n        ORDER BY\n          h.start_date DESC\n      ) = 1 THEN UTC_TIMESTAMP()\n      ELSE h.end_date\n    END AS ed\n  FROM\n    issue_status_history h\n    JOIN scoped s ON s.id = h.issue_id\n),\nclassified AS (\n  SELECT\n    h.issue_id,\n    h.st,\n    h.sd,\n    h.ed,\n    COALESCE(\n      cu.status_class,\n      CASE\n        h.std\n        WHEN 'IN_PROGRESS' THEN 'Active Work'\n        WHEN 'TODO' THEN 'Waiting'\n        WHEN 'DONE' THEN 'Done'\n        ELSE 'UNCLASSIFIED'\n      END\n    ) AS cls\n  FROM\n    hist h\n    LEFT JOIN curated cu ON LOWER(TRIM(cu.original_status)) = LOWER(h.st)\n)\nSELECT\n  CAST(dd.d AS DATETIME) AS `time`,\n  c.st AS metric,\n  COUNT(DISTINCT c.issue_id) AS value\nFROM\n  days dd\n  JOIN classified c ON c.sd < dd.d + INTERVAL 1 DAY\n  AND c.ed >= dd.d + INTERVAL 1 DAY\nWHERE\n  c.cls = 'Active Work'\nGROUP BY\n  dd.d,\n  c.st\nORDER BY\n  1,\n  2;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Work In Progress",
+      "transformations": [
+        {
+          "id": "partitionByValues",
+          "options": {
+            "fields": [
+              "metric"
+            ],
+            "keepFields": false,
+            "naming": {
+              "asLabels": false
+            }
+          }
+        }
+      ],
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Days since work started for every still-open ticket, oldest first, against the p50 and p85 cycle time of completed tickets.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Days In Current Status"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 195
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Days Since Work Started"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 191
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Current Status"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 215
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p85 Cycle Time (days)"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 163
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 48
+      },
+      "id": 2,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Days Since Work Started"
+          }
+        ]
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Aging Work In Progress. Days since work started for every still-open ticket, oldest first,\n-- alongside the p50 and p85 cycle time of completed tickets so an item can be watched crossing them.\n-- \"Work started\" = FIRST ever entry into an Active Work status; moving backwards and forwards again\n-- does not reset the clock. Tickets that have never entered an active status are not WIP and are\n-- excluded. The dashboard time range scopes the completed population behind p50/p85 only - the open\n-- tickets themselves are never time-filtered, since hiding the oldest would defeat the panel.\nWITH curated AS (\n    -- Team-curated status classes. Anything not listed falls back to DevLake's standard split.\n    SELECT * FROM (\n        SELECT 'In Progress'  AS original_status, 'Active Work' AS status_class UNION ALL\n        SELECT 'In Review',    'Waiting'                                        UNION ALL\n        SELECT 'Ready for QA', 'Waiting'                                        UNION ALL\n        SELECT 'Blocked',      'Waiting'\n    ) m WHERE 1 = 1\n),\nscoped AS (\n    SELECT i.id, i.issue_key, i.title, i.url, i.original_type\n    FROM issues i\n    JOIN board_issues bi    ON bi.issue_id = i.id \n      AND bi.board_id     IN ( $board_id )\n    WHERE i.id LIKE 'jira:%'\n      AND COALESCE(i.original_type, '') <> 'Epic'\n      AND COALESCE(i.is_subtask, 0) = 0\n      AND i.original_type IN ($issue_type)\n      AND EXISTS (SELECT 1 FROM issue_labels il\n                       WHERE il.issue_id = i.id AND il.label_name IN ($label))\n),\nhist AS (\n    -- The last interval of every issue is treated as still open and re-ended at \"now\", because\n    -- issue_trace freezes end_date at conversion time and leaves is_current_status = 0 on issues\n    -- that never had a status changelog.\n    SELECT h.issue_id,\n           COALESCE(NULLIF(TRIM(h.original_status), ''), '(blank)') AS st,\n           h.status AS std,\n           h.start_date AS sd,\n           ROW_NUMBER() OVER (PARTITION BY h.issue_id ORDER BY h.start_date DESC) AS rn_desc\n    FROM issue_status_history h\n    JOIN scoped s ON s.id = h.issue_id\n),\nclassified AS (\n    SELECT h.issue_id, h.st, h.sd, h.rn_desc,\n           COALESCE(cu.status_class,\n                    CASE h.std WHEN 'IN_PROGRESS' THEN 'Active Work'\n                               WHEN 'TODO'        THEN 'Waiting'\n                               WHEN 'DONE'        THEN 'Done'\n                               ELSE 'UNCLASSIFIED' END) AS cls\n    FROM hist h\n    LEFT JOIN curated cu ON LOWER(TRIM(cu.original_status)) = LOWER(h.st)\n),\nwork_started AS (\n    -- First ever entry into an active status. MIN() is what makes the clock non-resetting.\n    SELECT issue_id, MIN(sd) AS ws\n    FROM classified\n    WHERE cls = 'Active Work'\n    GROUP BY issue_id\n),\ncurrent_state AS (\n    SELECT issue_id, st, cls, sd AS entered_current\n    FROM classified\n    WHERE rn_desc = 1\n),\ncompleted AS (\n    -- Cycle time of tickets whose CURRENT status is Done: work started -> the Done that stuck.\n    SELECT TIMESTAMPDIFF(HOUR, w.ws, c.entered_current) / 24 AS cycle_days\n    FROM current_state c\n    JOIN work_started w ON w.issue_id = c.issue_id\n    WHERE (c.cls = 'Done' OR c.st = 'Done')\n      AND c.entered_current > w.ws\n      AND c.entered_current BETWEEN $__timeFrom() AND $__timeTo()\n),\npct AS (\n    -- Nearest-rank percentiles; MySQL has no PERCENTILE_CONT.\n    SELECT ROUND(MAX(CASE WHEN rn <= CEIL(0.50 * cnt) THEN cycle_days END), 1) AS p50,\n           ROUND(MAX(CASE WHEN rn <= CEIL(0.85 * cnt) THEN cycle_days END), 1) AS p85\n    FROM (\n        SELECT cycle_days,\n               ROW_NUMBER() OVER (ORDER BY cycle_days) AS rn,\n               COUNT(*)    OVER ()                     AS cnt\n        FROM completed\n    ) ranked\n)\nSELECT s.issue_key                                                          AS `Ticket`,\n       s.title                                                              AS `Title`,\n       s.original_type                                                      AS `Type`,\n       c.st                                                                 AS `Current Status`,\n       c.cls                                                                AS `Class`,\n       ROUND(TIMESTAMPDIFF(HOUR, w.ws, UTC_TIMESTAMP()) / 24, 1)            AS `Days Since Work Started`,\n       ROUND(TIMESTAMPDIFF(HOUR, c.entered_current, UTC_TIMESTAMP()) / 24, 1) AS `Days In Current Status`,\n       p.p50                                                                AS `p50 Cycle Time (days)`,\n       p.p85                                                                AS `p85 Cycle Time (days)`,\n       CASE WHEN p.p85 IS NULL                                                  THEN 'No baseline yet'\n            WHEN TIMESTAMPDIFF(HOUR, w.ws, UTC_TIMESTAMP()) / 24 > p.p85        THEN 'Over p85'\n            WHEN TIMESTAMPDIFF(HOUR, w.ws, UTC_TIMESTAMP()) / 24 > p.p50        THEN 'Over p50'\n            ELSE 'Within p50' END                                           AS `Against Baseline`,\n       DATE(w.ws)                                                           AS `Work Started`,\n       s.url                                                                AS `URL`\nFROM current_state c\nJOIN work_started w ON w.issue_id = c.issue_id\nJOIN scoped      s ON s.id       = c.issue_id\nCROSS JOIN pct p\nWHERE c.st <> 'Done' AND c.cls <> 'Done'\nORDER BY `Days Since Work Started` DESC;\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Aging Work In Progress",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "The 30 longest-running open tickets by days since work started, with p50 and p85 cycle time of completed tickets drawn as reference lines.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "line+area"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 20,
+        "x": 0,
+        "y": 56
+      },
+      "id": 3,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.75,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Aging Work In Progress (bar chart). One bar per still-open ticket, longest-running first, capped\n-- at the 30 oldest so the axis stays readable. p50 / p85 are NOT returned as columns here - extra\n-- numeric fields would render as extra bars - so set them as static threshold lines in the panel\n-- options, reading the current values off the Aging Work In Progress table panel.\n-- \"Work started\" = FIRST ever entry into an Active Work status; moving backwards and forwards again\n-- does not reset the clock. Tickets that have never entered an active status are not WIP.\nWITH curated AS (\n    -- Team-curated status classes. Anything not listed falls back to DevLake's standard split.\n    SELECT * FROM (\n        SELECT 'In Progress'  AS original_status, 'Active Work' AS status_class UNION ALL\n        SELECT 'In Review',    'Waiting'                                        UNION ALL\n        SELECT 'Ready for QA', 'Waiting'                                        UNION ALL\n        SELECT 'Blocked',      'Waiting'\n    ) m WHERE 1 = 1\n),\nscoped AS (\n    SELECT i.id, i.issue_key, i.title, i.url, i.original_type\n    FROM issues i\n    JOIN board_issues bi    ON bi.issue_id = i.id\n    JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n    WHERE i.id LIKE 'jira:%'\n      AND pm.project_name IN ( $project )\n      AND bi.board_id     IN ( $board_id )\n      AND COALESCE(i.original_type, '') <> 'Epic'\n      AND COALESCE(i.is_subtask, 0) = 0\n      AND i.original_type IN ($issue_type)\n      AND EXISTS (SELECT 1 FROM issue_labels il\n                       WHERE il.issue_id = i.id AND il.label_name IN ($label))\n),\nhist AS (\n    -- The last interval of every issue is treated as still open and re-ended at \"now\", because\n    -- issue_trace freezes end_date at conversion time and leaves is_current_status = 0 on issues\n    -- that never had a status changelog.\n    SELECT h.issue_id,\n           COALESCE(NULLIF(TRIM(h.original_status), ''), '(blank)') AS st,\n           h.status AS std,\n           h.start_date AS sd,\n           ROW_NUMBER() OVER (PARTITION BY h.issue_id ORDER BY h.start_date DESC) AS rn_desc\n    FROM issue_status_history h\n    JOIN scoped s ON s.id = h.issue_id\n),\nclassified AS (\n    SELECT h.issue_id, h.st, h.sd, h.rn_desc,\n           COALESCE(cu.status_class,\n                    CASE h.std WHEN 'IN_PROGRESS' THEN 'Active Work'\n                               WHEN 'TODO'        THEN 'Waiting'\n                               WHEN 'DONE'        THEN 'Done'\n                               ELSE 'UNCLASSIFIED' END) AS cls\n    FROM hist h\n    LEFT JOIN curated cu ON LOWER(TRIM(cu.original_status)) = LOWER(h.st)\n),\nwork_started AS (\n    -- First ever entry into an active status. MIN() is what makes the clock non-resetting.\n    SELECT issue_id, MIN(sd) AS ws\n    FROM classified\n    WHERE cls = 'Active Work'\n    GROUP BY issue_id\n),\ncurrent_state AS (\n    SELECT issue_id, st, cls, sd AS entered_current\n    FROM classified\n    WHERE rn_desc = 1\n)\nSELECT s.issue_key              AS `Ticket`,\n       ROUND(TIMESTAMPDIFF(HOUR, w.ws, UTC_TIMESTAMP()) / 24, 1)  AS `Days Since Work Started`,\n       s.url                                                      AS `URL`\nFROM current_state c\nJOIN work_started w ON w.issue_id = c.issue_id\nJOIN scoped      s ON s.id       = c.issue_id\nWHERE c.st <> 'Done' AND c.cls <> 'Done'\nORDER BY `Days Since Work Started` DESC\nLIMIT 30;\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Aging Work In Progress (Charted)",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "noValue": "No Data",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 20,
+        "y": 56
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "p50"
+          ],
+          "fields": "/^Days Since Work Started$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 3,
+          "refId": "A"
+        }
+      ],
+      "title": "p50 Aging WIP",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 20,
+        "y": 62
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "p85"
+          ],
+          "fields": "/^Days Since Work Started$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 3,
+          "refId": "A"
+        }
+      ],
+      "title": "p85 Aging WIP",
+      "type": "stat"
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 41,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "devlake-mysql"
+        },
+        "definition": "select DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'boards' AND pm.row_id like 'jira:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name ",
+        "includeAll": true,
+        "label": "Project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "select DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'boards' AND pm.row_id like 'jira:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name ",
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "devlake-mysql"
+        },
+        "definition": "SELECT CONCAT(b.name, '--', b.id) AS text\nFROM project_mapping pm\nJOIN boards b ON b.id = pm.row_id\nWHERE pm.`table` = 'boards' AND pm.row_id LIKE 'jira:%'\n  AND pm.project_name IN ( $project )\nORDER BY text",
+        "description": "",
+        "includeAll": true,
+        "label": "Board",
+        "multi": true,
+        "name": "board_id",
+        "options": [],
+        "query": "SELECT CONCAT(b.name, '--', b.id) AS text\nFROM project_mapping pm\nJOIN boards b ON b.id = pm.row_id\nWHERE pm.`table` = 'boards' AND pm.row_id LIKE 'jira:%'\n  AND pm.project_name IN ( $project )\nORDER BY text",
+        "refresh": 1,
+        "regex": "/^(?<text>.*)--(?<value>.*)$/",
+        "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "devlake-mysql"
+        },
+        "definition": "SELECT DISTINCT il.label_name AS text\nFROM issue_labels il\nWHERE il.issue_id LIKE 'jira:%'\n  AND COALESCE(il.label_name, '') <> ''\n  AND EXISTS(\n    SELECT 1 FROM board_issues bi WHERE bi.board_id IN ($board_id) AND bi.issue_id = il.issue_id\n  )\nORDER BY text",
+        "includeAll": true,
+        "label": "Label",
+        "multi": true,
+        "name": "label",
+        "options": [],
+        "query": "SELECT DISTINCT il.label_name AS text\nFROM issue_labels il\nWHERE il.issue_id LIKE 'jira:%'\n  AND COALESCE(il.label_name, '') <> ''\n  AND EXISTS(\n    SELECT 1 FROM board_issues bi WHERE bi.board_id IN ($board_id) AND bi.issue_id = il.issue_id\n  )\nORDER BY text",
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "devlake-mysql"
+        },
+        "definition": "SELECT DISTINCT i.type AS text\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND i.original_type <> 'Epic'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN ( $board_id )\n  )\nORDER BY text",
+        "includeAll": true,
+        "label": "Type",
+        "multi": true,
+        "name": "issue_type",
+        "options": [],
+        "query": "SELECT DISTINCT i.type AS text\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND i.original_type <> 'Epic'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN ( $board_id )\n  )\nORDER BY text",
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "1M",
+          "value": "1M"
+        },
+        "label": "Time Interval",
+        "name": "interval",
+        "options": [
+          {
+            "selected": true,
+            "text": "Month",
+            "value": "1M"
+          },
+          {
+            "selected": false,
+            "text": "Week",
+            "value": "1w"
+          },
+          {
+            "selected": false,
+            "text": "Day",
+            "value": "1d"
+          }
+        ],
+        "query": "Month : 1M, Week : 1w, Day : 1d",
+        "type": "custom"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "B. Ticket Delivery and Flows",
+  "uid": "ffxpy568h2mm8f",
+  "version": 4
+}

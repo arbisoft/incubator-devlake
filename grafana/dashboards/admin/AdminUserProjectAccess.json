@@ -1,35 +1,35 @@
 {
-  "__inputs": [],
   "__elements": {},
+  "__inputs": [],
   "__requires": [
     {
-      "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
+      "type": "grafana",
       "version": "11.0.0"
     },
     {
-      "type": "datasource",
       "id": "mysql",
       "name": "MySQL",
+      "type": "datasource",
       "version": "1.0.0"
     },
     {
-      "type": "panel",
       "id": "table",
       "name": "Table",
+      "type": "panel",
       "version": ""
     },
     {
-      "type": "panel",
       "id": "text",
       "name": "Text",
+      "type": "panel",
       "version": ""
     },
     {
-      "type": "panel",
       "id": "volkovlabs-form-panel",
       "name": "Business Forms",
+      "type": "panel",
       "version": "6.3.5"
     }
   ],
@@ -72,45 +72,45 @@
       },
       "id": 3,
       "options": {
-        "initial": {
-          "method": "-"
-        },
-        "update": {
-          "method": "-",
-          "confirm": false,
-          "code": "// Grafana's API root: \"\" on prod, \"/grafana\" on staging.\nconst base = window.grafanaBootData?.settings?.appSubUrl || '';\nconst path = base + '/api/datasources/proxy/uid/devlake-api/rest/user-project-mappings/';\n\n// Calls go via Grafana's datasource proxy, which attaches the DevLake API key\n// server-side and strips cookies. See provisioning/datasources/datasource.yml.\n//\n// Variables are read at runtime, not interpolated: values reach this source before\n// it compiles, so a quote or backslash in one is a syntax error. Keep the name\n// split across the + or this line becomes a variable reference itself.\nconst readVar = (name) => context.grafana.templateService.replace('${' + name + '}');\nconst userLogin = readVar('userLogin');\nconst project = readVar('project');\n\nreturn (async () => {\n  const res = await fetch(path + encodeURIComponent(userLogin), {\n    method: 'POST',\n    credentials: 'same-origin',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify({ projectName: project }),\n  });\n\n  if (res.ok) {\n    context.grafana.notifySuccess(['Mapping Added', userLogin + ' \u2192 ' + project]);\n    context.grafana.refresh();\n  } else {\n    context.grafana.notifyError(['Error', 'HTTP ' + res.status + ': ' + (await res.text())]);\n  }\n})();"
-        },
-        "resetAction": "initial",
-        "layout": {
-          "variant": "none",
-          "padding": "normal",
-          "orientation": "vertical"
-        },
         "buttonGroup": {
           "orientation": "center"
         },
-        "submit": {
-          "text": "Add Mapping",
-          "variant": "primary",
-          "icon": "plus"
+        "elements": [
+          {
+            "hidden": true,
+            "id": "_x",
+            "labelWidth": 1,
+            "readOnly": true,
+            "title": "",
+            "type": "string",
+            "value": "",
+            "width": 1
+          }
+        ],
+        "initial": {
+          "method": "-"
+        },
+        "layout": {
+          "orientation": "vertical",
+          "padding": "normal",
+          "variant": "none"
         },
         "reset": {
           "show": false
         },
-        "elements": [
-          {
-            "id": "_x",
-            "type": "string",
-            "title": "",
-            "value": "",
-            "width": 1,
-            "labelWidth": 1,
-            "hidden": true,
-            "readOnly": true
-          }
-        ]
+        "resetAction": "initial",
+        "submit": {
+          "icon": "plus",
+          "text": "Add Mapping",
+          "variant": "primary"
+        },
+        "update": {
+          "code": "// Grafana's API root: \"\" on prod, \"/grafana\" on staging.\nconst base = window.grafanaBootData?.settings?.appSubUrl || '';\nconst path = base + '/api/datasources/proxy/uid/devlake-api/rest/user-project-mappings/';\n\n// Calls go via Grafana's datasource proxy, which attaches the DevLake API key\n// server-side and strips cookies. See provisioning/datasources/datasource.yml.\n//\n// Variables are read at runtime, not interpolated: values reach this source before\n// it compiles, so a quote or backslash in one is a syntax error. Keep the name\n// split across the + or this line becomes a variable reference itself.\nconst readVar = (name) => context.grafana.templateService.replace('${' + name + '}');\nconst userLogin = readVar('userLogin');\nconst project = readVar('project');\n\nreturn (async () => {\n  const res = await fetch(path + encodeURIComponent(userLogin), {\n    method: 'POST',\n    credentials: 'same-origin',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify({ projectName: project }),\n  });\n\n  if (res.ok) {\n    context.grafana.notifySuccess(['Mapping Added', userLogin + ' → ' + project]);\n    context.grafana.refresh();\n  } else {\n    context.grafana.notifyError(['Error', 'HTTP ' + res.status + ': ' + (await res.text())]);\n  }\n})();",
+          "confirm": false,
+          "method": "-"
+        }
       },
-      "title": "Add: ${userLogin} \u2192 ${project}",
+      "title": "Add: ${userLogin} → ${project}",
       "type": "volkovlabs-form-panel"
     },
     {
@@ -126,45 +126,45 @@
       },
       "id": 4,
       "options": {
-        "initial": {
-          "method": "-"
-        },
-        "update": {
-          "method": "-",
-          "confirm": false,
-          "code": "// Grafana's API root: \"\" on prod, \"/grafana\" on staging.\nconst base = window.grafanaBootData?.settings?.appSubUrl || '';\nconst path = base + '/api/datasources/proxy/uid/devlake-api/rest/user-project-mappings/';\n\n// Calls go via Grafana's datasource proxy, which attaches the DevLake API key\n// server-side and strips cookies. See provisioning/datasources/datasource.yml.\n//\n// Variables are read at runtime, not interpolated: values reach this source before\n// it compiles, so a quote or backslash in one is a syntax error. Keep the name\n// split across the + or this line becomes a variable reference itself.\nconst readVar = (name) => context.grafana.templateService.replace('${' + name + '}');\nconst userLogin = readVar('userLogin');\nconst project = readVar('project');\n\nreturn (async () => {\n  const res = await fetch(\n    path + encodeURIComponent(userLogin) + '/' + encodeURIComponent(project),\n    { method: 'DELETE', credentials: 'same-origin' },\n  );\n\n  if (res.ok) {\n    context.grafana.notifySuccess(['Mapping Removed', userLogin + ' \u2192 ' + project]);\n    context.grafana.refresh();\n  } else {\n    context.grafana.notifyError(['Error', 'HTTP ' + res.status + ': ' + (await res.text())]);\n  }\n})();"
-        },
-        "resetAction": "initial",
-        "layout": {
-          "variant": "none",
-          "padding": "normal",
-          "orientation": "vertical"
-        },
         "buttonGroup": {
           "orientation": "center"
         },
-        "submit": {
-          "text": "Remove Mapping",
-          "variant": "destructive",
-          "icon": "trash-alt"
+        "elements": [
+          {
+            "hidden": true,
+            "id": "_x",
+            "labelWidth": 1,
+            "readOnly": true,
+            "title": "",
+            "type": "string",
+            "value": "",
+            "width": 1
+          }
+        ],
+        "initial": {
+          "method": "-"
+        },
+        "layout": {
+          "orientation": "vertical",
+          "padding": "normal",
+          "variant": "none"
         },
         "reset": {
           "show": false
         },
-        "elements": [
-          {
-            "id": "_x",
-            "type": "string",
-            "title": "",
-            "value": "",
-            "width": 1,
-            "labelWidth": 1,
-            "hidden": true,
-            "readOnly": true
-          }
-        ]
+        "resetAction": "initial",
+        "submit": {
+          "icon": "trash-alt",
+          "text": "Remove Mapping",
+          "variant": "destructive"
+        },
+        "update": {
+          "code": "// Grafana's API root: \"\" on prod, \"/grafana\" on staging.\nconst base = window.grafanaBootData?.settings?.appSubUrl || '';\nconst path = base + '/api/datasources/proxy/uid/devlake-api/rest/user-project-mappings/';\n\n// Calls go via Grafana's datasource proxy, which attaches the DevLake API key\n// server-side and strips cookies. See provisioning/datasources/datasource.yml.\n//\n// Variables are read at runtime, not interpolated: values reach this source before\n// it compiles, so a quote or backslash in one is a syntax error. Keep the name\n// split across the + or this line becomes a variable reference itself.\nconst readVar = (name) => context.grafana.templateService.replace('${' + name + '}');\nconst userLogin = readVar('userLogin');\nconst project = readVar('project');\n\nreturn (async () => {\n  const res = await fetch(\n    path + encodeURIComponent(userLogin) + '/' + encodeURIComponent(project),\n    { method: 'DELETE', credentials: 'same-origin' },\n  );\n\n  if (res.ok) {\n    context.grafana.notifySuccess(['Mapping Removed', userLogin + ' → ' + project]);\n    context.grafana.refresh();\n  } else {\n    context.grafana.notifyError(['Error', 'HTTP ' + res.status + ': ' + (await res.text())]);\n  }\n})();",
+          "confirm": false,
+          "method": "-"
+        }
       },
-      "title": "Remove: ${userLogin} \u2192 ${project}",
+      "title": "Remove: ${userLogin} → ${project}",
       "type": "volkovlabs-form-panel"
     },
     {
@@ -226,14 +226,14 @@
           "text": "",
           "value": ""
         },
+        "description": "Grafana username to grant or revoke project access for",
         "hide": 0,
         "label": "User Login",
         "name": "userLogin",
         "options": [],
         "query": "",
         "skipUrlSync": false,
-        "type": "textbox",
-        "description": "Grafana username to grant or revoke project access for"
+        "type": "textbox"
       },
       {
         "current": {
@@ -243,6 +243,7 @@
         },
         "datasource": "mysql",
         "definition": "SELECT name FROM projects ORDER BY name",
+        "description": "DevLake project to grant or revoke",
         "hide": 0,
         "label": "Project",
         "name": "project",
@@ -251,8 +252,7 @@
         "refresh": 2,
         "skipUrlSync": false,
         "sort": 1,
-        "type": "query",
-        "description": "DevLake project to grant or revoke"
+        "type": "query"
       }
     ]
   },
@@ -266,5 +266,5 @@
   "timezone": "browser",
   "title": "Admin: User Project Access",
   "uid": "admin-user-project-access",
-  "version": 1
+  "version": 5
 }
