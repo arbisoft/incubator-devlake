@@ -40,7 +40,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "**Scope & caveats:**\n\n- **All AI figures on this dashboard are Claude Code OTel-only**, scoped to the Project and Claude Code OTel Teams filters above. Legacy Claude Admin-API and Cursor activity are excluded — neither carries a reliable per-project mapping, so mixing them in would make these comparisons incomparable to the project-scoped panels elsewhere in the AI dashboard set. The human (merged-PR) side of every comparison below is scoped to the same Project filter, so both sides of each ratio move together.\n- **AI-Attributed Share of Lines Changed** compares two different populations: AI-session activity counts lines touched *inside* AI tool sessions (whether or not that code is ever committed or merged), while the human side counts lines in *merged* PR diffs only. This structurally overstates AI's share, since AI-touched lines aren't verified as AI-authored and can be edited or discarded by a developer before ever being committed. Read the percentage as an upper bound on AI's contribution, not a precise attribution.\n- **AI-Attributed Volume by Language** is queried directly from Claude Code's raw OTel telemetry rather than the shared domain layer — the unified AI-tool-decisions table drops the language column that OTel's raw telemetry carries.",
+        "content": "**Scope & caveats:**\n\n- **All AI figures on this dashboard are Claude Code OTel-only**, scoped to the Project and Claude Code OTel Teams filters above. Legacy Claude Admin-API and Cursor activity are excluded — neither carries a reliable per-project mapping, so mixing them in would make these comparisons incomparable to the project-scoped panels elsewhere in the AI dashboard set. The human (merged-PR) side uses the same Project filter; the team filter applies only to OTel data.\n- **AI-Attributed Share of Lines Changed** compares two different populations using additions only: AI-session activity counts lines added inside AI tool sessions (whether or not that code is ever committed or merged), while the other side counts additions in merged PR diffs only. This structurally overstates AI's share, since session additions are not verified as AI-authored and can be edited or discarded before being committed. Read the percentage as an upper bound on AI's contribution, not a precise attribution.\n- **Accepted Edits by Language** is queried from Claude Code OTel hourly tool-usage telemetry rather than the shared domain layer, because the shared AI-tool-decisions table does not carry a language dimension.",
         "mode": "markdown"
       },
       "pluginVersion": "11.0.0",
@@ -49,7 +49,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "AI-session lines added ÷ (AI-session lines added + merged-PR additions), both sides scoped to the selected project(s)/team(s). Compares two different populations — see the caveat above — so read this as an upper bound on AI's contribution, not an exact attribution.",
+      "description": "Claude Code OTel lines added divided by the sum of OTel lines added and additions in merged PRs. Both datasets use the selected Project; only the OTel numerator also uses the selected OTel Teams. These are different populations and the session lines are not verified as committed, so treat the percentage as an upper-bound directional comparison, not exact attribution.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -102,7 +102,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Distinct engineers with Claude Code OTel activity ÷ distinct name-deduplicated PR-merging contributors, both sides scoped to the selected project(s)/team(s). The two counts aren't cross-matched to the same identity — an AI user isn't verified to also be a PR-merging contributor — so this is a directional adoption trend rather than an exact percentage, and can read above 100% when the two populations diverge.",
+      "description": "Distinct OTel `user_email` values with canonical Claude Code activity divided by distinct name-deduplicated authors of merged PRs. Both are filtered by Project; only OTel activity is filtered by OTel Teams. The identities are not cross-matched, so this is a directional ratio and may exceed 100%.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -274,7 +274,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Weekly share of lines changed attributed to AI sessions vs. merged human PR diffs, stacked to 100%, both sides scoped to the selected project(s)/team(s). Engineers Adopted % is overlaid as a dashed line for reference, on its own scale since adoption typically runs well above code-share percentage. Bucketed weekly rather than monthly since Claude Code OTel history is currently short. Carries the same population caveat as the AI-Attributed Share of Lines Changed KPI above.",
+      "description": "Weekly shares of additions: canonical Claude Code OTel `lines_added` versus additions in merged PR diffs, normalized to a 100% stack. Both use Project; only OTel activity uses OTel Teams. The dashed adopted-engineer series is on a separate scale and is an unverified ratio of OTel users to merged-PR authors. This compares session activity with delivered PR changes, not matched authorship. Weeks begin Monday.",
       "fieldConfig": {
         "defaults": {
           "color": {

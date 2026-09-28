@@ -40,7 +40,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "**How to read this dashboard**\n\n- **All AI figures on this dashboard are Claude Code OTel-only**, scoped to the Project and Claude Code OTel Teams filters above. Legacy Claude Admin-API and Cursor activity are excluded — neither carries a reliable per-project mapping. Every \"per merged PR\" ratio below (AI Lines/PR, Tokens/PR, Cost/PR) now scopes the PR side to the same Project filter as the AI side, so the ratio stays meaningful at any Project selection. PR Size (p85/median) has no AI-mixing problem and stays scoped to the Project filter as normal.\n- AI spend and tokens come solely from `ai_model_usages`, which only Claude Code OTel writes to.\n- MySQL has no built-in percentile function; p85/median below are computed exactly via row-numbering over the full distribution, not approximated.",
+        "content": "**How to read this dashboard**\n\n- **All AI figures on this dashboard are Claude Code OTel-only**, scoped to the Project and Claude Code OTel Teams filters above. Legacy Claude Admin-API and Cursor activity are excluded — neither carries a reliable per-project mapping. Every \"per merged PR\" ratio uses the same Project filter on the AI and PR sides; the AI side also uses the OTel Teams filter, while PR counts are not team-filtered. Interpret these as project-level delivery ratios rather than team-specific PR rates. PR Size (p85/median) stays scoped to the Project filter.\n- AI spend and tokens come solely from `ai_model_usages`, which only Claude Code OTel writes to.\n- MySQL has no built-in percentile function; p85 and the median are selected by row number from the full sorted distribution. For an even number of PRs, the median is the lower of the two middle observations rather than their average.",
         "mode": "markdown"
       },
       "pluginVersion": "11.0.0",
@@ -261,7 +261,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "AI lines added ÷ PRs merged, both sides scoped to the selected project(s)/team(s).",
+      "description": "AI-session lines added divided by merged PR count for the selected Project and time range. The AI numerator is filtered by Project and OTel Teams; the PR denominator is filtered by Project only. This is a project-level ratio, not a team-specific PR rate.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -314,7 +314,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "AI tokens consumed ÷ PRs merged, both sides scoped to the selected project(s)/team(s).",
+      "description": "Claude Code OTel tokens divided by merged PR count for the selected Project and time range. The AI numerator is filtered by Project and OTel Teams; the PR denominator is filtered by Project only. This is a project-level ratio, not a team-specific PR rate.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -367,7 +367,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "AI spend ÷ PRs merged, both sides scoped to the selected project(s)/team(s).",
+      "description": "Claude Code OTel estimated spend divided by merged PR count for the selected Project and time range. The AI numerator is filtered by Project and OTel Teams; the PR denominator is filtered by Project only. This is a project-level ratio, not a team-specific PR rate.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -486,7 +486,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Weekly Cost/PR, Tokens/PR, and AI Lines/PR (real values, not indexed to a baseline), each with a week-over-week % change and direction arrow combined into the same cell. Both sides of every ratio (AI-side numerator, PR-side denominator) are scoped to the selected project(s)/team(s). This is the primary view for this panel group — see the trend-shape chart below for a normalized, at-a-glance version of the same data.",
+      "description": "Weekly estimated cost, token use, and OTel lines added divided by merged PRs in the same week. The AI numerators use Project and OTel Teams; the PR denominator uses Project only. Each cell shows the ratio and its change from the previous available week. Weeks begin Monday; read the indexed chart below only for relative trend shape.",
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -706,7 +706,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Each metric here is indexed to its own first non-zero week in the selected range, which is forced to exactly 100 — every other week is shown as a percentage of that one week's value, not as a real number. This makes the chart fragile whenever that first week happens to have a tiny real denominator: a first week with just 1 merged PR, for example, would make a completely normal later week with 17 PRs show as 1700%. Read this chart for trend shape only — use the table above for the real weekly values.",
+      "description": "Each metric here is indexed to its own first non-zero week in the selected range, which is forced to exactly 100 — every other week is shown as a percentage of that one week's value, not as a real number. This makes the chart fragile whenever that first week happens to have a tiny real denominator: a first week with just 1 merged PR, for example, would make a completely normal later week with 17 PRs show as 1700%. Read this chart for trend shape only — use the table above for the real weekly values. As in the weekly value table above, AI numerators use Project and OTel Teams while merged-PR denominators use Project only.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -850,7 +850,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Monthly p85 (solid) and median (dashed) of merged PR size (additions + deletions), scoped to the selected project(s). A widening gap between the two lines means a small number of oversized PRs are pulling the p85 up while the typical PR stays small — a signal worth watching for review-quality risk.",
+      "description": "Monthly p85 and rank-selected median of merged PR size (additions + deletions) in the selected Project. The query selects observations by row number; with an even number of PRs, its median is the lower middle observation, not the average of the two middle values. A widening p85-to-median gap means the upper tail of PR sizes is growing relative to the typical PR.",
       "fieldConfig": {
         "defaults": {
           "color": {

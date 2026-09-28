@@ -71,7 +71,7 @@
         "type": "mysql",
         "uid": "P430005175C4C7810"
       },
-      "description": "",
+      "description": "Counts distinct pull requests created in the selected time range for the selected GitLab repositories (`repo_id`). The time filter uses `created_date`, so this measures intake rather than merges.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -183,7 +183,7 @@
         "type": "mysql",
         "uid": "P430005175C4C7810"
       },
-      "description": "",
+      "description": "Counts distinct pull requests by their creation date, grouped into weeks or months according to the dashboard interval, for the selected repositories. The date filter uses `created_date`; the displayed bucket label follows the chosen interval.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -340,7 +340,7 @@
         "type": "mysql",
         "uid": "P430005175C4C7810"
       },
-      "description": "",
+      "description": "Ranks the 20 `author_name` values with the most merged pull requests among PRs created in the selected time range and selected repositories. The time filter is on `created_date`, not `merged_date`; status is DevLake's normalized `MERGED` value.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -499,7 +499,7 @@
         "type": "mysql",
         "uid": "P430005175C4C7810"
       },
-      "description": "",
+      "description": "Closed-without-merge PRs divided by all PRs in `CLOSED` or `MERGED` status, for PRs created in the selected time range and selected repositories. Open PRs are excluded from the denominator; the result is a fraction (0–1), not a count.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -596,7 +596,7 @@
         "type": "mysql",
         "uid": "P430005175C4C7810"
       },
-      "description": "",
+      "description": "Counts open, closed-without-merge, and merged PRs by creation week or month for the selected repositories. The selected time range applies to `created_date`; statuses are DevLake's normalized `OPEN`, `CLOSED`, and `MERGED` values.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -782,7 +782,7 @@
         "type": "mysql",
         "uid": "P430005175C4C7810"
       },
-      "description": "",
+      "description": "Counts distinct PRs in DevLake's `CLOSED` status that were created during the selected time range in the selected repositories. This excludes merged PRs and filters by creation date, not close date.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -894,7 +894,7 @@
         "type": "mysql",
         "uid": "P430005175C4C7810"
       },
-      "description": "",
+      "description": "Shows the weekly or monthly fraction of closed-without-merge PRs among PRs that are either `CLOSED` or `MERGED`, grouped and time-filtered by `created_date` for the selected repositories. Open PRs are excluded; the result is a fraction (0–1).",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1040,7 +1040,7 @@
         "type": "mysql",
         "uid": "P430005175C4C7810"
       },
-      "description": "",
+      "description": "Average elapsed time in days from `created_date` to `merged_date` for PRs with a merge date, scoped to the selected repositories. The dashboard time range is applied to `created_date`, so it groups by when PRs were opened rather than when they merged.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1139,7 +1139,7 @@
         "type": "mysql",
         "uid": "P430005175C4C7810"
       },
-      "description": "",
+      "description": "Average elapsed time in days from PR creation to merge, grouped by creation week or month for the selected repositories. Only PRs with `merged_date` contribute; the selected time range filters `created_date`.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1298,7 +1298,7 @@
         "type": "mysql",
         "uid": "P430005175C4C7810"
       },
-      "description": "Number of pipeline runs executed in the selected time range",
+      "description": "Counts distinct successful GitLab pipeline runs completed in the selected time range for the selected repository scopes. The query uses `finished_date`, requires `result = 'SUCCESS'`, and limits pipeline IDs to those containing `gitlab`.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -1407,7 +1407,7 @@
         "type": "mysql",
         "uid": "P430005175C4C7810"
       },
-      "description": "Number of successful pipeline runs / Number of total pipeline runs",
+      "description": "Calculates successful GitLab pipeline runs divided by all distinct GitLab pipeline runs in the selected range and repository scopes. It filters on `finished_date` and also drops results before the first day of the month after the selected range's start month, to avoid a partial starting month; despite the panel title, this is one aggregate rate, not an average of monthly rates.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -1522,7 +1522,7 @@
         "type": "mysql",
         "uid": "P430005175C4C7810"
       },
-      "description": "",
+      "description": "Counts successful and non-NULL, non-successful GitLab pipeline results by completion week or month for the selected repository scopes. The selected time range is applied to `finished_date`; rows with a NULL result are not included in either count.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1697,7 +1697,7 @@
         "type": "mysql",
         "uid": "P430005175C4C7810"
       },
-      "description": "",
+      "description": "Shows the count of completed GitLab pipeline runs by result for the selected time range and repository scopes. The time filter uses `finished_date`; an empty-string result is displayed as `Unknown` (a SQL NULL remains NULL).",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1891,7 +1891,7 @@
         "type": "mysql",
         "uid": "P430005175C4C7810"
       },
-      "description": "1. Mean Pipeline Runs success rate over time.\n2. The Pipeline runs being calculated are filtered by \"workflow runs starting time\" (time filter at the upper-right corner) and \"Jira board\" (\"Choose Board\" filter at the upper-left corner)",
+      "description": "Shows successful GitLab runs divided by all runs in each completion week or month for the selected repository scopes. The time range filters `finished_date`; this is a per-period rate, not a mean of individual run rates.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2038,7 +2038,7 @@
         "type": "mysql",
         "uid": "P430005175C4C7810"
       },
-      "description": "Number of successful pipeline runs / Number of total pipeline runs",
+      "description": "Calculates average GitLab pipeline duration in minutes for the selected completion-date range and repository scopes. The query uses `finished_date` and excludes results earlier than the first day of the month after the selected range's start month, which removes a partial starting month.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -2147,7 +2147,7 @@
         "type": "mysql",
         "uid": "P430005175C4C7810"
       },
-      "description": "",
+      "description": "Shows average GitLab pipeline duration in seconds by completion week or month for the selected repository scopes. The selected time range filters `finished_date`; the plotted series is grouped by completion period.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2409,5 +2409,6 @@
   "timezone": "utc",
   "title": "GitLab",
   "uid": "msSjEq97i",
-  "version": 3
+  "version": 3,
+  "description": "GitLab pull-request and CI pipeline metrics for the selected repositories and time range. PR panels generally filter by creation date; pipeline panels filter by completion date. PR status values are DevLake's normalized OPEN, MERGED, and CLOSED values."
 }
