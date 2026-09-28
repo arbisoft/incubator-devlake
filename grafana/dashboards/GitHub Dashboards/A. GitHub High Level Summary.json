@@ -909,7 +909,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  CASE WHEN LOWER(COALESCE(i.original_type,'')) LIKE '%bug%' THEN 'Bug' ELSE 'Tasks' END AS category,\n  COUNT(*) AS issues\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.created_date)\n  AND (i.assignee_id IN ( $developer_id ) OR (i.assignee_id IS NULL AND 'unassigned' IN ( $developer_id )))\nGROUP BY 1;",
+          "rawSql": "SELECT\n  CASE WHEN LOWER(COALESCE(i.original_type,'')) LIKE '%bug%' THEN 'Bug' ELSE 'Tasks' END AS category,\n  COUNT(*) AS issues\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.created_date)\n  AND (i.assignee_id IN ( $developer_id ) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ( $developer_id )))\nGROUP BY 1;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1006,7 +1006,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  SUM(CASE WHEN i.status NOT IN ('TODO', 'DONE', 'Closed') THEN 1 ELSE 0 END) AS `In Progress`,\n  SUM(CASE WHEN i.status = 'TODO' THEN 1 ELSE 0 END) AS `To Do`,\n  SUM(CASE WHEN i.status IN ('DONE', 'Closed') THEN 1 ELSE 0 END) AS `Done`\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND COALESCE(i.original_type, '') not like '%bug%'\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.created_date)\n  AND (i.assignee_id IN ( $developer_id ) OR (i.assignee_id IS NULL AND 'unassigned' IN ( $developer_id )))",
+          "rawSql": "SELECT\n  SUM(CASE WHEN i.status NOT IN ('TODO', 'DONE', 'Closed') THEN 1 ELSE 0 END) AS `In Progress`,\n  SUM(CASE WHEN i.status = 'TODO' THEN 1 ELSE 0 END) AS `To Do`,\n  SUM(CASE WHEN i.status IN ('DONE', 'Closed') THEN 1 ELSE 0 END) AS `Done`\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND COALESCE(i.original_type, '') not like '%bug%'\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.created_date)\n  AND (i.assignee_id IN ( $developer_id ) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ( $developer_id )))",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1103,7 +1103,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  SUM(CASE WHEN i.status NOT IN ('TODO', 'DONE', 'Closed') THEN 1 ELSE 0 END) AS `In Progress`,\n  SUM(CASE WHEN i.status = 'TODO' THEN 1 ELSE 0 END) AS `To Do`,\n  SUM(CASE WHEN i.status IN ('DONE', 'Closed') THEN 1 ELSE 0 END) AS `Done`\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND COALESCE(i.original_type, '') like '%bug%'\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.created_date)\n  AND (i.assignee_id IN ( $developer_id ) OR (i.assignee_id IS NULL AND 'unassigned' IN ( $developer_id )))",
+          "rawSql": "SELECT\n  SUM(CASE WHEN i.status NOT IN ('TODO', 'DONE', 'Closed') THEN 1 ELSE 0 END) AS `In Progress`,\n  SUM(CASE WHEN i.status = 'TODO' THEN 1 ELSE 0 END) AS `To Do`,\n  SUM(CASE WHEN i.status IN ('DONE', 'Closed') THEN 1 ELSE 0 END) AS `Done`\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND COALESCE(i.original_type, '') like '%bug%'\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.created_date)\n  AND (i.assignee_id IN ( $developer_id ) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ( $developer_id )))",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1956,7 +1956,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  SUM(CASE WHEN COALESCE(i.original_type, '') like '%bug%' THEN 1 ELSE 0 END) AS issues\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.created_date)\n  AND (i.assignee_id = '' OR i.assignee_id IS NULL)",
+          "rawSql": "SELECT\n  SUM(CASE WHEN COALESCE(i.original_type, '') like '%bug%' THEN 1 ELSE 0 END) AS issues\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.created_date)\n  AND (i.assignee_id = '' OR COALESCE(i.assignee_id, '') = '')",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2043,7 +2043,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT AVG(i.lead_time_minutes/1440) AS avg_days_to_resolve\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND i.original_type NOT LIKE '%bug%'\n  AND i.resolution_date IS NOT NULL\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.resolution_date)\n  AND (i.assignee_id IN (${developer_id}) OR (i.assignee_id IS NULL AND 'unassigned' IN (${developer_id})))",
+          "rawSql": "SELECT AVG(i.lead_time_minutes/1440) AS avg_days_to_resolve\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND i.original_type NOT LIKE '%bug%'\n  AND i.resolution_date IS NOT NULL\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.resolution_date)\n  AND (i.assignee_id IN (${developer_id}) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN (${developer_id})))",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2130,7 +2130,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT AVG(i.lead_time_minutes/1440) AS avg_days_to_resolve\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND i.original_type LIKE '%bug%'\n  AND i.resolution_date IS NOT NULL\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.resolution_date)\n  AND (i.assignee_id IN (${developer_id}) OR (i.assignee_id IS NULL AND 'unassigned' IN (${developer_id})))",
+          "rawSql": "SELECT AVG(i.lead_time_minutes/1440) AS avg_days_to_resolve\nFROM issues i\nJOIN board_issues bi    ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id\n                       AND pm.`table` = 'boards'\n                       AND pm.project_name IN (${project})\nWHERE i.id LIKE 'github:%'\n  AND i.original_type LIKE '%bug%'\n  AND i.resolution_date IS NOT NULL\n  AND bi.board_id IN (${repo_id})\n  AND $__timeFilter(i.resolution_date)\n  AND (i.assignee_id IN (${developer_id}) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN (${developer_id})))",
           "refId": "A",
           "sql": {
             "columns": [
