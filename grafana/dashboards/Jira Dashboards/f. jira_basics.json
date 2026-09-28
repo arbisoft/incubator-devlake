@@ -151,7 +151,8 @@
         }
       ],
       "title": "Average Time for Ticket Closure",
-      "type": "barchart"
+      "type": "barchart",
+      "description": "Average days to close a ticket, per developer.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -259,7 +260,8 @@
         }
       ],
       "title": "Work Allocation by Tasks and Bugs",
-      "type": "barchart"
+      "type": "barchart",
+      "description": "Tasks vs bugs assigned per developer.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -370,7 +372,8 @@
         }
       ],
       "title": "Bug Allocation (Done/Pending Distribution)",
-      "type": "barchart"
+      "type": "barchart",
+      "description": "Done vs pending bugs per developer.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -525,7 +528,8 @@
         }
       ],
       "title": "Bug in To Do List",
-      "type": "table"
+      "type": "table",
+      "description": "List of bugs not yet started.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -680,7 +684,8 @@
         }
       ],
       "title": "Bugs Reported",
-      "type": "table"
+      "type": "table",
+      "description": "List of bugs created in the selected period.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -835,7 +840,8 @@
         }
       ],
       "title": "Bug in Progress",
-      "type": "table"
+      "type": "table",
+      "description": "List of bugs currently in progress.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -990,7 +996,8 @@
         }
       ],
       "title": "Bugs Done",
-      "type": "table"
+      "type": "table",
+      "description": "List of completed bugs.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -1145,7 +1152,8 @@
         }
       ],
       "title": "Unassigned Bugs",
-      "type": "table"
+      "type": "table",
+      "description": "List of bugs not assigned to anyone.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -1300,7 +1308,8 @@
         }
       ],
       "title": "Epics Created",
-      "type": "table"
+      "type": "table",
+      "description": "List of epics created in the selected period.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -1411,7 +1420,8 @@
         }
       ],
       "title": "Story Allocation (Done/Pending Distribution)",
-      "type": "barchart"
+      "type": "barchart",
+      "description": "Done vs pending stories per developer.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -1566,7 +1576,8 @@
         }
       ],
       "title": "Stories Created",
-      "type": "table"
+      "type": "table",
+      "description": "List of stories created in the selected period.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -1721,7 +1732,8 @@
         }
       ],
       "title": "Stories in To Do List",
-      "type": "table"
+      "type": "table",
+      "description": "List of stories not yet started.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -1876,7 +1888,8 @@
         }
       ],
       "title": "Stories in Progress",
-      "type": "table"
+      "type": "table",
+      "description": "List of stories currently in progress.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -2031,7 +2044,8 @@
         }
       ],
       "title": "Stories Done",
-      "type": "table"
+      "type": "table",
+      "description": "List of completed stories.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -2142,7 +2156,8 @@
         }
       ],
       "title": "Tasks/Sub-Tasks Allocation (Done/Pending Distribution)",
-      "type": "barchart"
+      "type": "barchart",
+      "description": "Done vs pending tasks and sub-tasks per developer.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -2297,7 +2312,8 @@
         }
       ],
       "title": "Tasks & Sub-Tasks Created",
-      "type": "table"
+      "type": "table",
+      "description": "List of tasks and sub-tasks created in the selected period.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -2452,7 +2468,8 @@
         }
       ],
       "title": "Tasks & Sub-Tasks in To Do List",
-      "type": "table"
+      "type": "table",
+      "description": "List of tasks and sub-tasks not yet started.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -2607,7 +2624,8 @@
         }
       ],
       "title": "Tasks & Sub-Tasks in Progress",
-      "type": "table"
+      "type": "table",
+      "description": "List of tasks and sub-tasks currently in progress.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -2762,7 +2780,8 @@
         }
       ],
       "title": "Tasks & Sub-Tasks Done",
-      "type": "table"
+      "type": "table",
+      "description": "List of completed tasks and sub-tasks.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -2869,7 +2888,8 @@
         }
       ],
       "title": "Reopened Tickets",
-      "type": "table"
+      "type": "table",
+      "description": "List of tickets reopened in the selected period.\n\rdatasource: issues, board_issues, project_mapping, issue_status_history"
     }
   ],
   "preload": false,

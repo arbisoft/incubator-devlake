@@ -52,7 +52,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Per time bucket, unions issue creation events (by creator) and DONE resolution events (by assignee) and counts each side.",
+      "description": "Issues created vs issues closed over time.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -167,7 +167,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Per time bucket, counts issues created by category after mapping original_type into fixed buckets via keyword matching.",
+      "description": "Issues created over time, split by issue type.\n\rdatasource: issues, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -282,7 +282,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Per mapped issue type and priority, derives median and P75 of lead_time_minutes in days for DONE issues, keeping groups with at least 3 issues.",
+      "description": "Median and P75 lead time in days by issue type and priority.\n\rdatasource: issues, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -370,7 +370,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Lists open issues not updated in over 14 days with their assignee and days since the last update.",
+      "description": "Open issues with no update in over 14 days.\n\rdatasource: issues, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {

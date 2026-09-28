@@ -39,7 +39,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Counts PRs raised in the window and assigned to the selected developers, split into Merged, Open, Closed, and Draft.",
+      "description": "PRs raised in the period split into Merged, Open, Closed and Draft.\n\rdatasource: pull_requests, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -141,7 +141,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Number of PRs raised in the selected period, project and repostory",
+      "description": "Total PRs raised in the selected period, project and repository.\n\rdatasource: pull_requests, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -230,7 +230,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Number of PRs merged",
+      "description": "Total PRs merged in the selected period.\n\rdatasource: pull_requests, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -311,7 +311,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Number of PRs closed in the selected period, project and repostory",
+      "description": "Total PRs closed without merging in the selected period.\n\rdatasource: pull_requests, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -392,7 +392,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Number of PRs waiting for review in the selected period, project and repostory",
+      "description": "Open PRs still waiting for review.\n\rdatasource: pull_requests, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -473,7 +473,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "PRs Merged without Approval",
+      "description": "Merged PRs that never received an approval from someone other than the author.\n\rdatasource: pull_request_comments, pull_requests, repos, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -563,7 +563,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Average number of line changes in a PR",
+      "description": "Average number of lines changed per PR.\n\rdatasource: pull_requests, pull_request_commits, commits, project_mapping, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -653,7 +653,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Average number of days taken to merge a PR",
+      "description": "Average days from PR creation to merge.\n\rdatasource: pull_requests, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -743,7 +743,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Number of commits made in the selected period, project and repostory",
+      "description": "Total commits made through PRs in the selected period.\n\rdatasource: commits, pull_request_commits, pull_requests, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -838,7 +838,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Counts issues created in the window and assigned to the selected developers, split into Bug versus Tasks.",
+      "description": "Issues created in the period split into Bugs and Tasks.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1027,7 +1027,8 @@
         }
       ],
       "title": "Tasks Status Distribution",
-      "type": "piechart"
+      "type": "piechart",
+      "description": "Tasks split by status: To Do, In Progress and Done.\n\rdatasource: issues, board_issues, project_mapping"
     },
     {
       "datasource": {
@@ -1123,14 +1124,15 @@
         }
       ],
       "title": "Bugs Status Distribution",
-      "type": "piechart"
+      "type": "piechart",
+      "description": "Bugs split by status: To Do, In Progress and Done.\n\rdatasource: issues, board_issues, project_mapping"
     },
     {
       "datasource": {
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Non-bug issues created in the selected period.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1216,7 +1218,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Bug issues created in the selected period.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1300,7 +1302,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts in-progress (status other than TODO/DONE/Closed) non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Tasks currently in progress.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1385,7 +1387,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts not-yet-started (TODO) non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Tasks not yet started.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1470,7 +1472,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts in-progress (status other than TODO/DONE/Closed) bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Bugs currently in progress.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1555,7 +1557,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts not-yet-started (TODO) bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Bugs not yet started.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1640,7 +1642,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts completed (DONE/Closed) non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Tasks completed (Done/Closed).\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1725,7 +1727,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Number of tasks that are orphan/not assigned to anyone",
+      "description": "Tasks not assigned to anyone.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1811,7 +1813,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts completed (DONE/Closed) bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Bugs completed (Done/Closed).\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1896,7 +1898,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Bugs that are not assigned to anyone.",
+      "description": "Bugs not assigned to anyone.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1983,7 +1985,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Averages lead_time_minutes converted to days across resolved non-bug issues assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Average days to complete a task.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2149,7 +2151,8 @@
         }
       ],
       "title": "Average Bug Resolution Time (Days)",
-      "type": "stat"
+      "type": "stat",
+      "description": "Average days to resolve a bug.\n\rdatasource: issues, board_issues, project_mapping"
     },
     {
       "collapsed": false,
@@ -2166,7 +2169,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Number of successful workflow runs / Number of total workflow runs",
+      "description": "Share of workflow runs by result (success, failure, etc.).\n\rdatasource: cicd_pipelines",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2417,7 +2420,8 @@
         }
       ],
       "title": "Total Builds",
-      "type": "stat"
+      "type": "stat",
+      "description": "Total workflow runs (builds) in the selected period.\n\rdatasource: cicd_pipelines"
     },
     {
       "datasource": {
@@ -2484,7 +2488,8 @@
         }
       ],
       "title": "Successful Builds",
-      "type": "stat"
+      "type": "stat",
+      "description": "Workflow runs that succeeded.\n\rdatasource: cicd_pipelines"
     },
     {
       "datasource": {
@@ -2555,7 +2560,8 @@
         }
       ],
       "title": "Failed Builds",
-      "type": "stat"
+      "type": "stat",
+      "description": "Workflow runs that failed.\n\rdatasource: cicd_pipelines"
     },
     {
       "datasource": {
@@ -2642,7 +2648,8 @@
         }
       ],
       "title": "Failed Build PRs",
-      "type": "table"
+      "type": "table",
+      "description": "PRs whose commits triggered failed workflow runs.\n\rdatasource: pull_requests, accounts, pull_request_commits, cicd_pipeline_commits, cicd_pipelines"
     },
     {
       "collapsed": false,
@@ -2661,7 +2668,7 @@
       "datasource": {
         "uid": "devlake-mysql"
       },
-      "description": "Lists up to 10 developers assigned more than 125% of the team's per-head average issue count (fair share) for issues created in the window, scoped to boards mapped to the selected project.",
+      "description": "Developers assigned more than 125% of the team's average issue load.\n\rdatasource: issues, board_issues, project_mapping, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2745,7 +2752,7 @@
       "datasource": {
         "uid": "devlake-mysql"
       },
-      "description": "Lists up to 10 developers assigned less than 75% of the team's per-head average issue count (fair share) for issues created in the window, scoped to boards mapped to the selected project.",
+      "description": "Developers assigned less than 75% of the team's average issue load.\n\rdatasource: issues, board_issues, project_mapping, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {

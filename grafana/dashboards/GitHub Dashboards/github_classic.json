@@ -68,7 +68,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "",
+      "description": "Total issues created in the selected period.\n\rdatasource: issues, board_issues, boards",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -174,7 +174,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "",
+      "description": "Issues created over time.\n\rdatasource: issues, board_issues, boards",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -324,7 +324,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "",
+      "description": "Issues created in the period that are now Done.\n\rdatasource: issues, board_issues, boards",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -412,7 +412,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "",
+      "description": "Open vs closed issues, grouped by creation date.\n\rdatasource: issues, board_issues, boards",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -566,7 +566,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "",
+      "description": "Average issue lead time in days.\n\rdatasource: issues, board_issues, boards",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -659,7 +659,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "",
+      "description": "Average issue lead time in days over time.\n\rdatasource: issues, board_issues, boards",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -799,7 +799,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "",
+      "description": "20 open issues waiting the longest.\n\rdatasource: issues, board_issues, boards",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -934,7 +934,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "",
+      "description": "All open issues sorted by how long they have been waiting.\n\rdatasource: issues, board_issues, boards",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1115,7 +1115,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "",
+      "description": "Total non-draft PRs created in the selected period.\n\rdatasource: pull_requests",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1221,7 +1221,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "",
+      "description": "Non-draft PRs created over time.\n\rdatasource: pull_requests",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1372,7 +1372,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "",
+      "description": "Top 20 authors by number of merged PRs.\n\rdatasource: pull_requests",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1525,7 +1525,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "",
+      "description": "% of closed PRs that were closed without merging.\n\rdatasource: pull_requests",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1634,7 +1634,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "",
+      "description": "Open, closed and merged PRs over time.\n\rdatasource: pull_requests",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1814,7 +1814,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "",
+      "description": "Total PRs closed without being merged.\n\rdatasource: pull_requests",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1920,7 +1920,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "",
+      "description": "% of closed PRs not merged, over time.\n\rdatasource: pull_requests",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2058,7 +2058,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "",
+      "description": "Average days from PR creation to merge.\n\rdatasource: pull_requests",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2151,7 +2151,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "",
+      "description": "Average days to merge a PR over time.\n\rdatasource: pull_requests",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2290,7 +2290,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "",
+      "description": "Average days from PR creation to close.\n\rdatasource: pull_requests",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2381,7 +2381,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "",
+      "description": "Average days to close a PR over time.\n\rdatasource: pull_requests",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2533,7 +2533,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Number of workflow runs executed in the selected time range",
+      "description": "Total successful GitHub workflow runs.\n\rdatasource: cicd_pipelines",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -2636,7 +2636,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Number of successful workflow runs / Number of total workflow runs",
+      "description": "% of workflow runs that succeeded.\n\rdatasource: cicd_pipelines",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -2745,7 +2745,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "",
+      "description": "Successful vs failed workflow runs over time.\n\rdatasource: cicd_pipelines",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2914,7 +2914,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Number of successful workflow runs / Number of total workflow runs",
+      "description": "Share of workflow runs by result.\n\rdatasource: cicd_pipelines",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3102,7 +3102,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "1. Mean Workflow Runs success rate over time.\n2. The workflow runs being calculated are filtered by \"workflow runs starting time\" (time filter at the upper-right corner) and \"Jira board\" (\"Choose Board\" filter at the upper-left corner)",
+      "description": "Workflow run success rate over time.\n\rdatasource: cicd_pipelines",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3259,7 +3259,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Number of successful workflow runs / Number of total workflow runs",
+      "description": "Average workflow run duration in minutes.\n\rdatasource: cicd_pipelines",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -3362,7 +3362,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "",
+      "description": "Average workflow run duration over time.\n\rdatasource: cicd_pipelines",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3556,7 +3556,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Number of open draft PRs created in the selected time range",
+      "description": "Open draft PRs created in the selected period.\n\rdatasource: pull_requests",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -3627,7 +3627,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Number of open draft PRs created over time",
+      "description": "Open draft PRs created over time.\n\rdatasource: pull_requests",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3727,7 +3727,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Top contributors with open draft PRs in the selected time range",
+      "description": "Top 20 authors with open draft PRs.\n\rdatasource: pull_requests",
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -3812,7 +3812,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Aggregate CQTest coverage across all selected GitHub repos, based on SonarQube file metrics. Matches SonarQube projects by full repo name (e.g. \"owner/repo\") with fallback to the repo slug (\"repo\") for projects registered without an org prefix; project IDs are deduplicated so a slug-keyed project shared across selected repos is counted once. Filtered by file metric update time.",
+      "description": "Overall unit test coverage across selected repos, from SonarQube.\n\rdatasource: cq_projects, repos, cq_file_metrics",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3929,7 +3929,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Per-PR coverage view from SonarQube CQTest metrics. The Coverage % column reflects the SonarQube project's coverage at PR time -- exact PR-head-commit match where SonarQube scanned that commit (rare), otherwise the repository's most recent project status. Slug-fallback project matches are annotated in the Coverage Source column. Capped at 50 rows for performance.",
+      "description": "Unit test coverage per PR, from SonarQube.\n\rdatasource: repos, cq_projects, cq_file_metrics, pull_requests",
       "fieldConfig": {
         "defaults": {
           "color": {
