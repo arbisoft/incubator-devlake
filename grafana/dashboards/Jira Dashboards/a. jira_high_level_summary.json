@@ -2778,7 +2778,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT (bugs / CASE WHEN tasks = 0 THEN 1 ELSE tasks END) as Ratio\nFROM \n(\n  SELECT \n    SUM(CASE WHEN i.type LIKE '%bug%' THEN 1 ELSE 0 END) AS bugs,\n    SUM(CASE WHEN i.type LIKE 'TASK' AND i.status LIKE 'DONE' THEN 1 ELSE 0 END) AS tasks\n  FROM issues i\n  WHERE i.id LIKE '%jira:%'\n    AND $__timeFilter(i.created_date) \n  AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n    )\n) base",
+          "rawSql": "SELECT (bugs / CASE WHEN tasks = 0 THEN 1 ELSE tasks END) as Ratio\nFROM \n(\n  SELECT \n    SUM(CASE WHEN i.type LIKE '%bug%' THEN 1 ELSE 0 END) AS bugs,\n    SUM(CASE WHEN i.type LIKE '%TASK' AND i.status LIKE 'DONE' THEN 1 ELSE 0 END) AS tasks\n  FROM issues i\n  WHERE i.id LIKE '%jira:%'\n    AND $__timeFilter(i.created_date) \n  AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n    )\n) base",
           "refId": "A",
           "sql": {
             "columns": [
