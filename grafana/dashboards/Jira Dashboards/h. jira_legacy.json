@@ -18,8 +18,20 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": null,
+  "id": 52,
   "links": [
+    {
+      "asDropdown": false,
+      "icon": "bolt",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Homepage",
+      "tooltip": "",
+      "type": "link",
+      "url": "/grafana/d/Lv1XbLHnk/data-specific-dashboards-homepage"
+    },
     {
       "asDropdown": false,
       "icon": "external link",
@@ -1134,12 +1146,8 @@
     "list": [
       {
         "current": {
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
+          "text": "All",
+          "value": "$__all"
         },
         "datasource": "mysql",
         "definition": "select distinct upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'boards' AND pm.row_id like 'jira:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name ",
@@ -1155,12 +1163,8 @@
       },
       {
         "current": {
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
+          "text": "All",
+          "value": "$__all"
         },
         "datasource": "mysql",
         "definition": "SELECT concat(b.name, '--', b.id) FROM boards b JOIN project_mapping pm ON pm.row_id = b.id AND pm.table = 'boards' WHERE b.id LIKE 'jira%' AND pm.project_name IN (${project})",
@@ -1220,5 +1224,5 @@
   "timezone": "utc",
   "title": "H. Jira - Legacy",
   "uid": "F5vqBQl7zz",
-  "version": 8
+  "version": 7
 }
