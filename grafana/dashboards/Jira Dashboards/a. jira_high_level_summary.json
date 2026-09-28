@@ -39,6 +39,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Open tickets split by type.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -147,14 +148,14 @@
         }
       ],
       "title": "Jira Issues Summary",
-      "type": "barchart",
-      "description": "Open tickets split by type.\n\rdatasource: issues, board_issues"
+      "type": "barchart"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Open tickets split by priority.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -259,14 +260,14 @@
         }
       ],
       "title": "Priority Breakdown",
-      "type": "barchart",
-      "description": "Open tickets split by priority.\n\rdatasource: issues, board_issues"
+      "type": "barchart"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "All tickets split into To Do, In Progress and Done.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -357,8 +358,7 @@
         }
       ],
       "title": "Status Overview",
-      "type": "piechart",
-      "description": "All tickets split into To Do, In Progress and Done.\n\rdatasource: issues, board_issues"
+      "type": "piechart"
     },
     {
       "datasource": {
@@ -475,6 +475,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Stories split into To Do, In Progress and Done.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -562,14 +563,14 @@
         }
       ],
       "title": "Stories Status Overview",
-      "type": "piechart",
-      "description": "Stories split into To Do, In Progress and Done.\n\rdatasource: issues, board_issues"
+      "type": "piechart"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Tasks split into To Do, In Progress and Done.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -657,14 +658,14 @@
         }
       ],
       "title": "Tasks Status Overview",
-      "type": "piechart",
-      "description": "Tasks split into To Do, In Progress and Done.\n\rdatasource: issues, board_issues"
+      "type": "piechart"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Bugs split into To Do, In Progress and Done.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -752,8 +753,7 @@
         }
       ],
       "title": "Bug Status Overview",
-      "type": "piechart",
-      "description": "Bugs split into To Do, In Progress and Done.\n\rdatasource: issues, board_issues"
+      "type": "piechart"
     },
     {
       "datasource": {
@@ -1118,7 +1118,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Bugs completed.\n\rdatasource: issues, board_issues",
+      "description": "Stories completed.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1128,7 +1128,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-9"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-17"
             }
           ],
           "mappings": [],
@@ -1141,7 +1141,7 @@
               },
               {
                 "color": "red",
-                "value": 1
+                "value": 500
               }
             ]
           }
@@ -1154,7 +1154,7 @@
         "x": 16,
         "y": 17
       },
-      "id": 13,
+      "id": 18,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
@@ -1179,11 +1179,11 @@
             "type": "datasource",
             "uid": "-- Dashboard --"
           },
-          "panelId": 6,
+          "panelId": 7,
           "refId": "A"
         }
       ],
-      "title": "Bugs Done",
+      "title": "Stories Done",
       "transformations": [
         {
           "id": "filterFieldsByName",
@@ -1648,7 +1648,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Stories completed.\n\rdatasource: issues, board_issues",
+      "description": "Bugs completed.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1658,7 +1658,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-17"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-9"
             }
           ],
           "mappings": [],
@@ -1671,7 +1671,7 @@
               },
               {
                 "color": "red",
-                "value": 500
+                "value": 1
               }
             ]
           }
@@ -1684,7 +1684,7 @@
         "x": 16,
         "y": 21
       },
-      "id": 18,
+      "id": 13,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
@@ -1709,11 +1709,11 @@
             "type": "datasource",
             "uid": "-- Dashboard --"
           },
-          "panelId": 7,
+          "panelId": 6,
           "refId": "A"
         }
       ],
-      "title": "Stories Done",
+      "title": "Bugs Done",
       "transformations": [
         {
           "id": "filterFieldsByName",
@@ -2807,6 +2807,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Average days tickets spend in active work before completion.\n\rdatasource: issues, board_issues, project_mapping, issue_status_history",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2885,8 +2886,7 @@
         }
       ],
       "title": "Cycle Time",
-      "type": "stat",
-      "description": "Average days tickets spend in active work before completion.\n\rdatasource: issues, board_issues, project_mapping, issue_status_history"
+      "type": "stat"
     },
     {
       "collapsed": false,
@@ -2906,6 +2906,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Tickets missing context, user story or acceptance criteria.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2994,14 +2995,14 @@
         }
       ],
       "title": "Tickets Grooming Distribution",
-      "type": "bargauge",
-      "description": "Tickets missing context, user story or acceptance criteria.\n\rdatasource: issues, board_issues"
+      "type": "bargauge"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Total tickets created in the selected period.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3080,14 +3081,14 @@
         }
       ],
       "title": "Total Tickets",
-      "type": "stat",
-      "description": "Total tickets created in the selected period.\n\rdatasource: issues, board_issues"
+      "type": "stat"
     },
     {
       "datasource": {
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
+      "description": "Tickets with no acceptance criteria in the description.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3164,14 +3165,14 @@
           }
         }
       ],
-      "type": "stat",
-      "description": "Tickets with no acceptance criteria in the description.\n\rdatasource: issues, board_issues"
+      "type": "stat"
     },
     {
       "datasource": {
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
+      "description": "Tickets with no context section in the description.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3248,8 +3249,7 @@
           }
         }
       ],
-      "type": "stat",
-      "description": "Tickets with no context section in the description.\n\rdatasource: issues, board_issues"
+      "type": "stat"
     },
     {
       "collapsed": false,
@@ -3269,6 +3269,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Tickets with valid, missing or oversized story points.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3360,14 +3361,14 @@
         }
       ],
       "title": "Ticket Hygiene by Story Points",
-      "type": "piechart",
-      "description": "Tickets with valid, missing or oversized story points.\n\rdatasource: issues, board_issues"
+      "type": "piechart"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Tickets with vs without time estimates.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3459,14 +3460,14 @@
         }
       ],
       "title": "Ticket Hygiene by Estimates",
-      "type": "piechart",
-      "description": "Tickets with vs without time estimates.\n\rdatasource: issues, board_issues"
+      "type": "piechart"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Tickets with a proper, short or missing description.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3553,14 +3554,14 @@
         }
       ],
       "title": "Ticket Hygiene by Description",
-      "type": "piechart",
-      "description": "Tickets with a proper, short or missing description.\n\rdatasource: issues, board_issues"
+      "type": "piechart"
     },
     {
       "datasource": {
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
+      "description": "Tickets with no story points.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3637,14 +3638,14 @@
           }
         }
       ],
-      "type": "stat",
-      "description": "Tickets with no story points.\n\rdatasource: issues, board_issues"
+      "type": "stat"
     },
     {
       "datasource": {
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
+      "description": "Tickets with no time estimate.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3721,14 +3722,14 @@
           }
         }
       ],
-      "type": "stat",
-      "description": "Tickets with no time estimate.\n\rdatasource: issues, board_issues"
+      "type": "stat"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "In-progress tickets with no assignee.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3813,14 +3814,14 @@
         }
       ],
       "title": "Unassigned in Progress Tickets",
-      "type": "stat",
-      "description": "In-progress tickets with no assignee.\n\rdatasource: issues, board_issues"
+      "type": "stat"
     },
     {
       "datasource": {
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
+      "description": "Tickets with no description.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3897,14 +3898,14 @@
           }
         }
       ],
-      "type": "stat",
-      "description": "Tickets with no description.\n\rdatasource: issues, board_issues"
+      "type": "stat"
     },
     {
       "datasource": {
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
+      "description": "Tickets with story points above the allowed threshold.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3981,14 +3982,14 @@
           }
         }
       ],
-      "type": "stat",
-      "description": "Tickets with story points above the allowed threshold.\n\rdatasource: issues, board_issues"
+      "type": "stat"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "In-progress tickets with no recent activity.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -4073,14 +4074,14 @@
         }
       ],
       "title": "Stale in Progress Tickets",
-      "type": "stat",
-      "description": "In-progress tickets with no recent activity.\n\rdatasource: issues, board_issues"
+      "type": "stat"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Tickets not linked to a parent or epic.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -4167,14 +4168,14 @@
         }
       ],
       "title": "Tickets without Parent",
-      "type": "stat",
-      "description": "Tickets not linked to a parent or epic.\n\rdatasource: issues, board_issues"
+      "type": "stat"
     },
     {
       "datasource": {
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
+      "description": "Tickets with a description shorter than the minimum length.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -4251,14 +4252,14 @@
           }
         }
       ],
-      "type": "stat",
-      "description": "Tickets with a description shorter than the minimum length.\n\rdatasource: issues, board_issues"
+      "type": "stat"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Tickets with a title shorter than the minimum length.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -4344,8 +4345,7 @@
         }
       ],
       "title": "Ticket Title Length below Threshold",
-      "type": "stat",
-      "description": "Tickets with a title shorter than the minimum length.\n\rdatasource: issues, board_issues"
+      "type": "stat"
     },
     {
       "collapsed": false,
@@ -4645,5 +4645,5 @@
   "timezone": "utc",
   "title": "A. Jira High Level Summary",
   "uid": "dfy7sh5aww35sc",
-  "version": 11
+  "version": 3
 }
