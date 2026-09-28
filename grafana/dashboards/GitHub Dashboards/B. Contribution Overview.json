@@ -52,7 +52,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Counts approvals, change requests, comments and distinct PRs touched per reviewer from pull_request_comments tied to a commit SHA, top 20 reviewers.",
+      "description": "Approvals, change requests and comments given per reviewer (top 20).\n\rdatasource: pull_request_comments, pull_requests, project_mapping, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -164,7 +164,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Per PR author, counts merged PRs as approvals and sums the CHANGES_REQUESTED comments their PRs received, top 20 authors.",
+      "description": "Approved PRs vs changes requested received per PR author (top 20).\n\rdatasource: pull_request_comments, pull_requests, accounts, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -276,7 +276,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Sums additions and deletions per contributor across non-merge commits authored in the window, top 20 by total lines changed.",
+      "description": "Lines added and deleted per contributor, excluding merge commits (top 20).\n\rdatasource: commits, repo_commits, project_mapping, accounts, commit_parents",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -389,7 +389,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Counts distinct commits authored in the window per contributor, scoped to repos mapped to the selected project, top 20 by commit count.",
+      "description": "Number of commits per contributor (top 20).\n\rdatasource: commits, repo_commits, project_mapping, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -502,7 +502,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Counts each PR commit once per author, marking it Landed if any of its PRs merged and Abandoned if the PR closed unmerged, top 20 developers.",
+      "description": "PR commits per developer that landed (merged) vs were abandoned.\n\rdatasource: pull_request_commits, pull_requests, project_mapping, commits, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -614,7 +614,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Per-developer scorecard that joins four independent aggregates on account id: commit volume, PR-commit contributions, reviews given, and PRs authored.",
+      "description": "Per-developer scorecard of commits, PR contributions, reviews given and PRs authored.\n\rdatasource: pull_requests, project_mapping, commits, repo_commits, commit_parents, accounts, pull_request_commits, pull_request_comments",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -751,7 +751,7 @@
       "datasource": {
         "uid": "devlake-mysql"
       },
-      "description": "Per repo, averages over PRs the lines changed after the first CHANGES_REQUESTED comment as a percentage of the lines changed before it.",
+      "description": "Per repo, lines changed after a change request as a % of lines changed before it.\n\rdatasource: pull_request_comments, pull_requests, project_mapping, pull_request_commits, commits, repos",
       "fieldConfig": {
         "defaults": {
           "color": {

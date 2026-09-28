@@ -52,7 +52,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Per author, counts PRs created in the window split by status into Merged, Open, Closed and Draft, top 20 by total.",
+      "description": "PRs per author split into Merged, Open, Closed and Draft (top 20).\n\rdatasource: pull_requests, accounts, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -164,7 +164,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Per calendar month, counts PRs created in the window by the outcome of their most recent non-author review: Approved, Changes requested, Commented only, or No review.",
+      "description": "PRs per month grouped by review outcome: Approved, Changes Requested, Commented or No Review.\n\rdatasource: pull_request_comments, pull_requests, repos, project_mapping, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -272,7 +272,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Per author, divides merged PRs by merged plus closed PRs created in the window (closed floored at 1), top 20 by rate.",
+      "description": "Merged PRs as a % of all merged and closed PRs, per author.\n\rdatasource: pull_requests, accounts, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -384,7 +384,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Per reviewer, counts their latest review per PR as Approved, Rejected or Commented, excluding self-reviews, scoped to repos mapped to the selected project, top 20 reviewers.",
+      "description": "Reviews given per reviewer: Approved, Rejected or Commented (top 20).\n\rdatasource: pull_request_comments, pull_requests, project_mapping, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -496,7 +496,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Per time bucket, derives median/P75/P90 of created-to-merged time in days using CUME_DIST over merged PRs.",
+      "description": "Median, P75 and P90 days from PR creation to merge, over time.\n\rdatasource: pull_requests, accounts, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -636,7 +636,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Per time bucket, derives median and P90 hours from PR creation to the earliest comment by someone other than the author.",
+      "description": "Median and P90 hours from PR creation to first review by someone else.\n\rdatasource: pull_requests, pull_request_comments, accounts, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -751,7 +751,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Buckets PRs by total lines changed summed across their commits into four size bands, reporting PR count and share of total.",
+      "description": "PRs grouped into size bands by lines changed.\n\rdatasource: pull_requests, pull_request_commits, commits, project_mapping, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -840,7 +840,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Lists open PRs with days since creation, author and comma-joined reviewer names, keeping PRs the selected developer either authored or reviewed.",
+      "description": "Open PRs with their age in days, author and reviewers.\n\rdatasource: accounts, pull_request_comments, pull_requests, repos, project_mapping",
       "fieldConfig": {
         "defaults": {
           "actions": [],
@@ -944,7 +944,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Per repo, counts merged PRs having no APPROVED comment from anyone other than the author, and their share of all merged PRs.",
+      "description": "Per repo, merged PRs with no approval and their share of all merged PRs.\n\rdatasource: pull_request_comments, pull_requests, repos, accounts, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {

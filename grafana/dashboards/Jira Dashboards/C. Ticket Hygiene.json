@@ -155,7 +155,8 @@
         }
       ],
       "title": "Ticket Hygiene by Story Points Monthly Distribution",
-      "type": "barchart"
+      "type": "barchart",
+      "description": "Monthly tickets with valid, missing or oversized story points.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -310,7 +311,8 @@
         }
       ],
       "title": "Tickets without Story Points",
-      "type": "table"
+      "type": "table",
+      "description": "List of tickets with no story points.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -465,7 +467,8 @@
         }
       ],
       "title": "Tickets with Story Points above the Threshold",
-      "type": "table"
+      "type": "table",
+      "description": "List of tickets with story points above the threshold.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -576,7 +579,8 @@
         }
       ],
       "title": "Ticket Hygiene by Estimates Monthly Distribution",
-      "type": "barchart"
+      "type": "barchart",
+      "description": "Monthly tickets with vs without time estimates.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -731,7 +735,8 @@
         }
       ],
       "title": "Tickets without Estimates",
-      "type": "table"
+      "type": "table",
+      "description": "List of tickets with no time estimate.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -886,7 +891,8 @@
         }
       ],
       "title": "Ticket Title Length below Threshold",
-      "type": "table"
+      "type": "table",
+      "description": "List of tickets with a title shorter than the minimum length.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -997,7 +1003,8 @@
         }
       ],
       "title": "In Progress Tickets Hygiene",
-      "type": "barchart"
+      "type": "barchart",
+      "description": "Monthly in-progress tickets that are compliant, unassigned or stale.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -1164,7 +1171,8 @@
         }
       ],
       "title": "In Progress Tickets with No Activity",
-      "type": "table"
+      "type": "table",
+      "description": "List of in-progress tickets with no recent activity.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -1319,7 +1327,8 @@
         }
       ],
       "title": "In Progress Tickets without Assignee",
-      "type": "table"
+      "type": "table",
+      "description": "List of in-progress tickets with no assignee.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -1431,7 +1440,8 @@
         }
       ],
       "title": "Ticket Description Hygiene Monthly Distribution",
-      "type": "barchart"
+      "type": "barchart",
+      "description": "Monthly tickets with a proper, short or missing description.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -1537,7 +1547,8 @@
         }
       ],
       "title": "Tickets without Description",
-      "type": "table"
+      "type": "table",
+      "description": "List of tickets with no description.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -1643,7 +1654,8 @@
         }
       ],
       "title": "Tickets Description Length below Threshold",
-      "type": "table"
+      "type": "table",
+      "description": "List of tickets with a description shorter than the minimum length.\n\rdatasource: issues, board_issues"
     }
   ],
   "preload": false,

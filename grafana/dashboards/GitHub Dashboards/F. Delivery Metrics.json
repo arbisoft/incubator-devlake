@@ -52,7 +52,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Counts distinct successful production deployments per time bucket.",
+      "description": "Successful production deployments over time.\n\rdatasource: cicd_deployment_commits, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -167,7 +167,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Per time bucket, derives median and P75 of the precomputed pr_cycle_time (project_pr_metrics) in days for merged PRs.",
+      "description": "Median and P75 days from first commit to production for merged PRs.\n\rdatasource: project_pr_metrics, pull_requests",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -282,7 +282,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Per time bucket, the share of successful production deployments followed within 24h by a revert/hotfix PR in the same repo or by any incident.",
+      "description": "% of deployments followed within 24h by a revert, hotfix or incident.\n\rdatasource: cicd_deployment_commits, project_mapping, pull_requests, incidents",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -419,7 +419,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Per time bucket, the share of successful production deployments followed within 24h by a revert PR or by a deployment named rollback/revert.",
+      "description": "% of deployments rolled back within 24h.\n\rdatasource: cicd_deployment_commits, project_mapping, pull_requests",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -555,7 +555,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Per time bucket, counts deployments reverted within 7 days and derives median and P90 hours from deploy to the first revert PR merge.",
+      "description": "Median and P90 hours from deployment to rollback.\n\rdatasource: cicd_deployment_commits, project_mapping, pull_requests",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -687,7 +687,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "For deployments followed within 24h by a revert or hotfix PR, classifies each by its earliest signal and reports rollback versus fixed-forward counts.",
+      "description": "Failed deployments fixed by rolling back vs fixing forward.\n\rdatasource: cicd_deployment_commits, project_mapping, pull_requests",
       "fieldConfig": {
         "defaults": {
           "color": {
