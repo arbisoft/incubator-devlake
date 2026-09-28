@@ -22,18 +22,6 @@
   "links": [
     {
       "asDropdown": false,
-      "icon": "bolt",
-      "includeVars": false,
-      "keepTime": true,
-      "tags": [],
-      "targetBlank": false,
-      "title": "Homepage",
-      "tooltip": "",
-      "type": "link",
-      "url": "/grafana/d/Lv1XbLHnk/data-specific-dashboards-homepage"
-    },
-    {
-      "asDropdown": false,
       "icon": "external link",
       "includeVars": false,
       "keepTime": true,
@@ -1154,13 +1142,13 @@
           ]
         },
         "datasource": "mysql",
-        "definition": "SELECT project_name FROM user_project_mapping WHERE user_login = '${__user.login}'",
+        "definition": "select distinct upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'boards' AND pm.row_id like 'jira:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name ",
         "includeAll": true,
         "label": "Project",
         "multi": true,
         "name": "project",
         "options": [],
-        "query": "SELECT project_name FROM user_project_mapping WHERE user_login = '${__user.login}'",
+        "query": "select distinct upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'boards' AND pm.row_id like 'jira:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name ",
         "refresh": 1,
         "regex": "",
         "type": "query"
@@ -1230,7 +1218,7 @@
   },
   "timepicker": {},
   "timezone": "utc",
-  "title": "Jira - Legacy",
+  "title": "H. Jira - Legacy",
   "uid": "F5vqBQl7zz",
-  "version": 5
+  "version": 8
 }

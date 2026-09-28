@@ -2340,18 +2340,39 @@
   "templating": {
     "list": [
       {
+        "allValue": "",
+        "current": {
+          "text": "Workstream",
+          "value": "Workstream"
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "P430005175C4C7810"
+        },
+        "definition": "SELECT DISTINCT upm.project_name\nFROM user_project_mapping upm\nJOIN project_mapping pm ON pm.project_name = upm.project_name\nWHERE pm.`table` = 'repos'\n  AND pm.row_id LIKE 'gitlab:%'\n  AND upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name",
+        "description": "",
+        "includeAll": true,
+        "label": "Project",
+        "name": "project",
+        "options": [],
+        "query": "SELECT DISTINCT upm.project_name\nFROM user_project_mapping upm\nJOIN project_mapping pm ON pm.project_name = upm.project_name\nWHERE pm.`table` = 'repos'\n  AND pm.row_id LIKE 'gitlab:%'\n  AND upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name",
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
         "current": {},
         "datasource": {
           "type": "mysql",
           "uid": "P430005175C4C7810"
         },
-        "definition": "select concat(name, '--', id) as text from repos where id like 'gitlab%'",
+        "definition": "SELECT CONCAT(r.name, '--', r.id) AS text\nFROM project_mapping pm\nJOIN repos r ON r.id = pm.row_id\nWHERE pm.`table` = 'repos'\n  AND pm.row_id LIKE 'gitlab:%'\n  AND pm.project_name IN (${project})\nORDER BY text",
         "includeAll": true,
         "label": "Repo",
         "multi": true,
         "name": "repo_id",
         "options": [],
-        "query": "select concat(name, '--', id) as text from repos where id like 'gitlab%'",
+        "query": "SELECT CONCAT(r.name, '--', r.id) AS text\nFROM project_mapping pm\nJOIN repos r ON r.id = pm.row_id\nWHERE pm.`table` = 'repos'\n  AND pm.row_id LIKE 'gitlab:%'\n  AND pm.project_name IN (${project})\nORDER BY text",
         "refresh": 1,
         "regex": "/^(?<text>.*)--(?<value>.*)$/",
         "type": "query"
@@ -2388,5 +2409,5 @@
   "timezone": "utc",
   "title": "GitLab",
   "uid": "msSjEq97i",
-  "version": 2
+  "version": 3
 }
