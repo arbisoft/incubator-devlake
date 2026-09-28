@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/apache/incubator-devlake/core/models/common"
@@ -31,6 +32,21 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 )
+
+// TestMain initializes access.Default() once for the whole package. access.Init is
+// guarded by a package-level sync.Once, so calling it from an individual test would let
+// whichever test ran first decide its configuration for every other test in the binary.
+func TestMain(m *testing.M) {
+	cfg := viper.New()
+	cfg.Set("AUTH_ACCESS_ENABLED", true)
+	cfg.Set("AUTH_PUBLIC_URL", "https://devlake.example.com")
+	cfg.Set("GRAFANA_PUBLIC_URL", "https://grafana.example.com")
+	cfg.Set("GRAFANA_INTERNAL_URL", "http://grafana:3000")
+	cfg.Set("GRAFANA_MANAGEMENT_USER", "admin")
+	cfg.Set("GRAFANA_MANAGEMENT_PASSWORD", "test-password")
+	access.Init(contextimpl.NewDefaultBasicRes(cfg, logruslog.Global, nil))
+	os.Exit(m.Run())
+}
 
 // stubGrafana stands in for Grafana's /api/org/users, recording the last query so
 // tests can assert the identity is forwarded verbatim.
@@ -232,7 +248,11 @@ func call(r *gin.Engine, header string) *httptest.ResponseRecorder {
 }
 
 func TestRequireGrafanaAdmin(t *testing.T) {
-	initializeAccessDirectory(t)
+	// Fail loudly if TestMain's premise breaks, instead of the session cases
+	// passing through a disabled access directory.
+	if !access.Default().Enabled() {
+		t.Fatal("access.Default().Enabled() = false; want true (TestMain sets AUTH_ACCESS_ENABLED=true)")
+	}
 
 	admins := []orgUser{{Login: "alice", Email: "alice@arbisoft.com", Role: "Admin"}}
 	viewers := []orgUser{{Login: "bob", Email: "bob@arbisoft.com", Role: "Viewer"}}
@@ -290,23 +310,6 @@ func TestRequireGrafanaAdmin(t *testing.T) {
 			t.Fatalf("expected a session without a principal to be denied, got %d", code)
 		}
 	})
-}
-
-func initializeAccessDirectory(t *testing.T) {
-	t.Helper()
-
-	cfg := viper.New()
-	cfg.Set("AUTH_ACCESS_ENABLED", true)
-	cfg.Set("AUTH_PUBLIC_URL", "https://devlake.example.com")
-	cfg.Set("GRAFANA_PUBLIC_URL", "https://grafana.example.com")
-	cfg.Set("GRAFANA_INTERNAL_URL", "http://grafana:3000")
-	cfg.Set("GRAFANA_MANAGEMENT_USER", "admin")
-	cfg.Set("GRAFANA_MANAGEMENT_PASSWORD", "test-password")
-	access.Init(contextimpl.NewDefaultBasicRes(cfg, logruslog.Global, nil))
-
-	if !access.Default().Enabled() {
-		t.Fatal("access directory should be enabled for session authorization tests")
-	}
 }
 
 // withService swaps the package singleton for one test; Init guards with
