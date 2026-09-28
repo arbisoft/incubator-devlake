@@ -24,8 +24,12 @@ import (
 	"testing"
 
 	"github.com/apache/incubator-devlake/core/models/common"
+	contextimpl "github.com/apache/incubator-devlake/impls/context"
+	"github.com/apache/incubator-devlake/impls/logruslog"
+	"github.com/apache/incubator-devlake/server/api/access"
 	"github.com/apache/incubator-devlake/server/api/shared"
 	"github.com/gin-gonic/gin"
+	"github.com/spf13/viper"
 )
 
 // stubGrafana stands in for Grafana's /api/org/users, recording the last query so
@@ -198,12 +202,17 @@ func TestIsAdminFailsClosedWhenUnconfigured(t *testing.T) {
 // newRouter carries only the middleware under test. restAuth mirrors what
 // RestAuthentication does before rerouting: it marks the request as API-key
 // authenticated via the request context.
-func newRouter(restAuth bool) *gin.Engine {
+func newRouter(restAuth bool, principal *access.Principal) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	if restAuth {
 		r.Use(func(c *gin.Context) {
 			c.Request = shared.SetRestAuthUser(c.Request, &common.User{Name: "api-key-creator"})
+			c.Next()
+		})
+	} else if principal != nil {
+		r.Use(func(c *gin.Context) {
+			access.SetPrincipal(c, principal)
 			c.Next()
 		})
 	}
@@ -223,13 +232,15 @@ func call(r *gin.Engine, header string) *httptest.ResponseRecorder {
 }
 
 func TestRequireGrafanaAdmin(t *testing.T) {
+	initializeAccessDirectory(t)
+
 	admins := []orgUser{{Login: "alice", Email: "alice@arbisoft.com", Role: "Admin"}}
 	viewers := []orgUser{{Login: "bob", Email: "bob@arbisoft.com", Role: "Viewer"}}
 
 	t.Run("admin passes", func(t *testing.T) {
 		srv := stubGrafana(t, http.StatusOK, admins, nil)
 		withService(t, serviceFor(srv))
-		if code := call(newRouter(true), "alice").Code; code != http.StatusOK {
+		if code := call(newRouter(true, nil), "alice").Code; code != http.StatusOK {
 			t.Fatalf("expected 200 for a Grafana Admin, got %d", code)
 		}
 	})
@@ -237,7 +248,7 @@ func TestRequireGrafanaAdmin(t *testing.T) {
 	t.Run("viewer is denied", func(t *testing.T) {
 		srv := stubGrafana(t, http.StatusOK, viewers, nil)
 		withService(t, serviceFor(srv))
-		if code := call(newRouter(true), "bob").Code; code != http.StatusForbidden {
+		if code := call(newRouter(true, nil), "bob").Code; code != http.StatusForbidden {
 			t.Fatalf("expected 403 for a Grafana Viewer, got %d", code)
 		}
 	})
@@ -245,25 +256,57 @@ func TestRequireGrafanaAdmin(t *testing.T) {
 	t.Run("missing X-Grafana-User is denied", func(t *testing.T) {
 		srv := stubGrafana(t, http.StatusOK, admins, nil)
 		withService(t, serviceFor(srv))
-		if code := call(newRouter(true), "").Code; code != http.StatusForbidden {
+		if code := call(newRouter(true, nil), "").Code; code != http.StatusForbidden {
 			t.Fatalf("expected 403 without the identity header, got %d", code)
 		}
 	})
 
 	t.Run("unconfigured service is denied", func(t *testing.T) {
 		withService(t, nil)
-		if code := call(newRouter(true), "alice").Code; code != http.StatusForbidden {
+		if code := call(newRouter(true, nil), "alice").Code; code != http.StatusForbidden {
 			t.Fatalf("expected 403 when the lookup is unconfigured, got %d", code)
 		}
 	})
 
-	// Session callers keep working as before; this closes only the proxy path.
-	t.Run("non api-key caller passes through untouched", func(t *testing.T) {
+	t.Run("session customer admin passes", func(t *testing.T) {
 		withService(t, nil)
-		if code := call(newRouter(false), "").Code; code != http.StatusOK {
-			t.Fatalf("expected a session caller to be unaffected, got %d", code)
+		principal := &access.Principal{UserID: 1, Role: access.RoleCustomerAdmin}
+		if code := call(newRouter(false, principal), "").Code; code != http.StatusOK {
+			t.Fatalf("expected a customer admin session to pass, got %d", code)
 		}
 	})
+
+	t.Run("session member is denied", func(t *testing.T) {
+		withService(t, nil)
+		principal := &access.Principal{UserID: 2, Role: access.RoleMember}
+		if code := call(newRouter(false, principal), "").Code; code != http.StatusForbidden {
+			t.Fatalf("expected a member session to be denied, got %d", code)
+		}
+	})
+
+	t.Run("session without principal is denied", func(t *testing.T) {
+		withService(t, nil)
+		if code := call(newRouter(false, nil), "").Code; code != http.StatusForbidden {
+			t.Fatalf("expected a session without a principal to be denied, got %d", code)
+		}
+	})
+}
+
+func initializeAccessDirectory(t *testing.T) {
+	t.Helper()
+
+	cfg := viper.New()
+	cfg.Set("AUTH_ACCESS_ENABLED", true)
+	cfg.Set("AUTH_PUBLIC_URL", "https://devlake.example.com")
+	cfg.Set("GRAFANA_PUBLIC_URL", "https://grafana.example.com")
+	cfg.Set("GRAFANA_INTERNAL_URL", "http://grafana:3000")
+	cfg.Set("GRAFANA_MANAGEMENT_USER", "admin")
+	cfg.Set("GRAFANA_MANAGEMENT_PASSWORD", "test-password")
+	access.Init(contextimpl.NewDefaultBasicRes(cfg, logruslog.Global, nil))
+
+	if !access.Default().Enabled() {
+		t.Fatal("access directory should be enabled for session authorization tests")
+	}
 }
 
 // withService swaps the package singleton for one test; Init guards with
