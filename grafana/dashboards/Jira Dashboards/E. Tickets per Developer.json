@@ -336,7 +336,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT $__timeGroup(i.resolution_date, ${interval})                     AS time,\n  COUNT(*) as Value\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND i.status LIKE 'DONE'\n  AND i.assignee_id IN ($developer_id)\n  AND i.resolution_date IS NOT NULL\n  AND $__timeFilter(i.resolution_date) \n  AND i.type NOT LIKE 'EPIC'\nGROUP BY time\nORDER BY time;",
+          "rawSql": "SELECT $__timeGroup(i.resolution_date, ${interval})                     AS time,\n  COUNT(*) as Value\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND i.status LIKE 'DONE'\n  AND i.assignee_id IN ($developer_id)\n  AND EXISTS (SELECT 1 FROM board_issues bi\n              JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n              WHERE bi.issue_id = i.id\n                AND bi.board_id IN (${board_id})\n                AND pm.project_name IN (${project}))\n  AND i.resolution_date IS NOT NULL\n  AND $__timeFilter(i.resolution_date) \n  AND i.type NOT LIKE 'EPIC'\nGROUP BY time\nORDER BY time;",
           "refId": "A",
           "sql": {
             "columns": [
