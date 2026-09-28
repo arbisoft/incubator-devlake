@@ -412,6 +412,10 @@
             "steps": [
               {
                 "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 4
               }
             ]
           }
@@ -493,6 +497,10 @@
             "steps": [
               {
                 "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 1
               }
             ]
           }
@@ -673,6 +681,10 @@
             "steps": [
               {
                 "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 1
               }
             ]
           }
@@ -1324,7 +1336,7 @@
                 "color": "green"
               },
               {
-                "color": "#EAB839",
+                "color": "red",
                 "value": 0
               }
             ]
@@ -2001,7 +2013,7 @@
               },
               {
                 "color": "red",
-                "value": 15
+                "value": 2
               }
             ]
           }
@@ -2088,7 +2100,7 @@
               },
               {
                 "color": "red",
-                "value": 15
+                "value": 2
               }
             ]
           }
@@ -2518,7 +2530,7 @@
               },
               {
                 "color": "red",
-                "value": 80
+                "value": 1
               }
             ]
           }
@@ -2939,5 +2951,5 @@
   "timezone": "utc",
   "title": "A. GitHub High Level Summary",
   "uid": "efxmn9vz2bv28b",
-  "version": 9
+  "version": 18
 }
