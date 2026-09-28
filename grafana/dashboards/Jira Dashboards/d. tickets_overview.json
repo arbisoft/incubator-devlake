@@ -51,7 +51,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Per time bucket, unions issue creation events (by creator) and DONE resolution events (by assignee) and counts each side.",
+      "description": "Tickets created vs closed over time.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -273,7 +273,8 @@
         }
       ],
       "title": "Ticket Type Mix Trend",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Tickets created over time, split by type.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -360,14 +361,15 @@
         }
       ],
       "title": "Tickets Lead Time",
-      "type": "table"
+      "type": "table",
+      "description": "Median and P75 lead time in days by ticket type and priority.\n\rdatasource: issues"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Lists in progress tickets not updated in over 14 days with their assignee and days since the last update.",
+      "description": "In-progress tickets with no update in over 14 days.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -618,7 +620,8 @@
         }
       ],
       "title": "Bugs Reported vs Tickets Delivered (Scrum)",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Bugs reported vs tickets delivered over time (Scrum boards).\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -732,7 +735,8 @@
         }
       ],
       "title": "Bugs Reported vs Tickets Delivered (Kanban)",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Bugs reported vs tickets delivered over time (Kanban boards).\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -899,7 +903,8 @@
         }
       ],
       "title": "Highest Priority Tickets",
-      "type": "table"
+      "type": "table",
+      "description": "List of open Highest priority tickets.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -1066,7 +1071,8 @@
         }
       ],
       "title": "High Priority Tickets",
-      "type": "table"
+      "type": "table",
+      "description": "List of open High priority tickets.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -1233,7 +1239,8 @@
         }
       ],
       "title": "Medium Priority Tickets",
-      "type": "table"
+      "type": "table",
+      "description": "List of open Medium priority tickets.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -1400,7 +1407,8 @@
         }
       ],
       "title": "Low Priority Tickets",
-      "type": "table"
+      "type": "table",
+      "description": "List of open Low priority tickets.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -1567,7 +1575,8 @@
         }
       ],
       "title": "Lowest Priority Tickets",
-      "type": "table"
+      "type": "table",
+      "description": "List of open Lowest priority tickets.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -1734,7 +1743,8 @@
         }
       ],
       "title": "Tickets without Priority",
-      "type": "table"
+      "type": "table",
+      "description": "List of open tickets with no priority set.\n\rdatasource: issues, board_issues"
     }
   ],
   "preload": false,
