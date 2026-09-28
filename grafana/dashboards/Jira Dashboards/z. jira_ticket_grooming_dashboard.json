@@ -104,7 +104,8 @@
         }
       ],
       "title": "Ticket Grooming Misses Stats",
-      "type": "stat"
+      "type": "stat",
+      "description": "Total tickets and those missing context, user story or acceptance criteria.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -215,7 +216,8 @@
         }
       ],
       "title": "Ticket with Grooming Issues Distribution",
-      "type": "barchart"
+      "type": "barchart",
+      "description": "Monthly tickets missing context, user story or acceptance criteria.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -382,7 +384,8 @@
         }
       ],
       "title": "Tickets without User Story",
-      "type": "table"
+      "type": "table",
+      "description": "List of tickets with no user story in the description.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -549,7 +552,8 @@
         }
       ],
       "title": "Tickets without Acceptance Criteria",
-      "type": "table"
+      "type": "table",
+      "description": "List of tickets with no acceptance criteria in the description.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -716,7 +720,8 @@
         }
       ],
       "title": "Tickets without Context",
-      "type": "table"
+      "type": "table",
+      "description": "List of tickets with no context section in the description.\n\rdatasource: issues, board_issues"
     }
   ],
   "preload": false,

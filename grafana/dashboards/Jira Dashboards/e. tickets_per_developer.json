@@ -51,7 +51,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Per assignee, counts issues created in the window split by status into To Do, In Progress and Done.",
+      "description": "Tickets per developer split into To Do, In Progress and Done.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -163,7 +163,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Counts issues currently in progress status per assignee.",
+      "description": "Tickets currently in progress per developer.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -358,7 +358,8 @@
         }
       ],
       "title": "Tickets Closed",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Tickets closed over time.\n\rdatasource: issues"
     },
     {
       "datasource": {
@@ -445,7 +446,8 @@
         }
       ],
       "title": "Ticket Type Mix Per Developer",
-      "type": "table"
+      "type": "table",
+      "description": "Ticket types (bugs, stories, tasks) per developer.\n\rdatasource: issues, board_issues"
     }
   ],
   "preload": false,

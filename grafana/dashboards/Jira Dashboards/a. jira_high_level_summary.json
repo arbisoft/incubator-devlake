@@ -39,6 +39,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Open tickets split by type.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -154,6 +155,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Open tickets split by priority.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -265,6 +267,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "All tickets split into To Do, In Progress and Done.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -362,7 +365,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Overview ticket statuses of top 10 Epics sorted descending on ticket count",
+      "description": "Ticket status for the top 10 epics by ticket count.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -472,6 +475,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Stories split into To Do, In Progress and Done.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -566,6 +570,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Tasks split into To Do, In Progress and Done.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -660,6 +665,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Bugs split into To Do, In Progress and Done.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -754,7 +760,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Epics created in the selected period.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -848,7 +854,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Stories created in the selected period.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -942,7 +948,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Stories currently in progress.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1027,7 +1033,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Stories not yet started.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1112,7 +1118,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Stories completed.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1122,7 +1128,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-9"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-17"
             }
           ],
           "mappings": [],
@@ -1135,7 +1141,7 @@
               },
               {
                 "color": "red",
-                "value": 1
+                "value": 500
               }
             ]
           }
@@ -1148,7 +1154,7 @@
         "x": 16,
         "y": 17
       },
-      "id": 13,
+      "id": 18,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
@@ -1173,11 +1179,11 @@
             "type": "datasource",
             "uid": "-- Dashboard --"
           },
-          "panelId": 6,
+          "panelId": 7,
           "refId": "A"
         }
       ],
-      "title": "Bugs Done",
+      "title": "Stories Done",
       "transformations": [
         {
           "id": "filterFieldsByName",
@@ -1197,7 +1203,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Stories not assigned to anyone.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1285,7 +1291,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Distinct number of non-Epic tickets which are reopened in the provided time span.",
+      "description": "Non-epic tickets reopened in the selected period.\n\rdatasource: issues, board_issues, project_mapping, issue_status_history",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1378,7 +1384,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Bugs created in the selected period.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1472,7 +1478,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Bugs currently in progress.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1557,7 +1563,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Bugs not yet started.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1642,7 +1648,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Bugs completed.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1652,7 +1658,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-17"
+              "url": "/d/ffyfvmn24mrcwb/f-jira-basics?orgId=1&timezone=utc&${__all_variables}&${__url_time_range}&viewPanel=panel-9"
             }
           ],
           "mappings": [],
@@ -1665,7 +1671,7 @@
               },
               {
                 "color": "red",
-                "value": 500
+                "value": 1
               }
             ]
           }
@@ -1678,7 +1684,7 @@
         "x": 16,
         "y": 21
       },
-      "id": 18,
+      "id": 13,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
@@ -1703,11 +1709,11 @@
             "type": "datasource",
             "uid": "-- Dashboard --"
           },
-          "panelId": 7,
+          "panelId": 6,
           "refId": "A"
         }
       ],
-      "title": "Stories Done",
+      "title": "Bugs Done",
       "transformations": [
         {
           "id": "filterFieldsByName",
@@ -1727,7 +1733,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Bugs not assigned to anyone.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1821,7 +1827,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Percentage of distinct number of non-Epic tickets which are reopened in the provided time span.",
+      "description": "% of non-epic tickets reopened in the selected period.\n\rdatasource: issues, board_issues, project_mapping, issue_status_history",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1916,7 +1922,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Tasks created in the selected period.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2010,7 +2016,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Tasks not yet started.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2095,7 +2101,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Tasks currently in progress.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2180,7 +2186,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Tasks completed.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2265,7 +2271,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Tasks not assigned to anyone.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2353,7 +2359,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Averages lead_time_minutes converted to days across resolved non-bug issues assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Average days to resolve a bug.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2440,7 +2446,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Averages lead_time_minutes converted to days across resolved non-bug issues assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Average days to complete a story.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2527,7 +2533,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Averages lead_time_minutes converted to days across resolved non-bug issues assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Average days to complete a task.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2614,7 +2620,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Number of bugs reported over tasks delivered in the selected period.",
+      "description": "Bugs reported per ticket delivered (Kanban boards).\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2708,7 +2714,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Number of bugs reported over tasks created and delivered in the selected period.",
+      "description": "Bugs reported per ticket delivered (Scrum boards).\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2772,7 +2778,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT (bugs / CASE WHEN tasks = 0 THEN 1 ELSE tasks END) as Ratio\nFROM \n(\n  SELECT \n    SUM(CASE WHEN i.type LIKE '%bug%' THEN 1 ELSE 0 END) AS bugs,\n    SUM(CASE WHEN i.type LIKE 'TASK' AND i.status LIKE 'DONE' THEN 1 ELSE 0 END) AS tasks\n  FROM issues i\n  WHERE i.id LIKE '%jira:%'\n    AND $__timeFilter(i.created_date) \n  AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n    )\n) base",
+          "rawSql": "SELECT (bugs / CASE WHEN tasks = 0 THEN 1 ELSE tasks END) as Ratio\nFROM \n(\n  SELECT \n    SUM(CASE WHEN i.type LIKE '%bug%' THEN 1 ELSE 0 END) AS bugs,\n    SUM(CASE WHEN i.type LIKE '%TASK' AND i.status LIKE 'DONE' THEN 1 ELSE 0 END) AS tasks\n  FROM issues i\n  WHERE i.id LIKE '%jira:%'\n    AND $__timeFilter(i.created_date) \n  AND ('__all' IN ($developer_id) OR i.assignee_id IN ( $developer_id ))\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n    )\n) base",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2801,6 +2807,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Average days tickets spend in active work before completion.\n\rdatasource: issues, board_issues, project_mapping, issue_status_history",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2899,6 +2906,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Tickets missing context, user story or acceptance criteria.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2994,6 +3002,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Total tickets created in the selected period.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3079,6 +3088,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
+      "description": "Tickets with no acceptance criteria in the description.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3162,6 +3172,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
+      "description": "Tickets with no context section in the description.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3258,6 +3269,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Tickets with valid, missing or oversized story points.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3356,6 +3368,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Tickets with vs without time estimates.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3454,6 +3467,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Tickets with a proper, short or missing description.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3547,6 +3561,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
+      "description": "Tickets with no story points.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3630,6 +3645,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
+      "description": "Tickets with no time estimate.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3713,6 +3729,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "In-progress tickets with no assignee.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3804,6 +3821,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
+      "description": "Tickets with no description.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3887,6 +3905,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
+      "description": "Tickets with story points above the allowed threshold.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3970,6 +3989,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "In-progress tickets with no recent activity.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -4061,6 +4081,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Tickets not linked to a parent or epic.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -4154,6 +4175,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
+      "description": "Tickets with a description shorter than the minimum length.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -4237,6 +4259,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Tickets with a title shorter than the minimum length.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -4342,7 +4365,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Lists up to 10 developers assigned more than 125% of the team's per-head average issue count (fair share) for issues created in the window, scoped to boards mapped to the selected project.",
+      "description": "Tickets assigned per developer and their share of team work.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -4430,7 +4453,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "",
+      "description": "Assigned vs remaining team work per developer.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -4622,5 +4645,5 @@
   "timezone": "utc",
   "title": "A. Jira High Level Summary",
   "uid": "dfy7sh5aww35sc",
-  "version": 11
+  "version": 3
 }

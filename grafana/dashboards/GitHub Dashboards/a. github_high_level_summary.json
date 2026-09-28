@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": null,
+  "id": 184,
   "links": [],
   "panels": [
     {
@@ -39,7 +39,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Counts PRs raised in the window and assigned to the selected developers, split into Merged, Open, Closed, and Draft.",
+      "description": "PRs raised in the period split into Merged, Open, Closed and Draft.\n\rdatasource: pull_requests, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -141,7 +141,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Number of PRs raised in the selected period, project and repostory",
+      "description": "Total PRs raised in the selected period, project and repository.\n\rdatasource: pull_requests, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -230,7 +230,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Number of PRs merged",
+      "description": "Total PRs merged in the selected period.\n\rdatasource: pull_requests, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -311,7 +311,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Number of PRs closed in the selected period, project and repostory",
+      "description": "Total PRs closed without merging in the selected period.\n\rdatasource: pull_requests, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -392,7 +392,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Number of PRs waiting for review in the selected period, project and repostory",
+      "description": "Open PRs still waiting for review.\n\ndatasource: pull_requests, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -473,7 +473,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "PRs Merged without Approval",
+      "description": "Merged PRs that never received an approval from someone other than the author.\n\rdatasource: pull_request_comments, pull_requests, repos, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -563,7 +563,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Average number of line changes in a PR",
+      "description": "Average number of lines changed per PR.\n\rdatasource: pull_requests, pull_request_commits, commits, project_mapping, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -653,7 +653,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Average number of days taken to merge a PR",
+      "description": "Average days from PR creation to merge.\n\rdatasource: pull_requests, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -743,7 +743,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Number of commits made in the selected period, project and repostory",
+      "description": "Total commits made through PRs in the selected period.\n\rdatasource: commits, pull_request_commits, pull_requests, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -838,7 +838,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Counts issues created in the window and assigned to the selected developers, split into Bug versus Tasks.",
+      "description": "Issues created in the period split into Bugs and Tasks.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -938,6 +938,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Tasks split by status: To Do, In Progress and Done.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1034,6 +1035,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Bugs split by status: To Do, In Progress and Done.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1130,7 +1132,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Non-bug issues created in the selected period.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1216,7 +1218,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Bug issues created in the selected period.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1300,7 +1302,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts in-progress (status other than TODO/DONE/Closed) non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Tasks currently in progress.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1385,7 +1387,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts not-yet-started (TODO) non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Tasks not yet started.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1470,7 +1472,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts in-progress (status other than TODO/DONE/Closed) bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Bugs currently in progress.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1555,7 +1557,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts not-yet-started (TODO) bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Bugs not yet started.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1640,7 +1642,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts completed (DONE/Closed) non-bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Tasks completed (Done/Closed).\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1725,7 +1727,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Number of tasks that are orphan/not assigned to anyone",
+      "description": "Tasks not assigned to anyone.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1811,7 +1813,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
-      "description": "Counts completed (DONE/Closed) bug issues created in the window and assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Bugs completed (Done/Closed).\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1896,7 +1898,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Bugs that are not assigned to anyone.",
+      "description": "Bugs not assigned to anyone.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1983,7 +1985,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Averages lead_time_minutes converted to days across resolved non-bug issues assigned to the selected developers, scoped to boards mapped to the selected project.",
+      "description": "Average days to complete a task.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2070,6 +2072,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Average days to resolve a bug.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2166,7 +2169,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Number of successful workflow runs / Number of total workflow runs",
+      "description": "Share of workflow runs by result (success, failure, etc.).\n\rdatasource: cicd_pipelines",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2357,6 +2360,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
+      "description": "Total workflow runs (builds) in the selected period.\n\rdatasource: cicd_pipelines",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2424,6 +2428,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
+      "description": "Workflow runs that succeeded.\n\rdatasource: cicd_pipelines",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2491,6 +2496,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
+      "description": "Workflow runs that failed.\n\rdatasource: cicd_pipelines",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2562,6 +2568,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "PRs whose commits triggered failed workflow runs.\n\rdatasource: pull_requests, accounts, pull_request_commits, cicd_pipeline_commits, cicd_pipelines",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2661,7 +2668,7 @@
       "datasource": {
         "uid": "devlake-mysql"
       },
-      "description": "Lists up to 10 developers assigned more than 125% of the team's per-head average issue count (fair share) for issues created in the window, scoped to boards mapped to the selected project.",
+      "description": "Top 10 developers by issues assigned and their share of total team work.\n\rdatasource: issues, board_issues, project_mapping, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2717,7 +2724,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "Select replace(member, '-', ' ') as Developers, CONCAT(Tasks, ' / ', `Total Work`) AS `Issues Assigned / Total Issues`  from (\n  WITH scoped AS (\n  SELECT\n    i.id,\n    COALESCE(\n      NULLIF(TRIM(a.full_name), ''),\n      NULLIF(TRIM(a.user_name), ''),\n      NULLIF(TRIM(a.email), ''),\n      NULLIF(TRIM(i.assignee_name), '')\n    ) AS member\n  FROM issues i\n  JOIN board_issues bi    ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id\n                         AND pm.`table` = 'boards'\n                         AND pm.project_name IN (${project})\n  JOIN accounts a       ON a.id = i.assignee_id\n  WHERE i.id LIKE 'github:%'\n    AND bi.board_id IN (${repo_id})\n    AND $__timeFilter(i.created_date)\n),\nper_member AS (\n  SELECT member, COUNT(DISTINCT id) AS tasks\n  FROM scoped\n  WHERE member IS NOT NULL\n  GROUP BY member\n),\ntotals AS (\n  SELECT SUM(tasks) AS total_tasks, COUNT(*) AS headcount FROM per_member\n)\nSELECT\n  p.member                                              AS `Member`,\n  p.tasks                                               AS `Tasks`,\n  t.total_tasks                                         AS `Total Work`,\n  ROUND(t.total_tasks / t.headcount, 1)                 AS `Fair share`,\n  ROUND(p.tasks - (t.total_tasks / t.headcount), 1)     AS `Deviation`,\n  ROUND((p.tasks - (t.total_tasks / t.headcount))\n        * 100.0 / NULLIF(t.total_tasks / t.headcount, 0), 0) AS `Pct vs fair`,\n  CASE\n    WHEN p.tasks > (t.total_tasks / t.headcount) * 1.25 THEN 'Overloaded'\n    WHEN p.tasks < (t.total_tasks / t.headcount) * 0.75 THEN 'Underloaded'\n    ELSE 'Balanced'\n  END                                                   AS `Status`\nFROM per_member p\nCROSS JOIN totals t\nORDER BY p.tasks DESC\n) base\nwhere status = 'Overloaded'\nlimit 10;",
+          "rawSql": "Select \n  replace(member, '-', ' ') as Developer, \n  Tasks AS `Issues Assigned`, \n  100 * Tasks/`Total Work` AS `Workload Percentage`, \n  `Total Work` from (\n  WITH scoped AS (\n  SELECT\n    i.id,\n    COALESCE(\n      NULLIF(TRIM(a.full_name), ''),\n      NULLIF(TRIM(a.user_name), ''),\n      NULLIF(TRIM(a.email), ''),\n      NULLIF(TRIM(i.assignee_name), '')\n    ) AS member\n  FROM issues i\n  JOIN board_issues bi    ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id\n                         AND pm.`table` = 'boards'\n                         AND pm.project_name IN (${project})\n  JOIN accounts a       ON a.id = i.assignee_id\n  WHERE i.id LIKE 'github:%'\n    AND bi.board_id IN (${repo_id})\n    AND $__timeFilter(i.created_date)\n),\nper_member AS (\n  SELECT member, COUNT(DISTINCT id) AS tasks\n  FROM scoped\n  WHERE member IS NOT NULL\n  GROUP BY member\n),\ntotals AS (\n  SELECT SUM(tasks) AS total_tasks, COUNT(*) AS headcount FROM per_member\n)\nSELECT\n  p.member                                              AS `Member`,\n  p.tasks                                               AS `Tasks`,\n  t.total_tasks                                         AS `Total Work`,\n  ROUND(t.total_tasks / t.headcount, 1)                 AS `Fair share`,\n  ROUND(p.tasks - (t.total_tasks / t.headcount), 1)     AS `Deviation`,\n  ROUND((p.tasks - (t.total_tasks / t.headcount))\n        * 100.0 / NULLIF(t.total_tasks / t.headcount, 0), 0) AS `Pct vs fair`,\n  CASE\n    WHEN p.tasks > (t.total_tasks / t.headcount) * 1.25 THEN 'Overloaded'\n    WHEN p.tasks < (t.total_tasks / t.headcount) * 0.75 THEN 'Underloaded'\n    ELSE 'Balanced'\n  END                                                   AS `Status`\nFROM per_member p\nCROSS JOIN totals t\nORDER BY p.tasks DESC\n) base\nlimit 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2738,25 +2745,39 @@
           }
         }
       ],
-      "title": "Workload Above Fair Share",
+      "title": "Team Workload",
       "type": "table"
     },
     {
       "datasource": {
         "uid": "devlake-mysql"
       },
-      "description": "Lists up to 10 developers assigned less than 75% of the team's per-head average issue count (fair share) for issues created in the window, scoped to boards mapped to the selected project.",
+      "description": "Issues assigned vs remaining team load for the top 10 developers.\n\rdatasource: issues, board_issues, project_mapping, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
           "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 50,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
             },
-            "inspect": false
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "noValue": "No data against selected filters",
@@ -2765,10 +2786,6 @@
             "steps": [
               {
                 "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           }
@@ -2783,16 +2800,26 @@
       },
       "id": 13,
       "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
+        "barRadius": 0,
+        "barWidth": 0.75,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
         },
-        "showHeader": true
+        "orientation": "horizontal",
+        "showValue": "never",
+        "stacking": "normal",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
       },
       "pluginVersion": "11.6.2",
       "targets": [
@@ -2801,7 +2828,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "Select replace(member, '-', ' ') as Developers, CONCAT(Tasks, ' / ', `Total Work`) AS `Issues Assigned / Total Issues` from (\n  WITH scoped AS (\n  SELECT\n    i.id,\n    COALESCE(\n      NULLIF(TRIM(a.full_name), ''),\n      NULLIF(TRIM(a.user_name), ''),\n      NULLIF(TRIM(a.email), ''),\n      NULLIF(TRIM(i.assignee_name), '')\n    ) AS member\n  FROM issues i\n  JOIN board_issues bi    ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id\n                         AND pm.`table` = 'boards'\n                         AND pm.project_name IN (${project})\n  LEFT JOIN accounts a       ON a.id = i.assignee_id\n  WHERE i.id LIKE 'github:%'\n    AND bi.board_id IN (${repo_id})\n    AND $__timeFilter(i.created_date)\n),\nper_member AS (\n  SELECT member, COUNT(DISTINCT id) AS tasks\n  FROM scoped\n  WHERE member IS NOT NULL\n  GROUP BY member\n),\ntotals AS (\n  SELECT SUM(tasks) AS total_tasks, COUNT(*) AS headcount FROM per_member\n)\nSELECT\n  p.member                                              AS `Member`,\n  p.tasks                                               AS `Tasks`,\n  t.total_tasks                                         AS `Total Work`,\n  ROUND(t.total_tasks / t.headcount, 1)                 AS `Fair share`,\n  ROUND(p.tasks - (t.total_tasks / t.headcount), 1)     AS `Deviation`,\n  ROUND((p.tasks - (t.total_tasks / t.headcount))\n        * 100.0 / NULLIF(t.total_tasks / t.headcount, 0), 0) AS `Pct vs fair`,\n  CASE\n    WHEN p.tasks > (t.total_tasks / t.headcount) * 1.25 THEN 'Overloaded'\n    WHEN p.tasks < (t.total_tasks / t.headcount) * 0.75 THEN 'Underloaded'\n    ELSE 'Balanced'\n  END                                                   AS `Status`\nFROM per_member p\nCROSS JOIN totals t\nORDER BY p.tasks DESC\n) base\nwhere status = 'Underloaded'\nlimit 10;",
+          "rawSql": "Select \n  replace(member, '-', ' ') as Developer, \n  Tasks AS `Issues Assigned`,\n  (`Total Work` - Tasks) AS `Remaining Load` from (\n  WITH scoped AS (\n  SELECT\n    i.id,\n    COALESCE(\n      NULLIF(TRIM(a.full_name), ''),\n      NULLIF(TRIM(a.user_name), ''),\n      NULLIF(TRIM(a.email), ''),\n      NULLIF(TRIM(i.assignee_name), '')\n    ) AS member\n  FROM issues i\n  JOIN board_issues bi    ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id\n                         AND pm.`table` = 'boards'\n                         AND pm.project_name IN (${project})\n  JOIN accounts a       ON a.id = i.assignee_id\n  WHERE i.id LIKE 'github:%'\n    AND bi.board_id IN (${repo_id})\n    AND $__timeFilter(i.created_date)\n),\nper_member AS (\n  SELECT member, COUNT(DISTINCT id) AS tasks\n  FROM scoped\n  WHERE member IS NOT NULL\n  GROUP BY member\n),\ntotals AS (\n  SELECT SUM(tasks) AS total_tasks, COUNT(*) AS headcount FROM per_member\n)\nSELECT\n  p.member                                              AS `Member`,\n  p.tasks                                               AS `Tasks`,\n  t.total_tasks                                         AS `Total Work`,\n  ROUND(t.total_tasks / t.headcount, 1)                 AS `Fair share`,\n  ROUND(p.tasks - (t.total_tasks / t.headcount), 1)     AS `Deviation`,\n  ROUND((p.tasks - (t.total_tasks / t.headcount))\n        * 100.0 / NULLIF(t.total_tasks / t.headcount, 0), 0) AS `Pct vs fair`,\n  CASE\n    WHEN p.tasks > (t.total_tasks / t.headcount) * 1.25 THEN 'Overloaded'\n    WHEN p.tasks < (t.total_tasks / t.headcount) * 0.75 THEN 'Underloaded'\n    ELSE 'Balanced'\n  END                                                   AS `Status`\nFROM per_member p\nCROSS JOIN totals t\nORDER BY p.tasks DESC\n) base\nlimit 10;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -2822,8 +2849,8 @@
           }
         }
       ],
-      "title": "Workload Below Fair Share",
-      "type": "table"
+      "title": "Team Workload Overview",
+      "type": "barchart"
     }
   ],
   "preload": false,
@@ -2912,5 +2939,5 @@
   "timezone": "utc",
   "title": "A. GitHub High Level Summary",
   "uid": "efxmn9vz2bv28b",
-  "version": 13
+  "version": 9
 }

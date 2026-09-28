@@ -51,7 +51,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "The number of distinct people who completed work in it.",
+      "description": "Distinct people who completed work in each period.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -273,14 +273,15 @@
         }
       ],
       "title": "Throughput per Person",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Tickets delivered per active person over time.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "The number of distinct people who completed work in it.",
+      "description": "Headcount and throughput per person over time.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -395,7 +396,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Per sprint, story points committed (final scope) vs delivered, and the share of tickets carrying an estimate. Unpointed tickets excluded; secondary to ticket throughput.",
+      "description": "Story points committed vs delivered per sprint, and % of tickets estimated.\n\rdatasource: sprints, board_sprints, sprint_issues, issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -587,14 +588,15 @@
         }
       ],
       "title": "Pre-release defects per release",
-      "type": "barchart"
+      "type": "barchart",
+      "description": "Bugs found before each release shipped.\n\rdatasource: issues, board_issues, project_mapping"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Production issues raised after it shipped.",
+      "description": "Production bugs raised after each release shipped.\n\rdatasource: issues, board_issues, boards, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {

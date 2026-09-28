@@ -52,7 +52,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Per assignee, counts issues created in the window split by status into To Do, In Progress and Done.",
+      "description": "Issues per developer split into To Do, In Progress and Done.\n\rdatasource: issue_assignees, issues, board_issues, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -164,7 +164,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Counts issues currently in OPEN original_status per assignee, with no time window applied.",
+      "description": "Issues currently open per developer.\n\rdatasource: issues, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -252,7 +252,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Time series counting DONE issues per assignee, bucketed by resolution date.",
+      "description": "Issues closed per developer over time.\n\rdatasource: issues, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -367,7 +367,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Per assignee, counts issues by mapped type category and splits them into Planned versus Adhoc based on whether their sprint has a start date.",
+      "description": "Issue types per developer, split into Planned (sprint) vs Adhoc work.\n\rdatasource: issues, sprint_issues, sprints, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {

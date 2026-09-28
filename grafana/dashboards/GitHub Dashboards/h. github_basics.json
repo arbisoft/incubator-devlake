@@ -26,7 +26,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "-- Averages lead_time_minutes converted to days per assignee for issues created in the window, scoped to boards mapped to the selected project.",
+      "description": "Average days to resolve an issue, per developer.\n\rdatasource: issue_assignees, issues, board_issues, project_mapping, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -138,7 +138,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Per assignee, counts issues created in the window split into Task versus Bug by whether original_type contains 'bug', scoped to boards mapped to the selected project, top 20 by total issues.",
+      "description": "Tasks vs bugs assigned per developer (top 20).\n\rdatasource: issue_assignees, issues, board_issues, project_mapping, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -250,7 +250,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Per assignee, counts bugs created in the window split into Done versus Pending by status, scoped to boards mapped to the selected project, top 20 by total issues.",
+      "description": "Done vs pending bugs per developer (top 20).\n\rdatasource: issue_assignees, issues, board_issues, project_mapping, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {

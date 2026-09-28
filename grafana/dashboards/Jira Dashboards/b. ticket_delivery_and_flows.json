@@ -124,7 +124,8 @@
         }
       ],
       "title": "Mean Issue Lead Time in days",
-      "type": "stat"
+      "type": "stat",
+      "description": "Average days from ticket creation to resolution.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -238,7 +239,8 @@
         }
       ],
       "title": "Ticket Delivery Rate Over Time",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Sprint tickets committed vs delivered, per week.\n\rdatasource: sprint_issues, sprints, issues"
     },
     {
       "datasource": {
@@ -352,7 +354,8 @@
         }
       ],
       "title": "Tickets Delivery Stats",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Tickets opened vs closed over time.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
@@ -463,14 +466,15 @@
         }
       ],
       "title": "Issue Status Distribution",
-      "type": "barchart"
+      "type": "barchart",
+      "description": "Tickets opened vs closed per month.\n\rdatasource: issues, board_issues"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Tickets in an Active Work status at the end of each UTC day, broken down by status.",
+      "description": "Tickets in active work at the end of each day, by status.\n\rdatasource: issues, board_issues, issue_status_history",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -595,7 +599,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Days since work started for every still-open ticket, oldest first, against the p50 and p85 cycle time of completed tickets.",
+      "description": "Open tickets by days since work started, vs p50 and p85 cycle time.\n\rdatasource: issues, board_issues, issue_labels, issue_status_history",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -738,7 +742,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "The 30 longest-running open tickets by days since work started, with p50 and p85 cycle time of completed tickets drawn as reference lines.",
+      "description": "30 longest-running open tickets vs p50 and p85 cycle time.\n\rdatasource: issues, board_issues, project_mapping, issue_labels, issue_status_history",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -900,7 +904,8 @@
         }
       ],
       "title": "p50 Aging WIP",
-      "type": "stat"
+      "type": "stat",
+      "description": "Median (p50) cycle time of completed tickets in days.\n\rdatasource: issues, board_issues, project_mapping, issue_labels, issue_status_history"
     },
     {
       "datasource": {
@@ -964,7 +969,8 @@
         }
       ],
       "title": "p85 Aging WIP",
-      "type": "stat"
+      "type": "stat",
+      "description": "85th percentile (p85) cycle time of completed tickets in days.\n\rdatasource: issues, board_issues, project_mapping, issue_labels, issue_status_history"
     }
   ],
   "preload": false,
