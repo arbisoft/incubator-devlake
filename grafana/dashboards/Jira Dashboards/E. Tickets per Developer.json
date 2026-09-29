@@ -134,7 +134,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(i.assignee_name, '(Unassigned)') as Developer,\n  SUM(CASE WHEN i.status = 'TODO'        THEN 1 ELSE 0 END) AS `To Do`,\n  SUM(CASE WHEN i.status = 'IN_PROGRESS' THEN 1 ELSE 0 END) AS `In Progress`,\n  SUM(CASE WHEN i.status = 'DONE'        THEN 1 ELSE 0 END) AS Done\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter( i.created_date ) \n  AND i.type <> 'EPIC'\n  AND i.assignee_id IN ( $developer_id )\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )\nGROUP BY Developer\nORDER BY (`To Do` + `In Progress` + Done) DESC\nLIMIT 20;",
+          "rawSql": "SELECT COALESCE(NULLIF(TRIM(i.assignee_name), ''), 'Unassigned') as Developer,\n  SUM(CASE WHEN i.status = 'TODO'        THEN 1 ELSE 0 END) AS `To Do`,\n  SUM(CASE WHEN i.status = 'IN_PROGRESS' THEN 1 ELSE 0 END) AS `In Progress`,\n  SUM(CASE WHEN i.status = 'DONE'        THEN 1 ELSE 0 END) AS Done\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter( i.created_date ) \n  AND i.type <> 'EPIC'\n  AND (i.assignee_id IN ( $developer_id ) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ($developer_id)))\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${board_id}))\n  )\nGROUP BY Developer\nORDER BY (`To Do` + `In Progress` + Done) DESC\nLIMIT 20;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -222,7 +222,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT i.assignee_name as Developer, COUNT(i.id) as `Work In Progress`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.assignee_id IN ( $developer_id ) \n  AND i.type <> 'EPIC'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )\nGROUP BY assignee_name\nORDER BY `Work In Progress` DESC",
+          "rawSql": "SELECT COALESCE(NULLIF(TRIM(i.assignee_name), ''), 'Unassigned') as Developer, COUNT(i.id) as `Work In Progress`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date)\n  AND (i.assignee_id IN ( $developer_id ) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ($developer_id))) \n  AND i.type <> 'EPIC'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${board_id}))\n  )\nGROUP BY assignee_name\nORDER BY `Work In Progress` DESC",
           "refId": "A",
           "sql": {
             "columns": [
@@ -336,7 +336,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT $__timeGroup(i.resolution_date, ${interval})                     AS time,\n  COUNT(*) as Value\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND i.status LIKE 'DONE'\n  AND i.assignee_id IN ($developer_id)\n  AND i.resolution_date IS NOT NULL\n  AND $__timeFilter(i.resolution_date) \n  AND i.type NOT LIKE 'EPIC'\nGROUP BY time\nORDER BY time;",
+          "rawSql": "SELECT $__timeGroup(i.resolution_date, ${interval})                     AS time,\n  COUNT(*) as Value\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND i.status LIKE 'DONE'\n  AND (i.assignee_id IN ($developer_id) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ($developer_id)))\n  AND EXISTS (SELECT 1 FROM board_issues bi\n              JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n              WHERE bi.issue_id = i.id\n                AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${board_id}))\n                AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  AND i.resolution_date IS NOT NULL\n  AND $__timeFilter(i.resolution_date) \n  AND i.type NOT LIKE 'EPIC'\nGROUP BY time\nORDER BY time;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -424,7 +424,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(assignee_name, '(Unassigned)') as Developer,\n  SUM(CASE WHEN i.type = 'BUG' THEN 1 ELSE 0 END) as Bugs,\n  SUM(CASE WHEN i.type = 'STORY' THEN 1 ELSE 0 END) as Stories,\n  SUM(CASE WHEN i.type = 'TASK' THEN 1 ELSE 0 END) as Tasks,\n  SUM(CASE WHEN i.type = 'SUBTASK' THEN 1 ELSE 0 END) as `Sub Tasks`,\n  COUNT(i.id) as Total\nFROM issues i\nWHERE i.id like 'jira:%'\n  AND i.type <> 'EPIC'\n  AND i.assignee_id IN ( $developer_id )\n  AND $__timeFilter(i.created_date)\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN ( ${board_id} )\n  )\nGROUP BY Developer\nORDER BY Developer;",
+          "rawSql": "SELECT COALESCE(NULLIF(TRIM(assignee_name), ''), 'Unassigned') as Developer,\n  SUM(CASE WHEN i.type = 'BUG' THEN 1 ELSE 0 END) as Bugs,\n  SUM(CASE WHEN i.type = 'STORY' THEN 1 ELSE 0 END) as Stories,\n  SUM(CASE WHEN i.type = 'TASK' THEN 1 ELSE 0 END) as Tasks,\n  SUM(CASE WHEN i.type = 'SUBTASK' THEN 1 ELSE 0 END) as `Sub Tasks`,\n  COUNT(i.id) as Total\nFROM issues i\nWHERE i.id like 'jira:%'\n  AND i.type <> 'EPIC'\n  AND (i.assignee_id IN ( $developer_id ) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ($developer_id)))\n  AND $__timeFilter(i.created_date)\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${board_id}))\n  )\nGROUP BY Developer\nORDER BY Developer;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -488,14 +488,14 @@
           "type": "mysql",
           "uid": "devlake-mysql"
         },
-        "definition": "SELECT CONCAT(b.name, '--', b.id) AS text\nFROM project_mapping pm\nJOIN boards b ON b.id = pm.row_id\nWHERE pm.`table` = 'boards' AND pm.row_id LIKE 'jira:%'\n  AND pm.project_name IN ( $project )\nORDER BY text",
+        "definition": "SELECT CONCAT(b.name, '--', b.id) AS text\nFROM project_mapping pm\nJOIN boards b ON b.id = pm.row_id\nWHERE pm.`table` = 'boards' AND pm.row_id LIKE 'jira:%'\n  AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\nORDER BY text",
         "description": "",
         "includeAll": true,
         "label": "Board",
         "multi": true,
         "name": "board_id",
         "options": [],
-        "query": "SELECT CONCAT(b.name, '--', b.id) AS text\nFROM project_mapping pm\nJOIN boards b ON b.id = pm.row_id\nWHERE pm.`table` = 'boards' AND pm.row_id LIKE 'jira:%'\n  AND pm.project_name IN ( $project )\nORDER BY text",
+        "query": "SELECT CONCAT(b.name, '--', b.id) AS text\nFROM project_mapping pm\nJOIN boards b ON b.id = pm.row_id\nWHERE pm.`table` = 'boards' AND pm.row_id LIKE 'jira:%'\n  AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\nORDER BY text",
         "refresh": 1,
         "regex": "/^(?<text>.*)--(?<value>.*)$/",
         "type": "query"
@@ -512,13 +512,13 @@
           "type": "mysql",
           "uid": "devlake-mysql"
         },
-        "definition": "WITH scoped_issues AS (\n  SELECT bi.issue_id\n  FROM board_issues bi\n  WHERE bi.board_id IN ( ${board_id} )\n    AND bi.board_id LIKE 'jira:%'\n),\nscoped_accounts AS (\n  SELECT ia.assignee_id AS account_id\n  FROM issue_assignees ia\n  JOIN scoped_issues si ON si.issue_id = ia.issue_id\n  WHERE ia.assignee_id LIKE 'jira:%'\n  UNION\n  SELECT i.creator_id\n  FROM issues i\n  JOIN scoped_issues si ON si.issue_id = i.id\n  WHERE i.creator_id LIKE 'jira:%'\n  UNION\n  SELECT ic.author_id\n  FROM issue_changelogs ic\n  JOIN scoped_issues si ON si.issue_id = ic.issue_id\n  WHERE ic.author_id LIKE 'jira:%'\n  UNION\n  SELECT w.author_id\n  FROM issue_worklogs w\n  JOIN scoped_issues si ON si.issue_id = w.issue_id\n  WHERE w.author_id LIKE 'jira:%'\n)\nSELECT CONCAT(\n         REPLACE(COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           '(unmapped)'\n         ), '-', ' '),\n         '--', a.id) AS Name\nFROM accounts a\nJOIN scoped_accounts sa ON sa.account_id = a.id\nGROUP BY Name\nORDER BY Name;",
+        "definition": "SELECT Name FROM (\nWITH scoped_issues AS (\n  SELECT bi.issue_id\n  FROM board_issues bi\n  WHERE bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${board_id}))\n    AND bi.board_id LIKE 'jira:%'\n),\nscoped_accounts AS (\n  SELECT ia.assignee_id AS account_id\n  FROM issue_assignees ia\n  JOIN scoped_issues si ON si.issue_id = ia.issue_id\n  WHERE ia.assignee_id LIKE 'jira:%'\n  UNION\n  SELECT i.creator_id\n  FROM issues i\n  JOIN scoped_issues si ON si.issue_id = i.id\n  WHERE i.creator_id LIKE 'jira:%'\n  UNION\n  SELECT ic.author_id\n  FROM issue_changelogs ic\n  JOIN scoped_issues si ON si.issue_id = ic.issue_id\n  WHERE ic.author_id LIKE 'jira:%'\n  UNION\n  SELECT w.author_id\n  FROM issue_worklogs w\n  JOIN scoped_issues si ON si.issue_id = w.issue_id\n  WHERE w.author_id LIKE 'jira:%'\n)\nSELECT CONCAT(\n         REPLACE(COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           '(unmapped)'\n         ), '-', ' '),\n         '--', a.id) AS Name\nFROM accounts a\nJOIN scoped_accounts sa ON sa.account_id = a.id\nGROUP BY Name\n  UNION ALL\n  SELECT 'Unassigned--unassigned'\n) all_developers\nORDER BY Name",
         "includeAll": true,
         "label": "Developer",
         "multi": true,
         "name": "developer_id",
         "options": [],
-        "query": "WITH scoped_issues AS (\n  SELECT bi.issue_id\n  FROM board_issues bi\n  WHERE bi.board_id IN ( ${board_id} )\n    AND bi.board_id LIKE 'jira:%'\n),\nscoped_accounts AS (\n  SELECT ia.assignee_id AS account_id\n  FROM issue_assignees ia\n  JOIN scoped_issues si ON si.issue_id = ia.issue_id\n  WHERE ia.assignee_id LIKE 'jira:%'\n  UNION\n  SELECT i.creator_id\n  FROM issues i\n  JOIN scoped_issues si ON si.issue_id = i.id\n  WHERE i.creator_id LIKE 'jira:%'\n  UNION\n  SELECT ic.author_id\n  FROM issue_changelogs ic\n  JOIN scoped_issues si ON si.issue_id = ic.issue_id\n  WHERE ic.author_id LIKE 'jira:%'\n  UNION\n  SELECT w.author_id\n  FROM issue_worklogs w\n  JOIN scoped_issues si ON si.issue_id = w.issue_id\n  WHERE w.author_id LIKE 'jira:%'\n)\nSELECT CONCAT(\n         REPLACE(COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           '(unmapped)'\n         ), '-', ' '),\n         '--', a.id) AS Name\nFROM accounts a\nJOIN scoped_accounts sa ON sa.account_id = a.id\nGROUP BY Name\nORDER BY Name;",
+        "query": "SELECT Name FROM (\nWITH scoped_issues AS (\n  SELECT bi.issue_id\n  FROM board_issues bi\n  WHERE bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${board_id}))\n    AND bi.board_id LIKE 'jira:%'\n),\nscoped_accounts AS (\n  SELECT ia.assignee_id AS account_id\n  FROM issue_assignees ia\n  JOIN scoped_issues si ON si.issue_id = ia.issue_id\n  WHERE ia.assignee_id LIKE 'jira:%'\n  UNION\n  SELECT i.creator_id\n  FROM issues i\n  JOIN scoped_issues si ON si.issue_id = i.id\n  WHERE i.creator_id LIKE 'jira:%'\n  UNION\n  SELECT ic.author_id\n  FROM issue_changelogs ic\n  JOIN scoped_issues si ON si.issue_id = ic.issue_id\n  WHERE ic.author_id LIKE 'jira:%'\n  UNION\n  SELECT w.author_id\n  FROM issue_worklogs w\n  JOIN scoped_issues si ON si.issue_id = w.issue_id\n  WHERE w.author_id LIKE 'jira:%'\n)\nSELECT CONCAT(\n         REPLACE(COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           '(unmapped)'\n         ), '-', ' '),\n         '--', a.id) AS Name\nFROM accounts a\nJOIN scoped_accounts sa ON sa.account_id = a.id\nGROUP BY Name\n  UNION ALL\n  SELECT 'Unassigned--unassigned'\n) all_developers\nORDER BY Name",
         "refresh": 1,
         "regex": "/^(?<text>.*)--(?<value>.*)$/",
         "type": "query"

@@ -93,7 +93,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT SUM(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens) AS \"Tokens Burned\"\nFROM ai_model_usages\nWHERE source_connection_id IN (\n  SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n  INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n  WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n)\nAND $__timeFilter(date)",
+          "rawSql": "SELECT SUM(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens) AS \"Tokens Burned\"\nFROM ai_model_usages\nWHERE source_connection_id IN (\n  SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n  INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n  WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n)\nAND $__timeFilter(date)",
           "refId": "A"
         }
       ],
@@ -146,7 +146,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT SUM(num_sessions) AS \"Sessions\"\nFROM ai_activities\nWHERE record_kind = 'canonical_activity'\n  AND source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n  )\n  AND $__timeFilter(date)",
+          "rawSql": "SELECT SUM(num_sessions) AS \"Sessions\"\nFROM ai_activities\nWHERE record_kind = 'canonical_activity'\n  AND source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  )\n  AND $__timeFilter(date)",
           "refId": "A"
         }
       ],
@@ -199,7 +199,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT ROUND(SUM(ha.active_time_seconds) / 3600.0, 1) AS \"Active Hours\"\nFROM _tool_claude_code_otel_hourly_activity ha\nWHERE ha.connection_id IN (\n  SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n  INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n  WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n)\nAND $__timeFilter(ha.hour_start)",
+          "rawSql": "SELECT ROUND(SUM(ha.active_time_seconds) / 3600.0, 1) AS \"Active Hours\"\nFROM _tool_claude_code_otel_hourly_activity ha\nWHERE ha.connection_id IN (\n  SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n  INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n  WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n)\nAND $__timeFilter(ha.hour_start)",
           "refId": "A"
         }
       ],
@@ -252,7 +252,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT SUM(lines_added) AS \"Lines Added\"\nFROM ai_activities\nWHERE record_kind = 'canonical_activity'\n  AND source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n  )\n  AND $__timeFilter(date)",
+          "rawSql": "SELECT SUM(lines_added) AS \"Lines Added\"\nFROM ai_activities\nWHERE record_kind = 'canonical_activity'\n  AND source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  )\n  AND $__timeFilter(date)",
           "refId": "A"
         }
       ],
@@ -305,7 +305,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT SUM(lines_removed) AS \"Lines Removed\"\nFROM ai_activities\nWHERE record_kind = 'canonical_activity'\n  AND source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN ($project) AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n  )\n  AND $__timeFilter(date)",
+          "rawSql": "SELECT SUM(lines_removed) AS \"Lines Removed\"\nFROM ai_activities\nWHERE record_kind = 'canonical_activity'\n  AND source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  )\n  AND $__timeFilter(date)",
           "refId": "A"
         }
       ],
@@ -358,7 +358,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) AS \"PRs Merged\"\nFROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\nWHERE ppm.project_name IN ($project) AND $__timeFilter(pr.merged_date)",
+          "rawSql": "SELECT COUNT(*) AS \"PRs Merged\"\nFROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\nWHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(pr.merged_date)",
           "refId": "A"
         }
       ],
@@ -424,7 +424,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) AS \"PRs Closed, Never Merged\"\nFROM pull_requests pr\nJOIN project_mapping pm ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\nWHERE pm.project_name IN ($project) AND pr.status = 'CLOSED' AND $__timeFilter(pr.closed_date)",
+          "rawSql": "SELECT COUNT(*) AS \"PRs Closed, Never Merged\"\nFROM pull_requests pr\nJOIN project_mapping pm ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\nWHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status = 'CLOSED' AND $__timeFilter(pr.closed_date)",
           "refId": "A"
         }
       ],
@@ -477,7 +477,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(DISTINCT c.sha) AS \"Commits Never Merged\"\nFROM commits c\nJOIN repo_commits rc ON rc.commit_sha = c.sha\nJOIN project_mapping pm ON pm.row_id = rc.repo_id AND pm.`table` = 'repos'\nLEFT JOIN pull_request_commits prc ON prc.commit_sha = c.sha\nLEFT JOIN pull_requests pr ON pr.id = prc.pull_request_id AND pr.status = 'MERGED'\nWHERE pm.project_name IN ($project) AND pr.id IS NULL AND $__timeFilter(c.committed_date)",
+          "rawSql": "SELECT COUNT(DISTINCT c.sha) AS \"Commits Never Merged\"\nFROM commits c\nJOIN repo_commits rc ON rc.commit_sha = c.sha\nJOIN project_mapping pm ON pm.row_id = rc.repo_id AND pm.`table` = 'repos'\nLEFT JOIN pull_request_commits prc ON prc.commit_sha = c.sha\nLEFT JOIN pull_requests pr ON pr.id = prc.pull_request_id AND pr.status = 'MERGED'\nWHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.id IS NULL AND $__timeFilter(c.committed_date)",
           "refId": "A"
         }
       ],
@@ -530,7 +530,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT SUM(sz) AS \"Lines Never Merged\" FROM (\n  SELECT DISTINCT c.sha, (c.additions + c.deletions) AS sz\n  FROM commits c\n  JOIN repo_commits rc ON rc.commit_sha = c.sha\n  JOIN project_mapping pm ON pm.row_id = rc.repo_id AND pm.`table` = 'repos'\n  LEFT JOIN pull_request_commits prc ON prc.commit_sha = c.sha\n  LEFT JOIN pull_requests pr ON pr.id = prc.pull_request_id AND pr.status = 'MERGED'\n  WHERE pm.project_name IN ($project) AND pr.id IS NULL AND $__timeFilter(c.committed_date)\n) x",
+          "rawSql": "SELECT SUM(sz) AS \"Lines Never Merged\" FROM (\n  SELECT DISTINCT c.sha, (c.additions + c.deletions) AS sz\n  FROM commits c\n  JOIN repo_commits rc ON rc.commit_sha = c.sha\n  JOIN project_mapping pm ON pm.row_id = rc.repo_id AND pm.`table` = 'repos'\n  LEFT JOIN pull_request_commits prc ON prc.commit_sha = c.sha\n  LEFT JOIN pull_requests pr ON pr.id = prc.pull_request_id AND pr.status = 'MERGED'\n  WHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.id IS NULL AND $__timeFilter(c.committed_date)\n) x",
           "refId": "A"
         }
       ],
@@ -593,7 +593,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(NULLIF(a.full_name,''), pr.author_name) AS \"Contributor\",\n  COUNT(*) AS \"Total PRs\",\n  SUM(pr.status = 'CLOSED') AS \"Abandoned (Closed, Never Merged)\",\n  ROUND(100.0 * SUM(pr.status = 'CLOSED') / COUNT(*), 1) AS \"Abandonment Rate %\"\nFROM pull_requests pr\nLEFT JOIN accounts a ON a.id = pr.author_id\nJOIN project_mapping pm ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\nWHERE pm.project_name IN ($project) AND pr.status IN ('CLOSED', 'MERGED') AND COALESCE(pr.merged_date, pr.closed_date) BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY COALESCE(NULLIF(a.full_name,''), pr.author_name)\nHAVING COUNT(*) >= 5\nORDER BY 4 DESC\nLIMIT 25",
+          "rawSql": "SELECT COALESCE(NULLIF(a.full_name,''), pr.author_name) AS \"Contributor\",\n  COUNT(*) AS \"Total PRs\",\n  SUM(pr.status = 'CLOSED') AS \"Abandoned (Closed, Never Merged)\",\n  ROUND(100.0 * SUM(pr.status = 'CLOSED') / COUNT(*), 1) AS \"Abandonment Rate %\"\nFROM pull_requests pr\nLEFT JOIN accounts a ON a.id = pr.author_id\nJOIN project_mapping pm ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\nWHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status IN ('CLOSED', 'MERGED') AND COALESCE(pr.merged_date, pr.closed_date) BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY COALESCE(NULLIF(a.full_name,''), pr.author_name)\nHAVING COUNT(*) >= 5\nORDER BY 4 DESC\nLIMIT 25",
           "refId": "A"
         }
       ],
@@ -647,14 +647,14 @@
           ]
         },
         "datasource": "mysql",
-        "definition": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND cp.project_name REGEXP '^(${project:regex})$'\nORDER BY c.team_slug;",
+        "definition": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND (cp.project_name REGEXP '^(${project:regex})$' AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring}))\nORDER BY c.team_slug;",
         "hide": 0,
         "includeAll": true,
         "label": "Claude Code OTel teams",
         "multi": true,
         "name": "otel_teams",
         "options": [],
-        "query": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND cp.project_name REGEXP '^(${project:regex})$'\nORDER BY c.team_slug;",
+        "query": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND (cp.project_name REGEXP '^(${project:regex})$' AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring}))\nORDER BY c.team_slug;",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
