@@ -25,6 +25,7 @@ import (
 	"github.com/apache/incubator-devlake/plugins/claude_otel/api"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models/migrationscripts"
+	"github.com/apache/incubator-devlake/plugins/claude_otel/service"
 )
 
 var _ interface {
@@ -33,9 +34,14 @@ var _ interface {
 	plugin.PluginApi
 	plugin.PluginModel
 	plugin.PluginMigration
+	plugin.ProjectDeleteHook
 } = (*ClaudeOtel)(nil)
 
 type ClaudeOtel struct{}
+
+func (p ClaudeOtel) BeforeDeleteProject(tx dal.Transaction, projectName string) errors.Error {
+	return service.DeleteProjectPlacementsInTransaction(tx, projectName)
+}
 
 func (p ClaudeOtel) Name() string { return "claude_otel" }
 

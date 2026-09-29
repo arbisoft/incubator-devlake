@@ -259,6 +259,44 @@ func RemoveOtelProjectPlacements(projectName string) errors.Error {
 	return nil
 }
 
+// DeleteProjectPlacementsInTransaction removes OTel placements when the core project
+// deletion hook runs. The caller owns the transaction and its commit or rollback.
+func DeleteProjectPlacementsInTransaction(tx dal.Transaction, projectName string) errors.Error {
+	lifecycleMu.Lock()
+	defer lifecycleMu.Unlock()
+
+	placements := make([]*models.OtelConnectionProject, 0)
+	if err := tx.All(&placements, dal.Where("project_name = ?", projectName)); err != nil {
+		return errors.Default.Wrap(err, "error getting Claude Code OTel project placements for deletion")
+	}
+
+	checkedConnections := make(map[uint64]struct{}, len(placements))
+	for _, placement := range placements {
+		if _, checked := checkedConnections[placement.ConnectionId]; checked {
+			continue
+		}
+		checkedConnections[placement.ConnectionId] = struct{}{}
+
+		connection := &models.OtelConnection{}
+		if err := tx.First(connection, dal.Where("id = ?", placement.ConnectionId)); err != nil {
+			return errors.Default.Wrap(err, "error getting Claude Code OTel connection for project deletion")
+		}
+
+		connectionPlacements := make([]*models.OtelConnectionProject, 0)
+		if err := tx.All(&connectionPlacements, dal.Where("connection_id = ?", connection.ID)); err != nil {
+			return errors.Default.Wrap(err, "error getting Claude Code OTel connection placements for deletion")
+		}
+		if err := validateOtelProjectPlacementRemovalState(connection.Status, len(connectionPlacements)); err != nil {
+			return err
+		}
+	}
+
+	if err := tx.Delete(&models.OtelConnectionProject{}, dal.Where("project_name = ?", projectName)); err != nil {
+		return errors.Default.Wrap(err, "error removing Claude Code OTel project placements during project deletion")
+	}
+	return nil
+}
+
 func projectSummariesFromNames(names []string) []*models.OtelProjectSummary {
 	summaries := make([]*models.OtelProjectSummary, 0, len(names))
 	for _, name := range names {
