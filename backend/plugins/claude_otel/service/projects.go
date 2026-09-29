@@ -244,21 +244,6 @@ func validateOtelProjectPlacementRemovalState(connectionStatus string, placement
 	return nil
 }
 
-// RemoveOtelProjectPlacements removes a deleted project's OTel-only association rows.
-// The normal project service does not know about this plugin-owned table.
-func RemoveOtelProjectPlacements(projectName string) errors.Error {
-	lifecycleMu.Lock()
-	defer lifecycleMu.Unlock()
-
-	if err := validateOtelProjectRemovalLocked(projectName); err != nil {
-		return err
-	}
-	if err := db.Delete(&models.OtelConnectionProject{}, dal.Where("project_name = ?", projectName)); err != nil {
-		return errors.Default.Wrap(err, "error removing Claude Code OTel project placements")
-	}
-	return nil
-}
-
 // DeleteProjectPlacementsInTransaction removes OTel placements when the core project
 // deletion hook runs. The caller owns the transaction and its commit or rollback.
 func DeleteProjectPlacementsInTransaction(tx dal.Transaction, projectName string) errors.Error {

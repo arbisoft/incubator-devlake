@@ -80,9 +80,6 @@ func (p ClaudeOtel) ApiResources() map[string]map[string]plugin.ApiResourceHandl
 		"projects/:projectName/removal-preflight": {
 			"POST": api.ValidateProjectRemoval,
 		},
-		"projects/:projectName/placements": {
-			"DELETE": api.DeleteProjectPlacements,
-		},
 		"connections/:connectionId/projects": {
 			"PUT": api.PutConnectionProjects,
 		},

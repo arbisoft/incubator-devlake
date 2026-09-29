@@ -185,13 +185,6 @@ func ValidateProjectRemoval(input *plugin.ApiResourceInput) (*plugin.ApiResource
 	return &plugin.ApiResourceOutput{Status: http.StatusNoContent}, nil
 }
 
-func DeleteProjectPlacements(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
-	if err := service.RemoveOtelProjectPlacements(input.Params["projectName"]); err != nil {
-		return nil, err
-	}
-	return &plugin.ApiResourceOutput{Status: http.StatusNoContent}, nil
-}
-
 func parseId(raw string) (uint64, errors.Error) {
 	id, err := strconv.ParseUint(raw, 10, 64)
 	if err != nil {
