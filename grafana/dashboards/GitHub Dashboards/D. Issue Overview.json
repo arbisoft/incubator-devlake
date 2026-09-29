@@ -52,7 +52,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Issues created vs issues closed over time.\n\rdatasource: issues, board_issues, project_mapping",
+      "description": "Issues created vs issues closed over time.\nDeveloper filter uses the current assignee; Closed only counts issues created within the selected range.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
