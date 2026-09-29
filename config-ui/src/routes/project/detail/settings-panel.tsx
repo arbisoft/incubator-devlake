@@ -154,12 +154,6 @@ export const SettingsPanel = ({ project, onRefresh }: Props) => {
     });
 
     if (success) {
-      if (hasOtelPlacements) {
-        const [placementsRemoved] = await operator(() => API.otel.removeProjectPlacements(project.name), { hideToast: true });
-        if (!placementsRemoved) {
-          message.warning('Project deleted, but Claude Code OTel placement cleanup needs operator attention.');
-        }
-      }
       navigate(PATHS.PROJECTS());
     }
   };

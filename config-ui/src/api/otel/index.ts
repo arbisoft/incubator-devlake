@@ -71,8 +71,3 @@ export const validateProjectRemoval = (projectName: string): Promise<void> =>
   request(`/plugins/claude_otel/projects/${encodeURIComponent(projectName)}/removal-preflight`, {
     method: 'POST',
   });
-
-export const removeProjectPlacements = (projectName: string): Promise<void> =>
-  request(`/plugins/claude_otel/projects/${encodeURIComponent(projectName)}/placements`, {
-    method: 'DELETE',
-  });
