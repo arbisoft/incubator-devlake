@@ -174,7 +174,7 @@ func DeleteProject(c *gin.Context) {
 	projectName := c.Param("projectName")
 	err := services.DeleteProject(projectName)
 	if err != nil {
-		shared.ApiOutputError(c, errors.Default.Wrap(err, "error deleting project"))
+		shared.ApiOutputError(c, err)
 		return
 	}
 	shared.ApiOutputSuccess(c, nil, http.StatusOK)

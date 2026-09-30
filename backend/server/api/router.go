@@ -166,15 +166,22 @@ func handlePluginCall(basicRes context.BasicRes, pluginName string, handler plug
 			} else {
 				shouldBindJSONErr := c.ShouldBindJSON(&input.Body)
 				if shouldBindJSONErr != nil && shouldBindJSONErr.Error() != "EOF" {
-					shared.ApiOutputError(c, shouldBindJSONErr)
+					shared.ApiOutputError(c, errors.BadInput.Wrap(shouldBindJSONErr, shared.BadRequestBody))
 					return
 				}
 			}
 		}
 		output, err := handler(input)
 		if err != nil {
+			err = shared.NormalizeError(err)
 			if output != nil && output.Body != nil {
 				logruslog.Global.Error(err, "")
+				// helpers build these bodies from err.Error(), which carries the
+				// full wrap chain; keep only the client-safe message
+				if body, ok := output.Body.(*shared.ApiBody); ok {
+					body.Message = shared.SafeErrorMessage(err)
+					body.Causes = nil
+				}
 				shared.ApiOutputSuccess(c, output.Body, err.GetType().GetHttpCode())
 			} else {
 				shared.ApiOutputError(c, err)

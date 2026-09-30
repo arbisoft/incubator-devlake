@@ -18,7 +18,6 @@ limitations under the License.
 package services
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/apache/incubator-devlake/core/dal"
@@ -169,7 +168,7 @@ func TestRunProjectDeleteHooks(t *testing.T) {
 		assert.Equal(t, "test-project", hook.deleteCalls[0].projectName)
 	})
 
-	t.Run("returns wrapped error on hook veto", func(t *testing.T) {
+	t.Run("returns hook veto unwrapped", func(t *testing.T) {
 		expectedErr := errors.Default.New("project delete vetoed by plugin")
 		hook := &testHookPlugin{
 			name:      "test-hook-veto",
@@ -180,9 +179,7 @@ func TestRunProjectDeleteHooks(t *testing.T) {
 		tx := dalmocks.NewTransaction(t)
 		err := runProjectDeleteHooks(tx, "test-project")
 
-		assert.Error(t, err)
-		assert.ErrorIs(t, err, expectedErr)
-		assert.Contains(t, err.Error(), fmt.Sprintf("error executing delete hook for plugin %s", hook.Name()))
+		assert.Equal(t, expectedErr, err)
 	})
 }
 
@@ -208,7 +205,6 @@ func TestDeleteProject_RollsBackOnDeleteHookVeto(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, hookErr)
-	assert.Contains(t, err.Error(), fmt.Sprintf("error executing delete hook for plugin %s", hook.Name()))
 	assert.Equal(t, 1, len(hook.deleteCalls))
 	assert.Equal(t, "project-veto", hook.deleteCalls[0].projectName)
 	tx.AssertNotCalled(t, "Commit")

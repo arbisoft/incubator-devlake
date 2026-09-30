@@ -19,10 +19,13 @@ package api
 
 import (
 	"bytes"
+	"encoding/json"
+	goerrors "errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/apache/incubator-devlake/core/config"
@@ -31,7 +34,9 @@ import (
 	contextimpl "github.com/apache/incubator-devlake/impls/context"
 	"github.com/apache/incubator-devlake/impls/logruslog"
 	"github.com/apache/incubator-devlake/server/api/access"
+	"github.com/apache/incubator-devlake/server/api/shared"
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	rpccode "google.golang.org/genproto/googleapis/rpc/code"
 	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/protobuf/proto"
@@ -154,6 +159,96 @@ func TestPluginEndpointComputesIsCustomerAdminFromAccessPrincipal(t *testing.T) 
 			}
 			if gotIsCustomerAdmin != testCase.want {
 				t.Fatalf("IsCustomerAdmin = %t, want %t", gotIsCustomerAdmin, testCase.want)
+			}
+		})
+	}
+}
+
+// TestPluginEndpointErrorBodyIsClientSafe guards the error contract every plugin
+// endpoint shares: the status comes from the error's classification, the message is
+// the top-level one without the errors package's " (409)" suffix, and neither the
+// wrap chain nor the helpers' err.Error() rendering reaches the client.
+func TestPluginEndpointErrorBodyIsClientSafe(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	validationErr := validator.New().Struct(struct {
+		Endpoint string `validate:"required"`
+	}{})
+	conflict := errors.Conflict.New("Cannot delete the connection because it is referenced by blueprints")
+	testCases := []struct {
+		name        string
+		handler     plugin.ApiResourceHandler
+		body        string
+		wantStatus  int
+		wantMessage string
+		wantData    bool
+	}{
+		{
+			name: "helper-built conflict body keeps its data",
+			handler: func(*plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+				return &plugin.ApiResourceOutput{Body: &shared.ApiBody{
+					Message: conflict.Error(),
+					Data:    []string{"blueprint-1"},
+				}, Status: http.StatusConflict}, conflict
+			},
+			wantStatus:  http.StatusConflict,
+			wantMessage: "Cannot delete the connection because it is referenced by blueprints",
+			wantData:    true,
+		},
+		{
+			name: "wrap chain is not exposed",
+			handler: func(*plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+				return nil, errors.Default.Wrap(errors.NotFound.New("record not found"), "connection not found")
+			},
+			wantStatus:  http.StatusNotFound,
+			wantMessage: "connection not found",
+		},
+		{
+			name: "untyped validation error is a bad request",
+			handler: func(*plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+				return nil, errors.Convert(validationErr)
+			},
+			wantStatus:  http.StatusBadRequest,
+			wantMessage: "Endpoint is required",
+		},
+		{
+			name: "internal error text is not exposed",
+			handler: func(*plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+				return nil, errors.Convert(goerrors.New("Error 1146: Table 'lake.x' doesn't exist"))
+			},
+			wantStatus:  http.StatusInternalServerError,
+			wantMessage: "an unexpected error occurred",
+		},
+		{
+			name: "malformed JSON body is a bad request",
+			handler: func(*plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+				return nil, nil
+			},
+			body:        "{",
+			wantStatus:  http.StatusBadRequest,
+			wantMessage: shared.BadRequestBody,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			router := gin.New()
+			basicRes := contextimpl.NewDefaultBasicRes(config.GetConfig(), logruslog.Global, nil)
+			registerPluginEndpoints(router, basicRes, "github", map[string]map[string]plugin.ApiResourceHandler{
+				"probe": {http.MethodPost: testCase.handler},
+			})
+			request := httptest.NewRequest(http.MethodPost, "/plugins/github/probe", strings.NewReader(testCase.body))
+			request.Header.Set("Content-Type", "application/json")
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, request)
+
+			var body map[string]any
+			if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+				t.Fatalf("body %q is not JSON: %v", response.Body.String(), err)
+			}
+			if response.Code != testCase.wantStatus || body["message"] != testCase.wantMessage || body["causes"] != nil ||
+				(body["data"] != nil) != testCase.wantData {
+				t.Fatalf("status=%d body=%s, want %d with message %q, no causes, data=%t",
+					response.Code, response.Body.String(), testCase.wantStatus, testCase.wantMessage, testCase.wantData)
 			}
 		})
 	}

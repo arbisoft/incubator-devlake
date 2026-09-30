@@ -18,11 +18,14 @@ limitations under the License.
 package plugin
 
 import (
+	goerrors "errors"
+	"net"
+	"net/http"
+	"net/url"
+
 	"github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models/common"
-	"net/http"
-	"net/url"
 )
 
 // ApiResourceInput Contains api request information
@@ -86,10 +89,33 @@ func WrapTestConnectionErrResp(basicRes context.BasicRes, err errors.Error) erro
 	if err == nil {
 		return err
 	}
+	err = remapTestConnectionStatus(err)
 	if !basicRes.GetConfigReader().GetBool(wrapResponseError) {
 		return err
 	}
 	statusCode := err.GetType().GetHttpCode()
 	message := "Something went wrong when testing your connection, please check your connection details."
 	return errors.HttpStatus(statusCode).New(message)
+}
+
+// remapTestConnectionStatus keeps the remote service's verdict in the message
+// but not its status: DevLake answering 401 or 404 would describe DevLake's
+// own session or routing rather than the rejected connection details.
+// Rejections become 400, and remote or network failures 502/504. The empty
+// wrap message leaves the original message as the client-facing one.
+func remapTestConnectionStatus(err errors.Error) errors.Error {
+	status := err.GetType().GetHttpCode()
+	var netErr net.Error
+	switch {
+	case status > http.StatusBadRequest && status < http.StatusInternalServerError:
+		return errors.BadInput.Wrap(err, "")
+	case status > http.StatusInternalServerError:
+		return errors.HttpStatus(http.StatusBadGateway).Wrap(err, "")
+	case status == http.StatusInternalServerError && goerrors.As(err, &netErr):
+		if netErr.Timeout() {
+			return errors.Timeout.Wrap(err, "")
+		}
+		return errors.HttpStatus(http.StatusBadGateway).Wrap(err, "")
+	}
+	return err
 }

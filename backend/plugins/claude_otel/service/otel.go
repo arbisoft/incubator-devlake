@@ -146,7 +146,7 @@ func HideOtelConnection(user *common.User, id uint64) (*models.OtelConnectionWit
 		return nil, err
 	}
 	if connection.Status != models.OtelConnectionStatusRevoked {
-		return nil, errors.BadInput.New("only revoked Claude Code OTel connections can be removed")
+		return nil, errors.Conflict.New("only revoked Claude Code OTel connections can be removed")
 	}
 	if connection.HiddenAt == nil {
 		now := time.Now()
@@ -196,7 +196,7 @@ func CreateOtelConnection(user *common.User, input *OtelConnectionInput) (*model
 		return nil, errors.Default.Wrap(err, "error checking otel team connection")
 	}
 	if connectionCount > 0 {
-		return nil, errors.BadInput.New("a Claude Code OTel connection already exists for this team")
+		return nil, errors.Conflict.New("a Claude Code OTel connection already exists for this team")
 	}
 	connection := &models.OtelConnection{
 		Name:              fmt.Sprintf("%s: %s", defaultOtelConnectionName, teamName),
@@ -378,7 +378,7 @@ func RotateOtelConnection(user *common.User, id uint64) (*models.OtelConnectionW
 		return nil, err
 	}
 	if connection.Status != models.OtelConnectionStatusActive {
-		return nil, errors.BadInput.New("otel connection is not active")
+		return nil, errors.Conflict.New("otel connection is not active")
 	}
 	if err := validateOtelSettings(connection.CollectorEndpoint, connection.Protocol); err != nil {
 		return nil, err
@@ -398,10 +398,10 @@ func RotateOtelConnection(user *common.User, id uint64) (*models.OtelConnectionW
 		return nil, err
 	}
 	if missingVerifier {
-		return nil, errors.BadInput.New("credential verifier is unavailable; revoke this connection and create a new one")
+		return nil, errors.Conflict.New("credential verifier is unavailable; revoke this connection and create a new one")
 	}
 	if hasRetiringCredential(activeCredentials) {
-		return nil, errors.BadInput.New("finalize the current credential rotation before starting another")
+		return nil, errors.Conflict.New("finalize the current credential rotation before starting another")
 	}
 	for _, credential := range activeCredentials {
 		credential.PendingCollectorRestart = true
