@@ -166,6 +166,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Tickets created over time, split by type.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -273,14 +274,14 @@
         }
       ],
       "title": "Ticket Type Mix Trend",
-      "type": "timeseries",
-      "description": "Tickets created over time, split by type.\n\rdatasource: issues, board_issues"
+      "type": "timeseries"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Median and P75 lead time in days by ticket type and priority.\n\rdatasource: issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -361,8 +362,7 @@
         }
       ],
       "title": "Tickets Lead Time",
-      "type": "table",
-      "description": "Median and P75 lead time in days by ticket type and priority.\n\rdatasource: issues"
+      "type": "table"
     },
     {
       "datasource": {
@@ -513,6 +513,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Bugs reported vs tickets delivered over time (Scrum boards).\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -598,7 +599,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT $__timeGroup(i.created_date, $interval) as time,\n  COUNT(1) AS `Bug Reported`,\n  0 AS `Ticket Delivered`\nFROM issues i \nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date) \n  AND i.type = 'BUG'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n  )\nGROUP BY time\nUNION\nSELECT $__timeGroup(i.created_date, $interval) as time,\n  0 AS `Bug Reported`,\n  COUNT(1) AS `Ticket Delivered`\nFROM issues i \nWHERE i.id LIKE 'jira:%'\n  AND i.status = 'DONE'\n  AND i.resolution_date IS NOT NULL\n  AND $__timeFilter(i.resolution_date) \n  AND i.type = 'TASK'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n  )\nGROUP BY time",
+          "rawSql": "SELECT time, SUM(`Bug Reported`) AS `Bug Reported`, SUM(`Ticket Delivered`) AS `Ticket Delivered`\nFROM \n(    \n  SELECT $__timeGroup(i.created_date, $interval) as time,\n    COUNT(1) AS `Bug Reported`,\n    0 AS `Ticket Delivered`\n  FROM issues i \n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date) \n    AND i.type = 'BUG'\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n  GROUP BY time\n  UNION\n  SELECT $__timeGroup(i.created_date, $interval) as time,\n    0 AS `Bug Reported`,\n    COUNT(1) AS `Ticket Delivered`\n  FROM issues i \n  WHERE i.id LIKE 'jira:%'\n    AND i.status = 'DONE'\n    AND i.resolution_date IS NOT NULL\n    AND $__timeFilter(i.resolution_date) \n    AND i.type = 'TASK'\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n  GROUP BY time\n) base\nGROUP BY time",
           "refId": "A",
           "sql": {
             "columns": [
@@ -620,14 +621,14 @@
         }
       ],
       "title": "Bugs Reported vs Tickets Delivered (Scrum)",
-      "type": "timeseries",
-      "description": "Bugs reported vs tickets delivered over time (Scrum boards).\n\rdatasource: issues, board_issues"
+      "type": "timeseries"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Bugs reported vs tickets delivered over time (Kanban boards).\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -713,7 +714,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT $__timeGroup(i.created_date, $interval) as time,\n  COUNT(1) AS `Bug Reported`,\n  0 AS `Ticket Delivered`\nFROM issues i \nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date) \n  AND i.type = 'BUG'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n  )\nGROUP BY time\nUNION\nSELECT $__timeGroup(i.created_date, $interval) as time,\n  0 AS `Bug Reported`,\n  COUNT(1) AS `Ticket Delivered`\nFROM issues i \nWHERE i.id LIKE 'jira:%'\n  AND i.status = 'DONE'\n  AND i.resolution_date IS NOT NULL\n  AND $__timeFilter(i.resolution_date) \n  AND i.type = 'TASK'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n  )\nGROUP BY time",
+          "rawSql": "SELECT time, SUM(`Bug Reported`) AS `Bug Reported`, SUM(`Ticket Delivered`) as `Ticket Delivered`\nFROM\n(\n  SELECT $__timeGroup(i.created_date, $interval) as time,\n    COUNT(1) AS `Bug Reported`,\n    0 AS `Ticket Delivered`\n  FROM issues i \n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date) \n    AND i.type = 'BUG'\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n  GROUP BY time\n  UNION\n  SELECT $__timeGroup(i.created_date, $interval) as time,\n    0 AS `Bug Reported`,\n    COUNT(1) AS `Ticket Delivered`\n  FROM issues i \n  WHERE i.id LIKE 'jira:%'\n    AND i.status = 'DONE'\n    AND i.resolution_date IS NOT NULL\n    AND $__timeFilter(i.resolution_date) \n    AND i.type = 'TASK'\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n  GROUP BY time\n) base\nGROUP BY time",
           "refId": "A",
           "sql": {
             "columns": [
@@ -735,14 +736,14 @@
         }
       ],
       "title": "Bugs Reported vs Tickets Delivered (Kanban)",
-      "type": "timeseries",
-      "description": "Bugs reported vs tickets delivered over time (Kanban boards).\n\rdatasource: issues, board_issues"
+      "type": "timeseries"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of open Highest priority tickets.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -903,14 +904,14 @@
         }
       ],
       "title": "Highest Priority Tickets",
-      "type": "table",
-      "description": "List of open Highest priority tickets.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of open High priority tickets.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1071,14 +1072,14 @@
         }
       ],
       "title": "High Priority Tickets",
-      "type": "table",
-      "description": "List of open High priority tickets.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of open Medium priority tickets.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1239,14 +1240,14 @@
         }
       ],
       "title": "Medium Priority Tickets",
-      "type": "table",
-      "description": "List of open Medium priority tickets.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of open Low priority tickets.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1407,14 +1408,14 @@
         }
       ],
       "title": "Low Priority Tickets",
-      "type": "table",
-      "description": "List of open Low priority tickets.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of open Lowest priority tickets.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1575,14 +1576,14 @@
         }
       ],
       "title": "Lowest Priority Tickets",
-      "type": "table",
-      "description": "List of open Lowest priority tickets.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of open tickets with no priority set.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1743,8 +1744,7 @@
         }
       ],
       "title": "Tickets without Priority",
-      "type": "table",
-      "description": "List of open tickets with no priority set.\n\rdatasource: issues, board_issues"
+      "type": "table"
     }
   ],
   "preload": false,
@@ -1752,6 +1752,35 @@
   "tags": [],
   "templating": {
     "list": [
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "1M",
+          "value": "1M"
+        },
+        "description": "",
+        "label": "Time Interval",
+        "name": "interval",
+        "options": [
+          {
+            "selected": true,
+            "text": "Month",
+            "value": "1M"
+          },
+          {
+            "selected": false,
+            "text": "Week",
+            "value": "1w"
+          },
+          {
+            "selected": false,
+            "text": "Day",
+            "value": "1d"
+          }
+        ],
+        "query": "Month : 1M, Week : 1w, Day : 1d",
+        "type": "custom"
+      },
       {
         "allowCustomValue": false,
         "current": {
@@ -1819,35 +1848,6 @@
         "refresh": 1,
         "regex": "/^(?<text>.*)--(?<value>.*)$/",
         "type": "query"
-      },
-      {
-        "allowCustomValue": false,
-        "current": {
-          "text": "1M",
-          "value": "1M"
-        },
-        "description": "",
-        "label": "Time Interval",
-        "name": "interval",
-        "options": [
-          {
-            "selected": true,
-            "text": "Month",
-            "value": "1M"
-          },
-          {
-            "selected": false,
-            "text": "Week",
-            "value": "1w"
-          },
-          {
-            "selected": false,
-            "text": "Day",
-            "value": "1d"
-          }
-        ],
-        "query": "Month : 1M, Week : 1w, Day : 1d",
-        "type": "custom"
       }
     ]
   },

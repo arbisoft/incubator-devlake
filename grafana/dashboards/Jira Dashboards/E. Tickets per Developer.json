@@ -251,6 +251,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Tickets closed over time.\n\rdatasource: issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -336,7 +337,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT $__timeGroup(i.resolution_date, ${interval})                     AS time,\n  COUNT(*) as Value\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND i.status LIKE 'DONE'\n  AND (i.assignee_id IN ($developer_id) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ($developer_id)))\n  AND EXISTS (SELECT 1 FROM board_issues bi\n              JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n              WHERE bi.issue_id = i.id\n                AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${board_id}))\n                AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  AND i.resolution_date IS NOT NULL\n  AND $__timeFilter(i.resolution_date) \n  AND i.type NOT LIKE 'EPIC'\nGROUP BY time\nORDER BY time;",
+          "rawSql": "SELECT $__timeGroup(i.resolution_date, ${interval})                     AS time,\n  COUNT(*) as `Closed Count`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND i.status LIKE 'DONE'\n  AND (i.assignee_id IN ($developer_id) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ($developer_id)))\n  AND EXISTS (SELECT 1 FROM board_issues bi\n              JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n              WHERE bi.issue_id = i.id\n                AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${board_id}))\n                AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  AND i.resolution_date IS NOT NULL\n  AND $__timeFilter(i.resolution_date) \n  AND i.type NOT LIKE 'EPIC'\nGROUP BY time\nORDER BY time;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -358,14 +359,14 @@
         }
       ],
       "title": "Tickets Closed",
-      "type": "timeseries",
-      "description": "Tickets closed over time.\n\rdatasource: issues"
+      "type": "timeseries"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Ticket types (bugs, stories, tasks) per developer.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -446,8 +447,7 @@
         }
       ],
       "title": "Ticket Type Mix Per Developer",
-      "type": "table",
-      "description": "Ticket types (bugs, stories, tasks) per developer.\n\rdatasource: issues, board_issues"
+      "type": "table"
     }
   ],
   "preload": false,
@@ -455,6 +455,35 @@
   "tags": [],
   "templating": {
     "list": [
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "1M",
+          "value": "1M"
+        },
+        "description": "",
+        "label": "Time Interval",
+        "name": "interval",
+        "options": [
+          {
+            "selected": true,
+            "text": "Month",
+            "value": "1M"
+          },
+          {
+            "selected": false,
+            "text": "Week",
+            "value": "1w"
+          },
+          {
+            "selected": false,
+            "text": "Day",
+            "value": "1d"
+          }
+        ],
+        "query": "Month : 1M, Week : 1w, Day : 1d",
+        "type": "custom"
+      },
       {
         "allowCustomValue": false,
         "current": {
@@ -522,35 +551,6 @@
         "refresh": 1,
         "regex": "/^(?<text>.*)--(?<value>.*)$/",
         "type": "query"
-      },
-      {
-        "allowCustomValue": false,
-        "current": {
-          "text": "1M",
-          "value": "1M"
-        },
-        "description": "",
-        "label": "Time Interval",
-        "name": "interval",
-        "options": [
-          {
-            "selected": true,
-            "text": "Month",
-            "value": "1M"
-          },
-          {
-            "selected": false,
-            "text": "Week",
-            "value": "1w"
-          },
-          {
-            "selected": false,
-            "text": "Day",
-            "value": "1d"
-          }
-        ],
-        "query": "Month : 1M, Week : 1w, Day : 1d",
-        "type": "custom"
       }
     ]
   },

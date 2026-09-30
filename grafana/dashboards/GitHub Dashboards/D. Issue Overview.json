@@ -67,7 +67,7 @@
             "barAlignment": 0,
             "barWidthFactor": 0.6,
             "drawStyle": "line",
-            "fillOpacity": 0,
+            "fillOpacity": 30,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -75,7 +75,7 @@
               "viz": false
             },
             "insertNulls": false,
-            "lineInterpolation": "linear",
+            "lineInterpolation": "smooth",
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
@@ -182,7 +182,7 @@
             "barAlignment": 0,
             "barWidthFactor": 0.6,
             "drawStyle": "line",
-            "fillOpacity": 0,
+            "fillOpacity": 30,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -190,7 +190,7 @@
               "viz": false
             },
             "insertNulls": false,
-            "lineInterpolation": "linear",
+            "lineInterpolation": "smooth",
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
@@ -397,7 +397,26 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URL"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Show in GitHub",
+                    "url": "${__data.fields.URL}"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 9,
@@ -429,7 +448,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT REPLACE(COALESCE(\n         NULLIF(TRIM(a.full_name),     ''),\n         NULLIF(TRIM(a.user_name),     ''),\n         NULLIF(TRIM(i.assignee_name), ''),\n         '(unassigned)'\n       ), '-', ' ') AS Developer, \n  i.title AS Issue,\n  DATEDIFF(CURDATE(), i.updated_date) AS `Lead Time Days`\nFROM issues i\nLEFT JOIN accounts a ON a.id = i.assignee_id\nWHERE i.id LIKE 'github:%'\n  AND i.original_status = 'OPEN'\n  AND DATEDIFF(CURDATE(), i.updated_date) > 14\n  AND $__timeFilter(i.updated_date) \nAND (i.assignee_id IN ( $developer_id ) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ( $developer_id )))\n  AND EXISTS (SELECT 1 FROM board_issues bi2 JOIN project_mapping pm2 ON pm2.row_id = bi2.board_id AND pm2.`table` = 'boards' WHERE bi2.issue_id = i.id AND bi2.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) AND pm2.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\nORDER BY `Lead Time Days` DESC",
+          "rawSql": "SELECT REPLACE(COALESCE(\n         NULLIF(TRIM(a.full_name),     ''),\n         NULLIF(TRIM(a.user_name),     ''),\n         NULLIF(TRIM(i.assignee_name), ''),\n         '(unassigned)'\n       ), '-', ' ') AS Developer, \n  i.title AS Issue,\n  DATE_FORMAT(i.updated_date, '%W, %b %d, %Y') AS `Last Updated On`,\n  i.url as `URL`\nFROM issues i\nLEFT JOIN accounts a ON a.id = i.assignee_id\nWHERE i.id LIKE 'github:%'\n  AND i.original_status = 'OPEN'\n  AND DATEDIFF(CURDATE(), i.updated_date) > 14\n  AND $__timeFilter(i.updated_date) \nAND (i.assignee_id IN ( $developer_id ) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ( $developer_id )))\n  AND EXISTS (SELECT 1 FROM board_issues bi2 JOIN project_mapping pm2 ON pm2.row_id = bi2.board_id AND pm2.`table` = 'boards' WHERE bi2.issue_id = i.id AND bi2.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) AND pm2.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\nORDER BY i.updated_date DESC",
           "refId": "A",
           "sql": {
             "columns": [

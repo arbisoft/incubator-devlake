@@ -182,7 +182,7 @@
             "barAlignment": 0,
             "barWidthFactor": 0.6,
             "drawStyle": "line",
-            "fillOpacity": 0,
+            "fillOpacity": 30,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -190,7 +190,7 @@
               "viz": false
             },
             "insertNulls": false,
-            "lineInterpolation": "linear",
+            "lineInterpolation": "smooth",
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
@@ -826,8 +826,8 @@
     "list": [
       {
         "current": {
-          "text": "1m",
-          "value": "1m"
+          "text": "1M",
+          "value": "1M"
         },
         "label": "Time Interval",
         "name": "interval",
@@ -835,7 +835,7 @@
           {
             "selected": true,
             "text": "Month",
-            "value": "1m"
+            "value": "1M"
           },
           {
             "selected": false,
@@ -848,7 +848,7 @@
             "value": "1d"
           }
         ],
-        "query": "Month : 1m, Week : 1w, Day : 1d",
+        "query": "Month : 1M, Week : 1w, Day : 1d",
         "type": "custom"
       },
       {
