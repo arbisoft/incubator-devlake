@@ -368,7 +368,7 @@ func DeleteProject(name string) errors.Error {
 		return err
 	}
 	if pipelinesAreUnfinished {
-		return errors.Default.New("There are unfinished pipelines in the current project. It cannot be deleted at this time.")
+		return errors.Conflict.New("There are unfinished pipelines in the current project. It cannot be deleted at this time.")
 	}
 	tx := db.Begin()
 	defer func() {
@@ -421,8 +421,10 @@ func DeleteProject(name string) errors.Error {
 func runProjectDeleteHooks(tx dal.Transaction, projectName string) errors.Error {
 	return plugin.TraversalPlugin(func(name string, pluginInst plugin.PluginMeta) errors.Error {
 		if hook, ok := pluginInst.(plugin.ProjectDeleteHook); ok {
+			// returned unwrapped: the hook's own message is the reason the
+			// user sees for the rejected delete
 			if err := hook.BeforeDeleteProject(tx, projectName); err != nil {
-				return errors.Default.Wrap(err, fmt.Sprintf("error executing delete hook for plugin %s", name))
+				return err
 			}
 		}
 		return nil
