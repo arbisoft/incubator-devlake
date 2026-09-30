@@ -28,6 +28,7 @@ export interface ITask {
   finishedAt: string | null;
   options: any;
   message: string;
+  errorName: string;
   progressDetail?: {
     finishedSubTasks: number;
     totalSubTasks: number;

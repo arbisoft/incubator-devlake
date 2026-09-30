@@ -76,7 +76,7 @@ export const PipelineInfo = ({ id }: Props) => {
     return <Loading />;
   }
 
-  const { status, beganAt, finishedAt, stage, finishedTasks, totalTasks, message } = data;
+  const { status, beganAt, finishedAt, stage, finishedTasks, totalTasks } = data;
 
   return (
     <S.Info>
@@ -119,7 +119,9 @@ export const PipelineInfo = ({ id }: Props) => {
           ].includes(status) && <Button loading={operating} icon={<RedoOutlined />} onClick={handleRerun} />}
         </li>
       </ul>
-      {IPipelineStatus.FAILED === status && <p className="'message'">{message}</p>}
+      {IPipelineStatus.FAILED === status && (
+        <p className="'message'">Pipeline failed. Hover over a failed task below to see the reason.</p>
+      )}
     </S.Info>
   );
 };
