@@ -239,7 +239,7 @@ func validateOtelProjectRemovalLocked(projectName string) errors.Error {
 
 func validateOtelProjectPlacementRemovalState(connectionStatus string, placementCount int) errors.Error {
 	if connectionStatus == models.OtelConnectionStatusActive && placementCount == 1 {
-		return errors.BadInput.New(finalActiveOtelProjectPlacementMessage)
+		return errors.Conflict.New(finalActiveOtelProjectPlacementMessage)
 	}
 	return nil
 }

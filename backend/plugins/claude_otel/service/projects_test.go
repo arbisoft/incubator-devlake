@@ -161,8 +161,8 @@ func TestValidateOtelProjectPlacementRemovalState(t *testing.T) {
 				if err == nil {
 					t.Fatal("validateOtelProjectPlacementRemovalState() error = nil, want an error")
 				}
-				if status := err.GetType().GetHttpCode(); status != http.StatusBadRequest {
-					t.Fatalf("validateOtelProjectPlacementRemovalState() status = %d, want %d", status, http.StatusBadRequest)
+				if status := err.GetType().GetHttpCode(); status != http.StatusConflict {
+					t.Fatalf("validateOtelProjectPlacementRemovalState() status = %d, want %d", status, http.StatusConflict)
 				}
 				return
 			}
@@ -232,8 +232,8 @@ func TestDeleteProjectPlacementsInTransaction(t *testing.T) {
 				if err == nil {
 					t.Fatal("DeleteProjectPlacementsInTransaction() error = nil, want an error")
 				}
-				if status := err.GetType().GetHttpCode(); status != http.StatusBadRequest {
-					t.Fatalf("DeleteProjectPlacementsInTransaction() status = %d, want %d", status, http.StatusBadRequest)
+				if status := err.GetType().GetHttpCode(); status != http.StatusConflict {
+					t.Fatalf("DeleteProjectPlacementsInTransaction() status = %d, want %d", status, http.StatusConflict)
 				}
 				return
 			}
