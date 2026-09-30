@@ -19,7 +19,7 @@
 import type { ComponentType } from 'react';
 import { CopyOutlined } from '@ant-design/icons';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
-import { Alert, Button, Flex, Input, message, Modal, Select, Space } from 'antd';
+import { Alert, Button, Flex, Input, message, Modal, Select, Space, Typography } from 'antd';
 
 import type { OtelConnectionResponse, OtelProject } from '@/api/otel';
 import { ExternalLink, Message } from '@/components';
@@ -69,21 +69,26 @@ const OtelProjectSelect = ({
   onProjectNamesChange,
   onClearCreateError,
 }: OtelProjectSelectProps) => (
-  <Select
-    style={{ width: '100%' }}
-    mode="multiple"
-    allowClear
-    showSearch
-    optionFilterProp="label"
-    popupMatchSelectWidth={true}
-    placeholder="Select one or more projects"
-    value={projectNames}
-    options={projectOptions.map((project) => ({ value: project.name, label: project.name }))}
-    onChange={(names) => {
-      onProjectNamesChange(names);
-      onClearCreateError();
-    }}
-  />
+  <>
+    <Select
+      style={{ width: '100%' }}
+      mode="multiple"
+      allowClear
+      showSearch
+      optionFilterProp="label"
+      popupMatchSelectWidth={true}
+      placeholder="Select one or more projects"
+      value={projectNames}
+      options={projectOptions.map((project) => ({ value: project.name, label: project.name }))}
+      onChange={(names) => {
+        onProjectNamesChange(names);
+        onClearCreateError();
+      }}
+    />
+    {projectNames.length === 0 && (
+      <Typography.Text type="secondary">Select at least one DevLake project.</Typography.Text>
+    )}
+  </>
 );
 
 const CreateModal = ({
@@ -215,6 +220,7 @@ type LifecycleModalProps = OtelModalProps & {
 };
 
 const LifecycleModal = ({
+  current,
   action,
   title,
   content,
@@ -235,6 +241,11 @@ const LifecycleModal = ({
     onOk={() => onAction(action)}
   >
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
+      {current && (
+        <span>
+          Team: <strong>{current.connection.teamName}</strong> ({current.connection.teamSlug})
+        </span>
+      )}
       <Message content={content} />
       {error && <Alert type="error" showIcon message={error} />}
     </Space>

@@ -30,8 +30,6 @@ import { operator } from '@/utils';
 
 import { getOtelProjectError } from '@/routes/otel/utils';
 
-import * as S from './styled';
-
 const RegexPrIssueDefaultValue = '(?mi)(Closes)[\\s]*.*(((and )?#\\d+[ ]*)+)';
 
 interface Props {
@@ -252,7 +250,7 @@ export const SettingsPanel = ({ project, onRefresh }: Props) => {
         onCancel={handleHideDeleteDialog}
         onOk={handleDelete}
       >
-        <S.DialogBody>
+        <Flex vertical gap={12}>
           <Message content="This operation cannot be undone. Deleting this project will remove all associated project settings and data. This action does not delete any data connections or the data collected through them." />
           {hasOtelPlacements && (
             <Message
@@ -263,7 +261,7 @@ export const SettingsPanel = ({ project, onRefresh }: Props) => {
               }
             />
           )}
-        </S.DialogBody>
+        </Flex>
       </Modal>
     </Flex>
   );

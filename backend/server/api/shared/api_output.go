@@ -18,16 +18,23 @@ limitations under the License.
 package shared
 
 import (
+	goerrors "errors"
 	"net/http"
+	"regexp"
+	"strings"
 
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models"
 	"github.com/apache/incubator-devlake/impls/logruslog"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
+	"github.com/mitchellh/mapstructure"
 )
 
 const BadRequestBody = "bad request body format"
+
+const genericErrorMessage = "an unexpected error occurred"
 
 type TypedApiBody[T any] struct {
 	Code    int      `json:"code"`
@@ -44,76 +51,100 @@ type ResponsePipelines struct {
 	Pipelines []*models.Pipeline `json:"pipelines"`
 }
 
-// safeErrorMessage returns the top-level message only; Error() leaks the
-// error library's internal debug formatting, which must not reach clients.
-func safeErrorMessage(e errors.Error) string {
-	if message := e.Messages().Get(); message != "" {
+// httpStatusSuffix matches the " (409)" the errors package appends to each
+// message; clients already get the status from the response itself.
+var httpStatusSuffix = regexp.MustCompile(` \([1-5][0-9]{2}\)(,|$)`)
+
+// SafeErrorMessage returns the top-level message only, without the status
+// suffix; Error() leaks the error library's internal debug formatting and the
+// wrap chain, which must not reach clients. A 500 is always generic: its
+// message is often a converted SQL, driver or runtime error. Other statuses
+// (including 502/503/504 for remote failures) keep their text.
+func SafeErrorMessage(e errors.Error) string {
+	if e.GetType().GetHttpCode() == http.StatusInternalServerError {
+		return genericErrorMessage
+	}
+	if message := httpStatusSuffix.ReplaceAllString(e.Messages().Get(), "$1"); message != "" {
 		return message
 	}
-	return "an unexpected error occurred"
+	return genericErrorMessage
+}
+
+// NormalizeError turns any error into an errors.Error and reclassifies
+// client-caused failures that reached the API untyped (request validation and
+// request decoding), so they answer 400 instead of 500.
+func NormalizeError(err error) errors.Error {
+	e, ok := err.(errors.Error)
+	if !ok {
+		// no message of our own: a native error's text (SQL, driver, network)
+		// is not client-safe, so it falls back to the generic message
+		e = errors.Internal.Wrap(err, "")
+	}
+	if e.GetType().GetHttpCode() != http.StatusInternalServerError {
+		return e
+	}
+	var validationErrs validator.ValidationErrors
+	if goerrors.As(err, &validationErrs) {
+		return errors.BadInput.Wrap(err, validationMessage(validationErrs))
+	}
+	var decodeErr *mapstructure.Error
+	if goerrors.As(err, &decodeErr) {
+		return errors.BadInput.Wrap(err, strings.Join(decodeErr.Errors, "; "))
+	}
+	return e
+}
+
+func validationMessage(errs validator.ValidationErrors) string {
+	messages := make([]string, 0, len(errs))
+	for _, fieldErr := range errs {
+		if fieldErr.Tag() == "required" {
+			messages = append(messages, fieldErr.Field()+" is required")
+		} else {
+			messages = append(messages, fieldErr.Field()+" is invalid")
+		}
+	}
+	return strings.Join(messages, "; ")
 }
 
 // ApiOutputErrorWithCustomCode writes a JSON error message to the HTTP response body
 func ApiOutputErrorWithCustomCode(c *gin.Context, code int, err error) {
-	if e, ok := err.(errors.Error); ok {
-		logruslog.Global.Error(err, "HTTP %d error", e.GetType().GetHttpCode())
-		messages := e.Messages()
-		c.JSON(e.GetType().GetHttpCode(), &ApiBody{
-			Success: false,
-			Message: safeErrorMessage(e),
-			Code:    code,
-			Causes:  messages.Causes(),
-		})
-	} else {
-		logruslog.Global.Error(err, "HTTP %d error (native)", http.StatusInternalServerError)
-		c.JSON(http.StatusInternalServerError, &ApiBody{
-			Success: false,
-			Code:    code,
-			Message: err.Error(),
-		})
-	}
+	e := NormalizeError(err)
+	status := e.GetType().GetHttpCode()
+	logruslog.Global.Error(err, "HTTP %d error", status)
+	c.JSON(status, &ApiBody{
+		Success: false,
+		Message: SafeErrorMessage(e),
+		Code:    code,
+	})
 	c.Writer.Header().Set("Content-Type", "application/json")
 }
 
 // ApiOutputAdvancedErrorWithCustomCode writes a JSON error message to the HTTP response body
 func ApiOutputAdvancedErrorWithCustomCode(c *gin.Context, httpStatusCode, customBusinessCode int, err error) {
-	if e, ok := err.(errors.Error); ok {
-		logruslog.Global.Error(err, "HTTP %d error", e.GetType().GetHttpCode())
-		messages := e.Messages()
-		c.JSON(e.GetType().GetHttpCode(), &ApiBody{
-			Success: false,
-			Message: safeErrorMessage(e),
-			Code:    customBusinessCode,
-			Causes:  messages.Causes(),
-		})
-	} else {
-		logruslog.Global.Error(err, "HTTP %d error (native)", http.StatusInternalServerError)
-		c.JSON(httpStatusCode, &ApiBody{
-			Success: false,
-			Code:    customBusinessCode,
-			Message: err.Error(),
-		})
+	e := NormalizeError(err)
+	status := e.GetType().GetHttpCode()
+	// an unclassified native error answers with the caller's chosen status
+	if _, ok := err.(errors.Error); !ok && status == http.StatusInternalServerError {
+		status = httpStatusCode
 	}
+	logruslog.Global.Error(err, "HTTP %d error", status)
+	c.JSON(status, &ApiBody{
+		Success: false,
+		Code:    customBusinessCode,
+		Message: SafeErrorMessage(e),
+	})
 	c.Writer.Header().Set("Content-Type", "application/json")
 }
 
 // ApiOutputError writes a JSON error message to the HTTP response body
 func ApiOutputError(c *gin.Context, err error) {
-	if e, ok := err.(errors.Error); ok {
-		logruslog.Global.Error(err, "HTTP %d error", e.GetType().GetHttpCode())
-		messages := e.Messages()
-		c.JSON(e.GetType().GetHttpCode(), &ApiBody{
-			Success: false,
-			Message: safeErrorMessage(e),
-			Causes:  messages.Causes(),
-		})
-	} else {
-		logruslog.Global.Error(err, "HTTP %d error (native)", http.StatusInternalServerError)
-		c.JSON(http.StatusInternalServerError, &ApiBody{
-			Success: false,
-			Message: err.Error(),
-		})
-	}
+	e := NormalizeError(err)
+	status := e.GetType().GetHttpCode()
+	logruslog.Global.Error(err, "HTTP %d error", status)
+	c.JSON(status, &ApiBody{
+		Success: false,
+		Message: SafeErrorMessage(e),
+	})
 	c.Writer.Header().Set("Content-Type", "application/json")
 }
 

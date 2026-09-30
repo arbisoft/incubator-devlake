@@ -37,7 +37,7 @@ interface Props {
 export const PipelineTask = ({ task }: Props) => {
   const [operating, setOperating] = useState(false);
 
-  const { id, beganAt, finishedAt, status, message, progressDetail } = task;
+  const { id, beganAt, finishedAt, status, errorName, progressDetail } = task;
 
   const [, name] = useMemo(() => {
     const config = getPluginConfig(task.plugin);
@@ -131,7 +131,7 @@ export const PipelineTask = ({ task }: Props) => {
         {status === IPipelineStatus.COMPLETED && <p>All Subtasks completed</p>}
 
         {status === IPipelineStatus.FAILED && (
-          <TextTooltip content={message}>
+          <TextTooltip content={errorName}>
             <p className="error">Task failed: hover to view the reason</p>
           </TextTooltip>
         )}
