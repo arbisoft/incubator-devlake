@@ -166,6 +166,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Tickets delivered per active person over time.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -273,8 +274,7 @@
         }
       ],
       "title": "Throughput per Person",
-      "type": "timeseries",
-      "description": "Tickets delivered per active person over time.\n\rdatasource: issues, board_issues"
+      "type": "timeseries"
     },
     {
       "datasource": {
@@ -484,6 +484,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Bugs found before each release shipped.\n\rdatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -588,8 +589,7 @@
         }
       ],
       "title": "Pre-release defects per release",
-      "type": "barchart",
-      "description": "Bugs found before each release shipped.\n\rdatasource: issues, board_issues, project_mapping"
+      "type": "barchart"
     },
     {
       "datasource": {
@@ -679,7 +679,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH releases AS (\n    SELECT pm.project_name        AS project_name,\n           b.name                 AS board_name,\n           i.fix_versions         AS version,\n           MAX(i.resolution_date) AS shipped_at\n    FROM issues i\n    JOIN board_issues bi    ON bi.issue_id = i.id\n    JOIN boards b           ON b.id = bi.board_id\n    JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n    WHERE i.id LIKE 'jira:%'\n      AND COALESCE(i.fix_versions, '') <> ''\n      AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n      AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n    GROUP BY pm.project_name, b.name, i.fix_versions\n    HAVING MAX(i.resolution_date) IS NOT NULL\n),\nwindowed AS (\n    SELECT r.*,\n           LEAD(shipped_at) OVER (PARTITION BY project_name, board_name ORDER BY shipped_at) AS next_shipped_at\n    FROM releases r\n)\nSELECT \n       w.version          AS `Release`,\n       w.project_name     AS `Project`,\n       DATE(w.shipped_at) AS `Shipped`,\n       COUNT(bug.id)      AS `Escaped Defects`\nFROM windowed w\nLEFT JOIN issues bug\n       ON bug.id LIKE 'jira:%'\n      AND bug.type = 'BUG'\n      AND bug.created_date >  w.shipped_at\n      AND (w.next_shipped_at IS NULL OR bug.created_date <= w.next_shipped_at)\n      AND EXISTS (\n          SELECT 1 FROM board_issues bi2\n          WHERE bi2.issue_id = bug.id AND bi2.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n      )\nWHERE $__timeFilter(w.shipped_at)\nGROUP BY w.project_name, w.version, w.shipped_at\nORDER BY w.shipped_at;",
+          "rawSql": "WITH scoped_boards AS (\n    SELECT DISTINCT pm.row_id AS board_id, pm.project_name\n    FROM project_mapping pm\n    JOIN user_project_mapping upm ON upm.project_name = pm.project_name\n    WHERE pm.`table` = 'boards'\n      AND pm.row_id LIKE 'jira:%'\n      AND pm.row_id IN ($board_id)\n      AND pm.project_name IN ($project)\n      AND upm.user_login = ${__user.login:sqlstring}\n),\nreleases AS (\n    SELECT sb.project_name        AS project_name,\n           i.fix_versions         AS version,\n           MAX(i.resolution_date) AS shipped_at\n    FROM scoped_boards sb\n    JOIN board_issues bi ON bi.board_id = sb.board_id\n    JOIN issues i        ON i.id = bi.issue_id\n    WHERE COALESCE(i.fix_versions, '') <> ''\n    GROUP BY sb.project_name, i.fix_versions\n    HAVING MAX(i.resolution_date) >= $__timeFrom()\n),\nwindowed AS (\n    SELECT r.*,\n           LEAD(shipped_at) OVER (PARTITION BY project_name ORDER BY shipped_at) AS next_shipped_at\n    FROM releases r\n),\nbugs AS (\n    SELECT DISTINCT sb.project_name, i.id, i.created_date\n    FROM scoped_boards sb\n    JOIN board_issues bi ON bi.board_id = sb.board_id\n    JOIN issues i        ON i.id = bi.issue_id\n    WHERE i.type = 'BUG'\n      AND i.created_date > $__timeFrom()\n)\nSELECT\n       w.version              AS `Release`,\n       w.project_name         AS `Project`,\n       DATE(w.shipped_at)     AS `Shipped`,\n       COUNT(DISTINCT b.id)   AS `Escaped Defects`\nFROM windowed w\nLEFT JOIN bugs b\n       ON b.project_name = w.project_name\n      AND b.created_date >  w.shipped_at\n      AND (w.next_shipped_at IS NULL OR b.created_date <= w.next_shipped_at)\nWHERE $__timeFilter(w.shipped_at)\nGROUP BY w.project_name, w.version, w.shipped_at\nORDER BY w.shipped_at;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -712,7 +712,38 @@
       {
         "allowCustomValue": false,
         "current": {
-          "text": "All",
+          "text": "1M",
+          "value": "1M"
+        },
+        "description": "",
+        "label": "Time Interval",
+        "name": "interval",
+        "options": [
+          {
+            "selected": true,
+            "text": "Month",
+            "value": "1M"
+          },
+          {
+            "selected": false,
+            "text": "Week",
+            "value": "1w"
+          },
+          {
+            "selected": false,
+            "text": "Day",
+            "value": "1d"
+          }
+        ],
+        "query": "Month : 1M, Week : 1w, Day : 1d",
+        "type": "custom"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": [
+            "All"
+          ],
           "value": [
             "$__all"
           ]
@@ -753,63 +784,11 @@
         "refresh": 1,
         "regex": "/^(?<text>.*)--(?<value>.*)$/",
         "type": "query"
-      },
-      {
-        "allowCustomValue": false,
-        "current": {
-          "text": "All",
-          "value": [
-            "$__all"
-          ]
-        },
-        "datasource": {
-          "type": "mysql",
-          "uid": "devlake-mysql"
-        },
-        "definition": "WITH scoped_issues AS (\n  SELECT bi.issue_id\n  FROM board_issues bi\n  WHERE bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${board_id}))\n    AND bi.board_id LIKE 'jira:%'\n),\nscoped_accounts AS (\n  SELECT ia.assignee_id AS account_id\n  FROM issue_assignees ia\n  JOIN scoped_issues si ON si.issue_id = ia.issue_id\n  WHERE ia.assignee_id LIKE 'jira:%'\n  UNION\n  SELECT i.creator_id\n  FROM issues i\n  JOIN scoped_issues si ON si.issue_id = i.id\n  WHERE i.creator_id LIKE 'jira:%'\n  UNION\n  SELECT ic.author_id\n  FROM issue_changelogs ic\n  JOIN scoped_issues si ON si.issue_id = ic.issue_id\n  WHERE ic.author_id LIKE 'jira:%'\n  UNION\n  SELECT w.author_id\n  FROM issue_worklogs w\n  JOIN scoped_issues si ON si.issue_id = w.issue_id\n  WHERE w.author_id LIKE 'jira:%'\n)\nSELECT CONCAT(\n         REPLACE(COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           '(unmapped)'\n         ), '-', ' '),\n         '--', a.id) AS Name\nFROM accounts a\nJOIN scoped_accounts sa ON sa.account_id = a.id\nGROUP BY Name\nORDER BY Name;",
-        "includeAll": true,
-        "label": "Developer",
-        "multi": true,
-        "name": "developer_id",
-        "options": [],
-        "query": "WITH scoped_issues AS (\n  SELECT bi.issue_id\n  FROM board_issues bi\n  WHERE bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${board_id}))\n    AND bi.board_id LIKE 'jira:%'\n),\nscoped_accounts AS (\n  SELECT ia.assignee_id AS account_id\n  FROM issue_assignees ia\n  JOIN scoped_issues si ON si.issue_id = ia.issue_id\n  WHERE ia.assignee_id LIKE 'jira:%'\n  UNION\n  SELECT i.creator_id\n  FROM issues i\n  JOIN scoped_issues si ON si.issue_id = i.id\n  WHERE i.creator_id LIKE 'jira:%'\n  UNION\n  SELECT ic.author_id\n  FROM issue_changelogs ic\n  JOIN scoped_issues si ON si.issue_id = ic.issue_id\n  WHERE ic.author_id LIKE 'jira:%'\n  UNION\n  SELECT w.author_id\n  FROM issue_worklogs w\n  JOIN scoped_issues si ON si.issue_id = w.issue_id\n  WHERE w.author_id LIKE 'jira:%'\n)\nSELECT CONCAT(\n         REPLACE(COALESCE(\n           NULLIF(TRIM(a.full_name), ''),\n           NULLIF(TRIM(a.user_name), ''),\n           NULLIF(TRIM(a.email),     ''),\n           '(unmapped)'\n         ), '-', ' '),\n         '--', a.id) AS Name\nFROM accounts a\nJOIN scoped_accounts sa ON sa.account_id = a.id\nGROUP BY Name\nORDER BY Name;",
-        "refresh": 1,
-        "regex": "/^(?<text>.*)--(?<value>.*)$/",
-        "type": "query"
-      },
-      {
-        "allowCustomValue": false,
-        "current": {
-          "text": "1M",
-          "value": "1M"
-        },
-        "description": "",
-        "label": "Time Interval",
-        "name": "interval",
-        "options": [
-          {
-            "selected": true,
-            "text": "Month",
-            "value": "1M"
-          },
-          {
-            "selected": false,
-            "text": "Week",
-            "value": "1w"
-          },
-          {
-            "selected": false,
-            "text": "Day",
-            "value": "1d"
-          }
-        ],
-        "query": "Month : 1M, Week : 1w, Day : 1d",
-        "type": "custom"
       }
     ]
   },
   "time": {
-    "from": "now-90d",
+    "from": "now-30d",
     "to": "now"
   },
   "timepicker": {},

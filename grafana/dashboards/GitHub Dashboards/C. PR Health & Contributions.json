@@ -511,7 +511,7 @@
             "barAlignment": 0,
             "barWidthFactor": 0.6,
             "drawStyle": "line",
-            "fillOpacity": 0,
+            "fillOpacity": 30,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -519,7 +519,7 @@
               "viz": false
             },
             "insertNulls": false,
-            "lineInterpolation": "linear",
+            "lineInterpolation": "smooth",
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
@@ -651,7 +651,7 @@
             "barAlignment": 0,
             "barWidthFactor": 0.6,
             "drawStyle": "line",
-            "fillOpacity": 0,
+            "fillOpacity": 20,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -659,7 +659,7 @@
               "viz": false
             },
             "insertNulls": false,
-            "lineInterpolation": "linear",
+            "lineInterpolation": "smooth",
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
@@ -881,6 +881,24 @@
                 "value": 224
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URL"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Show in GitHub",
+                    "url": "${__data.fields.URL}"
+                  }
+                ]
+              }
+            ]
           }
         ]
       },
@@ -1035,14 +1053,14 @@
     "list": [
       {
         "current": {
-          "text": "1M",
-          "value": "1M"
+          "text": "1d",
+          "value": "1d"
         },
         "label": "Time Interval",
         "name": "interval",
         "options": [
           {
-            "selected": true,
+            "selected": false,
             "text": "Month",
             "value": "1M"
           },
@@ -1052,7 +1070,7 @@
             "value": "1w"
           },
           {
-            "selected": false,
+            "selected": true,
             "text": "Day",
             "value": "1d"
           }

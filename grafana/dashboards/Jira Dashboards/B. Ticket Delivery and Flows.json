@@ -50,6 +50,7 @@
       "datasource": {
         "uid": "devlake-mysql"
       },
+      "description": "Average days from ticket creation to resolution.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -124,14 +125,14 @@
         }
       ],
       "title": "Mean Issue Lead Time in days",
-      "type": "stat",
-      "description": "Average days from ticket creation to resolution.\n\rdatasource: issues, board_issues"
+      "type": "stat"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Sprint tickets committed vs delivered, per week.\n\rdatasource: sprint_issues, sprints, issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -217,7 +218,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT $__timeGroup(s.started_date, 1w) as time, \n  COUNT(1) as committed, \n  SUM(CASE WHEN i.resolution_date IS NOT NULL\n\t\tAND i.resolution_date >= s.started_date \n\t\tAND i.resolution_date <= s.ended_date\n\t\tTHEN 1 ELSE 0 END) AS Delivered\nFROM sprint_issues si \nJOIN sprints s ON s.id = si.sprint_id \nJOIN issues i ON i.id = si.issue_id \nWHERE s.id LIKE 'jira:%'\n  AND $__timeFilter(s.started_date)\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi WHERE bi.issue_id = si.issue_id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n  )\nGROUP BY time",
+          "rawSql": "SELECT $__timeGroup(s.started_date, $interval) as time, \n  COUNT(1) as committed, \n  SUM(CASE WHEN i.resolution_date IS NOT NULL\n\t\tAND i.resolution_date >= s.started_date \n\t\tAND i.resolution_date <= s.ended_date\n\t\tTHEN 1 ELSE 0 END) AS Delivered\nFROM sprint_issues si \nJOIN sprints s ON s.id = si.sprint_id \nJOIN issues i ON i.id = si.issue_id \nWHERE s.id LIKE 'jira:%'\n  AND $__timeFilter(s.started_date)\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi WHERE bi.issue_id = si.issue_id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n  )\nGROUP BY time",
           "refId": "A",
           "sql": {
             "columns": [
@@ -239,14 +240,14 @@
         }
       ],
       "title": "Ticket Delivery Rate Over Time",
-      "type": "timeseries",
-      "description": "Sprint tickets committed vs delivered, per week.\n\rdatasource: sprint_issues, sprints, issues"
+      "type": "timeseries"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Tickets opened vs closed over time.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -261,7 +262,7 @@
             "barAlignment": 0,
             "barWidthFactor": 0.6,
             "drawStyle": "line",
-            "fillOpacity": 0,
+            "fillOpacity": 30,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -354,14 +355,14 @@
         }
       ],
       "title": "Tickets Delivery Stats",
-      "type": "timeseries",
-      "description": "Tickets opened vs closed over time.\n\rdatasource: issues, board_issues"
+      "type": "timeseries"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Tickets opened vs closed per month.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -466,8 +467,7 @@
         }
       ],
       "title": "Issue Status Distribution",
-      "type": "barchart",
-      "description": "Tickets opened vs closed per month.\n\rdatasource: issues, board_issues"
+      "type": "barchart"
     },
     {
       "datasource": {
@@ -850,6 +850,7 @@
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
+      "description": "Median (p50) cycle time of completed tickets in days.\n\rdatasource: issues, board_issues, project_mapping, issue_labels, issue_status_history",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -904,14 +905,14 @@
         }
       ],
       "title": "p50 Aging WIP",
-      "type": "stat",
-      "description": "Median (p50) cycle time of completed tickets in days.\n\rdatasource: issues, board_issues, project_mapping, issue_labels, issue_status_history"
+      "type": "stat"
     },
     {
       "datasource": {
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
+      "description": "85th percentile (p85) cycle time of completed tickets in days.\n\rdatasource: issues, board_issues, project_mapping, issue_labels, issue_status_history",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -969,8 +970,7 @@
         }
       ],
       "title": "p85 Aging WIP",
-      "type": "stat",
-      "description": "85th percentile (p85) cycle time of completed tickets in days.\n\rdatasource: issues, board_issues, project_mapping, issue_labels, issue_status_history"
+      "type": "stat"
     }
   ],
   "preload": false,
@@ -1072,14 +1072,14 @@
       {
         "allowCustomValue": false,
         "current": {
-          "text": "1M",
-          "value": "1M"
+          "text": "1d",
+          "value": "1d"
         },
         "label": "Time Interval",
         "name": "interval",
         "options": [
           {
-            "selected": true,
+            "selected": false,
             "text": "Month",
             "value": "1M"
           },
@@ -1089,7 +1089,7 @@
             "value": "1w"
           },
           {
-            "selected": false,
+            "selected": true,
             "text": "Day",
             "value": "1d"
           }

@@ -51,6 +51,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Monthly tickets with valid, missing or oversized story points.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -154,15 +155,15 @@
           }
         }
       ],
-      "title": "Ticket Hygiene by Story Points Monthly Distribution",
-      "type": "barchart",
-      "description": "Monthly tickets with valid, missing or oversized story points.\n\rdatasource: issues, board_issues"
+      "title": "Ticket Hygiene by Story Points Monthly Overview",
+      "type": "barchart"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of tickets with no story points.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -311,14 +312,14 @@
         }
       ],
       "title": "Tickets without Story Points",
-      "type": "table",
-      "description": "List of tickets with no story points.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of tickets with story points above the threshold.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -467,14 +468,14 @@
         }
       ],
       "title": "Tickets with Story Points above the Threshold",
-      "type": "table",
-      "description": "List of tickets with story points above the threshold.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Monthly tickets with vs without time estimates.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -578,15 +579,15 @@
           }
         }
       ],
-      "title": "Ticket Hygiene by Estimates Monthly Distribution",
-      "type": "barchart",
-      "description": "Monthly tickets with vs without time estimates.\n\rdatasource: issues, board_issues"
+      "title": "Ticket Hygiene by Estimates Monthly Overview",
+      "type": "barchart"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of tickets with no time estimate.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -735,14 +736,14 @@
         }
       ],
       "title": "Tickets without Estimates",
-      "type": "table",
-      "description": "List of tickets with no time estimate.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of tickets with a title shorter than the minimum length.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -891,14 +892,14 @@
         }
       ],
       "title": "Ticket Title Length below Threshold",
-      "type": "table",
-      "description": "List of tickets with a title shorter than the minimum length.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Monthly in-progress tickets that are compliant, unassigned or stale.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1003,14 +1004,14 @@
         }
       ],
       "title": "In Progress Tickets Hygiene",
-      "type": "barchart",
-      "description": "Monthly in-progress tickets that are compliant, unassigned or stale.\n\rdatasource: issues, board_issues"
+      "type": "barchart"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of in-progress tickets with no recent activity.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1171,14 +1172,14 @@
         }
       ],
       "title": "In Progress Tickets with No Activity",
-      "type": "table",
-      "description": "List of in-progress tickets with no recent activity.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of in-progress tickets with no assignee.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1327,14 +1328,14 @@
         }
       ],
       "title": "In Progress Tickets without Assignee",
-      "type": "table",
-      "description": "List of in-progress tickets with no assignee.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Monthly tickets with a proper, short or missing description.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1439,15 +1440,15 @@
           }
         }
       ],
-      "title": "Ticket Description Hygiene Monthly Distribution",
-      "type": "barchart",
-      "description": "Monthly tickets with a proper, short or missing description.\n\rdatasource: issues, board_issues"
+      "title": "Ticket Description Hygiene Monthly Overview",
+      "type": "barchart"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of tickets with no description.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1547,14 +1548,14 @@
         }
       ],
       "title": "Tickets without Description",
-      "type": "table",
-      "description": "List of tickets with no description.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of tickets with a description shorter than the minimum length.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1654,8 +1655,7 @@
         }
       ],
       "title": "Tickets Description Length below Threshold",
-      "type": "table",
-      "description": "List of tickets with a description shorter than the minimum length.\n\rdatasource: issues, board_issues"
+      "type": "table"
     }
   ],
   "preload": false,

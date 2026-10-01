@@ -267,7 +267,7 @@
             "barAlignment": 0,
             "barWidthFactor": 0.6,
             "drawStyle": "line",
-            "fillOpacity": 0,
+            "fillOpacity": 30,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -275,7 +275,7 @@
               "viz": false
             },
             "insertNulls": false,
-            "lineInterpolation": "linear",
+            "lineInterpolation": "smooth",
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
@@ -297,10 +297,6 @@
             "steps": [
               {
                 "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           }
@@ -338,7 +334,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT $__timeGroup(i.resolution_date, ${interval})                     AS time,\n       REPLACE(COALESCE(\n         NULLIF(TRIM(a.full_name),     ''),\n         NULLIF(TRIM(a.user_name),     ''),\n         NULLIF(TRIM(i.assignee_name), ''),\n         '(unassigned)'\n       ), '-', ' ')                                              AS metric,\n       COUNT(*)                                                  AS value\nFROM issues i\nLEFT JOIN accounts a ON a.id = i.assignee_id\nWHERE i.status = 'DONE'\n  AND i.resolution_date IS NOT NULL\n  AND i.id LIKE 'github:%'\n  AND $__timeFilter(i.resolution_date)\nAND (i.assignee_id IN ( $developer_id ) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ( $developer_id )))\n  AND EXISTS (SELECT 1 FROM board_issues bi2 JOIN project_mapping pm2 ON pm2.row_id = bi2.board_id AND pm2.`table` = 'boards' WHERE bi2.issue_id = i.id AND bi2.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) AND pm2.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\nGROUP BY time, metric\nORDER BY time;",
+          "rawSql": "SELECT $__timeGroup(i.resolution_date, ${interval})                     AS time,\n       COUNT(*)                                                  AS value\nFROM issues i\nLEFT JOIN accounts a ON a.id = i.assignee_id\nWHERE i.status = 'DONE'\n  AND i.resolution_date IS NOT NULL\n  AND i.id LIKE 'github:%'\n  AND $__timeFilter(i.resolution_date)\nAND (i.assignee_id IN ( $developer_id ) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ( $developer_id )))\n  AND EXISTS (SELECT 1 FROM board_issues bi2 JOIN project_mapping pm2 ON pm2.row_id = bi2.board_id AND pm2.`table` = 'boards' WHERE bi2.issue_id = i.id AND bi2.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) AND pm2.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\nGROUP BY time\nORDER BY time;",
           "refId": "A",
           "sql": {
             "columns": [

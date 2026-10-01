@@ -354,7 +354,7 @@
           }
         }
       ],
-      "title": "Bug Allocation (Done/Pending Distribution)",
+      "title": "Bug Allocation & Status Overview",
       "type": "barchart"
     }
   ],
@@ -363,33 +363,6 @@
   "tags": [],
   "templating": {
     "list": [
-      {
-        "current": {
-          "text": "1m",
-          "value": "1m"
-        },
-        "label": "Time Interval",
-        "name": "interval",
-        "options": [
-          {
-            "selected": true,
-            "text": "Month",
-            "value": "1m"
-          },
-          {
-            "selected": false,
-            "text": "Week",
-            "value": "1w"
-          },
-          {
-            "selected": false,
-            "text": "Day",
-            "value": "1d"
-          }
-        ],
-        "query": "Month : 1m, Week : 1w, Day : 1d",
-        "type": "custom"
-      },
       {
         "current": {
           "text": "All",

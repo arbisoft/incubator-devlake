@@ -51,6 +51,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Average days to close a ticket, per developer.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -151,14 +152,14 @@
         }
       ],
       "title": "Average Time for Ticket Closure",
-      "type": "barchart",
-      "description": "Average days to close a ticket, per developer.\n\rdatasource: issues, board_issues"
+      "type": "barchart"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Tasks vs bugs assigned per developer.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -260,14 +261,14 @@
         }
       ],
       "title": "Work Allocation by Tasks and Bugs",
-      "type": "barchart",
-      "description": "Tasks vs bugs assigned per developer.\n\rdatasource: issues, board_issues"
+      "type": "barchart"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Done vs pending bugs per developer.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -371,15 +372,15 @@
           }
         }
       ],
-      "title": "Bug Allocation (Done/Pending Distribution)",
-      "type": "barchart",
-      "description": "Done vs pending bugs per developer.\n\rdatasource: issues, board_issues"
+      "title": "Bug Allocation & Status Overview",
+      "type": "barchart"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of bugs not yet started.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -528,14 +529,14 @@
         }
       ],
       "title": "Bug in To Do List",
-      "type": "table",
-      "description": "List of bugs not yet started.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of bugs created in the selected period.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -684,14 +685,14 @@
         }
       ],
       "title": "Bugs Reported",
-      "type": "table",
-      "description": "List of bugs created in the selected period.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of bugs currently in progress.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -840,14 +841,14 @@
         }
       ],
       "title": "Bug in Progress",
-      "type": "table",
-      "description": "List of bugs currently in progress.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of completed bugs.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -996,14 +997,14 @@
         }
       ],
       "title": "Bugs Done",
-      "type": "table",
-      "description": "List of completed bugs.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of bugs not assigned to anyone.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1152,14 +1153,14 @@
         }
       ],
       "title": "Unassigned Bugs",
-      "type": "table",
-      "description": "List of bugs not assigned to anyone.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of epics created in the selected period.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1308,14 +1309,14 @@
         }
       ],
       "title": "Epics Created",
-      "type": "table",
-      "description": "List of epics created in the selected period.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Done vs pending stories per developer.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1420,14 +1421,14 @@
         }
       ],
       "title": "Story Allocation (Done/Pending Distribution)",
-      "type": "barchart",
-      "description": "Done vs pending stories per developer.\n\rdatasource: issues, board_issues"
+      "type": "barchart"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of stories created in the selected period.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1576,14 +1577,14 @@
         }
       ],
       "title": "Stories Created",
-      "type": "table",
-      "description": "List of stories created in the selected period.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of stories not yet started.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1732,14 +1733,14 @@
         }
       ],
       "title": "Stories in To Do List",
-      "type": "table",
-      "description": "List of stories not yet started.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of stories currently in progress.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1888,14 +1889,14 @@
         }
       ],
       "title": "Stories in Progress",
-      "type": "table",
-      "description": "List of stories currently in progress.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of completed stories.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2044,14 +2045,14 @@
         }
       ],
       "title": "Stories Done",
-      "type": "table",
-      "description": "List of completed stories.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "Done vs pending tasks and sub-tasks per developer.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2155,15 +2156,15 @@
           }
         }
       ],
-      "title": "Tasks/Sub-Tasks Allocation (Done/Pending Distribution)",
-      "type": "barchart",
-      "description": "Done vs pending tasks and sub-tasks per developer.\n\rdatasource: issues, board_issues"
+      "title": "Tasks/Sub-Tasks Allocation & Status Overview",
+      "type": "barchart"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of tasks and sub-tasks created in the selected period.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2312,14 +2313,14 @@
         }
       ],
       "title": "Tasks & Sub-Tasks Created",
-      "type": "table",
-      "description": "List of tasks and sub-tasks created in the selected period.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of tasks and sub-tasks not yet started.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2468,14 +2469,14 @@
         }
       ],
       "title": "Tasks & Sub-Tasks in To Do List",
-      "type": "table",
-      "description": "List of tasks and sub-tasks not yet started.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of tasks and sub-tasks currently in progress.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2624,14 +2625,14 @@
         }
       ],
       "title": "Tasks & Sub-Tasks in Progress",
-      "type": "table",
-      "description": "List of tasks and sub-tasks currently in progress.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of completed tasks and sub-tasks.\n\rdatasource: issues, board_issues",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2780,14 +2781,14 @@
         }
       ],
       "title": "Tasks & Sub-Tasks Done",
-      "type": "table",
-      "description": "List of completed tasks and sub-tasks.\n\rdatasource: issues, board_issues"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
+      "description": "List of tickets reopened in the selected period.\n\rdatasource: issues, board_issues, project_mapping, issue_status_history",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2888,8 +2889,7 @@
         }
       ],
       "title": "Reopened Tickets",
-      "type": "table",
-      "description": "List of tickets reopened in the selected period.\n\rdatasource: issues, board_issues, project_mapping, issue_status_history"
+      "type": "table"
     }
   ],
   "preload": false,
