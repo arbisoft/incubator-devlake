@@ -33,7 +33,9 @@ ENV GF_USERS_ALLOW_SIGN_UP=false
 ENV GF_SERVER_SERVE_FROM_SUB_PATH=true
 ENV GF_DASHBOARDS_JSON_ENABLED=true
 ENV GF_LIVE_ALLOWED_ORIGINS='*'
-ENV GF_USERS_HOME_PAGE=/dashboards
+# Serve the provisioned dashboard JSON at Grafana's root route. This avoids a
+# redirect to a /d/<uid>/<slug> route that Grafana then labels as "Home".
+ENV GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH="/etc/grafana/dashboards/AI Impact/AI Throughput Overview.json"
 # Grafana interpolates $PROMETHEUS_URL in provisioning/datasources/prometheus.yml.
 # Default matches the previous hardcoded URL so local compose and prod (which
 # do not set this var) keep today's behavior. Staging overrides to the Compose
