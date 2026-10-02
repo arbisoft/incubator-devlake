@@ -172,3 +172,42 @@ test('preserves saved github app fields when update values are incomplete', () =
     name: 'Github App Tesing',
   });
 });
+
+test('keeps custom headers in the save payload', () => {
+  const payload = buildConnectionSavePayload(
+    {
+      endpoint: 'https://api.anthropic.com/v1/',
+    },
+    {
+      name: 'Claude Code',
+      token: 'token',
+      customHeaders: [{ key: 'X-Middleware-Auth', value: 'secret' }],
+    },
+  );
+
+  deepEqual(payload, {
+    endpoint: 'https://api.anthropic.com/v1/',
+    name: 'Claude Code',
+    token: 'token',
+    customHeaders: [{ key: 'X-Middleware-Auth', value: 'secret' }],
+  });
+});
+
+test('keeps saved custom headers when the form does not set them', () => {
+  const payload = buildConnectionSavePayload(
+    {
+      endpoint: 'https://api.anthropic.com/v1/',
+      customHeaders: [{ key: 'X-Middleware-Auth', value: 'secret' }],
+    },
+    {
+      name: 'Claude Code',
+      customHeaders: undefined,
+    },
+  );
+
+  deepEqual(payload, {
+    endpoint: 'https://api.anthropic.com/v1/',
+    customHeaders: [{ key: 'X-Middleware-Auth', value: 'secret' }],
+    name: 'Claude Code',
+  });
+});
