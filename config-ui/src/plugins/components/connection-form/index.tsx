@@ -26,10 +26,24 @@ import { ExternalLink } from '@/components';
 import { addConnection, updateConnection } from '@/features';
 import { selectConnection } from '@/features/connections';
 import { getPluginConfig } from '@/plugins';
+import { ICustomHeader } from '@/types';
 import { operator } from '@/utils';
 
 import { Form } from './fields';
 import { CONNECTION_FORM_FIELDS, buildConnectionSavePayload } from './payload';
+
+const sanitizeCustomHeaders = (headers?: Array<{ key?: string; value?: string }>): ICustomHeader[] | undefined => {
+  if (!headers) {
+    return headers;
+  }
+
+  return headers
+    .filter((header) => header.key?.trim() || header.value?.trim())
+    .map((header) => ({
+      key: header.key?.trim() ?? '',
+      value: header.value ?? '',
+    }));
+};
 
 interface Props {
   plugin: string;
@@ -93,6 +107,8 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: Props) => {
     return Object.values(errors).some((value) => value);
   }, [errors]);
 
+  const sanitizedCustomHeaders = useMemo(() => sanitizeCustomHeaders(values.customHeaders), [values.customHeaders]);
+
   const handleTest = async () => {
     await operator(
       () =>
@@ -142,10 +158,13 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: Props) => {
               webhookSharedKey: isEqual((selectedConnection as any)?.webhookSharedKey, values.webhookSharedKey)
                 ? undefined
                 : values.webhookSharedKey,
+              customHeaders: isEqual((selectedConnection as any)?.customHeaders, sanitizedCustomHeaders)
+                ? undefined
+                : sanitizedCustomHeaders,
             } as any)
           : API.connection.testOld(
               plugin,
-              pick({ ...initialValues, ...values }, [
+              pick({ ...initialValues, ...values, customHeaders: sanitizedCustomHeaders }, [
                 'name',
                 'endpoint',
                 'token',
@@ -180,6 +199,7 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: Props) => {
                 'workspaceSlug',
                 'enableWebhook',
                 'webhookSharedKey',
+                'customHeaders',
               ]),
             ),
       {
@@ -197,7 +217,7 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: Props) => {
     // shape.
     const payload = buildConnectionSavePayload(
       type === 'update' ? { ...initialValues, ...(selectedConnection ?? {}) } : initialValues,
-      values,
+      { ...values, customHeaders: sanitizedCustomHeaders },
     );
     const [success, res] = await operator(
       () =>

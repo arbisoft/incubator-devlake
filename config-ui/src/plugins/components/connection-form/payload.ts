@@ -48,6 +48,7 @@ export const CONNECTION_FORM_FIELDS = [
   'rateLimitPerHour',
   'enableWebhook',
   'webhookSharedKey',
+  'customHeaders',
 ];
 
 // Plugin `initialValues` may include defaults that are NOT user-typed form
