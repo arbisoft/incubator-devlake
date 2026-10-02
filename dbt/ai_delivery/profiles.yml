@@ -1,0 +1,21 @@
+# dbt connection profile for the ai_delivery marts.
+#
+# Targets the same MySQL `lake` database DevLake writes its domain layer into, so
+# the marts land next to `ai_activities` / `accounts` / `pull_requests` and the
+# Grafana dashboard can join them directly.
+#
+# Values are overridable via env vars so the same file works in local dev and
+# production without edits. Inside the DevLake docker network the DB host is the
+# `mysql` service name; override MYSQL_HOST for other deployments.
+ai_delivery:
+  target: dev
+  outputs:
+    dev:
+      type: mysql
+      server: "{{ env_var('MYSQL_HOST', 'mysql') }}"
+      port: "{{ env_var('MYSQL_PORT', '3306') | int }}"
+      database: "{{ env_var('MYSQL_DATABASE', 'lake') }}"
+      schema: "{{ env_var('MYSQL_DATABASE', 'lake') }}"
+      username: "{{ env_var('MYSQL_USER', 'merico') }}"
+      password: "{{ env_var('MYSQL_PASSWORD', 'merico') }}"
+      driver: MySQL ODBC 8.0 ANSI Driver

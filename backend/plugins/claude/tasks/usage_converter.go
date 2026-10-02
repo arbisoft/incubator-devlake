@@ -24,9 +24,9 @@ import (
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models/domainlayer"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/ai"
-	"github.com/apache/incubator-devlake/core/models/domainlayer/crossdomain"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/didgen"
 	"github.com/apache/incubator-devlake/core/plugin"
+	"github.com/apache/incubator-devlake/helpers/identityhelper"
 	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/plugins/claude/models"
 )
@@ -87,6 +87,11 @@ func ConvertUsage(taskCtx plugin.SubTaskContext) errors.Error {
 	}
 
 	db := taskCtx.GetDal()
+
+	resolver, err := identityhelper.NewAccountResolver(db)
+	if err != nil {
+		return err
+	}
 	connectionId := data.Options.ConnectionId
 
 	idGen := didgen.NewDomainIdGenerator(&models.ClaudeUsage{})
@@ -114,7 +119,7 @@ func ConvertUsage(taskCtx plugin.SubTaskContext) errors.Error {
 		Input:        cursor,
 		Convert: func(inputRow interface{}) ([]interface{}, errors.Error) {
 			usage := inputRow.(*models.ClaudeUsage)
-			accountId := resolveAccountId(db, usage.UserEmail)
+			accountId := resolver.ByEmail(usage.UserEmail)
 			return []interface{}{buildClaudeActivity(idGen, connectionId, accountId, usage)}, nil
 		},
 	})
@@ -123,18 +128,4 @@ func ConvertUsage(taskCtx plugin.SubTaskContext) errors.Error {
 	}
 
 	return converter.Execute()
-}
-
-// resolveAccountId looks up the global DevLake AccountId for a given email.
-// It queries the crossdomain accounts table. Returns an empty string when not found.
-func resolveAccountId(db dal.Dal, email string) string {
-	if email == "" {
-		return ""
-	}
-	var account crossdomain.Account
-	err := db.First(&account, dal.Where("email = ?", email))
-	if err != nil {
-		return ""
-	}
-	return account.Id
 }

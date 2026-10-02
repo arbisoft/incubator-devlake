@@ -1,0 +1,20 @@
+# dbt project for AI ↔ Delivery correlation marts.
+#
+# Precomputes the identity + project-membership joins that the
+# AIDeliveryCorrelation Grafana dashboard used to resolve at query time, so the
+# expensive multi-way join runs once per sync instead of on every panel refresh.
+#
+# Run by DevLake's dbt plugin (usually via a blueprint afterPlan stage), which
+# shells out to `dbt run` against this directory. Materialised as tables in the
+# same `lake` database the dashboard reads from.
+name: 'ai_delivery'
+version: '1.0.0'
+config-version: 2
+
+profile: 'ai_delivery'
+
+model-paths: ["models"]
+
+models:
+  ai_delivery:
+    +materialized: table

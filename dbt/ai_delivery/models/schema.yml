@@ -1,0 +1,66 @@
+version: 2
+
+models:
+  - name: mart_ai_person_accounts
+    description: >
+      Identity map: every DevLake account belonging to each AI user's email.
+      One row per (email, account_id). Consumed by the AIDeliveryCorrelation
+      dashboard to sum delivery across all of a person's accounts.
+    columns:
+      - name: email
+        description: Lower-cased AI user email (the person key).
+        tests:
+          - not_null
+      - name: account_id
+        description: A DevLake accounts.id belonging to that person.
+        tests:
+          - not_null
+
+  - name: mart_ai_project_members
+    description: >
+      Membership map: AI users who authored a PR in a project's repos.
+      One row per (project_name, email). Consumed by the project-scoped panels.
+    columns:
+      - name: project_name
+        description: DevLake project name (from project_mapping).
+        tests:
+          - not_null
+      - name: email
+        description: Lower-cased AI user email who is a member of that project.
+        tests:
+          - not_null
+
+  - name: mart_project_bugs_weekly
+    description: >
+      Bug volume per (project, week): issues of type BUG/INCIDENT reaching a project
+      through its boards. bugs_opened by created_date, bugs_resolved by resolution_date.
+      Context the dashboard correlates AI-usage intensity against; no AI attribution.
+    columns:
+      - name: project_name
+        tests: [not_null]
+      - name: week
+        tests: [not_null]
+
+  - name: mart_project_churn_weekly
+    description: >
+      Quality-variance engine. One row per (project, week, author, is_ai_adopter):
+      commit churn split by whether the author had any AI activity that week.
+      "AI-augmented author" flags a person, not AI-written code.
+    columns:
+      - name: project_name
+        tests: [not_null]
+      - name: week
+        tests: [not_null]
+      - name: is_ai_adopter
+        description: 1 if the author had any ai_activities that week, else 0.
+        tests: [not_null]
+
+  - name: mart_project_sonar_debt
+    description: >
+      Technical-debt snapshot per project from SonarQube (sqale_index, code_smells,
+      bugs, reliability). This is the SOLE technical-debt source — no derived proxy.
+      Point-in-time (DevLake keeps only the latest analysis, so there is no weekly
+      history). Empty until SonarQube is connected and its project mapped.
+    columns:
+      - name: project_name
+        tests: [not_null]

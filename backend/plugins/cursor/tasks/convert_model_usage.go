@@ -27,6 +27,7 @@ import (
 	"github.com/apache/incubator-devlake/core/models/domainlayer/ai"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/didgen"
 	"github.com/apache/incubator-devlake/core/plugin"
+	"github.com/apache/incubator-devlake/helpers/identityhelper"
 	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/plugins/cursor/models"
 )
@@ -55,6 +56,11 @@ func ConvertModelUsage(taskCtx plugin.SubTaskContext) errors.Error {
 	}
 
 	db := taskCtx.GetDal()
+
+	resolver, err := identityhelper.NewAccountResolver(db)
+	if err != nil {
+		return err
+	}
 	connectionId := data.Options.ConnectionId
 
 	idGen := didgen.NewDomainIdGenerator(&models.CursorUsageEvent{})
@@ -82,7 +88,7 @@ func ConvertModelUsage(taskCtx plugin.SubTaskContext) errors.Error {
 		Input:        cursor,
 		Convert: func(inputRow interface{}) ([]interface{}, errors.Error) {
 			u := inputRow.(*models.CursorUsageEvent)
-			accountId := resolveAccountId(db, u.UserEmail)
+			accountId := resolver.ByEmail(u.UserEmail)
 			activity := &ai.AiActivity{
 				DomainEntity: domainlayer.DomainEntity{
 					Id: idGen.Generate(connectionId, u.ScopeId, u.Timestamp, u.UserEmail, u.Model),
