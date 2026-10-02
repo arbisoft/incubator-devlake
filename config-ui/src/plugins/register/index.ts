@@ -27,7 +27,6 @@ import { BitbucketServerConfig } from './bitbucket-server';
 import { CircleCIConfig } from './circleci';
 import { ClaudeCodeConfig } from './claude-code';
 import { GitHubConfig } from './github';
-import { ClaudeConfig } from './claude';
 import { CodexConfig } from './codex';
 import { CursorConfig } from './cursor';
 import { GhCopilotConfig } from './gh-copilot';
@@ -60,7 +59,6 @@ export const pluginConfigs: IPluginConfig[] = [
   CircleCIConfig,
   ClaudeCodeConfig,
   GitHubConfig,
-  ClaudeConfig,
   CodexConfig,
   CursorConfig,
   GhCopilotConfig,
