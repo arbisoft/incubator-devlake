@@ -16,6 +16,11 @@
  *
  */
 
+export interface ICustomHeader {
+  key: string;
+  value: string;
+}
+
 export interface IConnectionAPI {
   [key: string]: any;
   id: ID;
@@ -27,6 +32,7 @@ export interface IConnectionAPI {
   token?: string;
   accessToken?: string;
   refreshToken?: string;
+  adminApiKey?: string;
   username?: string;
   password?: string;
   appId?: string;
@@ -44,6 +50,7 @@ export interface IConnectionAPI {
   instanceUrl?: string;
   apiVersion?: string;
   workspaceSlug?: string;
+  customHeaders?: ICustomHeader[];
 }
 
 export interface IConnectionTestResult {
@@ -94,6 +101,7 @@ export interface IConnection {
   token?: string;
   accessToken?: string;
   refreshToken?: string;
+  adminApiKey?: string;
   username?: string;
   password?: string;
   appId?: string;
@@ -111,4 +119,5 @@ export interface IConnection {
   instanceUrl?: string;
   apiVersion?: string;
   workspaceSlug?: string;
+  customHeaders?: ICustomHeader[];
 }

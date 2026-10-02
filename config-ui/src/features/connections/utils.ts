@@ -41,6 +41,7 @@ export const transformConnection = (plugin: string, connection: IConnectionAPI):
     rateLimitPerHour: connection.rateLimitPerHour,
     organization: connection.organization,
     workspaceSlug: connection.workspaceSlug,
+    customHeaders: connection.customHeaders,
   };
 };
 
