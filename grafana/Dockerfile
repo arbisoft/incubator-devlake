@@ -23,7 +23,7 @@
 #While incubation status is not necessarily a reflection of the completeness or stability of the code,
 #it does indicate that the project has yet to be fully endorsed by the ASF.
 
-FROM grafana/grafana:11.6.2
+FROM grafana/grafana:13.2.2
 COPY ./provisioning/dashboards /etc/grafana/provisioning/dashboards
 COPY ./provisioning/datasources /etc/grafana/provisioning/datasources
 COPY ./dashboards /etc/grafana/dashboards
@@ -42,13 +42,14 @@ ENV GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH="/etc/grafana/dashboards/AI Impact
 # service name (http://prometheus:9090). An unset var would provision an empty
 # URL and wipe the datasource on boot.
 ENV PROMETHEUS_URL=http://host.docker.internal:9090
+# Keep bundled plugin versions instead of re-downloading them on every start.
+ENV GF_PLUGINS_PREINSTALL_AUTO_UPDATE=false
 USER root
 # volkovlabs-form-panel (Business Forms) backs the Add/Remove panels in
 # dashboards/admin/AdminUserProjectAccess.json. Version is pinned: the dashboard
 # JSON targets the v6 panel schema, so an unpinned install would silently break
 # those panels on the next image build.
-RUN grafana-cli plugins install grafana-piechart-panel && \
-    grafana-cli plugins install volkovlabs-form-panel 6.3.5
+RUN grafana cli plugins install volkovlabs-form-panel 6.3.5
 RUN chgrp -R 0 /etc/grafana /usr/share/grafana /var/lib/grafana && \
     chmod -R g=u /etc/grafana /usr/share/grafana /var/lib/grafana
 USER 101
