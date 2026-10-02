@@ -1,0 +1,8 @@
+{
+  "type": "error",
+  "request_id": "req_synthetic_401",
+  "error": {
+    "type": "authentication_error",
+    "message": "Synthetic invalid Analytics API key"
+  }
+}

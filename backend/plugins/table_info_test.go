@@ -30,6 +30,7 @@ import (
 	bitbucket_server "github.com/apache/incubator-devlake/plugins/bitbucket_server/impl"
 	circleci "github.com/apache/incubator-devlake/plugins/circleci/impl"
 	claude "github.com/apache/incubator-devlake/plugins/claude/impl"
+	claude_enterprise "github.com/apache/incubator-devlake/plugins/claude_enterprise/impl"
 	codex "github.com/apache/incubator-devlake/plugins/codex/impl"
 	cursor "github.com/apache/incubator-devlake/plugins/cursor/impl"
 	customize "github.com/apache/incubator-devlake/plugins/customize/impl"
@@ -114,6 +115,7 @@ func Test_GetPluginTablesInfo(t *testing.T) {
 	checker.FeedIn("salesforce/models", salesforce.Salesforce{}.GetTablesInfo)
 	checker.FeedIn("gh-copilot/models", copilot.GhCopilot{}.GetTablesInfo)
 	checker.FeedIn("claude/models", claude.Claude{}.GetTablesInfo)
+	checker.FeedIn("claude_enterprise/models", claude_enterprise.ClaudeEnterprise{}.GetTablesInfo)
 	checker.FeedIn("codex/models", codex.Codex{}.GetTablesInfo)
 	checker.FeedIn("cursor/models", cursor.Cursor{}.GetTablesInfo)
 	err := checker.Verify()
