@@ -18,7 +18,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { isEqual, pick } from 'lodash';
-import { Flex, Alert, Button } from 'antd';
+import { Flex, Alert, Button, message } from 'antd';
 
 import API from '@/api';
 import { useAppDispatch, useAppSelector } from '@/hooks';
@@ -113,7 +113,7 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: Props) => {
   }
 
   const handleTest = async () => {
-    await operator(
+    const [success, res] = await operator(
       () =>
         type === 'update' && connectionId
           ? API.connection.test(plugin, connectionId, {
@@ -214,8 +214,13 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: Props) => {
       {
         setOperating: setTesting,
         formatMessage: () => 'Test Connection Successfully.',
+        hideToast: !!pluginConfig.connection.showTestResultMessage,
       },
     );
+
+    if (success && pluginConfig.connection.showTestResultMessage) {
+      message.success(res?.message || 'Test Connection Successfully.');
+    }
   };
 
   const handleSave = async () => {

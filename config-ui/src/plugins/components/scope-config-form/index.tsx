@@ -39,6 +39,7 @@ import { GhCopilotTransformation } from '@/plugins/register/gh-copilot';
 import { AsanaTransformation } from '@/plugins/register/asana';
 import { SalesforceTransformation } from '@/plugins/register/salesforce';
 import { ClickUpTransformation } from '@/plugins/register/clickup';
+import { YoutrackTransformation } from '@/plugins/register/youtrack';
 import { DOC_URL } from '@/release';
 import { operator } from '@/utils';
 
@@ -331,6 +332,16 @@ export const ScopeConfigForm = ({
                   entities={entities}
                   connectionId={connectionId}
                   scopeId={scopeId}
+                  transformation={transformation}
+                  setTransformation={setTransformation}
+                />
+              )}
+
+              {plugin === 'youtrack' && (
+                <YoutrackTransformation
+                  entities={entities}
+                  connectionId={connectionId}
+                  scopeConfigId={scopeConfigId}
                   transformation={transformation}
                   setTransformation={setTransformation}
                 />
