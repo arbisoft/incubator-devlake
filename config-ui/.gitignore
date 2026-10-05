@@ -16,6 +16,8 @@
 # testing
 /coverage
 /.test-dist
+/playwright-report
+/test-results
 
 # next.js
 /.next/

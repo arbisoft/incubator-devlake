@@ -509,9 +509,11 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     expect(meAfter.status()).toBe(401);
 
     // Navigating to protected page redirects to /login
-    await userPage.goto('/connections', { waitUntil: 'commit' });
-    await userPage.waitForURL(/.*\/login/);
-    expect(userPage.url()).toContain('/login');
+    // A blank page starts the navigation from inside, so the app's own redirect to /login cannot abort a goto.
+    const freshPage = await userContext.newPage();
+    await freshPage.evaluate((url) => setTimeout(() => window.location.assign(url), 0), `${APP_URL}/connections`);
+    await freshPage.waitForURL(/.*\/login/);
+    expect(freshPage.url()).toContain('/login');
 
     await userContext.close();
   });
@@ -565,6 +567,15 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
       data: { loginName: testLogin, password: tempPass },
     });
     expect(loginAttempt.status()).toBe(401);
+
+    // The credential-less person is no longer matched by resetLocalAuthState, so hide it here to avoid filling the users table.
+    const hideResp = await page.request.post(`${API_URL}/access/users/${targetUser.id}/hide`, {
+      headers: {
+        Cookie: `devlake_session=${adminAuth.token}; devlake_csrf=e2e-csrf-token`,
+        'X-CSRF-Token': 'e2e-csrf-token',
+      },
+    });
+    expect(hideResp.status()).toBe(200);
   });
 
   test('13. Privilege Boundary: Member role cannot access /access or invoke admin user management endpoints', async ({

@@ -19,9 +19,17 @@
 import { test, expect } from '../fixtures';
 import { getAdminSessionToken, loginAsAdmin } from '../auth-helpers';
 import { APP_URL, COLLECTOR_URL, GRAFANA_URL, PROMETHEUS_URL } from '../support/env';
+import { adminApi, createProject, deleteProject, uniqueName } from '../support/api';
 
 test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
   const testTeamName = `e2e-team-${Date.now().toString().slice(-6)}`;
+  const projectName = uniqueName('otel-proj');
+
+  test.beforeAll(async ({ playwright }) => {
+    const api = await adminApi(playwright);
+    await createProject(api, projectName);
+    await api.dispose();
+  });
 
   test.beforeEach(async ({ context }) => {
     await loginAsAdmin(context);
@@ -46,6 +54,9 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
       await api.post(`/api/plugins/claude_otel/connections/${connection.id}/hide`);
     }
     await api.dispose();
+    const projectApi = await adminApi(playwright);
+    await deleteProject(projectApi, projectName);
+    await projectApi.dispose();
   });
 
   test('1. Navigation from /connections, connection creation, one-time credential presentation, and persistence on refresh', async ({
@@ -86,13 +97,8 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     // 7. Select DevLake project
     const projectSelect = createModal.locator('.ant-select');
     await projectSelect.click();
-    const projectOption = page.locator('.ant-select-item-option').first();
-    const hasProject = await projectOption.waitFor({ state: 'visible', timeout: 5000 }).then(
-      () => true,
-      () => false,
-    );
-    test.skip(!hasProject, 'No DevLake project exists to attach the connection to');
-    await projectOption.click();
+    await page.keyboard.type(projectName);
+    await page.locator('.ant-select-item-option').filter({ hasText: projectName }).click();
 
     // Close select dropdown by clicking modal heading
     await createModal.getByText('Generate Claude Settings').click();
