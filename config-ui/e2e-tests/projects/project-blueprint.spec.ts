@@ -38,6 +38,7 @@ import {
 import {
   cronFieldInputs,
   iconButton,
+  emptyState,
   modalByTitle,
   pipelineRowById,
   sectionHeaderButton,
@@ -263,7 +264,7 @@ test.describe.serial('Project, blueprint, pipeline and webhook flows', () => {
 
     expect(await getProject(api, projectName)).toBeUndefined();
     await page.getByPlaceholder('Search project ...').fill(projectName);
-    await expect(page.getByText('No data')).toBeVisible();
+    await expect(emptyState(page, 'No data')).toBeVisible();
     await expect(tableRow(page, projectName)).toHaveCount(0);
   });
 });
