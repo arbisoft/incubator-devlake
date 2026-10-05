@@ -193,16 +193,6 @@ test.describe.serial('Project, blueprint, pipeline and webhook flows', () => {
 
   test('create and delete a webhook from the project Webhooks tab', async ({ page }) => {
     const webhookName = uniqueName('webhook');
-    // Hold the blueprint update so the one-time curl dialog can be inspected before the panel re-renders.
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => (release = resolve));
-    await page.route(/\/blueprints\/\d+$/, async (route) => {
-      if (route.request().method() === 'PATCH') {
-        await gate;
-      }
-      await route.continue();
-    });
-
     await page.goto(`/projects/${encodeURIComponent(projectName)}`);
     await tabByName(page, 'Webhooks').click();
     await page.getByRole('button', { name: 'Add a Webhook' }).click();
@@ -217,10 +207,13 @@ test.describe.serial('Project, blueprint, pipeline and webhook flows', () => {
     await expect(dialog).toContainText(`/api/rest/plugins/webhook/connections/${webhookId}/issues`);
     await expect(dialog).toContainText(`/api/rest/plugins/webhook/connections/${webhookId}/deployments`);
     await expect(dialog).toContainText("-H 'Authorization: Bearer ");
-    release();
 
+    // Attaching the first webhook re-renders the panel; the one-time key dialog must survive it.
     const row = tableRow(page, webhookName);
     await expect(row).toBeVisible();
+    await expect(dialog.getByText('CURL commands generated. Please copy them now.')).toBeVisible();
+    await dialog.getByRole('button', { name: 'Close' }).click();
+    await expect(dialog).toBeHidden();
     const current = await projectBlueprint();
     expect(current.connections).toContainEqual({ pluginName: 'webhook', connectionId: webhookId, scopes: [] });
 
@@ -235,24 +228,6 @@ test.describe.serial('Project, blueprint, pipeline and webhook flows', () => {
     await expect
       .poll(async () => (await projectBlueprint()).connections.filter((c) => c.pluginName === 'webhook'))
       .toEqual([]);
-  });
-
-  test('the one-time webhook dialog stays open after the webhook is attached to the blueprint', async ({ page }) => {
-    test.fail(
-      true,
-      'the empty-state Webhooks panel swaps branches and unmounts the create dialog with its one-time key',
-    );
-    await page.goto(`/projects/${encodeURIComponent(projectName)}`);
-    await tabByName(page, 'Webhooks').click();
-    await page.getByRole('button', { name: 'Add a Webhook' }).click();
-    const dialog = modalByTitle(page, 'Add a New Webhook');
-    await dialog.getByPlaceholder('Webhook Name').fill(uniqueName('webhook'));
-    await dialog.getByRole('button', { name: 'Generate POST URL' }).click();
-    await expect
-      .poll(async () => (await projectBlueprint()).connections.some((c) => c.pluginName === 'webhook'))
-      .toBe(true);
-    await expect(tableRow(page, /e2e-webhook/)).toBeVisible();
-    await expect(dialog.getByText('CURL commands generated. Please copy them now.')).toBeVisible();
   });
 
   test('the selected project tab is not kept across a reload', async ({ page }) => {

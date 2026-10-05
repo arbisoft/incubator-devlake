@@ -87,6 +87,7 @@ export const WebhooksPanel = ({ project, onRefresh }: Props) => {
     });
 
     if (success) {
+      handleCancel();
       onRefresh();
     }
   };
@@ -145,13 +146,14 @@ export const WebhooksPanel = ({ project, onRefresh }: Props) => {
               </>
             }
           />
-          {type === 'create' && <WebhookCreateDialog open onCancel={handleCancel} onSubmitAfter={handleCreate} />}
-          {type === 'selectExist' && (
-            <WebhookSelectorDialog open saving={operating} onCancel={handleCancel} onSubmit={handleSelect} />
-          )}
         </>
       ) : (
         <WebHookConnection filterIds={webhookIds} onCreateAfter={handleCreate} onDeleteAfter={handleDelete} />
+      )}
+      {/* Outside the empty-state branch so attaching the first webhook keeps the one-time key dialog open. */}
+      {type === 'create' && <WebhookCreateDialog open onCancel={handleCancel} onSubmitAfter={handleCreate} />}
+      {type === 'selectExist' && (
+        <WebhookSelectorDialog open saving={operating} onCancel={handleCancel} onSubmit={handleSelect} />
       )}
     </>
   );

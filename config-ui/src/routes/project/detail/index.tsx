@@ -16,7 +16,7 @@
  *
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
@@ -50,6 +50,13 @@ export const ProjectDetailPage = () => {
 
   const { ready, data, error } = useRefreshData(() => API.project.get(pname), [pname, version]);
 
+  // Keep the loaded project on screen during refreshes so open panels and dialogs are not unmounted.
+  const lastLoaded = useRef<{ pname: string; project: NonNullable<typeof data> } | null>(null);
+  if (data) {
+    lastLoaded.current = { pname, project: data };
+  }
+  const project = data ?? (!error && lastLoaded.current?.pname === pname ? lastLoaded.current.project : undefined);
+
   useEffect(() => {
     if (axios.isAxiosError(error) && error.response?.status === 404) {
       message.error(`Project not found with project name: ${pname}`);
@@ -67,24 +74,20 @@ export const ProjectDetailPage = () => {
     setVersion((v) => v + 1);
   };
 
-  if (!ready && !error) {
-    return <PageLoading />;
-  }
-
-  if (!data) {
-    return null;
+  if (!project) {
+    return !ready && !error ? <PageLoading /> : null;
   }
 
   return (
     <PageHeader
       breadcrumbs={[
         { name: 'Projects', path: PATHS.PROJECTS() },
-        { name: data.name, path: PATHS.PROJECT(pname) },
+        { name: project.name, path: PATHS.PROJECT(pname) },
       ]}
     >
       <Helmet>
         <title>
-          {data.name} - {brandName}
+          {project.name} - {brandName}
         </title>
       </Helmet>
       <S.Wrapper>
@@ -93,22 +96,22 @@ export const ProjectDetailPage = () => {
             {
               key: 'blueprint',
               label: 'Blueprint',
-              children: <BlueprintDetail id={data.blueprint.id} from={FromEnum.project} />,
+              children: <BlueprintDetail id={project.blueprint.id} from={FromEnum.project} />,
             },
             {
               key: 'webhook',
               label: 'Webhooks',
-              children: <WebhooksPanel project={data} onRefresh={handleRefresh} />,
+              children: <WebhooksPanel project={project} onRefresh={handleRefresh} />,
             },
             {
               key: 'claude-code-otel',
               label: 'Claude Code OTel',
-              children: <ClaudeCodeOtelPanel projectName={data.name} />,
+              children: <ClaudeCodeOtelPanel projectName={project.name} />,
             },
             {
               key: 'settings',
               label: 'Settings',
-              children: <SettingsPanel project={data} onRefresh={handleRefresh} />,
+              children: <SettingsPanel project={project} onRefresh={handleRefresh} />,
             },
           ]}
           activeKey={tabId}
