@@ -1,0 +1,189 @@
+{
+  "apiVersion": "dashboard.grafana.app/v2",
+  "kind": "Dashboard",
+  "metadata": {
+    "name": "rin8x2k"
+  },
+  "spec": {
+    "annotations": [
+      {
+        "kind": "AnnotationQuery",
+        "spec": {
+          "builtIn": true,
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "query": {
+            "datasource": {
+              "name": "-- Grafana --"
+            },
+            "group": "grafana",
+            "kind": "DataQuery",
+            "spec": {},
+            "version": "v0"
+          }
+        }
+      }
+    ],
+    "cursorSync": "Off",
+    "editable": true,
+    "elements": {
+      "panel-1": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "group": "mysql",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "dataset": "devlake",
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "WITH source_names (code, label) AS (\n    SELECT 'jira',           'Jira'            UNION ALL\n    SELECT 'github',         'GitHub'          UNION ALL\n    SELECT 'gitlab',         'GitLab'          UNION ALL\n    SELECT 'bitbucket',      'Bitbucket'       UNION ALL\n    SELECT 'bitbucket_server','Bitbucket Server' UNION ALL\n    SELECT 'azuredevops',    'Azure DevOps'    UNION ALL\n    SELECT 'azuredevops_go', 'Azure DevOps'    UNION ALL\n    SELECT 'gitee',          'Gitee'           UNION ALL\n    SELECT 'tapd',           'TAPD'            UNION ALL\n    SELECT 'zentao',         'ZenTao'          UNION ALL\n    SELECT 'teambition',     'Teambition'      UNION ALL\n    SELECT 'trello',         'Trello'          UNION ALL\n    SELECT 'asana',          'Asana'           UNION ALL\n    SELECT 'plane',          'Plane'           UNION ALL\n    SELECT 'taiga',          'Taiga'           UNION ALL\n    SELECT 'claude',         'Claude'          UNION ALL\n    SELECT 'claude (otel)',  'Claude Code (OTel)' UNION ALL\n    SELECT 'gh-copilot',     'GitHub Copilot'  UNION ALL\n    SELECT 'cursor',         'Cursor'          UNION ALL\n    SELECT 'codex',          'Codex'\n),-- Issue sources: boards that actually have issues; source = plugin prefix of the board id\nissue_sources AS (\n    SELECT DISTINCT pm.project_name, SUBSTRING_INDEX(pm.row_id, ':', 1) AS code\n    FROM project_mapping pm\n    WHERE pm.`table` = 'boards'\n      AND EXISTS (SELECT 1 FROM board_issues bi WHERE bi.board_id = pm.row_id)\n),-- PR sources: repos that actually have PRs\npr_sources AS (\n    SELECT DISTINCT pm.project_name, SUBSTRING_INDEX(pm.row_id, ':', 1) AS code\n    FROM project_mapping pm\n    WHERE pm.`table` = 'repos'\n      AND EXISTS (SELECT 1 FROM pull_requests pr WHERE pr.base_repo_id = pm.row_id)\n),\nai_rows AS (\n    SELECT DISTINCT\n        provider,\n        source_type,\n        source_connection_id,\n        CASE WHEN JSON_VALID(_raw_data_params) THEN COALESCE(\n            JSON_UNQUOTE(JSON_EXTRACT(_raw_data_params, '$.connectionId')),\n            JSON_UNQUOTE(JSON_EXTRACT(_raw_data_params, '$.ConnectionId'))) END AS conn_id,\n        CASE WHEN JSON_VALID(_raw_data_params) THEN COALESCE(\n            JSON_UNQUOTE(JSON_EXTRACT(_raw_data_params, '$.scopeId')),\n            JSON_UNQUOTE(JSON_EXTRACT(_raw_data_params, '$.ScopeId'))) END AS scope_id\n    FROM ai_activities\n),\nai_sources AS ( -- Claude OTel: connection is linked to projects directly\n    SELECT cp.project_name, 'claude (otel)' AS code\n    FROM ai_rows s\n    JOIN _tool_claude_code_otel_connection_projects cp ON cp.connection_id = s.source_connection_id\n    WHERE s.source_type = 'otel'\n    UNION -- Claude / Copilot / Cursor / Codex plugins: scope added to the project's blueprint\n    SELECT b.project_name, s.provider\n    FROM ai_rows s\n    JOIN _devlake_blueprint_scopes bs\n      ON bs.plugin_name = s.provider\n     AND bs.connection_id = s.conn_id\n     AND bs.scope_id = s.scope_id\n    JOIN _devlake_blueprints b ON b.id = bs.blueprint_id\n    WHERE COALESCE(s.source_type, '') <> 'otel'\n),\nlabelled AS (\n    SELECT 'issue' AS kind, x.project_name, COALESCE(n.label, x.code) AS label\n    FROM issue_sources x LEFT JOIN source_names n ON n.code = x.code\n    UNION ALL\n    SELECT 'pr', x.project_name, COALESCE(n.label, x.code)\n    FROM pr_sources x LEFT JOIN source_names n ON n.code = x.code\n    UNION ALL\n    SELECT 'ai', x.project_name, COALESCE(n.label, x.code)\n    FROM ai_sources x LEFT JOIN source_names n ON n.code = x.code\n),\nby_project AS (\n    SELECT project_name,\n        GROUP_CONCAT(DISTINCT CASE WHEN kind = 'issue' THEN label END ORDER BY label SEPARATOR ', ') AS issue_src,\n        GROUP_CONCAT(DISTINCT CASE WHEN kind = 'pr'    THEN label END ORDER BY label SEPARATOR ', ') AS pr_src,\n        GROUP_CONCAT(DISTINCT CASE WHEN kind = 'ai'    THEN label END ORDER BY label SEPARATOR ', ') AS ai_src\n    FROM labelled\n    GROUP BY project_name\n),\nthe_results AS (\n\tSELECT p.name AS `Project`,\n\t    COALESCE(CONCAT('✅ ', bp.issue_src), '❌ Not available') AS `Issue Visibility`,\n\t    COALESCE(CONCAT('✅ ', bp.pr_src),    '❌ Not available') AS `PR Visibility`,\n\t    COALESCE(CONCAT('✅ ', bp.ai_src),    '❌ Not available') AS `AI Visibility`,\n\t    (bp.issue_src IS NOT NULL) +\n\t        (bp.pr_src    IS NOT NULL) +\n\t        (bp.ai_src    IS NOT NULL) AS Score\n\tFROM projects p\n\tLEFT JOIN by_project bp ON bp.project_name = p.name\n\tORDER BY p.name\n)\nSELECT Project, `Issue Visibility`, `PR Visibility`, `AI Visibility`,\n\tCASE\n\t\tWHEN Score = 0 THEN '🚨 00.0%'\n\t\tWHEN Score = 1 THEN '🔶 33.3%'\n\t\tWHEN Score = 2 THEN '⚠️ 66.6%'\n\t\tELSE '✅ 100%'\n\tEND AS Compliance\t\nFROM the_results tr;",
+                        "sql": {
+                          "columns": [
+                            {
+                              "parameters": [],
+                              "type": "function"
+                            }
+                          ],
+                          "groupBy": [
+                            {
+                              "property": {
+                                "type": "string"
+                              },
+                              "type": "groupBy"
+                            }
+                          ],
+                          "limit": 50
+                        }
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "",
+          "id": 1,
+          "links": [],
+          "title": "",
+          "vizConfig": {
+            "group": "table",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "custom": {
+                    "align": "auto",
+                    "cellOptions": {
+                      "type": "auto"
+                    },
+                    "footer": {
+                      "reducers": []
+                    },
+                    "inspect": false
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "cellHeight": "sm",
+                "showHeader": true,
+                "sortBy": [
+                  {
+                    "desc": false,
+                    "displayName": "Project"
+                  }
+                ]
+              }
+            },
+            "version": "13.2.2"
+          }
+        }
+      }
+    },
+    "layout": {
+      "kind": "GridLayout",
+      "spec": {
+        "items": [
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-1"
+              },
+              "height": 18,
+              "width": 24,
+              "x": 0,
+              "y": 0
+            }
+          }
+        ]
+      }
+    },
+    "links": [],
+    "liveNow": false,
+    "preferences": {
+      "layout": {
+        "kind": "GridLayout",
+        "spec": {
+          "items": []
+        }
+      }
+    },
+    "preload": false,
+    "tags": [],
+    "timeSettings": {
+      "autoRefresh": "",
+      "autoRefreshIntervals": [
+        "5s",
+        "10s",
+        "30s",
+        "1m",
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "2h",
+        "1d"
+      ],
+      "fiscalYearStartMonth": 0,
+      "from": "now-6h",
+      "hideTimepicker": false,
+      "timezone": "browser",
+      "to": "now"
+    },
+    "title": "DevLake Readiness",
+    "variables": []
+  }
+}
