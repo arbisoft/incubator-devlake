@@ -16,18 +16,21 @@
  *
  */
 
-import { equal } from 'node:assert/strict';
-import { test } from 'node:test';
+import { describe, expect, it } from 'vitest';
 
 import { normalizeLoginReturnPath } from './utils';
 
-test('keeps a relative return path under the configured application prefix', () => {
-  equal(normalizeLoginReturnPath('/devlake/connections?tab=active', '/devlake/'), '/devlake/connections?tab=active');
-});
+describe('routes/login/utils', () => {
+  it('keeps a relative return path under the configured application prefix', () => {
+    expect(normalizeLoginReturnPath('/devlake/connections?tab=active', '/devlake/')).toBe(
+      '/devlake/connections?tab=active',
+    );
+  });
 
-test('rejects external and malformed login return paths', () => {
-  equal(normalizeLoginReturnPath('https://example.com', '/devlake'), '/devlake/');
-  equal(normalizeLoginReturnPath('//example.com', '/devlake'), '/devlake/');
-  equal(normalizeLoginReturnPath('connections', '/devlake'), '/devlake/');
-  equal(normalizeLoginReturnPath('/\\example.com', '/devlake'), '/devlake/');
+  it('rejects external and malformed login return paths', () => {
+    expect(normalizeLoginReturnPath('https://example.com', '/devlake/')).toBe('/devlake/');
+    expect(normalizeLoginReturnPath('//example.com', '/devlake/')).toBe('/devlake/');
+    expect(normalizeLoginReturnPath('connections', '/devlake/')).toBe('/devlake/');
+    expect(normalizeLoginReturnPath('/\\example.com', '/devlake/')).toBe('/devlake/');
+  });
 });

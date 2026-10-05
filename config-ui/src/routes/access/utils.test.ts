@@ -16,9 +16,11 @@
  *
  */
 
-import { equal } from 'node:assert/strict';
-import { test } from 'node:test';
+import { describe, expect, it } from 'vitest';
 import { AxiosError, AxiosHeaders, HttpStatusCode } from 'axios';
+
+// Load the routes barrel first so the config/routes import cycle resolves as it does in the app.
+import '@/routes';
 
 import {
   ACCESS_ERROR_CODE,
@@ -56,317 +58,323 @@ const createAxiosError = (status: number, data: unknown) =>
     data,
   });
 
-test('normalizes allowed-domain input before it is submitted', () => {
-  equal(normalizeDomain(' Example.COM '), 'example.com');
-});
-
-test('rejects invalid allowed-domain input locally', () => {
-  equal(isValidDomain('example.com'), true);
-  equal(isValidDomain('example'), true);
-  equal(isValidDomain(''), false);
-  equal(isValidDomain('example..com'), false);
-  equal(isValidDomain('person@example.com'), false);
-  equal(isValidDomain('@example.com'), false);
-  equal(isValidDomain('[192.168.1.1]'), false);
-  equal(isValidDomain('example.com.'), false);
-});
-
-test('rejects invalid email input locally', () => {
-  equal(isValidEmail('person@example.com'), true);
-  equal(isValidEmail('person@example'), true);
-  equal(isValidEmail('@example.com'), false);
-  equal(isValidEmail('person@example.com '), true);
-  equal(isValidEmail('person @example.com'), false);
-  equal(isValidEmail('person@example..com'), false);
-});
-
-test('accepts only supported local usernames', () => {
-  equal(isValidLocalLoginName('admin'), true);
-  equal(isValidLocalLoginName('Person.Name_1'), true);
-  equal(isValidLocalLoginName('ab'), false);
-  equal(isValidLocalLoginName('-admin'), false);
-  equal(isValidLocalLoginName('admin name'), false);
-  equal(isValidLocalLoginName('admin@example.com'), false);
-});
-
-test('maps create-user error codes to safe UI copy', () => {
-  const duplicateErr = createAxiosError(HttpStatusCode.BadRequest, {
-    code: ACCESS_ERROR_CODE.DUPLICATE_USER,
-    message: 'this email already has a DevLake access entry',
-  });
-  equal(getCreateUserError(duplicateErr), ACCESS_ERROR.DUPLICATE_USER);
-
-  const invalidErr = createAxiosError(HttpStatusCode.BadRequest, {
-    code: ACCESS_ERROR_CODE.INVALID_USER,
-    message: 'provide a valid email and role',
-  });
-  equal(getCreateUserError(invalidErr), ACCESS_ERROR.INVALID_USER);
-
-  const serverErr = createAxiosError(HttpStatusCode.InternalServerError, {
-    message: 'internal server error',
-  });
-  equal(getCreateUserError(serverErr), ACCESS_ERROR.REQUEST_FAILED);
-
-  equal(getCreateUserError(new Error('network error')), ACCESS_ERROR.REQUEST_FAILED);
-});
-
-test('maps local credential lifecycle errors to safe UI copy', () => {
-  const missingCredential = createAxiosError(HttpStatusCode.NotFound, {
-    code: ACCESS_ERROR_CODE.LOCAL_CREDENTIAL_MISSING,
-  });
-  const finalMethod = createAxiosError(HttpStatusCode.BadRequest, {
-    code: ACCESS_ERROR_CODE.LAST_LOGIN_METHOD,
+describe('routes/access/utils', () => {
+  it('normalizes allowed-domain input before it is submitted', () => {
+    expect(normalizeDomain(' Example.COM ')).toBe('example.com');
   });
 
-  equal(getLocalCredentialError(missingCredential), ACCESS_ERROR.LOCAL_CREDENTIAL_MISSING);
-  equal(getLocalCredentialError(finalMethod), ACCESS_ERROR.LAST_LOGIN_METHOD);
-});
-
-test('maps local credential errors with username-specific copy', () => {
-  const duplicate = createAxiosError(HttpStatusCode.BadRequest, {
-    code: ACCESS_ERROR_CODE.DUPLICATE_USER,
-  });
-  const invalid = createAxiosError(HttpStatusCode.BadRequest, {
-    code: ACCESS_ERROR_CODE.INVALID_USER,
-  });
-
-  equal(getLocalCredentialError(duplicate), 'This username already has a DevLake local password.');
-  equal(getLocalCredentialError(invalid), 'Enter a valid username, then try again.');
-});
-
-test('maps create-domain error codes to safe UI copy', () => {
-  const duplicateErr = createAxiosError(HttpStatusCode.BadRequest, {
-    code: ACCESS_ERROR_CODE.DUPLICATE_DOMAIN,
-    message: 'this domain already has a DevLake access policy',
-  });
-  equal(getCreateDomainError(duplicateErr), ACCESS_ERROR.DUPLICATE_DOMAIN);
-
-  const invalidErr = createAxiosError(HttpStatusCode.BadRequest, {
-    code: ACCESS_ERROR_CODE.INVALID_DOMAIN,
-    message: 'provide a valid domain and default role',
-  });
-  equal(getCreateDomainError(invalidErr), ACCESS_ERROR.INVALID_DOMAIN);
-
-  const serverErr = createAxiosError(HttpStatusCode.InternalServerError, {
-    message: 'internal server error',
-  });
-  equal(getCreateDomainError(serverErr), ACCESS_ERROR.REQUEST_FAILED);
-
-  equal(getCreateDomainError(new Error('network error')), ACCESS_ERROR.REQUEST_FAILED);
-});
-
-test('normalizes and validates OIDC provider settings locally', () => {
-  const provider = normalizeOIDCProviderInput({
-    providerKey: ' Google-Workspace ',
-    displayName: ' Google Workspace ',
-    issuerUrl: ' https://accounts.example.com/ ',
-    clientId: ' client-id ',
-    clientSecret: ' secret ',
-    scopes: 'openid, profile openid email',
-    grafanaTarget: GRAFANA_PROVIDER_KIND.GOOGLE,
-    confirmDevlakeOnly: false,
+  it('rejects invalid allowed-domain input locally', () => {
+    expect(isValidDomain('example.com')).toBe(true);
+    expect(isValidDomain('example')).toBe(true);
+    expect(isValidDomain('')).toBe(false);
+    expect(isValidDomain('example..com')).toBe(false);
+    expect(isValidDomain('person@example.com')).toBe(false);
+    expect(isValidDomain('@example.com')).toBe(false);
+    expect(isValidDomain('[192.168.1.1]')).toBe(false);
+    expect(isValidDomain('example.com.')).toBe(false);
   });
 
-  equal(provider.providerKey, 'google-workspace');
-  equal(provider.issuerUrl, 'https://accounts.example.com/');
-  equal(provider.scopes, 'openid profile email');
-  equal(isValidOIDCProviderInput(provider), true);
-  equal(isValidOIDCProviderInput({ ...provider, providerKey: 'invalid/key' }), false);
-  equal(isValidOIDCProviderInput({ ...provider, issuerUrl: 'http://issuer.example.com' }), false);
-  equal(isValidOIDCProviderInput({ ...provider, scopes: 'profile email' }), false);
-  equal(isValidOIDCProviderInput({ ...provider, issuerUrl: 'http://localhost:5556' }), false);
-  equal(isValidOIDCProviderInput({ ...provider, issuerUrl: 'http://localhost:5556' }, undefined, true), true);
-});
-
-test('allows stored OIDC credentials only for the unchanged client ID', () => {
-  const provider = normalizeOIDCProviderInput({
-    providerKey: 'google',
-    displayName: 'Google',
-    issuerUrl: 'https://accounts.example.com',
-    clientId: 'client-a',
-    clientSecret: '',
-    scopes: 'openid profile email',
-    grafanaTarget: GRAFANA_PROVIDER_KIND.GENERIC_OAUTH,
-    confirmDevlakeOnly: false,
-  });
-  const configuredProvider: OIDCProvider = {
-    providerKey: 'google',
-    displayName: 'Google',
-    issuerUrl: 'https://accounts.example.com',
-    clientId: 'client-a',
-    scopes: 'openid profile email',
-    enabled: true,
-    secretConfigured: true,
-    databaseSourceActive: true,
-    grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.SYNCHRONIZED,
-    grafanaSyncedRevision: 1,
-    providerRevision: 1,
-    hasCandidate: false,
-    grafanaTarget: GRAFANA_PROVIDER_KIND.GENERIC_OAUTH,
-    devlakeCallbackUrl: 'https://devlake.example.com/api/auth/callback',
-    grafanaCallbackUrl: 'https://grafana.example.com/login/generic_oauth',
-    allowLocalOidc: false,
-  };
-
-  equal(isValidOIDCProviderInput(provider, configuredProvider), true);
-  equal(isValidOIDCProviderInput({ ...provider, clientId: 'client-b' }, configuredProvider), false);
-});
-
-test('creates a write-only OIDC provider form from configured state', () => {
-  const provider: OIDCProvider = {
-    providerKey: 'google',
-    displayName: 'Google',
-    issuerUrl: 'https://accounts.google.com',
-    clientId: 'client',
-    scopes: 'openid profile email',
-    enabled: true,
-    secretConfigured: true,
-    databaseSourceActive: true,
-    grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.SYNCHRONIZED,
-    grafanaSyncedRevision: 1,
-    providerRevision: 1,
-    hasCandidate: false,
-    grafanaTarget: GRAFANA_PROVIDER_KIND.GENERIC_OAUTH,
-    devlakeCallbackUrl: 'https://devlake.example.com/api/auth/callback',
-    grafanaCallbackUrl: 'https://grafana.example.com/login/generic_oauth',
-    allowLocalOidc: false,
-  };
-
-  equal(formFromOIDCProvider(provider).clientSecret, '');
-  equal(formFromOIDCProvider(provider).scopes, provider.scopes);
-  equal(formFromOIDCProvider().scopes, 'openid profile email');
-  equal(formFromOIDCProvider().confirmDevlakeOnly, false);
-  equal(formFromOIDCProvider(provider).confirmDevlakeOnly, false);
-  equal(formFromOIDCProvider({ ...provider, grafanaTarget: GRAFANA_PROVIDER_KIND.NONE }).confirmDevlakeOnly, true);
-});
-
-test('maps OIDC provider errors to safe user-facing messages', () => {
-  const invalidProvider = createAxiosError(HttpStatusCode.BadRequest, {
-    code: ACCESS_ERROR_CODE.INVALID_OIDC_PROVIDER,
-  });
-  const blockedProvider = createAxiosError(HttpStatusCode.BadRequest, {
-    code: ACCESS_ERROR_CODE.OIDC_PROVIDER_BLOCKED,
-  });
-  const unavailableBlockedProvider = createAxiosError(HttpStatusCode.ServiceUnavailable, {
-    code: ACCESS_ERROR_CODE.OIDC_PROVIDER_BLOCKED,
-  });
-  const unavailableUnknownProvider = createAxiosError(HttpStatusCode.ServiceUnavailable, {
-    code: 'GRAFANA_CREDENTIAL_REJECTED',
-  });
-  const grafanaSyncFailed = createAxiosError(HttpStatusCode.ServiceUnavailable, {
-    code: ACCESS_ERROR_CODE.GRAFANA_SYNC_FAILED,
+  it('rejects invalid email input locally', () => {
+    expect(isValidEmail('person@example.com')).toBe(true);
+    expect(isValidEmail('person@example')).toBe(true);
+    expect(isValidEmail('@example.com')).toBe(false);
+    expect(isValidEmail('person@example.com ')).toBe(true);
+    expect(isValidEmail('person @example.com')).toBe(false);
+    expect(isValidEmail('person@example..com')).toBe(false);
   });
 
-  equal(getOIDCProviderError(invalidProvider), ACCESS_ERROR.INVALID_OIDC_PROVIDER);
-  equal(getOIDCProviderError(blockedProvider), ACCESS_ERROR.OIDC_PROVIDER_BLOCKED);
-  equal(getOIDCProviderError(unavailableBlockedProvider), ACCESS_ERROR.OIDC_PROVIDER_BLOCKED);
-  equal(getOIDCProviderError(grafanaSyncFailed), ACCESS_ERROR.GRAFANA_SYNC_FAILED);
-  equal(getOIDCProviderError(unavailableUnknownProvider), ACCESS_ERROR.OIDC_PROVIDER_FAILED);
-  equal(getOIDCProviderError(new Error('network error')), ACCESS_ERROR.OIDC_PROVIDER_FAILED);
-});
-
-test('summarizes OIDC provider lifecycle state without exposing internal synchronization details', () => {
-  const configuredProvider: OIDCProvider = {
-    providerKey: 'google',
-    displayName: 'Google',
-    issuerUrl: 'https://accounts.google.com',
-    clientId: 'client',
-    scopes: 'openid profile email',
-    enabled: false,
-    secretConfigured: true,
-    databaseSourceActive: false,
-    grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.SYNCHRONIZED,
-    grafanaSyncedRevision: 1,
-    providerRevision: 1,
-    hasCandidate: false,
-    grafanaTarget: GRAFANA_PROVIDER_KIND.GENERIC_OAUTH,
-    devlakeCallbackUrl: 'https://devlake.example.com/api/auth/callback',
-    grafanaCallbackUrl: 'https://grafana.example.com/login/generic_oauth',
-    allowLocalOidc: false,
-  };
-
-  equal(getOIDCProviderStatus(undefined), OIDC_PROVIDER_STATUS.CONFIGURED);
-  equal(getOIDCProviderStatus(configuredProvider), OIDC_PROVIDER_STATUS.CONFIGURED);
-  equal(canActivateOIDCProvider(configuredProvider), true);
-  equal(
-    getOIDCProviderStatus({ ...configuredProvider, databaseSourceActive: true, enabled: true }),
-    OIDC_PROVIDER_STATUS.ACTIVE,
-  );
-  equal(
-    getOIDCProviderStatus({ ...configuredProvider, grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.COMPENSATION_FAILED }),
-    OIDC_PROVIDER_STATUS.RECOVERY,
-  );
-  const compensatedProvider = { ...configuredProvider, grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.COMPENSATED };
-  equal(getOIDCProviderStatus(compensatedProvider), OIDC_PROVIDER_STATUS.COMPENSATED);
-  equal(canActivateOIDCProvider(compensatedProvider), true);
-  equal(OIDC_PROVIDER_STATUS_COLOR[OIDC_PROVIDER_STATUS.ACTIVE], 'green');
-  equal(OIDC_PROVIDER_STATUS_COLOR[OIDC_PROVIDER_STATUS.COMPENSATED], 'orange');
-  equal(OIDC_PROVIDER_STATUS_COLOR[OIDC_PROVIDER_STATUS.RECOVERY], 'red');
-  equal(OIDC_PROVIDER_STATUS_COLOR[OIDC_PROVIDER_STATUS.CONFIGURED], 'orange');
-});
-
-test('summarizes the authentication configuration state without inferring environment configuration', () => {
-  const provider: OIDCProvider = {
-    providerKey: 'google',
-    displayName: 'Google',
-    issuerUrl: 'https://accounts.google.com',
-    clientId: 'client',
-    scopes: 'openid profile email',
-    enabled: false,
-    secretConfigured: true,
-    databaseSourceActive: false,
-    grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.SYNCHRONIZED,
-    grafanaSyncedRevision: 1,
-    providerRevision: 1,
-    hasCandidate: false,
-    grafanaTarget: GRAFANA_PROVIDER_KIND.GOOGLE,
-    devlakeCallbackUrl: 'https://devlake.example.com/api/auth/callback',
-    grafanaCallbackUrl: 'https://grafana.example.com/login/google',
-    allowLocalOidc: false,
-  };
-
-  equal(getAuthenticationState([]), AUTHENTICATION_STATE.NO_MANAGED_OIDC);
-  equal(getAuthenticationState([{ ...provider, hasCandidate: true }]), AUTHENTICATION_STATE.ACTIVATION_REQUIRED);
-  equal(getAuthenticationState([provider]), AUTHENTICATION_STATE.NO_ACTIVE_OIDC);
-  equal(
-    getAuthenticationState([{ ...provider, enabled: true, databaseSourceActive: true }]),
-    AUTHENTICATION_STATE.OIDC_ACTIVE,
-  );
-});
-
-test('requires explicit DevLake-only confirmation and identifies a Generic OAuth candidate', () => {
-  const devLakeOnly = normalizeOIDCProviderInput({
-    providerKey: 'custom',
-    displayName: 'Custom OIDC',
-    issuerUrl: 'https://id.example.com',
-    clientId: 'client',
-    clientSecret: 'secret',
-    scopes: 'openid email',
-    grafanaTarget: GRAFANA_PROVIDER_KIND.NONE,
-    confirmDevlakeOnly: false,
+  it('accepts only supported local usernames', () => {
+    expect(isValidLocalLoginName('admin')).toBe(true);
+    expect(isValidLocalLoginName('Person.Name_1')).toBe(true);
+    expect(isValidLocalLoginName('ab')).toBe(false);
+    expect(isValidLocalLoginName('-admin')).toBe(false);
+    expect(isValidLocalLoginName('admin name')).toBe(false);
+    expect(isValidLocalLoginName('admin@example.com')).toBe(false);
   });
-  equal(isValidOIDCProviderInput(devLakeOnly), false);
-  equal(isValidOIDCProviderInput({ ...devLakeOnly, confirmDevlakeOnly: true }), true);
 
-  const provider: OIDCProvider = {
-    providerKey: 'custom',
-    displayName: 'Custom OIDC',
-    issuerUrl: 'https://id.example.com',
-    clientId: 'client',
-    scopes: 'openid email',
-    grafanaTarget: GRAFANA_PROVIDER_KIND.NONE,
-    enabled: true,
-    secretConfigured: true,
-    databaseSourceActive: true,
-    grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.NOT_APPLICABLE,
-    grafanaSyncedRevision: 0,
-    providerRevision: 1,
-    hasCandidate: false,
-    devlakeCallbackUrl: 'https://devlake.example.com/api/auth/callback',
-    grafanaCallbackUrl: 'https://grafana.example.com/login',
-    allowLocalOidc: false,
-  };
-  equal(canSelectGenericOIDCProvider(provider), true);
-  equal(canSelectGenericOIDCProvider({ ...provider, enabled: false }), false);
-  equal(canSelectGenericOIDCProvider({ ...provider, hasCandidate: true }), false);
+  it('maps create-user error codes to safe UI copy', () => {
+    const duplicateErr = createAxiosError(HttpStatusCode.BadRequest, {
+      code: ACCESS_ERROR_CODE.DUPLICATE_USER,
+      message: 'this email already has a DevLake access entry',
+    });
+    expect(getCreateUserError(duplicateErr)).toBe(ACCESS_ERROR.DUPLICATE_USER);
+
+    const invalidErr = createAxiosError(HttpStatusCode.BadRequest, {
+      code: ACCESS_ERROR_CODE.INVALID_USER,
+      message: 'provide a valid email and role',
+    });
+    expect(getCreateUserError(invalidErr)).toBe(ACCESS_ERROR.INVALID_USER);
+
+    const serverErr = createAxiosError(HttpStatusCode.InternalServerError, {
+      message: 'internal server error',
+    });
+    expect(getCreateUserError(serverErr)).toBe(ACCESS_ERROR.REQUEST_FAILED);
+
+    expect(getCreateUserError(new Error('network error'))).toBe(ACCESS_ERROR.REQUEST_FAILED);
+  });
+
+  it('maps local credential lifecycle errors to safe UI copy', () => {
+    const missingCredential = createAxiosError(HttpStatusCode.NotFound, {
+      code: ACCESS_ERROR_CODE.LOCAL_CREDENTIAL_MISSING,
+    });
+    const finalMethod = createAxiosError(HttpStatusCode.BadRequest, {
+      code: ACCESS_ERROR_CODE.LAST_LOGIN_METHOD,
+    });
+
+    expect(getLocalCredentialError(missingCredential)).toBe(ACCESS_ERROR.LOCAL_CREDENTIAL_MISSING);
+    expect(getLocalCredentialError(finalMethod)).toBe(ACCESS_ERROR.LAST_LOGIN_METHOD);
+  });
+
+  it('maps local credential errors with username-specific copy', () => {
+    const duplicate = createAxiosError(HttpStatusCode.BadRequest, {
+      code: ACCESS_ERROR_CODE.DUPLICATE_USER,
+    });
+    const invalid = createAxiosError(HttpStatusCode.BadRequest, {
+      code: ACCESS_ERROR_CODE.INVALID_USER,
+    });
+
+    expect(getLocalCredentialError(duplicate)).toBe('This username already has a DevLake local password.');
+    expect(getLocalCredentialError(invalid)).toBe('Enter a valid username, then try again.');
+  });
+
+  it('maps create-domain error codes to safe UI copy', () => {
+    const duplicateErr = createAxiosError(HttpStatusCode.BadRequest, {
+      code: ACCESS_ERROR_CODE.DUPLICATE_DOMAIN,
+      message: 'this domain already has a DevLake access policy',
+    });
+    expect(getCreateDomainError(duplicateErr)).toBe(ACCESS_ERROR.DUPLICATE_DOMAIN);
+
+    const invalidErr = createAxiosError(HttpStatusCode.BadRequest, {
+      code: ACCESS_ERROR_CODE.INVALID_DOMAIN,
+      message: 'provide a valid domain and default role',
+    });
+    expect(getCreateDomainError(invalidErr)).toBe(ACCESS_ERROR.INVALID_DOMAIN);
+
+    const serverErr = createAxiosError(HttpStatusCode.InternalServerError, {
+      message: 'internal server error',
+    });
+    expect(getCreateDomainError(serverErr)).toBe(ACCESS_ERROR.REQUEST_FAILED);
+
+    expect(getCreateDomainError(new Error('network error'))).toBe(ACCESS_ERROR.REQUEST_FAILED);
+  });
+
+  it('normalizes and validates OIDC provider settings locally', () => {
+    const provider = normalizeOIDCProviderInput({
+      providerKey: ' Google-Workspace ',
+      displayName: ' Google Workspace ',
+      issuerUrl: ' https://accounts.example.com/ ',
+      clientId: ' client-id ',
+      clientSecret: ' secret ',
+      scopes: 'openid, profile openid email',
+      grafanaTarget: GRAFANA_PROVIDER_KIND.GOOGLE,
+      confirmDevlakeOnly: false,
+    });
+
+    expect(provider.providerKey).toBe('google-workspace');
+    expect(provider.issuerUrl).toBe('https://accounts.example.com/');
+    expect(provider.scopes).toBe('openid profile email');
+    expect(isValidOIDCProviderInput(provider)).toBe(true);
+    expect(isValidOIDCProviderInput({ ...provider, providerKey: 'invalid/key' })).toBe(false);
+    expect(isValidOIDCProviderInput({ ...provider, issuerUrl: 'http://issuer.example.com' })).toBe(false);
+    expect(isValidOIDCProviderInput({ ...provider, scopes: 'profile email' })).toBe(false);
+    expect(isValidOIDCProviderInput({ ...provider, issuerUrl: 'http://localhost:5556' })).toBe(false);
+    expect(isValidOIDCProviderInput({ ...provider, issuerUrl: 'http://localhost:5556' }, undefined, true)).toBe(true);
+  });
+
+  it('allows stored OIDC credentials only for the unchanged client ID', () => {
+    const provider = normalizeOIDCProviderInput({
+      providerKey: 'google',
+      displayName: 'Google',
+      issuerUrl: 'https://accounts.example.com',
+      clientId: 'client-a',
+      clientSecret: '',
+      scopes: 'openid profile email',
+      grafanaTarget: GRAFANA_PROVIDER_KIND.GENERIC_OAUTH,
+      confirmDevlakeOnly: false,
+    });
+    const configuredProvider: OIDCProvider = {
+      providerKey: 'google',
+      displayName: 'Google',
+      issuerUrl: 'https://accounts.example.com',
+      clientId: 'client-a',
+      scopes: 'openid profile email',
+      enabled: true,
+      secretConfigured: true,
+      databaseSourceActive: true,
+      grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.SYNCHRONIZED,
+      grafanaSyncedRevision: 1,
+      providerRevision: 1,
+      hasCandidate: false,
+      grafanaTarget: GRAFANA_PROVIDER_KIND.GENERIC_OAUTH,
+      devlakeCallbackUrl: 'https://devlake.example.com/api/auth/callback',
+      grafanaCallbackUrl: 'https://grafana.example.com/login/generic_oauth',
+      allowLocalOidc: false,
+    };
+
+    expect(isValidOIDCProviderInput(provider, configuredProvider)).toBe(true);
+    expect(isValidOIDCProviderInput({ ...provider, clientId: 'client-b' }, configuredProvider)).toBe(false);
+  });
+
+  it('creates a write-only OIDC provider form from configured state', () => {
+    const provider: OIDCProvider = {
+      providerKey: 'google',
+      displayName: 'Google',
+      issuerUrl: 'https://accounts.google.com',
+      clientId: 'client',
+      scopes: 'openid profile email',
+      enabled: true,
+      secretConfigured: true,
+      databaseSourceActive: true,
+      grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.SYNCHRONIZED,
+      grafanaSyncedRevision: 1,
+      providerRevision: 1,
+      hasCandidate: false,
+      grafanaTarget: GRAFANA_PROVIDER_KIND.GENERIC_OAUTH,
+      devlakeCallbackUrl: 'https://devlake.example.com/api/auth/callback',
+      grafanaCallbackUrl: 'https://grafana.example.com/login/generic_oauth',
+      allowLocalOidc: false,
+    };
+
+    expect(formFromOIDCProvider(provider).clientSecret).toBe('');
+    expect(formFromOIDCProvider(provider).scopes).toBe(provider.scopes);
+    expect(formFromOIDCProvider().scopes).toBe('openid profile email');
+    expect(formFromOIDCProvider().confirmDevlakeOnly).toBe(false);
+    expect(formFromOIDCProvider(provider).confirmDevlakeOnly).toBe(false);
+    expect(formFromOIDCProvider({ ...provider, grafanaTarget: GRAFANA_PROVIDER_KIND.NONE }).confirmDevlakeOnly).toBe(
+      true,
+    );
+  });
+
+  it('maps OIDC provider errors to safe user-facing messages', () => {
+    const invalidProvider = createAxiosError(HttpStatusCode.BadRequest, {
+      code: ACCESS_ERROR_CODE.INVALID_OIDC_PROVIDER,
+    });
+    const blockedProvider = createAxiosError(HttpStatusCode.BadRequest, {
+      code: ACCESS_ERROR_CODE.OIDC_PROVIDER_BLOCKED,
+    });
+    const unavailableBlockedProvider = createAxiosError(HttpStatusCode.ServiceUnavailable, {
+      code: ACCESS_ERROR_CODE.OIDC_PROVIDER_BLOCKED,
+    });
+    const unavailableUnknownProvider = createAxiosError(HttpStatusCode.ServiceUnavailable, {
+      code: 'GRAFANA_CREDENTIAL_REJECTED',
+    });
+    const grafanaSyncFailed = createAxiosError(HttpStatusCode.ServiceUnavailable, {
+      code: ACCESS_ERROR_CODE.GRAFANA_SYNC_FAILED,
+    });
+
+    expect(getOIDCProviderError(invalidProvider)).toBe(ACCESS_ERROR.INVALID_OIDC_PROVIDER);
+    expect(getOIDCProviderError(blockedProvider)).toBe(ACCESS_ERROR.OIDC_PROVIDER_BLOCKED);
+    expect(getOIDCProviderError(unavailableBlockedProvider)).toBe(ACCESS_ERROR.OIDC_PROVIDER_BLOCKED);
+    expect(getOIDCProviderError(grafanaSyncFailed)).toBe(ACCESS_ERROR.GRAFANA_SYNC_FAILED);
+    expect(getOIDCProviderError(unavailableUnknownProvider)).toBe(ACCESS_ERROR.OIDC_PROVIDER_FAILED);
+    expect(getOIDCProviderError(new Error('network error'))).toBe(ACCESS_ERROR.OIDC_PROVIDER_FAILED);
+  });
+
+  it('summarizes OIDC provider lifecycle state without exposing internal synchronization details', () => {
+    const disabledProvider: OIDCProvider = {
+      providerKey: 'google',
+      displayName: 'Google',
+      issuerUrl: 'https://accounts.google.com',
+      clientId: 'client',
+      scopes: 'openid profile email',
+      enabled: false,
+      secretConfigured: true,
+      databaseSourceActive: false,
+      grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.SYNCHRONIZED,
+      grafanaSyncedRevision: 1,
+      providerRevision: 1,
+      hasCandidate: false,
+      grafanaTarget: GRAFANA_PROVIDER_KIND.GENERIC_OAUTH,
+      devlakeCallbackUrl: 'https://devlake.example.com/api/auth/callback',
+      grafanaCallbackUrl: 'https://grafana.example.com/login/generic_oauth',
+      allowLocalOidc: false,
+    };
+
+    expect(getOIDCProviderStatus(undefined)).toBe(OIDC_PROVIDER_STATUS.CONFIGURED);
+    expect(getOIDCProviderStatus(disabledProvider)).toBe(OIDC_PROVIDER_STATUS.DISABLED);
+    expect(canActivateOIDCProvider(disabledProvider)).toBe(true);
+    expect(getOIDCProviderStatus({ ...disabledProvider, databaseSourceActive: true, enabled: true })).toBe(
+      OIDC_PROVIDER_STATUS.ACTIVE,
+    );
+    expect(
+      getOIDCProviderStatus({
+        ...disabledProvider,
+        grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.COMPENSATION_FAILED,
+      }),
+    ).toBe(OIDC_PROVIDER_STATUS.RECOVERY);
+    const compensatedProvider = { ...disabledProvider, grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.COMPENSATED };
+    expect(getOIDCProviderStatus(compensatedProvider)).toBe(OIDC_PROVIDER_STATUS.COMPENSATED);
+    expect(canActivateOIDCProvider(compensatedProvider)).toBe(true);
+    expect(OIDC_PROVIDER_STATUS_COLOR[OIDC_PROVIDER_STATUS.ACTIVE]).toBe('green');
+    expect(OIDC_PROVIDER_STATUS_COLOR[OIDC_PROVIDER_STATUS.COMPENSATED]).toBe('orange');
+    expect(OIDC_PROVIDER_STATUS_COLOR[OIDC_PROVIDER_STATUS.RECOVERY]).toBe('red');
+    expect(OIDC_PROVIDER_STATUS_COLOR[OIDC_PROVIDER_STATUS.CONFIGURED]).toBe('orange');
+  });
+
+  it('summarizes the authentication configuration state without inferring environment configuration', () => {
+    const provider: OIDCProvider = {
+      providerKey: 'google',
+      displayName: 'Google',
+      issuerUrl: 'https://accounts.google.com',
+      clientId: 'client',
+      scopes: 'openid profile email',
+      enabled: false,
+      secretConfigured: true,
+      databaseSourceActive: false,
+      grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.SYNCHRONIZED,
+      grafanaSyncedRevision: 1,
+      providerRevision: 1,
+      hasCandidate: false,
+      grafanaTarget: GRAFANA_PROVIDER_KIND.GOOGLE,
+      devlakeCallbackUrl: 'https://devlake.example.com/api/auth/callback',
+      grafanaCallbackUrl: 'https://grafana.example.com/login/google',
+      allowLocalOidc: false,
+    };
+
+    expect(getAuthenticationState([])).toBe(AUTHENTICATION_STATE.NO_MANAGED_OIDC);
+    expect(getAuthenticationState([{ ...provider, hasCandidate: true }])).toBe(
+      AUTHENTICATION_STATE.ACTIVATION_REQUIRED,
+    );
+    expect(getAuthenticationState([provider])).toBe(AUTHENTICATION_STATE.NO_ACTIVE_OIDC);
+    expect(getAuthenticationState([{ ...provider, enabled: true, databaseSourceActive: true }])).toBe(
+      AUTHENTICATION_STATE.OIDC_ACTIVE,
+    );
+  });
+
+  it('requires explicit DevLake-only confirmation and identifies a Generic OAuth candidate', () => {
+    const devLakeOnly = normalizeOIDCProviderInput({
+      providerKey: 'custom',
+      displayName: 'Custom OIDC',
+      issuerUrl: 'https://id.example.com',
+      clientId: 'client',
+      clientSecret: 'secret',
+      scopes: 'openid email',
+      grafanaTarget: GRAFANA_PROVIDER_KIND.NONE,
+      confirmDevlakeOnly: false,
+    });
+    expect(isValidOIDCProviderInput(devLakeOnly)).toBe(false);
+    expect(isValidOIDCProviderInput({ ...devLakeOnly, confirmDevlakeOnly: true })).toBe(true);
+
+    const provider: OIDCProvider = {
+      providerKey: 'custom',
+      displayName: 'Custom OIDC',
+      issuerUrl: 'https://id.example.com',
+      clientId: 'client',
+      scopes: 'openid email',
+      grafanaTarget: GRAFANA_PROVIDER_KIND.NONE,
+      enabled: true,
+      secretConfigured: true,
+      databaseSourceActive: true,
+      grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.NOT_APPLICABLE,
+      grafanaSyncedRevision: 0,
+      providerRevision: 1,
+      hasCandidate: false,
+      devlakeCallbackUrl: 'https://devlake.example.com/api/auth/callback',
+      grafanaCallbackUrl: 'https://grafana.example.com/login',
+      allowLocalOidc: false,
+    };
+    expect(canSelectGenericOIDCProvider(provider)).toBe(true);
+    expect(canSelectGenericOIDCProvider({ ...provider, enabled: false })).toBe(false);
+    expect(canSelectGenericOIDCProvider({ ...provider, hasCandidate: true })).toBe(false);
+  });
 });
