@@ -35,6 +35,7 @@ import { JenkinsConfig } from './jenkins';
 import { JiraConfig } from './jira';
 import { HubspotConfig } from './hubspot';
 import { NotionConfig } from './notion';
+import { LinearConfig } from './linear';
 import { PagerDutyConfig } from './pagerduty';
 import { SalesforceConfig } from './salesforce';
 import { PlaneConfig } from './plane';
@@ -69,6 +70,7 @@ export const pluginConfigs: IPluginConfig[] = [
   JenkinsConfig,
   JiraConfig,
   NotionConfig,
+  LinearConfig,
   PagerDutyConfig,
   SalesforceConfig,
   PlaneConfig,
