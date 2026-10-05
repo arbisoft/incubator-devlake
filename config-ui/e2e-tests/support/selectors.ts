@@ -107,3 +107,12 @@ export const passwordInputs = (page: Page): Locator => page.locator('input[type=
 // AntD 6 Empty renders both an SVG title and a description with the same text; target the description.
 export const emptyState = (page: Page, text: string): Locator =>
   page.locator('.ant-empty-description').filter({ hasText: text });
+
+// antd 6 JS-ellipsis keeps the full value only in aria-label, so read it from there when present.
+export const cellFullText = async (cell: Locator): Promise<string> => {
+  const labelled = cell.locator('[aria-label]:not(button):not([role="img"])').first();
+  if (await labelled.count()) {
+    return (await labelled.getAttribute('aria-label')) ?? '';
+  }
+  return (await cell.innerText()).trim();
+};
