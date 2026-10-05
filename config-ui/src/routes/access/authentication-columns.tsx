@@ -24,14 +24,7 @@ import { GRAFANA_PROVIDER_LABEL, OIDC_PROVIDER_STATUS_COLOR } from './constants'
 import { canActivateOIDCProvider, canSelectGenericOIDCProvider, getOIDCProviderStatus } from './utils';
 
 export type Operation =
-  | 'validate'
-  | 'save'
-  | 'activate'
-  | 'enable'
-  | 'disable'
-  | 'retire'
-  | 'grafana-sync'
-  | 'select-generic';
+  'validate' | 'save' | 'activate' | 'enable' | 'disable' | 'retire' | 'grafana-sync' | 'select-generic';
 
 export type ActiveOperation = {
   action: Operation;

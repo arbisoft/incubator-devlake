@@ -77,8 +77,7 @@ export const Connection = () => {
 
   const dispatch = useAppDispatch();
   const connection = useAppSelector((state) => selectConnection(state, `${plugin}-${connectionId}`)) as
-    | IConnection
-    | undefined;
+    IConnection | undefined;
 
   const navigate = useNavigate();
 

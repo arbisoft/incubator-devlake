@@ -206,8 +206,7 @@ export const getOIDCProviderStatus = (provider?: OIDCProvider) => {
   if (provider.retiredAt) return OIDC_PROVIDER_STATUS.RETIRED;
   if (provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.COMPENSATION_FAILED)
     return OIDC_PROVIDER_STATUS.RECOVERY;
-  if (provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.COMPENSATED)
-    return OIDC_PROVIDER_STATUS.COMPENSATED;
+  if (provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.COMPENSATED) return OIDC_PROVIDER_STATUS.COMPENSATED;
   if (provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.FAILED) return OIDC_PROVIDER_STATUS.FAILED;
   if (!provider.enabled) return OIDC_PROVIDER_STATUS.DISABLED;
   if (provider.grafanaTarget === GRAFANA_PROVIDER_KIND.NONE) return OIDC_PROVIDER_STATUS.DEVLAKE_ONLY;
