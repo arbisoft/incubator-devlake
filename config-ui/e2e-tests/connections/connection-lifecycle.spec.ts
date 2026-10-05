@@ -132,7 +132,6 @@ test('deleting a connection from its page removes it from the UI and the API', a
 });
 
 test('deleting a connection from its page logs no render error', async ({ page, browserErrors }) => {
-  test.fail(true, 'connection.tsx destructures the connection after the store drops it on delete');
   const { id } = await createGithubConnection(api, uniqueName('gh-delete-err'));
 
   await page.goto(`/connections/github/${id}`);
