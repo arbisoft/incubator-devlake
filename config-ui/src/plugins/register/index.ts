@@ -48,6 +48,7 @@ import { QDevConfig } from './q-dev';
 import { TeambitionConfig } from './teambition';
 import { TestmoConfig } from './testmo';
 import { SlackConfig } from './slack/config';
+import { TempoConfig } from './tempo';
 
 export const pluginConfigs: IPluginConfig[] = [
   ArgoCDConfig,
@@ -73,6 +74,7 @@ export const pluginConfigs: IPluginConfig[] = [
   PlaneConfig,
   RootlyConfig,
   SlackConfig,
+  TempoConfig,
   QDevConfig,
   SonarQubeConfig,
   TAPDConfig,
