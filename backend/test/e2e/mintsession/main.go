@@ -75,6 +75,8 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("insert auth_sessions row: %w", err)
 	}
-	fmt.Print(token)
+	if _, err := fmt.Print(token); err != nil {
+		return fmt.Errorf("write token: %w", err)
+	}
 	return nil
 }
