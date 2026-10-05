@@ -33,7 +33,7 @@ import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?r
 import * as S from './styled';
 
 const SORT_START_WITH = ['o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'];
-const CLAUDE_PLUGIN = 'claude';
+const CLAUDE_PLUGIN = 'claude_code';
 
 interface StatusBadgeProps {
   count: number;
