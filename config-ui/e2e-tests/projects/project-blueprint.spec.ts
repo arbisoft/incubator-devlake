@@ -35,7 +35,18 @@ import {
   uniqueName,
   type ApiBlueprint,
 } from '../support/api';
-import { cronFieldInputs, modalByTitle, pipelineRowById, tableRow, tabByName, toast } from '../support/selectors';
+import {
+  cronFieldInputs,
+  iconButton,
+  modalByTitle,
+  pipelineRowById,
+  sectionHeaderButton,
+  selectOption,
+  tabByName,
+  tableRow,
+  tableRows,
+  toast,
+} from '../support/selectors';
 
 const SCOPE_FULL_NAME = 'e2e-org/e2e-repo';
 const SCOPE_ID = String(7_000_000 + Math.floor(Math.random() * 1_000_000));
@@ -101,7 +112,7 @@ test.describe.serial('Project, blueprint, pipeline and webhook flows', () => {
     await page.getByRole('button', { name: 'Add a Connection' }).click();
     const dialog = modalByTitle(page, /Add a Connection/);
     await dialog.getByRole('combobox').click();
-    await page.locator('.ant-select-item-option').filter({ hasText: connectionName }).click();
+    await selectOption(page, connectionName).click();
     await dialog.getByRole('button', { name: 'Next' }).click();
     await dialog.getByText(SCOPE_FULL_NAME, { exact: true }).click();
     await dialog.getByRole('button', { name: 'Save' }).click();
@@ -116,7 +127,7 @@ test.describe.serial('Project, blueprint, pipeline and webhook flows', () => {
   test('edit the sync policy and see it persisted after a reload', async ({ page }) => {
     await page.goto(`/projects/${encodeURIComponent(projectName)}`);
     await tabByName(page, 'Configuration').click();
-    await page.locator('h3', { hasText: 'Sync Policy' }).getByRole('button').click();
+    await sectionHeaderButton(page, 'Sync Policy').click();
     const dialog = modalByTitle(page, 'Set Sync Policy');
     await dialog.getByText('Last 30 days').click();
     await dialog.getByRole('radio', { name: 'Custom' }).check();
@@ -130,7 +141,7 @@ test.describe.serial('Project, blueprint, pipeline and webhook flows', () => {
 
     await page.reload();
     await tabByName(page, 'Configuration').click();
-    const policyRow = page.locator('.ant-table-tbody tr.ant-table-row').first();
+    const policyRow = tableRows(page).first();
     await expect(policyRow).toContainText('Custom');
     await expect(policyRow).toContainText('to Now');
     await expect(policyRow).toContainText('Enabled');
@@ -186,7 +197,7 @@ test.describe.serial('Project, blueprint, pipeline and webhook flows', () => {
     await tabByName(page, 'Configuration').click();
     await expect(page.getByText(connectionName)).toBeVisible();
     await expect(page.getByText('1 data scope')).toBeVisible();
-    const policyRow = page.locator('.ant-table-tbody tr.ant-table-row').first();
+    const policyRow = tableRows(page).first();
     await expect(policyRow).toContainText('Custom');
     await expect(policyRow).toContainText('Enabled');
   });
@@ -217,7 +228,7 @@ test.describe.serial('Project, blueprint, pipeline and webhook flows', () => {
     const current = await projectBlueprint();
     expect(current.connections).toContainEqual({ pluginName: 'webhook', connectionId: webhookId, scopes: [] });
 
-    await row.locator('button:has([aria-label="delete"])').click();
+    await iconButton(row, 'delete').click();
     const deleted = page.waitForResponse(
       (res) => res.url().endsWith(`/plugins/webhook/connections/${webhookId}`) && res.request().method() === 'DELETE',
     );

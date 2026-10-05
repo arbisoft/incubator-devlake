@@ -20,7 +20,7 @@ import { APIRequestContext } from '@playwright/test';
 import { test, expect } from '../fixtures';
 import { loginAsAdmin } from '../auth-helpers';
 import { DUMMY_TOKEN, adminApi, createConnection, deleteConnection, listConnections, uniqueName } from '../support/api';
-import { catalogCard, catalogCards, modalByTitle, tableRow } from '../support/selectors';
+import { catalogCard, catalogCardCount, catalogCards, modalByTitle, tableRow } from '../support/selectors';
 
 // UI-only upstream plugins must stay hidden until their backend is synced.
 const HIDDEN_UPSTREAM_PLUGINS = [
@@ -91,7 +91,7 @@ test('connections created through the API are reflected on the plugin card and i
   }
 
   await page.goto('/connections');
-  await expect(catalogCard(page, 'Claude Code').locator('.count')).toHaveText(`${baseline + names.length} connections`);
+  await expect(catalogCardCount(catalogCard(page, 'Claude Code'))).toHaveText(`${baseline + names.length} connections`);
 
   await catalogCard(page, 'Claude Code').click();
   const list = modalByTitle(page, 'Manage Connections: Claude Code');
@@ -102,7 +102,7 @@ test('connections created through the API are reflected on the plugin card and i
   const removed = created.pop() as number;
   await deleteConnection(api, 'claude_code', removed);
   await page.reload();
-  await expect(catalogCard(page, 'Claude Code').locator('.count')).toHaveText(
+  await expect(catalogCardCount(catalogCard(page, 'Claude Code'))).toHaveText(
     `${baseline + names.length - 1} connections`,
   );
 });

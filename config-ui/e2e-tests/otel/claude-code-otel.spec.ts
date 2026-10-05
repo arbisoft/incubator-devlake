@@ -22,6 +22,21 @@ import { randomUUID } from 'crypto';
 import { APP_URL, COLLECTOR_URL, GRAFANA_URL, OTLP_HTTP_URL, PROMETHEUS_URL } from '../support/env';
 import { adminApi, createProject, deleteProject, uniqueName } from '../support/api';
 import { runSql } from '../support/db';
+import {
+  catalogCard,
+  codeBlock,
+  editableControls,
+  modalCloseButton,
+  modalWithText,
+  openModals,
+  rowCells,
+  sectionWithHeading,
+  selectBox,
+  selectOption,
+  tableRow,
+  tableRows,
+  tableWithRow,
+} from '../support/selectors';
 
 test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
   const testTeamName = `e2e-team-${Date.now().toString().slice(-6)}`;
@@ -86,10 +101,7 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     await expect(page).toHaveURL(/.*\/connections/);
 
     // 2. Locate and click the Claude Code OTel item
-    const otelCard = page
-      .locator('li')
-      .filter({ hasText: /Claude Code OTel/i })
-      .first();
+    const otelCard = catalogCard(page, 'Claude Code OTel');
     await expect(otelCard).toBeVisible();
     await otelCard.click();
 
@@ -102,7 +114,7 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     await generateBtn.click();
 
     // 5. Verify Create Modal and notice copy
-    const createModal = page.locator('.ant-modal').filter({ hasText: /Generate Claude Settings/i });
+    const createModal = modalWithText(page, /Generate Claude Settings/i);
     await expect(createModal).toBeVisible();
     await expect(
       createModal.getByText(/This connection binds to the first Anthropic organization UUID it receives/i),
@@ -113,10 +125,10 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     await teamInput.fill(testTeamName);
 
     // 7. Select DevLake project
-    const projectSelect = createModal.locator('.ant-select');
+    const projectSelect = selectBox(createModal);
     await projectSelect.click();
     await page.keyboard.type(projectName);
-    await page.locator('.ant-select-item-option').filter({ hasText: projectName }).click();
+    await selectOption(page, projectName).click();
 
     // Close select dropdown by clicking modal heading
     await createModal.getByText('Generate Claude Settings').click();
@@ -127,14 +139,14 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     await submitBtn.click();
 
     // 9. Confirm SnippetModal appears with one-time credentials (allow up to 15s for helper/htpasswd restart)
-    const snippetModal = page.locator('.ant-modal').filter({ hasText: /Claude managed settings/i });
+    const snippetModal = modalWithText(page, /Claude managed settings/i);
     await expect(snippetModal).toBeVisible({ timeout: 15000 });
     await expect(
       snippetModal.getByText(/DevLake does not store the generated password or Basic Auth header/i),
     ).toBeVisible();
 
     // Check that code snippet is present
-    const codeSnippet = snippetModal.locator('pre, code, textarea').first();
+    const codeSnippet = codeBlock(snippetModal);
     await expect(codeSnippet).toBeVisible();
     const snippetText = await codeSnippet.textContent();
     expect(snippetText).toContain('CLAUDE_CODE_ENABLE_TELEMETRY');
@@ -143,17 +155,17 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     expect(basicAuthHeader).not.toBe('');
 
     // 10. Close snippet modal
-    const closeBtn = snippetModal.locator('.ant-modal-close');
+    const closeBtn = modalCloseButton(snippetModal);
     await closeBtn.click();
     await expect(snippetModal).not.toBeVisible();
 
     // 11. Refresh page and verify no plaintext password remains
     await page.reload();
     await expect(page).toHaveURL(/.*\/otel/);
-    await expect(page.locator('.ant-modal')).toHaveCount(0);
+    await expect(openModals(page)).toHaveCount(0);
 
     // 12. Verify newly created row in table
-    const row = page.locator('tr').filter({ hasText: testTeamName });
+    const row = tableRow(page, testTeamName);
     await expect(row).toBeVisible();
     await expect(row.getByText('Pending first telemetry')).toBeVisible();
     // A recent collector restart puts the endpoint in cooldown, so retry Apply until the row is Ready
@@ -162,9 +174,7 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
       await expect(row).toBeVisible({ timeout: 5000 });
       if (!(await row.getByText('Ready').isVisible())) {
         await row.getByRole('button', { name: /Apply/i }).click({ timeout: 5000 });
-        await page
-          .locator('.ant-modal')
-          .filter({ hasText: /Apply Credential Changes/i })
+        await modalWithText(page, /Apply Credential Changes/i)
           .getByRole('button', { name: 'Apply' })
           .click({ timeout: 5000 });
       }
@@ -177,7 +187,7 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     test.setTimeout(150_000);
     // 1. The connection created in test 1 is unbound until its first telemetry arrives
     await page.goto('/otel');
-    const newRow = page.locator('tr').filter({ hasText: testTeamName });
+    const newRow = tableRow(page, testTeamName);
     await expect(newRow).toBeVisible();
     await expect(newRow.getByText('Pending first telemetry')).toBeVisible();
 
@@ -239,12 +249,12 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     const connectionsResp = await page.request.get('/api/plugins/claude_otel/connections');
     expect(connectionsResp.status()).toBe(200);
     const connections: { connection: { teamName: string; organizationId?: string } }[] = await connectionsResp.json();
-    const connectionsTable = page.locator('.ant-table').filter({ has: page.locator('tr', { hasText: testTeamName }) });
-    const rows = connectionsTable.locator('tbody tr.ant-table-row');
+    const connectionsTable = tableWithRow(page, testTeamName);
+    const rows = tableRows(connectionsTable);
     const rowCount = await rows.count();
     expect(rowCount).toBeGreaterThan(0);
     for (let i = 0; i < rowCount; i++) {
-      const cells = rows.nth(i).locator('td');
+      const cells = rowCells(rows.nth(i));
       const teamName = (await cells.nth(0).innerText()).trim();
       const organization = (await cells.nth(3).innerText()).trim();
       const expected = connections
@@ -266,21 +276,19 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
 
     const policyHeading = page.getByRole('heading', { name: 'Canonical daily data' });
     await expect(policyHeading).toBeVisible();
-    const policySection = page.locator('.ant-flex').filter({ has: policyHeading }).last();
+    const policySection = sectionWithHeading(page, policyHeading);
     await expect(policySection.getByRole('cell', { name: 'otel', exact: true })).toHaveCount(otelPreferences.length);
     for (const preference of otelPreferences) {
       await expect(policySection.getByRole('rowheader', { name: preference.metricFamily }).first()).toBeVisible();
     }
-    await expect(policySection.locator('select, .ant-select, input[type="radio"], input[type="checkbox"]')).toHaveCount(
-      0,
-    );
+    await expect(editableControls(policySection)).toHaveCount(0);
   });
 
   test('3. Credential lifecycle: rotate, finalize, revoke, and hide', async ({ page }) => {
     await page.goto('/otel');
     await expect(page).toHaveURL(/.*\/otel/);
 
-    const row = page.locator('tr').filter({ hasText: testTeamName });
+    const row = tableRow(page, testTeamName);
     await expect(row).toBeVisible();
 
     // 1. ROTATE
@@ -288,14 +296,14 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     await expect(rotateBtn).toBeEnabled();
     await rotateBtn.click();
 
-    const rotateModal = page.locator('.ant-modal').filter({ hasText: /Rotate Claude Code OTel Credential/i });
+    const rotateModal = modalWithText(page, /Rotate Claude Code OTel Credential/i);
     await expect(rotateModal).toBeVisible();
     await rotateModal.getByRole('button', { name: 'Rotate' }).click();
 
     // Snippet modal appears for rotated credential
-    const snippetModal = page.locator('.ant-modal').filter({ hasText: /Claude managed settings/i });
+    const snippetModal = modalWithText(page, /Claude managed settings/i);
     await expect(snippetModal).toBeVisible({ timeout: 15000 });
-    await snippetModal.locator('.ant-modal-close').click();
+    await modalCloseButton(snippetModal).click();
     await expect(snippetModal).not.toBeVisible();
 
     // Row should now show retiring and active tags
@@ -307,7 +315,7 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     await expect(finalizeBtn).toBeEnabled();
     await finalizeBtn.click();
 
-    const finalizeModal = page.locator('.ant-modal').filter({ hasText: /Finalize Rotation/i });
+    const finalizeModal = modalWithText(page, /Finalize Rotation/i);
     await expect(finalizeModal).toBeVisible();
     await finalizeModal.getByRole('button', { name: 'Finalize' }).click();
     await expect(finalizeModal).not.toBeVisible({ timeout: 15000 });
@@ -321,7 +329,7 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     await expect(revokeBtn).toBeEnabled();
     await revokeBtn.click();
 
-    const revokeModal = page.locator('.ant-modal').filter({ hasText: /Revoke Claude Code OTel Credential/i });
+    const revokeModal = modalWithText(page, /Revoke Claude Code OTel Credential/i);
     await expect(revokeModal).toBeVisible();
     await revokeModal.getByRole('button', { name: 'Revoke' }).click();
     await expect(revokeModal).not.toBeVisible({ timeout: 15000 });
@@ -335,13 +343,13 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     await expect(removeBtn).toBeEnabled();
     await removeBtn.click();
 
-    const removeModal = page.locator('.ant-modal').filter({ hasText: /Remove Revoked Connection/i });
+    const removeModal = modalWithText(page, /Remove Revoked Connection/i);
     await expect(removeModal).toBeVisible();
     await removeModal.getByRole('button', { name: 'Remove' }).click();
     await expect(removeModal).not.toBeVisible({ timeout: 15000 });
 
     // The row should now be removed from the view
-    await expect(page.locator('tr').filter({ hasText: testTeamName })).toHaveCount(0, { timeout: 15000 });
+    await expect(tableRow(page, testTeamName)).toHaveCount(0, { timeout: 15000 });
   });
 
   test('4. Existing Grafana Prometheus dashboard verification', async ({ request }) => {

@@ -20,7 +20,7 @@ import { APIRequestContext } from '@playwright/test';
 import { test, expect } from '../fixtures';
 import { loginAsAdmin } from '../auth-helpers';
 import { adminApi, createGithubConnection, deleteConnection, listScopes, uniqueName } from '../support/api';
-import { iconButton, modalByTitle, tableRow, toast } from '../support/selectors';
+import { iconButton, modalByTitle, tableRow, tagWithText, toast } from '../support/selectors';
 
 const GITHUB_TOKEN = process.env.E2E_GITHUB_TOKEN;
 const GITHUB_REPO = process.env.E2E_GITHUB_REPO;
@@ -55,7 +55,7 @@ test.describe.serial('GitHub data scope and scope config on a connection', () =>
     const dialog = modalByTitle(page, 'Add Data Scope');
     await dialog.getByPlaceholder('Search').fill(repo.split('/')[1]);
     await dialog.getByText(repo, { exact: true }).click();
-    await expect(dialog.locator('.ant-tag').filter({ hasText: repo })).toBeVisible();
+    await expect(tagWithText(dialog, repo)).toBeVisible();
     await dialog.getByRole('button', { name: 'Save' }).click();
     await expect(toast(page, 'Add data scope successful.')).toBeVisible();
 

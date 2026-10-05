@@ -20,6 +20,13 @@ import { loginAsAdmin } from '../auth-helpers';
 import { API_URL, APP_URL, E2E_USER_PREFIX } from '../support/env';
 import { resetLocalAuthState } from '../support/db';
 import { fetchAuthMethods } from '../support/auth-state';
+import {
+  accessUserRow,
+  addLocalUserModal,
+  oneTimePasswordModal,
+  passwordInputs,
+  tableWithRow,
+} from '../support/selectors';
 
 test.describe('Rebase Verification Matrix: Local Auth & Multi-Provider OIDC', () => {
   test.beforeEach(async ({ request }) => {
@@ -115,11 +122,11 @@ test.describe('Rebase Verification Matrix: Local Auth & Multi-Provider OIDC', ()
 
     const testLogin = `${E2E_USER_PREFIX}rebase_${Date.now()}`;
     await page.getByRole('button', { name: 'Add local user' }).click();
-    const modal = page.locator('.ant-modal-content').filter({ hasText: 'Add local DevLake user' });
+    const modal = addLocalUserModal(page);
     await modal.getByPlaceholder('person').fill(testLogin);
     await modal.getByRole('button', { name: 'Create' }).click();
 
-    const otpModal = page.locator('.ant-modal-content').filter({ hasText: 'Copy this password now' });
+    const otpModal = oneTimePasswordModal(page);
     const tempPass = (await otpModal.getByRole('textbox').inputValue()).trim();
     await otpModal.getByRole('button', { name: 'Done' }).click();
 
@@ -133,8 +140,8 @@ test.describe('Rebase Verification Matrix: Local Auth & Multi-Provider OIDC', ()
     await userPage.waitForURL(/.*\/change-password/);
 
     const userPass = 'ValidRebasePassword12345!';
-    await userPage.locator('input[type="password"]').first().fill(userPass);
-    await userPage.locator('input[type="password"]').nth(1).fill(userPass);
+    await passwordInputs(userPage).first().fill(userPass);
+    await passwordInputs(userPage).nth(1).fill(userPass);
     await userPage.getByRole('button', { name: 'Change password' }).click();
     await userPage.waitForURL((url) => !url.pathname.includes('/change-password'), { timeout: 10000 });
 
@@ -147,10 +154,7 @@ test.describe('Rebase Verification Matrix: Local Auth & Multi-Provider OIDC', ()
 
     // 4. Verify disabling user immediately revokes the active local session
     await page.goto('/access');
-    const userRow = page
-      .locator('table')
-      .first()
-      .getByRole('row', { name: new RegExp(testLogin) });
+    const userRow = accessUserRow(page, testLogin);
     await expect(userRow).toBeVisible();
     await userRow.getByRole('button', { name: 'Disable' }).click();
     await expect(userRow.getByRole('button', { name: 'Enable' })).toBeVisible();
@@ -167,7 +171,7 @@ test.describe('Rebase Verification Matrix: Local Auth & Multi-Provider OIDC', ()
     await page.goto('/access');
 
     // 1. Verify both providers are listed on /access in the Authentication section
-    const authTable = page.locator('.ant-table').filter({ hasText: 'google-one' });
+    const authTable = tableWithRow(page, 'google-one');
     await expect(authTable.getByText('google-one').first()).toBeVisible();
     await expect(authTable.getByText('Auth0').first()).toBeVisible();
 

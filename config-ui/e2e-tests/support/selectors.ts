@@ -55,3 +55,52 @@ export const pipelineRowById = (page: Page, id: number): Locator =>
 export const selectBox = (scope: Page | Locator): Locator => scope.locator('.ant-select').first();
 
 export const textInputs = (scope: Page | Locator): Locator => scope.locator('input.ant-input');
+
+export const tableRows = (scope: Page | Locator): Locator => scope.locator('tbody tr.ant-table-row');
+
+export const rowCells = (row: Locator): Locator => row.locator('td');
+
+export const tableWithRow = (page: Page, text: string | RegExp): Locator =>
+  page.locator('.ant-table').filter({ has: tableRow(page, text) });
+
+export const modalWithText = (page: Page, text: string | RegExp): Locator =>
+  page.locator('.ant-modal-content').filter({ hasText: text });
+
+export const openModals = (page: Page): Locator => page.locator('.ant-modal-content');
+
+export const modalCloseButton = (modal: Locator): Locator => modal.locator('.ant-modal-close');
+
+export const popconfirm = (page: Page): Locator => page.locator('.ant-popconfirm');
+
+export const tagWithText = (scope: Page | Locator, text: string | RegExp): Locator =>
+  scope.locator('.ant-tag').filter({ hasText: text });
+
+export const codeBlock = (scope: Locator): Locator => scope.locator('pre, code, textarea').first();
+
+export const editableControls = (scope: Locator): Locator =>
+  scope.locator('select, .ant-select, input[type="radio"], input[type="checkbox"]');
+
+export const sectionWithHeading = (page: Page, heading: Locator): Locator =>
+  page.locator('.ant-flex').filter({ has: heading }).last();
+
+export const sectionHeaderButton = (page: Page, heading: string): Locator =>
+  page.locator('h3', { hasText: heading }).getByRole('button');
+
+export const appHeader = (page: Page): Locator => page.locator('header');
+
+export const catalogCardCount = (card: Locator): Locator => card.locator('.count');
+
+// Access page and local password screens.
+export const addLocalUserModal = (page: Page): Locator => modalWithText(page, 'Add local DevLake user');
+
+export const localUserDisplayNameInput = (modal: Locator): Locator => modal.locator('input').nth(1);
+
+export const oneTimePasswordModal = (page: Page): Locator => modalWithText(page, 'Copy this password now');
+
+export const accessUserRow = (page: Page, login: string): Locator =>
+  page
+    .locator('table')
+    .first()
+    .getByRole('row', { name: new RegExp(login) });
+
+export const passwordInputs = (page: Page): Locator => page.locator('input[type="password"]');

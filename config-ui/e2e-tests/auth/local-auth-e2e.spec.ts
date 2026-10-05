@@ -20,6 +20,17 @@ import { loginAsAdmin } from '../auth-helpers';
 import { API_URL, APP_URL, E2E_USER_PREFIX } from '../support/env';
 import { countLocalCredentials, passwordHashFor, resetLocalAuthState } from '../support/db';
 import { fetchAuthMethods } from '../support/auth-state';
+import {
+  accessUserRow,
+  addLocalUserModal,
+  appHeader,
+  localUserDisplayNameInput,
+  oneTimePasswordModal,
+  passwordInputs,
+  popconfirm,
+  selectBox,
+  selectOption,
+} from '../support/selectors';
 
 test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () => {
   test.beforeEach(async ({ request }) => {
@@ -104,18 +115,18 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     await addLocalUserBtn.click();
 
     // Modal should appear
-    const modal = page.locator('.ant-modal-content').filter({ hasText: 'Add local DevLake user' });
+    const modal = addLocalUserModal(page);
     await expect(modal).toBeVisible();
 
     const testLogin = `${E2E_USER_PREFIX}user_${Date.now()}`;
     await modal.getByPlaceholder('person').fill(testLogin);
-    await modal.locator('input').nth(1).fill(`Display ${testLogin}`);
+    await localUserDisplayNameInput(modal).fill(`Display ${testLogin}`);
 
     // Click Create
     await modal.getByRole('button', { name: 'Create' }).click();
 
     // One-time password modal should appear
-    const otpModal = page.locator('.ant-modal-content').filter({ hasText: 'Copy this password now' });
+    const otpModal = oneTimePasswordModal(page);
     await expect(otpModal).toBeVisible();
 
     // Capture temporary password from read-only input
@@ -128,10 +139,7 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     await otpModal.getByRole('button', { name: 'Done' }).click();
 
     // User should appear in table with Reset button under Local password column
-    const userRow = page
-      .locator('table')
-      .first()
-      .getByRole('row', { name: new RegExp(testLogin) });
+    const userRow = accessUserRow(page, testLogin);
     await expect(userRow).toBeVisible();
     await expect(userRow.getByRole('button', { name: 'Reset' })).toBeVisible();
   });
@@ -148,12 +156,12 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     const testLogin = `${E2E_USER_PREFIX}flow_${Date.now()}`;
     await page.getByRole('button', { name: 'Add local user' }).click();
 
-    const modal = page.locator('.ant-modal-content').filter({ hasText: 'Add local DevLake user' });
+    const modal = addLocalUserModal(page);
     await modal.getByPlaceholder('person').fill(testLogin);
-    await modal.locator('input').nth(1).fill(`Flow ${testLogin}`);
+    await localUserDisplayNameInput(modal).fill(`Flow ${testLogin}`);
     await modal.getByRole('button', { name: 'Create' }).click();
 
-    const otpModal = page.locator('.ant-modal-content').filter({ hasText: 'Copy this password now' });
+    const otpModal = oneTimePasswordModal(page);
     await expect(otpModal).toBeVisible();
     const tempPassInput = otpModal.getByRole('textbox');
     await expect(tempPassInput).toBeVisible();
@@ -184,8 +192,8 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     expect(gateCheck.body.message).toMatch(/password change required/i);
 
     // D. Password complexity validation: too short password (< 15 chars)
-    const newPassInput = userPage.locator('input[type="password"]').first();
-    const confirmPassInput = userPage.locator('input[type="password"]').nth(1);
+    const newPassInput = passwordInputs(userPage).first();
+    const confirmPassInput = passwordInputs(userPage).nth(1);
     const changeBtn = userPage.getByRole('button', { name: 'Change password' });
 
     await newPassInput.fill('shortpass1');
@@ -239,12 +247,12 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
 
     const testLogin = `${E2E_USER_PREFIX}reset_${Date.now()}`;
     await page.getByRole('button', { name: 'Add local user' }).click();
-    const modal = page.locator('.ant-modal-content').filter({ hasText: 'Add local DevLake user' });
+    const modal = addLocalUserModal(page);
     await modal.getByPlaceholder('person').fill(testLogin);
-    await modal.locator('input').nth(1).fill(`Reset Test ${testLogin}`);
+    await localUserDisplayNameInput(modal).fill(`Reset Test ${testLogin}`);
     await modal.getByRole('button', { name: 'Create' }).click();
 
-    const otpModal = page.locator('.ant-modal-content').filter({ hasText: 'Copy this password now' });
+    const otpModal = oneTimePasswordModal(page);
     await expect(otpModal).toBeVisible();
     const tempPass1 = (await otpModal.getByRole('textbox').inputValue()).trim();
     await otpModal.getByRole('button', { name: 'Done' }).click();
@@ -259,28 +267,25 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     await userPage.waitForURL(/.*\/change-password/);
 
     const userPass = 'MyUserPassword12345!';
-    await userPage.locator('input[type="password"]').first().fill(userPass);
-    await userPage.locator('input[type="password"]').nth(1).fill(userPass);
+    await passwordInputs(userPage).first().fill(userPass);
+    await passwordInputs(userPage).nth(1).fill(userPass);
     await userPage.getByRole('button', { name: 'Change password' }).click();
     await userPage.waitForURL((url) => !url.pathname.includes('/change-password'));
 
     // Admin resets user password
     await page.goto('/access');
-    const userRow = page
-      .locator('table')
-      .first()
-      .getByRole('row', { name: new RegExp(testLogin) });
+    const userRow = accessUserRow(page, testLogin);
     await expect(userRow).toBeVisible();
 
     // Click Reset in Local password column
     await userRow.getByRole('button', { name: 'Reset' }).click();
 
     // Confirm popconfirm
-    const popconfirm = page.locator('.ant-popconfirm');
-    await popconfirm.getByRole('button', { name: 'Reset' }).click();
+    const resetConfirm = popconfirm(page);
+    await resetConfirm.getByRole('button', { name: 'Reset' }).click();
 
     // New OTP modal appears
-    const newOtpModal = page.locator('.ant-modal-content').filter({ hasText: 'Copy this password now' });
+    const newOtpModal = oneTimePasswordModal(page);
     await expect(newOtpModal).toBeVisible();
     const tempPass2 = (await newOtpModal.getByRole('textbox').inputValue()).trim();
     expect(tempPass2).not.toBe(tempPass1);
@@ -306,12 +311,12 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
 
     const testLogin = `${E2E_USER_PREFIX}disable_${Date.now()}`;
     await page.getByRole('button', { name: 'Add local user' }).click();
-    const modal = page.locator('.ant-modal-content').filter({ hasText: 'Add local DevLake user' });
+    const modal = addLocalUserModal(page);
     await modal.getByPlaceholder('person').fill(testLogin);
-    await modal.locator('input').nth(1).fill(`Disable Test ${testLogin}`);
+    await localUserDisplayNameInput(modal).fill(`Disable Test ${testLogin}`);
     await modal.getByRole('button', { name: 'Create' }).click();
 
-    const otpModal = page.locator('.ant-modal-content').filter({ hasText: 'Copy this password now' });
+    const otpModal = oneTimePasswordModal(page);
     await expect(otpModal).toBeVisible();
     const tempPass = (await otpModal.getByRole('textbox').inputValue()).trim();
     await otpModal.getByRole('button', { name: 'Done' }).click();
@@ -326,17 +331,14 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     await userPage.waitForURL(/.*\/change-password/);
 
     const userPass = 'DisableTestPassword123!';
-    await userPage.locator('input[type="password"]').first().fill(userPass);
-    await userPage.locator('input[type="password"]').nth(1).fill(userPass);
+    await passwordInputs(userPage).first().fill(userPass);
+    await passwordInputs(userPage).nth(1).fill(userPass);
     await userPage.getByRole('button', { name: 'Change password' }).click();
     await userPage.waitForURL((url) => !url.pathname.includes('/change-password'));
 
     // Admin disables user
     await page.goto('/access');
-    const userRow = page
-      .locator('table')
-      .first()
-      .getByRole('row', { name: new RegExp(testLogin) });
+    const userRow = accessUserRow(page, testLogin);
     await expect(userRow).toBeVisible();
 
     await userRow.getByRole('button', { name: 'Disable' }).click();
@@ -395,12 +397,12 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
 
     const testLogin = `${E2E_USER_PREFIX}reenable_${Date.now()}`;
     await page.getByRole('button', { name: 'Add local user' }).click();
-    const modal = page.locator('.ant-modal-content').filter({ hasText: 'Add local DevLake user' });
+    const modal = addLocalUserModal(page);
     await modal.getByPlaceholder('person').fill(testLogin);
-    await modal.locator('input').nth(1).fill(`Re-enable ${testLogin}`);
+    await localUserDisplayNameInput(modal).fill(`Re-enable ${testLogin}`);
     await modal.getByRole('button', { name: 'Create' }).click();
 
-    const otpModal = page.locator('.ant-modal-content').filter({ hasText: 'Copy this password now' });
+    const otpModal = oneTimePasswordModal(page);
     await expect(otpModal).toBeVisible();
     const tempPass = (await otpModal.getByRole('textbox').inputValue()).trim();
     await otpModal.getByRole('button', { name: 'Done' }).click();
@@ -415,17 +417,14 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     await userPage.waitForURL(/.*\/change-password/);
 
     const userPass = 'ReenablePass123456!';
-    await userPage.locator('input[type="password"]').first().fill(userPass);
-    await userPage.locator('input[type="password"]').nth(1).fill(userPass);
+    await passwordInputs(userPage).first().fill(userPass);
+    await passwordInputs(userPage).nth(1).fill(userPass);
     await userPage.getByRole('button', { name: 'Change password' }).click();
     await userPage.waitForURL((url) => !url.pathname.includes('/change-password'));
 
     // Admin disables user
     await page.goto('/access');
-    const userRow = page
-      .locator('table')
-      .first()
-      .getByRole('row', { name: new RegExp(testLogin) });
+    const userRow = accessUserRow(page, testLogin);
     await expect(userRow).toBeVisible();
     await userRow.getByRole('button', { name: 'Disable' }).click();
     await expect(userRow.getByRole('button', { name: 'Enable' })).toBeVisible();
@@ -463,12 +462,12 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
 
     const testLogin = `${E2E_USER_PREFIX}logout_${Date.now()}`;
     await page.getByRole('button', { name: 'Add local user' }).click();
-    const modal = page.locator('.ant-modal-content').filter({ hasText: 'Add local DevLake user' });
+    const modal = addLocalUserModal(page);
     await modal.getByPlaceholder('person').fill(testLogin);
-    await modal.locator('input').nth(1).fill(`Logout ${testLogin}`);
+    await localUserDisplayNameInput(modal).fill(`Logout ${testLogin}`);
     await modal.getByRole('button', { name: 'Create' }).click();
 
-    const otpModal = page.locator('.ant-modal-content').filter({ hasText: 'Copy this password now' });
+    const otpModal = oneTimePasswordModal(page);
     const tempPass = (await otpModal.getByRole('textbox').inputValue()).trim();
     await otpModal.getByRole('button', { name: 'Done' }).click();
 
@@ -482,8 +481,8 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     await userPage.waitForURL(/.*\/change-password/);
 
     const userPass = 'LogoutPass1234567!';
-    await userPage.locator('input[type="password"]').first().fill(userPass);
-    await userPage.locator('input[type="password"]').nth(1).fill(userPass);
+    await passwordInputs(userPage).first().fill(userPass);
+    await passwordInputs(userPage).nth(1).fill(userPass);
     await userPage.getByRole('button', { name: 'Change password' }).click();
     await userPage.waitForURL((url) => !url.pathname.includes('/change-password'));
 
@@ -528,12 +527,12 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     // Create a local user
     const testLogin = `${E2E_USER_PREFIX}removemethod_${Date.now()}`;
     await page.getByRole('button', { name: 'Add local user' }).click();
-    const modal = page.locator('.ant-modal-content').filter({ hasText: 'Add local DevLake user' });
+    const modal = addLocalUserModal(page);
     await modal.getByPlaceholder('person').fill(testLogin);
-    await modal.locator('input').nth(1).fill(`RemoveMethod ${testLogin}`);
+    await localUserDisplayNameInput(modal).fill(`RemoveMethod ${testLogin}`);
     await modal.getByRole('button', { name: 'Create' }).click();
 
-    const otpModal = page.locator('.ant-modal-content').filter({ hasText: 'Copy this password now' });
+    const otpModal = oneTimePasswordModal(page);
     await expect(otpModal).toBeVisible();
     const tempPass = (await otpModal.getByRole('textbox').inputValue()).trim();
     await otpModal.getByRole('button', { name: 'Done' }).click();
@@ -589,18 +588,15 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
 
     const testLogin = `${E2E_USER_PREFIX}member_${Date.now()}`;
     await page.getByRole('button', { name: 'Add local user' }).click();
-    const modal = page.locator('.ant-modal-content').filter({ hasText: 'Add local DevLake user' });
+    const modal = addLocalUserModal(page);
     await modal.getByPlaceholder('person').fill(testLogin);
-    await modal.locator('input').nth(1).fill(`Member ${testLogin}`);
+    await localUserDisplayNameInput(modal).fill(`Member ${testLogin}`);
     // Select Member role
-    await modal.locator('.ant-select').click();
-    await page
-      .locator('.ant-select-item-option-content')
-      .filter({ hasText: /^Member$/ })
-      .click();
+    await selectBox(modal).click();
+    await selectOption(page, /^Member$/).click();
     await modal.getByRole('button', { name: 'Create' }).click();
 
-    const otpModal = page.locator('.ant-modal-content').filter({ hasText: 'Copy this password now' });
+    const otpModal = oneTimePasswordModal(page);
     const tempPass = (await otpModal.getByRole('textbox').inputValue()).trim();
     await otpModal.getByRole('button', { name: 'Done' }).click();
 
@@ -614,8 +610,8 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     await memberPage.waitForURL(/.*\/change-password/);
 
     const memberPass = 'MemberPassword12345!';
-    await memberPage.locator('input[type="password"]').first().fill(memberPass);
-    await memberPage.locator('input[type="password"]').nth(1).fill(memberPass);
+    await passwordInputs(memberPage).first().fill(memberPass);
+    await passwordInputs(memberPage).nth(1).fill(memberPass);
     await memberPage.getByRole('button', { name: 'Change password' }).click();
     await memberPage.waitForURL((url) => !url.pathname.includes('/change-password'));
 
@@ -657,7 +653,7 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
 
     const testLogin = `${E2E_USER_PREFIX}dup_${Date.now()}`;
     await page.getByRole('button', { name: 'Add local user' }).click();
-    const modal = page.locator('.ant-modal-content').filter({ hasText: 'Add local DevLake user' });
+    const modal = addLocalUserModal(page);
     const usernameInput = modal.getByPlaceholder('person');
     const createBtn = modal.getByRole('button', { name: 'Create' });
 
@@ -673,13 +669,13 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     await expect(createBtn).toBeEnabled();
     await createBtn.click();
 
-    const otpModal = page.locator('.ant-modal-content').filter({ hasText: 'Copy this password now' });
+    const otpModal = oneTimePasswordModal(page);
     await expect(otpModal).toBeVisible();
     await otpModal.getByRole('button', { name: 'Done' }).click();
 
     // Now attempt to create user with the exact same username
     await page.getByRole('button', { name: 'Add local user' }).click();
-    const dupModal = page.locator('.ant-modal-content').filter({ hasText: 'Add local DevLake user' });
+    const dupModal = addLocalUserModal(page);
     await dupModal.getByPlaceholder('person').fill(testLogin);
     await dupModal.getByRole('button', { name: 'Create' }).click();
 
@@ -699,11 +695,11 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
 
     const testLogin = `${E2E_USER_PREFIX}grafana_${Date.now()}`;
     await page.getByRole('button', { name: 'Add local user' }).click();
-    const modal = page.locator('.ant-modal-content').filter({ hasText: 'Add local DevLake user' });
+    const modal = addLocalUserModal(page);
     await modal.getByPlaceholder('person').fill(testLogin);
     await modal.getByRole('button', { name: 'Create' }).click();
 
-    const otpModal = page.locator('.ant-modal-content').filter({ hasText: 'Copy this password now' });
+    const otpModal = oneTimePasswordModal(page);
     const tempPass = (await otpModal.getByRole('textbox').inputValue()).trim();
     await otpModal.getByRole('button', { name: 'Done' }).click();
 
@@ -717,8 +713,8 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     await userPage.waitForURL(/.*\/change-password/);
 
     const userPass = 'GrafanaFallbackPass123!';
-    await userPage.locator('input[type="password"]').first().fill(userPass);
-    await userPage.locator('input[type="password"]').nth(1).fill(userPass);
+    await passwordInputs(userPage).first().fill(userPass);
+    await passwordInputs(userPage).nth(1).fill(userPass);
     await userPage.getByRole('button', { name: 'Change password' }).click();
     await userPage.waitForURL((url) => !url.pathname.includes('/change-password'));
 
@@ -744,11 +740,11 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     // Create a local user
     const testLogin = `${E2E_USER_PREFIX}sec_${Date.now()}`;
     await page.getByRole('button', { name: 'Add local user' }).click();
-    const modal = page.locator('.ant-modal-content').filter({ hasText: 'Add local DevLake user' });
+    const modal = addLocalUserModal(page);
     await modal.getByPlaceholder('person').fill(testLogin);
     await modal.getByRole('button', { name: 'Create' }).click();
 
-    const otpModal = page.locator('.ant-modal-content').filter({ hasText: 'Copy this password now' });
+    const otpModal = oneTimePasswordModal(page);
     const tempPass = (await otpModal.getByRole('textbox').inputValue()).trim();
     await otpModal.getByRole('button', { name: 'Done' }).click();
 
@@ -803,11 +799,11 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
 
     const testLogin = `${E2E_USER_PREFIX}menu_${Date.now()}`;
     await page.getByRole('button', { name: 'Add local user' }).click();
-    const modal = page.locator('.ant-modal-content').filter({ hasText: 'Add local DevLake user' });
+    const modal = addLocalUserModal(page);
     await modal.getByPlaceholder('person').fill(testLogin);
     await modal.getByRole('button', { name: 'Create' }).click();
 
-    const otpModal = page.locator('.ant-modal-content').filter({ hasText: 'Copy this password now' });
+    const otpModal = oneTimePasswordModal(page);
     const tempPass = (await otpModal.getByRole('textbox').inputValue()).trim();
     await otpModal.getByRole('button', { name: 'Done' }).click();
 
@@ -821,8 +817,8 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     await userPage.waitForURL(/.*\/change-password/);
 
     const userPass = 'ValidLinkUser123!';
-    await userPage.locator('input[type="password"]').first().fill(userPass);
-    await userPage.locator('input[type="password"]').nth(1).fill(userPass);
+    await passwordInputs(userPage).first().fill(userPass);
+    await passwordInputs(userPage).nth(1).fill(userPass);
     await userPage.getByRole('button', { name: 'Change password' }).click();
     await userPage.waitForURL((url) => !url.pathname.includes('/change-password'));
 
@@ -832,7 +828,7 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     // 3. User clicks on the Account menu in the header
     // In layout.tsx: <Dropdown menu={{ items: accountMenuItems }} onOpenChange={loadLinkableProviders}>
     // <Button type="text" icon={<UserOutlined />}>{user.name || user.email || 'Account'}</Button>
-    const userMenuButton = userPage.locator('header').getByRole('button', { name: new RegExp(testLogin, 'i') });
+    const userMenuButton = appHeader(userPage).getByRole('button', { name: new RegExp(testLogin, 'i') });
     await expect(userMenuButton).toBeVisible();
 
     // Intercept the /api/access/oidc-providers/linkable request
@@ -887,11 +883,11 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
 
     const testLogin = `${E2E_USER_PREFIX}link_${Date.now()}`;
     await page.getByRole('button', { name: 'Add local user' }).click();
-    const modal = page.locator('.ant-modal-content').filter({ hasText: 'Add local DevLake user' });
+    const modal = addLocalUserModal(page);
     await modal.getByPlaceholder('person').fill(testLogin);
     await modal.getByRole('button', { name: 'Create' }).click();
 
-    const otpModal = page.locator('.ant-modal-content').filter({ hasText: 'Copy this password now' });
+    const otpModal = oneTimePasswordModal(page);
     const tempPass = (await otpModal.getByRole('textbox').inputValue()).trim();
     await otpModal.getByRole('button', { name: 'Done' }).click();
 
@@ -905,8 +901,8 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     await userPage.waitForURL(/.*\/change-password/);
 
     const userPass = 'ValidLinkInit123!';
-    await userPage.locator('input[type="password"]').first().fill(userPass);
-    await userPage.locator('input[type="password"]').nth(1).fill(userPass);
+    await passwordInputs(userPage).first().fill(userPass);
+    await passwordInputs(userPage).nth(1).fill(userPass);
     await userPage.getByRole('button', { name: 'Change password' }).click();
     await userPage.waitForURL((url) => !url.pathname.includes('/change-password'));
 
@@ -940,9 +936,9 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     await page.goto('/access');
 
     // Click Account dropdown
-    const userMenuButton = page
-      .locator('header')
-      .getByRole('button', { name: new RegExp(`Account|${process.env.E2E_ADMIN_NAME ?? 'Account'}`, 'i') });
+    const userMenuButton = appHeader(page).getByRole('button', {
+      name: new RegExp(`Account|${process.env.E2E_ADMIN_NAME ?? 'Account'}`, 'i'),
+    });
     await expect(userMenuButton).toBeVisible();
 
     const linkablePromise = page.waitForResponse((response) =>
