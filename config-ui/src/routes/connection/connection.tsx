@@ -76,7 +76,9 @@ export const Connection = () => {
   } = theme.useToken();
 
   const dispatch = useAppDispatch();
-  const connection = useAppSelector((state) => selectConnection(state, `${plugin}-${connectionId}`)) as IConnection;
+  const connection = useAppSelector((state) => selectConnection(state, `${plugin}-${connectionId}`)) as
+    | IConnection
+    | undefined;
 
   const navigate = useNavigate();
 
@@ -85,7 +87,7 @@ export const Connection = () => {
     [version, page, pageSize],
   );
 
-  const { name } = connection;
+  const name = connection?.name ?? '';
 
   const pluginConfig = useMemo(() => getPluginConfig(plugin), [plugin]);
 
@@ -276,6 +278,11 @@ export const Connection = () => {
       );
     }
   };
+
+  // The store drops the connection on delete before navigation completes.
+  if (!connection) {
+    return null;
+  }
 
   return (
     <PageHeader
