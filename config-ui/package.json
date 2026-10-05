@@ -8,6 +8,8 @@
     "build": "vite build",
     "test": "node -e \"require('fs').rmSync('.test-dist',{recursive:true,force:true})\" && tsc -p tsconfig.test.json && node --test \".test-dist/**/*.test.js\"",
     "preview": "vite preview",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "lint": "tsc && eslint . --fix",
     "prettier": "prettier . --write",
     "lint-staged": "lint-staged",
@@ -50,6 +52,7 @@
     "styled-components": "^6.1.8"
   },
   "devDependencies": {
+    "@playwright/test": "~1.63.0",
     "@types/file-saver": "^2.0.5",
     "@types/node": "^18.19.20",
     "@types/react": "^18.2.56",
