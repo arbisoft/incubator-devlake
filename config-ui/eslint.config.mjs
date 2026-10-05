@@ -42,7 +42,15 @@ limitations under the License.
 
 export default tseslint.config(
   {
-    ignores: ['dist', 'node_modules', '.yarn', 'eslint.config.mjs', '.prettierrc.js'],
+    ignores: [
+      'dist',
+      'node_modules',
+      '.yarn',
+      'playwright-report',
+      'test-results',
+      'eslint.config.mjs',
+      '.prettierrc.js',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -83,6 +91,11 @@ export default tseslint.config(
         },
       ],
     },
+  },
+  {
+    // Playwright fixtures take a `use` callback that is not a React hook.
+    files: ['e2e-tests/**'],
+    rules: { 'react-hooks/rules-of-hooks': 'off' },
   },
   prettierConfig,
 );

@@ -17,7 +17,7 @@
  */
 
 import { CopyOutlined } from '@ant-design/icons';
-import { Button, Checkbox, Input, message } from 'antd';
+import { Button, Checkbox, Input, Space, message } from 'antd';
 
 import { Block } from '@/components/block';
 import { IPluginConfig } from '@/types';
@@ -111,22 +111,18 @@ export const NotionConfig: IPluginConfig = {
             title="Webhook URL Template"
             description="Replace {connectionId} and {scopeId} after creating connection and scope."
           >
-            <Input
-              readOnly
-              value={webhookUrl}
-              disabled={!values.enableWebhook}
-              addonAfter={
-                <Button
-                  type="text"
-                  icon={<CopyOutlined />}
-                  disabled={!values.enableWebhook}
-                  onClick={() => {
-                    void navigator.clipboard.writeText(webhookUrl);
-                    void message.success('Webhook URL copied.');
-                  }}
-                />
-              }
-            />
+            <Space.Compact style={{ width: '100%' }}>
+              <Input readOnly value={webhookUrl} disabled={!values.enableWebhook} />
+              <Button
+                type="text"
+                icon={<CopyOutlined />}
+                disabled={!values.enableWebhook}
+                onClick={() => {
+                  void navigator.clipboard.writeText(webhookUrl);
+                  void message.success('Webhook URL copied.');
+                }}
+              />
+            </Space.Compact>
           </Block>
         );
       },

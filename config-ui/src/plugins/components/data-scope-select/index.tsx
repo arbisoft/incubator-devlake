@@ -65,10 +65,10 @@ export const DataScopeSelect = ({
   const initialScopeVersionRef = useRef(0);
   const mountedRef = useRef(true);
   const listLoadingCountRef = useRef(0);
-  const listAbortControllerRef = useRef<AbortController>();
-  const searchAbortControllerRef = useRef<AbortController>();
-  const initialScopeAbortControllerRef = useRef<AbortController>();
-  const loadAllAbortControllerRef = useRef<AbortController>();
+  const listAbortControllerRef = useRef<AbortController | undefined>(undefined);
+  const searchAbortControllerRef = useRef<AbortController | undefined>(undefined);
+  const initialScopeAbortControllerRef = useRef<AbortController | undefined>(undefined);
+  const loadAllAbortControllerRef = useRef<AbortController | undefined>(undefined);
   const initialScopeKey = (initialScope ?? []).map((sc) => sc.id).join(',');
   const search = useDebounce(query, { wait: 500 });
 

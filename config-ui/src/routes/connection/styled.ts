@@ -96,7 +96,7 @@ export const Wrapper = styled.div`
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        color: ${({ theme }) => theme};
+        color: ${({ theme }) => theme.colors.primary};
         font-size: 52px;
 
         & > .anticon {

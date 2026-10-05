@@ -111,7 +111,7 @@ export const Authentication = ({ callbacks, providers, loadFailed, onRefresh }: 
         <Alert
           type="error"
           showIcon
-          message="Authentication settings could not be loaded. Refresh the page and try again."
+          title="Authentication settings could not be loaded. Refresh the page and try again."
         />
       </>
     );
@@ -131,7 +131,7 @@ export const Authentication = ({ callbacks, providers, loadFailed, onRefresh }: 
         </Space>
       </SectionHeader>
       <Message content="Grafana access remains independently managed. Providers marked DevLake only use Grafana's ordinary login." />
-      {pageError && <Alert type="error" showIcon message={pageError} style={{ marginTop: 16 }} />}
+      {pageError && <Alert type="error" showIcon title={pageError} style={{ marginTop: 16 }} />}
       <Table
         data-testid="access-authentication-table"
         rowKey="providerKey"

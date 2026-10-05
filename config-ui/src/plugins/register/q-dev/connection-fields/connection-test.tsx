@@ -152,7 +152,7 @@ export const QDevConnectionTest = ({ plugin, connectionId, values, initialValues
   };
 
   return (
-    <Space direction="vertical" style={{ width: '100%' }}>
+    <Space orientation="vertical" style={{ width: '100%' }}>
       <Button
         type="default"
         loading={testing}
@@ -167,7 +167,7 @@ export const QDevConnectionTest = ({ plugin, connectionId, values, initialValues
         <Alert
           type={getAlertType()}
           icon={getAlertIcon()}
-          message={testing ? 'Testing connection to AWS S3 and IAM Identity Center...' : testResult?.message}
+          title={testing ? 'Testing connection to AWS S3 and IAM Identity Center...' : testResult?.message}
           description={
             testResult?.success && testResult.details ? (
               <div>

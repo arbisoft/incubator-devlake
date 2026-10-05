@@ -47,7 +47,7 @@ export function getAdminSessionToken(): string {
     }).trim();
   } catch (err) {
     const stderr = (err as { stderr?: Buffer | string }).stderr?.toString().trim();
-    throw new Error(`Failed to mint an admin session: ${stderr || (err as Error).message}`);
+    throw new Error(`Failed to mint an admin session: ${stderr || (err as Error).message}`, { cause: err });
   }
   return cachedToken;
 }

@@ -70,7 +70,7 @@ export const getAuthenticationColumns = ({
     title: 'Provider',
     key: 'provider',
     render: (_: unknown, provider) => (
-      <Space direction="vertical" size={0}>
+      <Space orientation="vertical" size={0}>
         <Button type="link" style={{ padding: 0 }} onClick={() => onEdit(provider)}>
           {provider.displayName}
         </Button>
@@ -90,7 +90,7 @@ export const getAuthenticationColumns = ({
     title: 'Grafana',
     key: 'grafana',
     render: (_: unknown, provider) => (
-      <Space direction="vertical" size={0}>
+      <Space orientation="vertical" size={0}>
         <span>{GRAFANA_PROVIDER_LABEL[provider.grafanaTarget]}</span>
         {provider.grafanaTarget === GRAFANA_PROVIDER_KIND.GENERIC_OAUTH && (
           <Tag color="blue">Selected Generic OAuth</Tag>
@@ -124,8 +124,9 @@ export const getAuthenticationColumns = ({
             </Button>
           </Popconfirm>
         )}
-        {provider.enabled && !provider.hasCandidate && (
-          enabledProviderCount !== undefined && enabledProviderCount <= 1 ? (
+        {provider.enabled &&
+          !provider.hasCandidate &&
+          (enabledProviderCount !== undefined && enabledProviderCount <= 1 ? (
             <Tooltip title="At least one OIDC provider must remain enabled.">
               <span>
                 <Button size="small" disabled>
@@ -144,8 +145,7 @@ export const getAuthenticationColumns = ({
                 Disable
               </Button>
             </Popconfirm>
-          )
-        )}
+          ))}
         {!provider.enabled && !provider.hasCandidate && (
           <Button
             size="small"
@@ -175,15 +175,15 @@ export const getAuthenticationColumns = ({
         {!provider.hasCandidate &&
           (provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.FAILED ||
             provider.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.COMPENSATION_FAILED) && (
-          <Button
-            size="small"
-            loading={isActionOperating('grafana-sync', provider.providerKey)}
-            disabled={isOperating}
-            onClick={() => onAction('grafana-sync', provider)}
-          >
-            Retry Grafana
-          </Button>
-        )}
+            <Button
+              size="small"
+              loading={isActionOperating('grafana-sync', provider.providerKey)}
+              disabled={isOperating}
+              onClick={() => onAction('grafana-sync', provider)}
+            >
+              Retry Grafana
+            </Button>
+          )}
         {!provider.enabled && !provider.hasCandidate && (
           <Popconfirm
             title="Retire OIDC provider?"
