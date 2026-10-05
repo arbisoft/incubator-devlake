@@ -143,6 +143,9 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: Props) => {
                 ? undefined
                 : values.organization,
               org: isEqual(selectedConnection?.org, values.org) ? undefined : values.org,
+              enterprise: isEqual((selectedConnection as any)?.enterprise, values.enterprise)
+                ? undefined
+                : values.enterprise,
               organizationId: isEqual(selectedConnection?.organizationId, values.organizationId)
                 ? undefined
                 : values.organizationId,
@@ -196,6 +199,7 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: Props) => {
                 'companyId',
                 'organization',
                 'org',
+                'enterprise',
                 'organizationId',
                 'loginUrl',
                 'instanceUrl',
