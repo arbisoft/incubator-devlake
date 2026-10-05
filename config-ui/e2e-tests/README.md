@@ -41,6 +41,7 @@ Missing variables are read from the repo-root `.env`.
 | `E2E_DB_HOST`, `E2E_DB_PORT`, `E2E_DB_DSN`                                 | Host-side DB address used by the session minter (default `127.0.0.1:3306`; must be local)                   |
 | `E2E_BASE_URL`, `E2E_API_URL`                                              | config-ui and devlake API (default `http://localhost:4000`, `http://localhost:8080`)                        |
 | `E2E_GRAFANA_URL`, `E2E_PROMETHEUS_URL`, `E2E_COLLECTOR_URL`               | Defaults `http://localhost:3002`, `:9090`, `:8889`                                                          |
+| `E2E_OTLP_HTTP_URL`                                                        | Local collector OTLP/HTTP receiver the OTel spec sends telemetry to (default `http://localhost:4318`)       |
 | `E2E_GITHUB_TOKEN`, `E2E_GITHUB_REPO`                                      | Real GitHub token and a small public repo such as `octocat/Hello-World` (optional; enable the GitHub specs) |
 | `E2E_GO_BIN`, `E2E_DOCKER_BIN`                                             | Override the `go` / `docker` executables                                                                    |
 

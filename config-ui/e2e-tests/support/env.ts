@@ -59,6 +59,7 @@ export const API_URL = trimSlash(process.env.E2E_API_URL ?? 'http://localhost:80
 export const GRAFANA_URL = trimSlash(process.env.E2E_GRAFANA_URL ?? 'http://localhost:3002');
 export const PROMETHEUS_URL = trimSlash(process.env.E2E_PROMETHEUS_URL ?? 'http://localhost:9090');
 export const COLLECTOR_URL = trimSlash(process.env.E2E_COLLECTOR_URL ?? 'http://localhost:8889');
+export const OTLP_HTTP_URL = trimSlash(process.env.E2E_OTLP_HTTP_URL ?? 'http://localhost:4318');
 
 export const E2E_USER_PREFIX = 'e2e_';
 

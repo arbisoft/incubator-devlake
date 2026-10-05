@@ -18,12 +18,16 @@
 
 import { test, expect } from '../fixtures';
 import { getAdminSessionToken, loginAsAdmin } from '../auth-helpers';
-import { APP_URL, COLLECTOR_URL, GRAFANA_URL, PROMETHEUS_URL } from '../support/env';
+import { randomUUID } from 'crypto';
+import { APP_URL, COLLECTOR_URL, GRAFANA_URL, OTLP_HTTP_URL, PROMETHEUS_URL } from '../support/env';
 import { adminApi, createProject, deleteProject, uniqueName } from '../support/api';
+import { runSql } from '../support/db';
 
 test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
   const testTeamName = `e2e-team-${Date.now().toString().slice(-6)}`;
   const projectName = uniqueName('otel-proj');
+  const organizationId = randomUUID();
+  let basicAuthHeader = '';
 
   test.beforeAll(async ({ playwright }) => {
     const api = await adminApi(playwright);
@@ -47,13 +51,27 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     const connections: { connection: { id: number; teamName: string; status: string } }[] = await (
       await api.get('/api/plugins/claude_otel/connections')
     ).json();
-    for (const { connection } of connections.filter((it) => it.connection.teamName === testTeamName)) {
+    const testConnections = connections.filter((it) => it.connection.teamName === testTeamName);
+    for (const { connection } of testConnections) {
       if (connection.status === 'active') {
         await api.post(`/api/plugins/claude_otel/connections/${connection.id}/revoke`);
       }
       await api.post(`/api/plugins/claude_otel/connections/${connection.id}/hide`);
     }
     await api.dispose();
+    // Removes the facts and source preferences produced by test 2's telemetry.
+    runSql(`
+      DELETE FROM _tool_claude_code_otel_hourly_activity WHERE organization_id = '${organizationId}';
+      DELETE FROM _tool_claude_code_otel_series_state WHERE connection_id IN (${[
+        0,
+        ...testConnections.map((it) => it.connection.id),
+      ].join(',')});
+      DELETE FROM ai_activities WHERE workspace_key = '${organizationId}';
+      DELETE FROM ai_model_usages WHERE workspace_key = '${organizationId}';
+      DELETE FROM ai_tool_decisions WHERE workspace_key = '${organizationId}';
+      DELETE FROM ai_source_preferences WHERE workspace_key = '${organizationId}';
+      DELETE FROM _raw_otel_claude_code_metric_batches WHERE INSTR(payload_proto, '${organizationId}') > 0;
+    `);
     const projectApi = await adminApi(playwright);
     await deleteProject(projectApi, projectName);
     await projectApi.dispose();
@@ -121,6 +139,8 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     const snippetText = await codeSnippet.textContent();
     expect(snippetText).toContain('CLAUDE_CODE_ENABLE_TELEMETRY');
     expect(snippetText).toContain('Authorization=Basic');
+    basicAuthHeader = snippetText?.match(/Authorization=(Basic [A-Za-z0-9+/=]+)/)?.[1] ?? '';
+    expect(basicAuthHeader).not.toBe('');
 
     // 10. Close snippet modal
     const closeBtn = snippetModal.locator('.ant-modal-close');
@@ -153,14 +173,95 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     await expect(row.getByText('active')).toBeVisible();
   });
 
-  test('2. Organization binding display and canonical source policy', async ({ page }) => {
+  test('2. Organization binding from first telemetry and canonical source policy', async ({ page }) => {
+    test.setTimeout(150_000);
+    // 1. The connection created in test 1 is unbound until its first telemetry arrives
     await page.goto('/otel');
-    await expect(page).toHaveURL(/.*\/otel/);
+    const newRow = page.locator('tr').filter({ hasText: testTeamName });
+    await expect(newRow).toBeVisible();
+    await expect(newRow.getByText('Pending first telemetry')).toBeVisible();
 
-    // 1. Source policy section shows the otel-preferred metric families reported by the API and no controls to change them
+    // 2. Send one Claude Code datapoint through the collector with the generated credential
+    const attribute = (key: string, value: string) => ({ key, value: { stringValue: value } });
+    const otlpResp = await page.request.post(`${OTLP_HTTP_URL}/v1/metrics`, {
+      headers: { Authorization: basicAuthHeader, 'Content-Type': 'application/json' },
+      data: {
+        resourceMetrics: [
+          {
+            resource: { attributes: [attribute('service.name', 'claude-code')] },
+            scopeMetrics: [
+              {
+                scope: { name: 'com.anthropic.claude_code' },
+                metrics: [
+                  {
+                    name: 'claude_code.session.count',
+                    sum: {
+                      aggregationTemporality: 1,
+                      isMonotonic: true,
+                      dataPoints: [
+                        {
+                          asInt: '1',
+                          timeUnixNano: `${BigInt(Date.now()) * 1_000_000n}`,
+                          attributes: [
+                            attribute('organization.id', organizationId),
+                            attribute('user.email', `${testTeamName}@example.invalid`),
+                          ],
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(otlpResp.status(), 'collector accepts telemetry with the generated credential').toBe(200);
+
+    // 3. The backend binds the connection to the telemetry's organization
+    await expect
+      .poll(
+        async () => {
+          const resp = await page.request.get('/api/plugins/claude_otel/connections');
+          const list: { connection: { teamName: string; organizationId?: string } }[] = await resp.json();
+          return list.find((it) => it.connection.teamName === testTeamName)?.connection.organizationId;
+        },
+        { timeout: 120_000, intervals: [5000] },
+      )
+      .toBe(organizationId);
+
+    // 4. The row shows the bound organization, and every listed row matches the API
+    await page.reload();
+    await expect(newRow).toBeVisible();
+    await expect(newRow.getByText(organizationId)).toBeVisible();
+    await expect(newRow.getByText('Pending first telemetry')).toHaveCount(0);
+    const connectionsResp = await page.request.get('/api/plugins/claude_otel/connections');
+    expect(connectionsResp.status()).toBe(200);
+    const connections: { connection: { teamName: string; organizationId?: string } }[] = await connectionsResp.json();
+    const connectionsTable = page.locator('.ant-table').filter({ has: page.locator('tr', { hasText: testTeamName }) });
+    const rows = connectionsTable.locator('tbody tr.ant-table-row');
+    const rowCount = await rows.count();
+    expect(rowCount).toBeGreaterThan(0);
+    for (let i = 0; i < rowCount; i++) {
+      const cells = rows.nth(i).locator('td');
+      const teamName = (await cells.nth(0).innerText()).trim();
+      const organization = (await cells.nth(3).innerText()).trim();
+      const expected = connections
+        .filter((it) => it.connection.teamName === teamName)
+        .map((it) => it.connection.organizationId ?? 'Pending first telemetry');
+      expect(expected, `organization cell for ${teamName}`).toContain(organization);
+    }
+
+    // 5. Source policy section shows the otel-preferred metric families reported by the API and no controls to change them
     const preferencesResp = await page.request.get('/api/plugins/claude_otel/source-preferences');
     expect(preferencesResp.status()).toBe(200);
-    const preferences: { metricFamily: string; preferredSource: string }[] = await preferencesResp.json();
+    const preferences: { workspaceKey: string; metricFamily: string; preferredSource: string }[] =
+      await preferencesResp.json();
+    expect(
+      preferences.filter((it) => it.workspaceKey === organizationId && it.preferredSource === 'otel'),
+      'the new organization gets otel source preferences',
+    ).not.toHaveLength(0);
     const otelPreferences = preferences.filter((preference) => preference.preferredSource === 'otel');
 
     const policyHeading = page.getByRole('heading', { name: 'Canonical daily data' });
@@ -173,35 +274,6 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     await expect(policySection.locator('select, .ant-select, input[type="radio"], input[type="checkbox"]')).toHaveCount(
       0,
     );
-
-    // 2. The connection created in test 1 is unbound until its first telemetry arrives
-    const newRow = page.locator('tr').filter({ hasText: testTeamName });
-    await expect(newRow).toBeVisible();
-    await expect(newRow.getByText('Pending first telemetry')).toBeVisible();
-
-    // 3. Each listed row shows the organization the API reports for its team, or the pending marker
-    const connectionsResp = await page.request.get('/api/plugins/claude_otel/connections');
-    expect(connectionsResp.status()).toBe(200);
-    const connections: { connection: { teamName: string; organizationId?: string } }[] = await connectionsResp.json();
-    const rows = page.locator('tbody tr.ant-table-row');
-    const rowCount = await rows.count();
-    expect(rowCount).toBeGreaterThan(0);
-    let boundRows = 0;
-    for (let i = 0; i < rowCount; i++) {
-      const cells = rows.nth(i).locator('td');
-      const teamName = (await cells.nth(0).innerText()).trim();
-      const organization = (await cells.nth(3).innerText()).trim();
-      const expected = connections
-        .filter((it) => it.connection.teamName === teamName)
-        .map((it) => it.connection.organizationId ?? 'Pending first telemetry');
-      expect(expected, `organization cell for ${teamName}`).toContain(organization);
-      if (organization !== 'Pending first telemetry') {
-        boundRows++;
-      }
-    }
-    if (boundRows === 0) {
-      test.info().annotations.push({ type: 'note', description: 'No organization-bound connection on the first page' });
-    }
   });
 
   test('3. Credential lifecycle: rotate, finalize, revoke, and hide', async ({ page }) => {
