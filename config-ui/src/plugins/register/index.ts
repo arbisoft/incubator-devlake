@@ -38,6 +38,7 @@ import { NotionConfig } from './notion';
 import { PagerDutyConfig } from './pagerduty';
 import { SalesforceConfig } from './salesforce';
 import { PlaneConfig } from './plane';
+import { RootlyConfig } from './rootly';
 import { SonarQubeConfig } from './sonarqube';
 import { TAPDConfig } from './tapd';
 import { WebhookConfig } from './webhook';
@@ -70,6 +71,7 @@ export const pluginConfigs: IPluginConfig[] = [
   PagerDutyConfig,
   SalesforceConfig,
   PlaneConfig,
+  RootlyConfig,
   SlackConfig,
   QDevConfig,
   SonarQubeConfig,

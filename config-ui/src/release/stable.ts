@@ -110,6 +110,10 @@ const URLS = {
     PLANE: {
       BASIS: 'https://devlake.apache.org/docs/Configuration/Tutorial',
     },
+    ROOTLY: {
+      BASIS: 'https://devlake.apache.org/docs/Configuration/Rootly',
+      RATE_LIMIT: 'https://devlake.apache.org/docs/Configuration/Rootly#fixed-rate-limit-optional',
+    },
     SLACK: {
       BASIS: 'https://devlake.apache.org/docs/Configuration/Slack',
       RATE_LIMIT: 'https://devlake.apache.org/docs/Configuration/Slack#custom-rate-limit-optional',
