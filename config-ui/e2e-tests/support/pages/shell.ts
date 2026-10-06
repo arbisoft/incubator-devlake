@@ -94,6 +94,10 @@ export class ShellPage extends BasePage {
     return 0.299 * r + 0.587 * g + 0.114 * b;
   }
 
+  async backgroundColour(): Promise<string> {
+    return this.body.evaluate((el) => getComputedStyle(el).backgroundColor);
+  }
+
   menuText(text: string): Locator {
     return this.page.getByRole('menu').getByText(text);
   }

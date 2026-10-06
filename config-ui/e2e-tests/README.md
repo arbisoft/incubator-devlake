@@ -26,6 +26,7 @@ Playwright specs that drive a running DevLake stack (config-ui, devlake API, MyS
 - An existing `customer_admin` in the access directory (the bootstrap admin); its identity is used for the minted session.
 - Auth state: `auth/local-auth-e2e.spec.ts` and `auth/rebase-matrix.spec.ts` need local password auth enabled (`AUTH_LOCAL_ENABLED=true`, state B); `auth/local-auth-state-a.spec.ts` needs it disabled (state A). Specs for the other state skip themselves, detected via `GET /auth/methods`.
 - The `/otel` specs need the Grafana, Prometheus and collector endpoints reachable; they create and remove their own DevLake project.
+- `ui-kit/ui-kit.spec.ts` skips unless `E2E_UI_KIT_URL` points at a running `yarn start --port <port>` server, because `/ui-kit` is registered only in dev builds and is absent from `dist`. It needs no login or backend.
 - The GitHub-backed specs (`connections/connection-lifecycle`, `connections/data-scope`) skip unless `E2E_GITHUB_TOKEN` (and `E2E_GITHUB_REPO` for data scopes) are set. Every other new spec creates only `e2e-` prefixed data and removes it.
 
 ## Environment
@@ -43,6 +44,7 @@ Missing variables are read from the repo-root `.env`.
 | `E2E_GRAFANA_URL`, `E2E_PROMETHEUS_URL`, `E2E_COLLECTOR_URL`               | Defaults `http://localhost:3002`, `:9090`, `:8889`                                                          |
 | `E2E_OTLP_HTTP_URL`                                                        | Local collector OTLP/HTTP receiver the OTel spec sends telemetry to (default `http://localhost:4318`)       |
 | `E2E_GITHUB_TOKEN`, `E2E_GITHUB_REPO`                                      | Real GitHub token and a small public repo such as `octocat/Hello-World` (optional; enable the GitHub specs) |
+| `E2E_UI_KIT_URL`                                                           | URL of a `yarn start` dev server (for example `http://localhost:4173`); enables `ui-kit/ui-kit.spec.ts`     |
 | `E2E_GO_BIN`, `E2E_DOCKER_BIN`                                             | Override the `go` / `docker` executables                                                                    |
 | `E2E_UPDATE_GOLDENS`                                                       | `1` makes the write recorder write goldens instead of comparing against them (see Write goldens)            |
 | `PLAYWRIGHT_JSON_OUTPUT_NAME`                                              | Path of the Playwright JSON report (default `test-results/results.json`); feeds `yarn e2e:census`           |

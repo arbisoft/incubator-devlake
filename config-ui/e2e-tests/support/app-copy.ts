@@ -15,21 +15,6 @@
  * limitations under the License.
  *
  */
-// App routes the e2e suite visits; mirrors src/config/paths.ts without importing from src.
-export const PATHS = {
-  root: '/',
-  login: '/login',
-  projects: '/projects',
-  project: (name: string) => `/projects/${encodeURIComponent(name)}`,
-  connections: '/connections',
-  connection: (plugin: string, id: number) => `/connections/${plugin}/${id}`,
-  blueprints: '/advanced/blueprints',
-  blueprint: (id: number) => `/advanced/blueprints/${id}`,
-  pipelines: '/advanced/pipelines',
-  pipeline: (id: number) => `/advanced/pipeline/${id}`,
-  keys: '/keys',
-  access: '/access',
-  otel: '/otel',
-  onboard: '/onboard',
-  uiKit: '/ui-kit',
-};
+
+// App copy that page objects reuse; this depth keeps the relative path short.
+export { COPY as UI_KIT_COPY } from '../../src/routes/ui-kit/constants';
