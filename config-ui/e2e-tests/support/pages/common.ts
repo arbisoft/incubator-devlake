@@ -18,6 +18,7 @@
 import { Locator, Page } from '@playwright/test';
 
 import { PageResponse } from '../api';
+import { TEST_ACTION_HEADER } from '../constants';
 
 // Structural and AntD-specific helpers shared by every page object, so a visual reskin only touches page objects.
 
@@ -98,14 +99,14 @@ export class BasePage {
     await this.page.reload();
   }
 
-  // Runs a fetch inside the page, so it carries the page's session cookies; non-GET calls add the CSRF header.
+  // Runs a fetch inside the page with its session cookies; non-GET calls add the CSRF header, and the marker header keeps the write recorder from counting it.
   async sessionFetch<T = unknown>(
     path: string,
     init: { method?: string; body?: unknown } = {},
   ): Promise<PageResponse<T>> {
     return this.page.evaluate(
-      async ({ path, method, body }) => {
-        const headers: Record<string, string> = {};
+      async ({ path, method, body, marker }) => {
+        const headers: Record<string, string> = { [marker]: '1' };
         if (method !== 'GET') {
           headers['X-CSRF-Token'] = document.cookie.match(/devlake_csrf=([^;]+)/)?.[1] ?? '';
         }
@@ -119,7 +120,7 @@ export class BasePage {
         });
         return { status: resp.status, body: (await resp.json().catch(() => null)) as T | null };
       },
-      { path, method: init.method ?? 'GET', body: init.body },
+      { path, method: init.method ?? 'GET', body: init.body, marker: TEST_ACTION_HEADER },
     );
   }
 

@@ -1,0 +1,26 @@
+{
+  "titlePath": [
+    "Local Password Authentication - Phases 1-4 Full E2E Suite",
+    "14. User Management Validation: duplicate username triggers error and client format guards"
+  ],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/access/local-users",
+      "body": {
+        "displayName": "",
+        "loginName": "e2e_*",
+        "role": "member"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/access/local-users",
+      "body": {
+        "displayName": "",
+        "loginName": "e2e_*",
+        "role": "member"
+      }
+    }
+  ]
+}
