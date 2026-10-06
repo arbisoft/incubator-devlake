@@ -18,4 +18,5 @@
 
 export const COPY = {
   title: 'Connections',
+  deprecationTitle: 'Plugin deprecation notice',
 };

@@ -33,6 +33,7 @@ import { formatPlural } from '@/utils';
 
 import { COPY } from './constants';
 import * as S from './styled';
+import { useDeprecationNotice } from './use-deprecation-notice';
 
 const SORT_START_WITH = ['o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'];
 const CLAUDE_PLUGIN = 'claude_code';
@@ -96,9 +97,10 @@ export const Connections = () => {
   );
 
   const filterWebhookPlugins = plugins.filter((p) => p !== 'webhook');
-  const deprecatedPlugin = filterWebhookPlugins
-    .map((plugin) => getPluginConfig(plugin))
-    .find((config) => config?.isDeprecated && config.deprecationMessage);
+  const { notice: deprecatedPlugin, dismiss: dismissDeprecation } = useDeprecationNotice(
+    filterWebhookPlugins,
+    connections,
+  );
 
   const [firstPlugins, secondPlugins] = useMemo(
     () => splitPluginsByInitial(filterWebhookPlugins, (plugin) => getPluginConfig(plugin)?.name ?? plugin),
@@ -169,11 +171,11 @@ export const Connections = () => {
       <h5>You can create and manage data connections for the following data sources and use them in your Projects.</h5>
       {deprecatedPlugin?.deprecationMessage && (
         <S.DeprecationAlert
-          closable
+          closable={{ onClose: dismissDeprecation }}
           showIcon
           type="warning"
           icon={<WarningOutlined />}
-          message="Plugin deprecation notice"
+          message={COPY.deprecationTitle}
           description={deprecatedPlugin.deprecationMessage}
         />
       )}

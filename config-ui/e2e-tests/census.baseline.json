@@ -50,6 +50,13 @@
       "skips": 1,
       "fixmes": 0
     },
+    "connections/deprecation-notice.spec.ts": {
+      "tests": 1,
+      "expects": 8,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
     "keys/api-keys.spec.ts": {
       "tests": 1,
       "expects": 14,
