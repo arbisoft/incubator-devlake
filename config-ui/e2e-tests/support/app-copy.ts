@@ -22,3 +22,4 @@ export { COPY as LAYOUT_COPY, THEME_LABEL } from '../../src/routes/layout/consta
 export { COPY as SIDEBAR_COPY } from '../../src/ui/sidebar-nav/constants';
 export { COPY as ACCOUNT_BLOCK_COPY } from '../../src/ui/account-block/constants';
 export { COMMON_COPY } from '../../src/ui/constants';
+export { PROJECT_TAB } from '../../src/config/route-keys';

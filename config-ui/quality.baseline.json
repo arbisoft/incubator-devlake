@@ -1,11 +1,11 @@
 {
   "eslint": {
     "@typescript-eslint/no-explicit-any": {
-      "errors": 324,
+      "errors": 323,
       "warnings": 0
     },
     "@typescript-eslint/no-unused-vars": {
-      "errors": 14,
+      "errors": 13,
       "warnings": 0
     },
     "eqeqeq": {
@@ -41,7 +41,7 @@
       "warnings": 0
     },
     "no-duplicate-imports": {
-      "errors": 16,
+      "errors": 15,
       "warnings": 0
     },
     "no-empty": {
@@ -58,7 +58,7 @@
     },
     "react-hooks/exhaustive-deps": {
       "errors": 0,
-      "warnings": 77
+      "warnings": 75
     },
     "react-hooks/globals": {
       "errors": 0,
@@ -70,11 +70,11 @@
     },
     "react-hooks/refs": {
       "errors": 0,
-      "warnings": 36
+      "warnings": 35
     },
     "react-hooks/set-state-in-effect": {
       "errors": 0,
-      "warnings": 44
+      "warnings": 41
     },
     "react/display-name": {
       "errors": 1,
@@ -117,7 +117,7 @@
       "warnings": 19
     },
     "sonarjs/no-nested-template-literals": {
-      "errors": 3,
+      "errors": 2,
       "warnings": 0
     },
     "sonarjs/prefer-native-axios-alternative": {
@@ -148,6 +148,6 @@
   "knip": [],
   "jscpd": {
     "clones": 119,
-    "duplicatedLines": 2083
+    "duplicatedLines": 2075
   }
 }

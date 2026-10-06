@@ -15,7 +15,7 @@
  * limitations under the License.
  *
  */
-import { PROJECT_TAB } from '../../../src/config/route-keys';
+import { PROJECT_TAB } from '../app-copy';
 
 export type ProjectTabKey = (typeof PROJECT_TAB)[keyof typeof PROJECT_TAB];
 
