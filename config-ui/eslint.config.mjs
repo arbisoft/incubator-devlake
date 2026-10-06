@@ -58,6 +58,7 @@ export default tseslint.config(
       '.yarn',
       'playwright-report',
       'test-results',
+      '.jscpd-tmp',
       'eslint.config.mjs',
       '.prettierrc.js',
     ],
@@ -99,6 +100,19 @@ export default tseslint.config(
           blockPrefix: '\n',
           content: licenseHeader,
         },
+      ],
+    },
+  },
+  {
+    // CommonJS tooling scripts (eslint-summary.cjs, format-jscpd.cjs) run under node and keep the licence header.
+    files: ['**/*.cjs'],
+    plugins: { headers },
+    languageOptions: { sourceType: 'commonjs', globals: globals.node },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+      'headers/header-format': [
+        'error',
+        { source: 'string', style: 'jsdoc', blockPrefix: '\n', content: licenseHeader },
       ],
     },
   },
