@@ -122,7 +122,7 @@ export default tseslint.config(
     rules: { 'react-hooks/rules-of-hooks': 'off' },
   },
   {
-    files: ['e2e-tests/tools/**/*.mjs'],
+    files: ['e2e-tests/tools/**/*.mjs', 'tools/**/*.mjs'],
     languageOptions: { globals: globals.node },
   },
   {
