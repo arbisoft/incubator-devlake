@@ -150,4 +150,25 @@ describe('useListState', () => {
     expect(result.current.list).toMatchObject({ page: 1, keyword: '', filters: { status: 'all' } });
     expect(result.current.location.search).toBe('?tab=a');
   });
+
+  it('exposes the typed API query, omitting an empty keyword', () => {
+    const { result } = setup(`/list?${LIST_PARAMS.PAGE}=2&${LIST_PARAMS.PAGE_SIZE}=50`);
+    expect(result.current.list.query).toEqual({
+      page: 2,
+      pageSize: 50,
+      keyword: undefined,
+      sortBy: 'name',
+      sortOrder: SORT_ORDER.ASC,
+    });
+  });
+
+  it('keeps the query identity until a list value changes', () => {
+    const { result, rerender } = setup();
+    const first = result.current.list.query;
+    rerender();
+    expect(result.current.list.query).toBe(first);
+    act(() => result.current.list.setKeyword('jira'));
+    expect(result.current.list.query).not.toBe(first);
+    expect(result.current.list.query.keyword).toBe('jira');
+  });
 });

@@ -29,20 +29,39 @@ type DataTablePagination = {
   onPageSizeChange: (pageSize: number) => void;
 };
 
-type DataTableSort = {
-  value?: SortState;
-  onChange: (sort?: SortState) => void;
+type DataTableSort<S extends string> = {
+  value?: SortState<S>;
+  onChange: (sort?: SortState<S>) => void;
 };
 
-export type DataTableProps<T extends object> = {
+type DataTableList<S extends string> = {
+  page: number;
+  pageSize: number;
+  sort?: SortState<S>;
+  setPage: (page: number) => void;
+  setPageSize: (pageSize: number) => void;
+  setSort: (sort?: SortState<S>) => void;
+};
+
+export type DataTableProps<T extends object, S extends string = string> = {
   columns: TableColumnsType<T>;
   dataSource: T[];
   rowKey: TableProps<T>['rowKey'];
   loading: boolean;
   ariaLabel: string;
   pagination?: DataTablePagination;
-  sort?: DataTableSort;
+  list?: DataTableList<S>;
+  total?: number;
+  sort?: DataTableSort<S>;
   empty: EmptyStateProps;
   rowSelection?: TableProps<T>['rowSelection'];
   onRow?: TableProps<T>['onRow'];
+};
+
+export type ListEmptyOptions = {
+  failed: boolean;
+  onRetry: () => void;
+  filtered: boolean;
+  empty: Omit<EmptyStateProps, 'size'>;
+  noResults: Omit<EmptyStateProps, 'size'>;
 };

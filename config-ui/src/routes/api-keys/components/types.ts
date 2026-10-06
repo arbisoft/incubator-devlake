@@ -16,10 +16,14 @@
  *
  */
 
-export interface IApiKey {
-  id: string;
-  name: string;
-  expiredAt?: string;
-  allowedPath: string;
-  creator: string;
-}
+export type NewKeyModalProps = {
+  onClose: () => void;
+  onCreated: (apiKey: string) => void;
+};
+
+export type GeneratedKeyModalProps = {
+  open: boolean;
+  apiKey?: string;
+  onClose: () => void;
+  onClosed: () => void;
+};

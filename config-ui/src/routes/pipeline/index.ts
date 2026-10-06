@@ -19,3 +19,4 @@
 export * from './components';
 export * from './pipelines';
 export * from './pipeline';
+export * from './components/status-badge';

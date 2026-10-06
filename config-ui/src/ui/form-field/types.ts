@@ -16,11 +16,17 @@
  *
  */
 
-import dayjs from 'dayjs';
+import type { ReactNode } from 'react';
 
-export const timeOptions = [
-  { label: '7 days', value: dayjs().add(7, 'd').toISOString() },
-  { label: '30 days', value: dayjs().add(30, 'd').toISOString() },
-  { label: '90 days', value: dayjs().add(90, 'd').toISOString() },
-  { label: 'Never', value: '' },
-];
+type FormFieldControlProps = {
+  id: string;
+  'aria-describedby'?: string;
+  'aria-required'?: boolean;
+};
+
+export type FormFieldProps = {
+  label: string;
+  description?: ReactNode;
+  required?: boolean;
+  children: (control: FormFieldControlProps) => ReactNode;
+};

@@ -28,6 +28,7 @@ import { DetailDrawerDemo } from './detail-drawer.demo';
 import { EmptyStateDemo } from './empty-state.demo';
 import { ExternalLinkDemo } from './external-link.demo';
 import { FilterTabsDemo } from './filter-tabs.demo';
+import { FormFieldDemo } from './form-field.demo';
 import { FormModalDemo } from './form-modal.demo';
 import { IdentityCellDemo } from './identity-cell.demo';
 import { IntegrationCardDemo } from './integration-card.demo';
@@ -75,6 +76,7 @@ export const SECTIONS: SectionDefinition[] = [
   { id: SECTION.CONNECTION_HEALTH, Demo: ConnectionHealthDemo },
   { id: SECTION.DATA_TABLE, Demo: DataTableDemo },
   { id: SECTION.DETAIL_DRAWER, Demo: DetailDrawerDemo },
+  { id: SECTION.FORM_FIELD, Demo: FormFieldDemo },
   { id: SECTION.FORM_MODAL, Demo: FormModalDemo },
   { id: SECTION.INTEGRATION_CARD, Demo: IntegrationCardDemo },
   { id: SECTION.PAGE_FOOTER, Demo: PageFooterDemo },

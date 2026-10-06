@@ -16,10 +16,38 @@
  *
  */
 
-export interface IApiKey {
-  id: string;
-  name: string;
-  expiredAt?: string;
-  allowedPath: string;
-  creator: string;
-}
+import { Link } from 'react-router-dom';
+import styled from 'styled-components';
+
+export const Page = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.lg}px;
+`;
+
+export const NameLink = styled(Link)`
+  color: ${({ theme }) => theme.colors.text};
+`;
+
+export const ConnectionList = styled.ul`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.xxs}px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+`;
+
+export const OtelName = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.xxs}px;
+  min-width: 0;
+`;
+
+export const OtelLabel = styled.span`
+  max-width: ${({ theme }) => theme.layout.connectionNameWidth}px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;

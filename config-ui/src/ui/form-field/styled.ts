@@ -16,10 +16,28 @@
  *
  */
 
-export interface IApiKey {
-  id: string;
-  name: string;
-  expiredAt?: string;
-  allowedPath: string;
-  creator: string;
-}
+import styled from 'styled-components';
+
+import { textStyle } from '@/ui/style-helpers';
+
+export const Root = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.xxs}px;
+`;
+
+export const Label = styled.label`
+  ${textStyle('h3')}
+  color: ${({ theme }) => theme.colors.text};
+`;
+
+export const Required = styled.span`
+  margin-left: ${({ theme }) => theme.space.xxs}px;
+  color: ${({ theme }) => theme.colors.error};
+`;
+
+export const Description = styled.p`
+  ${textStyle('body')}
+  margin: 0;
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;

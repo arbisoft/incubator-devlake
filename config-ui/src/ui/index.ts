@@ -27,6 +27,7 @@ export * from './detail-drawer';
 export * from './empty-state';
 export * from './external-link';
 export * from './filter-tabs';
+export * from './form-field';
 export * from './form-modal';
 export * from './hooks';
 export * from './identity-cell';

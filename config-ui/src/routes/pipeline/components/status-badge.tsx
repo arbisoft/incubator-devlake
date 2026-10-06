@@ -16,10 +16,13 @@
  *
  */
 
-export interface IApiKey {
-  id: string;
-  name: string;
-  expiredAt?: string;
-  allowedPath: string;
-  creator: string;
-}
+import type { IPipelineStatus } from '@/types';
+import { StatusBadge } from '@/ui';
+
+import { PIPELINE_STATUS_COPY, PIPELINE_STATUS_TONE } from '../status-tone';
+
+type PipelineStatusBadgeProps = { status: IPipelineStatus };
+
+export const PipelineStatusBadge = ({ status }: PipelineStatusBadgeProps) => (
+  <StatusBadge tone={PIPELINE_STATUS_TONE[status]} label={PIPELINE_STATUS_COPY[status]} variant="dot" />
+);

@@ -16,10 +16,27 @@
  *
  */
 
-export interface IApiKey {
-  id: string;
-  name: string;
-  expiredAt?: string;
-  allowedPath: string;
-  creator: string;
-}
+import { useId } from 'react';
+
+import { Description, Label, Required, Root } from './styled';
+import type { FormFieldProps } from './types';
+
+export const FormField = ({ label, description, required, children }: FormFieldProps) => {
+  const id = useId();
+  const descriptionId = `${id}-description`;
+
+  return (
+    <Root>
+      <Label htmlFor={id}>
+        {label}
+        {required && <Required aria-hidden>*</Required>}
+      </Label>
+      {description && <Description id={descriptionId}>{description}</Description>}
+      {children({
+        id,
+        'aria-describedby': description ? descriptionId : undefined,
+        'aria-required': required || undefined,
+      })}
+    </Root>
+  );
+};

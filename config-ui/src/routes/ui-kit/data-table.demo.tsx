@@ -91,14 +91,8 @@ const ServerTable = () => {
         loading={false}
         ariaLabel={text.ariaLabel}
         empty={empty}
-        sort={{ value: list.sort, onChange: list.setSort }}
-        pagination={{
-          page: list.page,
-          pageSize: list.pageSize,
-          total: sorted.length,
-          onPageChange: list.setPage,
-          onPageSizeChange: list.setPageSize,
-        }}
+        list={list}
+        total={sorted.length}
       />
       <Mono>{JSON.stringify(list.toQuery())}</Mono>
     </>

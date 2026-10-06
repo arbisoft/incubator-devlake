@@ -16,10 +16,21 @@
  *
  */
 
-export interface IApiKey {
-  id: string;
-  name: string;
-  expiredAt?: string;
-  allowedPath: string;
-  creator: string;
-}
+import { Button } from 'antd';
+
+import { COMMON_COPY } from '@/ui/constants';
+import { EMPTY_ILLUSTRATION, EMPTY_STATE_SIZE, type EmptyStateProps } from '@/ui/empty-state';
+
+import type { ListEmptyOptions } from './types';
+
+export const buildListEmpty = ({ failed, onRetry, filtered, empty, noResults }: ListEmptyOptions): EmptyStateProps => {
+  if (failed) {
+    return {
+      illustration: EMPTY_ILLUSTRATION.ERROR,
+      title: COMMON_COPY.genericError,
+      size: EMPTY_STATE_SIZE.SECTION,
+      action: <Button onClick={onRetry}>{COMMON_COPY.retry}</Button>,
+    };
+  }
+  return filtered ? { ...noResults, size: EMPTY_STATE_SIZE.SECTION } : { ...empty, size: EMPTY_STATE_SIZE.SECTION };
+};

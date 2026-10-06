@@ -17,4 +17,5 @@
  */
 
 export * from './data-table';
+export * from './list-empty';
 export type * from './types';

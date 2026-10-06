@@ -16,6 +16,56 @@
  *
  */
 
+export const PROJECT_COLUMN = {
+  NAME: 'name',
+  CONNECTIONS: 'connections',
+  FREQUENCY: 'frequency',
+  CREATED_AT: 'createdAt',
+  LAST_RUN_AT: 'lastRunAt',
+  LAST_RUN_STATUS: 'lastRunStatus',
+  ACTION: 'action',
+} as const;
+
+export const PROJECT_METRICS = [
+  { pluginName: 'dora', pluginOption: {}, enable: true },
+  { pluginName: 'issue_trace', pluginOption: {}, enable: true },
+];
+
+export const NO_CONNECTIONS = 'N/A';
+export const CONFIGURATION_TAB_STATE = { activeKey: 'configuration' } as const;
+
 export const COPY = {
   title: 'Projects',
+  tableLabel: 'Projects',
+  searchPlaceholder: 'Search projects',
+  newProject: 'New project',
+  columns: {
+    name: 'Project name',
+    connections: 'Data connections',
+    frequency: 'Sync frequency',
+    createdAt: 'Created at',
+    lastRunAt: 'Last run completed at',
+    lastRunStatus: 'Last run status',
+    action: 'Action',
+  },
+  noConnections: NO_CONNECTIONS,
+  configure: 'Project Configuration',
+  empty: {
+    title: 'No projects yet',
+    description: 'Create a project to start collecting and analysing your engineering data.',
+  },
+  noResults: {
+    title: 'No projects match your search',
+    description: 'Try a different project name.',
+  },
+  create: {
+    title: 'Create a New Project',
+    submit: 'Save',
+    disabledReason: 'Enter a project name.',
+    name: {
+      label: 'Project name',
+      description: 'Give your project a unique name with letters, numbers, -, _ or /',
+      placeholder: 'Your Project Name',
+    },
+  },
 };

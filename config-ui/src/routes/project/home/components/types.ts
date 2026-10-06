@@ -16,10 +16,13 @@
  *
  */
 
-export interface IApiKey {
-  id: string;
-  name: string;
-  expiredAt?: string;
-  allowedPath: string;
-  creator: string;
-}
+import type { OtelConnectionResponse } from '@/api/otel';
+
+export type OtelConnectionNameProps = {
+  connection: OtelConnectionResponse;
+};
+
+export type NewProjectModalProps = {
+  onClose: () => void;
+  onCreated: () => void;
+};

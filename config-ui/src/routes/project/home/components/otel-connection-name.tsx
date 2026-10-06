@@ -16,10 +16,16 @@
  *
  */
 
-export interface IApiKey {
-  id: string;
-  name: string;
-  expiredAt?: string;
-  allowedPath: string;
-  creator: string;
-}
+import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?react';
+import { PluginIcon } from '@/ui';
+
+import { OtelLabel, OtelName } from '../styled';
+
+import type { OtelConnectionNameProps } from './types';
+
+export const OtelConnectionName = ({ connection }: OtelConnectionNameProps) => (
+  <OtelName>
+    <PluginIcon icon={() => <ClaudeCodeOtelIcon />} size="md" />
+    <OtelLabel title={connection.connection.name}>{connection.connection.name}</OtelLabel>
+  </OtelName>
+);

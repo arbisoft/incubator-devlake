@@ -57,6 +57,7 @@ export type LayoutTokens = {
   keyValueLabelWidth: number;
   emptyStateTextWidth: number;
   searchMaxWidth: number;
+  connectionNameWidth: number;
   sortSelectWidth: number;
   statusDotSize: number;
   sidebarHeaderHeight: number;
@@ -109,6 +110,7 @@ export const LAYOUT: LayoutTokens = {
   keyValueLabelWidth: 112,
   emptyStateTextWidth: 452,
   searchMaxWidth: 400,
+  connectionNameWidth: 200,
   sortSelectWidth: 168,
   statusDotSize: 6,
   sidebarHeaderHeight: 70,

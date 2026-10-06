@@ -16,10 +16,5 @@
  *
  */
 
-export interface IApiKey {
-  id: string;
-  name: string;
-  expiredAt?: string;
-  allowedPath: string;
-  creator: string;
-}
+export * from './generated-key-modal';
+export * from './new-key-modal';

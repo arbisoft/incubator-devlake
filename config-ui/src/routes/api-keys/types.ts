@@ -16,10 +16,14 @@
  *
  */
 
-export interface IApiKey {
-  id: string;
+import type { EXPIRATION, EXPIRY_STATE, KEY_COLUMN } from './constants';
+
+export type ExpirationKey = (typeof EXPIRATION)[keyof typeof EXPIRATION];
+export type ExpiryState = (typeof EXPIRY_STATE)[keyof typeof EXPIRY_STATE];
+export type KeySortKey = typeof KEY_COLUMN.EXPIRATION;
+
+export type NewKeyForm = {
   name: string;
-  expiredAt?: string;
+  expiration: ExpirationKey;
   allowedPath: string;
-  creator: string;
-}
+};

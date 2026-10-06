@@ -16,10 +16,21 @@
  *
  */
 
-export interface IApiKey {
-  id: string;
+import type { OtelConnectionResponse } from '@/api/otel';
+import type { IBlueprint, IPipelineStatus } from '@/types';
+
+import type { PROJECT_COLUMN } from './constants';
+
+export type ProjectSortKey =
+  typeof PROJECT_COLUMN.NAME | typeof PROJECT_COLUMN.CREATED_AT | typeof PROJECT_COLUMN.LAST_RUN_AT;
+
+export type ProjectRow = {
   name: string;
-  expiredAt?: string;
-  allowedPath: string;
-  creator: string;
-}
+  connections: IBlueprint['connections'];
+  otelConnections: OtelConnectionResponse[];
+  isManual: boolean;
+  cronConfig: string;
+  createdAt?: string;
+  lastRunCompletedAt?: string | null;
+  lastRunStatus?: IPipelineStatus;
+};

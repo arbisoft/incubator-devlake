@@ -35,7 +35,7 @@ export const list = (data?: ListParams): Promise<ListRes> =>
 
 type CreateForm = Pick<IApiKey, 'name' | 'expiredAt' | 'allowedPath'>;
 
-export const create = (data: CreateForm): Promise<IApiKey> =>
+export const create = (data: CreateForm): Promise<IApiKey & { apiKey: string }> =>
   request('/api-keys', {
     method: 'POST',
     data: {
