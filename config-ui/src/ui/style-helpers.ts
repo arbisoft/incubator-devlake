@@ -42,3 +42,18 @@ export const visuallyHidden = css`
   clip-path: inset(50%);
   white-space: nowrap;
 `;
+
+export const focusRingStyle = ({ theme }: { theme: DefaultTheme }) => css`
+  outline: ${theme.layout.focusRingWidth}px solid ${theme.colors.focusRing};
+  outline-offset: ${theme.layout.focusRingWidth}px;
+`;
+
+export const motionTransition =
+  (...properties: string[]) =>
+  ({ theme }: { theme: DefaultTheme }) => css`
+    transition: ${properties.map((property) => `${property} ${theme.motion.base}ms ${theme.motion.easing}`).join(', ')};
+
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+    }
+  `;

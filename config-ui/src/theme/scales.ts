@@ -31,6 +31,8 @@ export type SidebarTokens = {
   itemHoverBg: string;
   itemActiveBg: string;
   itemActiveText: string;
+  logoFilter: string;
+  markBg: string;
 };
 
 type TypographyStyle = { fontSize: number; lineHeight: number; fontWeight: number; letterSpacing: number };
@@ -57,6 +59,16 @@ export type LayoutTokens = {
   searchMaxWidth: number;
   sortSelectWidth: number;
   statusDotSize: number;
+  sidebarHeaderHeight: number;
+  sidebarControlSize: number;
+  railItemWidth: number;
+  navIconSize: number;
+  railIconSize: number;
+  avatarSize: number;
+  markTileSize: number;
+  wordmarkWidth: number;
+  confirmModalWidth: number;
+  modalWidth: { sm: number; md: number; lg: number };
 };
 export type ZIndexTokens = { sidebar: number; flyout: number; drawer: number; modal: number };
 export type MotionTokens = { fast: number; base: number; easing: string };
@@ -89,7 +101,7 @@ export const RADIUS: RadiusTokens = { sm: 4, md: 6, lg: 8, pill: 999 };
 export const LAYOUT: LayoutTokens = {
   sidebarWidth: 240,
   sidebarRailWidth: 72,
-  drawerWidth: 560,
+  drawerWidth: 600,
   contentGutter: SPACE.xl,
   pageFooterHeight: 58,
   breakpointTablet: 1024,
@@ -99,6 +111,16 @@ export const LAYOUT: LayoutTokens = {
   searchMaxWidth: 400,
   sortSelectWidth: 168,
   statusDotSize: 6,
+  sidebarHeaderHeight: 70,
+  sidebarControlSize: 28,
+  railItemWidth: 48,
+  navIconSize: 14,
+  railIconSize: 18,
+  avatarSize: 32,
+  markTileSize: 32,
+  wordmarkWidth: 120,
+  confirmModalWidth: 416,
+  modalWidth: { sm: 520, md: 600, lg: 800 },
 };
 
 // antd's popup layer is 1000 (modal, drawer); dropdowns 1050; the sidebar sits below them.

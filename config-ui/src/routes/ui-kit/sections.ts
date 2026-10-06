@@ -16,17 +16,32 @@
  *
  */
 
+import { AccountBlockDemo } from './account-block.demo';
+import { AppShellDemo } from './app-shell.demo';
+import { BrandBlockDemo } from './brand-block.demo';
 import { CodeBlockDemo } from './code-block.demo';
+import { ConfirmModalDemo } from './confirm-modal.demo';
+import { ConnectionHealthDemo } from './connection-health.demo';
 import { SECTION } from './constants';
+import { DataTableDemo } from './data-table.demo';
+import { DetailDrawerDemo } from './detail-drawer.demo';
 import { EmptyStateDemo } from './empty-state.demo';
 import { ExternalLinkDemo } from './external-link.demo';
 import { FilterTabsDemo } from './filter-tabs.demo';
+import { FormModalDemo } from './form-modal.demo';
 import { IdentityCellDemo } from './identity-cell.demo';
+import { IntegrationCardDemo } from './integration-card.demo';
 import { KeyValueListDemo } from './key-value-list.demo';
 import { MetricTileDemo } from './metric-tile.demo';
+import { PageFooterDemo } from './page-footer.demo';
+import { PageHeaderDemo } from './page-header.demo';
 import { PipelineProgressDemo } from './pipeline-progress.demo';
 import { PluginIconDemo } from './plugin-icon.demo';
+import { ProgressBannerDemo } from './progress-banner.demo';
+import { RouteTabsDemo } from './route-tabs.demo';
 import { SearchInputDemo } from './search-input.demo';
+import { SectionCardDemo } from './section-card.demo';
+import { SidebarNavDemo } from './sidebar-nav.demo';
 import { SortSelectDemo } from './sort-select.demo';
 import { StatusBadgeDemo } from './status-badge.demo';
 import { ToolbarDemo } from './toolbar.demo';
@@ -53,6 +68,21 @@ export const SECTIONS: SectionDefinition[] = [
   { id: SECTION.FILTER_TABS, Demo: FilterTabsDemo },
   { id: SECTION.SORT_SELECT, Demo: SortSelectDemo },
   { id: SECTION.TOOLBAR, Demo: ToolbarDemo },
+  { id: SECTION.ACCOUNT_BLOCK, Demo: AccountBlockDemo },
+  { id: SECTION.APP_SHELL, Demo: AppShellDemo },
+  { id: SECTION.BRAND_BLOCK, Demo: BrandBlockDemo },
+  { id: SECTION.CONFIRM_MODAL, Demo: ConfirmModalDemo },
+  { id: SECTION.CONNECTION_HEALTH, Demo: ConnectionHealthDemo },
+  { id: SECTION.DATA_TABLE, Demo: DataTableDemo },
+  { id: SECTION.DETAIL_DRAWER, Demo: DetailDrawerDemo },
+  { id: SECTION.FORM_MODAL, Demo: FormModalDemo },
+  { id: SECTION.INTEGRATION_CARD, Demo: IntegrationCardDemo },
+  { id: SECTION.PAGE_FOOTER, Demo: PageFooterDemo },
+  { id: SECTION.PAGE_HEADER, Demo: PageHeaderDemo },
+  { id: SECTION.PROGRESS_BANNER, Demo: ProgressBannerDemo },
+  { id: SECTION.ROUTE_TABS, Demo: RouteTabsDemo },
+  { id: SECTION.SECTION_CARD, Demo: SectionCardDemo },
+  { id: SECTION.SIDEBAR_NAV, Demo: SidebarNavDemo },
   { id: SECTION.USE_LIST_STATE, Demo: UseListStateDemo },
   { id: SECTION.USE_ROUTE_TAB, Demo: UseRouteTabDemo },
   { id: SECTION.USE_DOCUMENT_TITLE, Demo: UseDocumentTitleDemo },

@@ -25,9 +25,13 @@ export const FlatTabs = styled(Tabs)`
   }
 `;
 
-export const PillTabs = styled(Segmented)`
-  width: fit-content;
+export const PillScroller = styled.div`
   max-width: 100%;
+  overflow-x: auto;
+`;
+
+export const PillTabs = styled(Segmented)`
+  width: max-content;
 
   .ant-segmented-item-selected {
     color: ${({ theme }) => theme.colors.onSelected};

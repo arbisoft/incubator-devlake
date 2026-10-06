@@ -29,8 +29,19 @@ class ResizeObserverStub {
   disconnect = vi.fn();
 }
 
+const matchMediaStub = (query: string) => ({
+  matches: false,
+  media: query,
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+  addListener: vi.fn(),
+  removeListener: vi.fn(),
+  dispatchEvent: vi.fn(),
+});
+
 export const renderWithTheme = (ui: ReactElement) => {
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
+  vi.stubGlobal('matchMedia', matchMediaStub);
   const wrap = (node: ReactElement) => <ThemeProvider theme={getTheme('light')}>{node}</ThemeProvider>;
   const result = render(wrap(ui));
   return { ...result, rerender: (next: ReactElement) => result.rerender(wrap(next)) };

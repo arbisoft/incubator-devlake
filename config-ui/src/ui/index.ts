@@ -15,19 +15,33 @@
  * limitations under the License.
  *
  */
-
+export * from './account-block';
+export * from './app-shell';
+export * from './brand-block';
 export * from './code-block';
+export * from './confirm-modal';
+export * from './connection-health';
 export * from './constants';
+export * from './data-table';
+export * from './detail-drawer';
 export * from './empty-state';
 export * from './external-link';
 export * from './filter-tabs';
+export * from './form-modal';
 export * from './hooks';
 export * from './identity-cell';
+export * from './integration-card';
 export * from './key-value-list';
 export * from './metric-tile';
+export * from './page-footer';
+export * from './page-header';
 export * from './pipeline-progress';
 export * from './plugin-icon';
+export * from './progress-banner';
+export * from './route-tabs';
 export * from './search-input';
+export * from './section-card';
+export * from './sidebar-nav';
 export * from './sort-select';
 export * from './status-badge';
 export * from './toolbar';

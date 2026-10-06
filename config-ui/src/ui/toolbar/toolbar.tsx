@@ -16,12 +16,16 @@
  *
  */
 
+import { ConfigProvider } from 'antd';
+
 import { Bar, EndGroup, Group } from './styled';
 import type { ToolbarProps } from './types';
 
 export const Toolbar = ({ start, end }: ToolbarProps) => (
-  <Bar>
-    {start && <Group>{start}</Group>}
-    {end && <EndGroup>{end}</EndGroup>}
-  </Bar>
+  <ConfigProvider componentSize="large">
+    <Bar>
+      {start && <Group>{start}</Group>}
+      {end && <EndGroup>{end}</EndGroup>}
+    </Bar>
+  </ConfigProvider>
 );

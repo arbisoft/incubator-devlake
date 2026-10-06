@@ -24,6 +24,10 @@ export const STATUS_TONE = {
   NEUTRAL: 'neutral',
 } as const;
 
+export const NAV_ITEM_KIND = { ROUTE: 'route', EXTERNAL: 'external', DIVIDER: 'divider' } as const;
+
+export const MODAL_WIDTH = { SM: 'sm', MD: 'md', LG: 'lg' } as const;
+
 export const SORT_ORDER = { ASC: 'asc', DESC: 'desc' } as const;
 
 export const LIST_PARAMS = {
@@ -51,6 +55,8 @@ export const COMMON_COPY = {
   retry: 'Retry',
   search: 'Search',
   clear: 'Clear',
+  cancel: 'Cancel',
+  close: 'Close',
   opensInNewTab: '(opens in a new tab)',
   justNow: 'Just now',
   emptyValue: '-',

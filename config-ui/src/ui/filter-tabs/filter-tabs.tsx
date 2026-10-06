@@ -17,18 +17,20 @@
  */
 
 import { COPY, FILTER_TABS_VARIANT } from './constants';
-import { FlatTabs, PillTabs } from './styled';
+import { FlatTabs, PillScroller, PillTabs } from './styled';
 import type { FilterTabItem, FilterTabsProps } from './types';
 
 const labelOf = ({ label, count }: FilterTabItem) => (count === undefined ? label : COPY.withCount(label, count));
 
 export const FilterTabs = ({ items, value, onChange, variant }: FilterTabsProps) =>
   variant === FILTER_TABS_VARIANT.PILL ? (
-    <PillTabs
-      value={value}
-      options={items.map((item) => ({ value: item.key, label: labelOf(item) }))}
-      onChange={(key) => onChange(String(key))}
-    />
+    <PillScroller>
+      <PillTabs
+        value={value}
+        options={items.map((item) => ({ value: item.key, label: labelOf(item) }))}
+        onChange={(key) => onChange(String(key))}
+      />
+    </PillScroller>
   ) : (
     <FlatTabs
       type="card"

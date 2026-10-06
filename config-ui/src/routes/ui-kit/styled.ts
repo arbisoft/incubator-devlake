@@ -120,3 +120,38 @@ export const Target = styled.div`
   color: ${({ theme }) => theme.colors.onSelected};
   background: ${({ theme }) => theme.colors.selectedBg};
 `;
+
+export const DarkBox = styled.div<{ $wide?: boolean }>`
+  width: ${({ theme, $wide }) => ($wide ? theme.layout.sidebarWidth : theme.layout.sidebarRailWidth)}px;
+  color: ${({ theme }) => theme.sidebar.text};
+  background: ${({ theme }) => theme.sidebar.bg};
+`;
+
+export const Box = styled.div`
+  height: ${({ theme }) => theme.layout.drawerWidth}px;
+  overflow: hidden;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radius.lg}px;
+`;
+
+export const BoxNarrow = styled(Box)`
+  width: ${({ theme }) => theme.layout.drawerWidth - theme.layout.sidebarWidth}px;
+  max-width: 100%;
+`;
+
+export const Stack = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.md}px;
+`;
+
+export const Grid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(${({ theme }) => theme.layout.sidebarWidth}px, 1fr));
+  gap: ${({ theme }) => theme.space.md}px;
+`;
+
+export const NarrowCard = styled(Narrow)`
+  padding: 0;
+  border: 0;
+`;

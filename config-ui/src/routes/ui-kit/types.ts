@@ -23,3 +23,12 @@ import type { SECTION } from './constants';
 type SectionId = (typeof SECTION)[keyof typeof SECTION];
 
 export type SectionDefinition = { id: SectionId; Demo: ComponentType };
+
+export type UserRow = {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  status: 'active' | 'inactive';
+  hasNote: boolean;
+};

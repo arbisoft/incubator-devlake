@@ -21,6 +21,8 @@ import { STATUS_TONE } from '@/ui/constants';
 import { PIPELINE_PROGRESS_STATUS } from '@/ui/pipeline-progress';
 import type { RouteTab } from '@/ui/types';
 
+import type { UserRow } from './types';
+
 export const PLUGIN_KEYS = ['github', 'gitlab', 'jira', 'jenkins', 'slack', 'webhook'];
 export const UNKNOWN_PLUGIN_KEY = 'not-a-plugin';
 
@@ -124,3 +126,28 @@ export const IDENTITY_LONG = {
 
 export const METRIC_TIME = { label: 'Avg sync time', value: '4m 12s' };
 export const METRIC_LONG_VALUE = '48,212,903,114,552';
+
+const FIRST_NAMES = ['Jane', 'Alex', 'Sam', 'Priya', 'Chen', 'Maria', 'Omar', 'Lena', 'Noah'];
+const LAST_NAMES = ['Admin', 'Doe', 'Lee', 'Park', 'Smith'];
+const ROLES = ['Customer Administrator', 'Regular User', 'Viewer'];
+const TABLE_ROW_COUNT = 45;
+const LONG_NOTE_EVERY = 7;
+
+export const TABLE_ROWS: UserRow[] = Array.from({ length: TABLE_ROW_COUNT }, (_, index) => {
+  const first = FIRST_NAMES[index % FIRST_NAMES.length];
+  const last = LAST_NAMES[index % LAST_NAMES.length];
+  return {
+    id: index + 1,
+    name: `${first} ${last}`,
+    email: `${first}.${last}@example.com`.toLowerCase(),
+    role: ROLES[index % ROLES.length],
+    status: index % 3 === 2 ? 'inactive' : 'active',
+    hasNote: index % LONG_NOTE_EVERY === 0,
+  };
+});
+
+export const TABLE_LIST_DEFAULTS = { pageSize: 10, sort: { sortBy: 'name', sortOrder: 'asc' as const }, filters: {} };
+export const TABLE_SELECTED_ROWS = [1, 3];
+
+export const HEALTH_RETEST_MS = 1200;
+export const HEALTH_TESTED_AT_OFFSET_MS = 5 * 60_000;

@@ -24,6 +24,8 @@ const SELECTED_BG_LIGHT = '#D1CCFF';
 const SELECTED_BG_DARK = '#352F6A';
 const SIDEBAR_TEXT_MUTED = 'rgba(255, 255, 255, 0.65)';
 const SIDEBAR_ITEM_HOVER_BG = 'rgba(255, 255, 255, 0.08)';
+const SIDEBAR_LOGO_FILTER = 'brightness(0) invert(1)';
+const SIDEBAR_MARK_BG = '#14112A';
 
 export const PALETTE = {
   light: {
@@ -64,6 +66,8 @@ export const PALETTE = {
       itemHoverBg: SIDEBAR_ITEM_HOVER_BG,
       itemActiveBg: SELECTED_BG_LIGHT,
       itemActiveText: SIDEBAR_BG_LIGHT,
+      logoFilter: SIDEBAR_LOGO_FILTER,
+      markBg: SIDEBAR_MARK_BG,
     },
   },
   dark: {
@@ -103,6 +107,8 @@ export const PALETTE = {
       itemHoverBg: SIDEBAR_ITEM_HOVER_BG,
       itemActiveBg: SELECTED_BG_DARK,
       itemActiveText: WHITE,
+      logoFilter: SIDEBAR_LOGO_FILTER,
+      markBg: SIDEBAR_MARK_BG,
     },
   },
 } as const;

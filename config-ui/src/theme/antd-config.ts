@@ -130,6 +130,13 @@ export const buildAntdConfig = (
       darkItemSelectedColor: sidebar.itemActiveText,
       itemBorderRadius: RADIUS.md,
       itemHeight: CONTROL_HEIGHT.lg,
+      itemMarginInline: SPACE.sm,
+      itemMarginBlock: SPACE.xxs / 2,
+      itemPaddingInline: SPACE.lg,
+      iconSize: LAYOUT.navIconSize,
+      collapsedIconSize: LAYOUT.railIconSize,
+      collapsedWidth: LAYOUT.sidebarRailWidth,
+      darkGroupTitleColor: sidebar.textMuted,
     },
     Modal: {
       titleFontSize: TYPOGRAPHY.scale.h3.fontSize,
