@@ -19,9 +19,13 @@
 import { IPipeline } from '@/types';
 import { request } from '@/utils';
 
+import type { SortParams } from '../types';
+
 import { SubTasksRes } from './types';
 
-export const list = (params: Pagination): Promise<{ count: number; pipelines: IPipeline[] }> =>
+export type ListParams = Pagination & SortParams<'id' | 'beganAt' | 'finishedAt'> & { blueprint_id?: ID };
+
+export const list = (params: ListParams): Promise<{ count: number; pipelines: IPipeline[] }> =>
   request('/pipelines', { data: params });
 
 export const get = (id: ID) => request(`/pipelines/${id}`);

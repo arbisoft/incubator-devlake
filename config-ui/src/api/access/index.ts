@@ -18,6 +18,8 @@
 
 import { request } from '@/utils';
 
+import type { KeywordParams } from '../types';
+
 export const ACCESS_ROLE = {
   CUSTOMER_ADMIN: 'customer_admin',
   MEMBER: 'member',
@@ -175,7 +177,9 @@ export type PaginatedAccessDomains = {
 const basePath = '/access';
 
 export const current = (): Promise<AccessCurrent> => request(`${basePath}/me`);
-export const listUsers = (params: AccessPagination): Promise<PaginatedAccessUsers> =>
+export type AccessUserListParams = AccessPagination & KeywordParams;
+
+export const listUsers = (params: AccessUserListParams): Promise<PaginatedAccessUsers> =>
   request(`${basePath}/users`, { data: params });
 export const createUser = (data: { email: string; role: AccessRole }): Promise<AccessUser> =>
   request(`${basePath}/users`, { method: 'POST', data });

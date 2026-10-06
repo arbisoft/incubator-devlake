@@ -19,12 +19,16 @@
 import type { IApiKey } from '@/types';
 import { request } from '@/utils';
 
+import type { KeywordParams, SortParams } from '../types';
+
 type ListRes = {
   count: number;
   apikeys: IApiKey[];
 };
 
-export const list = (data?: Pagination): Promise<ListRes> =>
+export type ListParams = Pagination & KeywordParams & SortParams<'name' | 'expiredAt' | 'createdAt'>;
+
+export const list = (data?: ListParams): Promise<ListRes> =>
   request('/api-keys', {
     data,
   });
