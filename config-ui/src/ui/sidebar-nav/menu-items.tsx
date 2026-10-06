@@ -23,7 +23,7 @@ import { COMMON_COPY, NAV_ITEM_KIND } from '@/ui/constants';
 import type { NavItem } from '@/ui/types';
 
 import { ExternalIcon, HiddenHint } from './styled';
-import { hasChildren } from './utils';
+import { decorativeIcon, hasChildren } from './utils';
 
 type MenuItems = NonNullable<MenuProps['items']>;
 
@@ -33,7 +33,7 @@ export const toMenuItems = (items: NavItem[], collapsed: boolean): MenuItems =>
     if (item.kind === NAV_ITEM_KIND.EXTERNAL) {
       return {
         key: item.key,
-        icon: item.icon,
+        icon: decorativeIcon(item.icon),
         title: item.label,
         label: (
           <a href={item.href} target="_blank" rel="noopener noreferrer" tabIndex={-1}>
@@ -47,7 +47,7 @@ export const toMenuItems = (items: NavItem[], collapsed: boolean): MenuItems =>
     if (hasChildren(item)) {
       return {
         key: item.key,
-        icon: item.icon,
+        icon: decorativeIcon(item.icon),
         label: item.label,
         title: item.label,
         children: collapsed
@@ -64,7 +64,7 @@ export const toMenuItems = (items: NavItem[], collapsed: boolean): MenuItems =>
     }
     return {
       key: item.key,
-      icon: item.icon,
+      icon: decorativeIcon(item.icon),
       title: item.label,
       label: (
         <Link to={item.path} tabIndex={-1}>

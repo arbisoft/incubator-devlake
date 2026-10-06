@@ -16,6 +16,8 @@
  *
  */
 
+import { cloneElement, isValidElement, type ReactNode } from 'react';
+
 import { NAV_ITEM_KIND } from '@/ui/constants';
 import type { NavItem } from '@/ui/types';
 
@@ -77,3 +79,6 @@ export const navTargets = (items: NavItem[]): Map<string, NavItem> =>
       return [[item.key, item]];
     }),
   );
+
+export const decorativeIcon = (icon: ReactNode): ReactNode =>
+  isValidElement<{ 'aria-hidden'?: boolean }>(icon) ? cloneElement(icon, { 'aria-hidden': true }) : icon;

@@ -16,12 +16,13 @@
  *
  */
 
+import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
 
 import { NAV_ITEM_KIND } from '@/ui/constants';
 import type { NavItem } from '@/ui/types';
 
-import { findActiveKey, navTargets, openGroupKeys, visibleItems } from './utils';
+import { decorativeIcon, findActiveKey, navTargets, openGroupKeys, visibleItems } from './utils';
 
 const route = (key: string, path: string, extra: Partial<Extract<NavItem, { kind: 'route' }>> = {}): NavItem => ({
   kind: NAV_ITEM_KIND.ROUTE,
@@ -73,5 +74,13 @@ describe('visibleItems and group helpers', () => {
     expect(openGroupKeys(ITEMS, 'list')).toEqual(['group']);
     expect(openGroupKeys(ITEMS, 'home')).toEqual([]);
     expect([...navTargets(ITEMS).keys()]).toEqual(['home', 'list', 'other', 'docs']);
+  });
+});
+
+describe('decorativeIcon', () => {
+  it('hides an icon element from assistive technology and passes other nodes through', () => {
+    expect(decorativeIcon(createElement('i'))).toMatchObject({ props: { 'aria-hidden': true } });
+    expect(decorativeIcon('text')).toBe('text');
+    expect(decorativeIcon(null)).toBeNull();
   });
 });

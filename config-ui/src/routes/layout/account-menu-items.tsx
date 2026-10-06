@@ -35,9 +35,9 @@ import type { AccountMenuHandlers, AccountMenuState } from './types';
 type MenuItems = NonNullable<MenuProps['items']>;
 
 const THEME_ICON: Record<ThemeMode, ReactNode> = {
-  [THEME_MODE.LIGHT]: <SunOutlined />,
-  [THEME_MODE.DARK]: <MoonOutlined />,
-  [THEME_MODE.SYSTEM]: <DesktopOutlined />,
+  [THEME_MODE.LIGHT]: <SunOutlined aria-hidden />,
+  [THEME_MODE.DARK]: <MoonOutlined aria-hidden />,
+  [THEME_MODE.SYSTEM]: <DesktopOutlined aria-hidden />,
 };
 
 const getThemeItems = (themeMode: ThemeMode, onSelectTheme: AccountMenuHandlers['onSelectTheme']): MenuItems => [
@@ -63,7 +63,7 @@ const getSignInItems = (
     ? [
         {
           key: ACCOUNT_MENU_KEY.CHANGE_PASSWORD,
-          icon: <KeyOutlined />,
+          icon: <KeyOutlined aria-hidden />,
           label: COPY.account.changePassword,
           onClick: onChangePassword,
         },
@@ -100,7 +100,7 @@ export const getAccountMenuItems = (state: AccountMenuState, handlers: AccountMe
           { type: 'divider' as const, key: ACCOUNT_MENU_KEY.SIGN_OUT_DIVIDER },
           {
             key: ACCOUNT_MENU_KEY.SIGN_OUT,
-            icon: <LogoutOutlined />,
+            icon: <LogoutOutlined aria-hidden />,
             label: COPY.account.signOut,
             onClick: handlers.onSignOut,
           },
