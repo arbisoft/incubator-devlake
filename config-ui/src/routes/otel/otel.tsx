@@ -26,10 +26,11 @@ import { type OtelConnectionResponse } from '@/api/otel';
 import { Message, PageHeader } from '@/components';
 import { PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
+import { useDocumentTitle } from '@/ui/hooks';
 import { operator, type OperateConfig } from '@/utils';
 
 import { getOtelColumns } from './columns';
-import { OTEL_ERROR, OTEL_LIFECYCLE_ACTION, OTEL_REFRESH_INTERVAL_MS } from './constants';
+import { COPY, OTEL_ERROR, OTEL_LIFECYCLE_ACTION, OTEL_REFRESH_INTERVAL_MS } from './constants';
 import { OtelIngestionHealth } from './ingestion-health';
 import { OTEL_MODAL, OtelModals, type OtelLifecycleAction, type OtelModalState } from './modals';
 import { OtelSourcePolicy } from './source-policy';
@@ -53,6 +54,8 @@ const operateOtel = async <T,>(request: () => Promise<T>, config?: OperateConfig
 };
 
 export const Otel = () => {
+  useDocumentTitle(COPY.title);
+
   const [version, setVersion] = useState(1);
   const [operating, setOperating] = useState(false);
   const [modal, setModal] = useState<OtelModalState>();

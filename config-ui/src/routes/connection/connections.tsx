@@ -28,8 +28,10 @@ import { selectPlugins, selectAllConnections, selectWebhooks } from '@/features/
 import { useAppSelector, useRefreshData } from '@/hooks';
 import { getPluginConfig, ConnectionList, ConnectionForm } from '@/plugins';
 import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?react';
+import { useDocumentTitle } from '@/ui/hooks';
 import { formatPlural } from '@/utils';
 
+import { COPY } from './constants';
 import * as S from './styled';
 
 const SORT_START_WITH = ['o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'];
@@ -57,6 +59,8 @@ export const splitPluginsByInitial = (plugins: string[], nameOf: (plugin: string
 };
 
 export const Connections = () => {
+  useDocumentTitle(COPY.title);
+
   const [type, setType] = useState<'list' | 'form'>();
   const [plugin, setPlugin] = useState('');
 

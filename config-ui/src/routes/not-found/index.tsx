@@ -22,8 +22,13 @@ import { useNavigate } from 'react-router-dom';
 
 import { TipLayout } from '@/components';
 import { PATHS } from '@/config';
+import { useDocumentTitle } from '@/ui/hooks';
+
+import { COPY } from './constants';
 
 export const NotFound = () => {
+  useDocumentTitle(COPY.title);
+
   const navigate = useNavigate();
 
   return (

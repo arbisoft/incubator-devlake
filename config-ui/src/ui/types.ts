@@ -37,6 +37,7 @@ export type NavItem =
       label: string;
       icon: ReactNode;
       path: string;
+      matchPaths?: string[];
       children?: NavItem[];
       visible?: boolean;
     }

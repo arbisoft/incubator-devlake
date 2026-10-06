@@ -23,7 +23,9 @@ import API from '@/api';
 import type { Methods, Provider } from '@/api/auth';
 import { TipLayout } from '@/components';
 import { DEVLAKE_ENDPOINT, PATHS } from '@/config';
+import { useDocumentTitle } from '@/ui/hooks';
 
+import { COPY } from './constants';
 import { normalizeLoginReturnPath } from './utils';
 
 const { Title, Paragraph } = Typography;
@@ -35,6 +37,8 @@ type LocalLoginValues = {
 };
 
 export const Login = () => {
+  useDocumentTitle(COPY.title);
+
   const [methods, setMethods] = useState<Methods | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [localLoginPending, setLocalLoginPending] = useState(false);

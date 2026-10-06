@@ -17,25 +17,14 @@
  */
 
 import { Tag } from 'antd';
-import styled, { type DefaultTheme } from 'styled-components';
+import styled from 'styled-components';
 
 import { WEIGHT } from '@/theme/scales';
-import { STATUS_TONE } from '@/ui/constants';
-import { textStyle } from '@/ui/style-helpers';
+import { textStyle, toneColors } from '@/ui/style-helpers';
 import type { StatusTone } from '@/ui/types';
 
 import { STATUS_BADGE_VARIANT } from './constants';
 import type { StatusBadgeVariant } from './types';
-
-type ToneColors = { text: string; bg: string; dot: string };
-
-const toneColors = ({ colors }: DefaultTheme): Record<StatusTone, ToneColors> => ({
-  [STATUS_TONE.SUCCESS]: { text: colors.successText, bg: colors.successBg, dot: colors.success },
-  [STATUS_TONE.WARNING]: { text: colors.warningText, bg: colors.warningBg, dot: colors.warning },
-  [STATUS_TONE.ERROR]: { text: colors.errorActive, bg: colors.errorBg, dot: colors.error },
-  [STATUS_TONE.INFO]: { text: colors.infoText, bg: colors.infoTintBg, dot: colors.infoText },
-  [STATUS_TONE.NEUTRAL]: { text: colors.textSecondary, bg: colors.bgTableHeader, dot: colors.textSecondary },
-});
 
 type BadgeProps = { $tone: StatusTone; $variant: StatusBadgeVariant };
 

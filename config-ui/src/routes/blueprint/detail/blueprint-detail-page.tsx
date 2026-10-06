@@ -16,18 +16,21 @@
  *
  */
 
-import { Helmet } from 'react-helmet';
 import { useParams } from 'react-router-dom';
 
 import { PageHeader } from '@/components';
-import { BRAND_NAME, PATHS } from '@/config';
+import { PATHS } from '@/config';
+import { useDocumentTitle } from '@/ui/hooks';
 
+import { COPY } from '../constants';
 import { FromEnum } from '../types';
 
 import { BlueprintDetail } from './blueprint-detail';
 
 export const BlueprintDetailPage = () => {
   const { id } = useParams() as { id: string };
+
+  useDocumentTitle(COPY.detailTitle(id));
 
   return (
     <PageHeader
@@ -37,11 +40,6 @@ export const BlueprintDetailPage = () => {
         { name: id, path: PATHS.BLUEPRINT(id) },
       ]}
     >
-      <Helmet>
-        <title>
-          {`Blueprints:${id}`} - {BRAND_NAME}
-        </title>
-      </Helmet>
       <BlueprintDetail id={id} from={FromEnum.blueprint} />
     </PageHeader>
   );

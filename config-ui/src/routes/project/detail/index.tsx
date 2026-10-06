@@ -19,15 +19,14 @@
 import { Tabs, message } from 'antd';
 import axios from 'axios';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Helmet } from 'react-helmet';
 import { useParams, useNavigate } from 'react-router-dom';
 
 import API from '@/api';
 import { PageHeader, PageLoading } from '@/components';
-import { BRAND_NAME, PATHS, PROJECT_TAB } from '@/config';
+import { PATHS, PROJECT_TAB } from '@/config';
 import { useRefreshData } from '@/hooks';
 import { BlueprintDetail, FromEnum } from '@/routes';
-import { useRouteTab } from '@/ui/hooks';
+import { useDocumentTitle, useRouteTab } from '@/ui/hooks';
 
 import { ClaudeCodeOtelPanel } from './claude-code-otel-panel';
 import { COPY } from './constants';
@@ -41,6 +40,8 @@ export const ProjectDetailPage = () => {
 
   const { pname } = useParams() as { pname: string };
   const navigate = useNavigate();
+
+  useDocumentTitle(pname);
 
   const tabs = useMemo(() => getProjectTabs(pname), [pname]);
   const activeTab = useRouteTab(tabs);
@@ -83,11 +84,6 @@ export const ProjectDetailPage = () => {
         { name: project.name, path: PATHS.PROJECT_TAB(pname, PROJECT_TAB.BLUEPRINT) },
       ]}
     >
-      <Helmet>
-        <title>
-          {project.name} - {BRAND_NAME}
-        </title>
-      </Helmet>
       <S.Wrapper>
         <Tabs
           items={[

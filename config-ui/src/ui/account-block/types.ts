@@ -23,4 +23,5 @@ export type AccountBlockProps = {
   secondary: string;
   collapsed: boolean;
   menu: MenuProps['items'];
+  onOpenChange?: (open: boolean) => void;
 };

@@ -31,7 +31,10 @@ import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?r
 import { OnboardTour } from '@/routes/onboard/components';
 import { PipelineStatus } from '@/routes/pipeline';
 import { IBlueprint } from '@/types';
+import { useDocumentTitle } from '@/ui/hooks';
 import { formatTime, operator } from '@/utils';
+
+import { COPY } from './constants';
 
 type ClaudeCodeOtelConnectionNameProps = {
   connection: OtelConnectionResponse;
@@ -47,6 +50,8 @@ const ClaudeCodeOtelConnectionName = ({ connection }: ClaudeCodeOtelConnectionNa
 );
 
 export const ProjectHomePage = () => {
+  useDocumentTitle(COPY.title);
+
   const [version, setVersion] = useState(1);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);

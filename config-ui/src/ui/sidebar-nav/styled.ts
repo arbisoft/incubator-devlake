@@ -125,6 +125,12 @@ export const MenuFrame = styled.div`
     outline: none;
   }
 
+  .ant-menu:focus-visible {
+    outline: none;
+  }
+
+  .ant-menu:focus-visible .ant-menu-item-active,
+  .ant-menu:focus-visible .ant-menu-submenu-active > .ant-menu-submenu-title,
   .ant-menu-item:focus-visible,
   .ant-menu-item:has(a:focus-visible),
   .ant-menu-submenu-title:focus-visible {

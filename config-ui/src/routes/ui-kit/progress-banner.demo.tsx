@@ -19,11 +19,11 @@
 import { Button } from 'antd';
 import { useState } from 'react';
 
-import { ProgressBanner } from '@/ui';
+import { ProgressBanner, STATUS_TONE } from '@/ui';
 
 import { COPY, SECTION } from './constants';
 import { DemoCase, DemoSection } from './demo-section';
-import { Narrow } from './styled';
+import { Narrow, Stack } from './styled';
 
 const { progressBanner: text } = COPY;
 const noop = () => undefined;
@@ -48,6 +48,44 @@ export const ProgressBannerDemo = () => {
           />
         )}
         <span role="status">{status}</span>
+      </DemoCase>
+      <DemoCase label={COPY.cases.statusTones}>
+        <Stack>
+          <ProgressBanner
+            loading
+            title={text.title}
+            message={text.running}
+            actionLabel={text.details}
+            onAction={noop}
+            onDismiss={noop}
+          />
+          <ProgressBanner
+            tone={STATUS_TONE.SUCCESS}
+            title={text.title}
+            message={text.success}
+            actionLabel={text.dashboard}
+            onAction={noop}
+            secondaryAction={{ label: text.finish, onClick: noop }}
+            onDismiss={noop}
+          />
+          <ProgressBanner
+            tone={STATUS_TONE.WARNING}
+            title={text.title}
+            message={text.partial}
+            actionLabel={text.details}
+            onAction={noop}
+            secondaryAction={{ label: text.dashboard, onClick: noop }}
+            onDismiss={noop}
+          />
+          <ProgressBanner
+            tone={STATUS_TONE.ERROR}
+            title={text.title}
+            message={text.failed}
+            actionLabel={text.details}
+            onAction={noop}
+            onDismiss={noop}
+          />
+        </Stack>
       </DemoCase>
       <DemoCase label={COPY.cases.longText}>
         <Narrow>

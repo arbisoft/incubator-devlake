@@ -39,4 +39,8 @@ export const Main = styled.main`
 
 export const Banner = styled.div`
   margin-bottom: ${({ theme }) => theme.space.lg}px;
+
+  &:empty {
+    display: none;
+  }
 `;

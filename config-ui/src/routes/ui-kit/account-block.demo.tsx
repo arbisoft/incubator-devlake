@@ -38,7 +38,13 @@ export const AccountBlockDemo = () => {
     <DemoSection id={SECTION.ACCOUNT_BLOCK} title={COPY.sections.accountBlock}>
       <DemoCase label={COPY.cases.expanded}>
         <DarkBox $wide>
-          <AccountBlock name={text.name} secondary={text.secondary} collapsed={false} menu={menu} />
+          <AccountBlock
+            name={text.name}
+            secondary={text.secondary}
+            collapsed={false}
+            menu={menu}
+            onOpenChange={(open) => open && setChosen('opened')}
+          />
         </DarkBox>
         <span role="status">{chosen && text.chosen(chosen)}</span>
       </DemoCase>

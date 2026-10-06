@@ -19,12 +19,11 @@
 import { DeleteOutlined, PlusOutlined, LinkOutlined, ClearOutlined } from '@ant-design/icons';
 import { theme, Space, Table, Button, Modal, message } from 'antd';
 import { useState, useMemo } from 'react';
-import { Helmet } from 'react-helmet';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 
 import API from '@/api';
 import { PageHeader, Message, IconButton } from '@/components';
-import { BRAND_NAME, PATHS } from '@/config';
+import { PATHS } from '@/config';
 import { selectConnection, removeConnection } from '@/features';
 import { useAppDispatch, useAppSelector } from '@/hooks';
 import { useRefreshData } from '@/hooks';
@@ -38,6 +37,7 @@ import {
 } from '@/plugins';
 import { getPluginScopeName } from '@/plugins';
 import { IConnection } from '@/types';
+import { useDocumentTitle } from '@/ui/hooks';
 import { operator } from '@/utils';
 
 import * as S from './styled';
@@ -85,6 +85,8 @@ export const Connection = () => {
   );
 
   const name = connection?.name ?? '';
+
+  useDocumentTitle(connection?.name);
 
   const pluginConfig = useMemo(() => getPluginConfig(plugin), [plugin]);
 
@@ -293,11 +295,6 @@ export const Connection = () => {
         </Button>
       }
     >
-      <Helmet>
-        <title>
-          {connection.name} - {BRAND_NAME}
-        </title>
-      </Helmet>
       <Space style={{ display: 'flex' }} direction="vertical" size={36}>
         <div>
           <span style={{ marginRight: 4 }}>Status:</span>

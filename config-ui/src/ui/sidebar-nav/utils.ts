@@ -43,6 +43,14 @@ export const hasChildren = (item: RouteNavItem): item is RouteNavItem & { childr
 const matchesPath = (activePath: string, path: string) =>
   activePath === path || activePath.startsWith(path.endsWith('/') ? path : `${path}/`);
 
+const matchedLength = (leaf: RouteNavItem, activePath: string) =>
+  Math.max(
+    -1,
+    ...[leaf.path, ...(leaf.matchPaths ?? [])]
+      .filter((path) => matchesPath(activePath, path))
+      .map((path) => path.length),
+  );
+
 const leaves = (items: NavItem[]): RouteNavItem[] =>
   items.flatMap((item) => {
     if (item.kind !== NAV_ITEM_KIND.ROUTE) return [];
@@ -51,8 +59,9 @@ const leaves = (items: NavItem[]): RouteNavItem[] =>
 
 export const findActiveKey = (items: NavItem[], activePath: string): string | undefined =>
   leaves(items)
-    .filter((leaf) => matchesPath(activePath, leaf.path))
-    .sort((a, b) => b.path.length - a.path.length)[0]?.key;
+    .map((leaf) => ({ leaf, length: matchedLength(leaf, activePath) }))
+    .filter(({ length }) => length >= 0)
+    .sort((a, b) => b.length - a.length)[0]?.leaf.key;
 
 const containsKey = (item: RouteNavItem, key: string | undefined): boolean =>
   key !== undefined && hasChildren(item) && leaves(item.children).some((leaf) => leaf.key === key);

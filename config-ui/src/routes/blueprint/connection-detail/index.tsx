@@ -19,15 +19,17 @@
 import { DeleteOutlined, FormOutlined } from '@ant-design/icons';
 import { Flex, Popconfirm, Modal, Button } from 'antd';
 import { useState } from 'react';
-import { Helmet } from 'react-helmet';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import API from '@/api';
 import { PageLoading, PageHeader, ExternalLink } from '@/components';
-import { BRAND_NAME, PATHS, PROJECT_TAB } from '@/config';
+import { PATHS, PROJECT_TAB } from '@/config';
 import { useRefreshData } from '@/hooks';
 import { DataScopeSelect } from '@/plugins';
+import { useDocumentTitle } from '@/ui/hooks';
 import { operator } from '@/utils';
+
+import { COPY } from '../constants';
 
 import * as S from './styled';
 import { BlueprintConnectionDetailTable } from './table';
@@ -73,6 +75,8 @@ export const BlueprintConnectionDetailPage = () => {
           ?.scopes?.map((sc: any) => sc.scopeId) ?? [],
     };
   }, [version, pname, bid]);
+
+  useDocumentTitle(data && COPY.connectionDetailTitle(pname ?? data.blueprint.name, data.connection.name));
 
   if (!ready || !data) {
     return <PageLoading />;
@@ -192,11 +196,6 @@ export const BlueprintConnectionDetailPage = () => {
             ]
       }
     >
-      <Helmet>
-        <title>
-          {pname ? pname : blueprint.name} - {connection.name} - {BRAND_NAME}
-        </title>
-      </Helmet>
       <S.Top>
         <span>
           To manage the complete data scope and scope config for this connection, please{' '}

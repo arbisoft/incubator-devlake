@@ -111,6 +111,8 @@ export const COPY = {
     withValue: 'With value',
     clearable: 'Clearable',
     withCounts: 'With counts',
+    statusTones: 'Loading and status tones',
+    customTitle: 'Custom brand title (TITLE_CUSTOM)',
     manyItems: 'Many items',
     sizes: 'Sizes',
     fallback: 'Unknown plugin (fallback icon)',

@@ -22,7 +22,9 @@ import { useEffect, useState } from 'react';
 import API from '@/api';
 import { TipLayout } from '@/components';
 import { PATHS } from '@/config';
+import { useDocumentTitle } from '@/ui/hooks';
 
+import { COPY } from './change-password.constants';
 import { ChangePasswordCard } from './change-password.styled';
 
 const { Title } = Typography;
@@ -34,6 +36,8 @@ type PasswordChangeValues = {
 };
 
 export const ChangePassword = () => {
+  useDocumentTitle(COPY.title);
+
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(false);
