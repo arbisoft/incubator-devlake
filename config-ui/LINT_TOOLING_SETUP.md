@@ -499,7 +499,7 @@ The steps above were written for the pre-sync stack. This branch is now on ESLin
   - `yarn quality:baseline`: see below.
 - **`quality:baseline` stops the counts growing.** The report-only tools have no gate of their own. `tools/quality-baseline.mjs` runs the quality ESLint config, knip and jscpd, and compares per-rule ESLint totals, the knip findings and the jscpd totals with `quality.baseline.json`. It exits 1 if any of them grows. `yarn quality:baseline --write` rewrites the baseline, and should only be used when counts went down or an addition is explained.
 - **Rule tuning.** Some guide rules are noisy for this repo, so `eslint.quality.config.mjs` changes them, each with a one-line reason in the file. For `e2e-tests/**` it turns off `sonarjs/no-skipped-tests`, `super-linear-regex`, `pseudo-random`, `no-clear-text-protocols` and `no-duplicate-string`. Repo-wide it sets `sonarjs/no-nested-conditional`, `prefer-destructuring` and the React Compiler hook rules to `warn`. Everything else stays at the guide's severity.
-- **Knip needs almost no config.** It infers the Vite entry, the `@/` alias, Vitest, Playwright and the ESLint configs. `knip.jsonc` only ignores the three empty reskin barrels (`src/ui/index.ts`, `src/ui/hooks/index.ts`, `src/routes/ui-kit/index.ts`), each with its reason; do not add ignores to hide real findings.
+- **Knip needs almost no config.** It infers the Vite entry, the `@/` alias, Vitest, Playwright and the ESLint configs. `knip.jsonc` has no ignores now that the reskin barrels are filled; do not add ignores to hide real findings.
 
 ## Current command reference: ESLint 10+ and the Config UI reskin
 
