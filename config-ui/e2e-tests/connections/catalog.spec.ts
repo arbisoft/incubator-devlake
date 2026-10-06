@@ -20,7 +20,7 @@ import { APIRequestContext } from '@playwright/test';
 import { test, expect } from '../fixtures';
 import { loginAsAdmin } from '../auth-helpers';
 import { DUMMY_TOKEN, adminApi, createConnection, deleteConnection, listConnections, uniqueName } from '../support/api';
-import { catalogCard, catalogCardCount, catalogCards, modalByTitle, tableRow } from '../support/selectors';
+import { ConnectionsPage, PLUGINS } from '../support/pages/connections';
 
 // UI-only upstream plugins must stay hidden until their backend is synced.
 const HIDDEN_UPSTREAM_PLUGINS = [
@@ -58,16 +58,17 @@ test('the catalog lists the supported plugins, the OTel card, and hides upstream
   page,
   browserErrors,
 }) => {
-  await page.goto('/connections');
-  await expect(page.getByRole('heading', { name: 'Connections', level: 1 })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Data Connections', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Webhooks', exact: true })).toBeVisible();
+  const connections = new ConnectionsPage(page);
+  await connections.open();
+  await expect(connections.heading).toBeVisible();
+  await expect(connections.dataConnectionsHeading).toBeVisible();
+  await expect(connections.webhooksHeading).toBeVisible();
 
   for (const name of [...CORE_PLUGINS, 'Claude Code OTel']) {
-    await expect(catalogCard(page, name)).toBeVisible();
+    await expect(connections.card(name)).toBeVisible();
   }
 
-  const names = (await catalogCards(page).allInnerTexts()).map((n) => n.trim().toLowerCase());
+  const names = (await connections.cardNames.allInnerTexts()).map((n) => n.trim().toLowerCase());
   for (const hidden of HIDDEN_UPSTREAM_PLUGINS) {
     expect(names, `${hidden} must not be in the catalog`).not.toContain(hidden.toLowerCase());
   }
@@ -90,19 +91,17 @@ test('connections created through the API are reflected on the plugin card and i
     created.push(connection.id);
   }
 
-  await page.goto('/connections');
-  await expect(catalogCardCount(catalogCard(page, 'Claude Code'))).toHaveText(`${baseline + names.length} connections`);
+  const connections = new ConnectionsPage(page);
+  await connections.open();
+  await expect(connections.cardCount(PLUGINS.claudeCode.name)).toHaveText(`${baseline + names.length} connections`);
 
-  await catalogCard(page, 'Claude Code').click();
-  const list = modalByTitle(page, 'Manage Connections: Claude Code');
+  await connections.openCard(PLUGINS.claudeCode.name);
   for (const name of names) {
-    await expect(tableRow(list, name)).toBeVisible();
+    await expect(connections.connectionRow(PLUGINS.claudeCode, name)).toBeVisible();
   }
 
   const removed = created.pop() as number;
   await deleteConnection(api, 'claude_code', removed);
-  await page.reload();
-  await expect(catalogCardCount(catalogCard(page, 'Claude Code'))).toHaveText(
-    `${baseline + names.length - 1} connections`,
-  );
+  await connections.reload();
+  await expect(connections.cardCount(PLUGINS.claudeCode.name)).toHaveText(`${baseline + names.length - 1} connections`);
 });

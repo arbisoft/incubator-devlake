@@ -15,7 +15,7 @@
  * limitations under the License.
  *
  */
-import { APIRequestContext, Page } from '@playwright/test';
+import { APIRequestContext } from '@playwright/test';
 
 import { test, expect } from '../fixtures';
 import { loginAsAdmin } from '../auth-helpers';
@@ -27,7 +27,7 @@ import {
   getConnection,
   uniqueName,
 } from '../support/api';
-import { catalogCard, modalByTitle, tableRow, toast } from '../support/selectors';
+import { ConnectionDetailPage, ConnectionsPage, PLUGINS } from '../support/pages/connections';
 
 const GITHUB_TOKEN = process.env.E2E_GITHUB_TOKEN;
 
@@ -47,14 +47,6 @@ test.beforeEach(async ({ context }) => {
   await loginAsAdmin(context);
 });
 
-const openCreateForm = async (page: Page, pluginName: string) => {
-  await page.goto('/connections');
-  await catalogCard(page, pluginName).click();
-  const dialog = modalByTitle(page, `Manage Connections: ${pluginName}`);
-  await dialog.getByRole('button', { name: 'Create a New Connection' }).click();
-  return modalByTitle(page, `Manage Connections: ${pluginName}`);
-};
-
 test.describe('GitHub connection lifecycle through the UI', () => {
   test.skip(!GITHUB_TOKEN, 'E2E_GITHUB_TOKEN is not set');
 
@@ -62,18 +54,20 @@ test.describe('GitHub connection lifecycle through the UI', () => {
     const name = uniqueName('gh-conn');
     const renamed = `${name}-renamed`;
 
-    const form = await openCreateForm(page, 'GitHub');
-    await form.getByPlaceholder('Your Connection Name').fill(name);
-    await form.getByPlaceholder('Token').fill(GITHUB_TOKEN as string);
-    await form.getByPlaceholder('Your Connection Name').click();
-    await expect(form.getByText(/Valid From:/)).toBeVisible();
+    const connections = new ConnectionsPage(page);
+    const detail = new ConnectionDetailPage(page, PLUGINS.github);
+    const form = await connections.openCreateForm(PLUGINS.github);
+    await form.fillName(name);
+    await form.fillToken(GITHUB_TOKEN as string);
+    await form.clickNameField();
+    await expect(form.validFrom).toBeVisible();
 
-    await form.getByRole('button', { name: 'Test Connection' }).click();
-    await expect(toast(page, 'Test Connection Successfully.')).toBeVisible();
+    await form.test();
+    await expect(connections.toast('Test Connection Successfully.')).toBeVisible();
 
-    await form.getByRole('button', { name: 'Save Connection' }).click();
-    await expect(page).toHaveURL(/\/connections\/github\/\d+$/);
-    const id = Number(new URL(page.url()).pathname.split('/').pop());
+    await form.save();
+    await expect(page).toHaveURL(detail.urlPattern);
+    const id = detail.idFromUrl();
 
     const saved = await getConnection(api, 'github', id);
     expect(saved).toMatchObject({
@@ -86,29 +80,22 @@ test.describe('GitHub connection lifecycle through the UI', () => {
     expect(typeof saved?.token).toBe('string');
     expect(saved?.token).not.toBe(GITHUB_TOKEN);
     expect(saved?.token).toContain('*');
-    await expect(page.getByRole('link', { name })).toBeVisible();
+    await expect(detail.nameLink(name)).toBeVisible();
 
     // Edit the name from the connection list; the stored token must keep working.
-    await page.goto('/connections');
-    await catalogCard(page, 'GitHub').click();
+    await connections.open();
+    await connections.openCard(PLUGINS.github.name);
     // The edit form refetches the saved connection and would overwrite input typed before that finishes.
-    const detailLoaded = page.waitForResponse(
-      (res) => res.url().endsWith(`/plugins/github/connections/${id}`) && res.request().method() === 'GET',
-    );
-    await tableRow(modalByTitle(page, 'Manage Connections: GitHub'), name)
-      .getByRole('button', { name: 'Edit' })
-      .click();
-    await detailLoaded;
-    const editForm = modalByTitle(page, 'Manage Connections: GitHub').last();
-    await expect(editForm.getByText(/Valid From:/)).toBeVisible();
-    await editForm.getByPlaceholder('Your Connection Name').fill(renamed);
-    await editForm.getByRole('button', { name: 'Save Connection' }).click();
-    await expect(toast(page, 'Update Connection Successful.')).toBeVisible();
+    const editForm = await connections.openEditForm(PLUGINS.github, id, name);
+    await expect(editForm.validFrom).toBeVisible();
+    await editForm.fillName(renamed);
+    await editForm.save();
+    await expect(connections.toast('Update Connection Successful.')).toBeVisible();
 
-    await page.reload();
+    await connections.reload();
     expect((await getConnection(api, 'github', id))?.name).toBe(renamed);
-    await catalogCard(page, 'GitHub').click();
-    await expect(tableRow(modalByTitle(page, 'Manage Connections: GitHub'), renamed)).toBeVisible();
+    await connections.openCard(PLUGINS.github.name);
+    await expect(connections.connectionRow(PLUGINS.github, renamed)).toBeVisible();
     const testRes = await api.post(`/plugins/github/connections/${id}/test`);
     expect(testRes.status()).toBe(200);
     expect((await testRes.json()).success).toBe(true);
@@ -119,27 +106,24 @@ test('deleting a connection from its page removes it from the UI and the API', a
   const name = uniqueName('gh-delete');
   const { id } = await createGithubConnection(api, name);
 
-  await page.goto(`/connections/github/${id}`);
-  await page.getByRole('button', { name: 'Delete Connection' }).click();
-  await modalByTitle(page, 'Would you like to delete this Data Connection?')
-    .getByRole('button', { name: 'Confirm' })
-    .click();
-  await expect(page).toHaveURL(/\/connections$/);
+  const detail = new ConnectionDetailPage(page, PLUGINS.github);
+  const connections = new ConnectionsPage(page);
+  await detail.open(id);
+  await detail.deleteConnection();
+  await expect(page).toHaveURL(connections.urlPattern);
   expect(await getConnection(api, 'github', id)).toBeUndefined();
-  await page.reload();
-  await catalogCard(page, 'GitHub').click();
-  await expect(tableRow(modalByTitle(page, 'Manage Connections: GitHub'), name)).toHaveCount(0);
+  await connections.reload();
+  await connections.openCard(PLUGINS.github.name);
+  await expect(connections.connectionRow(PLUGINS.github, name)).toHaveCount(0);
 });
 
 test('deleting a connection from its page logs no render error', async ({ page, browserErrors }) => {
   const { id } = await createGithubConnection(api, uniqueName('gh-delete-err'));
 
-  await page.goto(`/connections/github/${id}`);
-  await page.getByRole('button', { name: 'Delete Connection' }).click();
-  await modalByTitle(page, 'Would you like to delete this Data Connection?')
-    .getByRole('button', { name: 'Confirm' })
-    .click();
-  await expect(page).toHaveURL(/\/connections$/);
+  const detail = new ConnectionDetailPage(page, PLUGINS.github);
+  await detail.open(id);
+  await detail.deleteConnection();
+  await expect(page).toHaveURL(new ConnectionsPage(page).urlPattern);
   expect(await getConnection(api, 'github', id)).toBeUndefined();
   expect(browserErrors).toEqual([]);
 });
@@ -151,17 +135,15 @@ test('claude_code connection keeps its custom headers in the saved payload', asy
     { key: 'X-E2E-Trace', value: 'e2e-header-secret-bbbb2222' },
   ];
 
-  const form = await openCreateForm(page, 'Claude Code');
-  await form.getByPlaceholder('Your Connection Name').fill(name);
-  await form.getByPlaceholder('e.g. org_123456789').fill('org_e2e_headers');
+  const form = await new ConnectionsPage(page).openCreateForm(PLUGINS.claudeCode);
+  await form.fillName(name);
+  await form.fillOrganization('org_e2e_headers');
   for (const [index, header] of headers.entries()) {
-    await form.getByRole('button', { name: '+ Add Header' }).click();
-    await form.getByPlaceholder('Header name').nth(index).fill(header.key);
-    await form.getByPlaceholder('Header value').nth(index).fill(header.value);
+    await form.addHeader(index, header.key, header.value);
   }
   // Custom headers replace the API key, and Save does not require a passing Test Connection.
-  await form.getByRole('button', { name: 'Save Connection' }).click();
-  await expect(page).toHaveURL(/\/connections\/claude_code\/\d+$/);
+  await form.save();
+  await expect(page).toHaveURL(new ConnectionDetailPage(page, PLUGINS.claudeCode).urlPattern);
 
   const saved = await findConnectionByName(api, 'claude_code', name);
   expect(saved).toMatchObject({ name, organization: 'org_e2e_headers', endpoint: 'https://api.anthropic.com' });
@@ -174,22 +156,21 @@ test('claude_code connection keeps its custom headers in the saved payload', asy
 });
 
 test('a rejected remote credential shows an error and does not sign the user out', async ({ page }) => {
-  const form = await openCreateForm(page, 'GitHub');
-  await form.getByPlaceholder('Your Connection Name').fill(uniqueName('gh-bad-token'));
-  await form.getByPlaceholder('Token').fill('ghp_e2eInvalidTokenValue000000000000000000');
+  const connections = new ConnectionsPage(page);
+  const form = await connections.openCreateForm(PLUGINS.github);
+  const name = uniqueName('gh-bad-token');
+  await form.fillName(name);
+  await form.fillToken('ghp_e2eInvalidTokenValue000000000000000000');
 
-  const testResponse = page.waitForResponse(
-    (res) => res.url().endsWith('/plugins/github/test') && res.request().method() === 'POST',
-  );
-  await form.getByRole('button', { name: 'Test Connection' }).click();
-  expect((await testResponse).status()).toBe(400);
+  expect(await form.testAndGetStatus()).toBe(400);
 
-  await expect(toast(page, /error when testing connection/i)).toBeVisible();
-  await expect(form).toBeVisible();
-  await expect(page).toHaveURL(/\/connections$/);
+  await expect(connections.toast(/error when testing connection/i)).toBeVisible();
+  await expect(form.dialog).toBeVisible();
+  await expect(page).toHaveURL(connections.urlPattern);
   const userinfo = await page.request.get('/api/auth/userinfo');
   expect((await userinfo.json()).authenticated).toBe(true);
-  await page.reload();
-  await expect(page).toHaveURL(/\/connections$/);
-  await expect(page.getByRole('heading', { name: 'Connections', level: 1 })).toBeVisible();
+  await connections.reload();
+  await expect(page).toHaveURL(connections.urlPattern);
+  await expect(connections.heading).toBeVisible();
+  expect(await findConnectionByName(api, 'github', name)).toBeUndefined();
 });

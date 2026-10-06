@@ -15,15 +15,33 @@
  * limitations under the License.
  *
  */
-import { test, expect } from './fixtures';
-import { APP_URL } from './support/env';
-import { PATHS } from './support/pages/paths';
-import { ShellPage } from './support/pages/shell';
+import { Locator } from '@playwright/test';
 
-test('config UI loads without browser errors', async ({ page, browserErrors }) => {
-  const shell = new ShellPage(page);
-  await shell.visit(PATHS.root);
-  expect(new URL(page.url()).origin).toBe(new URL(APP_URL).origin);
-  await expect(shell.body).toBeVisible();
-  expect(browserErrors).toEqual([]);
-});
+import { BasePage } from './common';
+import { PATHS } from './paths';
+
+export class OnboardPage extends BasePage {
+  async open(): Promise<void> {
+    await this.visit(PATHS.onboard);
+  }
+
+  get welcome(): Locator {
+    return this.page.getByText('Welcome to');
+  }
+
+  async startFirstRepository(): Promise<void> {
+    await this.page.getByRole('button', { name: 'Connect to your first repository' }).click();
+  }
+
+  get firstRepositoryHeading(): Locator {
+    return this.page.getByRole('heading', { name: 'Connect to your first repository' });
+  }
+
+  get projectNameInput(): Locator {
+    return this.page.getByPlaceholder('Your Project Name');
+  }
+
+  get nextStepButton(): Locator {
+    return this.page.getByRole('button', { name: 'Next Step' });
+  }
+}

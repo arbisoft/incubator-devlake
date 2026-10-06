@@ -12,7 +12,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "lint": "tsc && eslint . --fix",
-    "lint:check": "tsc && eslint .",
+    "lint:check": "tsc && tsc -p e2e-tests/tsconfig.json && eslint .",
     "lint:fix": "eslint . --fix",
     "dup": "jscpd src --min-tokens 60 --reporters console --ignore \"**/*.test.*,**/__tests__/**\"",
     "e2e:census": "node e2e-tests/tools/census.mjs",

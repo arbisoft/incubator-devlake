@@ -15,15 +15,26 @@
  * limitations under the License.
  *
  */
-import { test, expect } from './fixtures';
-import { APP_URL } from './support/env';
-import { PATHS } from './support/pages/paths';
-import { ShellPage } from './support/pages/shell';
+import { Locator } from '@playwright/test';
 
-test('config UI loads without browser errors', async ({ page, browserErrors }) => {
-  const shell = new ShellPage(page);
-  await shell.visit(PATHS.root);
-  expect(new URL(page.url()).origin).toBe(new URL(APP_URL).origin);
-  await expect(shell.body).toBeVisible();
-  expect(browserErrors).toEqual([]);
-});
+import { BasePage, Screen, urlEndingWith } from './common';
+import { PATHS } from './paths';
+
+// The audit log ("Recent access activity") section of the /access page.
+export class ActivityPage extends BasePage implements Screen {
+  async open(): Promise<void> {
+    await this.visit(PATHS.access);
+  }
+
+  get urlPattern(): RegExp {
+    return urlEndingWith(PATHS.access);
+  }
+
+  get ready(): Locator {
+    return this.recentActivityHeading;
+  }
+
+  get recentActivityHeading(): Locator {
+    return this.page.getByRole('heading', { name: 'Recent access activity' });
+  }
+}
