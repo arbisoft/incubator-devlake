@@ -20,14 +20,14 @@ import { Locator } from '@playwright/test';
 import { BasePage, Screen, urlEndingWith } from './common';
 import { PATHS } from './paths';
 
-// The audit log ("Recent access activity") section of the /access page.
+// The audit log ("Recent access activity") section of the /settings/users page.
 export class ActivityPage extends BasePage implements Screen {
   async open(): Promise<void> {
-    await this.visit(PATHS.access);
+    await this.visit(PATHS.settingsUsers);
   }
 
   get urlPattern(): RegExp {
-    return urlEndingWith(PATHS.access);
+    return urlEndingWith(PATHS.settingsUsers);
   }
 
   get ready(): Locator {

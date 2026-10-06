@@ -217,16 +217,17 @@ test.describe.serial('Project, blueprint, pipeline and webhook flows', () => {
       .toEqual([]);
   });
 
-  test('the selected project tab is not kept across a reload', async ({ page }) => {
-    // Currently the tab lives in router state; the reskin changes it to URL-based tabs.
+  test('the selected project tab is kept across a reload', async ({ page }) => {
     const projectPage = new ProjectPage(page, projectName);
     await projectPage.open();
     await expect(projectPage.tab('Blueprint')).toHaveAttribute('aria-selected', 'true');
     await projectPage.openTab('Webhooks');
     await expect(projectPage.tab('Webhooks')).toHaveAttribute('aria-selected', 'true');
+    await expect(page).toHaveURL(projectPage.tabUrlPattern('webhooks'));
     await projectPage.reload();
-    await expect(projectPage.tab('Blueprint')).toHaveAttribute('aria-selected', 'true');
-    await expect(projectPage.tab('Webhooks')).toHaveAttribute('aria-selected', 'false');
+    await expect(page).toHaveURL(projectPage.tabUrlPattern('webhooks'));
+    await expect(projectPage.tab('Webhooks')).toHaveAttribute('aria-selected', 'true');
+    await expect(projectPage.tab('Blueprint')).toHaveAttribute('aria-selected', 'false');
   });
 
   test('delete the project from its Settings tab', async ({ page }) => {

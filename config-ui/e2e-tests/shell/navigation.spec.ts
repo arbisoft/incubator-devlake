@@ -88,7 +88,7 @@ test.describe('authenticated shell', () => {
     await expect(page).toHaveURL(keys.urlPattern);
     await expect(keys.ready).toBeVisible();
 
-    await shell.openMenuItem(/User Management/);
+    await shell.openUsersMenuItem();
     await expect(page).toHaveURL(access.urlPattern);
     await expect(access.ready).toBeVisible();
 

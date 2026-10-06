@@ -73,7 +73,7 @@
     },
     "projects/project-blueprint.spec.ts": {
       "tests": 8,
-      "expects": 61,
+      "expects": 63,
       "backend": 9,
       "skips": 0,
       "fixmes": 0
@@ -82,6 +82,20 @@
       "tests": 5,
       "expects": 31,
       "backend": 2,
+      "skips": 1,
+      "fixmes": 0
+    },
+    "shell/redirects.spec.ts": {
+      "tests": 5,
+      "expects": 15,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "shell/sidebar.spec.ts": {
+      "tests": 6,
+      "expects": 39,
+      "backend": 1,
       "skips": 1,
       "fixmes": 0
     },
