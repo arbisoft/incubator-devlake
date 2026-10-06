@@ -16,11 +16,13 @@
  *
  */
 
-export * from './brand';
-export * from './cron';
-export * from './endpoint';
-export * from './entities';
-export * from './links';
-export * from './paths';
-export * from './route-keys';
-export type * from './types';
+import { Navigate, useLocation, useParams } from 'react-router-dom';
+
+import type { ParamRedirectProps } from './types';
+
+export const ParamRedirect = ({ to }: ParamRedirectProps) => {
+  const params = useParams();
+  const { search, hash } = useLocation();
+
+  return <Navigate replace to={{ pathname: to(params), search, hash }} />;
+};

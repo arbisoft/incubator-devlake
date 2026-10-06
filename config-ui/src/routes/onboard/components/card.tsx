@@ -22,6 +22,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import API from '@/api';
+import { PATHS } from '@/config';
 import { useRefreshData, useAutoRefresh } from '@/hooks';
 import { operator } from '@/utils';
 
@@ -143,14 +144,14 @@ export const OnboardCard = ({ style }: Props) => {
         </Flex>
         {status === 'prepare' && (
           <Space>
-            <Button type="primary" onClick={() => navigate('/onboard')}>
+            <Button type="primary" onClick={() => navigate(PATHS.ONBOARD())}>
               Continue
             </Button>
           </Space>
         )}
         {['running', 'failed'].includes(status) && (
           <Space>
-            <Button type="primary" onClick={() => navigate('/onboard')}>
+            <Button type="primary" onClick={() => navigate(PATHS.ONBOARD())}>
               Details
             </Button>
           </Space>
@@ -165,7 +166,7 @@ export const OnboardCard = ({ style }: Props) => {
         )}
         {status === 'partial' && (
           <Space>
-            <Button type="primary" onClick={() => navigate('/onboard')}>
+            <Button type="primary" onClick={() => navigate(PATHS.ONBOARD())}>
               Details
             </Button>
             <Button onClick={() => window.open(DashboardURLMap[data.plugin])}>Check Dashboard</Button>

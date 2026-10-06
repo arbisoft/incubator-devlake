@@ -16,11 +16,13 @@
  *
  */
 
-export * from './brand';
-export * from './cron';
-export * from './endpoint';
-export * from './entities';
-export * from './links';
-export * from './paths';
-export * from './route-keys';
-export type * from './types';
+import { PROJECT_TAB, type ProjectTab } from '@/config';
+
+export const COPY = {
+  tabs: {
+    [PROJECT_TAB.BLUEPRINT]: 'Blueprint',
+    [PROJECT_TAB.WEBHOOKS]: 'Webhooks',
+    [PROJECT_TAB.CLAUDE_CODE_OTEL]: 'Claude Code OTel',
+    [PROJECT_TAB.SETTINGS]: 'Settings',
+  } satisfies Record<ProjectTab, string>,
+} as const;

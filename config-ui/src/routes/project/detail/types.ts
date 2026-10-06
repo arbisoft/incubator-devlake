@@ -16,11 +16,7 @@
  *
  */
 
-export * from './brand';
-export * from './cron';
-export * from './endpoint';
-export * from './entities';
-export * from './links';
-export * from './paths';
-export * from './route-keys';
-export type * from './types';
+import type { ProjectTab } from '@/config';
+import type { RouteTab } from '@/ui/types';
+
+export type ProjectRouteTab = RouteTab & { key: ProjectTab };

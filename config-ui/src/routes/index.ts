@@ -31,3 +31,4 @@ export * from './onboard';
 export * from './otel';
 export * from './pipeline';
 export * from './project';
+export * from './redirect';

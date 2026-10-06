@@ -16,11 +16,17 @@
  *
  */
 
-export * from './brand';
-export * from './cron';
-export * from './endpoint';
-export * from './entities';
-export * from './links';
-export * from './paths';
-export * from './route-keys';
-export type * from './types';
+import { PATHS, PROJECT_TAB, type ProjectTab } from '@/config';
+
+import { COPY } from './constants';
+import type { ProjectRouteTab } from './types';
+
+const TAB_ORDER: ProjectTab[] = [
+  PROJECT_TAB.BLUEPRINT,
+  PROJECT_TAB.WEBHOOKS,
+  PROJECT_TAB.CLAUDE_CODE_OTEL,
+  PROJECT_TAB.SETTINGS,
+];
+
+export const getProjectTabs = (pname: string): ProjectRouteTab[] =>
+  TAB_ORDER.map((key) => ({ key, label: COPY.tabs[key], path: PATHS.PROJECT_TAB(pname, key) }));

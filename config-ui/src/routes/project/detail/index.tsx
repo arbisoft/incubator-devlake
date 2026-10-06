@@ -18,32 +18,32 @@
 
 import { Tabs, message } from 'antd';
 import axios from 'axios';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet';
-import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 
 import API from '@/api';
 import { PageHeader, PageLoading } from '@/components';
-import { BRAND_NAME, PATHS } from '@/config';
+import { BRAND_NAME, PATHS, PROJECT_TAB } from '@/config';
 import { useRefreshData } from '@/hooks';
 import { BlueprintDetail, FromEnum } from '@/routes';
+import { useRouteTab } from '@/ui/hooks';
 
 import { ClaudeCodeOtelPanel } from './claude-code-otel-panel';
+import { COPY } from './constants';
 import { SettingsPanel } from './settings-panel';
 import * as S from './styled';
+import { getProjectTabs } from './utils';
 import { WebhooksPanel } from './webhooks-panel';
 
 export const ProjectDetailPage = () => {
   const [version, setVersion] = useState(1);
-  const [tabId, setTabId] = useState('blueprint');
 
   const { pname } = useParams() as { pname: string };
-  const { state } = useLocation();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    setTabId(state?.tabId ?? 'blueprint');
-  }, [state]);
+  const tabs = useMemo(() => getProjectTabs(pname), [pname]);
+  const activeTab = useRouteTab(tabs);
 
   const { ready, data, error } = useRefreshData(() => API.project.get(pname), [pname, version]);
 
@@ -63,8 +63,9 @@ export const ProjectDetailPage = () => {
     }
   }, [error, navigate, pname]);
 
-  const handleChangeTabId = (tabId: string) => {
-    setTabId(tabId);
+  const handleChangeTab = (key: string) => {
+    const target = tabs.find((tab) => tab.key === key);
+    if (target) navigate(target.path);
   };
 
   const handleRefresh = () => {
@@ -79,7 +80,7 @@ export const ProjectDetailPage = () => {
     <PageHeader
       breadcrumbs={[
         { name: 'Projects', path: PATHS.PROJECTS() },
-        { name: project.name, path: PATHS.PROJECT(pname) },
+        { name: project.name, path: PATHS.PROJECT_TAB(pname, PROJECT_TAB.BLUEPRINT) },
       ]}
     >
       <Helmet>
@@ -91,28 +92,28 @@ export const ProjectDetailPage = () => {
         <Tabs
           items={[
             {
-              key: 'blueprint',
-              label: 'Blueprint',
+              key: PROJECT_TAB.BLUEPRINT,
+              label: COPY.tabs[PROJECT_TAB.BLUEPRINT],
               children: <BlueprintDetail id={project.blueprint.id} from={FromEnum.project} />,
             },
             {
-              key: 'webhook',
-              label: 'Webhooks',
+              key: PROJECT_TAB.WEBHOOKS,
+              label: COPY.tabs[PROJECT_TAB.WEBHOOKS],
               children: <WebhooksPanel project={project} onRefresh={handleRefresh} />,
             },
             {
-              key: 'claude-code-otel',
-              label: 'Claude Code OTel',
+              key: PROJECT_TAB.CLAUDE_CODE_OTEL,
+              label: COPY.tabs[PROJECT_TAB.CLAUDE_CODE_OTEL],
               children: <ClaudeCodeOtelPanel projectName={project.name} />,
             },
             {
-              key: 'settings',
-              label: 'Settings',
+              key: PROJECT_TAB.SETTINGS,
+              label: COPY.tabs[PROJECT_TAB.SETTINGS],
               children: <SettingsPanel project={project} onRefresh={handleRefresh} />,
             },
           ]}
-          activeKey={tabId}
-          onChange={handleChangeTabId}
+          activeKey={activeTab}
+          onChange={handleChangeTab}
         />
       </S.Wrapper>
     </PageHeader>

@@ -24,7 +24,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import API from '@/api';
 import { type OtelConnectionResponse } from '@/api/otel';
 import { PageHeader, Block, IconButton } from '@/components';
-import { getCron, PATHS } from '@/config';
+import { getCron, PATHS, PROJECT_TAB } from '@/config';
 import { ConnectionName } from '@/features';
 import { useRefreshData } from '@/hooks';
 import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?react';
@@ -237,7 +237,7 @@ export const ProjectHomePage = () => {
                 icon={<SettingOutlined />}
                 helptip="Project Configuration"
                 onClick={() =>
-                  navigate(PATHS.PROJECT(name), {
+                  navigate(PATHS.PROJECT_TAB(name, PROJECT_TAB.BLUEPRINT), {
                     state: { activeKey: 'configuration' },
                   })
                 }

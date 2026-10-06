@@ -16,11 +16,11 @@
  *
  */
 
-export * from './brand';
-export * from './cron';
-export * from './endpoint';
-export * from './entities';
-export * from './links';
-export * from './paths';
-export * from './route-keys';
-export type * from './types';
+import { DOC_URL } from '@/release';
+
+export const LINKS = {
+  DOCS: DOC_URL.TUTORIAL,
+  API: '/api/swagger/index.html',
+  GITHUB: 'https://github.com/apache/devlake',
+  SLACK: 'https://join.slack.com/t/devlake-io/shared_invite/zt-26ulybksw-IDrJYuqY1FrdjlMMJhs53Q',
+} as const;

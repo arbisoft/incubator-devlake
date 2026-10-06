@@ -23,7 +23,7 @@ import { useNavigate } from 'react-router-dom';
 import API from '@/api';
 import { OTEL_CONNECTION_STATUS } from '@/api/otel';
 import { Block, HelpTooltip, Message } from '@/components';
-import { PATHS } from '@/config';
+import { PATHS, PROJECT_TAB } from '@/config';
 import { useRefreshData } from '@/hooks';
 import { getOtelProjectError } from '@/routes/otel/utils';
 import { IProject } from '@/types';
@@ -119,11 +119,7 @@ export const SettingsPanel = ({ project, onRefresh }: Props) => {
 
     if (success) {
       onRefresh();
-      navigate(PATHS.PROJECT(name), {
-        state: {
-          tabId: 'settings',
-        },
-      });
+      navigate(PATHS.PROJECT_TAB(name, PROJECT_TAB.SETTINGS));
     }
   };
 

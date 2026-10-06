@@ -29,7 +29,7 @@ import {
   SlackOutlined,
 } from '@ant-design/icons';
 
-import { DOC_URL } from '@/release';
+import { LINKS, PATHS } from '@/config';
 import { ACCESS_PATH } from '@/routes/access/constants';
 
 const PATH_PREFIX = import.meta.env.DEVLAKE_PATH_PREFIX ?? '';
@@ -108,27 +108,27 @@ type HeaderItem = {
 
 export const headerItems: HeaderItem[] = [
   {
-    link: '/api/access/grafana-login',
+    link: PATHS.DASHBOARDS(),
     label: 'Dashboards',
     icon: <DashboardOutlined />,
   },
   {
-    link: DOC_URL.TUTORIAL,
+    link: LINKS.DOCS,
     label: 'Docs',
     icon: <FileSearchOutlined />,
   },
   {
-    link: '/api/swagger/index.html',
+    link: LINKS.API,
     label: 'API',
     icon: <ApiOutlined />,
   },
   {
-    link: 'https://github.com/apache/devlake',
+    link: LINKS.GITHUB,
     label: 'GitHub',
     icon: <GithubOutlined />,
   },
   {
-    link: 'https://join.slack.com/t/devlake-io/shared_invite/zt-26ulybksw-IDrJYuqY1FrdjlMMJhs53Q',
+    link: LINKS.SLACK,
     label: 'Slack',
     icon: <SlackOutlined />,
   },

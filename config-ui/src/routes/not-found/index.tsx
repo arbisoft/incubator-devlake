@@ -21,6 +21,7 @@ import { Card, Space, Flex, Button } from 'antd';
 import { useNavigate } from 'react-router-dom';
 
 import { TipLayout } from '@/components';
+import { PATHS } from '@/config';
 
 export const NotFound = () => {
   const navigate = useNavigate();
@@ -36,7 +37,7 @@ export const NotFound = () => {
         </h2>
         <p>This is an invalid address.</p>
         <Flex justify="center">
-          <Button type="primary" onClick={() => navigate('/')}>
+          <Button type="primary" onClick={() => navigate(PATHS.ROOT())}>
             Go HomePage
           </Button>
         </Flex>

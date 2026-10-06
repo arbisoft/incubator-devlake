@@ -16,11 +16,7 @@
  *
  */
 
-export * from './brand';
-export * from './cron';
-export * from './endpoint';
-export * from './entities';
-export * from './links';
-export * from './paths';
-export * from './route-keys';
-export type * from './types';
+import type { BLUEPRINT_VIEW, PROJECT_TAB } from './route-keys';
+
+export type ProjectTab = (typeof PROJECT_TAB)[keyof typeof PROJECT_TAB];
+export type BlueprintView = (typeof BLUEPRINT_VIEW)[keyof typeof BLUEPRINT_VIEW];

@@ -16,11 +16,14 @@
  *
  */
 
-export * from './brand';
-export * from './cron';
-export * from './endpoint';
-export * from './entities';
-export * from './links';
-export * from './paths';
-export * from './route-keys';
-export type * from './types';
+export const PROJECT_TAB = {
+  BLUEPRINT: 'blueprint',
+  WEBHOOKS: 'webhooks',
+  CLAUDE_CODE_OTEL: 'claude-code-otel',
+  SETTINGS: 'settings',
+} as const;
+
+export const BLUEPRINT_VIEW = {
+  STATUS: 'status',
+  CONFIGURATION: 'configuration',
+} as const;
