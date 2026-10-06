@@ -240,7 +240,7 @@ test.describe.serial('Project, blueprint, pipeline and webhook flows', () => {
 
     expect(await getProject(api, projectName)).toBeUndefined();
     await projects.search(projectName);
-    await expect(projects.emptyState('No data')).toBeVisible();
+    await expect(projects.noResults()).toBeVisible();
     await expect(projects.projectRow(projectName)).toHaveCount(0);
   });
 });

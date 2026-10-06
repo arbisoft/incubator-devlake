@@ -310,6 +310,13 @@ export async function listApiKeys(api: APIRequestContext): Promise<ApiKey[]> {
   return res.apikeys ?? [];
 }
 
+export async function createApiKey(api: APIRequestContext, name: string, expiredAt?: string): Promise<ApiKey> {
+  return json(
+    await api.post('/api-keys', { data: { name, expiredAt, allowedPath: '.*', type: 'devlake' } }),
+    `create api key ${name}`,
+  );
+}
+
 export async function deleteApiKeysByPrefix(api: APIRequestContext): Promise<void> {
   for (const key of await listApiKeys(api)) {
     if (key.name.startsWith(E2E_PREFIX)) {

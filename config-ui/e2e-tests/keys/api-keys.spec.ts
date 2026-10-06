@@ -19,7 +19,7 @@ import { APIRequestContext } from '@playwright/test';
 
 import { loginAsAdmin } from '../auth-helpers';
 import { test, expect } from '../fixtures';
-import { adminApi, deleteApiKeysByPrefix, listApiKeys, uniqueName } from '../support/api';
+import { adminApi, createApiKey, deleteApiKeysByPrefix, listApiKeys, uniqueName } from '../support/api';
 import { API_URL } from '../support/env';
 import { ApiKeysPage } from '../support/pages/api-keys';
 
@@ -81,5 +81,36 @@ test('an API key created in the UI authenticates REST calls until it is revoked'
   expect(revoked.status()).toBe(403);
   expect((await revoked.json()).message).toBe('api key is invalid');
   await bare.dispose();
+  expect(browserErrors).toEqual([]);
+});
+
+test('keyword search and expiration sort survive a reload', async ({ page, browserErrors }) => {
+  const prefix = uniqueName('sortkey');
+  const expiries = { soon: 10, middle: 20, late: 30 };
+  const names = Object.fromEntries(Object.keys(expiries).map((label) => [label, `${prefix}-${label}`]));
+  for (const [label, days] of Object.entries(expiries)) {
+    await createApiKey(api, names[label], new Date(Date.now() + days * DAY_MS).toISOString());
+  }
+  const ascending = [names.soon, names.middle, names.late];
+
+  const keys = new ApiKeysPage(page);
+  await keys.open();
+  await keys.search(prefix);
+  await expect.poll(async () => (await keys.keyNames()).length).toBe(ascending.length);
+  expect(keys.urlParams.get('keyword')).toBe(prefix);
+
+  await keys.sortByExpiration();
+  await expect.poll(() => keys.urlParams.get('sortOrder')).toBe('asc');
+  expect(keys.urlParams.get('sortBy')).toBe('expiredAt');
+  await expect.poll(() => keys.keyNames()).toEqual(ascending);
+
+  await keys.reload();
+  expect(keys.urlParams.get('keyword')).toBe(prefix);
+  expect(keys.urlParams.get('sortBy')).toBe('expiredAt');
+  await expect.poll(() => keys.keyNames()).toEqual(ascending);
+
+  await keys.sortByExpiration();
+  await expect.poll(() => keys.urlParams.get('sortOrder')).toBe('desc');
+  await expect.poll(() => keys.keyNames()).toEqual([...ascending].reverse());
   expect(browserErrors).toEqual([]);
 });

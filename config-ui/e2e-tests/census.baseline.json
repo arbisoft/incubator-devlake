@@ -58,8 +58,8 @@
       "fixmes": 0
     },
     "keys/api-keys.spec.ts": {
-      "tests": 1,
-      "expects": 14,
+      "tests": 2,
+      "expects": 25,
       "backend": 4,
       "skips": 0,
       "fixmes": 0
@@ -82,6 +82,13 @@
       "tests": 8,
       "expects": 63,
       "backend": 9,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "projects/projects-list.spec.ts": {
+      "tests": 2,
+      "expects": 15,
+      "backend": 0,
       "skips": 0,
       "fixmes": 0
     },

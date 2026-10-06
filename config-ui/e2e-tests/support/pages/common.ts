@@ -32,6 +32,12 @@ export const tableRow = (scope: Page | Locator, text: string | RegExp): Locator 
 
 export const tableRows = (scope: Page | Locator): Locator => scope.locator('tbody tr.ant-table-row');
 
+export const firstCellTexts = (scope: Page | Locator): Promise<string[]> =>
+  tableRows(scope).locator('td:first-child').allInnerTexts();
+
+export const paginationPage = (page: Page, number: number): Locator =>
+  page.locator(`li.ant-pagination-item[title="${number}"]`);
+
 export const tableWithRow = (page: Page, text: string | RegExp): Locator =>
   page.locator('.ant-table').filter({ has: tableRow(page, text) });
 
@@ -54,8 +60,6 @@ export const pipelineRowById = (page: Page, id: number): Locator =>
   page.locator('tbody tr.ant-table-row').filter({ has: page.getByRole('cell', { name: String(id), exact: true }) });
 
 export const selectBox = (scope: Page | Locator): Locator => scope.locator('.ant-select').first();
-
-export const textInputs = (scope: Page | Locator): Locator => scope.locator('input.ant-input');
 
 export const tagWithText = (scope: Page | Locator, text: string | RegExp): Locator =>
   scope.locator('.ant-tag').filter({ hasText: text });
@@ -122,6 +126,10 @@ export class BasePage {
     );
   }
 
+  get urlParams(): URLSearchParams {
+    return new URL(this.page.url()).searchParams;
+  }
+
   async waitUntilUrl(pattern: RegExp): Promise<void> {
     await this.page.waitForURL(pattern);
   }
@@ -163,8 +171,8 @@ export class BasePage {
     return emptyState(this.page, text);
   }
 
-  // Clicks the Confirm button of a confirmation dialog.
-  protected async confirmDialog(title: string | RegExp): Promise<void> {
-    await this.dialog(title).getByRole('button', { name: 'Confirm' }).click();
+  // Clicks the confirm button of a confirmation dialog.
+  protected async confirmDialog(title: string | RegExp, confirmLabel = 'Confirm'): Promise<void> {
+    await this.dialog(title).getByRole('button', { name: confirmLabel }).click();
   }
 }

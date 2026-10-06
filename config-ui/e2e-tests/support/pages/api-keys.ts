@@ -17,7 +17,9 @@
  */
 import { Locator } from '@playwright/test';
 
-import { BasePage, Screen, urlEndingWith, selectBox, selectOption, textInputs } from './common';
+import { API_KEYS_COPY as COPY } from '../app-copy';
+
+import { BasePage, Screen, firstCellTexts, selectOption, urlEndingWith } from './common';
 import { PATHS } from './paths';
 
 export class ApiKeysPage extends BasePage implements Screen {
@@ -30,7 +32,7 @@ export class ApiKeysPage extends BasePage implements Screen {
   }
 
   get ready(): Locator {
-    return this.page.getByRole('button', { name: 'New API Key' });
+    return this.page.getByRole('button', { name: COPY.newKey });
   }
 
   keyRow(name: string): Locator {
@@ -38,16 +40,17 @@ export class ApiKeysPage extends BasePage implements Screen {
   }
 
   get generatedKeyDialog(): Locator {
-    return this.dialog('Your API key has been generated!');
+    return this.dialog(COPY.generated.title);
   }
 
   async fillNewKeyForm(name: string, expiryLabel: string, allowedPath: string): Promise<void> {
     await this.ready.click();
-    const form = this.dialog('Generate a New API Key');
-    await form.getByPlaceholder('My API Key').fill(name);
-    await selectBox(form).click();
+    const form = this.dialog(COPY.create.title);
+    await form.getByRole('textbox', { name: COPY.create.name.label }).fill(name);
+    await form.getByRole('combobox', { name: COPY.create.expiration.label }).click();
     await selectOption(this.page, expiryLabel).click();
-    await textInputs(form).nth(1).fill(allowedPath);
+    const path = form.getByRole('textbox', { name: COPY.create.allowedPath.label });
+    await path.fill(allowedPath);
   }
 
   // Submits the new-key form and returns the one-time API key from the create response.
@@ -55,16 +58,30 @@ export class ApiKeysPage extends BasePage implements Screen {
     const created = this.page.waitForResponse(
       (res) => res.url().endsWith('/api-keys') && res.request().method() === 'POST',
     );
-    await this.dialog('Generate a New API Key').getByRole('button', { name: 'Generate' }).click();
+    await this.dialog(COPY.create.title).getByRole('button', { name: COPY.create.submit }).click();
     return ((await (await created).json()) as { apiKey: string }).apiKey;
   }
 
   async closeGeneratedKeyDialog(): Promise<void> {
-    await this.generatedKeyDialog.getByRole('button', { name: 'Close' }).click();
+    await this.generatedKeyDialog.getByRole('button', { name: COPY.generated.close }).click();
   }
 
   async revokeKey(name: string): Promise<void> {
-    await this.keyRow(name).getByRole('button', { name: 'Revoke' }).click();
-    await this.confirmDialog('Are you sure you want to revoke this API key?');
+    await this.keyRow(name).getByRole('button', { name: COPY.revoke }).click();
+    await this.confirmDialog(COPY.confirm.title(name), COPY.confirm.confirm);
+  }
+
+  async search(keyword: string): Promise<void> {
+    const box = this.page.getByRole('textbox', { name: COPY.searchPlaceholder });
+    await box.fill(keyword);
+    await box.press('Enter');
+  }
+
+  async sortByExpiration(): Promise<void> {
+    await this.page.getByRole('columnheader', { name: COPY.columns.expiration }).click();
+  }
+
+  keyNames(): Promise<string[]> {
+    return firstCellTexts(this.page);
   }
 }
