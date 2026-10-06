@@ -16,8 +16,8 @@
  *
  */
 
-import { useMemo } from 'react';
 import { theme } from 'antd';
+import { useMemo } from 'react';
 import styled from 'styled-components';
 
 import { getPluginConfig } from '@/plugins';

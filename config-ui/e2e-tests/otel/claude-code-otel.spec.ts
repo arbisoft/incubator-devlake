@@ -16,12 +16,12 @@
  *
  */
 
+import { randomUUID } from 'crypto';
+
 import { APIRequestContext } from '@playwright/test';
 
-import { test, expect } from '../fixtures';
 import { getAdminSessionToken, loginAsAdmin } from '../auth-helpers';
-import { randomUUID } from 'crypto';
-import { APP_URL, COLLECTOR_URL, GRAFANA_URL, OTLP_HTTP_URL, PROMETHEUS_URL } from '../support/env';
+import { test, expect } from '../fixtures';
 import {
   adminApi,
   createProject,
@@ -31,6 +31,7 @@ import {
   uniqueName,
 } from '../support/api';
 import { hiddenOtelConnectionCount, runSql } from '../support/db';
+import { APP_URL, COLLECTOR_URL, GRAFANA_URL, OTLP_HTTP_URL, PROMETHEUS_URL } from '../support/env';
 import { ConnectionsPage } from '../support/pages/connections';
 import { OtelPage } from '../support/pages/otel';
 

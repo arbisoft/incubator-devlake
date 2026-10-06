@@ -16,29 +16,29 @@
  *
  */
 
-import { useState, useEffect, useMemo } from 'react';
-import { omit } from 'lodash';
 import { Flex, Form, Input, Card, Alert, Divider, Select, Button } from 'antd';
+import { omit } from 'lodash';
+import { useState, useEffect, useMemo } from 'react';
 
 import API from '@/api';
 import { ExternalLink, Block, Message } from '@/components';
 import { transformEntities } from '@/config';
 import { getPluginConfig } from '@/plugins';
-import { GitHubTransformation } from '@/plugins/register/github';
-import { JiraTransformation } from '@/plugins/register/jira';
-import { GitLabTransformation } from '@/plugins/register/gitlab';
-import { JenkinsTransformation } from '@/plugins/register/jenkins';
+import { ArgoCDTransformation } from '@/plugins/register/argocd';
+import { AsanaTransformation } from '@/plugins/register/asana';
+import { AzureTransformation } from '@/plugins/register/azure';
+import { BambooTransformation } from '@/plugins/register/bamboo';
 import { BitbucketTransformation } from '@/plugins/register/bitbucket';
 import { BitbucketServerTransformation } from '@/plugins/register/bitbucket-server';
-import { AzureTransformation } from '@/plugins/register/azure';
-import { TapdTransformation } from '@/plugins/register/tapd';
-import { BambooTransformation } from '@/plugins/register/bamboo';
 import { CircleCITransformation } from '@/plugins/register/circleci';
-import { ArgoCDTransformation } from '@/plugins/register/argocd';
-import { GhCopilotTransformation } from '@/plugins/register/gh-copilot';
-import { AsanaTransformation } from '@/plugins/register/asana';
-import { SalesforceTransformation } from '@/plugins/register/salesforce';
 import { ClickUpTransformation } from '@/plugins/register/clickup';
+import { GhCopilotTransformation } from '@/plugins/register/gh-copilot';
+import { GitHubTransformation } from '@/plugins/register/github';
+import { GitLabTransformation } from '@/plugins/register/gitlab';
+import { JenkinsTransformation } from '@/plugins/register/jenkins';
+import { JiraTransformation } from '@/plugins/register/jira';
+import { SalesforceTransformation } from '@/plugins/register/salesforce';
+import { TapdTransformation } from '@/plugins/register/tapd';
 import { YoutrackTransformation } from '@/plugins/register/youtrack';
 import { DOC_URL } from '@/release';
 import { operator } from '@/utils';

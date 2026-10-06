@@ -16,23 +16,23 @@
  *
  */
 
-import { useState, useEffect, useMemo } from 'react';
-import { useLoaderData, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
-import { Layout as AntdLayout, Menu, Divider, Dropdown, Button, Tooltip } from 'antd';
 import { UserOutlined, SunOutlined, MoonOutlined, DesktopOutlined } from '@ant-design/icons';
+import { Layout as AntdLayout, Menu, Divider, Dropdown, Button, Tooltip } from 'antd';
+import { useState, useEffect, useMemo } from 'react';
+import { Helmet } from 'react-helmet';
+import { useLoaderData, Outlet, useNavigate, useLocation } from 'react-router-dom';
 
 import API from '@/api';
+import type { AccessCurrent } from '@/api/access';
 import { PageLoading, Logo, ExternalLink } from '@/components';
 import { init, selectError, selectStatus, cycleMode, selectThemeMode } from '@/features';
-import { OnboardCard } from '@/routes/onboard/components';
-import { OtelAttention } from '@/routes/otel/attention';
 import { useAppDispatch, useAppSelector } from '@/hooks';
-
-import { ACCESS_PATH, menuItems, menuItemsMatch, headerItems } from './config';
-import type { AccessCurrent } from '@/api/access';
 import { canManageAccess } from '@/routes/access/guard';
 import { useAccountMenu, useIdentityLinkNotification } from '@/routes/access/use-account-menu';
+import { OnboardCard } from '@/routes/onboard/components';
+import { OtelAttention } from '@/routes/otel/attention';
+
+import { ACCESS_PATH, menuItems, menuItemsMatch, headerItems } from './config';
 
 const themeIcon = {
   light: <SunOutlined />,

@@ -16,14 +16,14 @@
  *
  */
 
-import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { EyeOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import { theme, Table, Button, Modal } from 'antd';
+import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 
-import { selectConnections } from '@/features/connections';
 import { PATHS } from '@/config';
+import { selectConnections } from '@/features/connections';
 import { useAppSelector } from '@/hooks';
 import { getPluginConfig, ConnectionStatus, ConnectionForm } from '@/plugins';
 import { WebHookConnection } from '@/plugins/register/webhook';

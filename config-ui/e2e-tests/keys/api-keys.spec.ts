@@ -17,8 +17,8 @@
  */
 import { APIRequestContext } from '@playwright/test';
 
-import { test, expect } from '../fixtures';
 import { loginAsAdmin } from '../auth-helpers';
+import { test, expect } from '../fixtures';
 import { adminApi, deleteApiKeysByPrefix, listApiKeys, uniqueName } from '../support/api';
 import { API_URL } from '../support/env';
 import { ApiKeysPage } from '../support/pages/api-keys';

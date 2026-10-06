@@ -15,10 +15,11 @@
  * limitations under the License.
  *
  */
-import { BrowserContext, Request, TestInfo, test as base, expect } from '@playwright/test';
 import { createHash } from 'crypto';
 import fs from 'fs';
 import path from 'path';
+
+import { BrowserContext, Request, TestInfo, test as base, expect } from '@playwright/test';
 
 import {
   GOLDEN_IGNORED_WRITES,
@@ -35,7 +36,7 @@ export interface RecordedWrite {
   body: unknown;
 }
 
-export interface Golden {
+interface Golden {
   titlePath: string[];
   writes: RecordedWrite[];
 }
@@ -139,7 +140,7 @@ const slugify = (text: string): string =>
     .replace(/^-+|-+$/g, '')
     .slice(0, 80);
 
-export function goldenPath(testInfo: TestInfo): string {
+function goldenPath(testInfo: TestInfo): string {
   const specPath = path.relative(testInfo.project.testDir, testInfo.file).replace(/\.spec\.ts$/, '');
   const titlePath = testInfo.titlePath.slice(1);
   const hash = createHash('sha1').update(titlePath.join('\u0000')).digest('hex').slice(0, 8);

@@ -18,11 +18,12 @@
 import { APIRequestContext, APIResponse, PlaywrightWorkerArgs, expect } from '@playwright/test';
 
 import { getAdminSessionToken } from '../auth-helpers';
+
 import { API_URL } from './env';
 
 const CSRF_TOKEN = 'e2e-csrf-token';
 
-export const E2E_PREFIX = 'e2e-';
+const E2E_PREFIX = 'e2e-';
 
 export const uniqueName = (label: string) =>
   `${E2E_PREFIX}${label}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -110,7 +111,7 @@ export async function findConnectionByName(
   return (await listConnections(api, plugin)).find((c) => c.name === name);
 }
 
-export async function deleteScope(
+async function deleteScope(
   api: APIRequestContext,
   plugin: string,
   connectionId: number,
@@ -145,7 +146,7 @@ export async function deleteConnectionsByPrefix(api: APIRequestContext, plugin: 
   }
 }
 
-export interface ApiScope {
+interface ApiScope {
   id?: string | number;
   githubId?: number;
   name?: string;
@@ -267,7 +268,7 @@ export async function getPipeline(api: APIRequestContext, id: number): Promise<A
   return json(await api.get(`/pipelines/${id}`), `get pipeline ${id}`);
 }
 
-export async function cancelPipeline(api: APIRequestContext, id: number): Promise<void> {
+async function cancelPipeline(api: APIRequestContext, id: number): Promise<void> {
   await api.delete(`/pipelines/${id}`);
 }
 
@@ -355,7 +356,7 @@ export interface ApiOidcProvider {
   [key: string]: unknown;
 }
 
-export async function listOidcProviders(api: APIRequestContext): Promise<ApiOidcProvider[]> {
+async function listOidcProviders(api: APIRequestContext): Promise<ApiOidcProvider[]> {
   return json(await api.get('/access/oidc-providers'), 'list oidc providers');
 }
 
@@ -372,7 +373,7 @@ export interface ApiOtelConnection {
   projects: { name: string }[];
 }
 
-export async function listOtelConnections(api: APIRequestContext): Promise<ApiOtelConnection[]> {
+async function listOtelConnections(api: APIRequestContext): Promise<ApiOtelConnection[]> {
   return json(await api.get('/plugins/claude_otel/connections'), 'list otel connections');
 }
 

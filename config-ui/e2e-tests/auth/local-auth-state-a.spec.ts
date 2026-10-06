@@ -15,10 +15,10 @@
  * limitations under the License.
  *
  */
-import { test, expect } from '../fixtures';
 import { loginAsAdmin } from '../auth-helpers';
-import { countLocalCredentials } from '../support/db';
+import { test, expect } from '../fixtures';
 import { fetchAuthMethods } from '../support/auth-state';
+import { countLocalCredentials } from '../support/db';
 import { LoginPage } from '../support/pages/login';
 import { SettingsUsersPage } from '../support/pages/settings-users';
 

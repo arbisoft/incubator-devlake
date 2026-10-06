@@ -18,6 +18,7 @@
 import { Locator, Page } from '@playwright/test';
 
 import { LinkableProvider, PageResponse } from '../api';
+
 import { BasePage, sidebarMenu } from './common';
 
 const THEME_STORAGE_KEY = 'devlake.theme';

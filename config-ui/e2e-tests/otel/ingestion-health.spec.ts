@@ -17,8 +17,8 @@
  */
 
 // Verifies the /otel page renders the degraded and unhealthy ingestion states computed by the backend.
-import { test, expect } from '../fixtures';
 import { loginAsAdmin } from '../auth-helpers';
+import { test, expect } from '../fixtures';
 import { runSql } from '../support/db';
 import { OtelPage } from '../support/pages/otel';
 

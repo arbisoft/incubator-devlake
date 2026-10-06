@@ -15,8 +15,8 @@
  * limitations under the License.
  *
  */
-import { test, expect } from '../fixtures';
 import { loginAsAdmin } from '../auth-helpers';
+import { test, expect } from '../fixtures';
 import { PATHS } from '../support/pages/paths';
 import { ProjectsPage } from '../support/pages/projects';
 import { ShellPage } from '../support/pages/shell';

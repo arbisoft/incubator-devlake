@@ -16,21 +16,21 @@
  *
  */
 
-import { useState, useEffect, useMemo } from 'react';
 import { SearchOutlined } from '@ant-design/icons';
+import { useDebounce } from 'ahooks';
 import { Space, Tag, Input, message } from 'antd';
+import { uniqBy } from 'lodash';
 import type { McsID, McsItem, McsColumn } from 'miller-columns-select';
 import MillerColumnsSelect from 'miller-columns-select';
-import { useDebounce } from 'ahooks';
-import { uniqBy } from 'lodash';
+import { useState, useEffect, useMemo } from 'react';
 
 import API from '@/api';
 import { Loading, Block } from '@/components';
-import { IPluginConfig } from '@/types';
 import { getPluginScopeName } from '@/plugins';
+import { IPluginConfig } from '@/types';
 
-import * as T from './types';
 import * as S from './styled';
+import * as T from './types';
 
 interface Props {
   mode: 'single' | 'multiple';

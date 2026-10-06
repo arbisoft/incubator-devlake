@@ -19,7 +19,7 @@ import { execFileSync } from 'child_process';
 
 import { E2E_USER_PREFIX } from './env';
 
-export interface DbCredentials {
+interface DbCredentials {
   user: string;
   password: string;
   database: string;
@@ -28,7 +28,7 @@ export interface DbCredentials {
 }
 
 // Credentials come from E2E_DB_USER/PASSWORD/NAME, falling back to the app DB_URL (not E2E_DB_URL, which targets the Go test database).
-export function dbCredentials(): DbCredentials {
+function dbCredentials(): DbCredentials {
   let parsed: URL | undefined;
   if (process.env.DB_URL) {
     try {

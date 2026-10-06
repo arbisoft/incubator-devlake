@@ -17,8 +17,8 @@
  */
 import { APIRequestContext } from '@playwright/test';
 
-import { test, expect } from '../fixtures';
 import { loginAsAdmin } from '../auth-helpers';
+import { test, expect } from '../fixtures';
 import { adminApi, createGithubConnection, deleteConnection, listScopes, uniqueName } from '../support/api';
 import { ConnectionDetailPage, PLUGINS } from '../support/pages/connections';
 

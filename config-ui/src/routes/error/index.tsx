@@ -16,9 +16,9 @@
  *
  */
 
-import { useRouteError, useNavigate } from 'react-router-dom';
 import { CloseCircleOutlined } from '@ant-design/icons';
 import { Card, Space, Flex, Button } from 'antd';
+import { useRouteError, useNavigate } from 'react-router-dom';
 
 import { TipLayout } from '@/components';
 import { PATHS } from '@/config';

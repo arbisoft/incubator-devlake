@@ -19,8 +19,8 @@
 import { DOC_URL } from '@/release';
 import { IPluginConfig } from '@/types';
 
-import { DBUrl } from './connection-fields';
 import Icon from './assets/icon.svg?react';
+import { DBUrl } from './connection-fields';
 
 export const ZenTaoConfig: IPluginConfig = {
   plugin: 'zentao',

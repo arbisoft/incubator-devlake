@@ -15,8 +15,8 @@
  * limitations under the License.
  *
  */
-import { useParams } from 'react-router-dom';
 import { Card } from 'antd';
+import { useParams } from 'react-router-dom';
 
 import { PageHeader } from '@/components';
 import { PATHS } from '@/config';

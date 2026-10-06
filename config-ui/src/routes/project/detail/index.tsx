@@ -16,12 +16,11 @@
  *
  */
 
-import { useEffect, useRef, useState } from 'react';
-import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-
-import { Helmet } from 'react-helmet';
 import { Tabs, message } from 'antd';
+import axios from 'axios';
+import { useEffect, useRef, useState } from 'react';
+import { Helmet } from 'react-helmet';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 
 import API from '@/api';
 import { PageHeader, PageLoading } from '@/components';
@@ -29,10 +28,10 @@ import { PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
 import { BlueprintDetail, FromEnum } from '@/routes';
 
-import { WebhooksPanel } from './webhooks-panel';
-import { SettingsPanel } from './settings-panel';
 import { ClaudeCodeOtelPanel } from './claude-code-otel-panel';
+import { SettingsPanel } from './settings-panel';
 import * as S from './styled';
+import { WebhooksPanel } from './webhooks-panel';
 
 const brandName = import.meta.env.DEVLAKE_BRAND_NAME ?? 'DevLake';
 

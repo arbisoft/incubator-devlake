@@ -17,20 +17,20 @@
  */
 import { APIRequestContext, Page } from '@playwright/test';
 
-import { test, expect } from '../fixtures';
 import { loginAsAdmin } from '../auth-helpers';
+import { test, expect } from '../fixtures';
 import { adminApi } from '../support/api';
 import { fetchAuthMethods } from '../support/auth-state';
+import { ApiKeysPage } from '../support/pages/api-keys';
+import { BlueprintPage } from '../support/pages/blueprints';
 import { Screen } from '../support/pages/common';
 import { ConnectionsPage } from '../support/pages/connections';
+import { LoginPage } from '../support/pages/login';
 import { OnboardPage } from '../support/pages/onboard';
 import { OtelPage } from '../support/pages/otel';
 import { PATHS } from '../support/pages/paths';
 import { PipelinesPage } from '../support/pages/pipelines';
 import { ProjectsPage } from '../support/pages/projects';
-import { BlueprintPage } from '../support/pages/blueprints';
-import { ApiKeysPage } from '../support/pages/api-keys';
-import { LoginPage } from '../support/pages/login';
 import { SettingsUsersPage } from '../support/pages/settings-users';
 import { ShellPage } from '../support/pages/shell';
 

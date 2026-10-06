@@ -16,8 +16,8 @@
  *
  */
 
-import { useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
+import { useParams } from 'react-router-dom';
 
 import { PageHeader } from '@/components';
 import { PATHS } from '@/config';

@@ -20,7 +20,7 @@ import { Locator, Page } from '@playwright/test';
 import { BasePage, Screen, urlEndingWith, iconButton, tableRow, tagWithText } from './common';
 import { PATHS } from './paths';
 
-export const catalogCard = (page: Page, name: string): Locator =>
+const catalogCard = (page: Page, name: string): Locator =>
   page.locator('li').filter({ has: page.locator('.name', { hasText: new RegExp(`^${name}$`) }) });
 
 // A plugin's catalog display name and its key in API paths.

@@ -22,7 +22,7 @@ import { TEST_ACTION_HEADER } from '../constants';
 
 // Structural and AntD-specific helpers shared by every page object, so a visual reskin only touches page objects.
 
-export const modalByTitle = (page: Page, title: string | RegExp): Locator => page.getByRole('dialog', { name: title });
+const modalByTitle = (page: Page, title: string | RegExp): Locator => page.getByRole('dialog', { name: title });
 
 export const modalWithText = (page: Page, text: string | RegExp): Locator =>
   page.getByRole('dialog').filter({ hasText: text });
@@ -35,7 +35,7 @@ export const tableRows = (scope: Page | Locator): Locator => scope.locator('tbod
 export const tableWithRow = (page: Page, text: string | RegExp): Locator =>
   page.locator('.ant-table').filter({ has: tableRow(page, text) });
 
-export const toast = (page: Page, text: string | RegExp): Locator =>
+const toast = (page: Page, text: string | RegExp): Locator =>
   page.locator('.ant-message-notice').filter({ hasText: text });
 
 export const sidebarMenu = (page: Page): Locator => page.getByRole('menu').first();
@@ -47,7 +47,7 @@ export const selectOption = (page: Page, label: string | RegExp): Locator =>
 export const iconButton = (scope: Page | Locator, iconName: string): Locator =>
   scope.locator(`button:has([aria-label="${iconName}"])`);
 
-export const tabByName = (page: Page, name: string): Locator => page.getByRole('tab', { name, exact: true });
+const tabByName = (page: Page, name: string): Locator => page.getByRole('tab', { name, exact: true });
 
 // The five cron inputs (minute, hour, day, month, week) of the Custom sync frequency.
 export const cronFieldInputs = (dialog: Locator): Locator => dialog.locator('input.ant-input');
@@ -66,7 +66,7 @@ export const sectionHeaderButton = (page: Page, heading: string): Locator =>
   page.locator('h3', { hasText: heading }).getByRole('button');
 
 // AntD 6 Empty renders both an SVG title and a description with the same text; target the description.
-export const emptyState = (page: Page, text: string): Locator =>
+const emptyState = (page: Page, text: string): Locator =>
   page.locator('.ant-empty-description').filter({ hasText: text });
 
 // antd 6 JS-ellipsis keeps the full value only in aria-label, so read it from there when present.

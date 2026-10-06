@@ -17,12 +17,12 @@
  */
 import { APIRequestContext } from '@playwright/test';
 
-import { test, expect } from '../fixtures';
 import { loginAsAdmin } from '../auth-helpers';
-import { API_URL, APP_URL, E2E_USER_PREFIX } from '../support/env';
-import { countLocalCredentials, mustChangePasswordFor, passwordHashFor, resetLocalAuthState } from '../support/db';
+import { test, expect } from '../fixtures';
 import { ApiAccessUser, ApiMessage, adminApi, findAccessUserByLogin, listAccessUsers } from '../support/api';
 import { fetchAuthMethods } from '../support/auth-state';
+import { countLocalCredentials, mustChangePasswordFor, passwordHashFor, resetLocalAuthState } from '../support/db';
+import { API_URL, APP_URL, E2E_USER_PREFIX } from '../support/env';
 import { LoginPage } from '../support/pages/login';
 import { SettingsUsersPage } from '../support/pages/settings-users';
 import { ShellPage } from '../support/pages/shell';
