@@ -27,6 +27,7 @@ import {
   codeBlock,
   editableControls,
   modalCloseButton,
+  cellFullText,
   modalWithText,
   openModals,
   rowCells,
@@ -244,7 +245,7 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     // 4. The row shows the bound organization, and every listed row matches the API
     await page.reload();
     await expect(newRow).toBeVisible();
-    await expect(newRow.getByText(organizationId)).toBeVisible();
+    expect(await cellFullText(rowCells(newRow).nth(3))).toBe(organizationId);
     await expect(newRow.getByText('Pending first telemetry')).toHaveCount(0);
     const connectionsResp = await page.request.get('/api/plugins/claude_otel/connections');
     expect(connectionsResp.status()).toBe(200);
@@ -256,7 +257,7 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     for (let i = 0; i < rowCount; i++) {
       const cells = rowCells(rows.nth(i));
       const teamName = (await cells.nth(0).innerText()).trim();
-      const organization = (await cells.nth(3).innerText()).trim();
+      const organization = await cellFullText(cells.nth(3));
       const expected = connections
         .filter((it) => it.connection.teamName === teamName)
         .map((it) => it.connection.organizationId ?? 'Pending first telemetry');

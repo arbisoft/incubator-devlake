@@ -16,198 +16,199 @@
  *
  */
 
-import { deepEqual } from 'node:assert/strict';
-import { test } from 'node:test';
+import { describe, expect, it } from 'vitest';
 
 import { buildConnectionSavePayload } from './payload';
 
-test('preserves plugin defaults when save values only include touched fields', () => {
-  const payload = buildConnectionSavePayload(
-    {
+describe('plugins/components/connection-form/payload', () => {
+  it('preserves plugin defaults when save values only include touched fields', () => {
+    const payload = buildConnectionSavePayload(
+      {
+        endpoint: 'https://api.github.com/',
+        authMethod: 'AccessToken',
+      },
+      {
+        name: 'GitHub',
+        token: 'token',
+      },
+    );
+
+    expect(payload).toStrictEqual({
       endpoint: 'https://api.github.com/',
       authMethod: 'AccessToken',
-    },
-    {
       name: 'GitHub',
       token: 'token',
-    },
-  );
-
-  deepEqual(payload, {
-    endpoint: 'https://api.github.com/',
-    authMethod: 'AccessToken',
-    name: 'GitHub',
-    token: 'token',
+    });
   });
-});
 
-test('uses form values when they override plugin defaults', () => {
-  const payload = buildConnectionSavePayload(
-    {
-      endpoint: 'https://api.github.com/',
-      authMethod: 'AccessToken',
-    },
-    {
+  it('uses form values when they override plugin defaults', () => {
+    const payload = buildConnectionSavePayload(
+      {
+        endpoint: 'https://api.github.com/',
+        authMethod: 'AccessToken',
+      },
+      {
+        endpoint: 'https://github.example.com/api/v3/',
+        authMethod: 'AppKey',
+        name: 'GitHub Enterprise',
+      },
+    );
+
+    expect(payload).toStrictEqual({
       endpoint: 'https://github.example.com/api/v3/',
       authMethod: 'AppKey',
       name: 'GitHub Enterprise',
-    },
-  );
-
-  deepEqual(payload, {
-    endpoint: 'https://github.example.com/api/v3/',
-    authMethod: 'AppKey',
-    name: 'GitHub Enterprise',
+    });
   });
-});
 
-test('drops defaults that are not supported connection save fields', () => {
-  const payload = buildConnectionSavePayload(
-    {
+  it('drops defaults that are not supported connection save fields', () => {
+    const payload = buildConnectionSavePayload(
+      {
+        endpoint: 'https://api.github.com/',
+        unexpectedDefault: 'do-not-send',
+      },
+      {
+        name: 'GitHub',
+        token: 'token',
+      },
+    );
+
+    expect(payload).toStrictEqual({
       endpoint: 'https://api.github.com/',
-      unexpectedDefault: 'do-not-send',
-    },
-    {
       name: 'GitHub',
       token: 'token',
-    },
-  );
-
-  deepEqual(payload, {
-    endpoint: 'https://api.github.com/',
-    name: 'GitHub',
-    token: 'token',
-  });
-});
-
-test('handles undefined initialValues without throwing', () => {
-  const payload = buildConnectionSavePayload(undefined, {
-    name: 'GitHub',
-    token: 'token',
+    });
   });
 
-  deepEqual(payload, {
-    name: 'GitHub',
-    token: 'token',
-  });
-});
+  it('handles undefined initialValues without throwing', () => {
+    const payload = buildConnectionSavePayload(undefined, {
+      name: 'GitHub',
+      token: 'token',
+    });
 
-// Empty `values` is not a realistic save (the backend requires a `name`),
-// but the helper itself must not throw or strip defaults if it ever happens.
-test('does not throw when values is empty and preserves defaults', () => {
-  const payload = buildConnectionSavePayload(
-    {
+    expect(payload).toStrictEqual({
+      name: 'GitHub',
+      token: 'token',
+    });
+  });
+
+  // Empty `values` is not a realistic save (the backend requires a `name`),
+  // but the helper itself must not throw or strip defaults if it ever happens.
+  it('does not throw when values is empty and preserves defaults', () => {
+    const payload = buildConnectionSavePayload(
+      {
+        endpoint: 'https://api.github.com/',
+        authMethod: 'AccessToken',
+      },
+      {},
+    );
+
+    expect(payload).toStrictEqual({
       endpoint: 'https://api.github.com/',
       authMethod: 'AccessToken',
-    },
-    {},
-  );
-
-  deepEqual(payload, {
-    endpoint: 'https://api.github.com/',
-    authMethod: 'AccessToken',
+    });
   });
-});
 
-test('lets an explicit empty string in values clear a default', () => {
-  const payload = buildConnectionSavePayload(
-    {
+  it('lets an explicit empty string in values clear a default', () => {
+    const payload = buildConnectionSavePayload(
+      {
+        endpoint: 'https://api.github.com/',
+        proxy: 'http://proxy:8080',
+      },
+      { name: 'GitHub', proxy: '' },
+    );
+
+    expect(payload).toStrictEqual({
       endpoint: 'https://api.github.com/',
-      proxy: 'http://proxy:8080',
-    },
-    { name: 'GitHub', proxy: '' },
-  );
-
-  deepEqual(payload, {
-    endpoint: 'https://api.github.com/',
-    name: 'GitHub',
-    proxy: '',
+      name: 'GitHub',
+      proxy: '',
+    });
   });
-});
 
-test('lets an explicit false in values override a true default', () => {
-  const payload = buildConnectionSavePayload({ enableWebhook: true }, { name: 'GitHub', enableWebhook: false });
+  it('lets an explicit false in values override a true default', () => {
+    const payload = buildConnectionSavePayload({ enableWebhook: true }, { name: 'GitHub', enableWebhook: false });
 
-  deepEqual(payload, {
-    name: 'GitHub',
-    enableWebhook: false,
+    expect(payload).toStrictEqual({
+      name: 'GitHub',
+      enableWebhook: false,
+    });
   });
-});
 
-test('ignores explicit undefined in values so defaults are preserved', () => {
-  const payload = buildConnectionSavePayload(
-    { endpoint: 'https://api.github.com/' },
-    { endpoint: undefined, name: 'GitHub' },
-  );
+  it('ignores explicit undefined in values so defaults are preserved', () => {
+    const payload = buildConnectionSavePayload(
+      { endpoint: 'https://api.github.com/' },
+      { endpoint: undefined, name: 'GitHub' },
+    );
 
-  deepEqual(payload, {
-    endpoint: 'https://api.github.com/',
-    name: 'GitHub',
+    expect(payload).toStrictEqual({
+      endpoint: 'https://api.github.com/',
+      name: 'GitHub',
+    });
   });
-});
 
-test('preserves saved github app fields when update values are incomplete', () => {
-  const payload = buildConnectionSavePayload(
-    {
+  it('preserves saved github app fields when update values are incomplete', () => {
+    const payload = buildConnectionSavePayload(
+      {
+        endpoint: 'https://api.github.com/',
+        authMethod: 'AppKey',
+        appId: '3702997',
+        secretKey: '-----BEGIN RSA PRIVATE KEY-----***-----END RSA PRIVATE KEY-----',
+        installationId: 132075486,
+      },
+      {
+        name: 'Github App Tesing',
+        appId: '3702997',
+        secretKey: undefined,
+        installationId: undefined,
+      },
+    );
+
+    expect(payload).toStrictEqual({
       endpoint: 'https://api.github.com/',
       authMethod: 'AppKey',
       appId: '3702997',
       secretKey: '-----BEGIN RSA PRIVATE KEY-----***-----END RSA PRIVATE KEY-----',
       installationId: 132075486,
-    },
-    {
       name: 'Github App Tesing',
-      appId: '3702997',
-      secretKey: undefined,
-      installationId: undefined,
-    },
-  );
-
-  deepEqual(payload, {
-    endpoint: 'https://api.github.com/',
-    authMethod: 'AppKey',
-    appId: '3702997',
-    secretKey: '-----BEGIN RSA PRIVATE KEY-----***-----END RSA PRIVATE KEY-----',
-    installationId: 132075486,
-    name: 'Github App Tesing',
+    });
   });
-});
 
-test('keeps custom headers in the save payload', () => {
-  const payload = buildConnectionSavePayload(
-    {
+  it('keeps custom headers in the save payload', () => {
+    const payload = buildConnectionSavePayload(
+      {
+        endpoint: 'https://api.anthropic.com/v1/',
+      },
+      {
+        name: 'Claude Code',
+        token: 'token',
+        customHeaders: [{ key: 'X-Middleware-Auth', value: 'secret' }],
+      },
+    );
+
+    expect(payload).toStrictEqual({
       endpoint: 'https://api.anthropic.com/v1/',
-    },
-    {
       name: 'Claude Code',
       token: 'token',
       customHeaders: [{ key: 'X-Middleware-Auth', value: 'secret' }],
-    },
-  );
-
-  deepEqual(payload, {
-    endpoint: 'https://api.anthropic.com/v1/',
-    name: 'Claude Code',
-    token: 'token',
-    customHeaders: [{ key: 'X-Middleware-Auth', value: 'secret' }],
+    });
   });
-});
 
-test('keeps saved custom headers when the form does not set them', () => {
-  const payload = buildConnectionSavePayload(
-    {
+  it('keeps saved custom headers when the form does not set them', () => {
+    const payload = buildConnectionSavePayload(
+      {
+        endpoint: 'https://api.anthropic.com/v1/',
+        customHeaders: [{ key: 'X-Middleware-Auth', value: 'secret' }],
+      },
+      {
+        name: 'Claude Code',
+        customHeaders: undefined,
+      },
+    );
+
+    expect(payload).toStrictEqual({
       endpoint: 'https://api.anthropic.com/v1/',
       customHeaders: [{ key: 'X-Middleware-Auth', value: 'secret' }],
-    },
-    {
       name: 'Claude Code',
-      customHeaders: undefined,
-    },
-  );
-
-  deepEqual(payload, {
-    endpoint: 'https://api.anthropic.com/v1/',
-    customHeaders: [{ key: 'X-Middleware-Auth', value: 'secret' }],
-    name: 'Claude Code',
+    });
   });
 });

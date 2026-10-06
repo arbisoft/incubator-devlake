@@ -31,12 +31,16 @@ type JiraOptions struct {
 	ScopeConfig   *models.JiraScopeConfig `json:"scopeConfig" mapstructure:"scopeConfig"`
 	ScopeConfigId uint64                  `json:"scopeConfigId" mapstructure:"scopeConfigId"`
 	PageSize      int                     `json:"pageSize" mapstructure:"pageSize"`
+	ProjectName   string                  `json:"projectName,omitempty" mapstructure:"projectName,omitempty"`
 }
 
 type JiraTaskData struct {
 	Options        *JiraOptions
 	ApiClient      *api.ApiAsyncClient
 	JiraServerInfo models.JiraServerInfo
+	FilterId       string
+	Board          *models.JiraBoard
+	ProjectName    string // DevLake project name, empty if pipeline has no project
 }
 
 type JiraApiParams models.JiraApiParams

@@ -26,27 +26,35 @@ import { BitbucketConfig } from './bitbucket';
 import { BitbucketServerConfig } from './bitbucket-server';
 import { CircleCIConfig } from './circleci';
 import { ClaudeCodeConfig } from './claude-code';
+import { ClickUpConfig } from './clickup';
 import { GitHubConfig } from './github';
 import { CodexConfig } from './codex';
 import { CursorConfig } from './cursor';
 import { GhCopilotConfig } from './gh-copilot';
 import { GitLabConfig } from './gitlab';
+import { GrafanaIrmConfig } from './grafana_irm';
+import { IncidentioConfig } from './incidentio';
 import { JenkinsConfig } from './jenkins';
 import { JiraConfig } from './jira';
 import { HubspotConfig } from './hubspot';
 import { NotionConfig } from './notion';
+import { KiroConfig } from './kiro';
+import { LinearConfig } from './linear';
 import { PagerDutyConfig } from './pagerduty';
 import { SalesforceConfig } from './salesforce';
 import { PlaneConfig } from './plane';
+import { RootlyConfig } from './rootly';
 import { SonarQubeConfig } from './sonarqube';
 import { TAPDConfig } from './tapd';
 import { WebhookConfig } from './webhook';
+import { YoutrackConfig } from './youtrack';
 import { ZenTaoConfig } from './zentao';
 import { OpsgenieConfig } from './opsgenie';
 import { QDevConfig } from './q-dev';
 import { TeambitionConfig } from './teambition';
 import { TestmoConfig } from './testmo';
 import { SlackConfig } from './slack/config';
+import { TempoConfig } from './tempo';
 
 export const pluginConfigs: IPluginConfig[] = [
   ArgoCDConfig,
@@ -58,25 +66,33 @@ export const pluginConfigs: IPluginConfig[] = [
   BitbucketServerConfig,
   CircleCIConfig,
   ClaudeCodeConfig,
+  ClickUpConfig,
   GitHubConfig,
   CodexConfig,
   CursorConfig,
   GhCopilotConfig,
   GitLabConfig,
   HubspotConfig,
+  GrafanaIrmConfig,
+  IncidentioConfig,
   JenkinsConfig,
   JiraConfig,
   NotionConfig,
+  KiroConfig,
+  LinearConfig,
   PagerDutyConfig,
   SalesforceConfig,
   PlaneConfig,
+  RootlyConfig,
   SlackConfig,
+  TempoConfig,
   QDevConfig,
   SonarQubeConfig,
   TAPDConfig,
   TestmoConfig,
   ZenTaoConfig,
   WebhookConfig,
+  YoutrackConfig,
   OpsgenieConfig,
   TeambitionConfig,
 ].sort((a, b) => a.sort - b.sort);

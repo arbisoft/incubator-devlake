@@ -50,19 +50,16 @@ type Props = {
 
 const Callback = ({ label, value }: { label: string; value: string }) => (
   <Block title={label} description={OIDC_PROVIDER_MESSAGE.CALLBACK_DESCRIPTION}>
-    <Input
-      readOnly
-      value={value || 'Deployment public URL is not configured.'}
-      addonAfter={
-        value ? (
-          <CopyToClipboard text={value} onCopy={() => message.success('Callback URL copied.')}>
-            <Tooltip title={`Copy ${label}`}>
-              <Button type="text" icon={<CopyOutlined />} aria-label={`Copy ${label}`} />
-            </Tooltip>
-          </CopyToClipboard>
-        ) : undefined
-      }
-    />
+    <Space.Compact style={{ width: '100%' }}>
+      <Input readOnly value={value || 'Deployment public URL is not configured.'} />
+      {value ? (
+        <CopyToClipboard text={value} onCopy={() => message.success('Callback URL copied.')}>
+          <Tooltip title={`Copy ${label}`}>
+            <Button type="text" icon={<CopyOutlined />} aria-label={`Copy ${label}`} />
+          </Tooltip>
+        </CopyToClipboard>
+      ) : null}
+    </Space.Compact>
   </Block>
 );
 
@@ -143,10 +140,10 @@ export const AuthenticationEditor = ({ open, provider, callbacks, onClose, onSav
           </Button>
         </Space>
       }
-      destroyOnClose
+      destroyOnHidden
       width={720}
     >
-      <Space direction="vertical" size={16} style={{ display: 'flex' }}>
+      <Space orientation="vertical" size={16} style={{ display: 'flex' }}>
         <Callback
           label="DevLake callback URL"
           value={provider?.devlakeCallbackUrl ?? callbacks?.devlakeCallbackUrl ?? ''}
@@ -233,14 +230,14 @@ export const AuthenticationEditor = ({ open, provider, callbacks, onClose, onSav
           <Alert
             type="info"
             showIcon
-            message="A staged revision is awaiting activation. The active provider remains in use until then."
+            title="A staged revision is awaiting activation. The active provider remains in use until then."
           />
         )}
         {provider?.grafanaSyncStatus === OIDC_PROVIDER_SYNC_STATUS.COMPENSATION_FAILED && (
-          <Alert type="warning" showIcon message={OIDC_PROVIDER_MESSAGE.RECOVERY_REQUIRED} />
+          <Alert type="warning" showIcon title={OIDC_PROVIDER_MESSAGE.RECOVERY_REQUIRED} />
         )}
-        {operationError && <Alert type="error" showIcon message={operationError} />}
-        {operationSuccess && <Alert type="success" showIcon message={operationSuccess} />}
+        {operationError && <Alert type="error" showIcon title={operationError} />}
+        {operationSuccess && <Alert type="success" showIcon title={operationSuccess} />}
       </Space>
     </Modal>
   );

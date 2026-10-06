@@ -16,13 +16,5 @@
  *
  */
 
-
-// Playwright specs are not React Testing Library or Jest tests.
-module.exports = {
-  rules: {
-    'testing-library/prefer-screen-queries': 'off',
-    'jest/valid-title': 'off',
-    'jest/valid-expect': 'off',
-    'jest/no-conditional-expect': 'off',
-  },
-};
+export * from './tokens';
+export * from './ThemeProvider';

@@ -16,23 +16,24 @@
  *
  */
 
-import { deepEqual, equal } from 'node:assert/strict';
-import { test } from 'node:test';
+import { describe, expect, it } from 'vitest';
 
 import { IBPMode } from '../../../types';
 
 import { buildBlueprintCreatePayload } from './utils';
 
-test('normal blueprint create payload does not set a default timeAfter', () => {
-  const payload = buildBlueprintCreatePayload('github history', IBPMode.NORMAL, '0 0 * * *');
+describe('routes/blueprint/home/utils', () => {
+  it('normal blueprint create payload does not set a default timeAfter', () => {
+    const payload = buildBlueprintCreatePayload('github history', IBPMode.NORMAL, '0 0 * * *');
 
-  equal(Object.hasOwn(payload, 'timeAfter'), false);
-  deepEqual(payload.connections, []);
-});
+    expect(Object.hasOwn(payload, 'timeAfter')).toBe(false);
+    expect(payload.connections).toStrictEqual([]);
+  });
 
-test('advanced blueprint create payload does not set a default timeAfter', () => {
-  const payload = buildBlueprintCreatePayload('advanced history', IBPMode.ADVANCED, '0 0 * * *');
+  it('advanced blueprint create payload does not set a default timeAfter', () => {
+    const payload = buildBlueprintCreatePayload('advanced history', IBPMode.ADVANCED, '0 0 * * *');
 
-  equal(Object.hasOwn(payload, 'timeAfter'), false);
-  deepEqual(payload.plan, [[]]);
+    expect(Object.hasOwn(payload, 'timeAfter')).toBe(false);
+    expect(payload.plan).toStrictEqual([[]]);
+  });
 });

@@ -38,6 +38,7 @@ export interface IConnectionAPI {
   appId?: string;
   clientId?: string;
   secretKey?: string;
+  cloudId?: string;
   clientSecret?: string;
   dbUrl?: string;
   companyId?: number;
@@ -107,6 +108,7 @@ export interface IConnection {
   appId?: string;
   clientId?: string;
   secretKey?: string;
+  cloudId?: string;
   clientSecret?: string;
   dbUrl?: string;
   companyId?: number;

@@ -1413,7 +1413,7 @@
   },
   "timepicker": {},
   "timezone": "utc",
-  "title": "Claude - MySQL",
+  "title": "Claude Usage",
   "uid": "claude_adoption_mysql",
   "version": 3
 }

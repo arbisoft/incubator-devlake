@@ -97,7 +97,7 @@ export const SalesforceTransformation = ({ entities, transformation, setTransfor
                   style={{ marginTop: 12 }}
                   type="info"
                   showIcon
-                  message="CDC is not available in the current Salesforce implementation yet, so this option stays disabled."
+                  title="CDC is not available in the current Salesforce implementation yet, so this option stays disabled."
                 />
               </Form.Item>
             </>

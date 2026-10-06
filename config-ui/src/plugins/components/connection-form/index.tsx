@@ -18,7 +18,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { isEqual, pick } from 'lodash';
-import { Flex, Alert, Button } from 'antd';
+import { Flex, Alert, Button, message } from 'antd';
 
 import API from '@/api';
 import { useAppDispatch, useAppSelector } from '@/hooks';
@@ -98,10 +98,9 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: Props) => {
     };
   }, [plugin, connectionId]);
 
-  const {
-    name,
-    connection: { docLink, fields, initialValues },
-  } = getPluginConfig(plugin);
+  const pluginConfig = getPluginConfig(plugin);
+  const name = pluginConfig?.name;
+  const { docLink = '', fields = [], initialValues = {} } = pluginConfig?.connection ?? {};
 
   const disabled = useMemo(() => {
     return Object.values(errors).some((value) => value);
@@ -109,8 +108,12 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: Props) => {
 
   const sanitizedCustomHeaders = useMemo(() => sanitizeCustomHeaders(values.customHeaders), [values.customHeaders]);
 
+  if (!plugin || !name) {
+    return null;
+  }
+
   const handleTest = async () => {
-    await operator(
+    const [success, res] = await operator(
       () =>
         type === 'update' && connectionId
           ? API.connection.test(plugin, connectionId, {
@@ -127,6 +130,7 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: Props) => {
                 ? undefined
                 : values.refreshToken,
               appId: isEqual(selectedConnection?.appId, values.appId) ? undefined : values.appId,
+              cloudId: isEqual((selectedConnection as any)?.cloudId, values.cloudId) ? undefined : values.cloudId,
               clientId: isEqual((selectedConnection as any)?.clientId, values.clientId) ? undefined : values.clientId,
               secretKey: isEqual(selectedConnection?.secretKey, values.secretKey) ? undefined : values.secretKey,
               clientSecret: isEqual((selectedConnection as any)?.clientSecret, values.clientSecret)
@@ -139,6 +143,9 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: Props) => {
                 ? undefined
                 : values.organization,
               org: isEqual(selectedConnection?.org, values.org) ? undefined : values.org,
+              enterprise: isEqual((selectedConnection as any)?.enterprise, values.enterprise)
+                ? undefined
+                : values.enterprise,
               organizationId: isEqual(selectedConnection?.organizationId, values.organizationId)
                 ? undefined
                 : values.organizationId,
@@ -176,6 +183,7 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: Props) => {
                 'authMethod',
                 'authMode',
                 'appId',
+                'cloudId',
                 'clientId',
                 'secretKey',
                 'clientSecret',
@@ -192,6 +200,7 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: Props) => {
                 'companyId',
                 'organization',
                 'org',
+                'enterprise',
                 'organizationId',
                 'loginUrl',
                 'instanceUrl',
@@ -205,8 +214,13 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: Props) => {
       {
         setOperating: setTesting,
         formatMessage: () => 'Test Connection Successfully.',
+        hideToast: !!pluginConfig.connection.showTestResultMessage,
       },
     );
+
+    if (success && pluginConfig.connection.showTestResultMessage) {
+      message.success(res?.message || 'Test Connection Successfully.');
+    }
   };
 
   const handleSave = async () => {

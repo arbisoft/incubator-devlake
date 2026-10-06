@@ -115,7 +115,7 @@ const CreateModal = ({
     }}
     onOk={onCreate}
   >
-    <Space direction="vertical" size={8} style={{ width: '100%' }}>
+    <Space orientation="vertical" size={8} style={{ width: '100%' }}>
       <span>Team name</span>
       <Input
         autoFocus
@@ -135,7 +135,7 @@ const CreateModal = ({
         onProjectNamesChange={onProjectNamesChange}
         onClearCreateError={onClearCreateError}
       />
-      {createError && <Alert type="error" showIcon message={createError} />}
+      {createError && <Alert type="error" showIcon title={createError} />}
       <Message content="The team name and its derived reporting slug cannot be changed later. Project placement controls dashboard visibility; it is not repository attribution." />
       <Message content={OTEL_ORGANIZATION.CREATE_NOTICE} />
     </Space>
@@ -165,7 +165,7 @@ const ProjectPlacementsModal = ({
     }}
     onOk={onUpdateProjects}
   >
-    <Space direction="vertical" size={8} style={{ width: '100%' }}>
+    <Space orientation="vertical" size={8} style={{ width: '100%' }}>
       <span>DevLake projects for {current?.connection.teamName}</span>
       <OtelProjectSelect
         projectNames={projectNames}
@@ -173,7 +173,7 @@ const ProjectPlacementsModal = ({
         onProjectNamesChange={onProjectNamesChange}
         onClearCreateError={onClearCreateError}
       />
-      {createError && <Alert type="error" showIcon message={createError} />}
+      {createError && <Alert type="error" showIcon title={createError} />}
       <Message content="Changing project placement does not generate a credential, rewrite credential storage, restart the Collector, or change existing telemetry." />
     </Space>
   </Modal>
@@ -181,12 +181,12 @@ const ProjectPlacementsModal = ({
 
 const SnippetModal = ({ current, managedSettings, onClose }: OtelModalProps) => (
   <Modal open width={900} centered title="Claude managed settings" footer={null} onCancel={onClose}>
-    <Space direction="vertical" style={{ width: '100%' }} size={16}>
+    <Space orientation="vertical" style={{ width: '100%' }} size={16}>
       <Message content="Copy this now. DevLake does not store the generated password or Basic Auth header." />
       <Message content="Pasting this JSON replaces existing managed env settings, including any console exporter flags." />
       <ManagedSettings>{managedSettings}</ManagedSettings>
       <Flex justify="space-between" align="center">
-        <Space direction="vertical" size={4}>
+        <Space orientation="vertical" size={4}>
           <span>
             Add this JSON in{' '}
             <ExternalLink link="https://claude.ai/admin-settings/claude-code">
@@ -240,14 +240,14 @@ const LifecycleModal = ({
     onCancel={onClose}
     onOk={() => onAction(action)}
   >
-    <Space direction="vertical" size={12} style={{ width: '100%' }}>
+    <Space orientation="vertical" size={12} style={{ width: '100%' }}>
       {current && (
         <span>
           Team: <strong>{current.connection.teamName}</strong> ({current.connection.teamSlug})
         </span>
       )}
       <Message content={content} />
-      {error && <Alert type="error" showIcon message={error} />}
+      {error && <Alert type="error" showIcon title={error} />}
     </Space>
   </Modal>
 );

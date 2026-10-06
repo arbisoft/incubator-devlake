@@ -83,7 +83,9 @@ export function runSql(sql: string): string {
     );
   } catch (err) {
     const stderr = (err as { stderr?: Buffer | string }).stderr?.toString().replace(/\s+/g, ' ').trim();
-    throw new Error(`SQL execution via docker container "${container}" failed: ${stderr || (err as Error).message}`);
+    throw new Error(`SQL execution via docker container "${container}" failed: ${stderr || (err as Error).message}`, {
+      cause: err,
+    });
   }
 }
 

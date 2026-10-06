@@ -16,46 +16,47 @@
  *
  */
 
-import { deepEqual, equal, throws } from 'node:assert/strict';
-import { test } from 'node:test';
+import { describe, expect, it } from 'vitest';
 
 import { buildOnboardBlueprintUpdatePayload } from './utils';
 
-test('github onboard blueprint update payload does not set timeAfter', () => {
-  const payload = buildOnboardBlueprintUpdatePayload('github', 1, [{ data: { githubId: 1001 } }]);
+describe('routes/onboard/utils', () => {
+  it('github onboard blueprint update payload does not set timeAfter', () => {
+    const payload = buildOnboardBlueprintUpdatePayload('github', 1, [{ data: { githubId: 1001 } }]);
 
-  equal(Object.hasOwn(payload, 'timeAfter'), false);
-  deepEqual(payload, {
-    connections: [
+    expect(Object.hasOwn(payload, 'timeAfter')).toBe(false);
+    expect(payload).toStrictEqual({
+      connections: [
+        {
+          pluginName: 'github',
+          connectionId: 1,
+          scopes: [{ scopeId: '1001' }],
+        },
+      ],
+    });
+  });
+
+  it('non-github onboard blueprint update payload preserves the previous explicit 14-day timeAfter', () => {
+    const payload = buildOnboardBlueprintUpdatePayload(
+      'jira',
+      1,
+      [{ data: { boardId: 1001 } }],
+      new Date('2026-06-08T12:34:56Z'),
+    );
+
+    expect(Object.hasOwn(payload, 'timeAfter')).toBe(true);
+    // formatTime is called with { utc: true } so the offset is always +00:00.
+    expect(payload.timeAfter).toBe('2026-05-25T00:00:00+00:00');
+    expect(payload.connections).toStrictEqual([
       {
-        pluginName: 'github',
+        pluginName: 'jira',
         connectionId: 1,
         scopes: [{ scopeId: '1001' }],
       },
-    ],
+    ]);
   });
-});
 
-test('non-github onboard blueprint update payload preserves the previous explicit 14-day timeAfter', () => {
-  const payload = buildOnboardBlueprintUpdatePayload(
-    'jira',
-    1,
-    [{ data: { boardId: 1001 } }],
-    new Date('2026-06-08T12:34:56Z'),
-  );
-
-  equal(Object.hasOwn(payload, 'timeAfter'), true);
-  // formatTime is called with { utc: true } so the offset is always +00:00.
-  equal(payload.timeAfter, '2026-05-25T00:00:00+00:00');
-  deepEqual(payload.connections, [
-    {
-      pluginName: 'jira',
-      connectionId: 1,
-      scopes: [{ scopeId: '1001' }],
-    },
-  ]);
-});
-
-test('onboard blueprint update payload rejects a scope without the plugin scope ID', () => {
-  throws(() => buildOnboardBlueprintUpdatePayload('github', 1, [{ data: {} }]), /Missing scope ID field/);
+  it('onboard blueprint update payload rejects a scope without the plugin scope ID', () => {
+    expect(() => buildOnboardBlueprintUpdatePayload('github', 1, [{ data: {} }])).toThrow(/Missing scope ID field/);
+  });
 });

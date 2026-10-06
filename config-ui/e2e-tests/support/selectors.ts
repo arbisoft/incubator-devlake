@@ -19,8 +19,7 @@ import { Locator, Page } from '@playwright/test';
 
 // Structural and AntD-specific selectors live here so a visual reskin only touches this file.
 
-export const modalByTitle = (page: Page, title: string | RegExp): Locator =>
-  page.locator('.ant-modal-content').filter({ has: page.locator('.ant-modal-title', { hasText: title }) });
+export const modalByTitle = (page: Page, title: string | RegExp): Locator => page.getByRole('dialog', { name: title });
 
 export const tableRow = (scope: Page | Locator, text: string | RegExp): Locator =>
   scope.locator('tbody tr.ant-table-row').filter({ hasText: text });
@@ -64,9 +63,9 @@ export const tableWithRow = (page: Page, text: string | RegExp): Locator =>
   page.locator('.ant-table').filter({ has: tableRow(page, text) });
 
 export const modalWithText = (page: Page, text: string | RegExp): Locator =>
-  page.locator('.ant-modal-content').filter({ hasText: text });
+  page.getByRole('dialog').filter({ hasText: text });
 
-export const openModals = (page: Page): Locator => page.locator('.ant-modal-content');
+export const openModals = (page: Page): Locator => page.getByRole('dialog');
 
 export const modalCloseButton = (modal: Locator): Locator => modal.locator('.ant-modal-close');
 
@@ -104,3 +103,16 @@ export const accessUserRow = (page: Page, login: string): Locator =>
     .getByRole('row', { name: new RegExp(login) });
 
 export const passwordInputs = (page: Page): Locator => page.locator('input[type="password"]');
+
+// AntD 6 Empty renders both an SVG title and a description with the same text; target the description.
+export const emptyState = (page: Page, text: string): Locator =>
+  page.locator('.ant-empty-description').filter({ hasText: text });
+
+// antd 6 JS-ellipsis keeps the full value only in aria-label, so read it from there when present.
+export const cellFullText = async (cell: Locator): Promise<string> => {
+  const labelled = cell.locator('[aria-label]:not(button):not([role="img"])').first();
+  if (await labelled.count()) {
+    return (await labelled.getAttribute('aria-label')) ?? '';
+  }
+  return (await cell.innerText()).trim();
+};

@@ -72,16 +72,21 @@ const redirectToLoginIfSessionIsReallyGone = async () => {
   window.location.replace(`/login?return_url=${returnUrl}`);
 };
 
+// A 401 from a plugin connection test is the remote credential failing, not a DevLake session expiry.
+const isPluginConnectionTest = (url?: string) =>
+  !!url && /\/plugins\/[^/]+(?:\/connections\/[^/]+)?\/test\/?$/.test(url);
+
 instance.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status;
+    const requestUrl = error.config?.url as string | undefined;
 
     if (status === 428) {
       window.location.replace('/db-migrate');
     }
 
-    if (status === 401 && !isLoginRoute()) {
+    if (status === 401 && !isLoginRoute() && !isPluginConnectionTest(requestUrl)) {
       void redirectToLoginIfSessionIsReallyGone();
     }
 
