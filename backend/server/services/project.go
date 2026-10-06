@@ -41,7 +41,25 @@ var projectService ProjectService
 // ProjectQuery used to query projects as the api project input
 type ProjectQuery struct {
 	Pagination
+	SortQuery
 	Keyword *string `json:"keyword" form:"keyword"`
+}
+
+const projectLastRunJoin = "LEFT JOIN (SELECT b.project_name, MAX(p.finished_at) last_run_at " +
+	"FROM _devlake_blueprints b JOIN _devlake_pipelines p ON p.blueprint_id = b.id " +
+	"GROUP BY b.project_name) lr ON lr.project_name = projects.name"
+
+const projectSortLastRunAt = "lastRunAt"
+
+var projectSortSpec = sortSpec{
+	columns: map[string]string{
+		"name":               "projects.name",
+		"createdAt":          "projects.created_at",
+		projectSortLastRunAt: "lr.last_run_at",
+	},
+	defaultColumn: "projects.created_at",
+	tieBreaker:    "projects.name",
+	nullsLastKeys: map[string]bool{projectSortLastRunAt: true},
 }
 
 func (query *ProjectQuery) GetKeyword() string {
@@ -57,6 +75,10 @@ func GetProjects(query *ProjectQuery) ([]*models.ApiOutputProject, int64, errors
 	if err := VerifyStruct(query); err != nil {
 		return nil, 0, err
 	}
+	orderBy, err := query.orderBy(projectSortSpec)
+	if err != nil {
+		return nil, 0, err
+	}
 	clauses := []dal.Clause{
 		dal.From(&models.Project{}),
 	}
@@ -69,8 +91,11 @@ func GetProjects(query *ProjectQuery) ([]*models.ApiOutputProject, int64, errors
 		return nil, 0, errors.Default.Wrap(err, "error getting DB count of project")
 	}
 
+	if query.SortBy == projectSortLastRunAt {
+		clauses = append(clauses, dal.Select("projects.*"), dal.Join(projectLastRunJoin))
+	}
 	clauses = append(clauses,
-		dal.Orderby("created_at DESC"),
+		dal.Orderby(orderBy),
 		dal.Offset(query.GetSkip()),
 		dal.Limit(query.GetPageSize()),
 	)
