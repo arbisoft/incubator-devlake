@@ -12,6 +12,10 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "lint": "tsc && eslint . --fix",
+    "lint:check": "tsc && eslint .",
+    "lint:fix": "eslint . --fix",
+    "dup": "jscpd src --min-tokens 60 --reporters console --ignore \"**/*.test.*,**/__tests__/**\"",
+    "e2e:census": "node e2e-tests/tools/census.mjs",
     "prettier": "prettier . --write",
     "lint-staged": "lint-staged",
     "prepare": "cd .. && husky install config-ui/.husky"
@@ -76,6 +80,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.12.0",
     "husky": "9.1.7",
+    "jscpd": "^5.4.0",
     "jsdom": "30.1.0",
     "lint-staged": "17.5.1",
     "prettier": "3.9.8",
