@@ -16,10 +16,23 @@
  *
  */
 
-import 'styled-components';
-import type { AppTheme } from './tokens';
+export const DEFAULT_BRAND_NAME = 'Arbisoft DevLake';
+export const POWERED_BY = 'Powered by Apache DevLake';
 
-declare module 'styled-components' {
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- declaration merging needs an interface
-  export interface DefaultTheme extends Omit<AppTheme, 'antd'> {}
-}
+type BrandEnv = Partial<
+  Pick<ImportMetaEnv, 'DEVLAKE_BRAND_NAME' | 'DEVLAKE_TITLE_CUSTOM' | 'DEVLAKE_COLOR_CUSTOM' | 'DEVLAKE_COPYRIGHT_HIDE'>
+>;
+
+export const resolveBrand = (env: BrandEnv) => ({
+  brandName: env.DEVLAKE_BRAND_NAME || DEFAULT_BRAND_NAME,
+  titleCustom: env.DEVLAKE_TITLE_CUSTOM || undefined,
+  primaryOverride: env.DEVLAKE_COLOR_CUSTOM || undefined,
+  copyrightHide: Boolean(env.DEVLAKE_COPYRIGHT_HIDE),
+});
+
+const brand = resolveBrand(import.meta.env);
+
+export const BRAND_NAME = brand.brandName;
+export const TITLE_CUSTOM = brand.titleCustom;
+export const PRIMARY_OVERRIDE = brand.primaryOverride;
+export const COPYRIGHT_HIDE = brand.copyrightHide;

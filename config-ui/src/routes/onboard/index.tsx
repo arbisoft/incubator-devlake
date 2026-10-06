@@ -24,7 +24,7 @@ import { useNavigate } from 'react-router-dom';
 
 import API from '@/api';
 import { PageLoading } from '@/components';
-import { PATHS } from '@/config';
+import { BRAND_NAME, PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
 
 import type { Record } from './context';
@@ -50,8 +50,6 @@ const steps = [
     title: 'Add data scope',
   },
 ];
-
-const brandName = import.meta.env.DEVLAKE_BRAND_NAME ?? 'DevLake';
 
 interface Props {
   logo?: React.ReactNode;
@@ -113,7 +111,7 @@ export const Onboard = ({ logo, title }: Props) => {
       }}
     >
       <Helmet>
-        <title>Onboard - {brandName}</title>
+        <title>Onboard - {BRAND_NAME}</title>
       </Helmet>
       <Layout style={{ minHeight: '100vh' }}>
         <S.Inner>

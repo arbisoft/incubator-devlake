@@ -3711,6 +3711,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "config-ui@workspace:."
   dependencies:
+    "@ant-design/colors": "npm:^8.0.1"
     "@ant-design/icons": "npm:6.3.4"
     "@eslint/js": "npm:^10.0.1"
     "@playwright/test": "npm:~1.63.0"
