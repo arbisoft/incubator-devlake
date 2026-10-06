@@ -1,11 +1,3 @@
 {
-  "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
-  "ignore": [
-    // Empty reskin barrel kept for phase 1 (plan 3.10); nothing imports it yet.
-    "src/ui/index.ts",
-    // Empty reskin hooks barrel kept for phase 1; nothing imports it yet.
-    "src/ui/hooks/index.ts",
-    // Empty /ui-kit route barrel kept for phase 1; nothing imports it yet.
-    "src/routes/ui-kit/index.ts",
-  ],
+  "$schema": "https://unpkg.com/knip@6/schema-jsonc.json"
 }

@@ -48,6 +48,11 @@ export const PALETTE = {
       bgTableHeader: '#FAFAFA',
       error: '#F5222D',
       errorActive: '#CF1322',
+      successText: '#027A48',
+      warningText: '#B54708',
+      infoText: '#0958D9',
+      warningBg: '#FFF7E6',
+      infoTintBg: '#E6F7FF',
       infoBg: '#E6F7FF',
     },
     sidebar: {
@@ -83,6 +88,11 @@ export const PALETTE = {
       bgTableHeader: '#2D2D2F',
       error: '#FF4D4F',
       errorActive: '#FF7875',
+      successText: '#6CCB8B',
+      warningText: '#F4BE55',
+      infoText: '#69B1FF',
+      warningBg: '#33290F',
+      infoTintBg: '#162033',
     },
     sidebar: {
       bg: '#141225',

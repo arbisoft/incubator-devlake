@@ -35,7 +35,11 @@ export type SidebarTokens = {
 
 type TypographyStyle = { fontSize: number; lineHeight: number; fontWeight: number; letterSpacing: number };
 type TypographyKey = 'display' | 'h1' | 'h2' | 'h3' | 'body' | 'bodyMedium' | 'bodyLarge' | 'caption' | 'captionStrong';
-export type TypographyTokens = { fontFamily: string; scale: Record<TypographyKey, TypographyStyle> };
+export type TypographyTokens = {
+  fontFamily: string;
+  monoFamily: string;
+  scale: Record<TypographyKey, TypographyStyle>;
+};
 
 export type SpaceTokens = { xxs: number; xs: number; sm: number; md: number; lg: number; xl: number; xxl: number };
 export type RadiusTokens = { sm: number; md: number; lg: number; pill: number };
@@ -48,16 +52,23 @@ export type LayoutTokens = {
   pageFooterHeight: number;
   breakpointTablet: number;
   focusRingWidth: number;
+  keyValueLabelWidth: number;
+  emptyStateTextWidth: number;
+  searchMaxWidth: number;
+  sortSelectWidth: number;
+  statusDotSize: number;
 };
 export type ZIndexTokens = { sidebar: number; flyout: number; drawer: number; modal: number };
 export type MotionTokens = { fast: number; base: number; easing: string };
 
 const FONT_FAMILY = '"Figtree", -apple-system, "Segoe UI", sans-serif';
+const MONO_FAMILY = 'ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace';
 
 export const WEIGHT = { regular: 400, medium: 500, semibold: 600, bold: 700 } as const;
 
 export const TYPOGRAPHY: TypographyTokens = {
   fontFamily: FONT_FAMILY,
+  monoFamily: MONO_FAMILY,
   scale: {
     display: { fontSize: 30, lineHeight: 36, fontWeight: WEIGHT.semibold, letterSpacing: -0.6 },
     h1: { fontSize: 24, lineHeight: 32, fontWeight: WEIGHT.bold, letterSpacing: -0.4 },
@@ -83,6 +94,11 @@ export const LAYOUT: LayoutTokens = {
   pageFooterHeight: 58,
   breakpointTablet: 1024,
   focusRingWidth: 2,
+  keyValueLabelWidth: 112,
+  emptyStateTextWidth: 452,
+  searchMaxWidth: 400,
+  sortSelectWidth: 168,
+  statusDotSize: 6,
 };
 
 // antd's popup layer is 1000 (modal, drawer); dropdowns 1050; the sidebar sits below them.

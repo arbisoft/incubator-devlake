@@ -203,6 +203,11 @@ type ForkThemeColors = {
   bgTableHeader: string;
   primaryActive: string;
   errorActive: string;
+  successText: string;
+  warningText: string;
+  infoText: string;
+  warningBg: string;
+  infoTintBg: string;
 };
 
 export type AppThemeColors = BaseThemeColors & ForkThemeColors;

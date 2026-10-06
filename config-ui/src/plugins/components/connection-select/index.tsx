@@ -16,25 +16,15 @@
  *
  */
 
-import { theme, Select, SelectProps } from 'antd';
+import { Select, SelectProps } from 'antd';
 import styled from 'styled-components';
 
 import { getPluginConfig } from '@/plugins';
+import { PluginIcon } from '@/ui';
 
 const Option = styled.div`
   display: flex;
   align-items: center;
-
-  .icon {
-    display: inline-block;
-    width: 24px;
-    height: 24px;
-
-    & > svg {
-      width: 100%;
-      height: 100%;
-    }
-  }
 
   .name {
     margin-left: 8px;
@@ -48,10 +38,6 @@ const Option = styled.div`
 interface Props extends Omit<SelectProps, 'optionRender'> {}
 
 export const ConnectionSelect = ({ ...props }: Props) => {
-  const {
-    token: { colorPrimary },
-  } = theme.useToken();
-
   return (
     <Select
       style={{ width: 384 }}
@@ -60,7 +46,7 @@ export const ConnectionSelect = ({ ...props }: Props) => {
         const plugin = getPluginConfig(option.data.plugin);
         return (
           <Option>
-            <span className="icon">{plugin.icon({ color: colorPrimary })}</span>
+            <PluginIcon icon={plugin.icon} size="md" />
             <span className="name">{option.label}</span>
           </Option>
         );

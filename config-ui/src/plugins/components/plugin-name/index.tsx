@@ -16,26 +16,17 @@
  *
  */
 
-import { theme } from 'antd';
 import { useMemo } from 'react';
 import styled from 'styled-components';
 
 import { getPluginConfig } from '@/plugins';
+import { PluginIcon } from '@/ui';
 
 const Wrapper = styled.div`
   display: flex;
   align-items: center;
 
-  .icon {
-    display: inline-flex;
-    margin-right: 8px;
-    width: 24px;
-
-    & > svg {
-      width: 100%;
-      height: 100%;
-    }
-  }
+  gap: 8px;
 `;
 
 interface Props {
@@ -46,13 +37,9 @@ interface Props {
 export const PluginName = ({ plugin, name }: Props) => {
   const pluginConfig = useMemo(() => getPluginConfig(plugin), [plugin]);
 
-  const {
-    token: { colorPrimary },
-  } = theme.useToken();
-
   return (
     <Wrapper>
-      <span className="icon">{pluginConfig.icon({ color: colorPrimary })}</span>
+      <PluginIcon icon={pluginConfig.icon} size="md" />
       <span>{name}</span>
     </Wrapper>
   );

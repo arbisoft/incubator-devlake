@@ -90,6 +90,13 @@ describe('theme tokens', () => {
       ['textSecondary/bgContainer', colors.textSecondary, colors.bgContainer],
       ['textSecondary/bgTableHeader', colors.textSecondary, colors.bgTableHeader],
       ['link/bgLayout', colors.link, colors.bgLayout],
+      ['errorActive/bgLayout', colors.errorActive, colors.bgLayout],
+      ['errorActive/bgContainer', colors.errorActive, colors.bgContainer],
+      ['successText/bgContainer', colors.successText, colors.bgContainer],
+      ['warningText/bgContainer', colors.warningText, colors.bgContainer],
+      ['warningText/warningBg', colors.warningText, colors.warningBg],
+      ['infoText/bgContainer', colors.infoText, colors.bgContainer],
+      ['infoText/infoTintBg', colors.infoText, colors.infoTintBg],
       ['onPrimary/primary', brand.onPrimary, colors.primary],
       ['onSelected/selectedBg', colors.onSelected, colors.selectedBg],
       ['sidebar.text/sidebar.bg', sidebar.text, sidebar.bg],
@@ -132,6 +139,7 @@ describe('theme tokens', () => {
     expect(theme.antd.token?.fontFamily).toBe(theme.typography.fontFamily);
     expect(theme.antd.token?.colorLink).toBe(theme.colors.link);
     expect(theme.antd.token?.borderRadius).toBe(theme.radius.md);
+    expect(theme.antd.token?.colorErrorText).toBe(theme.colors.errorActive);
     expect(theme.antd.components?.Menu?.darkItemBg).toBe(theme.sidebar.bg);
     expect(getTheme('light', '#1677ff').antd.token?.colorPrimary).toBe('#1677ff');
   });

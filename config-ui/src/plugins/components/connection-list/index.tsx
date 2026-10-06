@@ -17,7 +17,7 @@
  */
 
 import { EyeOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
-import { theme, Table, Button, Modal } from 'antd';
+import { Table, Button, Modal } from 'antd';
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
@@ -27,21 +27,13 @@ import { selectConnections } from '@/features/connections';
 import { useAppSelector } from '@/hooks';
 import { getPluginConfig, ConnectionStatus, ConnectionForm } from '@/plugins';
 import { WebHookConnection } from '@/plugins/register/webhook';
+import { PluginIcon } from '@/ui';
 
 const ModalTitle = styled.div`
   display: flex;
   align-items: center;
 
-  .icon {
-    display: inline-flex;
-    margin-right: 8px;
-    width: 24px;
-
-    & > svg {
-      width: 100%;
-      height: 100%;
-    }
-  }
+  gap: 8px;
 `;
 
 interface Props {
@@ -54,10 +46,6 @@ export const ConnectionList = ({ plugin, onCreate }: Props) => {
   const [connectionId, setConnectionId] = useState<ID>();
 
   const pluginConfig = useMemo(() => getPluginConfig(plugin), [plugin]);
-
-  const {
-    token: { colorPrimary },
-  } = theme.useToken();
 
   const connections = useAppSelector((state) => selectConnections(state, plugin));
 
@@ -123,7 +111,7 @@ export const ConnectionList = ({ plugin, onCreate }: Props) => {
         centered
         title={
           <ModalTitle>
-            <span className="icon">{pluginConfig.icon({ color: colorPrimary })}</span>
+            <PluginIcon icon={pluginConfig.icon} size="md" />
             <span className="name">Manage Connections: {pluginConfig.name}</span>
           </ModalTitle>
         }
