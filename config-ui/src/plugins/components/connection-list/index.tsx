@@ -20,7 +20,6 @@ import { EyeOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import { Table, Button, Modal } from 'antd';
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import styled from 'styled-components';
 
 import { PATHS } from '@/config';
 import { selectConnections } from '@/features/connections';
@@ -29,12 +28,8 @@ import { getPluginConfig, ConnectionStatus, ConnectionForm } from '@/plugins';
 import { WebHookConnection } from '@/plugins/register/webhook';
 import { PluginIcon } from '@/ui';
 
-const ModalTitle = styled.div`
-  display: flex;
-  align-items: center;
-
-  gap: 8px;
-`;
+import { COLUMN_WIDTH, COPY, MODAL_WIDTH } from './constants';
+import { CreateButton, ModalTitle } from './styled';
 
 interface Props {
   plugin: string;
@@ -72,27 +67,27 @@ export const ConnectionList = ({ plugin, onCreate }: Props) => {
         size="small"
         columns={[
           {
-            title: 'Connection Name',
+            title: COPY.connectionName,
             dataIndex: 'name',
             key: 'name',
           },
           {
-            title: 'Status',
+            title: COPY.status,
             key: 'status',
-            width: 200,
+            width: COLUMN_WIDTH,
             render: (_, row) => <ConnectionStatus connection={row} />,
           },
           {
             title: '',
             key: 'link',
-            width: 200,
+            width: COLUMN_WIDTH,
             render: (_, { plugin, id }) => (
               <>
                 <Button type="link" icon={<EyeOutlined />} onClick={() => navigate(PATHS.CONNECTION(plugin, id))}>
-                  Details
+                  {COPY.details}
                 </Button>
                 <Button type="link" icon={<EditOutlined />} onClick={() => handleShowForm(id)}>
-                  Edit
+                  {COPY.edit}
                 </Button>
               </>
             ),
@@ -101,18 +96,18 @@ export const ConnectionList = ({ plugin, onCreate }: Props) => {
         dataSource={connections}
         pagination={false}
       />
-      <Button style={{ marginTop: 16 }} type="primary" icon={<PlusOutlined />} onClick={() => onCreate()}>
-        Create a New Connection
-      </Button>
+      <CreateButton type="primary" icon={<PlusOutlined />} onClick={() => onCreate()}>
+        {COPY.create}
+      </CreateButton>
       <Modal
         destroyOnClose
         open={open}
-        width={820}
+        width={MODAL_WIDTH}
         centered
         title={
           <ModalTitle>
             <PluginIcon icon={pluginConfig.icon} size="md" />
-            <span className="name">Manage Connections: {pluginConfig.name}</span>
+            <span className="name">{COPY.manage(pluginConfig.name)}</span>
           </ModalTitle>
         }
         footer={null}

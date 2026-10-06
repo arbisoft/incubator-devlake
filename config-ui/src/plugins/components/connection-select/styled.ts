@@ -16,30 +16,24 @@
  *
  */
 
-import { SelectProps } from 'antd';
+import { Select } from 'antd';
+import styled from 'styled-components';
 
-import { getPluginConfig } from '@/plugins';
-import { PluginIcon } from '@/ui';
+import { SELECT_WIDTH } from './constants';
 
-import { COPY } from './constants';
-import { Option, StyledSelect } from './styled';
+export const StyledSelect = styled(Select)`
+  width: ${SELECT_WIDTH}px;
+`;
 
-type Props = Omit<SelectProps, 'optionRender'>;
+export const Option = styled.div`
+  display: flex;
+  align-items: center;
 
-export const ConnectionSelect = ({ ...props }: Props) => {
-  return (
-    <StyledSelect
-      placeholder={COPY.placeholder}
-      optionRender={(option) => {
-        const plugin = getPluginConfig(option.data.plugin);
-        return (
-          <Option>
-            <PluginIcon icon={plugin.icon} size="md" />
-            <span className="name">{option.label}</span>
-          </Option>
-        );
-      }}
-      {...props}
-    />
-  );
-};
+  .name {
+    margin-left: ${({ theme }) => theme.space.xs}px;
+    max-width: 90%;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+`;

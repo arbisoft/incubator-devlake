@@ -16,30 +16,15 @@
  *
  */
 
-import { SelectProps } from 'antd';
+import { Button } from 'antd';
+import styled from 'styled-components';
 
-import { getPluginConfig } from '@/plugins';
-import { PluginIcon } from '@/ui';
+export const ModalTitle = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.xs}px;
+`;
 
-import { COPY } from './constants';
-import { Option, StyledSelect } from './styled';
-
-type Props = Omit<SelectProps, 'optionRender'>;
-
-export const ConnectionSelect = ({ ...props }: Props) => {
-  return (
-    <StyledSelect
-      placeholder={COPY.placeholder}
-      optionRender={(option) => {
-        const plugin = getPluginConfig(option.data.plugin);
-        return (
-          <Option>
-            <PluginIcon icon={plugin.icon} size="md" />
-            <span className="name">{option.label}</span>
-          </Option>
-        );
-      }}
-      {...props}
-    />
-  );
-};
+export const CreateButton = styled(Button)`
+  margin-top: ${({ theme }) => theme.space.md}px;
+`;

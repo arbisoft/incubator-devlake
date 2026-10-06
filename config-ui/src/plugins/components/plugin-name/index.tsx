@@ -17,17 +17,11 @@
  */
 
 import { useMemo } from 'react';
-import styled from 'styled-components';
 
 import { getPluginConfig } from '@/plugins';
 import { PluginIcon } from '@/ui';
 
-const Wrapper = styled.div`
-  display: flex;
-  align-items: center;
-
-  gap: 8px;
-`;
+import { Wrapper } from './styled';
 
 interface Props {
   plugin: string;

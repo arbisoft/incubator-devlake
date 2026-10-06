@@ -16,30 +16,6 @@
  *
  */
 
-import { SelectProps } from 'antd';
+export const COPY = { placeholder: 'Select...' };
 
-import { getPluginConfig } from '@/plugins';
-import { PluginIcon } from '@/ui';
-
-import { COPY } from './constants';
-import { Option, StyledSelect } from './styled';
-
-type Props = Omit<SelectProps, 'optionRender'>;
-
-export const ConnectionSelect = ({ ...props }: Props) => {
-  return (
-    <StyledSelect
-      placeholder={COPY.placeholder}
-      optionRender={(option) => {
-        const plugin = getPluginConfig(option.data.plugin);
-        return (
-          <Option>
-            <PluginIcon icon={plugin.icon} size="md" />
-            <span className="name">{option.label}</span>
-          </Option>
-        );
-      }}
-      {...props}
-    />
-  );
-};
+export const SELECT_WIDTH = 384;

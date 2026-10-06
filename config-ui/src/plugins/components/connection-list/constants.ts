@@ -16,30 +16,14 @@
  *
  */
 
-import { SelectProps } from 'antd';
-
-import { getPluginConfig } from '@/plugins';
-import { PluginIcon } from '@/ui';
-
-import { COPY } from './constants';
-import { Option, StyledSelect } from './styled';
-
-type Props = Omit<SelectProps, 'optionRender'>;
-
-export const ConnectionSelect = ({ ...props }: Props) => {
-  return (
-    <StyledSelect
-      placeholder={COPY.placeholder}
-      optionRender={(option) => {
-        const plugin = getPluginConfig(option.data.plugin);
-        return (
-          <Option>
-            <PluginIcon icon={plugin.icon} size="md" />
-            <span className="name">{option.label}</span>
-          </Option>
-        );
-      }}
-      {...props}
-    />
-  );
+export const COPY = {
+  connectionName: 'Connection Name',
+  status: 'Status',
+  details: 'Details',
+  edit: 'Edit',
+  create: 'Create a New Connection',
+  manage: (name: string) => `Manage Connections: ${name}`,
 };
+
+export const COLUMN_WIDTH = 200;
+export const MODAL_WIDTH = 820;
