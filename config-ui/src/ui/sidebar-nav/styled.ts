@@ -110,6 +110,11 @@ export const MenuFrame = styled.div`
   .ant-menu-inline-collapsed .ant-menu-submenu-selected > .ant-menu-submenu-title {
     color: ${({ theme }) => theme.sidebar.itemActiveText};
     background: ${({ theme }) => theme.sidebar.itemActiveBg};
+
+    .ant-menu-item-icon {
+      color: ${({ theme }) => theme.sidebar.itemActiveText};
+      transition-property: font-size, margin;
+    }
   }
 
   .ant-menu-item-divider {

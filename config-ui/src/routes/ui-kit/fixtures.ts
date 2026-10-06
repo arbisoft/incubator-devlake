@@ -36,7 +36,7 @@ export const TONE_LABELS: Record<string, string> = {
 
 export const KEY_VALUE_ITEMS = [
   { label: 'When', value: '4 Sept 2026, 16:20 (UTC+05:00)' },
-  { label: 'Actor', value: 'saad.rana@arbisoft.com' },
+  { label: 'Actor', value: 'jane.admin@example.com' },
   { label: 'Source IP', value: '203.0.113.24' },
   { label: 'Request ID', value: 'req_8f21c4ad9e' },
 ];
@@ -118,7 +118,7 @@ export const RELATIVE_OFFSETS_MS = [10_000, 5 * 60_000, 3 * 3_600_000, 2 * 86_40
 
 export const DOCS_HREF = 'https://devlake.apache.org/docs/Overview';
 
-export const IDENTITY = { primary: 'Saad Rana', secondary: 'saad.rana@arbisoft.com' };
+export const IDENTITY = { primary: 'Jane Admin', secondary: 'jane.admin@example.com' };
 export const IDENTITY_LONG = {
   primary: 'A user with an extraordinarily long display name that cannot fit',
   secondary: 'a.user.with.an.extraordinarily.long.address@subdomain.example.com',
