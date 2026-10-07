@@ -75,11 +75,11 @@ export const SettingsUsers = () => {
   const [credentialOpen, setCredentialOpen] = useState(false);
 
   const users = useRefreshData(
-    () => API.access.listUsers({ ...toAccessPagination(list.query), keyword: list.query.keyword }),
+    (signal) => API.access.listUsers({ ...toAccessPagination(list.query), keyword: list.query.keyword }, signal),
     [version, list.query],
   );
   const domains = useRefreshData(
-    () => API.access.listDomains(toAccessPagination({ page: domainPage, pageSize: domainPageSize })),
+    (signal) => API.access.listDomains(toAccessPagination({ page: domainPage, pageSize: domainPageSize }), signal),
     [version, domainPage, domainPageSize],
   );
   const methods = useRefreshData(() => API.auth.methods().catch(() => undefined), []);

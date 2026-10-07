@@ -50,7 +50,7 @@ export const SettingsActivity = () => {
   const [selected, setSelected] = useState<ActivityRow>();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const { data, ready, error } = useRefreshData(() => API.access.listAuditEvents(), [version]);
+  const { data, ready, error } = useRefreshData((signal) => API.access.listAuditEvents(signal), [version]);
 
   const rows = useMemo(() => (data ?? []).map(toActivityRow), [data]);
   const filtered = useMemo(() => filterActivityRows(rows, keyword), [rows, keyword]);
