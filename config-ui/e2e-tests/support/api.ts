@@ -410,6 +410,22 @@ export async function findAccessUserByLogin(
   return (await listAccessUsers(api)).find((u) => u.localLoginName === loginName);
 }
 
+export interface ApiAuditEvent {
+  id: number;
+  action: string;
+  actorEmail: string;
+  targetEmail: string;
+  detail: string;
+}
+
+export async function findAuditEventByTarget(
+  api: APIRequestContext,
+  targetEmail: string,
+): Promise<ApiAuditEvent | undefined> {
+  const events = await json<ApiAuditEvent[]>(await api.get('/access/audit-events'), 'list audit events');
+  return events.find((event) => event.targetEmail === targetEmail);
+}
+
 export interface ApiOidcProvider {
   providerKey: string;
   enabled: boolean;

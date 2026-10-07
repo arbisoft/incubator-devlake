@@ -18,7 +18,7 @@
 import { Locator } from '@playwright/test';
 
 import { ApiMessage, PageResponse } from '../api';
-import { SETTINGS_COPY } from '../app-copy';
+import { AUTH_COPY } from '../app-copy';
 
 import { BasePage, Screen, tableWithRow, urlEndingWith } from './common';
 import { PATHS } from './paths';
@@ -34,7 +34,7 @@ export class SettingsAuthPage extends BasePage implements Screen {
   }
 
   get ready(): Locator {
-    return this.page.getByRole('heading', { name: SETTINGS_COPY.authentication.title, exact: true });
+    return this.page.getByRole('heading', { name: AUTH_COPY.title, exact: true });
   }
 
   // The first element with the text inside the providers table that lists the given provider key.
