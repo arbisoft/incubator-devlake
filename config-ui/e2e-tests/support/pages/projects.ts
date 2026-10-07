@@ -28,7 +28,7 @@ import {
   paginationPage,
   pipelineRowById,
   sectionHeaderButton,
-  selectOption,
+  chooseOption,
   tableRow,
 } from './common';
 import { PATHS, PROJECT_TABS, ProjectTabKey } from './paths';
@@ -145,7 +145,7 @@ export class ProjectPage extends BasePage {
     await this.page.getByRole('button', { name: 'Add a Connection' }).click();
     const dialog = this.dialog(/Add a Connection/);
     await dialog.getByRole('combobox').click();
-    await selectOption(this.page, connectionName).click();
+    await chooseOption(this.page, connectionName);
     await dialog.getByRole('button', { name: 'Next' }).click();
     await dialog.getByText(scopeFullName, { exact: true }).click();
     await dialog.getByRole('button', { name: 'Save' }).click();
