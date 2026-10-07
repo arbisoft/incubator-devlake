@@ -114,7 +114,7 @@ type ProjectDeleteHook interface {
 // DevLake project name.
 //
 // BeforeRenameProject is called inside the core rename transaction, after the
-// project row is locked and before it is renamed. Returning an error aborts
+// project row is locked and before any core table is renamed. Returning an error aborts
 // the rename.
 //
 // Contract:

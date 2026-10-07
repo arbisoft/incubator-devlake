@@ -343,8 +343,8 @@ func TestPatchProject_RunsRenameHookBeforeRenamingProjectRow(t *testing.T) {
 	tx := dalmocks.NewTransaction(t)
 	expectProjectRowLock(tx)
 	tx.On("UpdateColumn", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		assert.Equal(t, 1, len(hook.renameCalls), "rename hook must run before any core table is renamed")
 		if _, ok := args.Get(0).(*models.Project); ok {
-			assert.Equal(t, 1, len(hook.renameCalls), "rename hook must run before the project row is renamed")
 			renamed = append(renamed, args.Get(2).(string))
 		}
 	}).Return(nil)
@@ -392,7 +392,6 @@ func TestPatchProject_RollsBackOnRenameHookVeto(t *testing.T) {
 
 	tx := dalmocks.NewTransaction(t)
 	expectProjectRowLock(tx)
-	tx.On("UpdateColumn", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	tx.On("Rollback").Return(nil).Once()
 	mockDB := dalmocks.NewDal(t)
 	mockDB.On("Begin").Return(tx).Once()
@@ -403,10 +402,6 @@ func TestPatchProject_RollsBackOnRenameHookVeto(t *testing.T) {
 	assert.ErrorIs(t, err, hookErr)
 	tx.AssertNotCalled(t, "Commit")
 	for _, call := range tx.Calls {
-		if call.Method != "UpdateColumn" {
-			continue
-		}
-		_, isProjectRow := call.Arguments.Get(0).(*models.Project)
-		assert.False(t, isProjectRow, "the project row must not be renamed after a hook veto")
+		assert.NotEqual(t, "UpdateColumn", call.Method, "no table may be renamed after a hook veto")
 	}
 }

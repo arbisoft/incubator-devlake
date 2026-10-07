@@ -252,6 +252,11 @@ func PatchProject(name string, body map[string]interface{}) (*models.ApiOutputPr
 
 	// name changed, updates the related entities as well
 	if name != project.Name {
+		// lock order: project row, then plugin rows such as OTel connections (by id), then core tables; hooks never take in-process lifecycle locks
+		err = runProjectRenameHooks(tx, name, project.Name)
+		if err != nil {
+			return nil, err
+		}
 		// ProjectMetric
 		err = tx.UpdateColumn(
 			&models.ProjectMetricSetting{},
@@ -298,11 +303,6 @@ func PatchProject(name string, body map[string]interface{}) (*models.ApiOutputPr
 			"project_name", project.Name,
 			dal.Where("project_name = ?", name),
 		)
-		if err != nil {
-			return nil, err
-		}
-		// lock order: project row first, then any plugin lock; hooks never take lifecycle locks
-		err = runProjectRenameHooks(tx, name, project.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -412,7 +412,7 @@ func DeleteProject(name string) errors.Error {
 			}
 		}
 	}()
-	// lock order: project row first, then any plugin lock; hooks never take lifecycle locks
+	// lock order: project row, then plugin rows such as OTel connections (by id), then core tables; hooks never take in-process lifecycle locks
 	if _, err = getProjectByName(tx, name, dal.Lock(true, false)); err != nil {
 		return err
 	}
