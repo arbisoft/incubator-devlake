@@ -16,10 +16,25 @@
  *
  */
 
-export * from './access-form-modal';
-export * from './form-note';
-export * from './login-name-field';
-export * from './role-field';
-export * from './text-field';
-export type * from './types';
-export { Fields } from './styled';
+import styled from 'styled-components';
+
+import { textStyle } from '@/ui/style-helpers';
+
+export const Content = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.lg}px;
+`;
+
+export const Heading = styled.h3`
+  ${textStyle('h3')}
+  margin: 0;
+  color: ${({ theme }) => theme.colors.text};
+`;
+
+export const SectionLabel = styled.h4`
+  ${textStyle('body')}
+  margin: 0 0 ${({ theme }) => theme.space.xs}px;
+  color: ${({ theme }) => theme.colors.textSecondary};
+  text-transform: uppercase;
+`;

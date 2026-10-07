@@ -16,4 +16,4 @@
  *
  */
 
-export * from './page';
+export * from './authentication';

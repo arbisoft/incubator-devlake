@@ -16,6 +16,7 @@
  *
  */
 
+import { useEffect, useState } from 'react';
 import { useTheme } from 'styled-components';
 
 import { Panel, StatusRow } from './styled';
@@ -23,6 +24,18 @@ import type { DetailDrawerProps } from './types';
 
 export const DetailDrawer = ({ open, title, status, onClose, footer, children }: DetailDrawerProps) => {
   const { layout } = useTheme();
+  const [wasOpen, setWasOpen] = useState(open);
+  const [opener, setOpener] = useState<HTMLElement | null>(null);
+
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setOpener(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+  }
+
+  useEffect(() => {
+    if (!open) opener?.focus();
+  }, [open, opener]);
+
   return (
     <Panel open={open} size={layout.drawerWidth} title={title} footer={footer} destroyOnHidden onClose={onClose}>
       {status && <StatusRow>{status}</StatusRow>}

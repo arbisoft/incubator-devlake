@@ -34,6 +34,7 @@ export * from './identity-cell';
 export * from './integration-card';
 export * from './key-value-list';
 export * from './list-page';
+export * from './list-toolbar';
 export * from './metric-tile';
 export * from './page-footer';
 export * from './overflow-list';

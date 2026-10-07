@@ -20,10 +20,8 @@ import {
   ACCESS_ERROR_CODE,
   ACCESS_ROLE,
   ACCESS_STATUS,
-  GRAFANA_PROVIDER_KIND,
   type AccessRole,
   type AccessStatus,
-  type GrafanaProviderKind,
 } from '@/api/access/constants';
 import { CONFIRM_TONE } from '@/ui/confirm-modal/constants';
 import { STATUS_TONE } from '@/ui/constants';
@@ -113,72 +111,8 @@ export const CREATE_DOMAIN_ERROR_MAP: Record<string, string> = {
   [ACCESS_ERROR_CODE.INVALID_DOMAIN]: ACCESS_ERROR.INVALID_DOMAIN,
 };
 
-export const OIDC_PROVIDER_ERROR_MAP: Record<string, string> = {
-  [ACCESS_ERROR_CODE.INVALID_OIDC_PROVIDER]: ACCESS_ERROR.INVALID_OIDC_PROVIDER,
-  [ACCESS_ERROR_CODE.OIDC_PROVIDER_BLOCKED]: ACCESS_ERROR.OIDC_PROVIDER_BLOCKED,
-  [ACCESS_ERROR_CODE.OIDC_PROVIDER_MISSING]: ACCESS_ERROR.OIDC_PROVIDER_BLOCKED,
-  [ACCESS_ERROR_CODE.OIDC_PROVIDER_REVISION_CONFLICT]: ACCESS_ERROR.OIDC_PROVIDER_STALE,
-  [ACCESS_ERROR_CODE.GRAFANA_TARGET_CONFLICT]: ACCESS_ERROR.GRAFANA_TARGET_CONFLICT,
-  [ACCESS_ERROR_CODE.GRAFANA_SYNC_FAILED]: ACCESS_ERROR.GRAFANA_SYNC_FAILED,
-};
-
 export const DUPLICATE_USER_SERVER_TEXT = 'this email already has a DevLake access entry';
 export const DUPLICATE_DOMAIN_SERVER_TEXT = 'this domain already has a DevLake access policy';
-
-export const OIDC_PROVIDER_STATUS = {
-  CONFIGURED: 'Configured',
-  ACTIVE: 'Active',
-  DISABLED: 'Disabled',
-  DEVLAKE_ONLY: 'DevLake only',
-  PENDING: 'Changes awaiting activation',
-  FAILED: 'Grafana synchronization failed',
-  COMPENSATED: 'Activation failed; Grafana restored',
-  RECOVERY: 'Grafana recovery required',
-  RETIRED: 'Retired',
-} as const;
-
-export const AUTHENTICATION_STATE = {
-  NO_MANAGED_OIDC: 'No OIDC provider managed here',
-  ACTIVATION_REQUIRED: 'OIDC activation required',
-  NO_ACTIVE_OIDC: 'No active OIDC provider',
-  OIDC_ACTIVE: 'OIDC sign-in active',
-} as const;
-
-export const OIDC_PROVIDER_MESSAGE = {
-  GRAFANA_SYNCHRONIZED: 'Grafana OAuth configuration synchronized.',
-  CALLBACK_DESCRIPTION: 'Register this exact callback URL with the customer OIDC provider.',
-  SECRET_REPLACEMENT_REQUIRED: 'Required only when changing the client ID or rotating the secret.',
-  VALIDATED: 'OIDC provider settings are valid.',
-  GRAFANA_SYNC_FAILED: ACCESS_ERROR.GRAFANA_SYNC_FAILED,
-  RECOVERY_REQUIRED:
-    'Grafana OAuth was disabled because the new configuration could not be safely rolled back. Retry synchronization after resolving the deployment issue.',
-  ACTIVATION_COMPENSATED:
-    'DevLake activation did not complete. Grafana was restored to its previous configuration; resolve the issue and activate again.',
-} as const;
-
-export const OIDC_PROVIDER_STATUS_COLOR: Record<string, string> = {
-  [OIDC_PROVIDER_STATUS.ACTIVE]: 'green',
-  [OIDC_PROVIDER_STATUS.DEVLAKE_ONLY]: 'blue',
-  [OIDC_PROVIDER_STATUS.DISABLED]: 'default',
-  [OIDC_PROVIDER_STATUS.FAILED]: 'red',
-  [OIDC_PROVIDER_STATUS.COMPENSATED]: 'orange',
-  [OIDC_PROVIDER_STATUS.RECOVERY]: 'red',
-  [OIDC_PROVIDER_STATUS.CONFIGURED]: 'orange',
-  [OIDC_PROVIDER_STATUS.PENDING]: 'orange',
-};
-
-export const GRAFANA_PROVIDER_OPTIONS: Array<{ value: GrafanaProviderKind; label: string }> = [
-  { value: GRAFANA_PROVIDER_KIND.GOOGLE, label: 'Google' },
-  { value: GRAFANA_PROVIDER_KIND.AZURE_AD, label: 'Microsoft Entra ID' },
-  { value: GRAFANA_PROVIDER_KIND.OKTA, label: 'Okta' },
-  { value: GRAFANA_PROVIDER_KIND.GITLAB, label: 'GitLab' },
-  { value: GRAFANA_PROVIDER_KIND.GENERIC_OAUTH, label: 'Generic OAuth' },
-  { value: GRAFANA_PROVIDER_KIND.NONE, label: 'DevLake only' },
-];
-
-export const GRAFANA_PROVIDER_LABEL: Record<GrafanaProviderKind, string> = Object.fromEntries(
-  GRAFANA_PROVIDER_OPTIONS.map((option) => [option.value, option.label]),
-) as Record<GrafanaProviderKind, string>;
 
 export const COPY = {
   actions: { enable: 'Enable', disable: 'Disable' },
@@ -282,18 +216,6 @@ export const COPY = {
       copy: 'Copy temporary password',
       done: 'Done',
     },
-  },
-  authentication: {
-    title: 'Authentication',
-    description:
-      "Grafana access remains independently managed. Providers marked DevLake only use Grafana's ordinary login.",
-  },
-  activity: {
-    title: 'Recent Activities',
-    description: 'Recent changes to who can access DevLake.',
-    tableLabel: 'Recent access activity',
-    columns: { when: 'When', action: 'Action', actor: 'Actor', target: 'Target', detail: 'Detail' },
-    system: 'System',
   },
   confirm: {
     resetPassword: {

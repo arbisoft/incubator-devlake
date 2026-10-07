@@ -39,6 +39,7 @@ export const SECTION = {
   FORM_FIELD: 'formField',
   OVERFLOW_LIST: 'overflowList',
   LIST_PAGE: 'listPage',
+  LIST_TOOLBAR: 'listToolbar',
   ROW_LINK: 'rowLink',
   FORM_MODAL: 'formModal',
   DETAIL_DRAWER: 'detailDrawer',
@@ -88,6 +89,7 @@ export const COPY = {
     formField: 'FormField',
     overflowList: 'OverflowList',
     listPage: 'ListPage',
+    listToolbar: 'ListToolbar',
     rowLink: 'RowLink',
     formModal: 'FormModal',
     detailDrawer: 'DetailDrawer',
@@ -211,6 +213,7 @@ export const COPY = {
   },
   filterTabs: { selected: (key: string) => `Selected: ${key}` },
   sortSelect: { selected: (key: string) => `Selected: ${key}` },
+  listToolbar: { search: 'Search items', add: 'Add item', filters: 'Filters slot' },
   toolbar: { start: 'Start slot', end: 'End slot', add: 'Add connection' },
   useListState: {
     keyword: 'Keyword',

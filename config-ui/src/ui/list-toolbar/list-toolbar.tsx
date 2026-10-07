@@ -16,10 +16,19 @@
  *
  */
 
-export * from './access-form-modal';
-export * from './form-note';
-export * from './login-name-field';
-export * from './role-field';
-export * from './text-field';
-export type * from './types';
-export { Fields } from './styled';
+import { SearchInput } from '@/ui/search-input';
+import { Toolbar } from '@/ui/toolbar';
+
+import type { ListToolbarProps } from './types';
+
+export const ListToolbar = ({ list, searchPlaceholder, filters, end }: ListToolbarProps) => (
+  <Toolbar
+    start={
+      <>
+        <SearchInput value={list.keyword} placeholder={searchPlaceholder} onSearch={list.setKeyword} allowClear />
+        {filters}
+      </>
+    }
+    end={end}
+  />
+);

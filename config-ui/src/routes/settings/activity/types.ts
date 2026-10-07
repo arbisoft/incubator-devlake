@@ -16,10 +16,14 @@
  *
  */
 
-export * from './access-form-modal';
-export * from './form-note';
-export * from './login-name-field';
-export * from './role-field';
-export * from './text-field';
-export type * from './types';
-export { Fields } from './styled';
+import type { AccessAuditEvent } from '@/api/access';
+
+export type ActivityRow = {
+  id: AccessAuditEvent['id'];
+  when: string;
+  action: string;
+  actor: string;
+  target: string;
+  detail: string;
+  event: AccessAuditEvent;
+};

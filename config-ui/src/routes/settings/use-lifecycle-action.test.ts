@@ -23,7 +23,13 @@ import API from '@/api';
 import { ACCESS_ROLE, ACCESS_STATUS, type AccessDomain, type AccessUser } from '@/api/access';
 
 import { COPY, LIFECYCLE_ACTION, LIFECYCLE_SUBJECT } from './constants';
+import type { LifecycleAction } from './types';
 import { useLifecycleAction, type LifecycleTarget } from './use-lifecycle-action';
+
+vi.mock('antd', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('antd')>()),
+  message: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
+}));
 
 vi.mock('@/api', () => ({
   default: {
@@ -83,6 +89,16 @@ describe('useLifecycleAction', () => {
     expect(access.updateUser).toHaveBeenLastCalledWith(7, { role: ACCESS_ROLE.MEMBER, status: ACCESS_STATUS.ACTIVE });
     expect(result.current.confirmProps.open).toBe(false);
     expect(onDone).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends nothing for an action it does not handle, for a user or a domain', async () => {
+    const { result, onDone } = setup();
+    const unknown = 'unknown' as LifecycleAction;
+    await act(async () => result.current.start(unknown, USER_TARGET));
+    await act(async () => result.current.start(unknown, DOMAIN_TARGET));
+    expect(access.updateUser).not.toHaveBeenCalled();
+    expect(access.updateDomain).not.toHaveBeenCalled();
+    expect(onDone).not.toHaveBeenCalled();
   });
 
   it('disables a domain at once, keeping the default role', async () => {

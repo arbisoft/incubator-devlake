@@ -25,16 +25,7 @@ import API from '@/api';
 import { PATHS, PROJECT_TAB } from '@/config';
 import { useRefreshData } from '@/hooks';
 import { OnboardTour } from '@/routes/onboard/components';
-import {
-  buildListEmpty,
-  DataTable,
-  ListPage,
-  PageHeader,
-  SearchInput,
-  Toolbar,
-  useListState,
-  useRefreshVersion,
-} from '@/ui';
+import { DataTable, ListPage, ListToolbar, PageHeader, buildListEmpty, useListState, useRefreshVersion } from '@/ui';
 
 import { NewProjectModal } from './components';
 import { CONFIGURATION_TAB_STATE, COPY } from './constants';
@@ -90,12 +81,7 @@ export const ProjectHomePage = () => {
   return (
     <ListPage>
       <PageHeader title={COPY.title} />
-      <Toolbar
-        start={
-          <SearchInput value={keyword} placeholder={COPY.searchPlaceholder} onSearch={list.setKeyword} allowClear />
-        }
-        end={newProjectButton}
-      />
+      <ListToolbar list={list} searchPlaceholder={COPY.searchPlaceholder} end={newProjectButton} />
       <DataTable<ProjectRow, ProjectSortKey>
         rowKey="name"
         ariaLabel={COPY.tableLabel}

@@ -21,6 +21,7 @@ import { describe, expect, it } from 'vitest';
 
 // Load the routes barrel first so the config/routes import cycle resolves as it does in the app.
 import '@/routes';
+import { STATUS_TONE } from '@/ui';
 
 import {
   ACCESS_ERROR_CODE,
@@ -29,7 +30,7 @@ import {
   type OIDCProvider,
 } from '../../api/access';
 
-import { AUTHENTICATION_STATE, OIDC_PROVIDER_STATUS, OIDC_PROVIDER_STATUS_COLOR } from './constants';
+import { AUTHENTICATION_STATE, OIDC_PROVIDER_STATUS, OIDC_PROVIDER_STATUS_TONE } from './authentication/constants';
 import {
   ACCESS_ERROR,
   canActivateOIDCProvider,
@@ -305,10 +306,10 @@ describe('routes/settings/utils', () => {
     const compensatedProvider = { ...disabledProvider, grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.COMPENSATED };
     expect(getOIDCProviderStatus(compensatedProvider)).toBe(OIDC_PROVIDER_STATUS.COMPENSATED);
     expect(canActivateOIDCProvider(compensatedProvider)).toBe(true);
-    expect(OIDC_PROVIDER_STATUS_COLOR[OIDC_PROVIDER_STATUS.ACTIVE]).toBe('green');
-    expect(OIDC_PROVIDER_STATUS_COLOR[OIDC_PROVIDER_STATUS.COMPENSATED]).toBe('orange');
-    expect(OIDC_PROVIDER_STATUS_COLOR[OIDC_PROVIDER_STATUS.RECOVERY]).toBe('red');
-    expect(OIDC_PROVIDER_STATUS_COLOR[OIDC_PROVIDER_STATUS.CONFIGURED]).toBe('orange');
+    expect(OIDC_PROVIDER_STATUS_TONE[OIDC_PROVIDER_STATUS.ACTIVE]).toBe(STATUS_TONE.SUCCESS);
+    expect(OIDC_PROVIDER_STATUS_TONE[OIDC_PROVIDER_STATUS.COMPENSATED]).toBe(STATUS_TONE.WARNING);
+    expect(OIDC_PROVIDER_STATUS_TONE[OIDC_PROVIDER_STATUS.RECOVERY]).toBe(STATUS_TONE.ERROR);
+    expect(OIDC_PROVIDER_STATUS_TONE[OIDC_PROVIDER_STATUS.CONFIGURED]).toBe(STATUS_TONE.WARNING);
   });
 
   it('summarizes the authentication configuration state without inferring environment configuration', () => {

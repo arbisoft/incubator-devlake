@@ -16,27 +16,23 @@
  *
  */
 
-import type { TableColumnsType } from 'antd';
+import { Button, type TableColumnsType } from 'antd';
 
-import type { AccessAuditEvent } from '@/api/access';
-import { COMMON_COPY } from '@/ui';
+import { ACTIVITY_COLUMN, COPY } from './constants';
+import type { ActivityRow } from './types';
 
-import { COPY } from '../constants';
-
-export const getAuditColumns = (): TableColumnsType<AccessAuditEvent> => [
-  { title: COPY.activity.columns.when, dataIndex: 'createdAt', key: 'createdAt' },
-  { title: COPY.activity.columns.action, dataIndex: 'action', key: 'action' },
+export const getActivityColumns = (onOpen: (row: ActivityRow) => void): TableColumnsType<ActivityRow> => [
+  { key: ACTIVITY_COLUMN.WHEN, title: COPY.columns.when, dataIndex: 'when' },
   {
-    title: COPY.activity.columns.actor,
-    dataIndex: 'actorEmail',
-    key: 'actorEmail',
-    render: (value: string) => value || COPY.activity.system,
+    key: ACTIVITY_COLUMN.ACTION,
+    title: COPY.columns.action,
+    render: (_, row) => (
+      <Button type="link" aria-label={COPY.openEvent(row.action, row.when)} onClick={() => onOpen(row)}>
+        {row.action}
+      </Button>
+    ),
   },
-  {
-    title: COPY.activity.columns.target,
-    dataIndex: 'targetEmail',
-    key: 'targetEmail',
-    render: (value: string) => value || COMMON_COPY.emptyValue,
-  },
-  { title: COPY.activity.columns.detail, dataIndex: 'detail', key: 'detail' },
+  { key: ACTIVITY_COLUMN.ACTOR, title: COPY.columns.actor, dataIndex: 'actor' },
+  { key: ACTIVITY_COLUMN.TARGET, title: COPY.columns.target, dataIndex: 'target' },
+  { key: ACTIVITY_COLUMN.DETAIL, title: COPY.columns.detail, dataIndex: 'detail' },
 ];

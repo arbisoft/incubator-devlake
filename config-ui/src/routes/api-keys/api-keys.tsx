@@ -24,14 +24,13 @@ import API from '@/api';
 import { useRefreshData } from '@/hooks';
 import type { IApiKey } from '@/types';
 import {
-  buildListEmpty,
-  ConfirmModal,
   CONFIRM_TONE,
+  ConfirmModal,
   DataTable,
   ListPage,
+  ListToolbar,
   PageHeader,
-  SearchInput,
-  Toolbar,
+  buildListEmpty,
   useListState,
   useRefreshVersion,
 } from '@/ui';
@@ -105,12 +104,7 @@ export const ApiKeys = () => {
   return (
     <ListPage>
       <PageHeader title={COPY.title} description={COPY.description} />
-      <Toolbar
-        start={
-          <SearchInput value={keyword} placeholder={COPY.searchPlaceholder} onSearch={list.setKeyword} allowClear />
-        }
-        end={newKeyButton}
-      />
+      <ListToolbar list={list} searchPlaceholder={COPY.searchPlaceholder} end={newKeyButton} />
       <DataTable<IApiKey, KeySortKey>
         rowKey="id"
         ariaLabel={COPY.tableLabel}

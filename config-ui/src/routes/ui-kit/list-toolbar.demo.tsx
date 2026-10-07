@@ -18,30 +18,34 @@
 
 import { PlusOutlined } from '@ant-design/icons';
 import { Button } from 'antd';
+import { useState } from 'react';
 
-import { ListPage, ListToolbar, PageHeader } from '@/ui';
+import { ListToolbar } from '@/ui';
 
 import { COPY, SECTION } from './constants';
 import { DemoCase, DemoSection } from './demo-section';
 
-const { listPage: text } = COPY;
+const { listToolbar: text } = COPY;
 
-export const ListPageDemo = () => (
-  <DemoSection id={SECTION.LIST_PAGE} title={COPY.sections.listPage}>
-    <DemoCase label={COPY.cases.composed}>
-      <ListPage>
-        <PageHeader title={text.title} />
+export const ListToolbarDemo = () => {
+  const [keyword, setKeyword] = useState('');
+  return (
+    <DemoSection id={SECTION.LIST_TOOLBAR} title={COPY.sections.listToolbar}>
+      <DemoCase label={COPY.cases.startOnly}>
+        <ListToolbar list={{ keyword, setKeyword }} searchPlaceholder={text.search} />
+      </DemoCase>
+      <DemoCase label={COPY.cases.composed}>
         <ListToolbar
-          list={{ keyword: '', setKeyword: () => undefined }}
+          list={{ keyword, setKeyword }}
           searchPlaceholder={text.search}
+          filters={<span>{text.filters}</span>}
           end={
             <Button type="primary" icon={<PlusOutlined />}>
               {text.add}
             </Button>
           }
         />
-        <span>{text.row}</span>
-      </ListPage>
-    </DemoCase>
-  </DemoSection>
-);
+      </DemoCase>
+    </DemoSection>
+  );
+};

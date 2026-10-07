@@ -24,10 +24,13 @@ export type FormNoteProps = { children: string };
 
 export type TextFieldProps = {
   label: string;
+  description?: string;
   value: string;
   placeholder?: string;
   error?: string;
   required?: boolean;
+  disabled?: boolean;
+  secret?: boolean;
   onChange: (value: string) => void;
 };
 

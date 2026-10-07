@@ -23,20 +23,34 @@ import { FormField } from '@/ui';
 import { FieldError } from './styled';
 import type { TextFieldProps } from './types';
 
-export const TextField = ({ label, value, placeholder, error, required, onChange }: TextFieldProps) => (
-  <FormField label={label} required={required}>
-    {(control) => (
-      <>
-        <Input
-          {...control}
-          size="large"
-          placeholder={placeholder}
-          value={value}
-          status={error ? 'error' : undefined}
-          onChange={(event) => onChange(event.target.value)}
-        />
-        {error && <FieldError role="alert">{error}</FieldError>}
-      </>
-    )}
-  </FormField>
-);
+export const TextField = ({
+  label,
+  description,
+  value,
+  placeholder,
+  error,
+  required,
+  disabled,
+  secret,
+  onChange,
+}: TextFieldProps) => {
+  const Control = secret ? Input.Password : Input;
+  return (
+    <FormField label={label} description={description} required={required}>
+      {(control) => (
+        <>
+          <Control
+            {...control}
+            size="large"
+            placeholder={placeholder}
+            disabled={disabled}
+            value={value}
+            status={error ? 'error' : undefined}
+            onChange={(event) => onChange(event.target.value)}
+          />
+          {error && <FieldError role="alert">{error}</FieldError>}
+        </>
+      )}
+    </FormField>
+  );
+};

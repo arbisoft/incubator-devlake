@@ -34,7 +34,7 @@
     },
     "max-lines": {
       "errors": 0,
-      "warnings": 19
+      "warnings": 18
     },
     "no-console": {
       "errors": 3,
@@ -54,7 +54,7 @@
     },
     "react-hooks/exhaustive-deps": {
       "errors": 0,
-      "warnings": 75
+      "warnings": 74
     },
     "react-hooks/globals": {
       "errors": 0,
@@ -70,7 +70,7 @@
     },
     "react-hooks/set-state-in-effect": {
       "errors": 0,
-      "warnings": 41
+      "warnings": 40
     },
     "react/display-name": {
       "errors": 1,
@@ -85,7 +85,7 @@
       "warnings": 0
     },
     "react/no-unescaped-entities": {
-      "errors": 20,
+      "errors": 18,
       "warnings": 0
     },
     "sonarjs/cognitive-complexity": {
@@ -98,7 +98,7 @@
     },
     "sonarjs/no-duplicate-string": {
       "errors": 0,
-      "warnings": 21
+      "warnings": 20
     },
     "sonarjs/no-globals-shadowing": {
       "errors": 2,

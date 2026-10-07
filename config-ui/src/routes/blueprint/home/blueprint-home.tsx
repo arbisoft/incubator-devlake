@@ -26,14 +26,13 @@ import { PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
 import type { IBlueprint } from '@/types';
 import {
-  buildListEmpty,
   DataTable,
   FILTER_TABS_VARIANT,
   FilterTabs,
   ListPage,
+  ListToolbar,
   PageHeader,
-  SearchInput,
-  Toolbar,
+  buildListEmpty,
   useListState,
   useRefreshVersion,
 } from '@/ui';
@@ -96,10 +95,11 @@ export const BlueprintHomePage = () => {
         description={COPY.description}
         breadcrumbs={[{ label: COPY.breadcrumbAdvanced, path: PATHS.BLUEPRINTS() }, { label: COPY.title }]}
       />
-      <Toolbar
-        start={
+      <ListToolbar
+        list={list}
+        searchPlaceholder={COPY.searchPlaceholder}
+        filters={
           <>
-            <SearchInput value={keyword} placeholder={COPY.searchPlaceholder} onSearch={list.setKeyword} allowClear />
             <FilterTabs
               items={STATUS_ITEMS}
               value={filters.status}

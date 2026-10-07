@@ -16,10 +16,21 @@
  *
  */
 
-export * from './access-form-modal';
-export * from './form-note';
-export * from './login-name-field';
-export * from './role-field';
-export * from './text-field';
-export type * from './types';
-export { Fields } from './styled';
+import type { OIDCProvider } from '@/api/access';
+
+import type { PROVIDER_ACTION } from './constants';
+
+export type ProviderAction = (typeof PROVIDER_ACTION)[keyof typeof PROVIDER_ACTION];
+
+export type ProviderOperation = { action: ProviderAction; providerKey: string };
+
+export type ProviderActionsProps = {
+  provider: OIDCProvider;
+  enabledProviderCount: number;
+  isOperating: boolean;
+  isActionOperating: (action: ProviderAction, providerKey: string) => boolean;
+  onEdit: (provider: OIDCProvider) => void;
+  onAction: (action: ProviderAction, provider: OIDCProvider) => void;
+};
+
+export type ProviderColumnActions = Omit<ProviderActionsProps, 'provider'>;

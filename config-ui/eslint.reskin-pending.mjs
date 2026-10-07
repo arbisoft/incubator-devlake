@@ -49,7 +49,4 @@ export const RESKIN_LINT_PENDING = [
   'src/routes/otel/styled.ts',
   'src/routes/project/detail/settings-panel.tsx',
   'src/routes/project/detail/webhooks-panel.tsx',
-  'src/routes/settings/authentication/authentication-columns.tsx',
-  'src/routes/settings/authentication/authentication-editor.tsx',
-  'src/routes/settings/authentication/authentication.tsx',
 ];

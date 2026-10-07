@@ -17,135 +17,124 @@
  */
 
 import { PlusOutlined } from '@ant-design/icons';
-import { Alert, Button, Space, Table, Tooltip, message } from 'antd';
-import { useMemo, useState } from 'react';
+import { Alert, Button, Space, Tooltip } from 'antd';
+import { useCallback, useMemo, useState } from 'react';
 
 import API from '@/api';
-import type { OIDCCallbacks, OIDCProvider } from '@/api/access';
-import { Toolbar } from '@/ui';
-import { operator } from '@/utils';
+import type { OIDCProvider } from '@/api/access';
+import { useRefreshData } from '@/hooks';
+import {
+  DataTable,
+  EMPTY_ILLUSTRATION,
+  EMPTY_STATE_SIZE,
+  ConfirmModal,
+  ListPage,
+  PageHeader,
+  SectionCard,
+  Toolbar,
+  buildListEmpty,
+  useRefreshVersion,
+} from '@/ui';
 
-import { OIDC_PROVIDER_MESSAGE } from '../constants';
-import { getAuthenticationState, getOIDCProviderError } from '../utils';
+import { getAuthenticationState } from '../utils';
 
-import { type ActiveOperation, type Operation, getAuthenticationColumns } from './authentication-columns';
-import { AuthenticationEditor } from './authentication-editor';
+import { getProviderColumns } from './columns';
+import { ProviderEditor } from './components';
+import { COPY } from './constants';
+import { useProviderActions } from './use-provider-actions';
 
-type Props = {
-  callbacks?: OIDCCallbacks;
-  providers: OIDCProvider[];
-  loadFailed: boolean;
-  onRefresh: () => void;
-};
-
-export const Authentication = ({ callbacks, providers, loadFailed, onRefresh }: Props) => {
+export const SettingsAuthentication = () => {
+  const { version, refresh } = useRefreshVersion();
   const [editorOpen, setEditorOpen] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState<OIDCProvider>();
-  const [operating, setOperating] = useState<ActiveOperation>();
-  const [pageError, setPageError] = useState<string>();
+  const [selected, setSelected] = useState<OIDCProvider>();
+  const { start, confirmProps, error, clearError, isOperating, isActionOperating } = useProviderActions({
+    onDone: refresh,
+  });
 
-  const isOperating = Boolean(operating);
-  const authenticationState = getAuthenticationState(providers);
-  const isActionOperating = (action: Operation, providerKey?: string) =>
-    operating?.action === action && operating.providerKey === providerKey;
+  const { data, ready } = useRefreshData(async () => {
+    const [providerResult, callbacks] = await Promise.all([
+      API.access
+        .listOIDCProviders()
+        .then((providers) => ({ providers, loadFailed: false }))
+        .catch(() => ({ providers: [], loadFailed: true })),
+      API.access.getOIDCCallbacks().catch(() => undefined),
+    ]);
+    return { providerResult, callbacks };
+  }, [version]);
 
-  const openEditor = (provider?: OIDCProvider) => {
-    setSelectedProvider(provider);
-    setPageError(undefined);
-    setEditorOpen(true);
-  };
+  const providers = useMemo(() => data?.providerResult.providers ?? [], [data]);
+  const loadFailed = data?.providerResult.loadFailed ?? false;
+  const enabledProviderCount = useMemo(() => providers.filter((provider) => provider.enabled).length, [providers]);
 
-  const closeEditor = () => {
-    if (!isOperating) setEditorOpen(false);
-  };
-
-  const performAction = async (action: Exclude<Operation, 'validate' | 'save'>, provider: OIDCProvider) => {
-    setPageError(undefined);
-    const requests = {
-      activate: () => API.access.activateOIDCProvider(provider.providerKey),
-      enable: () => API.access.enableOIDCProvider(provider.providerKey),
-      disable: () => API.access.disableOIDCProvider(provider.providerKey),
-      retire: () => API.access.retireOIDCProvider(provider.providerKey),
-      'grafana-sync': () => API.access.retryGrafanaOIDCProviderSync(provider.providerKey),
-      'select-generic': () => API.access.selectGenericOIDCProvider(provider.providerKey),
-    } as const;
-
-    const [success, result] = await operator(requests[action], {
-      hideToast: true,
-      setOperating: (active) => setOperating(active ? { action, providerKey: provider.providerKey } : undefined),
-      formatReason: getOIDCProviderError,
-    });
-    if (!success) {
-      setPageError(getOIDCProviderError(result));
-      onRefresh();
-      return;
-    }
-    if (action === 'grafana-sync') {
-      message.success(OIDC_PROVIDER_MESSAGE.GRAFANA_SYNCHRONIZED);
-    } else {
-      message.success('OIDC provider updated.');
-    }
-    onRefresh();
-  };
-
-  const enabledProviderCount = useMemo(() => providers.filter((p) => p.enabled).length, [providers]);
+  const openEditor = useCallback(
+    (provider?: OIDCProvider) => {
+      setSelected(provider);
+      clearError();
+      setEditorOpen(true);
+    },
+    [clearError],
+  );
 
   const columns = useMemo(
     () =>
-      getAuthenticationColumns({
-        onEdit: openEditor,
-        onAction: performAction,
+      getProviderColumns({
+        enabledProviderCount,
         isOperating,
         isActionOperating,
-        enabledProviderCount,
+        onEdit: openEditor,
+        onAction: start,
       }),
-    [isOperating, operating, enabledProviderCount],
+    [enabledProviderCount, isOperating, isActionOperating, openEditor, start],
   );
 
-  if (loadFailed) {
-    return (
-      <Alert
-        type="error"
-        showIcon
-        title="Authentication settings could not be loaded. Refresh the page and try again."
-      />
-    );
-  }
+  const addButton = (
+    <Button type="primary" icon={<PlusOutlined aria-hidden />} onClick={() => openEditor()}>
+      {COPY.addProvider}
+    </Button>
+  );
+  const empty = buildListEmpty({
+    failed: loadFailed,
+    onRetry: refresh,
+    filtered: false,
+    empty: { ...COPY.empty, illustration: EMPTY_ILLUSTRATION.NO_USERS, action: addButton },
+    noResults: COPY.empty,
+  });
 
   return (
-    <>
+    <ListPage>
+      <PageHeader title={COPY.title} description={COPY.description} />
       <Toolbar
         end={
           <Space size="small">
-            <Tooltip title="Review the OIDC configuration managed in User Management.">
-              <Button onClick={() => openEditor(providers[0])}>{authenticationState}</Button>
+            <Tooltip title={COPY.stateTooltip}>
+              <Button onClick={() => openEditor(providers[0])}>{getAuthenticationState(providers)}</Button>
             </Tooltip>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => openEditor()}>
-              Add provider
-            </Button>
+            {addButton}
           </Space>
         }
       />
-      {pageError && <Alert type="error" showIcon title={pageError} />}
-      <Table
-        data-testid="access-authentication-table"
-        rowKey="providerKey"
-        size="middle"
-        dataSource={providers}
-        pagination={false}
-        columns={columns}
-      />
-
-      <AuthenticationEditor
+      {error && <Alert type="error" showIcon title={error} />}
+      <SectionCard title={COPY.sectionTitle} count={loadFailed ? undefined : providers.length}>
+        <DataTable
+          rowKey="providerKey"
+          ariaLabel={COPY.tableLabel}
+          loading={!ready}
+          columns={columns}
+          dataSource={providers}
+          empty={loadFailed ? { ...empty, title: COPY.loadFailed, size: EMPTY_STATE_SIZE.SECTION } : empty}
+        />
+      </SectionCard>
+      <ProviderEditor
         open={editorOpen}
-        provider={selectedProvider}
-        callbacks={callbacks}
-        onClose={closeEditor}
+        provider={selected}
+        callbacks={data?.callbacks}
+        onClose={() => setEditorOpen(false)}
         onSaved={() => {
           setEditorOpen(false);
-          onRefresh();
+          refresh();
         }}
       />
-    </>
+      <ConfirmModal {...confirmProps} />
+    </ListPage>
   );
 };

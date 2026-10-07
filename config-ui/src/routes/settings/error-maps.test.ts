@@ -23,13 +23,8 @@ import { ACCESS_ERROR_CODE } from '@/api/access';
 import { COMMON_COPY } from '@/ui';
 import { toUserMessage } from '@/ui/utils';
 
-import {
-  ACCESS_ERROR,
-  CREATE_DOMAIN_ERROR_MAP,
-  CREATE_USER_ERROR_MAP,
-  LOCAL_CREDENTIAL_ERROR_MAP,
-  OIDC_PROVIDER_ERROR_MAP,
-} from './constants';
+import { OIDC_PROVIDER_ERROR_MAP } from './authentication/constants';
+import { ACCESS_ERROR, CREATE_DOMAIN_ERROR_MAP, CREATE_USER_ERROR_MAP, LOCAL_CREDENTIAL_ERROR_MAP } from './constants';
 import { getLocalCredentialError, getOIDCProviderError } from './utils';
 
 const failure = (status: number, data: unknown) =>

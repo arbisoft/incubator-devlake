@@ -29,10 +29,9 @@ import {
   DataTable,
   EMPTY_ILLUSTRATION,
   ListPage,
+  ListToolbar,
   PageHeader,
-  SearchInput,
   SectionCard,
-  Toolbar,
   buildListEmpty,
   useListState,
   useRefreshVersion,
@@ -168,15 +167,9 @@ export const SettingsUsers = () => {
   return (
     <ListPage>
       <PageHeader title={COPY.users.title} description={COPY.users.description} />
-      <Toolbar
-        start={
-          <SearchInput
-            value={keyword}
-            placeholder={COPY.users.searchPlaceholder}
-            onSearch={list.setKeyword}
-            allowClear
-          />
-        }
+      <ListToolbar
+        list={list}
+        searchPlaceholder={COPY.users.searchPlaceholder}
         end={
           <Space>
             {localAuthEnabled && (

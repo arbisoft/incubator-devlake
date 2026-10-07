@@ -16,10 +16,10 @@
  *
  */
 
-export * from './access-form-modal';
-export * from './form-note';
-export * from './login-name-field';
-export * from './role-field';
-export * from './text-field';
-export type * from './types';
-export { Fields } from './styled';
+import type { ActivityRow } from '../types';
+
+export type ActivityDrawerProps = {
+  open: boolean;
+  row?: ActivityRow;
+  onClose: () => void;
+};

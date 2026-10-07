@@ -16,7 +16,7 @@
  *
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 
 import API from '@/api';
 import {
@@ -26,11 +26,11 @@ import {
   type AccessUser,
   type LocalCredentialResponse,
 } from '@/api/access';
-import { CONFIRM_TONE, type ConfirmModalProps } from '@/ui';
 import { operator } from '@/utils';
 
 import { LIFECYCLE_ACTION, LIFECYCLE_CONFIRM, LIFECYCLE_SUBJECT } from './constants';
 import type { LifecycleAction, LifecycleSubject } from './types';
+import { useConfirmFlow } from './use-confirm-flow';
 import { getDomainLabel, getLocalCredentialError, getUserLabel } from './utils';
 
 export type LifecycleTarget =
@@ -69,18 +69,22 @@ const toRequest = ({ action, target }: Pending): (() => Promise<unknown>) | unde
       return () => API.access.resetLocalCredential(id);
     case LIFECYCLE_ACTION.REMOVE_PASSWORD:
       return () => API.access.removeLocalCredential(id);
-    default:
+    case LIFECYCLE_ACTION.ENABLE:
+    case LIFECYCLE_ACTION.DISABLE:
       return () => API.access.updateUser(id, { role, status: statusFor(action) });
+    default:
+      return undefined;
   }
 };
 
-export const useLifecycleAction = ({ onDone, onCredential }: Options) => {
-  const [pending, setPending] = useState<Pending>();
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+const resolve = ({ action, target }: Pending) => ({
+  config: LIFECYCLE_CONFIRM[target.subject][action],
+  name: getName(target),
+});
 
+export const useLifecycleAction = ({ onDone, onCredential }: Options) => {
   const run = useCallback(
-    async (next: Pending) => {
+    async (next: Pending, setLoading: (loading: boolean) => void) => {
       const request = toRequest(next);
       if (!request) return false;
       const [success, response] = await operator(request, {
@@ -96,16 +100,11 @@ export const useLifecycleAction = ({ onDone, onCredential }: Options) => {
     [onCredential, onDone],
   );
 
+  const { request, confirmProps } = useConfirmFlow({ resolve, run });
+
   const start = useCallback(
-    (action: LifecycleAction, target: LifecycleTarget) => {
-      if (LIFECYCLE_CONFIRM[target.subject][action]) {
-        setPending({ action, target });
-        setOpen(true);
-        return;
-      }
-      void run({ action, target });
-    },
-    [run],
+    (action: LifecycleAction, target: LifecycleTarget) => request({ action, target }),
+    [request],
   );
 
   const changeRole = useCallback(
@@ -121,22 +120,6 @@ export const useLifecycleAction = ({ onDone, onCredential }: Options) => {
     },
     [onDone],
   );
-
-  const config = pending && LIFECYCLE_CONFIRM[pending.target.subject][pending.action];
-  const name = pending ? getName(pending.target) : '';
-
-  const confirmProps: ConfirmModalProps = {
-    open,
-    tone: config?.tone ?? CONFIRM_TONE.DEFAULT,
-    title: config?.title(name) ?? '',
-    description: config?.description(name) ?? '',
-    confirmLabel: config?.confirm ?? '',
-    loading,
-    onConfirm: async () => {
-      if (pending && (await run(pending))) setOpen(false);
-    },
-    onCancel: () => setOpen(false),
-  };
 
   return { start, changeRole, confirmProps };
 };
