@@ -35,6 +35,7 @@ import {
   uniqueName,
   type ApiBlueprint,
 } from '../support/api';
+import { deletePipelinesNamedLike } from '../support/db';
 import { BlueprintPage } from '../support/pages/blueprints';
 import { PipelinesPage } from '../support/pages/pipelines';
 import { ProjectPage, ProjectsPage } from '../support/pages/projects';
@@ -64,6 +65,7 @@ test.describe.serial('Project, blueprint, pipeline and webhook flows', () => {
 
   test.afterAll(async () => {
     await deleteProject(api, projectName);
+    deletePipelinesNamedLike(projectName);
     await deleteWebhooksByPrefix(api);
     if (connectionId) {
       await deleteConnection(api, 'github', connectionId);

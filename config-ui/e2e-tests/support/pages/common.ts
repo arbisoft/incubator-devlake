@@ -59,6 +59,10 @@ export const cronFieldInputs = (dialog: Locator): Locator => dialog.locator('inp
 export const pipelineRowById = (page: Page, id: number): Locator =>
   page.locator('tbody tr.ant-table-row').filter({ has: page.getByRole('cell', { name: String(id), exact: true }) });
 
+// The pill filter tabs are an antd Segmented whose radio input is visually hidden, so the label is the click target.
+export const segmentedOption = (scope: Page | Locator, label: string): Locator =>
+  scope.locator('.ant-segmented-item').filter({ hasText: label });
+
 export const selectBox = (scope: Page | Locator): Locator => scope.locator('.ant-select').first();
 
 export const tagWithText = (scope: Page | Locator, text: string | RegExp): Locator =>
@@ -137,6 +141,10 @@ export class BasePage {
   // Waits until the URL path no longer contains the segment.
   async waitUntilPathLeaves(segment: string, timeout?: number): Promise<void> {
     await this.page.waitForURL((url) => !url.pathname.includes(segment), { timeout });
+  }
+
+  async pressEscape(): Promise<void> {
+    await this.page.keyboard.press('Escape');
   }
 
   async pause(ms: number): Promise<void> {

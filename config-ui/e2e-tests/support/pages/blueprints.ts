@@ -17,7 +17,9 @@
  */
 import { Locator } from '@playwright/test';
 
-import { BasePage, Screen, urlEndingWith } from './common';
+import { BLUEPRINT_HOME_COPY as COPY } from '../app-copy';
+
+import { BasePage, Screen, firstCellTexts, segmentedOption, urlEndingWith } from './common';
 import { PATHS } from './paths';
 
 export class BlueprintPage extends BasePage implements Screen {
@@ -30,7 +32,43 @@ export class BlueprintPage extends BasePage implements Screen {
   }
 
   get ready(): Locator {
-    return this.page.getByRole('button', { name: 'New Blueprint' });
+    return this.page.getByRole('button', { name: COPY.newBlueprint });
+  }
+
+  async openWithQuery(query: string): Promise<void> {
+    await this.visit(`${PATHS.blueprints}?${query}`);
+  }
+
+  async search(keyword: string): Promise<void> {
+    const box = this.page.getByRole('textbox', { name: COPY.searchPlaceholder });
+    await box.fill(keyword);
+    await box.press('Enter');
+  }
+
+  async filterByStatus(label: string): Promise<void> {
+    await segmentedOption(this.page, label).click();
+  }
+
+  noResults(): Locator {
+    return this.page.getByRole('heading', { name: COPY.noResults.title });
+  }
+
+  blueprintNames(): Promise<string[]> {
+    return firstCellTexts(this.page);
+  }
+
+  async createBlueprint(name: string, mode: 'normal' | 'advanced'): Promise<void> {
+    await this.ready.click();
+    const dialog = this.dialog(COPY.create.title);
+    await dialog.getByRole('textbox', { name: COPY.create.name.label }).fill(name);
+    if (mode === 'advanced') {
+      await dialog.getByRole('radio', { name: COPY.create.mode.advanced }).check();
+    }
+    await dialog.getByRole('button', { name: COPY.create.submit }).click();
+  }
+
+  async openCreateDialog(): Promise<void> {
+    await this.ready.click();
   }
 
   detailUrlPattern(id: number): RegExp {

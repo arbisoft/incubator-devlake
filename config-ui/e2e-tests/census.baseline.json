@@ -1,6 +1,20 @@
 {
   "moves": {},
   "specs": {
+    "advanced/blueprints.spec.ts": {
+      "tests": 5,
+      "expects": 24,
+      "backend": 5,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "advanced/pipelines.spec.ts": {
+      "tests": 4,
+      "expects": 18,
+      "backend": 1,
+      "skips": 0,
+      "fixmes": 0
+    },
     "auth/access-page.spec.ts": {
       "tests": 1,
       "expects": 5,
@@ -87,7 +101,7 @@
     },
     "projects/projects-list.spec.ts": {
       "tests": 2,
-      "expects": 15,
+      "expects": 16,
       "backend": 0,
       "skips": 0,
       "fixmes": 0

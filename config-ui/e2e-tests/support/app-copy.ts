@@ -26,3 +26,8 @@ export { PROJECT_TAB } from '../../src/config/route-keys';
 export { COPY as CONNECTIONS_COPY } from '../../src/routes/connection/constants';
 export { COPY as API_KEYS_COPY } from '../../src/routes/api-keys/constants';
 export { COPY as PROJECT_HOME_COPY } from '../../src/routes/project/home/constants';
+export {
+  COPY as BLUEPRINT_HOME_COPY,
+  STATUS_FILTER as BLUEPRINT_STATUS_FILTER,
+} from '../../src/routes/blueprint/home/constants';
+export { COPY as PIPELINE_COPY } from '../../src/routes/pipeline/constants';

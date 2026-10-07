@@ -86,10 +86,12 @@ test.describe.serial('Projects list search, sort and pagination', () => {
   test('a search with no match shows the empty state and keeps the keyword', async ({ page }) => {
     const projects = new ProjectsPage(page);
     await projects.open();
-    await projects.search(`${prefix}-no-such-project`);
+    const keyword = `${prefix}-no-such-project`;
+    await projects.search(keyword);
+    await expect.poll(() => projects.urlParams.get('keyword')).toBe(keyword);
     await expect(projects.noResults()).toBeVisible();
     await projects.reload();
     await expect(projects.noResults()).toBeVisible();
-    expect(projects.urlParams.get('keyword')).toBe(`${prefix}-no-such-project`);
+    expect(projects.urlParams.get('keyword')).toBe(keyword);
   });
 });

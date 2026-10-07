@@ -129,3 +129,12 @@ export function hiddenOtelConnectionCount(teamName: string): number {
     ).trim(),
   );
 }
+
+// Pipelines outlive their blueprint and cannot be deleted through the API, so cleanup removes the rows named after test blueprints.
+export function deletePipelinesNamedLike(prefix: string): void {
+  const pattern = `${prefix.replace(/'/g, "''")}%`;
+  runSql(`
+    DELETE FROM _devlake_tasks WHERE pipeline_id IN (SELECT id FROM _devlake_pipelines WHERE name LIKE '${pattern}');
+    DELETE FROM _devlake_pipelines WHERE name LIKE '${pattern}';
+  `);
+}

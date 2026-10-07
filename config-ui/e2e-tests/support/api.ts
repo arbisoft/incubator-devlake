@@ -246,6 +246,54 @@ export async function deleteProject(api: APIRequestContext, name: string): Promi
   expect(res.ok(), `delete project ${name} failed with ${res.status()}`).toBe(true);
 }
 
+export async function createBlueprint(
+  api: APIRequestContext,
+  name: string,
+  options: { enable?: boolean } = {},
+): Promise<ApiBlueprint> {
+  return json(
+    await api.post('/blueprints', {
+      data: {
+        name,
+        mode: 'NORMAL',
+        enable: options.enable ?? true,
+        cronConfig: '0 0 * * *',
+        isManual: false,
+        skipOnFail: true,
+        connections: [],
+      },
+    }),
+    `create blueprint ${name}`,
+  );
+}
+
+// A blueprint with no connections answers 400 yet still records a pipeline that completes at once.
+export async function triggerBlueprint(api: APIRequestContext, blueprintId: number): Promise<void> {
+  await api.post(`/blueprints/${blueprintId}/trigger`, { data: { skipCollectors: false, fullSync: false } });
+  await expect.poll(async () => (await listBlueprintPipelines(api, blueprintId)).length).toBeGreaterThan(0);
+}
+
+async function deleteBlueprint(api: APIRequestContext, blueprintId: number): Promise<void> {
+  await cancelPipelinesOfBlueprint(api, blueprintId);
+  await api.delete(`/blueprints/${blueprintId}`);
+}
+
+export async function listBlueprintsByKeyword(api: APIRequestContext, keyword: string): Promise<ApiBlueprint[]> {
+  const res = await json<{ blueprints: ApiBlueprint[] }>(
+    await api.get('/blueprints', { params: { type: 'ALL', keyword, pageSize: 100 } }),
+    'list blueprints',
+  );
+  return res.blueprints ?? [];
+}
+
+export async function deleteBlueprintsByPrefix(api: APIRequestContext, prefix: string): Promise<void> {
+  for (const blueprint of await listBlueprintsByKeyword(api, prefix)) {
+    if (blueprint.name.startsWith(prefix)) {
+      await deleteBlueprint(api, blueprint.id);
+    }
+  }
+}
+
 export interface ApiPipeline {
   id: number;
   name: string;
