@@ -17,7 +17,7 @@
  */
 import { Locator, Page } from '@playwright/test';
 
-import { PROJECT_HOME_COPY as COPY } from '../app-copy';
+import { COMMON_COPY, PROJECT_HOME_COPY as COPY, WEBHOOK_COPY } from '../app-copy';
 
 import {
   BasePage,
@@ -25,7 +25,6 @@ import {
   urlEndingWith,
   cronFieldInputs,
   firstCellTexts,
-  iconButton,
   paginationPage,
   pipelineRowById,
   sectionHeaderButton,
@@ -184,21 +183,21 @@ export class ProjectPage extends BasePage {
   }
 
   get webhookDialog(): Locator {
-    return this.dialog('Add a New Webhook');
+    return this.dialog(WEBHOOK_COPY.create.title);
   }
 
   get webhookCurlNotice(): Locator {
-    return this.webhookDialog.getByText('CURL commands generated. Please copy them now.');
+    return this.webhookDialog.getByText(WEBHOOK_COPY.create.generated);
   }
 
   async generateWebhook(name: string): Promise<void> {
-    await this.page.getByRole('button', { name: 'Add a Webhook' }).click();
-    await this.webhookDialog.getByPlaceholder('Webhook Name').fill(name);
-    await this.webhookDialog.getByRole('button', { name: 'Generate POST URL' }).click();
+    await this.page.getByRole('button', { name: WEBHOOK_COPY.add }).click();
+    await this.webhookDialog.getByPlaceholder(WEBHOOK_COPY.create.namePlaceholder).fill(name);
+    await this.webhookDialog.getByRole('button', { name: WEBHOOK_COPY.create.submit }).click();
   }
 
   async closeWebhookDialog(): Promise<void> {
-    await this.webhookDialog.getByRole('button', { name: 'Close' }).click();
+    await this.webhookDialog.getByRole('button', { name: COMMON_COPY.close, exact: true }).click();
   }
 
   webhookRow(name: string): Locator {
@@ -207,11 +206,13 @@ export class ProjectPage extends BasePage {
 
   // Deletes the webhook through its row and returns the HTTP status of the delete request.
   async deleteWebhook(name: string, webhookId: number): Promise<number> {
-    await iconButton(this.webhookRow(name), 'delete').click();
+    await this.webhookRow(name)
+      .getByRole('button', { name: WEBHOOK_COPY.actions.remove(name) })
+      .click();
     const deleted = this.page.waitForResponse(
       (res) => res.url().endsWith(`/plugins/webhook/connections/${webhookId}`) && res.request().method() === 'DELETE',
     );
-    await this.confirmDialog('Delete this Webhook?');
+    await this.confirmDialog(WEBHOOK_COPY.remove.title(name), WEBHOOK_COPY.remove.confirm);
     return (await deleted).status();
   }
 

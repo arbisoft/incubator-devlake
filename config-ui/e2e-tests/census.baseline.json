@@ -67,9 +67,23 @@
       "fixmes": 0
     },
     "connections/health.spec.ts": {
-      "tests": 3,
-      "expects": 12,
+      "tests": 4,
+      "expects": 17,
       "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "connections/manage-dialog.spec.ts": {
+      "tests": 2,
+      "expects": 4,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "connections/webhooks.spec.ts": {
+      "tests": 1,
+      "expects": 13,
+      "backend": 3,
       "skips": 0,
       "fixmes": 0
     },

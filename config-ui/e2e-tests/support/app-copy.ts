@@ -24,6 +24,11 @@ export { COPY as ACCOUNT_BLOCK_COPY } from '../../src/ui/account-block/constants
 export { COMMON_COPY } from '../../src/ui/constants';
 export { PROJECT_TAB } from '../../src/config/route-keys';
 export { COPY as CONNECTIONS_COPY, CATALOG_FILTER } from '../../src/routes/connection/constants';
+export { COPY as WEBHOOK_COPY } from '../../src/plugins/register/webhook/constants';
+export { COPY as CONNECTION_LIST_COPY } from '../../src/plugins/components/connection-list/constants';
+export { COPY as CONNECTION_FORM_COPY } from '../../src/plugins/components/connection-form/constants';
+export { COPY as CONNECTION_HEALTH_COPY } from '../../src/ui/connection-health/constants';
+export { COPY as CONNECTION_MODAL_COPY } from '../../src/plugins/components/connection-modal/constants';
 export { COPY as INTEGRATION_CARD_COPY } from '../../src/ui/integration-card/constants';
 export { HEALTH_STORAGE_KEY, HEALTH_TTL_MS } from '../../src/features/connections/constants';
 export { INTEGRATION_CATEGORY } from '../../src/plugins/catalog';

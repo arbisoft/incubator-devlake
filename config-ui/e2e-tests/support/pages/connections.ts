@@ -20,14 +20,21 @@ import { Locator, Page } from '@playwright/test';
 import {
   CATALOG_FILTER,
   CONNECTIONS_COPY,
+  CONNECTION_HEALTH_COPY,
+  CONNECTION_LIST_COPY,
+  CONNECTION_MODAL_COPY,
   HEALTH_STORAGE_KEY,
   HEALTH_TTL_MS,
   INTEGRATION_CARD_COPY,
   SORT_SELECT_COPY,
 } from '../app-copy';
 
-import { BasePage, Screen, selectOption, urlEndingWith, tableRow } from './common';
+import { BasePage, Screen, segmentedOption, selectOption, urlEndingWith, tableRow } from './common';
+import { ConnectionForm } from './connection-form';
 import { PATHS } from './paths';
+
+// The manage dialog lists name, status, repo count and actions, in that order.
+const REPO_COUNT_COLUMN = 2;
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -43,61 +50,10 @@ export const PLUGINS = {
   github: { name: 'GitHub', key: 'github' },
   claudeCode: { name: 'Claude Code', key: 'claude_code' },
   azureDevops: { name: 'Azure DevOps', key: 'azuredevops' },
+  webhook: { name: 'Webhook', key: 'webhook' },
 } satisfies Record<string, PluginRef>;
 
-const manageTitle = (plugin: PluginRef) => CONNECTIONS_COPY.manageTitle(plugin.name);
-
-// The create or edit form of a plugin connection, shown inside its "Manage Connections" dialog.
-export class ConnectionForm {
-  constructor(
-    private readonly page: Page,
-    private readonly pluginKey: string,
-    readonly dialog: Locator,
-  ) {}
-
-  get validFrom(): Locator {
-    return this.dialog.getByText(/Valid From:/);
-  }
-
-  async fillName(name: string): Promise<void> {
-    await this.dialog.getByPlaceholder('Your Connection Name').fill(name);
-  }
-
-  async clickNameField(): Promise<void> {
-    await this.dialog.getByPlaceholder('Your Connection Name').click();
-  }
-
-  async fillToken(token: string): Promise<void> {
-    await this.dialog.getByPlaceholder('Token').fill(token);
-  }
-
-  async fillOrganization(organization: string): Promise<void> {
-    await this.dialog.getByPlaceholder('e.g. org_123456789').fill(organization);
-  }
-
-  async addHeader(index: number, key: string, value: string): Promise<void> {
-    await this.dialog.getByRole('button', { name: '+ Add Header' }).click();
-    await this.dialog.getByPlaceholder('Header name').nth(index).fill(key);
-    await this.dialog.getByPlaceholder('Header value').nth(index).fill(value);
-  }
-
-  async test(): Promise<void> {
-    await this.dialog.getByRole('button', { name: 'Test Connection' }).click();
-  }
-
-  // Clicks Test Connection and returns the HTTP status of the plugin's test request.
-  async testAndGetStatus(): Promise<number> {
-    const testResponse = this.page.waitForResponse(
-      (res) => res.url().endsWith(`/plugins/${this.pluginKey}/test`) && res.request().method() === 'POST',
-    );
-    await this.test();
-    return (await testResponse).status();
-  }
-
-  async save(): Promise<void> {
-    await this.dialog.getByRole('button', { name: 'Save Connection' }).click();
-  }
-}
+const manageTitle = (plugin: PluginRef) => CONNECTION_MODAL_COPY.title(plugin.name);
 
 // A stored health entry of a connection, as the catalog keeps it in sessionStorage.
 export interface StoredHealth {
@@ -299,6 +255,31 @@ export class ConnectionsPage extends BasePage implements Screen {
     return tableRow(this.manageDialog(plugin), name);
   }
 
+  // A filter tab of the manage dialog, such as "Failed (1)".
+  manageTab(plugin: PluginRef, label: string): Locator {
+    return segmentedOption(this.manageDialog(plugin), label);
+  }
+
+  async selectManageTab(plugin: PluginRef, label: string): Promise<void> {
+    await this.manageTab(plugin, label).click();
+  }
+
+  repoCount(plugin: PluginRef, name: string): Locator {
+    return this.connectionRow(plugin, name).getByRole('cell').nth(REPO_COUNT_COLUMN);
+  }
+
+  // The "Tested …" line of a row in the manage dialog, which only shows when the connection has a result.
+  rowTestedAt(plugin: PluginRef, name: string): Locator {
+    return this.connectionRow(plugin, name).getByText(/^Tested /);
+  }
+
+  // Retests one row of the manage dialog and returns once the test request has answered.
+  async retestRow(plugin: PluginRef, id: number, name: string): Promise<void> {
+    const tested = this.waitForConnectionTest(plugin, id);
+    await this.connectionRow(plugin, name).getByRole('button', { name: CONNECTION_HEALTH_COPY.retest }).click();
+    await tested;
+  }
+
   async openCreateForm(plugin: PluginRef): Promise<ConnectionForm> {
     await this.open();
     await this.addConnectionFromCard(plugin.name);
@@ -310,7 +291,9 @@ export class ConnectionsPage extends BasePage implements Screen {
     const detailLoaded = this.page.waitForResponse(
       (res) => res.url().endsWith(`/plugins/${plugin.key}/connections/${id}`) && res.request().method() === 'GET',
     );
-    await this.connectionRow(plugin, name).getByRole('button', { name: 'Edit' }).click();
+    await this.connectionRow(plugin, name)
+      .getByRole('button', { name: CONNECTION_LIST_COPY.editFor(name) })
+      .click();
     await detailLoaded;
     return new ConnectionForm(this.page, plugin.key, this.manageDialog(plugin).last());
   }

@@ -1,0 +1,29 @@
+{
+  "titlePath": ["create, rename, renew the key of and delete a webhook from the connections page"],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/plugins/webhook/connections",
+      "body": {
+        "name": "e2e-*"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/plugins/webhook/connections/:id",
+      "body": {
+        "name": "e2e-*-renamed"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/api/api-keys/:id",
+      "body": null
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/plugins/webhook/connections/:id",
+      "body": null
+    }
+  ]
+}

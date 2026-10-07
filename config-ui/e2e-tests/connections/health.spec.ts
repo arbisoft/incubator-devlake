@@ -20,6 +20,7 @@ import { APIRequestContext } from '@playwright/test';
 import { loginAsAdmin } from '../auth-helpers';
 import { test, expect } from '../fixtures';
 import { DUMMY_TOKEN, adminApi, createGithubConnection, deleteConnectionsByPrefix, uniqueName } from '../support/api';
+import { CONNECTION_HEALTH_COPY, COMMON_COPY } from '../support/app-copy';
 import { ConnectionsPage, PLUGINS } from '../support/pages/connections';
 
 // A real token passes the test; the dummy one is rejected by GitHub.
@@ -99,4 +100,28 @@ test('a result older than the validity window is tested again on the next visit'
   await expect
     .poll(async () => (await connections.storedHealth(PLUGINS.github, id))?.testedAt ?? 0)
     .toBeGreaterThan(before);
+});
+
+test('a manual retest in the manage dialog updates the tested time', async ({ page }) => {
+  const name = uniqueName('gh-health-retest');
+  const { id } = await createGithubConnection(api, name, TOKEN);
+
+  const connections = new ConnectionsPage(page);
+  const firstTest = connections.waitForConnectionTest(PLUGINS.github, id);
+  await connections.open();
+  await firstTest;
+  await expect.poll(async () => (await connections.storedHealth(PLUGINS.github, id))?.status).toBe(EXPECTED_STATUS);
+  const before = (await connections.storedHealth(PLUGINS.github, id))?.testedAt ?? 0;
+  expect(before).toBeGreaterThan(0);
+  await connections.waitUntilSettled();
+
+  await connections.openCard(PLUGINS.github.name);
+  await expect(connections.rowTestedAt(PLUGINS.github, name)).toBeVisible();
+  await connections.retestRow(PLUGINS.github, id, name);
+  await expect
+    .poll(async () => (await connections.storedHealth(PLUGINS.github, id))?.testedAt ?? 0)
+    .toBeGreaterThan(before);
+  await expect(connections.rowTestedAt(PLUGINS.github, name)).toHaveText(
+    CONNECTION_HEALTH_COPY.testedAt(COMMON_COPY.justNow),
+  );
 });
