@@ -142,6 +142,8 @@ export const buildAntdConfig = (
       titleFontSize: TYPOGRAPHY.scale.h3.fontSize,
       titleLineHeight: TYPOGRAPHY.scale.h3.lineHeight / TYPOGRAPHY.scale.h3.fontSize,
       borderRadiusLG: RADIUS.lg,
+      contentBg: colors.bgContainer,
+      headerBg: colors.bgContainer,
     },
     Input: { activeBorderColor: colors.primary, hoverBorderColor: colors.primaryHover },
     Select: { activeBorderColor: colors.primary, hoverBorderColor: colors.primaryHover },

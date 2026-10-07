@@ -16,11 +16,22 @@
  *
  */
 
-export type ICheck = {
-  count: number;
-  projects: Array<{
-    name: string;
-    blueprintId: ID;
-    scopes?: Array<{ scopeName: string }>;
-  }>;
+export type ScopeConfigRow = { id: ID; name: string };
+
+export type ScopeConfigSelectModalProps = {
+  open: boolean;
+  plugin: string;
+  connectionId: ID;
+  title: string;
+  scopeConfigId?: ID;
+  onCancel: () => void;
+  onSubmit: (scopeConfigId: ID) => void;
+};
+
+export type ScopeConfigListProps = {
+  plugin: string;
+  connectionId: ID;
+  scopeConfigId?: ID;
+  selectedId?: ID;
+  onSelect: (scopeConfigId: ID) => void;
 };

@@ -16,11 +16,14 @@
  *
  */
 
-export type ICheck = {
-  count: number;
-  projects: Array<{
-    name: string;
-    blueprintId: ID;
-    scopes?: Array<{ scopeName: string }>;
-  }>;
-};
+import styled from 'styled-components';
+
+export const Stack = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.md}px;
+`;
+
+export const Toolbar = styled.div`
+  display: flex;
+`;

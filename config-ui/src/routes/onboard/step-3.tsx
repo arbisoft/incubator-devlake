@@ -125,7 +125,6 @@ export const Step3 = () => {
             connectionId={connectionId}
             selectedScope={scopes}
             onChangeSelectedScope={setScopes}
-            footer={null}
           />
         </div>
         <Markdown className="qa">{QA}</Markdown>

@@ -16,8 +16,7 @@
  *
  */
 
-import { ConnectionModal, DataScopeRemote } from '@/plugins';
-import { MODAL_WIDTH } from '@/ui';
+import { DataScopeRemoteModal } from '@/plugins';
 
 import { DETAIL_COPY } from '../constants';
 import type { ScopeRow } from '../scope-table';
@@ -41,19 +40,13 @@ export const AddDataScopeModal = ({
   onClose,
   onAdded,
 }: AddDataScopeModalProps) => (
-  <ConnectionModal
+  <DataScopeRemoteModal
     open={open}
     plugin={plugin}
+    connectionId={connectionId}
     title={DETAIL_COPY.addScopeTitle(connectionName)}
-    width={MODAL_WIDTH.LG}
+    disabledScope={scopes}
     onCancel={onClose}
-  >
-    <DataScopeRemote
-      plugin={plugin}
-      connectionId={connectionId}
-      disabledScope={scopes}
-      onCancel={onClose}
-      onSubmit={onAdded}
-    />
-  </ConnectionModal>
+    onSubmit={onAdded}
+  />
 );

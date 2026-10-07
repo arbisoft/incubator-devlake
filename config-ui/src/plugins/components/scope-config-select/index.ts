@@ -16,24 +16,4 @@
  *
  */
 
-import type { ButtonProps } from 'antd';
-import { Tooltip, Button } from 'antd';
-import { forwardRef, Ref } from 'react';
-
-interface Props extends Pick<
-  ButtonProps,
-  'type' | 'icon' | 'size' | 'disabled' | 'loading' | 'ghost' | 'danger' | 'block' | 'onClick'
-> {
-  helptip: string;
-}
-
-export const IconButton = forwardRef(function (
-  { helptip, ...props }: Props,
-  ref?: Ref<HTMLAnchorElement | HTMLButtonElement>,
-) {
-  return (
-    <Tooltip title={helptip}>
-      <Button ref={ref} {...props} />
-    </Tooltip>
-  );
-});
+export * from './scope-config-select-modal';

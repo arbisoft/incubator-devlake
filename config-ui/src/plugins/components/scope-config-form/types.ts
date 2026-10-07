@@ -16,31 +16,37 @@
  *
  */
 
-import { ScopeConfigSelectModal } from '@/plugins';
+import type { Dispatch, SetStateAction } from 'react';
 
-import { DETAIL_COPY } from '../constants';
+export type Transformation = Record<string, unknown>;
 
-type AssociateScopeConfigModalProps = {
-  open: boolean;
+export type ScopeConfigFormProps = {
   plugin: string;
   connectionId: ID;
-  onClose: () => void;
-  onSubmit: (configId: ID) => void;
+  defaultName?: string;
+  showWarning?: boolean;
+  forceCreate?: boolean;
+  scopeId?: ID;
+  scopeConfigId?: ID;
+  onCancel: () => void;
+  onSubmit: (id: string) => void;
 };
 
-export const AssociateScopeConfigModal = ({
-  open,
-  plugin,
-  connectionId,
-  onClose,
-  onSubmit,
-}: AssociateScopeConfigModalProps) => (
-  <ScopeConfigSelectModal
-    open={open}
-    plugin={plugin}
-    connectionId={connectionId}
-    title={DETAIL_COPY.associateTitle}
-    onCancel={onClose}
-    onSubmit={onSubmit}
-  />
-);
+export type TransformationProps = {
+  entities: string[];
+  connectionId: ID;
+  scopeId?: ID;
+  scopeConfigId?: ID;
+  transformation: Transformation;
+  setTransformation: Dispatch<SetStateAction<Transformation>>;
+  setHasError: Dispatch<SetStateAction<boolean>>;
+};
+
+export type StepDetailsProps = {
+  name: string;
+  entities: string[];
+  entityOptions: { label: string; value: string }[];
+  showWarning: boolean;
+  onNameChange: (name: string) => void;
+  onEntitiesChange: (entities: string[]) => void;
+};

@@ -16,11 +16,23 @@
  *
  */
 
-export type ICheck = {
-  count: number;
-  projects: Array<{
-    name: string;
-    blueprintId: ID;
-    scopes?: Array<{ scopeName: string }>;
-  }>;
+import type { McsItem } from 'miller-columns-select';
+
+import type { IDataScope } from '@/types';
+
+export type ScopeSelectItem = McsItem<{ data: IDataScope }>;
+
+export type InitialScope = { id: ID; scope?: IDataScope };
+
+export type DataScopeSelectProps = {
+  plugin: string;
+  connectionId: ID;
+  showWarning?: boolean;
+  initialScope?: InitialScope[];
+  onCancel?: () => void;
+  onSubmit?: (scopeIds: ID[]) => void;
 };
+
+export type ScopeOption = { label: string; value: ID };
+
+export type MergeItems = (items: ScopeSelectItem[]) => void;

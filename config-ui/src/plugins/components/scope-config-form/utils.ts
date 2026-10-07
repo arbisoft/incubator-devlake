@@ -16,11 +16,14 @@
  *
  */
 
-export type ICheck = {
-  count: number;
-  projects: Array<{
-    name: string;
-    blueprintId: ID;
-    scopes?: Array<{ scopeName: string }>;
-  }>;
-};
+import { omit } from 'lodash';
+
+import { SCOPE_CONFIG_META_FIELDS } from './constants';
+import type { Transformation } from './types';
+
+export const isDetailsValid = (name: string, entities: string[]) => !!name && entities.length > 0;
+
+export const toTransformation = (config: Record<string, unknown>): Transformation =>
+  omit(config, SCOPE_CONFIG_META_FIELDS);
+
+export const toCopyName = (name: string, forceCreate: boolean) => (forceCreate ? `${name}-copy` : name);

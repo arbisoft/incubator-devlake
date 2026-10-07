@@ -16,11 +16,26 @@
  *
  */
 
-export type ICheck = {
-  count: number;
-  projects: Array<{
-    name: string;
-    blueprintId: ID;
-    scopes?: Array<{ scopeName: string }>;
-  }>;
-};
+import { describe, expect, it } from 'vitest';
+
+import { NO_SCOPE_CONFIG } from './constants';
+import { toScopeConfigRows } from './utils';
+
+const CONFIGS = [
+  { id: 1, name: 'one' },
+  { id: 2, name: 'two' },
+];
+
+describe('toScopeConfigRows', () => {
+  it('is empty until the configs load', () => {
+    expect(toScopeConfigRows(undefined, true)).toEqual([]);
+  });
+
+  it('lists the configs as they are', () => {
+    expect(toScopeConfigRows(CONFIGS, false)).toEqual(CONFIGS);
+  });
+
+  it('puts a "no scope config" row first when a config is already associated', () => {
+    expect(toScopeConfigRows(CONFIGS, true)).toEqual([{ ...NO_SCOPE_CONFIG }, ...CONFIGS]);
+  });
+});

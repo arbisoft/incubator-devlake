@@ -1,7 +1,7 @@
 {
   "eslint": {
     "@typescript-eslint/no-explicit-any": {
-      "errors": 290,
+      "errors": 259,
       "warnings": 0
     },
     "@typescript-eslint/no-unused-vars": {
@@ -22,31 +22,31 @@
     },
     "max-lines": {
       "errors": 0,
-      "warnings": 18
+      "warnings": 15
     },
     "no-console": {
       "errors": 2,
       "warnings": 0
     },
     "no-duplicate-imports": {
-      "errors": 12,
+      "errors": 8,
       "warnings": 0
     },
     "no-empty": {
       "errors": 0,
-      "warnings": 3
+      "warnings": 2
     },
     "prefer-destructuring": {
       "errors": 0,
-      "warnings": 17
+      "warnings": 14
     },
     "react-hooks/exhaustive-deps": {
       "errors": 0,
-      "warnings": 73
+      "warnings": 67
     },
     "react-hooks/globals": {
       "errors": 0,
-      "warnings": 2
+      "warnings": 1
     },
     "react-hooks/immutability": {
       "errors": 0,
@@ -58,11 +58,7 @@
     },
     "react-hooks/set-state-in-effect": {
       "errors": 0,
-      "warnings": 39
-    },
-    "react/display-name": {
-      "errors": 1,
-      "warnings": 0
+      "warnings": 31
     },
     "react/jsx-key": {
       "errors": 1,
@@ -98,10 +94,10 @@
     },
     "sonarjs/no-nested-conditional": {
       "errors": 0,
-      "warnings": 17
+      "warnings": 13
     },
     "sonarjs/no-nested-template-literals": {
-      "errors": 2,
+      "errors": 1,
       "warnings": 0
     },
     "sonarjs/prefer-native-axios-alternative": {
@@ -127,7 +123,7 @@
   },
   "knip": [],
   "jscpd": {
-    "clones": 110,
-    "duplicatedLines": 1946
+    "clones": 105,
+    "duplicatedLines": 1890
   }
 }

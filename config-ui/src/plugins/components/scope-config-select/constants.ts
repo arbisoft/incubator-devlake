@@ -16,11 +16,18 @@
  *
  */
 
-export type ICheck = {
-  count: number;
-  projects: Array<{
-    name: string;
-    blueprintId: ID;
-    scopes?: Array<{ scopeName: string }>;
-  }>;
+export const NO_SCOPE_CONFIG = { id: 'None', name: 'No Scope Config' } as const;
+
+export const COPY = {
+  save: 'Save',
+  disabledReason: 'Select a scope config.',
+  add: 'Add New Scope Config',
+  addTitle: 'Add Scope Config',
+  tableLabel: 'Scope configs',
+  nameColumn: 'Name',
+  empty: {
+    title: 'No scope configs yet',
+    description: 'Add a scope config to associate it with data scopes.',
+  },
+  defaultName: (count: number) => `shared-config-<${count}>`,
 };

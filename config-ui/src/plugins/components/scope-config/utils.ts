@@ -16,11 +16,16 @@
  *
  */
 
-export type ICheck = {
-  count: number;
-  projects: Array<{
-    name: string;
-    blueprintId: ID;
-    scopes?: Array<{ scopeName: string }>;
-  }>;
-};
+import type { ProjectRef, RelatedProject } from './types';
+
+type CheckedProject = { name: string; scopes?: Array<{ scopeName: string }> };
+type ScopeBlueprint = { id: ID; projectName: string };
+
+export const toRelatedProjects = (projects: CheckedProject[] | undefined): RelatedProject[] =>
+  (projects ?? []).map((it) => ({ name: it.name, scopes: it.scopes ?? [] }));
+
+export const toProjectRefs = (blueprints: ScopeBlueprint[] | undefined): ProjectRef[] =>
+  (blueprints ?? []).map((it) => ({ name: it.projectName, blueprintId: it.id }));
+
+export const toCheckedProjectRefs = (projects: Array<{ name: string; blueprintId: ID }> | undefined): ProjectRef[] =>
+  (projects ?? []).map((it) => ({ name: it.name, blueprintId: it.blueprintId }));

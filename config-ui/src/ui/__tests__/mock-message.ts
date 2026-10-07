@@ -16,11 +16,10 @@
  *
  */
 
-export type ICheck = {
-  count: number;
-  projects: Array<{
-    name: string;
-    blueprintId: ID;
-    scopes?: Array<{ scopeName: string }>;
-  }>;
-};
+import type * as Antd from 'antd';
+import { vi } from 'vitest';
+
+export const messageMock = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
+
+// Keeps toasts out of the jsdom window: pass the module `vi.mock('antd', ...)` gets from `importOriginal`.
+export const withMockedMessage = (antd: typeof Antd) => ({ ...antd, message: messageMock });

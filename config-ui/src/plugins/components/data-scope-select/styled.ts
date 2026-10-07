@@ -16,11 +16,27 @@
  *
  */
 
-export type ICheck = {
-  count: number;
-  projects: Array<{
-    name: string;
-    blueprintId: ID;
-    scopes?: Array<{ scopeName: string }>;
-  }>;
-};
+import styled from 'styled-components';
+
+export const Stack = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.md}px;
+`;
+
+export const Row = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.space.xs}px;
+`;
+
+export const Actions = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: ${({ theme }) => theme.space.xs}px;
+`;
+
+export const Notice = styled.div`
+  margin-bottom: ${({ theme }) => theme.space.lg}px;
+`;

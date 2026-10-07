@@ -16,31 +16,39 @@
  *
  */
 
-import { ScopeConfigSelectModal } from '@/plugins';
+import type { SCOPE_CONFIG_DIALOG } from './constants';
 
-import { DETAIL_COPY } from '../constants';
+export type ScopeConfigDialog = (typeof SCOPE_CONFIG_DIALOG)[keyof typeof SCOPE_CONFIG_DIALOG];
 
-type AssociateScopeConfigModalProps = {
-  open: boolean;
+export type ProjectRef = { name: string; blueprintId: ID };
+
+export type RelatedProject = { name: string; scopes: Array<{ scopeName: string }> };
+
+export type ScopeConfigProps = {
   plugin: string;
   connectionId: ID;
-  onClose: () => void;
-  onSubmit: (configId: ID) => void;
+  scopeId: ID;
+  scopeName: string;
+  scopeConfigId?: ID;
+  scopeConfigName?: string;
+  onSuccess: (id?: ID) => void;
 };
 
-export const AssociateScopeConfigModal = ({
-  open,
-  plugin,
-  connectionId,
-  onClose,
-  onSubmit,
-}: AssociateScopeConfigModalProps) => (
-  <ScopeConfigSelectModal
-    open={open}
-    plugin={plugin}
-    connectionId={connectionId}
-    title={DETAIL_COPY.associateTitle}
-    onCancel={onClose}
-    onSubmit={onSubmit}
-  />
-);
+export type SavedDialogProps = {
+  plugin: string;
+  projects: ProjectRef[];
+  operating: boolean;
+  onRun: (project: ProjectRef) => void;
+  onClose: () => void;
+};
+
+export type RelatedProjectsDialogProps = {
+  open: boolean;
+  plugin: string;
+  title: string;
+  scopeName: string;
+  projects: RelatedProject[];
+  onCancel: () => void;
+  onContinue: () => void;
+  onDuplicate: () => void;
+};

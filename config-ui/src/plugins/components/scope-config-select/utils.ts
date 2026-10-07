@@ -16,11 +16,10 @@
  *
  */
 
-export type ICheck = {
-  count: number;
-  projects: Array<{
-    name: string;
-    blueprintId: ID;
-    scopes?: Array<{ scopeName: string }>;
-  }>;
+import { NO_SCOPE_CONFIG } from './constants';
+import type { ScopeConfigRow } from './types';
+
+export const toScopeConfigRows = (configs: ScopeConfigRow[] | undefined, hasCurrent: boolean): ScopeConfigRow[] => {
+  if (!configs) return [];
+  return hasCurrent ? [{ ...NO_SCOPE_CONFIG }, ...configs] : configs;
 };

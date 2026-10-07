@@ -16,59 +16,54 @@
  *
  */
 
-import { CheckCircleFilled, SearchOutlined } from '@ant-design/icons';
+import { SearchOutlined } from '@ant-design/icons';
 import { useDebounce } from 'ahooks';
-import { Space, Tag, Button, Input, Modal, message } from 'antd';
-import type { McsID, McsItem, McsColumn } from 'miller-columns-select';
-import { MillerColumnsSelect } from 'miller-columns-select';
-import { useState, useEffect, useMemo } from 'react';
+import { Button, Input, Modal } from 'antd';
+import type { McsItem } from 'miller-columns-select';
+import { useState, useEffect, useEffectEvent, useMemo, useRef } from 'react';
 
-import API from '@/api';
 import { Loading, Block, Message } from '@/components';
-import { getPluginScopeName } from '@/plugins';
-import { IPluginConfig } from '@/types';
 
-import * as S from './styled';
-import * as T from './types';
+import { COPY, LOAD_STATUS, LOADING_ICON_SIZE, ROOT_COLUMN_ID, SCOPE_ITEM_TYPE, SEARCH_DEBOUNCE_MS } from './constants';
+import { loadChildren } from './load-children';
+import { ScopePanes } from './scope-panes';
+import { SelectedScopes } from './selected-scopes';
+import { JobLoad, Stack, SuccessIcon } from './styled';
+import type { LoadStatus, ResItem, SearchProps } from './types';
+import { toBrowseProps, toSelectionProps } from './utils';
 
-interface Props {
-  mode: 'single' | 'multiple';
-  plugin: string;
-  connectionId: ID;
-  config: IPluginConfig['dataScope'];
-  disabledScope: any[];
-  selectedScope: any[];
-  onChange: (selectedScope: any[]) => void;
-}
+type MillerState = {
+  items: McsItem<ResItem>[];
+  loadedIds: ID[];
+  expandedIds: ID[];
+  errorId?: ID | null;
+  nextTokenMap: Record<ID, string>;
+};
 
-let canceling = false;
+type GetItemsParams = { groupId: ID | null; currentPageToken?: string; loadAll?: boolean };
 
-export const SearchLocal = ({ mode, plugin, connectionId, config, disabledScope, selectedScope, onChange }: Props) => {
-  const [miller, setMiller] = useState<{
-    items: McsItem<T.ResItem>[];
-    loadedIds: ID[];
-    expandedIds: ID[];
-    errorId?: ID | null;
-    nextTokenMap: Record<ID, string>;
-  }>({
-    items: [],
-    loadedIds: [],
-    expandedIds: [],
-    nextTokenMap: {},
-  });
-
+export const SearchLocal = ({
+  mode,
+  plugin,
+  connectionId,
+  config,
+  disabledScope,
+  selectedScope,
+  onChange,
+}: SearchProps) => {
+  const [miller, setMiller] = useState<MillerState>({ items: [], loadedIds: [], expandedIds: [], nextTokenMap: {} });
   const [open, setOpen] = useState(false);
-  const [status, setStatus] = useState('init');
-
+  const [jobStatus, setJobStatus] = useState<LoadStatus>(LOAD_STATUS.INIT);
   const [query, setQuery] = useState('');
-  const search = useDebounce(query, { wait: 500 });
+  const canceling = useRef(false);
+  const search = useDebounce(query, { wait: SEARCH_DEBOUNCE_MS });
 
   const scopes = useMemo(
     () =>
       search
         ? miller.items
             .filter((it) => it.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
-            .filter((it) => it.type !== 'group')
+            .filter((it) => it.type !== SCOPE_ITEM_TYPE.GROUP)
             .map((it) => ({
               ...it,
               parentId: null,
@@ -77,50 +72,34 @@ export const SearchLocal = ({ mode, plugin, connectionId, config, disabledScope,
     [search, miller.items],
   );
 
-  const getItems = async ({
-    groupId,
-    currentPageToken,
-    loadAll,
-  }: {
-    groupId: ID | null;
-    currentPageToken?: string;
-    loadAll?: boolean;
-  }) => {
-    if (canceling) {
-      canceling = false;
-      setStatus('init');
+  const getItems = async ({ groupId, currentPageToken, loadAll }: GetItemsParams) => {
+    if (canceling.current) {
+      canceling.current = false;
+      setJobStatus(LOAD_STATUS.INIT);
       return;
     }
 
-    let newItems: McsItem<T.ResItem>[] = [];
-    let nextPageToken = '';
-    let errorId: ID | null;
-
-    try {
-      const res = await API.scope.remote(plugin, connectionId, {
-        groupId,
-        pageToken: currentPageToken,
-      });
-
-      newItems = (res?.children ?? []).map((it) => ({
-        ...it,
-        title: it.name,
-      }));
-
-      nextPageToken = res.nextPageToken;
-    } catch (err: any) {
-      errorId = groupId;
-      message.error(err.response.data.message);
-    }
+    const {
+      items: newItems,
+      nextPageToken,
+      failed,
+    } = await loadChildren({
+      plugin,
+      connectionId,
+      groupId,
+      pageToken: currentPageToken,
+      toTitle: (it) => it.name,
+    });
+    const errorId = failed ? groupId : undefined;
 
     if (nextPageToken) {
       setMiller((m) => ({
         ...m,
         items: [...m.items, ...newItems],
-        expandedIds: [...m.expandedIds, groupId ?? 'root'],
+        expandedIds: [...m.expandedIds, groupId ?? ROOT_COLUMN_ID],
         nextTokenMap: {
           ...m.nextTokenMap,
-          [`${groupId ? groupId : 'root'}`]: nextPageToken,
+          [groupId ?? ROOT_COLUMN_ID]: nextPageToken,
         },
       }));
 
@@ -131,12 +110,12 @@ export const SearchLocal = ({ mode, plugin, connectionId, config, disabledScope,
       setMiller((m) => ({
         ...m,
         items: [...m.items, ...newItems],
-        expandedIds: [...m.expandedIds, groupId ?? 'root'],
-        loadedIds: [...m.loadedIds, groupId ?? 'root'],
+        expandedIds: [...m.expandedIds, groupId ?? ROOT_COLUMN_ID],
+        loadedIds: [...m.loadedIds, groupId ?? ROOT_COLUMN_ID],
         errorId,
       }));
 
-      const groupItems = newItems.filter((it) => it.type === 'group');
+      const groupItems = newItems.filter((it) => it.type === SCOPE_ITEM_TYPE.GROUP);
 
       if (loadAll && groupItems.length) {
         groupItems.forEach(async (it) => await getItems({ groupId: it.id, loadAll: true }));
@@ -144,127 +123,101 @@ export const SearchLocal = ({ mode, plugin, connectionId, config, disabledScope,
     }
   };
 
-  useEffect(() => {
-    getItems({ groupId: null });
-  }, []);
+  const loadRoot = useEffectEvent(() => getItems({ groupId: null }));
 
   useEffect(() => {
-    if (
-      miller.items.length &&
-      !miller.items.filter((it) => it.type === 'group' && !miller.loadedIds.includes(it.id)).length
-    ) {
-      setStatus('loaded');
-    }
-  }, [miller]);
+    loadRoot();
+  }, []);
+
+  const searchPlaceholder = config.searchPlaceholder ?? COPY.searchFallback;
+  const browseProps = toBrowseProps(miller, config);
+  const selectionProps = toSelectionProps(disabledScope, selectedScope, miller.items, onChange);
+  const allLoaded =
+    miller.items.length > 0 &&
+    !miller.items.some((it) => it.type === SCOPE_ITEM_TYPE.GROUP && !miller.loadedIds.includes(it.id));
+  const status = allLoaded ? LOAD_STATUS.LOADED : jobStatus;
 
   const handleLoadAllScopes = async () => {
     setOpen(false);
-    setStatus('loading');
+    setJobStatus(LOAD_STATUS.LOADING);
 
-    if (!miller.loadedIds.includes('root')) {
+    if (!miller.loadedIds.includes(ROOT_COLUMN_ID)) {
       await getItems({
         groupId: null,
-        currentPageToken: miller.nextTokenMap['root'],
+        currentPageToken: miller.nextTokenMap[ROOT_COLUMN_ID],
         loadAll: true,
       });
     }
 
-    const noLoadedItems = miller.items.filter((it) => it.type === 'group' && !miller.loadedIds.includes(it.id));
-    if (noLoadedItems.length) {
-      noLoadedItems.forEach(async (it) => {
-        await getItems({
-          groupId: it.id,
-          currentPageToken: miller.nextTokenMap[it.id],
-          loadAll: true,
-        });
+    const noLoadedItems = miller.items.filter(
+      (it) => it.type === SCOPE_ITEM_TYPE.GROUP && !miller.loadedIds.includes(it.id),
+    );
+    noLoadedItems.forEach(async (it) => {
+      await getItems({
+        groupId: it.id,
+        currentPageToken: miller.nextTokenMap[it.id],
+        loadAll: true,
       });
-    }
+    });
   };
 
   const handleCancelLoadAllScopes = () => {
-    setStatus('cancel');
-    canceling = true;
+    setJobStatus(LOAD_STATUS.CANCEL);
+    canceling.current = true;
   };
 
   return (
-    <>
-      <Block title={config.title} required>
-        <Space wrap>
-          {selectedScope.length ? (
-            selectedScope.map((sc) => (
-              <Tag
-                key={sc.id}
-                color="blue"
-                closable
-                onClose={() => onChange(selectedScope.filter((it) => it.id !== sc.id))}
-              >
-                {getPluginScopeName(plugin, sc) || sc.fullName || sc.name || sc.id}
-              </Tag>
-            ))
-          ) : (
-            <span>Please select scope...</span>
-          )}
-        </Space>
-      </Block>
-      <Block>
-        {(status === 'loading' || status === 'cancel') && (
-          <S.JobLoad>
-            <Loading style={{ marginRight: 8 }} size={20} />
-            Loading: <span className="count">{miller.items.length}</span> scopes found
-            <Button style={{ marginLeft: 8 }} loading={status === 'cancel'} onClick={handleCancelLoadAllScopes}>
-              Cancel
+    <Block title={config.title} required>
+      <Stack>
+        {(status === LOAD_STATUS.LOADING || status === LOAD_STATUS.CANCEL) && (
+          <JobLoad>
+            <Loading size={LOADING_ICON_SIZE} />
+            {COPY.loadingScopes} <span className="count">{miller.items.length}</span> {COPY.scopesFound}
+            <Button loading={status === LOAD_STATUS.CANCEL} onClick={handleCancelLoadAllScopes}>
+              {COPY.cancel}
             </Button>
-          </S.JobLoad>
+          </JobLoad>
         )}
 
-        {status === 'loaded' && (
-          <S.JobLoad>
-            <CheckCircleFilled style={{ color: 'var(--devlake-color-success)' }} />
-            <span className="count">{miller.items.length}</span> scopes found
-          </S.JobLoad>
+        {status === LOAD_STATUS.LOADED && (
+          <JobLoad>
+            <SuccessIcon />
+            <span className="count">{miller.items.length}</span> {COPY.scopesFound}
+          </JobLoad>
         )}
 
-        {status === 'init' && (
-          <S.JobLoad>
+        {status === LOAD_STATUS.INIT && (
+          <JobLoad>
             <Button type="primary" disabled={!miller.items.length} onClick={() => setOpen(true)}>
-              Load all scopes to search by keywords
+              {COPY.loadAll}
             </Button>
-          </S.JobLoad>
+          </JobLoad>
         )}
-      </Block>
-      <Block>
-        {status === 'loaded' && (
-          <Input prefix={<SearchOutlined />} value={query} onChange={(e) => setQuery(e.target.value)} />
+
+        {status === LOAD_STATUS.LOADED && (
+          <Input
+            prefix={<SearchOutlined />}
+            placeholder={searchPlaceholder}
+            aria-label={searchPlaceholder}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
         )}
-        <MillerColumnsSelect
+        <ScopePanes<ResItem>
           mode={mode}
           items={scopes}
-          columnCount={search ? 1 : (config.millerColumn?.columnCount ?? 1)}
-          columnHeight={300}
-          getCanExpand={(it) => it.type === 'group'}
-          getHasMore={(id) => !miller.loadedIds.includes(id ?? 'root')}
-          getHasError={(id) => id === miller.errorId}
-          onExpand={(id: McsID) => getItems({ groupId: id })}
-          onScroll={(id: McsID | null) =>
-            getItems({ groupId: id, currentPageToken: miller.nextTokenMap[id ?? 'root'] })
-          }
-          renderTitle={(column: McsColumn) =>
-            !column.parentId &&
-            config.millerColumn?.firstColumnTitle && (
-              <S.ColumnTitle>{config.millerColumn.firstColumnTitle}</S.ColumnTitle>
-            )
-          }
-          renderLoading={() => <Loading size={20} style={{ padding: '4px 12px' }} />}
-          renderError={() => <span style={{ color: 'red' }}>Something Error</span>}
-          disabledIds={(disabledScope ?? []).map((it) => it.id)}
-          selectedIds={selectedScope.map((it) => it.id)}
-          onSelectItemIds={(selectedIds: ID[]) => onChange(miller.items.filter((it) => selectedIds.includes(it.id)))}
+          {...browseProps}
+          {...selectionProps}
+          columnCount={search ? 1 : browseProps.columnCount}
+          onExpand={(id) => getItems({ groupId: id })}
+          onScroll={(id) => getItems({ groupId: id, currentPageToken: miller.nextTokenMap[id ?? ROOT_COLUMN_ID] })}
           expandedIds={miller.expandedIds}
         />
-      </Block>
+        <SelectedScopes plugin={plugin} scopes={selectedScope} onChange={onChange} />
+      </Stack>
       <Modal open={open} centered onOk={handleLoadAllScopes} onCancel={() => setOpen(false)}>
-        <Message content={`This operation may take a long time, as it iterates through all the ${config.title}.`} />
+        <Message content={COPY.loadAllWarning(config.title)} />
       </Modal>
-    </>
+    </Block>
   );
 };
