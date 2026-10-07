@@ -16,8 +16,33 @@
  *
  */
 
-import type { ACCESS_MODAL, LIFECYCLE_ACTION, LIFECYCLE_SUBJECT } from './constants';
+import { ConnectionModal, ScopeConfigSelect } from '@/plugins';
+import { MODAL_WIDTH } from '@/ui';
 
-export type AccessModal = (typeof ACCESS_MODAL)[keyof typeof ACCESS_MODAL];
-export type LifecycleSubject = (typeof LIFECYCLE_SUBJECT)[keyof typeof LIFECYCLE_SUBJECT];
-export type LifecycleAction = (typeof LIFECYCLE_ACTION)[keyof typeof LIFECYCLE_ACTION];
+import { DETAIL_COPY } from '../constants';
+
+type AssociateScopeConfigModalProps = {
+  open: boolean;
+  plugin: string;
+  connectionId: ID;
+  onClose: () => void;
+  onSubmit: (configId: ID) => void;
+};
+
+export const AssociateScopeConfigModal = ({
+  open,
+  plugin,
+  connectionId,
+  onClose,
+  onSubmit,
+}: AssociateScopeConfigModalProps) => (
+  <ConnectionModal
+    open={open}
+    plugin={plugin}
+    title={DETAIL_COPY.associateTitle}
+    width={MODAL_WIDTH.LG}
+    onCancel={onClose}
+  >
+    <ScopeConfigSelect plugin={plugin} connectionId={connectionId} onCancel={onClose} onSubmit={onSubmit} />
+  </ConnectionModal>
+);

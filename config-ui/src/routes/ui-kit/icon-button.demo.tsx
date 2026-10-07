@@ -18,7 +18,7 @@
 
 import { DeleteOutlined, EditOutlined } from '@ant-design/icons';
 
-import { IconButton } from '@/ui';
+import { ICON_BUTTON_TONE, IconButton } from '@/ui';
 
 import { COPY, SECTION } from './constants';
 import { DemoCase, DemoSection } from './demo-section';
@@ -30,8 +30,16 @@ export const IconButtonDemo = () => (
     <DemoCase label={COPY.cases.default}>
       <IconButton icon={<EditOutlined />} label={COPY.iconButton.edit} onClick={noop} />
     </DemoCase>
+    <DemoCase label={COPY.cases.primary}>
+      <IconButton icon={<EditOutlined />} label={COPY.iconButton.edit} tone={ICON_BUTTON_TONE.PRIMARY} onClick={noop} />
+    </DemoCase>
     <DemoCase label={COPY.cases.danger}>
-      <IconButton icon={<DeleteOutlined />} label={COPY.iconButton.remove} danger onClick={noop} />
+      <IconButton
+        icon={<DeleteOutlined />}
+        label={COPY.iconButton.remove}
+        tone={ICON_BUTTON_TONE.DANGER}
+        onClick={noop}
+      />
     </DemoCase>
     <DemoCase label={COPY.cases.disabled}>
       <IconButton icon={<EditOutlined />} label={COPY.iconButton.edit} disabled onClick={noop} />

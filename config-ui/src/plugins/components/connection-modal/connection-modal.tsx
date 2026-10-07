@@ -28,6 +28,7 @@ import type { ConnectionModalProps } from './types';
 export const ConnectionModal = ({
   open,
   plugin,
+  title,
   width = MODAL_WIDTH.MD,
   onCancel,
   afterClose,
@@ -46,7 +47,7 @@ export const ConnectionModal = ({
       title={
         <TitleRow>
           <PluginIcon icon={icon} size="md" />
-          {COPY.title(name)}
+          {title ?? COPY.title(name)}
         </TitleRow>
       }
       onCancel={onCancel}

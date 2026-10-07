@@ -26,7 +26,6 @@ export const RESKIN_LINT_PENDING = [
   'src/routes/blueprint/detail/status-panel.tsx',
   'src/routes/blueprint/detail/styled.ts',
   'src/routes/change-password.tsx',
-  'src/routes/connection/connection.tsx',
   'src/routes/db-migrate/index.tsx',
   'src/routes/error/index.tsx',
   'src/routes/login/index.tsx',

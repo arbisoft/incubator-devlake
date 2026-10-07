@@ -16,15 +16,25 @@
  *
  */
 
-import { Button, Tooltip } from 'antd';
+import { Tooltip } from 'antd';
 
+import { ICON_BUTTON_TONE } from './constants';
+import { ToneButton } from './styled';
 import type { IconButtonProps } from './types';
 
-export const IconButton = ({ icon, label, danger, disabled, loading, onClick }: IconButtonProps) => (
+export const IconButton = ({
+  icon,
+  label,
+  tone = ICON_BUTTON_TONE.DEFAULT,
+  disabled,
+  loading,
+  onClick,
+}: IconButtonProps) => (
   <Tooltip title={label}>
-    <Button
+    <ToneButton
       type="text"
-      danger={danger}
+      danger={tone === ICON_BUTTON_TONE.DANGER}
+      $brand={tone === ICON_BUTTON_TONE.PRIMARY}
       icon={icon}
       aria-label={label}
       disabled={disabled}

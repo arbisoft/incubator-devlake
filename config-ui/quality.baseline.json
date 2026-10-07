@@ -1,7 +1,7 @@
 {
   "eslint": {
     "@typescript-eslint/no-explicit-any": {
-      "errors": 295,
+      "errors": 290,
       "warnings": 0
     },
     "@typescript-eslint/no-unused-vars": {
@@ -29,7 +29,7 @@
       "warnings": 0
     },
     "no-duplicate-imports": {
-      "errors": 14,
+      "errors": 12,
       "warnings": 0
     },
     "no-empty": {
@@ -42,7 +42,7 @@
     },
     "react-hooks/exhaustive-deps": {
       "errors": 0,
-      "warnings": 74
+      "warnings": 73
     },
     "react-hooks/globals": {
       "errors": 0,
@@ -127,7 +127,7 @@
   },
   "knip": [],
   "jscpd": {
-    "clones": 112,
-    "duplicatedLines": 1973
+    "clones": 110,
+    "duplicatedLines": 1946
   }
 }

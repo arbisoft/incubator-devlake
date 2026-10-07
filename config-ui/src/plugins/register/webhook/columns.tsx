@@ -20,7 +20,7 @@ import { DeleteOutlined, EyeOutlined, FormOutlined } from '@ant-design/icons';
 import { Button, type TableColumnsType } from 'antd';
 
 import type { IWebhook } from '@/types';
-import { IconButton } from '@/ui';
+import { ICON_BUTTON_TONE, IconButton } from '@/ui';
 
 import { COLUMN_KEY, COPY, WEBHOOK_DIALOG } from './constants';
 import type { WebhookDialogKind } from './types';
@@ -59,7 +59,7 @@ export const getColumns = ({ onOpen }: ColumnOptions): TableColumnsType<IWebhook
         <IconButton
           icon={<DeleteOutlined />}
           label={COPY.actions.remove(webhook.name)}
-          danger
+          tone={ICON_BUTTON_TONE.DANGER}
           onClick={() => onOpen(WEBHOOK_DIALOG.DELETE, webhook)}
         />
       </>

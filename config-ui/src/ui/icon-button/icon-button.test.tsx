@@ -21,6 +21,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
+import { ICON_BUTTON_TONE } from './constants';
 import { IconButton } from './icon-button';
 import type { IconButtonProps } from './types';
 
@@ -49,5 +50,15 @@ describe('IconButton', () => {
     const { onClick } = setup({ disabled: true });
     fireEvent.click(screen.getByRole('button', { name: LABEL }));
     expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('marks only the danger tone as a danger button', () => {
+    setup({ tone: ICON_BUTTON_TONE.DANGER });
+    expect(screen.getByRole('button', { name: LABEL }).className).toContain('ant-btn-dangerous');
+  });
+
+  it('keeps the default and primary tones free of the danger style', () => {
+    setup({ tone: ICON_BUTTON_TONE.PRIMARY });
+    expect(screen.getByRole('button', { name: LABEL }).className).not.toContain('ant-btn-dangerous');
   });
 });

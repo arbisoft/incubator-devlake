@@ -16,16 +16,44 @@
  *
  */
 
-import type { ReactNode } from 'react';
+import { ConnectionModal, DataScopeRemote } from '@/plugins';
+import { MODAL_WIDTH } from '@/ui';
 
-import type { ModalWidth } from '@/ui';
+import { DETAIL_COPY } from '../constants';
+import type { ScopeRow } from '../scope-table';
 
-export type ConnectionModalProps = {
+type AddDataScopeModalProps = {
   open: boolean;
   plugin: string;
-  title?: string;
-  width?: ModalWidth;
-  onCancel: () => void;
-  afterClose?: () => void;
-  children: ReactNode;
+  connectionId: ID;
+  connectionName: string;
+  scopes: ScopeRow[];
+  onClose: () => void;
+  onAdded: () => void;
 };
+
+export const AddDataScopeModal = ({
+  open,
+  plugin,
+  connectionId,
+  connectionName,
+  scopes,
+  onClose,
+  onAdded,
+}: AddDataScopeModalProps) => (
+  <ConnectionModal
+    open={open}
+    plugin={plugin}
+    title={DETAIL_COPY.addScopeTitle(connectionName)}
+    width={MODAL_WIDTH.LG}
+    onCancel={onClose}
+  >
+    <DataScopeRemote
+      plugin={plugin}
+      connectionId={connectionId}
+      disabledScope={scopes}
+      onCancel={onClose}
+      onSubmit={onAdded}
+    />
+  </ConnectionModal>
+);

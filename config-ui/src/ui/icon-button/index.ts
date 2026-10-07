@@ -16,5 +16,6 @@
  *
  */
 
+export { ICON_BUTTON_TONE } from './constants';
 export * from './icon-button';
 export type * from './types';

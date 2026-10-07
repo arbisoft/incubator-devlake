@@ -61,6 +61,7 @@ export const SECTION = {
   USE_IN_VIEW: 'useInView',
   USE_SIDEBAR_COLLAPSED: 'useSidebarCollapsed',
   USE_CONCURRENCY_QUEUE: 'useConcurrencyQueue',
+  USE_CONFIRM_FLOW: 'useConfirmFlow',
   UTILS: 'utils',
 } as const;
 
@@ -112,6 +113,7 @@ export const COPY = {
     useInView: 'useInView',
     useSidebarCollapsed: 'useSidebarCollapsed',
     useConcurrencyQueue: 'useConcurrencyQueue',
+    useConfirmFlow: 'useConfirmFlow',
     utils: 'Utilities',
   },
   cases: {
@@ -150,6 +152,8 @@ export const COPY = {
     flat: 'Flat',
     disabled: 'Disabled',
     danger: 'Danger',
+    primary: 'Primary',
+    link: 'Link variant',
     expanded: 'Expanded',
     rail: 'Rail',
     railFlyout: 'Rail, click a group to open its flyout',
@@ -258,6 +262,15 @@ export const COPY = {
     duplicate: 'Enqueue job 1 again',
     state: (running: number, done: number) => `In flight: ${running}, finished: ${done}`,
     job: (n: number) => `Job ${n}`,
+  },
+  useConfirmFlow: {
+    target: 'Arbisoft Website',
+    title: (name: string) => `Delete “${name}”?`,
+    description: 'This cannot be undone.',
+    confirm: 'Delete',
+    request: 'Ask to delete',
+    skip: 'Delete without asking',
+    done: (count: number) => `Deleted: ${count}`,
   },
   utils: {
     toUserMessage: 'toUserMessage',

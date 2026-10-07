@@ -16,8 +16,19 @@
  *
  */
 
-import type { ACCESS_MODAL, LIFECYCLE_ACTION, LIFECYCLE_SUBJECT } from './constants';
+import { useCallback, useState } from 'react';
 
-export type AccessModal = (typeof ACCESS_MODAL)[keyof typeof ACCESS_MODAL];
-export type LifecycleSubject = (typeof LIFECYCLE_SUBJECT)[keyof typeof LIFECYCLE_SUBJECT];
-export type LifecycleAction = (typeof LIFECYCLE_ACTION)[keyof typeof LIFECYCLE_ACTION];
+import type { ScopeRow, ScopeSelection } from './types';
+import { pruneSelection } from './utils';
+
+// The selection follows the rows on screen: ids that leave the page, or the result set, are dropped once loading ends.
+export const useScopeSelection = (rows: ScopeRow[], ready: boolean): ScopeSelection & { clear: () => void } => {
+  const [selectedIds, setSelectedIds] = useState<ID[]>([]);
+
+  const pruned = ready ? pruneSelection(selectedIds, rows) : selectedIds;
+  if (pruned !== selectedIds) setSelectedIds(pruned);
+
+  const clear = useCallback(() => setSelectedIds([]), []);
+
+  return { selectedIds: pruned, onChange: setSelectedIds, clear };
+};

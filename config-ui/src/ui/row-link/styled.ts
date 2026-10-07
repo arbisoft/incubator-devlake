@@ -17,13 +17,21 @@
  */
 
 import { Link } from 'react-router-dom';
-import styled from 'styled-components';
+import styled, { css } from 'styled-components';
 
 import { focusRingStyle } from '@/ui/style-helpers';
 
-export const Anchor = styled(Link)`
-  color: ${({ theme }) => theme.colors.text};
+export const Anchor = styled(Link)<{ $link: boolean }>`
+  color: ${({ theme, $link }) => ($link ? theme.colors.link : theme.colors.text)};
   border-radius: ${({ theme }) => theme.radius.sm}px;
+
+  ${({ $link }) =>
+    $link &&
+    css`
+      &:hover {
+        text-decoration: underline;
+      }
+    `}
 
   &:focus-visible {
     ${focusRingStyle}

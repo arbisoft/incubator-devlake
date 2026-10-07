@@ -16,5 +16,6 @@
  *
  */
 
+export { ROW_LINK_VARIANT } from './constants';
 export * from './row-link';
 export type * from './types';

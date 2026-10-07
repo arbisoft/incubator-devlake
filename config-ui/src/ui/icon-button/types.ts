@@ -18,10 +18,12 @@
 
 import type { ReactNode } from 'react';
 
+import type { ICON_BUTTON_TONE } from './constants';
+
 export type IconButtonProps = {
   icon: ReactNode;
   label: string;
-  danger?: boolean;
+  tone?: (typeof ICON_BUTTON_TONE)[keyof typeof ICON_BUTTON_TONE];
   disabled?: boolean;
   loading?: boolean;
   onClick: () => void;

@@ -16,7 +16,7 @@
  *
  */
 
-import { RowLink } from '@/ui';
+import { ROW_LINK_VARIANT, RowLink } from '@/ui';
 
 import { COPY, SECTION } from './constants';
 import { DemoCase, DemoSection } from './demo-section';
@@ -28,6 +28,11 @@ export const RowLinkDemo = () => (
   <DemoSection id={SECTION.ROW_LINK} title={COPY.sections.rowLink}>
     <DemoCase label={COPY.cases.default}>
       <RowLink to="/">{text.label}</RowLink>
+    </DemoCase>
+    <DemoCase label={COPY.cases.link}>
+      <RowLink to="/" variant={ROW_LINK_VARIANT.LINK}>
+        {text.label}
+      </RowLink>
     </DemoCase>
     <DemoCase label={COPY.cases.longText}>
       <Narrow>

@@ -15,35 +15,38 @@
  * limitations under the License.
  *
  */
-import { Alert } from 'antd';
+
 import styled from 'styled-components';
 
 import { textStyle } from '@/ui/style-helpers';
 
-export const Grid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(
-    auto-fill,
-    minmax(min(100%, ${({ theme }) => theme.layout.catalogCardMinWidth}px), 1fr)
-  );
-  gap: ${({ theme }) => theme.space.md}px;
-`;
-
-export const Cell = styled.div`
-  display: grid;
-  min-width: 0;
-`;
-
-export const SwitchField = styled.label`
+export const NameList = styled.ul`
   ${textStyle('body')}
-  display: inline-flex;
-  align-items: center;
-  gap: ${({ theme }) => theme.space.xs}px;
+  margin: ${({ theme }) => theme.space.xs}px 0 0;
+  padding-left: ${({ theme }) => theme.space.lg}px;
+  list-style: disc;
+  color: ${({ theme }) => theme.colors.text};
+`;
+
+export const Lead = styled.p`
+  ${textStyle('body')}
+  margin: 0;
   color: ${({ theme }) => theme.colors.textSecondary};
 `;
 
-export const DeprecationAlert = styled(Alert)`
-  .ant-alert-description {
-    white-space: pre-line;
-  }
+export const Section = styled.section`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.xs}px;
+  margin-top: ${({ theme }) => theme.space.md}px;
+`;
+
+export const SectionTitle = styled.h4`
+  ${textStyle('bodyMedium')}
+  margin: 0;
+  color: ${({ theme }) => theme.colors.text};
+`;
+
+export const FailureList = styled(NameList)`
+  color: ${({ theme }) => theme.colors.error};
 `;

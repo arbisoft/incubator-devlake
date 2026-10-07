@@ -53,6 +53,7 @@ import { StatusBadgeDemo } from './status-badge.demo';
 import { ToolbarDemo } from './toolbar.demo';
 import type { SectionDefinition } from './types';
 import { UseConcurrencyQueueDemo } from './use-concurrency-queue.demo';
+import { UseConfirmFlowDemo } from './use-confirm-flow.demo';
 import { UseDocumentTitleDemo } from './use-document-title.demo';
 import { UseInViewDemo } from './use-in-view.demo';
 import { UseListStateDemo } from './use-list-state.demo';
@@ -105,5 +106,6 @@ export const SECTIONS: SectionDefinition[] = [
   { id: SECTION.USE_IN_VIEW, Demo: UseInViewDemo },
   { id: SECTION.USE_SIDEBAR_COLLAPSED, Demo: UseSidebarCollapsedDemo },
   { id: SECTION.USE_CONCURRENCY_QUEUE, Demo: UseConcurrencyQueueDemo },
+  { id: SECTION.USE_CONFIRM_FLOW, Demo: UseConfirmFlowDemo },
   { id: SECTION.UTILS, Demo: UtilsDemo },
 ];

@@ -19,7 +19,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { CONFIRM_TONE } from '@/ui';
+import { CONFIRM_TONE } from '@/ui/confirm-modal';
 
 import { useConfirmFlow } from './use-confirm-flow';
 

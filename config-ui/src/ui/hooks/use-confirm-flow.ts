@@ -18,9 +18,8 @@
 
 import { useCallback, useState } from 'react';
 
-import { CONFIRM_TONE, type ConfirmModalProps } from '@/ui';
-
-import type { ConfirmConfig } from './types';
+import { CONFIRM_TONE, type ConfirmModalProps } from '@/ui/confirm-modal';
+import type { ConfirmConfig } from '@/ui/types';
 
 type Options<P> = {
   resolve: (pending: P) => { config?: ConfirmConfig; name: string };

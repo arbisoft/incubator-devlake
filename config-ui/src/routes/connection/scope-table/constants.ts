@@ -16,8 +16,19 @@
  *
  */
 
-import type { ACCESS_MODAL, LIFECYCLE_ACTION, LIFECYCLE_SUBJECT } from './constants';
+export const SCOPE_COLUMN = {
+  NAME: 'name',
+  PROJECTS: 'projects',
+  SCOPE_CONFIG: 'scopeConfig',
+  ACTIONS: 'actions',
+} as const;
 
-export type AccessModal = (typeof ACCESS_MODAL)[keyof typeof ACCESS_MODAL];
-export type LifecycleSubject = (typeof LIFECYCLE_SUBJECT)[keyof typeof LIFECYCLE_SUBJECT];
-export type LifecycleAction = (typeof LIFECYCLE_ACTION)[keyof typeof LIFECYCLE_ACTION];
+export const MAX_VISIBLE_PROJECTS = 3;
+
+export const COPY = {
+  tableLabel: 'Data scopes',
+  columns: { name: 'Data Scope', projects: 'Project', scopeConfig: 'Scope Config', actions: 'Action' },
+  moreProjects: (count: number) => `+${count} more`,
+  clearData: (name: string) => `Clear historical data of ${name}`,
+  deleteScope: (name: string) => `Delete ${name}`,
+};

@@ -16,8 +16,15 @@
  *
  */
 
-import type { ACCESS_MODAL, LIFECYCLE_ACTION, LIFECYCLE_SUBJECT } from './constants';
+import { Button } from 'antd';
+import styled, { css } from 'styled-components';
 
-export type AccessModal = (typeof ACCESS_MODAL)[keyof typeof ACCESS_MODAL];
-export type LifecycleSubject = (typeof LIFECYCLE_SUBJECT)[keyof typeof LIFECYCLE_SUBJECT];
-export type LifecycleAction = (typeof LIFECYCLE_ACTION)[keyof typeof LIFECYCLE_ACTION];
+export const ToneButton = styled(Button)<{ $brand: boolean }>`
+  ${({ $brand, theme }) =>
+    $brand &&
+    css`
+      &:not(:disabled) {
+        color: ${theme.colors.iconBrand};
+      }
+    `}
+`;

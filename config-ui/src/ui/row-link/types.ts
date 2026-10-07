@@ -19,4 +19,8 @@
 import type { ComponentProps } from 'react';
 import type { Link } from 'react-router-dom';
 
-export type RowLinkProps = ComponentProps<typeof Link>;
+import type { ROW_LINK_VARIANT } from './constants';
+
+export type RowLinkProps = ComponentProps<typeof Link> & {
+  variant?: (typeof ROW_LINK_VARIANT)[keyof typeof ROW_LINK_VARIANT];
+};
