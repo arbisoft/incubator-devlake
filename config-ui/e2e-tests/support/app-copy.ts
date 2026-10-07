@@ -23,7 +23,10 @@ export { COPY as SIDEBAR_COPY } from '../../src/ui/sidebar-nav/constants';
 export { COPY as ACCOUNT_BLOCK_COPY } from '../../src/ui/account-block/constants';
 export { COMMON_COPY } from '../../src/ui/constants';
 export { PROJECT_TAB } from '../../src/config/route-keys';
-export { COPY as CONNECTIONS_COPY } from '../../src/routes/connection/constants';
+export { COPY as CONNECTIONS_COPY, CATALOG_FILTER } from '../../src/routes/connection/constants';
+export { COPY as INTEGRATION_CARD_COPY } from '../../src/ui/integration-card/constants';
+export { HEALTH_STORAGE_KEY, HEALTH_TTL_MS } from '../../src/features/connections/constants';
+export { INTEGRATION_CATEGORY } from '../../src/plugins/catalog';
 export { COPY as API_KEYS_COPY } from '../../src/routes/api-keys/constants';
 export { COPY as PROJECT_HOME_COPY } from '../../src/routes/project/home/constants';
 export {
@@ -34,3 +37,4 @@ export { COPY as PIPELINE_COPY } from '../../src/routes/pipeline/constants';
 export { COPY as SETTINGS_COPY } from '../../src/routes/settings/constants';
 export { COPY as AUTH_COPY } from '../../src/routes/settings/authentication/constants';
 export { COPY as ACTIVITY_COPY } from '../../src/routes/settings/activity/constants';
+export { COPY as SORT_SELECT_COPY } from '../../src/ui/sort-select/constants';

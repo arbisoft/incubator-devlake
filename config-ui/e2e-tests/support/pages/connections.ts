@@ -17,13 +17,21 @@
  */
 import { Locator, Page } from '@playwright/test';
 
-import { CONNECTIONS_COPY } from '../app-copy';
+import {
+  CATALOG_FILTER,
+  CONNECTIONS_COPY,
+  HEALTH_STORAGE_KEY,
+  HEALTH_TTL_MS,
+  INTEGRATION_CARD_COPY,
+  SORT_SELECT_COPY,
+} from '../app-copy';
 
-import { BasePage, Screen, urlEndingWith, iconButton, tableRow, tagWithText } from './common';
+import { BasePage, Screen, selectOption, urlEndingWith, tableRow } from './common';
 import { PATHS } from './paths';
 
-const catalogCard = (page: Page, name: string): Locator =>
-  page.locator('li').filter({ has: page.locator('.name', { hasText: new RegExp(`^${name}$`) }) });
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const catalogCard = (page: Page, name: string): Locator => page.getByRole('article', { name, exact: true });
 
 // A plugin's catalog display name and its key in API paths.
 export interface PluginRef {
@@ -37,7 +45,7 @@ export const PLUGINS = {
   azureDevops: { name: 'Azure DevOps', key: 'azuredevops' },
 } satisfies Record<string, PluginRef>;
 
-const manageTitle = (plugin: PluginRef) => `Manage Connections: ${plugin.name}`;
+const manageTitle = (plugin: PluginRef) => CONNECTIONS_COPY.manageTitle(plugin.name);
 
 // The create or edit form of a plugin connection, shown inside its "Manage Connections" dialog.
 export class ConnectionForm {
@@ -91,6 +99,16 @@ export class ConnectionForm {
   }
 }
 
+// A stored health entry of a connection, as the catalog keeps it in sessionStorage.
+export interface StoredHealth {
+  status: string;
+  reason?: string;
+  message?: string;
+  testedAt: number;
+}
+
+const isConnectionTest = (url: string) => /\/plugins\/[^/]+\/connections\/\d+\/test$/.test(new URL(url).pathname);
+
 export class ConnectionsPage extends BasePage implements Screen {
   async open(): Promise<void> {
     await this.visit(PATHS.connections);
@@ -108,14 +126,6 @@ export class ConnectionsPage extends BasePage implements Screen {
     return this.page.getByRole('heading', { name: 'Connections', level: 1 });
   }
 
-  get dataConnectionsHeading(): Locator {
-    return this.page.getByRole('heading', { name: 'Data Connections', exact: true });
-  }
-
-  get webhooksHeading(): Locator {
-    return this.page.getByRole('heading', { name: 'Webhooks', exact: true });
-  }
-
   get deprecationNotice(): Locator {
     return this.page.getByRole('alert').filter({ hasText: CONNECTIONS_COPY.deprecationTitle });
   }
@@ -129,15 +139,156 @@ export class ConnectionsPage extends BasePage implements Screen {
   }
 
   get cardNames(): Locator {
-    return this.page.locator('li .name');
+    return this.page.getByRole('article').getByRole('heading');
+  }
+
+  async cardNameList(): Promise<string[]> {
+    return (await this.cardNames.allInnerTexts()).map((name) => name.trim());
+  }
+
+  get cards(): Locator {
+    return this.page.getByRole('article');
+  }
+
+  get connectedCards(): Locator {
+    return this.cards.filter({ hasText: /\d+ connected/ });
   }
 
   cardCount(name: string): Locator {
-    return this.card(name).locator('.count');
+    return this.card(name).getByText(/^\d+ connected$/);
   }
 
+  cardFailedCount(name: string): Locator {
+    return this.card(name).getByText(/^\d+ failed$/);
+  }
+
+  categoryTab(category: string): Locator {
+    return this.page.getByRole('tab', { name: new RegExp(`^${escapeRegExp(category)} \\(\\d+\\)$`) });
+  }
+
+  async selectCategory(category: string): Promise<void> {
+    await this.categoryTab(category).click();
+  }
+
+  get searchBox(): Locator {
+    return this.page.getByRole('textbox', { name: CONNECTIONS_COPY.searchPlaceholder });
+  }
+
+  async search(keyword: string): Promise<void> {
+    await this.searchBox.fill(keyword);
+    await this.searchBox.press('Enter');
+  }
+
+  get connectedOnlySwitch(): Locator {
+    return this.page.getByRole('switch', { name: CONNECTIONS_COPY.connectedOnly });
+  }
+
+  async toggleConnectedOnly(): Promise<void> {
+    await this.connectedOnlySwitch.click();
+  }
+
+  get sortSelect(): Locator {
+    return this.page.getByRole('combobox', { name: SORT_SELECT_COPY.prefix });
+  }
+
+  async sortBy(label: string): Promise<void> {
+    await this.sortSelect.click();
+    await selectOption(this.page, label).click();
+  }
+
+  async clearFilters(): Promise<void> {
+    await this.page.getByRole('button', { name: CONNECTIONS_COPY.clearFilters }).click();
+  }
+
+  get noResults(): Locator {
+    return this.page.getByText(CONNECTIONS_COPY.noResults.title);
+  }
+
+  get noConnections(): Locator {
+    return this.page.getByText(CONNECTIONS_COPY.empty.title);
+  }
+
+  get queryParams(): { category: string | null; connected: string | null } {
+    return {
+      category: this.urlParams.get(CATALOG_FILTER.CATEGORY),
+      connected: this.urlParams.get(CATALOG_FILTER.CONNECTED),
+    };
+  }
+
+  // Counts the connection tests the page sends from now on.
+  trackConnectionTests(): { count: () => number } {
+    let seen = 0;
+    this.page.on('request', (request) => {
+      if (request.method() === 'POST' && isConnectionTest(request.url())) seen += 1;
+    });
+    return { count: () => seen };
+  }
+
+  // Resolves with the response of the test request of one connection.
+  waitForConnectionTest(plugin: PluginRef, id: number) {
+    return this.page.waitForResponse(
+      (res) => res.url().endsWith(`/plugins/${plugin.key}/connections/${id}/test`) && res.request().method() === 'POST',
+    );
+  }
+
+  async waitUntilSettled(): Promise<void> {
+    await this.page.waitForLoadState('networkidle');
+  }
+
+  async storedHealth(plugin: PluginRef, id: number): Promise<StoredHealth | undefined> {
+    return this.page.evaluate(
+      ({ key, unique }) => {
+        const raw = window.sessionStorage.getItem(key);
+        return raw ? (JSON.parse(raw)[unique] as StoredHealth | undefined) : undefined;
+      },
+      { key: HEALTH_STORAGE_KEY, unique: `${plugin.key}-${id}` },
+    );
+  }
+
+  // Moves every stored result past the validity window, as if the page had been left open for longer.
+  async expireStoredHealth(): Promise<void> {
+    await this.page.evaluate(
+      ({ key, ttl }) => {
+        const raw = window.sessionStorage.getItem(key);
+        if (!raw) return;
+        const entries = JSON.parse(raw) as Record<string, { testedAt: number }>;
+        for (const entry of Object.values(entries)) entry.testedAt -= ttl + 1;
+        window.sessionStorage.setItem(key, JSON.stringify(entries));
+      },
+      { key: HEALTH_STORAGE_KEY, ttl: HEALTH_TTL_MS },
+    );
+  }
+
+  private async chooseFromCardMenu(name: string, item: string | RegExp): Promise<void> {
+    await this.card(name)
+      .getByRole('button', { name: INTEGRATION_CARD_COPY.actionsFor(name) })
+      .click();
+    await this.page.getByRole('menuitem', { name: item }).click();
+  }
+
+  // The manage dialog of a plugin, or the OTel page for its card, opened from the card's actions menu.
   async openCard(name: string): Promise<void> {
-    await this.card(name).click();
+    await this.chooseFromCardMenu(
+      name,
+      new RegExp(`^(${CONNECTIONS_COPY.menu.manage}|${CONNECTIONS_COPY.menu.open})$`),
+    );
+  }
+
+  // The create form of a plugin, opened from the card's actions menu (a connected card has no Add button).
+  async addConnectionFromCard(name: string): Promise<void> {
+    await this.chooseFromCardMenu(name, CONNECTIONS_COPY.menu.add);
+  }
+
+  connectionNameField(plugin: PluginRef): Locator {
+    return this.manageDialog(plugin).getByPlaceholder('Your Connection Name');
+  }
+
+  manageButton(name: string): Locator {
+    return this.card(name).getByRole('button', { name: /^Manage \(\d+\)$/ });
+  }
+
+  addButton(name: string): Locator {
+    return this.card(name).getByRole('button', { name: INTEGRATION_CARD_COPY.add, exact: true });
   }
 
   manageDialog(plugin: PluginRef): Locator {
@@ -150,8 +301,7 @@ export class ConnectionsPage extends BasePage implements Screen {
 
   async openCreateForm(plugin: PluginRef): Promise<ConnectionForm> {
     await this.open();
-    await this.openCard(plugin.name);
-    await this.manageDialog(plugin).getByRole('button', { name: 'Create a New Connection' }).click();
+    await this.addConnectionFromCard(plugin.name);
     return new ConnectionForm(this.page, plugin.key, this.manageDialog(plugin));
   }
 
@@ -166,94 +316,4 @@ export class ConnectionsPage extends BasePage implements Screen {
   }
 }
 
-export class ConnectionDetailPage extends BasePage {
-  constructor(
-    page: Page,
-    private readonly plugin: PluginRef,
-  ) {
-    super(page);
-  }
-
-  get urlPattern(): RegExp {
-    return new RegExp(`/connections/${this.plugin.key}/\\d+$`);
-  }
-
-  async open(id: number): Promise<void> {
-    await this.visit(PATHS.connection(this.plugin.key, id));
-  }
-
-  idFromUrl(): number {
-    return Number(new URL(this.page.url()).pathname.split('/').pop());
-  }
-
-  nameLink(name: string): Locator {
-    return this.page.getByRole('link', { name });
-  }
-
-  async deleteConnection(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Delete Connection' }).click();
-    await this.confirmDialog('Would you like to delete this Data Connection?');
-  }
-
-  scopeRow(fullName: string): Locator {
-    return this.row(fullName);
-  }
-
-  scopeConfigCell(fullName: string, configName: string): Locator {
-    return this.scopeRow(fullName).getByText(configName);
-  }
-
-  get addScopeDialog(): Locator {
-    return this.dialog('Add Data Scope');
-  }
-
-  async openAddScope(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Add Data Scope' }).click();
-  }
-
-  async searchRemoteScope(text: string): Promise<void> {
-    await this.addScopeDialog.getByPlaceholder('Search').fill(text);
-  }
-
-  async pickRemoteScope(fullName: string): Promise<void> {
-    await this.addScopeDialog.getByText(fullName, { exact: true }).click();
-  }
-
-  pickedScopeTag(fullName: string): Locator {
-    return tagWithText(this.addScopeDialog, fullName);
-  }
-
-  async saveAddScope(): Promise<void> {
-    await this.addScopeDialog.getByRole('button', { name: 'Save' }).click();
-  }
-
-  async openAssociateScopeConfig(scopeFullName: string): Promise<void> {
-    await iconButton(this.scopeRow(scopeFullName), 'link').click();
-  }
-
-  get associateDialog(): Locator {
-    return this.dialog('Associate Scope Config');
-  }
-
-  // Creates a scope config with default entities from the associate dialog.
-  async createScopeConfig(name: string): Promise<void> {
-    await this.associateDialog.getByRole('button', { name: 'Add New Scope Config' }).click();
-    const form = this.dialog('Add Scope Config');
-    await form.getByPlaceholder('My Scope Config 1').fill(name);
-    await form.getByRole('button', { name: 'Next' }).click();
-    await form.getByRole('button', { name: 'Save' }).click();
-  }
-
-  associateScopeConfigRow(name: string): Locator {
-    return tableRow(this.associateDialog, name);
-  }
-
-  async saveAssociateScopeConfig(): Promise<void> {
-    await this.associateDialog.getByRole('button', { name: 'Save' }).click();
-  }
-
-  async removeScope(fullName: string): Promise<void> {
-    await iconButton(this.scopeRow(fullName), 'delete').click();
-    await this.confirmDialog('Would you like to delete the selected Data Scope?');
-  }
-}
+export { ConnectionDetailPage } from './connection-detail';

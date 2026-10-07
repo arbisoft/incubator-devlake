@@ -39,9 +39,9 @@
       "fixmes": 0
     },
     "connections/catalog.spec.ts": {
-      "tests": 2,
-      "expects": 9,
-      "backend": 1,
+      "tests": 8,
+      "expects": 32,
+      "backend": 2,
       "skips": 0,
       "fixmes": 0
     },
@@ -62,6 +62,13 @@
     "connections/deprecation-notice.spec.ts": {
       "tests": 1,
       "expects": 8,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "connections/health.spec.ts": {
+      "tests": 3,
+      "expects": 12,
       "backend": 0,
       "skips": 0,
       "fixmes": 0
