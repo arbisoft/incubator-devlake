@@ -27,6 +27,11 @@ import { NewBlueprintModal } from './new-blueprint-modal';
 
 const { create } = vi.hoisted(() => ({ create: vi.fn() }));
 
+vi.mock('antd', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('antd')>()),
+  message: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
+}));
+
 vi.mock('@/api', () => ({ default: { blueprint: { create } } }));
 
 const BASE_PAYLOAD = { name: 'alpha', enable: true, cronConfig: '0 0 * * *', isManual: false, skipOnFail: true };

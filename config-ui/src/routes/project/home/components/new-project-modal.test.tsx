@@ -25,6 +25,11 @@ import { COPY } from '../constants';
 
 import { NewProjectModal } from './new-project-modal';
 
+vi.mock('antd', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('antd')>()),
+  message: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
+}));
+
 vi.mock('@/api', () => ({ default: { project: { create: vi.fn() } } }));
 
 const field = () => screen.getByRole<HTMLInputElement>('textbox', { name: new RegExp(COPY.create.name.label) });
