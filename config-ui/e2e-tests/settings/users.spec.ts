@@ -75,7 +75,7 @@ test.describe.serial('Settings users search', () => {
     await usersPage.open();
     await usersPage.search(prefix);
     await expect.poll(() => usersPage.urlParams.get('keyword')).toBe(prefix);
-    // Both users have no email, so their order is the database's.
+    // Neither user has a display name yet, so the row order is the database's.
     await expect.poll(async () => (await usersPage.userIdentities()).sort()).toEqual([firstEmail, secondEmail]);
 
     await usersPage.search(secondEmail);
