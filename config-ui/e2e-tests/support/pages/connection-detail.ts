@@ -17,9 +17,16 @@
  */
 import { Locator, Page } from '@playwright/test';
 
-import { DETAIL_COPY, SCOPE_TABLE_COPY } from '../app-copy';
+import {
+  DATA_SCOPE_REMOTE_COPY,
+  DETAIL_COPY,
+  SCOPE_CONFIG_COPY,
+  SCOPE_CONFIG_FORM_COPY,
+  SCOPE_CONFIG_SELECT_COPY,
+  SCOPE_TABLE_COPY,
+} from '../app-copy';
 
-import { BasePage, iconButton, tableRow, tagWithText } from './common';
+import { BasePage, tableRow, tagWithText } from './common';
 import type { PluginRef } from './connections';
 import { PATHS } from './paths';
 
@@ -117,7 +124,7 @@ export class ConnectionDetailPage extends BasePage {
   }
 
   async searchRemoteScope(text: string): Promise<void> {
-    await this.addScopeDialog.getByPlaceholder('Search').fill(text);
+    await this.addScopeDialog.getByPlaceholder(DATA_SCOPE_REMOTE_COPY.searchFallback).fill(text);
   }
 
   async pickRemoteScope(fullName: string): Promise<void> {
@@ -129,24 +136,24 @@ export class ConnectionDetailPage extends BasePage {
   }
 
   async saveAddScope(): Promise<void> {
-    await this.addScopeDialog.getByRole('button', { name: 'Save' }).click();
+    await this.addScopeDialog.getByRole('button', { name: DATA_SCOPE_REMOTE_COPY.submit, exact: true }).click();
   }
 
   async openAssociateScopeConfig(scopeFullName: string): Promise<void> {
-    await iconButton(this.scopeRow(scopeFullName), 'link').click();
+    await this.scopeRow(scopeFullName).getByRole('button', { name: SCOPE_CONFIG_COPY.associate, exact: true }).click();
   }
 
   get associateDialog(): Locator {
-    return this.dialog('Associate Scope Config');
+    return this.dialog(DETAIL_COPY.associateTitle);
   }
 
   // Creates a scope config with default entities from the associate dialog.
   async createScopeConfig(name: string): Promise<void> {
-    await this.associateDialog.getByRole('button', { name: 'Add New Scope Config' }).click();
-    const form = this.dialog('Add Scope Config');
-    await form.getByPlaceholder('My Scope Config 1').fill(name);
-    await form.getByRole('button', { name: 'Next' }).click();
-    await form.getByRole('button', { name: 'Save' }).click();
+    await this.associateDialog.getByRole('button', { name: SCOPE_CONFIG_SELECT_COPY.add }).click();
+    const form = this.dialog(SCOPE_CONFIG_SELECT_COPY.addTitle);
+    await form.getByPlaceholder(SCOPE_CONFIG_FORM_COPY.name.placeholder).fill(name);
+    await form.getByRole('button', { name: SCOPE_CONFIG_FORM_COPY.next, exact: true }).click();
+    await form.getByRole('button', { name: SCOPE_CONFIG_FORM_COPY.save, exact: true }).click();
   }
 
   associateScopeConfigRow(name: string): Locator {
@@ -154,7 +161,7 @@ export class ConnectionDetailPage extends BasePage {
   }
 
   async saveAssociateScopeConfig(): Promise<void> {
-    await this.associateDialog.getByRole('button', { name: 'Save' }).click();
+    await this.associateDialog.getByRole('button', { name: SCOPE_CONFIG_SELECT_COPY.save, exact: true }).click();
   }
 
   async removeScope(fullName: string): Promise<void> {
