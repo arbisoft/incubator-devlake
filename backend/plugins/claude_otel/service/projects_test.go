@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/apache/incubator-devlake/core/dal"
+	"github.com/apache/incubator-devlake/core/errors"
 	coremodels "github.com/apache/incubator-devlake/core/models"
 	"github.com/apache/incubator-devlake/core/models/common"
 	dalmocks "github.com/apache/incubator-devlake/mocks/core/dal"
@@ -246,4 +247,76 @@ func TestDeleteProjectPlacementsInTransaction(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRenameProjectPlacementsInTransaction(t *testing.T) {
+	t.Run("renames only the placements of the old project name", func(t *testing.T) {
+		tx := dalmocks.NewTransaction(t)
+		var column, value string
+		var clauses []dal.Clause
+		tx.On("UpdateColumn", mock.AnythingOfType("*models.OtelConnectionProject"), mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+			column = args.Get(1).(string)
+			value = args.Get(2).(string)
+			clauses = args.Get(3).([]dal.Clause)
+		}).Return(nil).Once()
+
+		if err := RenameProjectPlacementsInTransaction(tx, "Core", "Platform"); err != nil {
+			t.Fatalf("RenameProjectPlacementsInTransaction() error = %v, want nil", err)
+		}
+		if column != "project_name" || value != "Platform" {
+			t.Fatalf("updated column = (%q, %q), want project_name = Platform", column, value)
+		}
+		where := clauses[0].Data.(dal.DalClause)
+		if where.Expr != "project_name = ?" || len(where.Params) != 1 || where.Params[0] != "Core" {
+			t.Fatalf("placement rename filter = (%q, %#v), want project_name = ? with Core", where.Expr, where.Params)
+		}
+	})
+
+	t.Run("returns a failed update", func(t *testing.T) {
+		tx := dalmocks.NewTransaction(t)
+		tx.On("UpdateColumn", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.Default.New("duplicate placement")).Once()
+
+		if err := RenameProjectPlacementsInTransaction(tx, "Core", "Platform"); err == nil {
+			t.Fatal("RenameProjectPlacementsInTransaction() error = nil, want an error")
+		}
+	})
+}
+
+func TestLockOtelProjects(t *testing.T) {
+	t.Run("reads the named projects with a write lock", func(t *testing.T) {
+		tx := dalmocks.NewTransaction(t)
+		var clauses []dal.Clause
+		tx.On("All", mock.AnythingOfType("*[]*models.Project"), mock.Anything).Run(func(args mock.Arguments) {
+			clauses = args.Get(1).([]dal.Clause)
+			*args.Get(0).(*[]*coremodels.Project) = []*coremodels.Project{
+				{BaseProject: coremodels.BaseProject{Name: "Core"}},
+				{BaseProject: coremodels.BaseProject{Name: "Mobile"}},
+			}
+		}).Return(nil).Once()
+
+		if err := lockOtelProjects(tx, []string{"Core", "Mobile"}); err != nil {
+			t.Fatalf("lockOtelProjects() error = %v, want nil", err)
+		}
+		locked := false
+		for _, clause := range clauses {
+			if clause.Type == dal.LockClause {
+				locked = clause.Data.([]bool)[0]
+			}
+		}
+		if !locked {
+			t.Fatalf("lockOtelProjects() clauses = %#v, want a write lock", clauses)
+		}
+	})
+
+	t.Run("rejects a project that no longer exists", func(t *testing.T) {
+		tx := dalmocks.NewTransaction(t)
+		tx.On("All", mock.AnythingOfType("*[]*models.Project"), mock.Anything).Run(func(args mock.Arguments) {
+			*args.Get(0).(*[]*coremodels.Project) = []*coremodels.Project{{BaseProject: coremodels.BaseProject{Name: "Core"}}}
+		}).Return(nil).Once()
+
+		err := lockOtelProjects(tx, []string{"Core", "Gone"})
+		if err == nil || err.GetType().GetHttpCode() != http.StatusBadRequest {
+			t.Fatalf("lockOtelProjects() error = %v, want a bad request", err)
+		}
+	})
 }

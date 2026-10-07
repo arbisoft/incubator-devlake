@@ -301,6 +301,11 @@ func PatchProject(name string, body map[string]interface{}) (*models.ApiOutputPr
 		if err != nil {
 			return nil, err
 		}
+		// lock order: project row first, then any plugin lock; hooks never take lifecycle locks
+		err = runProjectRenameHooks(tx, name, project.Name)
+		if err != nil {
+			return nil, err
+		}
 		if projectService != nil {
 			if err := projectService.RenameProject(tx, name, project.Name); err != nil {
 				return nil, err
@@ -312,6 +317,9 @@ func PatchProject(name string, body map[string]interface{}) (*models.ApiOutputPr
 			"name", project.Name,
 			dal.Where("name = ?", name),
 		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Blueprint
@@ -404,6 +412,10 @@ func DeleteProject(name string) errors.Error {
 			}
 		}
 	}()
+	// lock order: project row first, then any plugin lock; hooks never take lifecycle locks
+	if _, err = getProjectByName(tx, name, dal.Lock(true, false)); err != nil {
+		return err
+	}
 	if err = runProjectDeleteHooks(tx, name); err != nil {
 		return err
 	}
@@ -449,6 +461,19 @@ func runProjectDeleteHooks(tx dal.Transaction, projectName string) errors.Error 
 			// returned unwrapped: the hook's own message is the reason the
 			// user sees for the rejected delete
 			if err := hook.BeforeDeleteProject(tx, projectName); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func runProjectRenameHooks(tx dal.Transaction, oldName string, newName string) errors.Error {
+	return plugin.TraversalPlugin(func(name string, pluginInst plugin.PluginMeta) errors.Error {
+		if hook, ok := pluginInst.(plugin.ProjectRenameHook); ok {
+			// returned unwrapped: the hook's own message is the reason the
+			// user sees for the rejected rename
+			if err := hook.BeforeRenameProject(tx, oldName, newName); err != nil {
 				return err
 			}
 		}

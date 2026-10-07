@@ -67,20 +67,13 @@ func normalizeOtelProjectNames(projectNames []string) ([]string, errors.Error) {
 	return names, nil
 }
 
-func validateOtelProjectNames(projectNames []string) ([]string, errors.Error) {
-	names, err := normalizeOtelProjectNames(projectNames)
-	if err != nil {
-		return nil, err
-	}
-
+// lockOtelProjects row-locks the named projects so a concurrent rename or delete finishes first or waits for the caller's transaction.
+func lockOtelProjects(tx dal.Transaction, names []string) errors.Error {
 	projects := make([]*coremodels.Project, 0, len(names))
-	if err := db.All(&projects, dal.Where("name IN ?", names)); err != nil {
-		return nil, errors.Default.Wrap(err, "error validating Claude Code OTel projects")
+	if err := tx.All(&projects, dal.Where("name IN ?", names), dal.Lock(true, false)); err != nil {
+		return errors.Default.Wrap(err, "error locking Claude Code OTel projects")
 	}
-	if err := validateOtelProjectNamesExist(names, projects); err != nil {
-		return nil, err
-	}
-	return names, nil
+	return validateOtelProjectNamesExist(names, projects)
 }
 
 func validateOtelProjectNamesExist(names []string, projects []*coremodels.Project) errors.Error {
@@ -182,12 +175,16 @@ func ReplaceOtelConnectionProjects(id uint64, projectNames []string) ([]*models.
 	if _, err := getOtelConnection(id); err != nil {
 		return nil, err
 	}
-	names, err := validateOtelProjectNames(projectNames)
+	names, err := normalizeOtelProjectNames(projectNames)
 	if err != nil {
 		return nil, err
 	}
 
 	tx := db.Begin()
+	if err := lockOtelProjects(tx, names); err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
 	if err := tx.Delete(&models.OtelConnectionProject{}, dal.Where("connection_id = ?", id)); err != nil {
 		_ = tx.Rollback()
 		return nil, errors.Default.Wrap(err, "error replacing Claude Code OTel project placements")
@@ -246,10 +243,8 @@ func validateOtelProjectPlacementRemovalState(connectionStatus string, placement
 
 // DeleteProjectPlacementsInTransaction removes OTel placements when the core project
 // deletion hook runs. The caller owns the transaction and its commit or rollback.
+// Lock order: project row, then lifecycleMu; hooks rely on the row lock and never take lifecycleMu.
 func DeleteProjectPlacementsInTransaction(tx dal.Transaction, projectName string) errors.Error {
-	lifecycleMu.Lock()
-	defer lifecycleMu.Unlock()
-
 	placements := make([]*models.OtelConnectionProject, 0)
 	if err := tx.All(&placements, dal.Where("project_name = ?", projectName)); err != nil {
 		return errors.Default.Wrap(err, "error getting Claude Code OTel project placements for deletion")
@@ -288,4 +283,19 @@ func projectSummariesFromNames(names []string) []*models.OtelProjectSummary {
 		summaries = append(summaries, &models.OtelProjectSummary{Name: name})
 	}
 	return summaries
+}
+
+// RenameProjectPlacementsInTransaction moves OTel placements to the new project name when
+// the core project rename hook runs. The caller owns the transaction and its commit or rollback.
+// Lock order: project row, then lifecycleMu; hooks rely on the row lock and never take lifecycleMu.
+func RenameProjectPlacementsInTransaction(tx dal.Transaction, oldName string, newName string) errors.Error {
+	err := tx.UpdateColumn(
+		&models.OtelConnectionProject{},
+		"project_name", newName,
+		dal.Where("project_name = ?", oldName),
+	)
+	if err != nil {
+		return errors.Default.Wrap(err, "error renaming Claude Code OTel project placements during project rename")
+	}
+	return nil
 }

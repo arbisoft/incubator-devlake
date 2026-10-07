@@ -175,7 +175,7 @@ func CreateOtelConnection(user *common.User, input *OtelConnectionInput) (*model
 	if input == nil {
 		input = &OtelConnectionInput{}
 	}
-	projectNames, err := validateOtelProjectNames(input.ProjectNames)
+	projectNames, err := normalizeOtelProjectNames(input.ProjectNames)
 	if err != nil {
 		return nil, err
 	}
@@ -209,6 +209,10 @@ func CreateOtelConnection(user *common.User, input *OtelConnectionInput) (*model
 	setOtelActor(user, connection, true)
 
 	tx := db.Begin()
+	if err := lockOtelProjects(tx, projectNames); err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
 	if err := tx.Create(connection); err != nil {
 		_ = tx.Rollback()
 		return nil, errors.Default.Wrap(err, "error creating otel connection")

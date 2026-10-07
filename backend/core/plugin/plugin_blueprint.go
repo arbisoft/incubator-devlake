@@ -110,6 +110,25 @@ type ProjectDeleteHook interface {
 	BeforeDeleteProject(tx dal.Transaction, projectName string) errors.Error
 }
 
+// ProjectRenameHook is implemented by plugins that persist state keyed by a
+// DevLake project name.
+//
+// BeforeRenameProject is called inside the core rename transaction, after the
+// project row is locked and before it is renamed. Returning an error aborts
+// the rename.
+//
+// Contract:
+// - Database mutations must use only the supplied transaction.
+// - The plugin must not commit or roll back the transaction.
+// - The hook must not take an in-process lock that a project row lock holder may hold.
+// - External side effects cannot be rolled back by the database transaction.
+// - Plugins must not depend on hook execution order across plugins.
+// Plugins that do not maintain project-scoped state do not need to implement
+// this interface.
+type ProjectRenameHook interface {
+	BeforeRenameProject(tx dal.Transaction, oldName string, newName string) errors.Error
+}
+
 // CompositeDataSourcePluginBlueprintV200 is for unit test
 type CompositeDataSourcePluginBlueprintV200 interface {
 	PluginMeta

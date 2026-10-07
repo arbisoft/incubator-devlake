@@ -73,7 +73,8 @@ func TestDeleteProjectRemovesOnlyItsUserProjectMappings(t *testing.T) {
 	dataDal.On("Begin").Return(projectTx).Once()
 
 	var mappingDeleteClauses []dal.Clause
-	projectTx.On("First", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	expectProjectRowLock(projectTx)
+	projectTx.On("First", mock.AnythingOfType("*models.Blueprint"), mock.Anything).Run(func(args mock.Arguments) {
 		args.Get(0).(*models.Blueprint).ID = 7
 	}).Return(nil).Once()
 	projectTx.On("Delete", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
@@ -114,7 +115,13 @@ type testHookPlugin struct {
 		tx          dal.Transaction
 		projectName string
 	}
-	deleteErr errors.Error
+	deleteErr   errors.Error
+	renameCalls []struct {
+		tx      dal.Transaction
+		oldName string
+		newName string
+	}
+	renameErr errors.Error
 }
 
 func (p *testHookPlugin) Description() string { return "test hook plugin" }
@@ -126,6 +133,15 @@ func (p *testHookPlugin) BeforeDeleteProject(tx dal.Transaction, projectName str
 		projectName string
 	}{tx: tx, projectName: projectName})
 	return p.deleteErr
+}
+
+func (p *testHookPlugin) BeforeRenameProject(tx dal.Transaction, oldName string, newName string) errors.Error {
+	p.renameCalls = append(p.renameCalls, struct {
+		tx      dal.Transaction
+		oldName string
+		newName string
+	}{tx: tx, oldName: oldName, newName: newName})
+	return p.renameErr
 }
 
 func registerProjectDeleteTestPlugin(t *testing.T, testPlugin plugin.PluginMeta) {
@@ -145,6 +161,17 @@ func withProjectTestDatabase(t *testing.T, testDB dal.Dal) {
 		db = previousDB
 		bpManager = previousManager
 	})
+}
+
+func expectProjectRowLock(tx *dalmocks.Transaction) {
+	tx.On("First", mock.AnythingOfType("*models.Project"), mock.MatchedBy(func(clauses []dal.Clause) bool {
+		for _, clause := range clauses {
+			if clause.Type == dal.LockClause {
+				return true
+			}
+		}
+		return false
+	})).Return(nil).Once()
 }
 
 func TestRunProjectDeleteHooks(t *testing.T) {
@@ -198,6 +225,7 @@ func TestDeleteProject_RollsBackOnDeleteHookVeto(t *testing.T) {
 	mockDB.On("First", mock.Anything, mock.Anything).Return(notFound).Once()
 	mockDB.On("IsErrorNotFound", mock.Anything).Return(true).Twice()
 	mockDB.On("Begin").Return(tx).Once()
+	expectProjectRowLock(tx)
 	tx.On("Rollback").Return(nil).Once()
 	withProjectTestDatabase(t, mockDB)
 
@@ -213,7 +241,8 @@ func TestDeleteProject_RollsBackOnDeleteHookVeto(t *testing.T) {
 func TestDeleteProject_RollsBackOnBlueprintDeletionFailure(t *testing.T) {
 	expectedErr := errors.Default.New("unable to delete blueprint labels")
 	tx := dalmocks.NewTransaction(t)
-	tx.On("First", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	expectProjectRowLock(tx)
+	tx.On("First", mock.AnythingOfType("*models.Blueprint"), mock.Anything).Run(func(args mock.Arguments) {
 		args.Get(0).(*models.Blueprint).ID = 42
 	}).Return(nil).Once()
 	tx.On("Delete", mock.Anything, mock.Anything).Return(expectedErr).Once()
@@ -244,7 +273,8 @@ func TestDeleteProject_SuccessfulDeletionInSingleTransaction(t *testing.T) {
 	registerProjectDeleteTestPlugin(t, hook)
 
 	tx := dalmocks.NewTransaction(t)
-	tx.On("First", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	expectProjectRowLock(tx)
+	tx.On("First", mock.AnythingOfType("*models.Blueprint"), mock.Anything).Run(func(args mock.Arguments) {
 		args.Get(0).(*models.Blueprint).ID = 42
 	}).Return(nil).Once()
 	tx.On("Delete", mock.Anything, mock.Anything).Return(nil)
@@ -269,6 +299,114 @@ func TestDeleteProject_SuccessfulDeletionInSingleTransaction(t *testing.T) {
 	assert.Equal(t, 1, len(hook.deleteCalls))
 	assert.Equal(t, tx, hook.deleteCalls[0].tx)
 	assert.Equal(t, "project-success", hook.deleteCalls[0].projectName)
-	assert.Len(t, tx.Calls, 12)
+	assert.Len(t, tx.Calls, 13)
 	tx.AssertNotCalled(t, "Rollback")
+}
+
+func TestRunProjectRenameHooks(t *testing.T) {
+	t.Run("skips ordinary plugins without ProjectRenameHook", func(t *testing.T) {
+		registerProjectDeleteTestPlugin(t, &testOrdinaryPlugin{name: "test-ordinary-rename-skip"})
+
+		tx := dalmocks.NewTransaction(t)
+		assert.NoError(t, runProjectRenameHooks(tx, "old-project", "new-project"))
+	})
+
+	t.Run("invokes implementing plugins with exact transaction and names", func(t *testing.T) {
+		hook := &testHookPlugin{name: "test-hook-rename-invoke"}
+		registerProjectDeleteTestPlugin(t, hook)
+
+		tx := dalmocks.NewTransaction(t)
+		assert.NoError(t, runProjectRenameHooks(tx, "old-project", "new-project"))
+
+		assert.Equal(t, 1, len(hook.renameCalls))
+		assert.Equal(t, tx, hook.renameCalls[0].tx)
+		assert.Equal(t, "old-project", hook.renameCalls[0].oldName)
+		assert.Equal(t, "new-project", hook.renameCalls[0].newName)
+	})
+
+	t.Run("returns hook veto unwrapped", func(t *testing.T) {
+		expectedErr := errors.Default.New("project rename vetoed by plugin")
+		registerProjectDeleteTestPlugin(t, &testHookPlugin{name: "test-hook-rename-veto", renameErr: expectedErr})
+
+		tx := dalmocks.NewTransaction(t)
+		err := runProjectRenameHooks(tx, "old-project", "new-project")
+
+		assert.Equal(t, expectedErr, err)
+	})
+}
+
+func TestPatchProject_RunsRenameHookBeforeRenamingProjectRow(t *testing.T) {
+	hook := &testHookPlugin{name: "test-hook-patch-rename"}
+	registerProjectDeleteTestPlugin(t, hook)
+
+	var renamed []string
+	tx := dalmocks.NewTransaction(t)
+	expectProjectRowLock(tx)
+	tx.On("UpdateColumn", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		if _, ok := args.Get(0).(*models.Project); ok {
+			assert.Equal(t, 1, len(hook.renameCalls), "rename hook must run before the project row is renamed")
+			renamed = append(renamed, args.Get(2).(string))
+		}
+	}).Return(nil)
+	tx.On("Update", mock.Anything).Return(nil)
+	tx.On("Commit").Return(nil).Once()
+	mockDB := dalmocks.NewDal(t)
+	mockDB.On("Begin").Return(tx).Once()
+	mockDB.On("Pluck", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockDB.On("All", mock.Anything, mock.Anything).Return(nil)
+	mockDB.On("First", mock.Anything, mock.Anything).Return(nil)
+	withProjectTestDatabase(t, mockDB)
+
+	_, err := PatchProject("old-project", map[string]interface{}{"name": "new-project"})
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"new-project"}, renamed)
+	assert.Equal(t, "old-project", hook.renameCalls[0].oldName)
+	assert.Equal(t, "new-project", hook.renameCalls[0].newName)
+}
+
+func TestPatchProject_SkipsRenameHookWhenNameIsUnchanged(t *testing.T) {
+	hook := &testHookPlugin{name: "test-hook-patch-same-name"}
+	registerProjectDeleteTestPlugin(t, hook)
+
+	tx := dalmocks.NewTransaction(t)
+	expectProjectRowLock(tx)
+	tx.On("Update", mock.Anything).Return(nil)
+	tx.On("Commit").Return(nil).Once()
+	mockDB := dalmocks.NewDal(t)
+	mockDB.On("Begin").Return(tx).Once()
+	mockDB.On("Pluck", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockDB.On("All", mock.Anything, mock.Anything).Return(nil)
+	mockDB.On("First", mock.Anything, mock.Anything).Return(nil)
+	withProjectTestDatabase(t, mockDB)
+
+	_, err := PatchProject("same-project", map[string]interface{}{"name": "same-project"})
+
+	assert.NoError(t, err)
+	assert.Empty(t, hook.renameCalls)
+}
+
+func TestPatchProject_RollsBackOnRenameHookVeto(t *testing.T) {
+	hookErr := errors.Default.New("hook rejection")
+	registerProjectDeleteTestPlugin(t, &testHookPlugin{name: "test-hook-patch-veto", renameErr: hookErr})
+
+	tx := dalmocks.NewTransaction(t)
+	expectProjectRowLock(tx)
+	tx.On("UpdateColumn", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	tx.On("Rollback").Return(nil).Once()
+	mockDB := dalmocks.NewDal(t)
+	mockDB.On("Begin").Return(tx).Once()
+	withProjectTestDatabase(t, mockDB)
+
+	_, err := PatchProject("old-project", map[string]interface{}{"name": "new-project"})
+
+	assert.ErrorIs(t, err, hookErr)
+	tx.AssertNotCalled(t, "Commit")
+	for _, call := range tx.Calls {
+		if call.Method != "UpdateColumn" {
+			continue
+		}
+		_, isProjectRow := call.Arguments.Get(0).(*models.Project)
+		assert.False(t, isProjectRow, "the project row must not be renamed after a hook veto")
+	}
 }
