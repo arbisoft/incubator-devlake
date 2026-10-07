@@ -15,7 +15,7 @@
  * limitations under the License.
  *
  */
-import { Locator, Page } from '@playwright/test';
+import { Locator, Page, Request } from '@playwright/test';
 
 import {
   CATALOG_FILTER,
@@ -180,11 +180,19 @@ export class ConnectionsPage extends BasePage implements Screen {
     return { count: () => seen };
   }
 
-  // Resolves with the response of the test request of one connection.
-  waitForConnectionTest(plugin: PluginRef, id: number) {
-    return this.page.waitForResponse(
-      (res) => res.url().endsWith(`/plugins/${plugin.key}/connections/${id}/test`) && res.request().method() === 'POST',
-    );
+  // Resolves once the test request of one connection has settled, whether it answered or the app gave up on it.
+  waitForConnectionTest(plugin: PluginRef, id: number): Promise<void> {
+    const suffix = `/plugins/${plugin.key}/connections/${id}/test`;
+    return new Promise((resolve) => {
+      const onSettled = (request: Request) => {
+        if (!request.url().endsWith(suffix) || request.method() !== 'POST') return;
+        this.page.off('requestfinished', onSettled);
+        this.page.off('requestfailed', onSettled);
+        resolve();
+      };
+      this.page.on('requestfinished', onSettled);
+      this.page.on('requestfailed', onSettled);
+    });
   }
 
   async waitUntilSettled(): Promise<void> {

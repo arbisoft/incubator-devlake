@@ -249,7 +249,7 @@ export async function deleteProject(api: APIRequestContext, name: string): Promi
 export async function createBlueprint(
   api: APIRequestContext,
   name: string,
-  options: { enable?: boolean } = {},
+  options: { enable?: boolean; connections?: ApiBlueprint['connections'] } = {},
 ): Promise<ApiBlueprint> {
   return json(
     await api.post('/blueprints', {
@@ -260,7 +260,7 @@ export async function createBlueprint(
         cronConfig: '0 0 * * *',
         isManual: false,
         skipOnFail: true,
-        connections: [],
+        connections: options.connections ?? [],
       },
     }),
     `create blueprint ${name}`,

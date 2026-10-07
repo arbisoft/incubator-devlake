@@ -17,6 +17,8 @@
  */
 import { Locator, Page } from '@playwright/test';
 
+import { DETAIL_COPY, SCOPE_TABLE_COPY } from '../app-copy';
+
 import { BasePage, iconButton, tableRow, tagWithText } from './common';
 import type { PluginRef } from './connections';
 import { PATHS } from './paths';
@@ -41,13 +43,61 @@ export class ConnectionDetailPage extends BasePage {
     return Number(new URL(this.page.url()).pathname.split('/').pop());
   }
 
+  // The connection name is the page heading, which the spec reads as the name shown for a saved connection.
   nameLink(name: string): Locator {
-    return this.page.getByRole('link', { name });
+    return this.heading.filter({ hasText: name });
   }
 
+  get heading(): Locator {
+    return this.page.getByRole('heading', { level: 1 });
+  }
+
+  // Asks to delete the connection and confirms; the dialog names the connection shown in the heading.
   async deleteConnection(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Delete Connection' }).click();
-    await this.confirmDialog('Would you like to delete this Data Connection?');
+    const name = (await this.heading.innerText()).trim();
+    await this.page.getByRole('button', { name: DETAIL_COPY.deleteConnection }).click();
+    await this.confirmDialog(DETAIL_COPY.confirm.connection.title(name), DETAIL_COPY.confirm.connection.confirm);
+  }
+
+  get conflictDialog(): Locator {
+    return this.dialog(DETAIL_COPY.conflict.connection.title);
+  }
+
+  conflictNames(): Locator {
+    return this.conflictDialog.getByRole('listitem');
+  }
+
+  async search(text: string): Promise<void> {
+    const box = this.page.getByRole('textbox', { name: DETAIL_COPY.searchPlaceholder });
+    await box.fill(text);
+    await box.press('Enter');
+  }
+
+  async selectScope(fullName: string): Promise<void> {
+    await this.scopeRow(fullName).getByRole('checkbox').check();
+  }
+
+  get bulkDeleteButton(): Locator {
+    return this.page.getByRole('button', { name: DETAIL_COPY.deleteScopes });
+  }
+
+  get bulkDialog(): Locator {
+    return this.dialog(DETAIL_COPY.bulk.title);
+  }
+
+  // Confirms the bulk delete for the given number of selected scopes and waits for the progress dialog to finish.
+  async deleteSelectedScopes(count: number): Promise<void> {
+    await this.bulkDeleteButton.click();
+    const { title, confirm } = DETAIL_COPY.confirm.scopesBulk;
+    await this.confirmDialog(title(count), confirm);
+  }
+
+  bulkSucceeded(count: number): Locator {
+    return this.bulkDialog.getByText(`${DETAIL_COPY.bulk.succeeded}: ${count}`);
+  }
+
+  async closeBulkResult(): Promise<void> {
+    await this.bulkDialog.getByRole('button', { name: DETAIL_COPY.bulk.close }).click();
   }
 
   scopeRow(fullName: string): Locator {
@@ -63,7 +113,7 @@ export class ConnectionDetailPage extends BasePage {
   }
 
   async openAddScope(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Add Data Scope' }).click();
+    await this.page.getByRole('button', { name: DETAIL_COPY.addScope }).click();
   }
 
   async searchRemoteScope(text: string): Promise<void> {
@@ -108,7 +158,10 @@ export class ConnectionDetailPage extends BasePage {
   }
 
   async removeScope(fullName: string): Promise<void> {
-    await iconButton(this.scopeRow(fullName), 'delete').click();
-    await this.confirmDialog('Would you like to delete the selected Data Scope?');
+    await this.scopeRow(fullName)
+      .getByRole('button', { name: SCOPE_TABLE_COPY.deleteScope(fullName), exact: true })
+      .click();
+    const { title, confirm } = DETAIL_COPY.confirm.scopeDelete;
+    await this.confirmDialog(title(fullName), confirm);
   }
 }
