@@ -16,7 +16,7 @@
  *
  */
 
-import { Button, Input, Modal, Select } from 'antd';
+import { Button, Input, Modal, Select, Space } from 'antd';
 import { CopyOutlined } from '@ant-design/icons';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
 
@@ -198,19 +198,16 @@ export const TemporaryPasswordModal = ({
       title="Temporary password"
       footer={<Button onClick={onClose}>Done</Button>}
       closable={false}
-      maskClosable={false}
+      mask={{ closable: false }}
     >
       <Message content="Copy this password now. It is shown only once and must be changed after sign-in." />
       <Block title={`Password for ${loginName}`}>
-        <Input
-          readOnly
-          value={temporaryPassword}
-          addonAfter={
-            <CopyToClipboard text={temporaryPassword}>
-              <Button type="text" icon={<CopyOutlined />} aria-label="Copy temporary password" />
-            </CopyToClipboard>
-          }
-        />
+        <Space.Compact style={{ width: '100%' }}>
+          <Input readOnly value={temporaryPassword} />
+          <CopyToClipboard text={temporaryPassword}>
+            <Button type="text" icon={<CopyOutlined />} aria-label="Copy temporary password" />
+          </CopyToClipboard>
+        </Space.Compact>
       </Block>
     </Modal>
   );

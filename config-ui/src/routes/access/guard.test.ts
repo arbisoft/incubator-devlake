@@ -16,16 +16,20 @@
  *
  */
 
-import { equal } from 'node:assert/strict';
-import { test } from 'node:test';
+import { describe, expect, it } from 'vitest';
+
+// Load the routes barrel first so the config/routes import cycle resolves as it does in the app.
+import '@/routes';
 
 import { ACCESS_ROLE } from '../../api/access';
 
 import { canManageAccess } from './guard';
 
-test('allows only enabled customer administrators into access management', () => {
-  equal(canManageAccess({ enabled: true, role: ACCESS_ROLE.CUSTOMER_ADMIN }), true);
-  equal(canManageAccess({ enabled: true, role: ACCESS_ROLE.MEMBER }), false);
-  equal(canManageAccess({ enabled: false }), false);
-  equal(canManageAccess(null), false);
+describe('routes/access/guard', () => {
+  it('allows only enabled customer administrators into access management', () => {
+    expect(canManageAccess({ enabled: true, role: ACCESS_ROLE.CUSTOMER_ADMIN })).toBe(true);
+    expect(canManageAccess({ enabled: true, role: ACCESS_ROLE.MEMBER })).toBe(false);
+    expect(canManageAccess({ enabled: false })).toBe(false);
+    expect(canManageAccess(null)).toBe(false);
+  });
 });

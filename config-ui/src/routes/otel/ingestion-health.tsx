@@ -50,7 +50,7 @@ export const OtelIngestionHealth = ({ loading, status }: OtelIngestionHealthProp
   const [payload, setPayload] = useState<unknown>();
   const [payloadLoading, setPayloadLoading] = useState(false);
   const [payloadOpen, setPayloadOpen] = useState(false);
-  const payloadText = payloadLoading ? 'Loading...' : JSON.stringify(payload, null, 2) ?? '';
+  const payloadText = payloadLoading ? 'Loading...' : (JSON.stringify(payload, null, 2) ?? '');
 
   const viewPayload = async (batch: OtelMetricBatchSummary) => {
     setPayloadLoading(true);

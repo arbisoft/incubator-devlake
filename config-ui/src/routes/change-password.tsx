@@ -84,9 +84,9 @@ export const ChangePassword = () => {
       <ChangePasswordCard>
         <Title level={3}>Change your password</Title>
         {mustChangePassword && (
-          <Alert type="info" message="Choose a new password to continue." style={{ marginBottom: 16 }} />
+          <Alert type="info" title="Choose a new password to continue." style={{ marginBottom: 16 }} />
         )}
-        {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} />}
+        {error && <Alert type="error" title={error} style={{ marginBottom: 16 }} />}
         <Form<PasswordChangeValues> layout="vertical" onFinish={changePassword} requiredMark={false}>
           {!mustChangePassword && (
             <Form.Item

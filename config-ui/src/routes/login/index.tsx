@@ -85,8 +85,8 @@ export const Login = () => {
         <Title level={3} style={{ textAlign: 'center' }}>
           Sign in to DevLake
         </Title>
-        {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} />}
-        {accessDenied && <Alert type="error" message={ACCESS_DENIED_MESSAGE} style={{ marginBottom: 16 }} />}
+        {error && <Alert type="error" title={error} style={{ marginBottom: 16 }} />}
+        {accessDenied && <Alert type="error" title={ACCESS_DENIED_MESSAGE} style={{ marginBottom: 16 }} />}
         {localPassword?.enabled && (
           <Form<LocalLoginValues> layout="vertical" onFinish={startLocalLogin} requiredMark={false}>
             <Form.Item label="Username" name="loginName" rules={[{ required: true, message: 'Enter your username.' }]}>
@@ -95,7 +95,7 @@ export const Login = () => {
             <Form.Item label="Password" name="password" rules={[{ required: true, message: 'Enter your password.' }]}>
               <Input.Password autoComplete="current-password" />
             </Form.Item>
-            {localLoginError && <Alert type="error" message={localLoginError} style={{ marginBottom: 16 }} />}
+            {localLoginError && <Alert type="error" title={localLoginError} style={{ marginBottom: 16 }} />}
             <Button type="primary" htmlType="submit" size="large" block loading={localLoginPending}>
               Sign in
             </Button>

@@ -16,25 +16,26 @@
  *
  */
 
-import { equal } from 'node:assert/strict';
-import { test } from 'node:test';
+import { describe, expect, it } from 'vitest';
 
 import { formatPlural } from './text';
 
-test('formats singular count correctly', () => {
-  equal(formatPlural(1, 'credential'), '1 credential');
-  equal(formatPlural(1, 'active credential'), '1 active credential');
-  equal(formatPlural(1, 'connection'), '1 connection');
-});
+describe('utils/text', () => {
+  it('formats singular count correctly', () => {
+    expect(formatPlural(1, 'credential')).toBe('1 credential');
+    expect(formatPlural(1, 'active credential')).toBe('1 active credential');
+    expect(formatPlural(1, 'connection')).toBe('1 connection');
+  });
 
-test('formats plural count correctly with default s suffix', () => {
-  equal(formatPlural(0, 'credential'), '0 credentials');
-  equal(formatPlural(2, 'active credential'), '2 active credentials');
-  equal(formatPlural(5, 'connection'), '5 connections');
-});
+  it('formats plural count correctly with default s suffix', () => {
+    expect(formatPlural(0, 'credential')).toBe('0 credentials');
+    expect(formatPlural(2, 'active credential')).toBe('2 active credentials');
+    expect(formatPlural(5, 'connection')).toBe('5 connections');
+  });
 
-test('formats plural count correctly with explicit custom plural', () => {
-  equal(formatPlural(1, 'person', 'people'), '1 person');
-  equal(formatPlural(2, 'person', 'people'), '2 people');
-  equal(formatPlural(0, 'person', 'people'), '0 people');
+  it('formats plural count correctly with explicit custom plural', () => {
+    expect(formatPlural(1, 'person', 'people')).toBe('1 person');
+    expect(formatPlural(2, 'person', 'people')).toBe('2 people');
+    expect(formatPlural(0, 'person', 'people')).toBe('0 people');
+  });
 });

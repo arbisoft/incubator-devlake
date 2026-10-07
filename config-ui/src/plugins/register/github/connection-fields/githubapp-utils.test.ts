@@ -16,8 +16,7 @@
  *
  */
 
-import { equal, deepEqual } from 'node:assert/strict';
-import { test } from 'node:test';
+import { describe, expect, it } from 'vitest';
 
 import {
   buildGithubInstallationOptions,
@@ -26,64 +25,43 @@ import {
   shouldValidateGithubAppConfig,
 } from './githubapp-utils';
 
-test('detects masked GitHub App private keys returned by the API', () => {
-  equal(
-    isMaskedGithubAppSecret('-----BEGIN RSA PRIVATE KEY-----\nMIIEpA********END\n-----END RSA PRIVATE KEY-----'),
-    true,
-  );
-  equal(isMaskedGithubAppSecret('-----BEGIN RSA PRIVATE KEY-----\nMIIEpAABCDEF\n-----END RSA PRIVATE KEY-----'), false);
-});
+describe('plugins/register/github/connection-fields/githubapp-utils', () => {
+  it('detects masked GitHub App private keys returned by the API', () => {
+    expect(
+      isMaskedGithubAppSecret('-----BEGIN RSA PRIVATE KEY-----\nMIIEpA********END\n-----END RSA PRIVATE KEY-----'),
+    ).toBe(true);
+    expect(
+      isMaskedGithubAppSecret('-----BEGIN RSA PRIVATE KEY-----\nMIIEpAABCDEF\n-----END RSA PRIVATE KEY-----'),
+    ).toBe(false);
+  });
 
-test('does not validate saved masked GitHub App private keys', () => {
-  equal(
-    shouldValidateGithubAppConfig(
-      'https://api.github.com/',
-      '12345',
-      '-----BEGIN RSA PRIVATE KEY-----\nMIIEpA********END\n-----END RSA PRIVATE KEY-----',
-    ),
-    false,
-  );
-  equal(
-    shouldValidateGithubAppConfig(
-      'https://api.github.com/',
-      '12345',
-      '-----BEGIN RSA PRIVATE KEY-----\nMIIEpAABCDEF\n-----END RSA PRIVATE KEY-----',
-    ),
-    true,
-  );
-});
+  it('does not validate saved masked GitHub App private keys', () => {
+    expect(
+      shouldValidateGithubAppConfig(
+        'https://api.github.com/',
+        '12345',
+        '-----BEGIN RSA PRIVATE KEY-----\nMIIEpA********END\n-----END RSA PRIVATE KEY-----',
+      ),
+    ).toBe(false);
+    expect(
+      shouldValidateGithubAppConfig(
+        'https://api.github.com/',
+        '12345',
+        '-----BEGIN RSA PRIVATE KEY-----\nMIIEpAABCDEF\n-----END RSA PRIVATE KEY-----',
+      ),
+    ).toBe(true);
+  });
 
-test('keeps saved installation visible when installations cannot be reloaded', () => {
-  deepEqual(buildGithubInstallationOptions(undefined, 98765), [{ value: 98765, label: 'Saved installation (98765)' }]);
-});
+  it('keeps saved installation visible when installations cannot be reloaded', () => {
+    expect(buildGithubInstallationOptions(undefined, 98765)).toStrictEqual([
+      { value: 98765, label: 'Saved installation (98765)' },
+    ]);
+  });
 
-test('does not duplicate saved installation option when GitHub returns it', () => {
-  deepEqual(
-    buildGithubInstallationOptions(
-      [
-        {
-          id: 98765,
-          account: {
-            login: 'apache',
-          },
-        },
-      ],
-      98765,
-    ),
-    [{ value: 98765, label: 'apache' }],
-  );
-});
-
-test('changing GitHub App ID clears stale validation and returns to untested state', () => {
-  deepEqual(
-    invalidateGithubAppConfig(
-      {
-        appId: '12345',
-        secretKey: 'private-key',
-        installationId: 98765,
-        status: 'valid',
-        from: 'old-app',
-        installations: [
+  it('does not duplicate saved installation option when GitHub returns it', () => {
+    expect(
+      buildGithubInstallationOptions(
+        [
           {
             id: 98765,
             account: {
@@ -91,70 +69,90 @@ test('changing GitHub App ID clears stale validation and returns to untested sta
             },
           },
         ],
-      },
-      { appId: '67890' },
-    ),
-    {
+        98765,
+      ),
+    ).toStrictEqual([{ value: 98765, label: 'apache' }]);
+  });
+
+  it('changing GitHub App ID clears stale validation and returns to untested state', () => {
+    expect(
+      invalidateGithubAppConfig(
+        {
+          appId: '12345',
+          secretKey: 'private-key',
+          installationId: 98765,
+          status: 'valid',
+          from: 'old-app',
+          installations: [
+            {
+              id: 98765,
+              account: {
+                login: 'apache',
+              },
+            },
+          ],
+        },
+        { appId: '67890' },
+      ),
+    ).toStrictEqual({
       appId: '67890',
       secretKey: 'private-key',
       installationId: undefined,
       status: 'idle',
       from: undefined,
       installations: undefined,
-    },
-  );
-});
+    });
+  });
 
-test('changing GitHub App private key clears stale validation and returns to untested state', () => {
-  deepEqual(
-    invalidateGithubAppConfig(
-      {
-        appId: '12345',
-        secretKey: 'old-private-key',
-        installationId: 98765,
-        status: 'valid',
-        from: 'old-app',
-        installations: [
-          {
-            id: 98765,
-            account: {
-              login: 'apache',
+  it('changing GitHub App private key clears stale validation and returns to untested state', () => {
+    expect(
+      invalidateGithubAppConfig(
+        {
+          appId: '12345',
+          secretKey: 'old-private-key',
+          installationId: 98765,
+          status: 'valid',
+          from: 'old-app',
+          installations: [
+            {
+              id: 98765,
+              account: {
+                login: 'apache',
+              },
             },
-          },
-        ],
-      },
-      { secretKey: 'new-private-key' },
-    ),
-    {
+          ],
+        },
+        { secretKey: 'new-private-key' },
+      ),
+    ).toStrictEqual({
       appId: '12345',
       secretKey: 'new-private-key',
       installationId: undefined,
       status: 'idle',
       from: undefined,
       installations: undefined,
-    },
-  );
-});
+    });
+  });
 
-test('clearing a required GitHub App credential resets status to idle', () => {
-  deepEqual(
-    invalidateGithubAppConfig(
-      {
-        appId: '12345',
-        secretKey: 'private-key',
-        installationId: 98765,
-        status: 'valid',
-        from: 'old-app',
-      },
-      { secretKey: '' },
-    ),
-    {
+  it('clearing a required GitHub App credential resets status to idle', () => {
+    expect(
+      invalidateGithubAppConfig(
+        {
+          appId: '12345',
+          secretKey: 'private-key',
+          installationId: 98765,
+          status: 'valid',
+          from: 'old-app',
+        },
+        { secretKey: '' },
+      ),
+    ).toStrictEqual({
       appId: '12345',
       secretKey: '',
       installationId: undefined,
       status: 'idle',
       from: undefined,
       installations: undefined,
-    },
-  );
+    });
+  });
 });

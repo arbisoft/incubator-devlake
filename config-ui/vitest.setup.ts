@@ -16,14 +16,9 @@
  *
  */
 
-module.exports = {
-  extends: ['react-app', 'react-app/jest', 'prettier'],
-  plugins: ['header', 'prettier'],
-  rules: {
-    'prettier/prettier': 'warn',
-    'header/header': ['error', '.file-headerrc'],
-    'react-hooks/exhaustive-deps': 'off',
-    'no-console': 'warn',
-  },
-};
+import { afterEach } from 'vitest';
+import { cleanup } from '@testing-library/react';
 
+afterEach(() => {
+  cleanup();
+});

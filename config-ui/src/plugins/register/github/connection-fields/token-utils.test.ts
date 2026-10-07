@@ -16,21 +16,23 @@
  *
  */
 
-import { equal } from 'node:assert/strict';
-import { test } from 'node:test';
+import { describe, expect, it } from 'vitest';
 
 import { isMaskedGithubToken } from './token-utils';
 
-test('detects masked GitHub tokens returned by the API', () => {
-  equal(isMaskedGithubToken('ghp_example********************Suffix12'), true);
-  equal(
-    isMaskedGithubToken('github_pat_example******************************************************************Suffix12'),
-    true,
-  );
-});
+describe('plugins/register/github/connection-fields/token-utils', () => {
+  it('detects masked GitHub tokens returned by the API', () => {
+    expect(isMaskedGithubToken('ghp_example********************Suffix12')).toBe(true);
+    expect(
+      isMaskedGithubToken(
+        'github_pat_example******************************************************************Suffix12',
+      ),
+    ).toBe(true);
+  });
 
-test('does not treat real GitHub tokens as masked placeholders', () => {
-  equal(isMaskedGithubToken('ghp_exampleTokenWithoutMaskCharacters12345'), false);
-  equal(isMaskedGithubToken(''), false);
-  equal(isMaskedGithubToken(undefined), false);
+  it('does not treat real GitHub tokens as masked placeholders', () => {
+    expect(isMaskedGithubToken('ghp_exampleTokenWithoutMaskCharacters12345')).toBe(false);
+    expect(isMaskedGithubToken('')).toBe(false);
+    expect(isMaskedGithubToken(undefined)).toBe(false);
+  });
 });

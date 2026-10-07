@@ -29,7 +29,7 @@ import { getAttentionDescription, getAttentionState, isSameAttentionState, type 
 export const OtelAttention = () => {
   const [attention, setAttention] = useState<OtelAttentionState>();
   const mounted = useRef(false);
-  const abortController = useRef<AbortController>();
+  const abortController = useRef<AbortController | undefined>(undefined);
   const lastRefreshedAt = useRef(0);
   const navigate = useNavigate();
 
@@ -91,7 +91,7 @@ export const OtelAttention = () => {
         banner
         showIcon
         type={storageRecovery ? 'error' : 'warning'}
-        message="Claude Code telemetry needs attention."
+        title="Claude Code telemetry needs attention."
         description={description}
         action={
           <Button type="link" onClick={() => navigate(PATHS.OTEL())}>

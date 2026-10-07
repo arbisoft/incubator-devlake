@@ -19,7 +19,7 @@
 import { Fragment, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { theme, Badge, Modal } from 'antd';
-import { chunk } from 'lodash';
+import { WarningOutlined } from '@ant-design/icons';
 
 import { selectPlugins, selectAllConnections, selectWebhooks } from '@/features/connections';
 import API from '@/api';
@@ -44,6 +44,16 @@ interface StatusBadgeProps {
 const StatusBadge = ({ count, color, text }: StatusBadgeProps) => {
   if (count <= 0) return null;
   return <Badge color={color} text={text} />;
+};
+
+// Group by the displayed name's first letter. The headings used to be produced
+// by cutting the list at the first plugin id starting with o-z, which only
+// agrees with the headings while `sort` happens to run alphabetically — it
+// stopped doing so as plugins were appended in the order they were added, so
+// Asana, Kiro, Linear and incident.io all showed up under O-Z.
+export const splitPluginsByInitial = (plugins: string[], nameOf: (plugin: string) => string) => {
+  const isOZ = (plugin: string) => SORT_START_WITH.includes((nameOf(plugin)[0] ?? '').toLowerCase());
+  return [plugins.filter((plugin) => !isOZ(plugin)), plugins.filter(isOZ)];
 };
 
 export const Connections = () => {
@@ -82,22 +92,23 @@ export const Connections = () => {
   );
 
   const filterWebhookPlugins = plugins.filter((p) => p !== 'webhook');
-  const index = filterWebhookPlugins.findIndex((p) => SORT_START_WITH.includes(p[0]));
+  const deprecatedPlugin = filterWebhookPlugins
+    .map((plugin) => getPluginConfig(plugin))
+    .find((config) => config?.isDeprecated && config.deprecationMessage);
 
-  const [firstPlugins, secondPlugins] = useMemo(() => {
-    if (index > 0) {
-      return chunk(filterWebhookPlugins, index);
-    }
-    return [filterWebhookPlugins, []];
-  }, [index]);
+  const [firstPlugins, secondPlugins] = useMemo(
+    () => splitPluginsByInitial(filterWebhookPlugins, (plugin) => getPluginConfig(plugin)?.name ?? plugin),
+    [filterWebhookPlugins],
+  );
 
   const handleShowListDialog = (plugin: string) => {
     setType('list');
     setPlugin(plugin);
   };
 
-  const handleShowFormDialog = () => {
+  const handleShowFormDialog = (pluginName?: string) => {
     setType('form');
+    if (pluginName) setPlugin(pluginName);
   };
 
   const handleHideDialog = () => {
@@ -144,7 +155,7 @@ export const Connections = () => {
   );
 
   return (
-    <S.Wrapper theme={colorPrimary}>
+    <S.Wrapper>
       <h1>Connections</h1>
       <h5>
         Create and manage data connections from the following data sources or Webhooks to be used in syncing data in
@@ -152,6 +163,16 @@ export const Connections = () => {
       </h5>
       <h2>Data Connections</h2>
       <h5>You can create and manage data connections for the following data sources and use them in your Projects.</h5>
+      {deprecatedPlugin?.deprecationMessage && (
+        <S.DeprecationAlert
+          closable
+          showIcon
+          type="warning"
+          icon={<WarningOutlined />}
+          message="Plugin deprecation notice"
+          description={deprecatedPlugin.deprecationMessage}
+        />
+      )}
       <h4>A-N</h4>
       <ul>
         {firstPlugins.map((plugin) => {
@@ -161,6 +182,7 @@ export const Connections = () => {
             <Fragment key={plugin}>
               <li onClick={() => handleShowListDialog(plugin)}>
                 {pluginConfig.isBeta && <span className="beta">Beta</span>}
+                {pluginConfig.isDeprecated && <span className="deprecated">Deprecated</span>}
                 <span className="logo">{pluginConfig.icon({ color: colorPrimary })}</span>
                 <span className="name">{pluginConfig.name}</span>
                 <span className="count">
@@ -185,6 +207,7 @@ export const Connections = () => {
           return (
             <li key={plugin} onClick={() => handleShowListDialog(plugin)}>
               {pluginConfig.isBeta && <span className="beta">Beta</span>}
+              {pluginConfig.isDeprecated && <span className="deprecated">Deprecated</span>}
               <span className="logo">{pluginConfig.icon({ color: colorPrimary })}</span>
               <span className="name">{pluginConfig.name}</span>
               <span className="count">
@@ -241,7 +264,7 @@ export const Connections = () => {
           <ConnectionList plugin={plugin} onCreate={handleShowFormDialog} />
         </Modal>
       )}
-      {type === 'form' && pluginConfig && (
+      {type === 'form' && plugin && pluginConfig && (
         <Modal
           open
           width={820}

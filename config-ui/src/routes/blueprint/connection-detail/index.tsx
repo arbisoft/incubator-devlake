@@ -235,7 +235,7 @@ export const BlueprintConnectionDetailPage = () => {
         open={open}
         width={820}
         centered
-        destroyOnClose
+        destroyOnHidden
         title="Manage Data Scope"
         footer={null}
         onCancel={handleHideDataScope}

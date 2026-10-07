@@ -16,8 +16,7 @@
  *
  */
 
-import { equal } from 'node:assert/strict';
-import { test } from 'node:test';
+import { describe, expect, it } from 'vitest';
 import { AxiosError, AxiosHeaders, HttpStatusCode } from 'axios';
 
 import { OTEL_CONNECTION_STATUS } from '../../api/otel/types';
@@ -34,31 +33,36 @@ const createAxiosError = (status: number, data: unknown) =>
     data,
   });
 
-test('surfaces only safe project-placement validation errors', () => {
-  const validationError = createAxiosError(HttpStatusCode.BadRequest, {
-    message: 'project "alpha" does not exist',
+describe('routes/otel/utils', () => {
+  it('surfaces only safe project-placement validation errors', () => {
+    const validationError = createAxiosError(HttpStatusCode.BadRequest, {
+      message: 'project "alpha" does not exist',
+    });
+    expect(getOtelProjectError(validationError)).toBe('project "alpha" does not exist');
+
+    const unexpectedError = createAxiosError(HttpStatusCode.InternalServerError, {
+      message: 'internal database error',
+    });
+    expect(getOtelProjectError(unexpectedError)).toBe(OTEL_ERROR.PROJECTS);
+    expect(getOtelProjectError(new Error('network error'))).toBe(OTEL_ERROR.PROJECTS);
   });
-  equal(getOtelProjectError(validationError), 'project "alpha" does not exist');
 
-  const unexpectedError = createAxiosError(HttpStatusCode.InternalServerError, {
-    message: 'internal database error',
+  it('derives a consistent OTel connection display status', () => {
+    const ready = {
+      connection: { status: OTEL_CONNECTION_STATUS.ACTIVE },
+      restartRequired: false,
+      recoveryRequired: false,
+    };
+    expect(getOtelConnectionStatus(ready)).toBe(OTEL_CONNECTION_DISPLAY_STATUS.READY);
+
+    expect(getOtelConnectionStatus({ ...ready, recoveryRequired: true })).toBe(
+      OTEL_CONNECTION_DISPLAY_STATUS.ACTION_REQUIRED,
+    );
+    expect(getOtelConnectionStatus({ ...ready, restartRequired: true })).toBe(
+      OTEL_CONNECTION_DISPLAY_STATUS.ACTION_REQUIRED,
+    );
+    expect(getOtelConnectionStatus({ ...ready, connection: { status: OTEL_CONNECTION_STATUS.REVOKED } })).toBe(
+      OTEL_CONNECTION_DISPLAY_STATUS.REVOKED,
+    );
   });
-  equal(getOtelProjectError(unexpectedError), OTEL_ERROR.PROJECTS);
-  equal(getOtelProjectError(new Error('network error')), OTEL_ERROR.PROJECTS);
-});
-
-test('derives a consistent OTel connection display status', () => {
-  const ready = {
-    connection: { status: OTEL_CONNECTION_STATUS.ACTIVE },
-    restartRequired: false,
-    recoveryRequired: false,
-  };
-  equal(getOtelConnectionStatus(ready), OTEL_CONNECTION_DISPLAY_STATUS.READY);
-
-  equal(getOtelConnectionStatus({ ...ready, recoveryRequired: true }), OTEL_CONNECTION_DISPLAY_STATUS.ACTION_REQUIRED);
-  equal(getOtelConnectionStatus({ ...ready, restartRequired: true }), OTEL_CONNECTION_DISPLAY_STATUS.ACTION_REQUIRED);
-  equal(
-    getOtelConnectionStatus({ ...ready, connection: { status: OTEL_CONNECTION_STATUS.REVOKED } }),
-    OTEL_CONNECTION_DISPLAY_STATUS.REVOKED,
-  );
 });
