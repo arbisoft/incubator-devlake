@@ -25,7 +25,7 @@ import {
   firstCellTexts,
   paginationPage,
   pipelineRowById,
-  selectOption,
+  chooseOption,
   urlEndingWith,
 } from './common';
 import { PATHS } from './paths';
@@ -49,7 +49,7 @@ export class PipelinesPage extends BasePage implements Screen {
 
   async filterByBlueprint(name: string): Promise<void> {
     await this.page.getByRole('combobox', { name: COPY.blueprintFilter.label }).click();
-    await selectOption(this.page, name).click();
+    await chooseOption(this.page, name);
   }
 
   async sortByColumn(label: string): Promise<void> {

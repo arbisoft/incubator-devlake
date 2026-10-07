@@ -19,7 +19,7 @@ import { Locator } from '@playwright/test';
 
 import { API_KEYS_COPY as COPY } from '../app-copy';
 
-import { BasePage, Screen, firstCellTexts, selectOption, urlEndingWith } from './common';
+import { BasePage, Screen, firstCellTexts, chooseOption, urlEndingWith } from './common';
 import { PATHS } from './paths';
 
 export class ApiKeysPage extends BasePage implements Screen {
@@ -48,7 +48,7 @@ export class ApiKeysPage extends BasePage implements Screen {
     const form = this.dialog(COPY.create.title);
     await form.getByRole('textbox', { name: COPY.create.name.label }).fill(name);
     await form.getByRole('combobox', { name: COPY.create.expiration.label }).click();
-    await selectOption(this.page, expiryLabel).click();
+    await chooseOption(this.page, expiryLabel);
     const path = form.getByRole('textbox', { name: COPY.create.allowedPath.label });
     await path.fill(allowedPath);
   }

@@ -23,7 +23,7 @@ import {
   cellFullText,
   modalWithText,
   selectBox,
-  selectOption,
+  chooseOption,
   tableRow,
   tableRows,
   tableWithRow,
@@ -59,7 +59,7 @@ export class OtelCredentialDialog {
   async selectProject(projectName: string): Promise<void> {
     await selectBox(this.dialog).click();
     await this.page.keyboard.type(projectName);
-    await selectOption(this.page, projectName).click();
+    await chooseOption(this.page, projectName);
     await this.dialog.getByText('Generate Claude Settings').click();
   }
 

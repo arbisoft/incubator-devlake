@@ -19,7 +19,7 @@ import { Locator, Page } from '@playwright/test';
 
 import { COMMON_COPY, SETTINGS_COPY } from '../app-copy';
 
-import { BasePage, Screen, firstCellTexts, modalWithText, selectBox, selectOption, urlEndingWith } from './common';
+import { BasePage, Screen, firstCellTexts, modalWithText, selectBox, chooseOption, urlEndingWith } from './common';
 import { PATHS } from './paths';
 
 // The one-time password dialog shown after a local user is created or reset.
@@ -81,7 +81,7 @@ export class LocalUserDialog {
 
   async selectRole(label: string | RegExp): Promise<void> {
     await selectBox(this.dialog).click();
-    await selectOption(this.page, label).click();
+    await chooseOption(this.page, label);
   }
 
   async create(): Promise<OneTimePasswordDialog> {
