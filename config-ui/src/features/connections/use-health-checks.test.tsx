@@ -24,7 +24,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import API from '@/api';
 import { IConnectionStatus, type IConnection } from '@/types';
 
-import { HEALTH_CONCURRENCY, HEALTH_TTL_MS } from './constants';
+import { HEALTH_CONCURRENCY, HEALTH_PROBE_TIMEOUT_MS, HEALTH_TTL_MS } from './constants';
 import { connectionsSlice } from './slice';
 import { useHealthChecks } from './use-health-checks';
 
@@ -62,7 +62,7 @@ describe('useHealthChecks', () => {
     const { store, check } = setup();
     check([connection(1)]);
     await waitFor(() => expect(store.getState().connections.health['github-1']?.status).toBe(IConnectionStatus.ONLINE));
-    expect(testMock).toHaveBeenCalledWith('github', 1);
+    expect(testMock).toHaveBeenCalledWith('github', 1, undefined, HEALTH_PROBE_TIMEOUT_MS);
   });
 
   it('skips connections with a result inside the window', async () => {

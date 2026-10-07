@@ -19,6 +19,7 @@ export const WEBHOOK_PLUGIN = 'webhook';
 
 export const HEALTH_TTL_MS = 30 * 60 * 1000;
 export const HEALTH_CONCURRENCY = 3;
+export const HEALTH_PROBE_TIMEOUT_MS = 20 * 1000;
 export const HEALTH_STORAGE_KEY = 'devlake.connectionHealth';
 
 export const HEALTH_FAILURE_REASON = {

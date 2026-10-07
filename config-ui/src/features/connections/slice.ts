@@ -22,7 +22,7 @@ import API from '@/api';
 import { RootState } from '@/app/store';
 import { IConnection, IConnectionAPI, IConnectionStatus, IWebhook, IStatus } from '@/types';
 
-import { WEBHOOK_PLUGIN } from './constants';
+import { HEALTH_PROBE_TIMEOUT_MS, WEBHOOK_PLUGIN } from './constants';
 import { healthFromTestError, healthFromTestResult, readStoredHealth } from './health';
 import type { ConnectionHealthEntry, ConnectionHealthMap } from './types';
 import { getErrorResponse, transformConnection, transformWebhook } from './utils';
@@ -119,11 +119,12 @@ export const testConnection = createAsyncThunk(
 );
 
 // Background probe: records health only and leaves `status` to the user-initiated test above.
+// The timeout keeps a hung host from holding one of the few probe slots.
 export const checkConnectionHealth = createAsyncThunk(
   'connections/checkConnectionHealth',
   async ({ plugin, id, unique }: IConnection) => {
     try {
-      const res = await API.connection.test(plugin, id);
+      const res = await API.connection.test(plugin, id, undefined, HEALTH_PROBE_TIMEOUT_MS);
       return { unique, health: healthFromTestResult(res, Date.now()) };
     } catch (err: unknown) {
       return { unique, health: healthFromTestError(err, Date.now()) };
