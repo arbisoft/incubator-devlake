@@ -16,7 +16,7 @@
  *
  */
 
-import { Flex, Space, Card, Modal, Input, Checkbox, Button, message } from 'antd';
+import { Flex, Space, Card, Modal, Input, Checkbox, Button } from 'antd';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -83,10 +83,6 @@ export const SettingsPanel = ({ project, onRefresh }: Props) => {
   }, [project]);
 
   const handleUpdate = async () => {
-    if (name !== project.name && hasOtelPlacements) {
-      message.error('Remove Claude Code OTel project placements before renaming this project.');
-      return;
-    }
     const [success] = await operator(
       () =>
         API.project.update(project.name, {
@@ -156,15 +152,7 @@ export const SettingsPanel = ({ project, onRefresh }: Props) => {
       <Space direction="vertical" size="large">
         <Card>
           <Block title="Project Name" description="Edit your project name with letters, numbers, -, _ or /" required>
-            <Input
-              style={{ width: 386 }}
-              value={name}
-              disabled={hasOtelPlacements}
-              onChange={(e) => setName(e.target.value)}
-            />
-            {hasOtelPlacements && (
-              <Message content="Remove the project's Claude Code OTel placements before renaming it. This keeps project-configured telemetry links stable." />
-            )}
+            <Input style={{ width: 386 }} value={name} onChange={(e) => setName(e.target.value)} />
           </Block>
           <Block
             title={
