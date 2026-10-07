@@ -19,7 +19,7 @@
 import type { OtelConnectionResponse } from '@/api/otel';
 import type { IBlueprint, IPipelineStatus } from '@/types';
 
-import type { PROJECT_COLUMN } from './constants';
+import type { CONNECTION_ENTRY_KIND, PROJECT_COLUMN } from './constants';
 
 export type ProjectSortKey =
   typeof PROJECT_COLUMN.NAME | typeof PROJECT_COLUMN.CREATED_AT | typeof PROJECT_COLUMN.LAST_RUN_AT;
@@ -34,3 +34,9 @@ export type ProjectRow = {
   lastRunCompletedAt?: string | null;
   lastRunStatus?: IPipelineStatus;
 };
+
+type PluginConnection = IBlueprint['connections'][number];
+
+export type ConnectionEntry =
+  | { kind: typeof CONNECTION_ENTRY_KIND.PLUGIN; key: string; connection: PluginConnection }
+  | { kind: typeof CONNECTION_ENTRY_KIND.OTEL; key: string; connection: OtelConnectionResponse };

@@ -16,32 +16,8 @@
  *
  */
 
-import { Drawer } from 'antd';
+import type { BLUEPRINT_COLUMN, LIST_FILTER } from './constants';
 
-import * as S from './styled';
+export type BlueprintSortKey = typeof BLUEPRINT_COLUMN.NAME;
 
-interface Props {
-  open: boolean;
-  data: any;
-  title?: string;
-  onClose?: () => void;
-}
-
-export const Inspector = ({ open, data, title, onClose }: Props) => {
-  return (
-    <Drawer bodyStyle={{ padding: 0 }} open={open} title={title} onClose={onClose}>
-      <S.Wrapper>
-        <div className="title">
-          <h3>JSON CONFIGURATION</h3>
-          <span>application/json</span>
-        </div>
-        <p className="description">This is the configuration format used in a blueprint's advanced mode.</p>
-        <div className="content">
-          <code>
-            <pre>{JSON.stringify(data, null, '  ')}</pre>
-          </code>
-        </div>
-      </S.Wrapper>
-    </Drawer>
-  );
-};
+export type BlueprintFilters = Record<(typeof LIST_FILTER)[keyof typeof LIST_FILTER], string>;

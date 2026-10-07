@@ -21,12 +21,6 @@ import styled from 'styled-components';
 
 import { textStyle } from '@/ui/style-helpers';
 
-export const Page = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${({ theme }) => theme.space.lg}px;
-`;
-
 export const ExpirationCell = styled.span`
   display: inline-flex;
   flex-wrap: wrap;

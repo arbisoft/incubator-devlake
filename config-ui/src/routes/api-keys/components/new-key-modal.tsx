@@ -18,11 +18,11 @@
 
 import { ApiOutlined } from '@ant-design/icons';
 import { Input, Select } from 'antd';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 import API from '@/api';
 import { LINKS } from '@/config';
-import { ExternalLink, FormField, FormModal, MODAL_WIDTH, toUserMessage } from '@/ui';
+import { ExternalLink, FormField, FormModal, toUserMessage, useModalForm } from '@/ui';
 import { operator } from '@/utils';
 
 import { COPY, DEFAULT_ALLOWED_PATH, DEFAULT_EXPIRATION, ERROR_MAP, EXPIRATION } from '../constants';
@@ -39,11 +39,19 @@ const EXPIRATION_OPTIONS = Object.values(EXPIRATION).map((value) => ({
 
 const INITIAL_FORM: NewKeyForm = { name: '', expiration: DEFAULT_EXPIRATION, allowedPath: DEFAULT_ALLOWED_PATH };
 
-export const NewKeyModal = ({ onClose, onCreated }: NewKeyModalProps) => {
-  const [form, setForm] = useState(INITIAL_FORM);
-  const [submitting, setSubmitting] = useState(false);
+export const NewKeyModal = ({ open, onClose, onCreated }: NewKeyModalProps) => {
+  const {
+    values: form,
+    setField,
+    reset,
+    setSaving,
+    modalProps,
+  } = useModalForm(INITIAL_FORM, {
+    onClose,
+    required: ['name', 'allowedPath'],
+    disabledReason: COPY.create.disabledReason,
+  });
   const prefix = useMemo(() => getPathPrefix(window.location.origin), []);
-  const invalid = !form.name || !form.allowedPath;
   const { name, expiration, allowedPath } = COPY.create;
 
   const submit = async () => {
@@ -54,23 +62,22 @@ export const NewKeyModal = ({ onClose, onCreated }: NewKeyModalProps) => {
           expiredAt: getExpiresAt(form.expiration),
           allowedPath: form.allowedPath,
         }),
-      { setOperating: setSubmitting, formatReason: (error) => toUserMessage(error, ERROR_MAP) },
+      { setOperating: setSaving, formatReason: (error) => toUserMessage(error, ERROR_MAP) },
     );
-    if (success) onCreated(res.apiKey);
+    if (success) {
+      reset();
+      onCreated(res.apiKey);
+    }
   };
 
   return (
     <FormModal
-      open
+      open={open}
       title={COPY.create.title}
       icon={<ApiOutlined aria-hidden />}
       submitLabel={COPY.create.submit}
-      width={MODAL_WIDTH.MD}
-      loading={submitting}
-      submitDisabled={invalid}
-      disabledReason={COPY.create.disabledReason}
       onSubmit={submit}
-      onCancel={onClose}
+      {...modalProps}
     >
       <Fields>
         <FormField label={name.label} description={name.description} required>
@@ -80,7 +87,7 @@ export const NewKeyModal = ({ onClose, onCreated }: NewKeyModalProps) => {
               size="large"
               placeholder={name.placeholder}
               value={form.name}
-              onChange={(event) => setForm({ ...form, name: event.target.value })}
+              onChange={(event) => setField('name', event.target.value)}
             />
           )}
         </FormField>
@@ -92,7 +99,7 @@ export const NewKeyModal = ({ onClose, onCreated }: NewKeyModalProps) => {
               size="large"
               options={EXPIRATION_OPTIONS}
               value={form.expiration}
-              onChange={(value) => setForm({ ...form, expiration: value })}
+              onChange={(value) => setField('expiration', value)}
             />
           )}
         </FormField>
@@ -112,7 +119,7 @@ export const NewKeyModal = ({ onClose, onCreated }: NewKeyModalProps) => {
                 {...control}
                 size="large"
                 value={form.allowedPath}
-                onChange={(event) => setForm({ ...form, allowedPath: event.target.value })}
+                onChange={(event) => setField('allowedPath', event.target.value)}
               />
             </PathRow>
           )}

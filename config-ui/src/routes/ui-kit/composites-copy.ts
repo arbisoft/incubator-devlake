@@ -75,6 +75,20 @@ export const COMPOSITES_COPY = {
     longHint:
       'A deliberately long hint that is much longer than the field so it must wrap onto several lines without overflowing.',
   },
+  listPage: { title: 'Projects', search: 'Search projects', add: 'New project', row: 'edly-Github' },
+  rowLink: { label: 'devlake pilot-Blueprint' },
+  useModalForm: {
+    field: 'Name',
+    reset: 'Reset',
+    toggleSaving: 'Toggle saving',
+    state: (name: string, saving: boolean) => `Name: "${name}", saving: ${saving}`,
+  },
+  useRefreshVersion: { refresh: 'Refresh', version: (count: number) => `Refresh count: ${count}` },
+  overflowList: {
+    more: (count: number) => `+${count} more`,
+    items: ['arbisoft-app-devlake', 'corey-systems', 'hirestream-platform', 'sophia-web', 'fixalert-mobile'],
+    longItem: 'a-connection-with-an-extraordinarily-long-name-that-has-to-be-clipped-inside-the-cell',
+  },
   formModal: {
     open: 'Open',
     title: 'Add a new webhook',

@@ -17,10 +17,9 @@
  */
 
 import { Input } from 'antd';
-import { useState } from 'react';
 
 import API from '@/api';
-import { FormField, FormModal, MODAL_WIDTH } from '@/ui';
+import { FormField, FormModal, useModalForm } from '@/ui';
 import { operator } from '@/utils';
 
 import { COPY } from '../constants';
@@ -28,38 +27,33 @@ import { buildNewProject } from '../utils';
 
 import type { NewProjectModalProps } from './types';
 
-export const NewProjectModal = ({ onClose, onCreated }: NewProjectModalProps) => {
-  const [name, setName] = useState('');
-  const [saving, setSaving] = useState(false);
+export const NewProjectModal = ({ open, onClose, onCreated }: NewProjectModalProps) => {
+  const { values, setField, reset, setSaving, modalProps } = useModalForm(
+    { name: '' },
+    { onClose, required: ['name'], disabledReason: COPY.create.disabledReason },
+  );
   const { name: field } = COPY.create;
 
   const submit = async () => {
-    const [success] = await operator(async () => API.project.create(buildNewProject(name)), {
+    const [success] = await operator(async () => API.project.create(buildNewProject(values.name)), {
       setOperating: setSaving,
     });
-    if (success) onCreated();
+    if (success) {
+      reset();
+      onCreated();
+    }
   };
 
   return (
-    <FormModal
-      open
-      title={COPY.create.title}
-      submitLabel={COPY.create.submit}
-      width={MODAL_WIDTH.MD}
-      loading={saving}
-      submitDisabled={!name}
-      disabledReason={COPY.create.disabledReason}
-      onSubmit={submit}
-      onCancel={onClose}
-    >
+    <FormModal open={open} title={COPY.create.title} submitLabel={COPY.create.submit} onSubmit={submit} {...modalProps}>
       <FormField label={field.label} description={field.description} required>
         {(control) => (
           <Input
             {...control}
             size="large"
             placeholder={field.placeholder}
-            value={name}
-            onChange={(event) => setName(event.target.value)}
+            value={values.name}
+            onChange={(event) => setField('name', event.target.value)}
           />
         )}
       </FormField>

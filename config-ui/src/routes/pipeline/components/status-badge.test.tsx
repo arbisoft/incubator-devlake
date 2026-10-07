@@ -22,8 +22,9 @@ import { describe, expect, it } from 'vitest';
 import { IPipelineStatus } from '@/types';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 import { STATUS_TONE } from '@/ui/constants';
+import { PIPELINE_PROGRESS_STATUS } from '@/ui/pipeline-progress/constants';
 
-import { PIPELINE_STATUS_COPY, PIPELINE_STATUS_TONE } from '../status-tone';
+import { PIPELINE_PROGRESS_STATUS_MAP, PIPELINE_STATUS_COPY, PIPELINE_STATUS_TONE } from '../status-tone';
 
 import { PipelineStatusBadge } from './status-badge';
 
@@ -46,6 +47,24 @@ describe('pipeline status maps', () => {
     [IPipelineStatus.CANCELLED, STATUS_TONE.NEUTRAL],
   ])('maps %s to the %s tone', (status, tone) => {
     expect(PIPELINE_STATUS_TONE[status]).toBe(tone);
+  });
+});
+
+describe('pipeline progress status map', () => {
+  it('covers every status', () => {
+    for (const status of ALL_STATUSES) {
+      expect(PIPELINE_PROGRESS_STATUS_MAP[status]).toBeTruthy();
+    }
+  });
+
+  it.each([
+    [IPipelineStatus.CREATED, PIPELINE_PROGRESS_STATUS.PENDING],
+    [IPipelineStatus.RERUN, PIPELINE_PROGRESS_STATUS.RUNNING],
+    [IPipelineStatus.PARTIAL, PIPELINE_PROGRESS_STATUS.COMPLETED],
+    [IPipelineStatus.FAILED, PIPELINE_PROGRESS_STATUS.FAILED],
+    [IPipelineStatus.CANCELLED, PIPELINE_PROGRESS_STATUS.PENDING],
+  ])('maps %s to the %s bar', (status, bar) => {
+    expect(PIPELINE_PROGRESS_STATUS_MAP[status]).toBe(bar);
   });
 });
 

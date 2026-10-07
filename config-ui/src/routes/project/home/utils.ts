@@ -19,8 +19,8 @@
 import type { OtelConnectionResponse } from '@/api/otel';
 import type { IProject } from '@/types';
 
-import { PROJECT_METRICS } from './constants';
-import type { ProjectRow } from './types';
+import { CONNECTION_ENTRY_KIND, PROJECT_METRICS } from './constants';
+import type { ConnectionEntry, ProjectRow } from './types';
 
 export const toProjectRow = (project: IProject, otelConnections: OtelConnectionResponse[] = []): ProjectRow => ({
   name: project.name,
@@ -40,3 +40,16 @@ export const buildNewProject = (name: string) => ({
   description: '',
   metrics: PROJECT_METRICS,
 });
+
+export const getConnectionEntries = ({ connections, otelConnections }: ProjectRow): ConnectionEntry[] => [
+  ...connections.map((connection): ConnectionEntry => ({
+    kind: CONNECTION_ENTRY_KIND.PLUGIN,
+    key: `${connection.pluginName}-${connection.connectionId}`,
+    connection,
+  })),
+  ...otelConnections.map((connection): ConnectionEntry => ({
+    kind: CONNECTION_ENTRY_KIND.OTEL,
+    key: `claude_otel-${connection.connection.id}`,
+    connection,
+  })),
+];

@@ -25,11 +25,19 @@ import API from '@/api';
 import { PATHS, PROJECT_TAB } from '@/config';
 import { useRefreshData } from '@/hooks';
 import { OnboardTour } from '@/routes/onboard/components';
-import { buildListEmpty, DataTable, PageHeader, SearchInput, Toolbar, useListState } from '@/ui';
+import {
+  buildListEmpty,
+  DataTable,
+  ListPage,
+  PageHeader,
+  SearchInput,
+  Toolbar,
+  useListState,
+  useRefreshVersion,
+} from '@/ui';
 
 import { NewProjectModal } from './components';
 import { CONFIGURATION_TAB_STATE, COPY } from './constants';
-import { Page } from './styled';
 import type { ProjectRow, ProjectSortKey } from './types';
 import { useProjectColumns } from './use-project-columns';
 import { toProjectRow } from './utils';
@@ -37,7 +45,7 @@ import { toProjectRow } from './utils';
 export const ProjectHomePage = () => {
   const list = useListState<ProjectSortKey, Record<string, never>>({ filters: {} });
   const { keyword } = list;
-  const [version, setVersion] = useState(0);
+  const { version, refresh } = useRefreshVersion();
   const [creating, setCreating] = useState(false);
 
   const navigate = useNavigate();
@@ -55,8 +63,6 @@ export const ProjectHomePage = () => {
     [navigate],
   );
   const { columns, tourRefs } = useProjectColumns(handleConfigure);
-
-  const refresh = () => setVersion((current) => current + 1);
 
   const handleCreated = () => {
     setCreating(false);
@@ -82,7 +88,7 @@ export const ProjectHomePage = () => {
   });
 
   return (
-    <Page>
+    <ListPage>
       <PageHeader title={COPY.title} />
       <Toolbar
         start={
@@ -100,8 +106,8 @@ export const ProjectHomePage = () => {
         list={list}
         total={data?.count ?? 0}
       />
-      {creating && <NewProjectModal onClose={() => setCreating(false)} onCreated={handleCreated} />}
+      <NewProjectModal open={creating} onClose={() => setCreating(false)} onCreated={handleCreated} />
       {ready && rows.length === 1 && <OnboardTour {...tourRefs} />}
-    </Page>
+    </ListPage>
   );
 };

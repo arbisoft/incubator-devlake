@@ -28,24 +28,25 @@ import {
   ConfirmModal,
   CONFIRM_TONE,
   DataTable,
+  ListPage,
   PageHeader,
   SearchInput,
   Toolbar,
   useListState,
+  useRefreshVersion,
 } from '@/ui';
 import { operator } from '@/utils';
 
 import { getColumns } from './columns';
 import { GeneratedKeyModal, NewKeyModal } from './components';
 import { COPY } from './constants';
-import { Page } from './styled';
 import type { KeySortKey } from './types';
 import { getPathPrefix } from './utils';
 
 export const ApiKeys = () => {
   const list = useListState<KeySortKey, Record<string, never>>({ filters: {} });
   const { keyword } = list;
-  const [version, setVersion] = useState(0);
+  const { version, refresh } = useRefreshVersion();
   const [creating, setCreating] = useState(false);
   const [generatedKey, setGeneratedKey] = useState<string>();
   const [generatedOpen, setGeneratedOpen] = useState(false);
@@ -67,8 +68,6 @@ export const ApiKeys = () => {
       }),
     [pathPrefix],
   );
-
-  const refresh = () => setVersion((current) => current + 1);
 
   const handleCreated = (apiKey: string) => {
     setCreating(false);
@@ -104,7 +103,7 @@ export const ApiKeys = () => {
   });
 
   return (
-    <Page>
+    <ListPage>
       <PageHeader title={COPY.title} description={COPY.description} />
       <Toolbar
         start={
@@ -122,7 +121,7 @@ export const ApiKeys = () => {
         list={list}
         total={data?.count ?? 0}
       />
-      {creating && <NewKeyModal onClose={() => setCreating(false)} onCreated={handleCreated} />}
+      <NewKeyModal open={creating} onClose={() => setCreating(false)} onCreated={handleCreated} />
       <GeneratedKeyModal
         open={generatedOpen}
         apiKey={generatedKey}
@@ -139,6 +138,6 @@ export const ApiKeys = () => {
         onConfirm={handleRevoke}
         onCancel={() => setRevokeOpen(false)}
       />
-    </Page>
+    </ListPage>
   );
 };

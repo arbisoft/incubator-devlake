@@ -69,6 +69,8 @@ export type LayoutTokens = {
   markTileSize: number;
   wordmarkWidth: number;
   confirmModalWidth: number;
+  pipelineTaskHeight: number;
+  pipelineTaskDurationWidth: number;
   modalWidth: { sm: number; md: number; lg: number };
 };
 export type ZIndexTokens = { sidebar: number; flyout: number; drawer: number; modal: number };
@@ -122,6 +124,8 @@ export const LAYOUT: LayoutTokens = {
   markTileSize: 32,
   wordmarkWidth: 120,
   confirmModalWidth: 416,
+  pipelineTaskHeight: 80,
+  pipelineTaskDurationWidth: 80,
   modalWidth: { sm: 520, md: 600, lg: 800 },
 };
 

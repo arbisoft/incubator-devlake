@@ -33,13 +33,16 @@ import { FormModalDemo } from './form-modal.demo';
 import { IdentityCellDemo } from './identity-cell.demo';
 import { IntegrationCardDemo } from './integration-card.demo';
 import { KeyValueListDemo } from './key-value-list.demo';
+import { ListPageDemo } from './list-page.demo';
 import { MetricTileDemo } from './metric-tile.demo';
+import { OverflowListDemo } from './overflow-list.demo';
 import { PageFooterDemo } from './page-footer.demo';
 import { PageHeaderDemo } from './page-header.demo';
 import { PipelineProgressDemo } from './pipeline-progress.demo';
 import { PluginIconDemo } from './plugin-icon.demo';
 import { ProgressBannerDemo } from './progress-banner.demo';
 import { RouteTabsDemo } from './route-tabs.demo';
+import { RowLinkDemo } from './row-link.demo';
 import { SearchInputDemo } from './search-input.demo';
 import { SectionCardDemo } from './section-card.demo';
 import { SidebarNavDemo } from './sidebar-nav.demo';
@@ -51,6 +54,8 @@ import { UseConcurrencyQueueDemo } from './use-concurrency-queue.demo';
 import { UseDocumentTitleDemo } from './use-document-title.demo';
 import { UseInViewDemo } from './use-in-view.demo';
 import { UseListStateDemo } from './use-list-state.demo';
+import { UseModalFormDemo } from './use-modal-form.demo';
+import { UseRefreshVersionDemo } from './use-refresh-version.demo';
 import { UseRouteTabDemo } from './use-route-tab.demo';
 import { UseSidebarCollapsedDemo } from './use-sidebar-collapsed.demo';
 import { UtilsDemo } from './utils.demo';
@@ -78,6 +83,9 @@ export const SECTIONS: SectionDefinition[] = [
   { id: SECTION.DETAIL_DRAWER, Demo: DetailDrawerDemo },
   { id: SECTION.FORM_FIELD, Demo: FormFieldDemo },
   { id: SECTION.FORM_MODAL, Demo: FormModalDemo },
+  { id: SECTION.OVERFLOW_LIST, Demo: OverflowListDemo },
+  { id: SECTION.LIST_PAGE, Demo: ListPageDemo },
+  { id: SECTION.ROW_LINK, Demo: RowLinkDemo },
   { id: SECTION.INTEGRATION_CARD, Demo: IntegrationCardDemo },
   { id: SECTION.PAGE_FOOTER, Demo: PageFooterDemo },
   { id: SECTION.PAGE_HEADER, Demo: PageHeaderDemo },
@@ -87,6 +95,8 @@ export const SECTIONS: SectionDefinition[] = [
   { id: SECTION.SIDEBAR_NAV, Demo: SidebarNavDemo },
   { id: SECTION.USE_LIST_STATE, Demo: UseListStateDemo },
   { id: SECTION.USE_ROUTE_TAB, Demo: UseRouteTabDemo },
+  { id: SECTION.USE_REFRESH_VERSION, Demo: UseRefreshVersionDemo },
+  { id: SECTION.USE_MODAL_FORM, Demo: UseModalFormDemo },
   { id: SECTION.USE_DOCUMENT_TITLE, Demo: UseDocumentTitleDemo },
   { id: SECTION.USE_IN_VIEW, Demo: UseInViewDemo },
   { id: SECTION.USE_SIDEBAR_COLLAPSED, Demo: UseSidebarCollapsedDemo },

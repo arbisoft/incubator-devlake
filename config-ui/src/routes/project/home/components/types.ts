@@ -23,6 +23,7 @@ export type OtelConnectionNameProps = {
 };
 
 export type NewProjectModalProps = {
+  open: boolean;
   onClose: () => void;
   onCreated: () => void;
 };

@@ -33,11 +33,11 @@ export const Pipeline = () => {
   return (
     <PageHeader
       breadcrumbs={[
-        { name: 'Advanced', path: PATHS.BLUEPRINTS() },
-        { name: 'Pipelines', path: PATHS.PIPELINES() },
+        { name: COPY.breadcrumbAdvanced, path: PATHS.BLUEPRINTS() },
+        { name: COPY.title, path: PATHS.PIPELINES() },
         {
           name: id as string,
-          path: `/pipelines/${id}`,
+          path: PATHS.PIPELINE(id as string),
         },
       ]}
     >

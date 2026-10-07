@@ -20,5 +20,7 @@ export * from './use-concurrency-queue';
 export * from './use-document-title';
 export * from './use-in-view';
 export * from './use-list-state';
+export * from './use-modal-form';
+export * from './use-refresh-version';
 export * from './use-route-tab';
 export * from './use-sidebar-collapsed';

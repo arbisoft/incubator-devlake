@@ -29,7 +29,6 @@ export const RESKIN_LINT_PENDING = [
   'src/routes/blueprint/detail/configuration-panel.tsx',
   'src/routes/blueprint/detail/status-panel.tsx',
   'src/routes/blueprint/detail/styled.ts',
-  'src/routes/blueprint/home/index.tsx',
   'src/routes/change-password.tsx',
   'src/routes/connection/connection.tsx',
   'src/routes/connection/connections.tsx',
@@ -52,9 +51,6 @@ export const RESKIN_LINT_PENDING = [
   'src/routes/otel/otel.tsx',
   'src/routes/otel/source-policy.tsx',
   'src/routes/otel/styled.ts',
-  'src/routes/pipeline/components/table.tsx',
-  'src/routes/pipeline/components/task.tsx',
-  'src/routes/pipeline/components/tasks.tsx',
   'src/routes/project/detail/settings-panel.tsx',
   'src/routes/project/detail/webhooks-panel.tsx',
 ];

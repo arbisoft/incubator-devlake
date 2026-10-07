@@ -17,6 +17,7 @@
  */
 
 export type NewKeyModalProps = {
+  open: boolean;
   onClose: () => void;
   onCreated: (apiKey: string) => void;
 };

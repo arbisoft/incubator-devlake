@@ -18,42 +18,34 @@
 
 import styled from 'styled-components';
 
-export const Wrapper = styled.div`
-  padding: 16px 24px;
-  background-color: ${({ theme }) => theme.colors.bgElevated};
+import { textStyle } from '@/ui/style-helpers';
 
-  .title {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+export const HeadingRow = styled.div`
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.space.md}px;
+`;
 
-    h3 {
-      margin: 0;
-      padding: 0;
-    }
+export const Heading = styled.h3`
+  ${textStyle('h3')}
+  margin: 0;
+  color: ${({ theme }) => theme.colors.text};
+`;
 
-    span {
-      font-size: 10px;
-      color: ${({ theme }) => theme.colors.textFaint};
-    }
-  }
+export const Mime = styled.span`
+  ${textStyle('caption')}
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
 
-  p.description {
-    margin: 8px 0 16px;
-    font-size: 12px;
-  }
+export const Description = styled.p`
+  ${textStyle('body')}
+  margin: ${({ theme }) => theme.space.xxs}px 0 ${({ theme }) => theme.space.md}px;
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
 
-  .content {
-    padding: 10px;
-    max-height: 600;
-    background-color: ${({ theme }) => theme.colors.bgContainer};
-    border-radius: 4px;
-    box-shadow: 1px 1px 3px 0px rgb(0 0 0 / 20%) inset;
-    overflow-y: auto;
-
-    pre {
-      margin: 0;
-      font-size: 10px;
-    }
-  }
+export const StatusStack = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.xxs}px;
 `;

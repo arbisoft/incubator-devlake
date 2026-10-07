@@ -32,6 +32,8 @@ export const PROJECT_METRICS = [
 ];
 
 export const NO_CONNECTIONS = 'N/A';
+export const MAX_VISIBLE_CONNECTIONS = 2;
+export const CONNECTION_ENTRY_KIND = { PLUGIN: 'plugin', OTEL: 'otel' } as const;
 export const CONFIGURATION_TAB_STATE = { activeKey: 'configuration' } as const;
 
 export const COPY = {
@@ -49,6 +51,7 @@ export const COPY = {
     action: 'Action',
   },
   noConnections: NO_CONNECTIONS,
+  moreConnections: (count: number) => `+${count} more`,
   configure: 'Project Configuration',
   empty: {
     title: 'No projects yet',

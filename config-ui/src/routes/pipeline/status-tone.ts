@@ -18,6 +18,7 @@
 
 import { IPipelineStatus } from '@/types';
 import { STATUS_TONE } from '@/ui/constants';
+import { PIPELINE_PROGRESS_STATUS } from '@/ui/pipeline-progress/constants';
 
 export const PIPELINE_STATUS_TONE = {
   [IPipelineStatus.CREATED]: STATUS_TONE.NEUTRAL,
@@ -44,4 +45,16 @@ export const PIPELINE_STATUS_COPY = {
   [IPipelineStatus.PARTIAL]: 'Partial Success',
   [IPipelineStatus.FAILED]: 'Failed',
   [IPipelineStatus.CANCELLED]: 'Cancelled',
+} as const;
+
+export const PIPELINE_PROGRESS_STATUS_MAP = {
+  [IPipelineStatus.CREATED]: PIPELINE_PROGRESS_STATUS.PENDING,
+  [IPipelineStatus.PENDING]: PIPELINE_PROGRESS_STATUS.PENDING,
+  [IPipelineStatus.ACTIVE]: PIPELINE_PROGRESS_STATUS.RUNNING,
+  [IPipelineStatus.RUNNING]: PIPELINE_PROGRESS_STATUS.RUNNING,
+  [IPipelineStatus.RERUN]: PIPELINE_PROGRESS_STATUS.RUNNING,
+  [IPipelineStatus.COMPLETED]: PIPELINE_PROGRESS_STATUS.COMPLETED,
+  [IPipelineStatus.PARTIAL]: PIPELINE_PROGRESS_STATUS.COMPLETED,
+  [IPipelineStatus.FAILED]: PIPELINE_PROGRESS_STATUS.FAILED,
+  [IPipelineStatus.CANCELLED]: PIPELINE_PROGRESS_STATUS.PENDING,
 } as const;

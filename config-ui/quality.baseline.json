@@ -1,11 +1,11 @@
 {
   "eslint": {
     "@typescript-eslint/no-explicit-any": {
-      "errors": 323,
+      "errors": 320,
       "warnings": 0
     },
     "@typescript-eslint/no-unused-vars": {
-      "errors": 13,
+      "errors": 12,
       "warnings": 0
     },
     "eqeqeq": {
@@ -34,7 +34,7 @@
     },
     "max-lines": {
       "errors": 0,
-      "warnings": 20
+      "warnings": 19
     },
     "no-console": {
       "errors": 3,
@@ -48,13 +48,9 @@
       "errors": 0,
       "warnings": 3
     },
-    "no-restricted-imports": {
-      "errors": 0,
-      "warnings": 3
-    },
     "prefer-destructuring": {
       "errors": 0,
-      "warnings": 22
+      "warnings": 20
     },
     "react-hooks/exhaustive-deps": {
       "errors": 0,
@@ -89,7 +85,7 @@
       "warnings": 0
     },
     "react/no-unescaped-entities": {
-      "errors": 21,
+      "errors": 20,
       "warnings": 0
     },
     "sonarjs/cognitive-complexity": {
@@ -102,10 +98,10 @@
     },
     "sonarjs/no-duplicate-string": {
       "errors": 0,
-      "warnings": 22
+      "warnings": 21
     },
     "sonarjs/no-globals-shadowing": {
-      "errors": 3,
+      "errors": 2,
       "warnings": 0
     },
     "sonarjs/no-ignored-exceptions": {
@@ -147,7 +143,7 @@
   },
   "knip": [],
   "jscpd": {
-    "clones": 119,
-    "duplicatedLines": 2075
+    "clones": 114,
+    "duplicatedLines": 2009
   }
 }

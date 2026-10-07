@@ -23,12 +23,20 @@ import { useMemo, useRef } from 'react';
 import { getCron, PATHS } from '@/config';
 import { ConnectionName } from '@/features';
 import { PipelineStatusBadge } from '@/routes/pipeline';
+import { OverflowList, RowLink } from '@/ui';
 import { formatTime } from '@/utils';
 
 import { OtelConnectionName } from './components';
-import { CONFIGURATION_TAB_STATE, COPY, NO_CONNECTIONS, PROJECT_COLUMN } from './constants';
-import { ConnectionList, NameLink } from './styled';
+import {
+  CONFIGURATION_TAB_STATE,
+  CONNECTION_ENTRY_KIND,
+  COPY,
+  MAX_VISIBLE_CONNECTIONS,
+  NO_CONNECTIONS,
+  PROJECT_COLUMN,
+} from './constants';
 import type { ProjectRow } from './types';
+import { getConnectionEntries } from './utils';
 
 export const useProjectColumns = (onConfigure: (name: string) => void) => {
   const nameRef = useRef<HTMLAnchorElement>(null);
@@ -43,31 +51,35 @@ export const useProjectColumns = (onConfigure: (name: string) => void) => {
         dataIndex: 'name',
         sorter: true,
         render: (name: string) => (
-          <NameLink to={PATHS.PROJECT(name)} state={CONFIGURATION_TAB_STATE} ref={nameRef}>
+          <RowLink to={PATHS.PROJECT(name)} state={CONFIGURATION_TAB_STATE} ref={nameRef}>
             {name}
-          </NameLink>
+          </RowLink>
         ),
       },
       {
         key: PROJECT_COLUMN.CONNECTIONS,
         title: COPY.columns.connections,
-        render: (_, { connections, otelConnections }) =>
-          !connections.length && !otelConnections.length ? (
+        render: (_, row) => {
+          const entries = getConnectionEntries(row);
+          return entries.length === 0 ? (
             NO_CONNECTIONS
           ) : (
-            <ConnectionList ref={connectionRef}>
-              {connections.map((connection) => (
-                <li key={`${connection.pluginName}-${connection.connectionId}`}>
-                  <ConnectionName plugin={connection.pluginName} connectionId={connection.connectionId} />
-                </li>
-              ))}
-              {otelConnections.map((connection) => (
-                <li key={`claude_otel-${connection.connection.id}`}>
-                  <OtelConnectionName connection={connection} />
-                </li>
-              ))}
-            </ConnectionList>
-          ),
+            <OverflowList
+              listRef={connectionRef}
+              max={MAX_VISIBLE_CONNECTIONS}
+              moreLabel={COPY.moreConnections}
+              items={entries.map(({ key, ...entry }) => ({
+                key,
+                node:
+                  entry.kind === CONNECTION_ENTRY_KIND.PLUGIN ? (
+                    <ConnectionName plugin={entry.connection.pluginName} connectionId={entry.connection.connectionId} />
+                  ) : (
+                    <OtelConnectionName connection={entry.connection} />
+                  ),
+              }))}
+            />
+          );
+        },
       },
       {
         key: PROJECT_COLUMN.FREQUENCY,

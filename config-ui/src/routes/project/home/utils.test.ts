@@ -21,8 +21,9 @@ import { describe, expect, it } from 'vitest';
 import type { OtelConnectionResponse } from '@/api/otel';
 import { IPipelineStatus, type IProject } from '@/types';
 
-import { PROJECT_METRICS } from './constants';
-import { buildNewProject, toProjectRow } from './utils';
+import { CONNECTION_ENTRY_KIND, PROJECT_METRICS } from './constants';
+import type { ProjectRow } from './types';
+import { buildNewProject, getConnectionEntries, toProjectRow } from './utils';
 
 const otel = (id: number, projects: string[]) =>
   ({ connection: { id, name: `team-${id}` }, projects: projects.map((name) => ({ name })) }) as OtelConnectionResponse;
@@ -64,5 +65,21 @@ describe('toProjectRow', () => {
 describe('buildNewProject', () => {
   it('creates the project with the default metrics and no description', () => {
     expect(buildNewProject('alpha')).toEqual({ name: 'alpha', description: '', metrics: PROJECT_METRICS });
+  });
+});
+
+describe('getConnectionEntries', () => {
+  const ROW = toProjectRow(PROJECT, [otel(4, ['alpha'])]);
+
+  it('lists the plugin connections first, then the OTel ones, each with a unique key', () => {
+    const entries = getConnectionEntries(ROW);
+    expect(entries.map(({ kind, key }) => [kind, key])).toEqual([
+      [CONNECTION_ENTRY_KIND.PLUGIN, 'github-1'],
+      [CONNECTION_ENTRY_KIND.OTEL, 'claude_otel-4'],
+    ]);
+  });
+
+  it('is empty for a project with no connection of any kind', () => {
+    expect(getConnectionEntries({ connections: [], otelConnections: [] } as unknown as ProjectRow)).toEqual([]);
   });
 });

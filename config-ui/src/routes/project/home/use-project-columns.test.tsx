@@ -16,7 +16,7 @@
  *
  */
 
-import { renderHook, screen } from '@testing-library/react';
+import { fireEvent, renderHook, screen, waitFor } from '@testing-library/react';
 import type { TableColumnsType } from 'antd';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
@@ -24,7 +24,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { IPipelineStatus } from '@/types';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
-import { COPY, PROJECT_COLUMN } from './constants';
+import { COPY, MAX_VISIBLE_CONNECTIONS, PROJECT_COLUMN } from './constants';
 import type { ProjectRow } from './types';
 import { useProjectColumns } from './use-project-columns';
 
@@ -73,6 +73,19 @@ describe('useProjectColumns', () => {
     const otelConnections = [{ connection: { id: 3, name: 'claude-team' }, projects: [] }] as never;
     renderCell(PROJECT_COLUMN.CONNECTIONS, { ...ROW, otelConnections });
     expect(screen.getByText('claude-team')).toBeTruthy();
+  });
+
+  it('caps the connections and keeps the rest reachable from a focusable toggle', async () => {
+    const otelConnections = [1, 2, 3, 4].map((id) => ({
+      connection: { id, name: `team-${id}` },
+      projects: [],
+    })) as never;
+    renderCell(PROJECT_COLUMN.CONNECTIONS, { ...ROW, otelConnections });
+    const hidden = 4 - MAX_VISIBLE_CONNECTIONS;
+    expect(screen.queryByText('team-3')).toBeNull();
+    fireEvent.focus(screen.getByRole('button', { name: COPY.moreConnections(hidden) }));
+    await waitFor(() => expect(screen.getByText('team-4')).toBeTruthy());
+    expect(screen.getByText('team-3')).toBeTruthy();
   });
 
   it('shows a dash when the project has not run', () => {

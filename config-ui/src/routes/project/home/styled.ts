@@ -16,27 +16,7 @@
  *
  */
 
-import { Link } from 'react-router-dom';
 import styled from 'styled-components';
-
-export const Page = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${({ theme }) => theme.space.lg}px;
-`;
-
-export const NameLink = styled(Link)`
-  color: ${({ theme }) => theme.colors.text};
-`;
-
-export const ConnectionList = styled.ul`
-  display: flex;
-  flex-direction: column;
-  gap: ${({ theme }) => theme.space.xxs}px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-`;
 
 export const OtelName = styled.span`
   display: inline-flex;
