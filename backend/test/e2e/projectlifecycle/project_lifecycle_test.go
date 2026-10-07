@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -44,19 +45,15 @@ const (
 	blockedWindow  = 750 * time.Millisecond
 )
 
-// gatePlugin parks a project hook on its lock-holding transaction until the test releases it.
-type gatePlugin struct {
+// hookGate parks a project hook on its lock-holding transaction until the test releases it.
+type hookGate struct {
 	mu      sync.Mutex
 	armed   string
 	entered chan struct{}
 	release chan struct{}
 }
 
-func (g *gatePlugin) Description() string { return "holds project hooks open for lock tests" }
-func (g *gatePlugin) RootPkgPath() string { return "plugins/test_project_gate" }
-func (g *gatePlugin) Name() string        { return "test_project_gate" }
-
-func (g *gatePlugin) arm(projectName string) {
+func (g *hookGate) arm(projectName string) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.armed = projectName
@@ -64,7 +61,7 @@ func (g *gatePlugin) arm(projectName string) {
 	g.release = make(chan struct{})
 }
 
-func (g *gatePlugin) hold(projectName string) {
+func (g *hookGate) hold(projectName string) {
 	g.mu.Lock()
 	if g.armed != projectName {
 		g.mu.Unlock()
@@ -77,20 +74,32 @@ func (g *gatePlugin) hold(projectName string) {
 	<-release
 }
 
-func (g *gatePlugin) BeforeRenameProject(_ dal.Transaction, oldName string, _ string) errors.Error {
-	g.hold(oldName)
+// gatedOtel parks after the OTel hook, so the parked transaction holds the project row and every lock the hook took.
+type gatedOtel struct {
+	otelimpl.ClaudeOtel
+	gate *hookGate
+}
+
+func (p *gatedOtel) BeforeRenameProject(tx dal.Transaction, oldName string, newName string) errors.Error {
+	if err := p.ClaudeOtel.BeforeRenameProject(tx, oldName, newName); err != nil {
+		return err
+	}
+	p.gate.hold(oldName)
 	return nil
 }
 
-func (g *gatePlugin) BeforeDeleteProject(_ dal.Transaction, projectName string) errors.Error {
-	g.hold(projectName)
+func (p *gatedOtel) BeforeDeleteProject(tx dal.Transaction, projectName string) errors.Error {
+	if err := p.ClaudeOtel.BeforeDeleteProject(tx, projectName); err != nil {
+		return err
+	}
+	p.gate.hold(projectName)
 	return nil
 }
 
 type fixture struct {
 	t    *testing.T
 	db   dal.Dal
-	gate *gatePlugin
+	gate *hookGate
 	seq  *atomic.Int64
 }
 
@@ -99,9 +108,22 @@ func (f *fixture) at(t *testing.T) *fixture {
 }
 
 func newFixture(t *testing.T) *fixture {
-	gate := &gatePlugin{}
-	client := helper.StartDevLakeServer(t, []plugin.PluginMeta{otelimpl.ClaudeOtel{}, gate})
+	// lifecycle operations write htpasswd to a temp dir and reach no restart helper
+	t.Setenv("OTEL_AUTH_HTPASSWD_PATH", filepath.Join(t.TempDir(), ".htpasswd"))
+	t.Setenv("OTEL_RESTART_HELPER_URL", "http://127.0.0.1:1")
+	gate := &hookGate{}
+	client := helper.StartDevLakeServer(t, []plugin.PluginMeta{&gatedOtel{gate: gate}})
 	return &fixture{t: t, db: client.GetDal(), gate: gate, seq: &atomic.Int64{}}
+}
+
+// armGate parks the next hook for projectName; release is idempotent and also runs at cleanup so a failed test never leaves a transaction parked.
+func (f *fixture) armGate(projectName string) (<-chan struct{}, func()) {
+	f.gate.arm(projectName)
+	entered, gateRelease := f.gate.entered, f.gate.release
+	var once sync.Once
+	release := func() { once.Do(func() { close(gateRelease) }) }
+	f.t.Cleanup(release)
+	return entered, release
 }
 
 func (f *fixture) name(prefix string) string {
@@ -134,10 +156,12 @@ func (f *fixture) createProject(name string) {
 func (f *fixture) createConnection(projectNames ...string) uint64 {
 	f.t.Helper()
 	connection := &otelmodels.OtelConnection{
-		Name:     f.name("otel"),
-		TeamName: "Team",
-		TeamSlug: f.name("team"),
-		Status:   otelmodels.OtelConnectionStatusActive,
+		Name:              f.name("otel"),
+		TeamName:          "Team",
+		TeamSlug:          f.name("team"),
+		CollectorEndpoint: "https://otel.example.test",
+		Protocol:          "grpc",
+		Status:            otelmodels.OtelConnectionStatusActive,
 	}
 	require.NoError(f.t, f.db.Create(connection))
 	for _, projectName := range projectNames {
@@ -233,11 +257,34 @@ func replacePlacementsAsync(connectionID uint64, projectNames ...string) <-chan 
 	return out
 }
 
+func runAsync(operation func() errors.Error) <-chan editResult {
+	out := make(chan editResult, 1)
+	go func() {
+		defer close(out)
+		out <- editResult{err: operation()}
+	}()
+	return out
+}
+
+func (f *fixture) connectionStatus(connectionID uint64) string {
+	f.t.Helper()
+	connection := &otelmodels.OtelConnection{}
+	require.NoError(f.t, f.db.First(connection, dal.Where("id = ?", connectionID)))
+	return connection.Status
+}
+
+func requireNoServerError(t *testing.T, err errors.Error, what string) {
+	t.Helper()
+	if err != nil {
+		require.Less(t, err.GetType().GetHttpCode(), http.StatusInternalServerError, "%s: %v", what, err)
+	}
+}
+
 func requireBlocked[T any](t *testing.T, result <-chan T, what string) {
 	t.Helper()
 	select {
 	case <-result:
-		t.Fatalf("%s finished while the project row lock was held", what)
+		t.Fatalf("%s finished while the parked transaction held its locks", what)
 	case <-time.After(blockedWindow):
 	}
 }
@@ -296,14 +343,13 @@ func TestProjectLifecycleWithOtelPlacements(t *testing.T) {
 		f.createProject(oldName)
 		connection := f.createConnection(oldName)
 
-		f.gate.arm(oldName)
-		entered, release := f.gate.entered, f.gate.release
+		entered, release := f.armGate(oldName)
 		rename := f.async(http.MethodPatch, "/projects/"+oldName, map[string]any{"name": newName})
 		awaitSignal(t, entered, "the rename hook")
 
 		edit := replacePlacementsAsync(connection, oldName)
 		requireBlocked(t, edit, "the placement edit")
-		close(release)
+		release()
 
 		renamed := awaitResult(t, rename, "the rename")
 		require.Equal(t, http.StatusCreated, renamed.status, renamed.body)
@@ -319,20 +365,160 @@ func TestProjectLifecycleWithOtelPlacements(t *testing.T) {
 		f.createProject(keeper)
 		connection := f.createConnection(doomed, keeper)
 
-		f.gate.arm(doomed)
-		entered, release := f.gate.entered, f.gate.release
+		entered, release := f.armGate(doomed)
 		deletion := f.async(http.MethodDelete, "/projects/"+doomed, nil)
 		awaitSignal(t, entered, "the delete hook")
 
 		edit := replacePlacementsAsync(connection, doomed, keeper)
 		requireBlocked(t, edit, "the placement edit")
-		close(release)
+		release()
 
 		deleted := awaitResult(t, deletion, "the delete")
 		require.Equal(t, http.StatusOK, deleted.status, deleted.body)
 		require.Error(t, awaitResult(t, edit, "the placement edit").err)
 		require.Equal(t, []string{keeper}, f.placements(connection))
 		require.Zero(t, f.countOrphanPlacements())
+	})
+
+	t.Run("two deletes of a connection's only two placements leave it one", func(t *testing.T) {
+		f := f.at(t)
+		first, second := f.name("pair-a"), f.name("pair-b")
+		f.createProject(first)
+		f.createProject(second)
+		connection := f.createConnection(first, second)
+
+		entered, release := f.armGate(first)
+		firstDelete := f.async(http.MethodDelete, "/projects/"+first, nil)
+		awaitSignal(t, entered, "the first delete hook")
+
+		secondDelete := f.async(http.MethodDelete, "/projects/"+second, nil)
+		requireBlocked(t, secondDelete, "the second delete")
+		release()
+
+		deleted := awaitResult(t, firstDelete, "the first delete")
+		require.Equal(t, http.StatusOK, deleted.status, deleted.body)
+		refused := awaitResult(t, secondDelete, "the second delete")
+		require.Equal(t, http.StatusConflict, refused.status, refused.body)
+		require.Equal(t, []string{second}, f.placements(connection))
+		require.True(t, f.projectExists(second))
+		require.Zero(t, f.countOrphanPlacements())
+	})
+
+	lifecycleOperations := []struct {
+		name      string
+		operation func(connectionID uint64) errors.Error
+		status    string
+	}{
+		{
+			name: "revoke",
+			operation: func(connectionID uint64) errors.Error {
+				_, err := otelservice.RevokeOtelConnection(nil, connectionID)
+				return err
+			},
+			status: otelmodels.OtelConnectionStatusRevoked,
+		},
+		{
+			name: "rotate",
+			operation: func(connectionID uint64) errors.Error {
+				_, err := otelservice.RotateOtelConnection(nil, connectionID)
+				return err
+			},
+			status: otelmodels.OtelConnectionStatusActive,
+		},
+	}
+	for _, lifecycle := range lifecycleOperations {
+		t.Run("a "+lifecycle.name+" waits for an in-flight project delete", func(t *testing.T) {
+			f := f.at(t)
+			doomed, keeper := f.name("doomed"), f.name("keeper")
+			f.createProject(doomed)
+			f.createProject(keeper)
+			connection := f.createConnection(doomed, keeper)
+
+			entered, release := f.armGate(doomed)
+			deletion := f.async(http.MethodDelete, "/projects/"+doomed, nil)
+			awaitSignal(t, entered, "the delete hook")
+
+			change := runAsync(func() errors.Error { return lifecycle.operation(connection) })
+			requireBlocked(t, change, "the "+lifecycle.name)
+			release()
+
+			deleted := awaitResult(t, deletion, "the delete")
+			require.Equal(t, http.StatusOK, deleted.status, deleted.body)
+			require.NoError(t, awaitResult(t, change, "the "+lifecycle.name).err)
+			require.Equal(t, lifecycle.status, f.connectionStatus(connection))
+			require.Equal(t, []string{keeper}, f.placements(connection))
+		})
+	}
+
+	t.Run("deletes, edits, checks and lifecycle changes on one connection never deadlock", func(t *testing.T) {
+		f := f.at(t)
+		const rounds = 30
+		for round := 0; round < rounds; round++ {
+			first, second, third := f.name("mix-a"), f.name("mix-b"), f.name("mix-c")
+			f.createProject(first)
+			f.createProject(second)
+			f.createProject(third)
+			connection := f.createConnection(first, second)
+
+			start := make(chan struct{})
+			var wg sync.WaitGroup
+			var serverErrors atomic.Int64
+			deleteProject := func(name string) {
+				defer wg.Done()
+				<-start
+				if status, body := f.request(http.MethodDelete, "/projects/"+name, nil); status >= http.StatusInternalServerError {
+					serverErrors.Add(1)
+					t.Logf("delete %s: %d %s", name, status, body)
+				}
+			}
+			runService := func(what string, operation func() errors.Error) {
+				defer wg.Done()
+				<-start
+				requireNoServerError(t, operation(), what)
+			}
+			wg.Add(6)
+			go deleteProject(first)
+			go deleteProject(second)
+			go runService("placement edit", func() errors.Error {
+				_, err := otelservice.ReplaceOtelConnectionProjects(connection, []string{second, third})
+				return err
+			})
+			go runService("removal check", func() errors.Error {
+				err := otelservice.ValidateOtelProjectRemoval(first)
+				if err != nil && err.GetType().GetHttpCode() == http.StatusConflict {
+					return nil
+				}
+				return err
+			})
+			go runService("lifecycle change", func() errors.Error {
+				var err errors.Error
+				if round%2 == 0 {
+					_, err = otelservice.RevokeOtelConnection(nil, connection)
+				} else {
+					_, err = otelservice.RotateOtelConnection(nil, connection)
+				}
+				if err != nil && err.GetType().GetHttpCode() == http.StatusConflict {
+					return nil
+				}
+				return err
+			})
+			go func() {
+				defer wg.Done()
+				<-start
+				if status, body := f.request(http.MethodPatch, "/projects/"+third, map[string]any{"name": third + "-renamed"}); status >= http.StatusInternalServerError {
+					serverErrors.Add(1)
+					t.Logf("rename %s: %d %s", third, status, body)
+				}
+			}()
+			close(start)
+			wg.Wait()
+
+			require.Zero(t, serverErrors.Load(), "round %d", round)
+			if f.connectionStatus(connection) == otelmodels.OtelConnectionStatusActive {
+				require.NotEmpty(t, f.placements(connection), "round %d left an active connection without a placement", round)
+			}
+			require.Zero(t, f.countOrphanPlacements(), "round %d", round)
+		}
 	})
 
 	t.Run("renames racing placement edits never orphan a placement", func(t *testing.T) {
