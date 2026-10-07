@@ -27,6 +27,9 @@ import type { IntegrationCardProps } from './types';
 
 const NAME = 'GitHub';
 const CATEGORY = 'Code & SCM';
+const DETAILS = '2 active credentials';
+const MENU_LABEL = 'Open it';
+const DOCS_URL = 'https://example.com/docs';
 
 const setup = (props: Partial<IntegrationCardProps> = {}) => {
   const onAdd = vi.fn();
@@ -52,20 +55,51 @@ describe('IntegrationCard', () => {
     expect(onAdd).toHaveBeenCalledOnce();
   });
 
-  it('shows the counts and Manage when connected, with Add still reachable', () => {
+  it('shows the counts and only Manage when connected', () => {
     const onManage = vi.fn();
     const { onAdd } = setup({ connected: 3, failed: 1, onManage });
     expect(screen.getByText(COPY.connected(3))).toBeTruthy();
     expect(screen.getByText(COPY.failed(1))).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: COPY.manage(3) }));
     expect(onManage).toHaveBeenCalledOnce();
-    fireEvent.click(screen.getByRole('button', { name: COPY.add }));
-    expect(onAdd).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('button', { name: COPY.add })).toBeNull();
+    expect(onAdd).not.toHaveBeenCalled();
   });
 
   it('marks beta integrations in the category line', () => {
     setup({ beta: true });
     expect(screen.getByText(COPY.categoryBeta(CATEGORY))).toBeTruthy();
+  });
+
+  it('flags a deprecated integration with text', () => {
+    setup({ deprecated: true });
+    expect(screen.getByText(COPY.deprecated)).toBeTruthy();
+  });
+
+  it('shows extra details below the counts', () => {
+    setup({ connected: 1, onManage: vi.fn(), details: <span>{DETAILS}</span> });
+    expect(screen.getByText(DETAILS)).toBeTruthy();
+  });
+
+  it('opens the actions menu and runs the chosen action', async () => {
+    const onPick = vi.fn();
+    setup({ menu: [{ key: 'open', label: MENU_LABEL, onClick: onPick }] });
+    fireEvent.click(screen.getByRole('button', { name: COPY.actionsFor(NAME) }));
+    fireEvent.click(await screen.findByText(MENU_LABEL));
+    expect(onPick).toHaveBeenCalledOnce();
+  });
+
+  it('links to the documentation in a new tab', () => {
+    setup({ docsHref: DOCS_URL });
+    const link = screen.getByRole('link', { name: new RegExp(COPY.docs(NAME)) });
+    expect(link.getAttribute('href')).toBe(DOCS_URL);
+    expect(link.getAttribute('target')).toBe('_blank');
+  });
+
+  it('shows no header actions without a menu or docs link', () => {
+    setup();
+    expect(screen.queryByRole('button', { name: COPY.actionsFor(NAME) })).toBeNull();
+    expect(screen.queryByRole('link')).toBeNull();
   });
 
   it('hides the failed count when none failed', () => {

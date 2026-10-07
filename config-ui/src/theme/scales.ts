@@ -45,7 +45,13 @@ export type TypographyTokens = {
 
 export type SpaceTokens = { xxs: number; xs: number; sm: number; md: number; lg: number; xl: number; xxl: number };
 export type RadiusTokens = { sm: number; md: number; lg: number; pill: number };
-export type ShadowTokens = { buttonPrimary: string; buttonSecondary: string; flyout: string; popover: string };
+export type ShadowTokens = {
+  buttonPrimary: string;
+  buttonSecondary: string;
+  segmentSelected: string;
+  flyout: string;
+  popover: string;
+};
 export type LayoutTokens = {
   sidebarWidth: number;
   sidebarRailWidth: number;
@@ -71,6 +77,10 @@ export type LayoutTokens = {
   confirmModalWidth: number;
   pipelineTaskHeight: number;
   pipelineTaskDurationWidth: number;
+  catalogCardMinWidth: number;
+  segmentInset: number;
+  segmentPaddingBlock: number;
+  segmentPaddingInline: number;
   modalWidth: { sm: number; md: number; lg: number };
 };
 export type ZIndexTokens = { sidebar: number; flyout: number; drawer: number; modal: number };
@@ -126,6 +136,10 @@ export const LAYOUT: LayoutTokens = {
   confirmModalWidth: 416,
   pipelineTaskHeight: 80,
   pipelineTaskDurationWidth: 80,
+  catalogCardMinWidth: 272,
+  segmentInset: 2,
+  segmentPaddingBlock: 3,
+  segmentPaddingInline: 11,
   modalWidth: { sm: 520, md: 600, lg: 800 },
 };
 
@@ -139,6 +153,7 @@ export const MOTION: MotionTokens = { fast: 120, base: 200, easing: 'ease-out' }
 export const buildShadow = (mode: ResolvedTheme): ShadowTokens => ({
   buttonPrimary: '0 2px 0 rgba(0, 0, 0, 0.043)',
   buttonSecondary: '0 2px 0 rgba(0, 0, 0, 0.016)',
+  segmentSelected: '0 2px 8px rgba(0, 0, 0, 0.05)',
   flyout: '0 6px 16px rgba(0, 0, 0, 0.24)',
   popover: antdTheme.getDesignToken({
     algorithm: mode === 'dark' ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,

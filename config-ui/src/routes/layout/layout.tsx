@@ -81,7 +81,7 @@ export const Layout = () => {
   }
 
   if (status === 'failed') {
-    throw error.message;
+    throw error?.message;
   }
 
   return (

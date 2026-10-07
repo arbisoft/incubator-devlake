@@ -125,6 +125,11 @@ export const COMPOSITES_COPY = {
     managed: (name: string) => `Manage: ${name}`,
     added: (name: string) => `Add: ${name}`,
     none: 'No action yet',
+    manageAction: 'Manage connections',
+    addAction: 'Add connection',
+    docsUrl: 'https://devlake.apache.org/docs/Overview/Introduction',
+    activeCredentials: '2 active credentials',
+    requiresAction: '1 connection requiring action',
   },
   progressBanner: {
     message: 'Finish connecting your first tool to start collecting data.',

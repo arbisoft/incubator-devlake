@@ -15,23 +15,30 @@
  * limitations under the License.
  *
  */
+import type { IntegrationCategory } from '@/plugins/catalog';
+import type { IPluginConfig } from '@/types';
 
-import type { MenuProps } from 'antd';
-import type { ReactNode } from 'react';
+import type { CATALOG_SORT, MANAGE_DIALOG_MODE } from './constants';
 
-import type { PluginIconProps } from '@/ui/plugin-icon';
+export type OtelCredentialSummary = { active: number; restartRequired: number; recoveryRequired: number };
 
-export type IntegrationCardProps = {
-  icon: PluginIconProps['icon'];
+export type IntegrationSummary = {
+  key: string;
   name: string;
-  category: string;
-  beta?: boolean;
-  deprecated?: boolean;
-  connected: number;
-  failed?: number;
-  details?: ReactNode;
-  menu?: MenuProps['items'];
+  icon: IPluginConfig['icon'];
+  category: IntegrationCategory;
+  weight: number;
+  beta: boolean;
+  deprecated: boolean;
+  connections: number;
+  failed: number;
+  href?: string;
   docsHref?: string;
-  onManage?: () => void;
-  onAdd: () => void;
+  otel?: OtelCredentialSummary;
 };
+
+export type CatalogSortKey = (typeof CATALOG_SORT)[keyof typeof CATALOG_SORT];
+
+export type CatalogQuery = { keyword: string; category: string; connectedOnly: boolean };
+
+export type ManageDialogMode = (typeof MANAGE_DIALOG_MODE)[keyof typeof MANAGE_DIALOG_MODE];

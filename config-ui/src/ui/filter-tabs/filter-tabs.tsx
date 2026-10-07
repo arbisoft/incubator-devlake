@@ -33,7 +33,6 @@ export const FilterTabs = ({ items, value, onChange, variant }: FilterTabsProps)
     </PillScroller>
   ) : (
     <FlatTabs
-      type="card"
       activeKey={value}
       items={items.map((item) => ({ key: item.key, label: labelOf(item) }))}
       onChange={onChange}

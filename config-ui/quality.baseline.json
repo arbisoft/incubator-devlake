@@ -1,7 +1,7 @@
 {
   "eslint": {
     "@typescript-eslint/no-explicit-any": {
-      "errors": 320,
+      "errors": 312,
       "warnings": 0
     },
     "@typescript-eslint/no-unused-vars": {
@@ -17,15 +17,11 @@
       "warnings": 0
     },
     "jsx-a11y/click-events-have-key-events": {
-      "errors": 5,
+      "errors": 1,
       "warnings": 0
     },
     "jsx-a11y/no-autofocus": {
       "errors": 1,
-      "warnings": 0
-    },
-    "jsx-a11y/no-noninteractive-element-interactions": {
-      "errors": 4,
       "warnings": 0
     },
     "jsx-a11y/no-static-element-interactions": {
@@ -37,7 +33,7 @@
       "warnings": 18
     },
     "no-console": {
-      "errors": 3,
+      "errors": 2,
       "warnings": 0
     },
     "no-duplicate-imports": {
@@ -120,10 +116,6 @@
       "errors": 1,
       "warnings": 0
     },
-    "sonarjs/prefer-native-lodash-alternative": {
-      "errors": 2,
-      "warnings": 0
-    },
     "sonarjs/prefer-single-boolean-return": {
       "errors": 1,
       "warnings": 0
@@ -144,6 +136,6 @@
   "knip": [],
   "jscpd": {
     "clones": 112,
-    "duplicatedLines": 1985
+    "duplicatedLines": 1973
   }
 }

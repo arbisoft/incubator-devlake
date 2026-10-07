@@ -25,9 +25,25 @@ export const Root = styled.article<{ $connected: boolean }>`
   flex-direction: column;
   gap: ${({ theme }) => theme.space.sm}px;
   padding: ${({ theme }) => theme.space.sm}px;
-  background: ${({ theme, $connected }) => ($connected ? theme.colors.primarySubtle : theme.colors.bgContainer)};
-  border: 1px solid ${({ theme, $connected }) => ($connected ? theme.colors.borderSubtle : theme.colors.border)};
+  background: ${({ theme, $connected }) =>
+    $connected
+      ? `linear-gradient(to bottom, ${theme.colors.primarySubtle}, ${theme.colors.primarySubtleEnd})`
+      : theme.colors.bgContainer};
+  border: 1px solid ${({ theme, $connected }) => ($connected ? theme.colors.primarySubtleBorder : theme.colors.border)};
   border-radius: ${({ theme }) => theme.radius.lg}px;
+`;
+
+export const Header = styled.div`
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.space.xs}px;
+`;
+
+export const HeaderActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.xxs}px;
 `;
 
 export const Name = styled.h3`
@@ -35,6 +51,13 @@ export const Name = styled.h3`
   margin: 0;
   color: ${({ theme }) => theme.colors.text};
   overflow-wrap: anywhere;
+`;
+
+export const CategoryRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.xs}px;
 `;
 
 export const Category = styled.p`
@@ -49,6 +72,14 @@ export const Counts = styled.div`
   flex-wrap: wrap;
   align-items: center;
   gap: ${({ theme }) => theme.space.xs}px;
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
+
+export const Details = styled.div`
+  ${textStyle('caption')}
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.xxs}px;
   color: ${({ theme }) => theme.colors.textSecondary};
 `;
 

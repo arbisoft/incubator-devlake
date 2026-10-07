@@ -15,14 +15,24 @@
  * limitations under the License.
  *
  */
+import { describe, expect, it } from 'vitest';
 
-export const COPY = {
-  categoryBeta: (category: string) => `${category} · Beta`,
-  deprecated: 'Deprecated',
-  actionsFor: (name: string) => `${name} actions`,
-  docs: (name: string) => `View ${name} documentation`,
-  connected: (count: number) => `${count} connected`,
-  failed: (count: number) => `${count} failed`,
-  manage: (count: number) => `Manage (${count})`,
-  add: 'Add',
-};
+import { getErrorResponse } from './utils';
+
+describe('getErrorResponse', () => {
+  it('reads the status and body of an axios-style error', () => {
+    expect(getErrorResponse({ response: { status: 409, data: { code: 1 } } })).toEqual({
+      status: 409,
+      data: { code: 1 },
+    });
+  });
+
+  it('tolerates a response with no usable body or status', () => {
+    expect(getErrorResponse({ response: { data: 'text' } })).toEqual({ status: undefined, data: {} });
+  });
+
+  it('has nothing for an error without a response', () => {
+    expect(getErrorResponse(new Error('Network Error'))).toBeUndefined();
+    expect(getErrorResponse(undefined)).toBeUndefined();
+  });
+});

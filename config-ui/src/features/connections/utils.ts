@@ -55,3 +55,11 @@ export const transformWebhook = (connection: IWebhookAPI): IWebhook => {
     apiKeyId: connection.apiKey?.id,
   };
 };
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
+
+export const getErrorResponse = (error: unknown): { status?: number; data: Record<string, unknown> } | undefined => {
+  if (!isRecord(error) || !isRecord(error.response)) return undefined;
+  const { status, data } = error.response;
+  return { status: typeof status === 'number' ? status : undefined, data: isRecord(data) ? data : {} };
+};

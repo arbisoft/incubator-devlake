@@ -18,13 +18,21 @@
 
 import { configureStore } from '@reduxjs/toolkit';
 
-import { connectionsSlice, themeSlice } from '@/features';
+import { connectionsSlice, themeSlice, writeStoredHealth } from '@/features';
 
 export const store = configureStore({
   reducer: {
     connections: connectionsSlice.reducer,
     theme: themeSlice.reducer,
   },
+});
+
+let persistedHealth = store.getState().connections.health;
+store.subscribe(() => {
+  const { health } = store.getState().connections;
+  if (health === persistedHealth) return;
+  persistedHealth = health;
+  writeStoredHealth(health);
 });
 
 export type AppDispatch = typeof store.dispatch;

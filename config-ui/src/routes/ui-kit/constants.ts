@@ -153,6 +153,8 @@ export const COPY = {
     notConnected: 'Not connected',
     connected: 'Connected',
     withFailures: 'Connected with failures',
+    withActions: 'Actions menu, docs link and details',
+    deprecated: 'Deprecated',
     beta: 'Beta',
     withBreadcrumbs: 'With breadcrumbs',
     withStatus: 'With status',

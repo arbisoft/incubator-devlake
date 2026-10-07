@@ -15,14 +15,19 @@
  * limitations under the License.
  *
  */
+import type { IConnectionStatus } from '@/types';
 
-export const COPY = {
-  categoryBeta: (category: string) => `${category} · Beta`,
-  deprecated: 'Deprecated',
-  actionsFor: (name: string) => `${name} actions`,
-  docs: (name: string) => `View ${name} documentation`,
-  connected: (count: number) => `${count} connected`,
-  failed: (count: number) => `${count} failed`,
-  manage: (count: number) => `Manage (${count})`,
-  add: 'Add',
+import type { HEALTH_FAILURE_REASON } from './constants';
+
+export type HealthFailureReason = (typeof HEALTH_FAILURE_REASON)[keyof typeof HEALTH_FAILURE_REASON];
+
+export type ConnectionHealthEntry = {
+  status: IConnectionStatus.ONLINE | IConnectionStatus.OFFLINE;
+  reason?: HealthFailureReason;
+  message?: string;
+  testedAt: number;
 };
+
+export type ConnectionHealthMap = Record<string, ConnectionHealthEntry>;
+
+export type TestFailureInput = { status?: number; message?: string };
