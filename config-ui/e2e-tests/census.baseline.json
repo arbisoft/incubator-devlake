@@ -1,5 +1,7 @@
 {
-  "moves": {},
+  "moves": {
+    "auth/access-page.spec.ts": "settings/users.spec.ts"
+  },
   "specs": {
     "advanced/blueprints.spec.ts": {
       "tests": 5,
@@ -12,13 +14,6 @@
       "tests": 4,
       "expects": 18,
       "backend": 1,
-      "skips": 0,
-      "fixmes": 0
-    },
-    "auth/access-page.spec.ts": {
-      "tests": 1,
-      "expects": 5,
-      "backend": 0,
       "skips": 0,
       "fixmes": 0
     },
@@ -102,6 +97,13 @@
     "projects/projects-list.spec.ts": {
       "tests": 2,
       "expects": 16,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "settings/users.spec.ts": {
+      "tests": 3,
+      "expects": 12,
       "backend": 0,
       "skips": 0,
       "fixmes": 0

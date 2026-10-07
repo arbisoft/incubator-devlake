@@ -42,6 +42,8 @@ export const PATHS = {
   keys: '/keys',
   access: '/access',
   settingsUsers: '/settings/users',
+  settingsAuthentication: '/settings/authentication',
+  settingsActivity: '/settings/activity',
   otel: '/otel',
   onboard: '/onboard',
   uiKit: '/ui-kit',

@@ -31,3 +31,4 @@ export {
   STATUS_FILTER as BLUEPRINT_STATUS_FILTER,
 } from '../../src/routes/blueprint/home/constants';
 export { COPY as PIPELINE_COPY } from '../../src/routes/pipeline/constants';
+export { COPY as SETTINGS_COPY } from '../../src/routes/settings/constants';

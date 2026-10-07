@@ -398,6 +398,11 @@ export async function listAccessUsers(api: APIRequestContext): Promise<ApiAccess
   }
 }
 
+// Creates an email (SSO) user that signs in later; it works with or without local auth.
+export async function createEmailUser(api: APIRequestContext, email: string): Promise<ApiAccessUser> {
+  return json<ApiAccessUser>(await api.post('/access/users', { data: { email, role: 'member' } }), 'create email user');
+}
+
 export async function findAccessUserByLogin(
   api: APIRequestContext,
   loginName: string,

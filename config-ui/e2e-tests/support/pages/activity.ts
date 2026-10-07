@@ -17,17 +17,19 @@
  */
 import { Locator } from '@playwright/test';
 
+import { SETTINGS_COPY } from '../app-copy';
+
 import { BasePage, Screen, urlEndingWith } from './common';
 import { PATHS } from './paths';
 
-// The audit log ("Recent access activity") section of the /settings/users page.
+// The /settings/activity page, with the access audit log.
 export class ActivityPage extends BasePage implements Screen {
   async open(): Promise<void> {
-    await this.visit(PATHS.settingsUsers);
+    await this.visit(PATHS.settingsActivity);
   }
 
   get urlPattern(): RegExp {
-    return urlEndingWith(PATHS.settingsUsers);
+    return urlEndingWith(PATHS.settingsActivity);
   }
 
   get ready(): Locator {
@@ -35,6 +37,6 @@ export class ActivityPage extends BasePage implements Screen {
   }
 
   get recentActivityHeading(): Locator {
-    return this.page.getByRole('heading', { name: 'Recent access activity' });
+    return this.page.getByRole('heading', { name: SETTINGS_COPY.activity.title, exact: true });
   }
 }

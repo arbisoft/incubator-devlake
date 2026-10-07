@@ -17,7 +17,9 @@
  */
 import { Locator, Page } from '@playwright/test';
 
-import { BasePage, Screen, modalWithText, selectBox, selectOption, urlEndingWith } from './common';
+import { COMMON_COPY, SETTINGS_COPY } from '../app-copy';
+
+import { BasePage, Screen, firstCellTexts, modalWithText, selectBox, selectOption, urlEndingWith } from './common';
 import { PATHS } from './paths';
 
 // The one-time password dialog shown after a local user is created or reset.
@@ -25,7 +27,7 @@ export class OneTimePasswordDialog {
   constructor(private readonly page: Page) {}
 
   get dialog(): Locator {
-    return modalWithText(this.page, 'Copy this password now');
+    return modalWithText(this.page, SETTINGS_COPY.modals.temporaryPassword.hint);
   }
 
   get passwordInput(): Locator {
@@ -37,7 +39,7 @@ export class OneTimePasswordDialog {
   }
 
   async done(): Promise<void> {
-    await this.dialog.getByRole('button', { name: 'Done' }).click();
+    await this.dialog.getByRole('button', { name: SETTINGS_COPY.modals.temporaryPassword.done }).click();
   }
 }
 
@@ -46,25 +48,23 @@ export class LocalUserDialog {
   constructor(private readonly page: Page) {}
 
   get dialog(): Locator {
-    return modalWithText(this.page, 'Add local DevLake user');
+    return modalWithText(this.page, SETTINGS_COPY.modals.addLocalUser.title);
   }
 
   get usernameInput(): Locator {
-    return this.dialog.getByPlaceholder('person');
+    return this.dialog.getByPlaceholder(SETTINGS_COPY.modals.username.placeholder);
   }
 
   get displayNameInput(): Locator {
-    return this.dialog.locator('input').nth(1);
+    return this.dialog.getByRole('textbox', { name: SETTINGS_COPY.modals.addLocalUser.name.label, exact: true });
   }
 
   get createButton(): Locator {
-    return this.dialog.getByRole('button', { name: 'Create' });
+    return this.dialog.getByRole('button', { name: SETTINGS_COPY.modals.addLocalUser.submit });
   }
 
   get formatError(): Locator {
-    return this.page.getByText(
-      'Use 3-64 letters, numbers, dots, underscores, or hyphens, starting with a letter or number.',
-    );
+    return this.page.getByText(SETTINGS_COPY.modals.invalidLoginName);
   }
 
   get duplicateError(): Locator {
@@ -90,11 +90,11 @@ export class LocalUserDialog {
   }
 
   async cancel(): Promise<void> {
-    await this.dialog.getByRole('button', { name: 'Cancel' }).click();
+    await this.dialog.getByRole('button', { name: COMMON_COPY.cancel }).click();
   }
 }
 
-// A row of the people table on /settings/users, with its local-password actions.
+// A row of the users table on /settings/users, with its local-password actions.
 export class AccessUserRow {
   constructor(
     private readonly page: Page,
@@ -103,27 +103,30 @@ export class AccessUserRow {
 
   get root(): Locator {
     return this.page
-      .locator('table')
-      .first()
+      .getByRole('region', { name: SETTINGS_COPY.users.title, exact: true })
       .getByRole('row', { name: new RegExp(this.login) });
   }
 
   get resetButton(): Locator {
-    return this.root.getByRole('button', { name: 'Reset' });
+    return this.root.getByRole('button', { name: SETTINGS_COPY.users.localPassword.resetFor(this.login), exact: true });
   }
 
   get disableButton(): Locator {
-    return this.root.getByRole('button', { name: 'Disable' });
+    return this.root.getByRole('button', { name: SETTINGS_COPY.users.disable(this.login), exact: true });
   }
 
   get enableButton(): Locator {
-    return this.root.getByRole('button', { name: 'Enable' });
+    return this.root.getByRole('button', { name: SETTINGS_COPY.users.enable(this.login), exact: true });
   }
 
-  // Resets the local password through its confirmation popup and returns the new one-time password dialog.
+  // Resets the local password through its confirmation dialog and returns the new one-time password dialog.
   async reset(): Promise<OneTimePasswordDialog> {
+    const confirm = SETTINGS_COPY.confirm.resetPassword;
     await this.resetButton.click();
-    await this.page.locator('.ant-popconfirm').getByRole('button', { name: 'Reset' }).click();
+    await this.page
+      .getByRole('dialog', { name: confirm.title() })
+      .getByRole('button', { name: confirm.confirm })
+      .click();
     return new OneTimePasswordDialog(this.page);
   }
 
@@ -151,15 +154,15 @@ export class SettingsUsersPage extends BasePage implements Screen {
   }
 
   get ready(): Locator {
-    return this.page.getByRole('heading', { name: 'Allowed domains' });
+    return this.page.getByRole('heading', { name: SETTINGS_COPY.domains.title });
   }
 
   get directoryHeading(): Locator {
-    return this.page.getByRole('heading', { name: /People|User|Authentication/i }).first();
+    return this.page.getByRole('heading', { name: SETTINGS_COPY.users.title, exact: true }).first();
   }
 
   get addLocalUserButton(): Locator {
-    return this.page.getByRole('button', { name: 'Add local user' });
+    return this.page.getByRole('button', { name: SETTINGS_COPY.users.addLocalUser });
   }
 
   async openAddLocalUser(): Promise<LocalUserDialog> {
@@ -181,6 +184,22 @@ export class SettingsUsersPage extends BasePage implements Screen {
       await form.selectRole(options.role);
     }
     return form.create();
+  }
+
+  async search(keyword: string): Promise<void> {
+    const box = this.page.getByRole('textbox', { name: SETTINGS_COPY.users.searchPlaceholder });
+    await box.fill(keyword);
+    await box.press('Enter');
+  }
+
+  // The email or login shown under each name in the users table.
+  async userIdentities(): Promise<string[]> {
+    const cells = await firstCellTexts(this.page.getByRole('region', { name: SETTINGS_COPY.users.title, exact: true }));
+    return cells.map((text) => text.split('\n').pop()?.trim() ?? '');
+  }
+
+  get noResults(): Locator {
+    return this.page.getByRole('heading', { name: SETTINGS_COPY.users.noResults.title });
   }
 
   userRow(login: string): AccessUserRow {

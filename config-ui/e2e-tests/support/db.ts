@@ -101,6 +101,15 @@ export function resetLocalAuthState(): void {
   `);
 }
 
+// Removes the e2e- email users that tests add through the API and their audit rows (they have no identities until a first login).
+export function deleteEmailUsersNamedLike(prefix: string): void {
+  const pattern = `${prefix.replace(/'/g, "''")}%`;
+  runSql(`
+    DELETE FROM auth_access_users WHERE email LIKE '${pattern}';
+    DELETE FROM auth_access_audit_events WHERE target_email LIKE '${pattern}';
+  `);
+}
+
 export function countLocalCredentials(loginName: string): number {
   return Number(
     runSql(`SELECT COUNT(*) FROM auth_local_credentials WHERE login_name = '${loginName.replace(/'/g, "''")}';`).trim(),

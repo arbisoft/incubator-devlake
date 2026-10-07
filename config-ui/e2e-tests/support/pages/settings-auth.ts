@@ -18,22 +18,23 @@
 import { Locator } from '@playwright/test';
 
 import { ApiMessage, PageResponse } from '../api';
+import { SETTINGS_COPY } from '../app-copy';
 
 import { BasePage, Screen, tableWithRow, urlEndingWith } from './common';
 import { PATHS } from './paths';
 
-// The sign-in providers section of the /settings/users page.
+// The /settings/authentication page, with the sign-in providers table.
 export class SettingsAuthPage extends BasePage implements Screen {
   async open(): Promise<void> {
-    await this.visit(PATHS.settingsUsers);
+    await this.visit(PATHS.settingsAuthentication);
   }
 
   get urlPattern(): RegExp {
-    return urlEndingWith(PATHS.settingsUsers);
+    return urlEndingWith(PATHS.settingsAuthentication);
   }
 
   get ready(): Locator {
-    return this.page.getByRole('heading', { name: 'Authentication', exact: true });
+    return this.page.getByRole('heading', { name: SETTINGS_COPY.authentication.title, exact: true });
   }
 
   // The first element with the text inside the providers table that lists the given provider key.
