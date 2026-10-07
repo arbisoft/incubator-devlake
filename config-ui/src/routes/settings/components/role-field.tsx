@@ -16,19 +16,26 @@
  *
  */
 
-export * from './api-keys';
-export * from './blueprint';
-export * from './connection';
+import { Select } from 'antd';
 
-export * from './change-password';
-export * from './db-migrate';
-export * from './error';
-export * from './layout';
-export * from './login';
-export * from './not-found';
-export * from './onboard';
-export * from './otel';
-export * from './pipeline';
-export * from './project';
-export * from './redirect';
-export * from './settings';
+import type { AccessRole } from '@/api/access';
+import { FormField } from '@/ui';
+
+import { ROLE_OPTIONS } from '../constants';
+
+import type { RoleFieldProps } from './types';
+
+export const RoleField = ({ label, value, onChange }: RoleFieldProps) => (
+  <FormField label={label} required>
+    {(control) => (
+      <Select<AccessRole>
+        id={control.id}
+        aria-required={control['aria-required']}
+        size="large"
+        options={ROLE_OPTIONS}
+        value={value}
+        onChange={onChange}
+      />
+    )}
+  </FormField>
+);

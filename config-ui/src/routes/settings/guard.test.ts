@@ -25,7 +25,7 @@ import { ACCESS_ROLE } from '../../api/access';
 
 import { canManageAccess } from './guard';
 
-describe('routes/access/guard', () => {
+describe('routes/settings/guard', () => {
   it('allows only enabled customer administrators into access management', () => {
     expect(canManageAccess({ enabled: true, role: ACCESS_ROLE.CUSTOMER_ADMIN })).toBe(true);
     expect(canManageAccess({ enabled: true, role: ACCESS_ROLE.MEMBER })).toBe(false);

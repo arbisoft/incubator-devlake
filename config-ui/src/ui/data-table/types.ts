@@ -25,6 +25,7 @@ type DataTablePagination = {
   page: number;
   pageSize: number;
   total: number;
+  pageSizeOptions?: readonly number[];
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
 };
@@ -37,6 +38,7 @@ type DataTableSort<S extends string> = {
 type DataTableList<S extends string> = {
   page: number;
   pageSize: number;
+  pageSizeOptions?: readonly number[];
   sort?: SortState<S>;
   setPage: (page: number) => void;
   setPageSize: (pageSize: number) => void;

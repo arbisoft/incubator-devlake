@@ -16,19 +16,20 @@
  *
  */
 
-export * from './api-keys';
-export * from './blueprint';
-export * from './connection';
+import type { AccessDomain, AccessRole, AccessStatus, AccessUser } from '@/api/access';
 
-export * from './change-password';
-export * from './db-migrate';
-export * from './error';
-export * from './layout';
-export * from './login';
-export * from './not-found';
-export * from './onboard';
-export * from './otel';
-export * from './pipeline';
-export * from './project';
-export * from './redirect';
-export * from './settings';
+export type UserColumnActions = {
+  onRoleChange: (user: AccessUser, role: AccessRole) => void;
+  onStatusChange: (user: AccessUser, status: AccessStatus) => void;
+  onRemove: (user: AccessUser) => void;
+  onAddLocalCredential: (user: AccessUser) => void;
+  onResetLocalCredential: (user: AccessUser) => void;
+  onRemoveLocalCredential: (user: AccessUser) => void;
+  localAuthEnabled: boolean;
+};
+
+export type DomainColumnActions = {
+  onRoleChange: (domain: AccessDomain, role: AccessRole) => void;
+  onStatusChange: (domain: AccessDomain, status: AccessStatus) => void;
+  onRemove: (domain: AccessDomain) => void;
+};

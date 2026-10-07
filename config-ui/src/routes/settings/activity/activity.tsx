@@ -16,19 +16,34 @@
  *
  */
 
-export * from './api-keys';
-export * from './blueprint';
-export * from './connection';
+import { Table } from 'antd';
 
-export * from './change-password';
-export * from './db-migrate';
-export * from './error';
-export * from './layout';
-export * from './login';
-export * from './not-found';
-export * from './onboard';
-export * from './otel';
-export * from './pipeline';
-export * from './project';
-export * from './redirect';
-export * from './settings';
+import API from '@/api';
+import { useRefreshData } from '@/hooks';
+import { ListPage, PageHeader } from '@/ui';
+
+import { COPY } from '../constants';
+
+import { getAuditColumns } from './columns';
+
+const AUDIT_COLUMNS = getAuditColumns();
+
+export const SettingsActivity = () => {
+  const { data, ready } = useRefreshData(() => API.access.listAuditEvents(), []);
+
+  return (
+    <ListPage>
+      <PageHeader title={COPY.activity.title} description={COPY.activity.description} />
+      <Table
+        data-testid="access-activity-table"
+        aria-label={COPY.activity.tableLabel}
+        rowKey="id"
+        size="middle"
+        loading={!ready}
+        dataSource={data ?? []}
+        pagination={false}
+        columns={AUDIT_COLUMNS}
+      />
+    </ListPage>
+  );
+};

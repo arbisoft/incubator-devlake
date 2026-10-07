@@ -19,37 +19,29 @@
 import axios, { HttpStatusCode } from 'axios';
 
 import {
-  ACCESS_ERROR_CODE,
   GRAFANA_PROVIDER_KIND,
   OIDC_PROVIDER_SYNC_STATUS,
-  type AccessApiErrorResponse,
+  type AccessUser,
+  type AccessDomain,
   type OIDCProvider,
   type OIDCProviderInput,
-} from '../../api/access';
+} from '@/api/access';
+import { toUserMessage } from '@/ui/utils';
 
-import { AUTHENTICATION_STATE, OIDC_PROVIDER_STATUS } from './constants';
+import {
+  ACCESS_ERROR,
+  AUTHENTICATION_STATE,
+  CREATE_DOMAIN_ERROR_MAP,
+  CREATE_USER_ERROR_MAP,
+  DUPLICATE_DOMAIN_SERVER_TEXT,
+  DUPLICATE_USER_SERVER_TEXT,
+  LOCAL_CREDENTIAL_ERROR_MAP,
+  OIDC_PROVIDER_ERROR_MAP,
+  OIDC_PROVIDER_STATUS,
+  PAGE_SIZE_OPTIONS,
+} from './constants';
 
-export const ACCESS_ERROR = {
-  DUPLICATE_DOMAIN: 'This domain already has a DevLake access policy.',
-  DUPLICATE_USER: 'This email already has a DevLake access entry.',
-  INVALID_DOMAIN: 'Enter a valid email domain and role, then try again.',
-  INVALID_USER: 'Enter a valid email and role, then try again.',
-  LOCAL_CREDENTIAL_MISSING: 'This person does not have a local password.',
-  LAST_LOGIN_METHOD: 'Keep at least one interactive login method enabled.',
-  REQUEST_FAILED: 'Unable to update access settings. Please try again.',
-  INVALID_OIDC_PROVIDER: 'Enter valid OIDC provider settings and include the openid scope.',
-  OIDC_PROVIDER_BLOCKED: 'OIDC provider settings cannot be applied until the deployment prerequisites are available.',
-  OIDC_PROVIDER_FAILED: 'OIDC provider settings could not be completed. Please try again.',
-  OIDC_PROVIDER_STALE: 'This provider changed. Refresh the page before saving it.',
-  GRAFANA_TARGET_CONFLICT: 'Another provider already controls this Grafana sign-in option.',
-  GRAFANA_SYNC_FAILED:
-    'OIDC provider was saved, but Grafana OAuth synchronization failed. Use Retry Grafana to complete synchronization.',
-} as const;
-
-const LOCAL_CREDENTIAL_ERROR = {
-  DUPLICATE_USER: 'This username already has a DevLake local password.',
-  INVALID_USER: 'Enter a valid username, then try again.',
-} as const;
+export { ACCESS_ERROR };
 
 export const normalizeDomain = (value: string) => value.trim().toLowerCase();
 
@@ -73,26 +65,13 @@ export const isValidEmail = (value: string) => {
 
 export const isValidLocalLoginName = (value: string) => /^[a-z0-9][a-z0-9._-]{2,63}$/i.test(value.trim());
 
-const extractErrorCode = (error: unknown): string | undefined => {
-  if (!axios.isAxiosError<AccessApiErrorResponse>(error) || error.response?.status !== HttpStatusCode.BadRequest) {
-    return undefined;
-  }
-  return typeof error.response.data?.code === 'string' ? error.response.data.code : undefined;
-};
+const BAD_REQUEST_ONLY = [HttpStatusCode.BadRequest];
+const BAD_REQUEST_OR_NOT_FOUND = [HttpStatusCode.BadRequest, HttpStatusCode.NotFound];
+const BAD_REQUEST_OR_UNAVAILABLE = [HttpStatusCode.BadRequest, HttpStatusCode.ServiceUnavailable];
 
-const extractLocalCredentialErrorCode = (error: unknown): string | undefined => {
-  if (!axios.isAxiosError<AccessApiErrorResponse>(error)) return undefined;
-  const response = error.response;
-  if (response?.status !== HttpStatusCode.BadRequest && response?.status !== HttpStatusCode.NotFound) return undefined;
-  return typeof response.data?.code === 'string' ? response.data.code : undefined;
-};
-
-const extractOIDCProviderErrorCode = (error: unknown): string | undefined => {
-  if (!axios.isAxiosError<AccessApiErrorResponse>(error)) return undefined;
-  const response = error.response;
-  const status = response?.status;
-  if (status !== HttpStatusCode.BadRequest && status !== HttpStatusCode.ServiceUnavailable) return undefined;
-  return typeof response?.data?.code === 'string' ? response.data.code : undefined;
+const mapAccessError = (error: unknown, statuses: number[], map: Record<string, string>, fallback: string) => {
+  const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+  return status !== undefined && statuses.includes(status) ? toUserMessage(error, map, fallback) : fallback;
 };
 
 const serverMessage = (error: unknown) => {
@@ -103,33 +82,23 @@ const serverMessage = (error: unknown) => {
 };
 
 export const getCreateUserError = (error: unknown) => {
-  const code = extractErrorCode(error);
-  if (code === ACCESS_ERROR_CODE.DUPLICATE_USER) return ACCESS_ERROR.DUPLICATE_USER;
-  if (code === ACCESS_ERROR_CODE.INVALID_USER) return ACCESS_ERROR.INVALID_USER;
-  if (code === ACCESS_ERROR_CODE.LOCAL_CREDENTIAL_MISSING) return ACCESS_ERROR.LOCAL_CREDENTIAL_MISSING;
-  if (code === ACCESS_ERROR_CODE.LAST_LOGIN_METHOD) return ACCESS_ERROR.LAST_LOGIN_METHOD;
+  const mapped = mapAccessError(error, BAD_REQUEST_ONLY, CREATE_USER_ERROR_MAP, '');
+  if (mapped) return mapped;
 
   const message = serverMessage(error);
-  if (message.includes('this email already has a DevLake access entry')) return ACCESS_ERROR.DUPLICATE_USER;
+  if (message.includes(DUPLICATE_USER_SERVER_TEXT)) return ACCESS_ERROR.DUPLICATE_USER;
   return message ? ACCESS_ERROR.INVALID_USER : ACCESS_ERROR.REQUEST_FAILED;
 };
 
-export const getLocalCredentialError = (error: unknown) => {
-  const code = extractLocalCredentialErrorCode(error);
-  if (code === ACCESS_ERROR_CODE.LOCAL_CREDENTIAL_MISSING) return ACCESS_ERROR.LOCAL_CREDENTIAL_MISSING;
-  if (code === ACCESS_ERROR_CODE.LAST_LOGIN_METHOD) return ACCESS_ERROR.LAST_LOGIN_METHOD;
-  if (code === ACCESS_ERROR_CODE.DUPLICATE_USER) return LOCAL_CREDENTIAL_ERROR.DUPLICATE_USER;
-  if (code === ACCESS_ERROR_CODE.INVALID_USER) return LOCAL_CREDENTIAL_ERROR.INVALID_USER;
-  return ACCESS_ERROR.REQUEST_FAILED;
-};
+export const getLocalCredentialError = (error: unknown) =>
+  mapAccessError(error, BAD_REQUEST_OR_NOT_FOUND, LOCAL_CREDENTIAL_ERROR_MAP, ACCESS_ERROR.REQUEST_FAILED);
 
 export const getCreateDomainError = (error: unknown) => {
-  const code = extractErrorCode(error);
-  if (code === ACCESS_ERROR_CODE.DUPLICATE_DOMAIN) return ACCESS_ERROR.DUPLICATE_DOMAIN;
-  if (code === ACCESS_ERROR_CODE.INVALID_DOMAIN) return ACCESS_ERROR.INVALID_DOMAIN;
+  const mapped = mapAccessError(error, BAD_REQUEST_ONLY, CREATE_DOMAIN_ERROR_MAP, '');
+  if (mapped) return mapped;
 
   const message = serverMessage(error);
-  if (message.includes('this domain already has a DevLake access policy')) return ACCESS_ERROR.DUPLICATE_DOMAIN;
+  if (message.includes(DUPLICATE_DOMAIN_SERVER_TEXT)) return ACCESS_ERROR.DUPLICATE_DOMAIN;
   return message ? ACCESS_ERROR.INVALID_DOMAIN : ACCESS_ERROR.REQUEST_FAILED;
 };
 
@@ -188,17 +157,8 @@ export const isValidOIDCProviderInput = (
   );
 };
 
-export const getOIDCProviderError = (error: unknown) => {
-  const code = extractOIDCProviderErrorCode(error);
-  if (code === ACCESS_ERROR_CODE.INVALID_OIDC_PROVIDER) return ACCESS_ERROR.INVALID_OIDC_PROVIDER;
-  if (code === ACCESS_ERROR_CODE.OIDC_PROVIDER_BLOCKED || code === ACCESS_ERROR_CODE.OIDC_PROVIDER_MISSING) {
-    return ACCESS_ERROR.OIDC_PROVIDER_BLOCKED;
-  }
-  if (code === ACCESS_ERROR_CODE.OIDC_PROVIDER_REVISION_CONFLICT) return ACCESS_ERROR.OIDC_PROVIDER_STALE;
-  if (code === ACCESS_ERROR_CODE.GRAFANA_TARGET_CONFLICT) return ACCESS_ERROR.GRAFANA_TARGET_CONFLICT;
-  if (code === ACCESS_ERROR_CODE.GRAFANA_SYNC_FAILED) return ACCESS_ERROR.GRAFANA_SYNC_FAILED;
-  return ACCESS_ERROR.OIDC_PROVIDER_FAILED;
-};
+export const getOIDCProviderError = (error: unknown) =>
+  mapAccessError(error, BAD_REQUEST_OR_UNAVAILABLE, OIDC_PROVIDER_ERROR_MAP, ACCESS_ERROR.OIDC_PROVIDER_FAILED);
 
 export const getOIDCProviderStatus = (provider?: OIDCProvider) => {
   if (!provider) return OIDC_PROVIDER_STATUS.CONFIGURED;
@@ -233,3 +193,17 @@ export const canSelectGenericOIDCProvider = (provider: OIDCProvider) =>
   !provider.hasCandidate &&
   provider.grafanaTarget === GRAFANA_PROVIDER_KIND.NONE &&
   provider.grafanaSyncStatus !== OIDC_PROVIDER_SYNC_STATUS.COMPENSATION_FAILED;
+
+export const getUserLabel = (user: AccessUser) => user.email || user.localLoginName || user.displayName;
+
+export const getUserIdentity = (user: AccessUser) => ({
+  primary: user.displayName,
+  secondary: user.email || user.localLoginName,
+});
+
+export const getDomainLabel = (domain: AccessDomain) => domain.domain;
+
+export const toAccessPagination = ({ page, pageSize }: { page: number; pageSize: number }) => ({
+  page,
+  pageSize: PAGE_SIZE_OPTIONS.find((size) => size === pageSize) ?? PAGE_SIZE_OPTIONS[0],
+});

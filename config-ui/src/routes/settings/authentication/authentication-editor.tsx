@@ -32,13 +32,13 @@ import {
 import { Block } from '@/components';
 import { operator } from '@/utils';
 
-import { GRAFANA_PROVIDER_OPTIONS, OIDC_PROVIDER_MESSAGE } from './constants';
+import { GRAFANA_PROVIDER_OPTIONS, OIDC_PROVIDER_MESSAGE } from '../constants';
 import {
   formFromOIDCProvider,
   getOIDCProviderError,
   isValidOIDCProviderInput,
   normalizeOIDCProviderInput,
-} from './utils';
+} from '../utils';
 
 type Props = {
   open: boolean;

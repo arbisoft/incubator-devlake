@@ -50,7 +50,7 @@
     },
     "prefer-destructuring": {
       "errors": 0,
-      "warnings": 20
+      "warnings": 17
     },
     "react-hooks/exhaustive-deps": {
       "errors": 0,
@@ -110,7 +110,7 @@
     },
     "sonarjs/no-nested-conditional": {
       "errors": 0,
-      "warnings": 19
+      "warnings": 17
     },
     "sonarjs/no-nested-template-literals": {
       "errors": 2,
@@ -143,7 +143,7 @@
   },
   "knip": [],
   "jscpd": {
-    "clones": 114,
-    "duplicatedLines": 2009
+    "clones": 112,
+    "duplicatedLines": 1985
   }
 }

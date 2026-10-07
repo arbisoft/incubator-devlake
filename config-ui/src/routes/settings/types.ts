@@ -16,19 +16,17 @@
  *
  */
 
-export * from './api-keys';
-export * from './blueprint';
-export * from './connection';
+import type { CONFIRM_TONE } from '@/ui/confirm-modal/constants';
 
-export * from './change-password';
-export * from './db-migrate';
-export * from './error';
-export * from './layout';
-export * from './login';
-export * from './not-found';
-export * from './onboard';
-export * from './otel';
-export * from './pipeline';
-export * from './project';
-export * from './redirect';
-export * from './settings';
+import type { ACCESS_MODAL, LIFECYCLE_ACTION, LIFECYCLE_SUBJECT } from './constants';
+
+export type AccessModal = (typeof ACCESS_MODAL)[keyof typeof ACCESS_MODAL];
+export type LifecycleSubject = (typeof LIFECYCLE_SUBJECT)[keyof typeof LIFECYCLE_SUBJECT];
+export type LifecycleAction = (typeof LIFECYCLE_ACTION)[keyof typeof LIFECYCLE_ACTION];
+
+export type ConfirmConfig = {
+  tone: (typeof CONFIRM_TONE)[keyof typeof CONFIRM_TONE];
+  title: (name: string) => string;
+  description: (name: string) => string;
+  confirm: string;
+};

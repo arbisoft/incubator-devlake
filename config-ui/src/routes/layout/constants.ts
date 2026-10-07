@@ -27,6 +27,8 @@ export const NAV_KEY = {
   API_KEYS: 'api-keys',
   SETTINGS: 'settings',
   USERS: 'users',
+  AUTHENTICATION: 'authentication',
+  ACTIVITY: 'activity',
   RESOURCES: 'resources',
   DOCS: 'docs',
   API: 'api',
@@ -35,6 +37,8 @@ export const NAV_KEY = {
   DIVIDER: 'divider',
   DASHBOARDS: 'dashboards',
 } as const;
+
+export const ACCESS_NAV_KEYS: string[] = [NAV_KEY.SETTINGS, NAV_KEY.USERS, NAV_KEY.AUTHENTICATION, NAV_KEY.ACTIVITY];
 
 export const COPYRIGHT_HIDDEN_NAV_KEYS: string[] = [NAV_KEY.DASHBOARDS, NAV_KEY.GITHUB, NAV_KEY.SLACK];
 
@@ -79,6 +83,8 @@ export const COPY = {
     apiKeys: 'API Keys',
     settings: 'Settings',
     users: 'Users',
+    authentication: 'Authentication',
+    activity: 'Recent Activities',
     resources: 'Resources',
     docs: 'Docs',
     api: 'API',

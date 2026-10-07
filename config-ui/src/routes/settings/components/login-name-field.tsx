@@ -16,19 +16,19 @@
  *
  */
 
-export * from './api-keys';
-export * from './blueprint';
-export * from './connection';
+import { COPY } from '../constants';
+import { isValidLocalLoginName } from '../utils';
 
-export * from './change-password';
-export * from './db-migrate';
-export * from './error';
-export * from './layout';
-export * from './login';
-export * from './not-found';
-export * from './onboard';
-export * from './otel';
-export * from './pipeline';
-export * from './project';
-export * from './redirect';
-export * from './settings';
+import { TextField } from './text-field';
+import type { LoginNameFieldProps } from './types';
+
+export const LoginNameField = ({ value, onChange }: LoginNameFieldProps) => (
+  <TextField
+    label={COPY.modals.username.label}
+    placeholder={COPY.modals.username.placeholder}
+    value={value}
+    error={value.length > 0 && !isValidLocalLoginName(value) ? COPY.modals.invalidLoginName : undefined}
+    required
+    onChange={onChange}
+  />
+);

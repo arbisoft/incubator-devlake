@@ -16,19 +16,29 @@
  *
  */
 
-export * from './api-keys';
-export * from './blueprint';
-export * from './connection';
+import { Modal } from 'antd';
+import styled from 'styled-components';
 
-export * from './change-password';
-export * from './db-migrate';
-export * from './error';
-export * from './layout';
-export * from './login';
-export * from './not-found';
-export * from './onboard';
-export * from './otel';
-export * from './pipeline';
-export * from './project';
-export * from './redirect';
-export * from './settings';
+import { textStyle } from '@/ui/style-helpers';
+
+export const Dialog = styled(Modal)`
+  .ant-modal-title {
+    ${textStyle('h3')}
+  }
+
+  .ant-modal-header {
+    margin-bottom: ${({ theme }) => theme.space.lg}px;
+  }
+`;
+
+export const TitleRow = styled.span`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.xs}px;
+`;
+
+export const Hint = styled.p`
+  ${textStyle('body')}
+  margin: 0 0 ${({ theme }) => theme.space.md}px;
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;

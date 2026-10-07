@@ -94,6 +94,22 @@ describe('DataTable', () => {
     expect(onPageChange).toHaveBeenCalledExactlyOnceWith(2);
   });
 
+  it('offers the page sizes the caller passes', () => {
+    setup({
+      pagination: {
+        page: 1,
+        pageSize: 10,
+        total: 100,
+        pageSizeOptions: [10, 25],
+        onPageChange: vi.fn(),
+        onPageSizeChange: vi.fn(),
+      },
+    });
+    fireEvent.mouseDown(screen.getByRole('combobox'));
+    expect(screen.getByText('25 / page')).toBeTruthy();
+    expect(screen.queryByText('100 / page')).toBeNull();
+  });
+
   it('takes sort and pagination straight from the list state', () => {
     const list = {
       page: 1,

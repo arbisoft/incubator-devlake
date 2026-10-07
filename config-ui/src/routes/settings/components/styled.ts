@@ -18,13 +18,32 @@
 
 import styled from 'styled-components';
 
-export const SectionHeader = styled.div<{ $spaced?: boolean }>`
+import { textStyle } from '@/ui/style-helpers';
+
+export const Fields = styled.div`
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: ${({ $spaced }) => ($spaced ? '32px 0 16px' : '0 0 16px')};
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.lg}px;
 `;
 
-export const SectionTitle = styled.h3`
+export const Note = styled.p`
+  ${textStyle('body')}
+  display: flex;
+  align-items: flex-start;
+  gap: ${({ theme }) => theme.space.xxs}px;
   margin: 0;
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
+
+export const NoteIcon = styled.span`
+  display: inline-flex;
+  align-items: center;
+  height: ${({ theme }) => theme.typography.scale.body.lineHeight}px;
+  color: ${({ theme }) => theme.colors.warning};
+`;
+
+export const FieldError = styled.p`
+  ${textStyle('caption')}
+  margin: ${({ theme }) => theme.space.xxs}px 0 0;
+  color: ${({ theme }) => theme.colors.errorActive};
 `;

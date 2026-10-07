@@ -39,7 +39,9 @@ import {
   Pipelines,
   Pipeline,
   ApiKeys,
-  Access,
+  SettingsActivity,
+  SettingsAuthentication,
+  SettingsUsers,
   accessLoader,
   NotFound,
   ParamRedirect,
@@ -169,7 +171,15 @@ export const routes: RouteObject[] = [
           },
           {
             path: ROUTE_SEGMENTS.SETTINGS_USERS,
-            element: <Access />,
+            element: <SettingsUsers />,
+          },
+          {
+            path: ROUTE_SEGMENTS.SETTINGS_AUTHENTICATION,
+            element: <SettingsAuthentication />,
+          },
+          {
+            path: ROUTE_SEGMENTS.SETTINGS_ACTIVITY,
+            element: <SettingsActivity />,
           },
         ],
       },

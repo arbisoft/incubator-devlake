@@ -58,7 +58,7 @@ const createAxiosError = (status: number, data: unknown) =>
     data,
   });
 
-describe('routes/access/utils', () => {
+describe('routes/settings/utils', () => {
   it('normalizes allowed-domain input before it is submitted', () => {
     expect(normalizeDomain(' Example.COM ')).toBe('example.com');
   });

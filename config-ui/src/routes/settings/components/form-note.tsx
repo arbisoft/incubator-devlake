@@ -16,19 +16,16 @@
  *
  */
 
-export * from './api-keys';
-export * from './blueprint';
-export * from './connection';
+import { WarningOutlined } from '@ant-design/icons';
 
-export * from './change-password';
-export * from './db-migrate';
-export * from './error';
-export * from './layout';
-export * from './login';
-export * from './not-found';
-export * from './onboard';
-export * from './otel';
-export * from './pipeline';
-export * from './project';
-export * from './redirect';
-export * from './settings';
+import { Note, NoteIcon } from './styled';
+import type { FormNoteProps } from './types';
+
+export const FormNote = ({ children }: FormNoteProps) => (
+  <Note>
+    <NoteIcon aria-hidden>
+      <WarningOutlined />
+    </NoteIcon>
+    <span>{children}</span>
+  </Note>
+);

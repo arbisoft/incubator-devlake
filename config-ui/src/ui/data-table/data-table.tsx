@@ -48,6 +48,7 @@ export const DataTable = <T extends object, S extends string = string>({
       page: list.page,
       pageSize: list.pageSize,
       total,
+      pageSizeOptions: list.pageSizeOptions,
       onPageChange: list.setPage,
       onPageSizeChange: list.setPageSize,
     });
@@ -70,7 +71,7 @@ export const DataTable = <T extends object, S extends string = string>({
           current: pagination.page,
           pageSize: pagination.pageSize,
           total: pagination.total,
-          pageSizeOptions: SIZE_OPTIONS,
+          pageSizeOptions: [...(pagination.pageSizeOptions ?? SIZE_OPTIONS)],
           placement: ['bottomCenter'],
           onChange: (page, pageSize) =>
             pageSize === pagination.pageSize ? pagination.onPageChange(page) : pagination.onPageSizeChange(pageSize),

@@ -22,14 +22,14 @@ import { useMemo, useState } from 'react';
 
 import API from '@/api';
 import type { OIDCCallbacks, OIDCProvider } from '@/api/access';
-import { Message } from '@/components';
+import { Toolbar } from '@/ui';
 import { operator } from '@/utils';
+
+import { OIDC_PROVIDER_MESSAGE } from '../constants';
+import { getAuthenticationState, getOIDCProviderError } from '../utils';
 
 import { type ActiveOperation, type Operation, getAuthenticationColumns } from './authentication-columns';
 import { AuthenticationEditor } from './authentication-editor';
-import { OIDC_PROVIDER_MESSAGE } from './constants';
-import { SectionHeader, SectionTitle } from './styled';
-import { getAuthenticationState, getOIDCProviderError } from './utils';
 
 type Props = {
   callbacks?: OIDCCallbacks;
@@ -104,34 +104,29 @@ export const Authentication = ({ callbacks, providers, loadFailed, onRefresh }: 
 
   if (loadFailed) {
     return (
-      <>
-        <SectionHeader $spaced>
-          <SectionTitle>Authentication</SectionTitle>
-        </SectionHeader>
-        <Alert
-          type="error"
-          showIcon
-          title="Authentication settings could not be loaded. Refresh the page and try again."
-        />
-      </>
+      <Alert
+        type="error"
+        showIcon
+        title="Authentication settings could not be loaded. Refresh the page and try again."
+      />
     );
   }
 
   return (
     <>
-      <SectionHeader $spaced>
-        <SectionTitle>Authentication</SectionTitle>
-        <Space size="small">
-          <Tooltip title="Review the OIDC configuration managed in User Management.">
-            <Button onClick={() => openEditor(providers[0])}>{authenticationState}</Button>
-          </Tooltip>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => openEditor()}>
-            Add provider
-          </Button>
-        </Space>
-      </SectionHeader>
-      <Message content="Grafana access remains independently managed. Providers marked DevLake only use Grafana's ordinary login." />
-      {pageError && <Alert type="error" showIcon title={pageError} style={{ marginTop: 16 }} />}
+      <Toolbar
+        end={
+          <Space size="small">
+            <Tooltip title="Review the OIDC configuration managed in User Management.">
+              <Button onClick={() => openEditor(providers[0])}>{authenticationState}</Button>
+            </Tooltip>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => openEditor()}>
+              Add provider
+            </Button>
+          </Space>
+        }
+      />
+      {pageError && <Alert type="error" showIcon title={pageError} />}
       <Table
         data-testid="access-authentication-table"
         rowKey="providerKey"
@@ -139,7 +134,6 @@ export const Authentication = ({ callbacks, providers, loadFailed, onRefresh }: 
         dataSource={providers}
         pagination={false}
         columns={columns}
-        style={{ marginTop: 16 }}
       />
 
       <AuthenticationEditor

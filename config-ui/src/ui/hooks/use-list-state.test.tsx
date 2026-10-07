@@ -102,6 +102,20 @@ describe('useListState', () => {
     expect(result.current.list.pageSize).toBe(DEFAULT_PAGE_SIZE);
   });
 
+  it('accepts only the page sizes the caller allows', () => {
+    const defaults = { pageSize: 10, pageSizeOptions: [10, 25, 50], filters: {} };
+    const read = (initial: string) =>
+      renderHook(() => useListState<SortField, Record<string, never>>(defaults), {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <MemoryRouter initialEntries={[initial]}>{children}</MemoryRouter>
+        ),
+      }).result.current;
+    const allowed = read(`/list?${LIST_PARAMS.PAGE_SIZE}=25`);
+    expect(allowed.pageSize).toBe(25);
+    expect(allowed.pageSizeOptions).toEqual([10, 25, 50]);
+    expect(read(`/list?${LIST_PARAMS.PAGE_SIZE}=20`).pageSize).toBe(10);
+  });
+
   it('resets the page to 1 when the keyword changes', () => {
     const { result } = setup(`/list?${LIST_PARAMS.PAGE}=4`);
     act(() => result.current.list.setKeyword('git'));

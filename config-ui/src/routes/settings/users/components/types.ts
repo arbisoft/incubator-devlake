@@ -16,19 +16,26 @@
  *
  */
 
-export * from './api-keys';
-export * from './blueprint';
-export * from './connection';
+import type { AccessUser, LocalCredentialResponse } from '@/api/access';
 
-export * from './change-password';
-export * from './db-migrate';
-export * from './error';
-export * from './layout';
-export * from './login';
-export * from './not-found';
-export * from './onboard';
-export * from './otel';
-export * from './pipeline';
-export * from './project';
-export * from './redirect';
-export * from './settings';
+export type TemporaryCredential = { loginName: string; temporaryPassword: string };
+
+type ModalBase = { open: boolean; onClose: () => void };
+
+export type AddUserModalProps = ModalBase & { onCreated: () => void };
+
+export type AddDomainModalProps = ModalBase & { onCreated: () => void };
+
+export type AddLocalUserModalProps = ModalBase & { onCreated: (credential: LocalCredentialResponse) => void };
+
+export type AddLocalCredentialModalProps = ModalBase & {
+  user?: AccessUser;
+  onCreated: (credential: LocalCredentialResponse) => void;
+};
+
+export type TemporaryPasswordModalProps = {
+  open: boolean;
+  credential?: TemporaryCredential;
+  onClose: () => void;
+  onClosed: () => void;
+};

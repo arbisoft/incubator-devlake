@@ -27,6 +27,7 @@ type ListFilters = Record<string, string>;
 
 export type ListDefaults<S extends string, F extends ListFilters> = {
   pageSize?: number;
+  pageSizeOptions?: readonly number[];
   keyword?: string;
   sort?: ListSort<S>;
   filters: F;
@@ -63,7 +64,7 @@ const readList = <S extends string, F extends ListFilters>(
   ) as F;
   return {
     page: Number.isInteger(page) && page > 0 ? page : DEFAULT_PAGE,
-    pageSize: (PAGE_SIZE_OPTIONS as readonly number[]).includes(pageSize)
+    pageSize: (defaults.pageSizeOptions ?? PAGE_SIZE_OPTIONS).includes(pageSize)
       ? pageSize
       : (defaults.pageSize ?? DEFAULT_PAGE_SIZE),
     keyword: params.get(LIST_PARAMS.KEYWORD) ?? defaults.keyword ?? '',
@@ -164,5 +165,16 @@ export const useListState = <S extends string, F extends ListFilters>(inlineDefa
     >;
   }, [values]);
 
-  return { ...values, query, setPage, setPageSize, setKeyword, setSort, setFilter, reset, toQuery };
+  return {
+    ...values,
+    pageSizeOptions: defaults.pageSizeOptions,
+    query,
+    setPage,
+    setPageSize,
+    setKeyword,
+    setSort,
+    setFilter,
+    reset,
+    toQuery,
+  };
 };

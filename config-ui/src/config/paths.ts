@@ -48,6 +48,8 @@ export const ROUTE_SEGMENTS = {
   OTEL: 'otel',
   SETTINGS: 'settings',
   SETTINGS_USERS: 'users',
+  SETTINGS_AUTHENTICATION: 'authentication',
+  SETTINGS_ACTIVITY: 'activity',
 } as const;
 
 export const PATHS = {
