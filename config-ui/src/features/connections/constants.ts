@@ -33,6 +33,11 @@ export const COPY = {
     [HEALTH_FAILURE_REASON.UNREACHABLE]: 'Unreachable',
     [HEALTH_FAILURE_REASON.FAILED]: 'Connection failed',
   },
+  testFailed: {
+    fallback: 'Error when testing connection. Check the endpoint and the credentials, then try again.',
+    credentials: 'Error when testing connection: the credentials were rejected.',
+    unreachable: 'Error when testing connection: the server could not be reached.',
+  },
 };
 
 export const HTTP_STATUS = {
@@ -45,6 +50,15 @@ export const HTTP_STATUS = {
   SERVICE_UNAVAILABLE: 503,
   GATEWAY_TIMEOUT: 504,
 } as const;
+
+export const TEST_ERROR_MAP: Record<string, string> = {
+  [HTTP_STATUS.UNAUTHORIZED]: COPY.testFailed.credentials,
+  [HTTP_STATUS.FORBIDDEN]: COPY.testFailed.credentials,
+  [HTTP_STATUS.REQUEST_TIMEOUT]: COPY.testFailed.unreachable,
+  [HTTP_STATUS.BAD_GATEWAY]: COPY.testFailed.unreachable,
+  [HTTP_STATUS.SERVICE_UNAVAILABLE]: COPY.testFailed.unreachable,
+  [HTTP_STATUS.GATEWAY_TIMEOUT]: COPY.testFailed.unreachable,
+};
 
 export const UNREACHABLE_STATUSES: readonly number[] = [
   HTTP_STATUS.REQUEST_TIMEOUT,

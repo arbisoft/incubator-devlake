@@ -82,6 +82,7 @@ export type LayoutTokens = {
   segmentPaddingBlock: number;
   segmentPaddingInline: number;
   modalWidth: { sm: number; md: number; lg: number };
+  modalViewportMargin: number;
 };
 export type ZIndexTokens = { sidebar: number; flyout: number; drawer: number; modal: number };
 export type MotionTokens = { fast: number; base: number; easing: string };
@@ -141,6 +142,7 @@ export const LAYOUT: LayoutTokens = {
   segmentPaddingBlock: 3,
   segmentPaddingInline: 11,
   modalWidth: { sm: 520, md: 600, lg: 800 },
+  modalViewportMargin: 40,
 };
 
 // antd's popup layer is 1000 (modal, drawer); dropdowns 1050; the sidebar sits below them.

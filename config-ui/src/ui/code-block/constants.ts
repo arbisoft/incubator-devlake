@@ -16,7 +16,7 @@
  *
  */
 
-export const CODE_LANGUAGE = { JSON: 'json' } as const;
+export const CODE_LANGUAGE = { JSON: 'json', SHELL: 'shell' } as const;
 
 export const COPY = {
   region: 'Code',

@@ -49,7 +49,7 @@ export const ConnectionName = ({ initialValue, value, setValue, setError }: Prop
       description="Give your connection a unique name to help you identify it in the future."
       required
     >
-      <Input style={{ width: 386 }} placeholder="Your Connection Name" value={value} onChange={handleChange} />
+      <Input placeholder="Your Connection Name" value={value} onChange={handleChange} />
     </Block>
   );
 };

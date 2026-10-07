@@ -93,6 +93,13 @@ describe('FormModal', () => {
     expect(screen.getByRole('button', { name: new RegExp(SUBMIT) }).className).toContain('ant-btn-loading');
   });
 
+  it('can leave out the cancel button and still closes from the header', () => {
+    const { onCancel } = setup({ showCancel: false });
+    expect(screen.queryByRole('button', { name: COMMON_COPY.cancel })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: COMMON_COPY.close }));
+    expect(onCancel).toHaveBeenCalledOnce();
+  });
+
   it('closes on Escape', () => {
     const { onCancel } = setup();
     pressEscape(screen.getByRole('textbox', { name: FIELD }));

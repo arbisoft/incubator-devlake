@@ -244,9 +244,6 @@ export const selectPlugins = (state: RootState) => state.connections.plugins;
 
 export const selectAllConnections = (state: RootState) => state.connections.connections;
 
-export const selectConnections = (state: RootState, plugin: string) =>
-  state.connections.connections.filter((connection) => connection.plugin === plugin);
-
 export const selectConnection = (state: RootState, unique: string) =>
   state.connections.connections.find((cs) => cs.unique === unique);
 

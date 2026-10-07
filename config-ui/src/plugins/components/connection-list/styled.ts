@@ -16,15 +16,9 @@
  *
  */
 
-import { Button } from 'antd';
 import styled from 'styled-components';
 
-export const ModalTitle = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${({ theme }) => theme.space.xs}px;
-`;
-
-export const CreateButton = styled(Button)`
-  margin-top: ${({ theme }) => theme.space.md}px;
+export const Root = styled.div`
+  display: grid;
+  gap: ${({ theme }) => theme.space.lg}px;
 `;

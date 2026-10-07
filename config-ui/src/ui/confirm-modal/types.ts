@@ -30,4 +30,5 @@ export type ConfirmModalProps = {
   loading?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  afterClose?: () => void;
 };

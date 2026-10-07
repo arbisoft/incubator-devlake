@@ -27,6 +27,7 @@ import { CONNECTION_HEALTH_STATE, COPY } from './constants';
 import type { ConnectionHealthProps } from './types';
 
 const MESSAGE = 'The server did not answer';
+const CUSTOM_LABEL = 'Credentials rejected';
 const FIVE_MINUTES_MS = 5 * 60_000;
 
 const setup = (props: Partial<ConnectionHealthProps> = {}) => {
@@ -45,6 +46,12 @@ describe('ConnectionHealth', () => {
   ] as const)('labels the %s state with text', (state, label) => {
     setup({ state });
     expect(screen.getByText(label)).toBeTruthy();
+  });
+
+  it('shows a given label in place of the state label', () => {
+    setup({ state: CONNECTION_HEALTH_STATE.OFFLINE, label: CUSTOM_LABEL });
+    expect(screen.getByText(CUSTOM_LABEL)).toBeTruthy();
+    expect(screen.queryByText(COPY.offline)).toBeNull();
   });
 
   it('keeps retest visible and calls it', () => {

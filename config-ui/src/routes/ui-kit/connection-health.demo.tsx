@@ -73,6 +73,16 @@ export const ConnectionHealthDemo = () => {
           onRetest={noop}
         />
       </DemoCase>
+      <DemoCase label={COPY.cases.offlineReason}>
+        <ConnectionHealth
+          state={CONNECTION_HEALTH_STATE.OFFLINE}
+          label={text.reason}
+          testedAt={testedAt}
+          message={text.message}
+          testing={false}
+          onRetest={noop}
+        />
+      </DemoCase>
       <DemoCase label={COPY.cases.unknown}>
         <ConnectionHealth state={CONNECTION_HEALTH_STATE.UNKNOWN} testing={false} onRetest={noop} />
       </DemoCase>

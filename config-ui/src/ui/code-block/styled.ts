@@ -24,7 +24,7 @@ export const Wrapper = styled.div`
   position: relative;
 `;
 
-export const Pre = styled.pre<{ $maxHeight?: number }>`
+export const Pre = styled.pre<{ $maxHeight?: number; $singleLine?: boolean }>`
   ${textStyle('caption')}
   margin: 0;
   box-sizing: border-box;
@@ -38,6 +38,13 @@ export const Pre = styled.pre<{ $maxHeight?: number }>`
   background: ${({ theme }) => theme.colors.primarySubtle};
   border: 1px solid ${({ theme }) => theme.colors.borderSubtle};
   border-radius: ${({ theme }) => theme.radius.lg}px;
+  white-space: ${({ $singleLine }) => ($singleLine ? 'nowrap' : 'pre-wrap')};
+  overflow-wrap: anywhere;
+  text-overflow: ${({ $singleLine }) => ($singleLine ? 'ellipsis' : 'clip')};
+`;
+
+export const FullText = styled.span`
+  display: block;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 `;

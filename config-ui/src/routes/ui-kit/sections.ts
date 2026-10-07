@@ -30,6 +30,7 @@ import { ExternalLinkDemo } from './external-link.demo';
 import { FilterTabsDemo } from './filter-tabs.demo';
 import { FormFieldDemo } from './form-field.demo';
 import { FormModalDemo } from './form-modal.demo';
+import { IconButtonDemo } from './icon-button.demo';
 import { IdentityCellDemo } from './identity-cell.demo';
 import { IntegrationCardDemo } from './integration-card.demo';
 import { KeyValueListDemo } from './key-value-list.demo';
@@ -65,6 +66,7 @@ export const SECTIONS: SectionDefinition[] = [
   { id: SECTION.PLUGIN_ICON, Demo: PluginIconDemo },
   { id: SECTION.STATUS_BADGE, Demo: StatusBadgeDemo },
   { id: SECTION.EXTERNAL_LINK, Demo: ExternalLinkDemo },
+  { id: SECTION.ICON_BUTTON, Demo: IconButtonDemo },
   { id: SECTION.IDENTITY_CELL, Demo: IdentityCellDemo },
   { id: SECTION.KEY_VALUE_LIST, Demo: KeyValueListDemo },
   { id: SECTION.CODE_BLOCK, Demo: CodeBlockDemo },

@@ -21,6 +21,7 @@ import type { CONNECTION_HEALTH_STATE } from './constants';
 export type ConnectionHealthProps = {
   state: (typeof CONNECTION_HEALTH_STATE)[keyof typeof CONNECTION_HEALTH_STATE];
   testedAt?: Date | string | number;
+  label?: string;
   message?: string;
   testing: boolean;
   onRetest: () => void;

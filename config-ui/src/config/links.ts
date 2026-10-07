@@ -22,5 +22,11 @@ export const LINKS = {
   DOCS: DOC_URL.TUTORIAL,
   API: '/api/swagger/index.html',
   GITHUB: 'https://github.com/apache/devlake',
+  WEBHOOK_SCHEMA: {
+    INCIDENT: 'https://devlake.apache.org/docs/Plugins/webhook#register-issues---update-or-create-issues',
+    INCIDENT_CLOSE: 'https://devlake.apache.org/docs/Plugins/webhook#register-issues---close-issues-optional',
+    DEPLOYMENT: 'https://devlake.apache.org/docs/Plugins/webhook#deployment',
+    PULL_REQUEST: 'https://devlake.apache.org/docs/Plugins/webhook#pull_requests',
+  },
   SLACK: 'https://join.slack.com/t/devlake-io/shared_invite/zt-26ulybksw-IDrJYuqY1FrdjlMMJhs53Q',
 } as const;

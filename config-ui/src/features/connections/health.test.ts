@@ -18,6 +18,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { IConnectionStatus, type IConnection } from '@/types';
+import { CONNECTION_HEALTH_STATE } from '@/ui';
 
 import { COPY, HEALTH_FAILURE_REASON, HEALTH_STORAGE_KEY, HEALTH_TTL_MS, MESSAGE_MAX_LENGTH } from './constants';
 import {
@@ -31,6 +32,8 @@ import {
   hydrateHealth,
   isHealthFresh,
   readStoredHealth,
+  toHealthView,
+  toTestErrorMessage,
   toTestFailureInput,
   writeStoredHealth,
 } from './health';
@@ -199,6 +202,47 @@ describe('freshness', () => {
   it('counts the failed connections', () => {
     const health: ConnectionHealthMap = { a: offline(NOW), b: online(NOW), c: offline(NOW) };
     expect(countFailed([connection('a'), connection('b'), connection('d')], health)).toBe(1);
+  });
+});
+
+describe('health view', () => {
+  it('reads as not tested without an entry', () => {
+    expect(toHealthView(undefined)).toEqual({ state: CONNECTION_HEALTH_STATE.UNKNOWN });
+  });
+
+  it('reads a passing test as online with its time and message', () => {
+    const entry: ConnectionHealthEntry = { ...online(NOW), message: 'ok' };
+    expect(toHealthView(entry)).toEqual({ state: CONNECTION_HEALTH_STATE.ONLINE, testedAt: NOW, message: 'ok' });
+  });
+
+  it('labels a failed test with its reason wording and keeps the raw message', () => {
+    const entry: ConnectionHealthEntry = {
+      status: IConnectionStatus.OFFLINE,
+      reason: HEALTH_FAILURE_REASON.CREDENTIALS,
+      message: 'bad token',
+      testedAt: NOW,
+    };
+    expect(toHealthView(entry)).toEqual({
+      state: CONNECTION_HEALTH_STATE.OFFLINE,
+      testedAt: NOW,
+      label: COPY.failure[HEALTH_FAILURE_REASON.CREDENTIALS],
+      message: 'bad token',
+    });
+  });
+});
+
+describe('test error message', () => {
+  it.each([
+    [401, COPY.testFailed.credentials],
+    [403, COPY.testFailed.credentials],
+    [504, COPY.testFailed.unreachable],
+    [400, COPY.testFailed.fallback],
+  ])('maps a %i response to its wording', (status, expected) => {
+    expect(toTestErrorMessage(axiosLike(status, 'raw server text'))).toBe(expected);
+  });
+
+  it('falls back when no response came back and never echoes the raw message', () => {
+    expect(toTestErrorMessage(new Error('dial tcp 10.0.0.1: i/o timeout'))).toBe(COPY.testFailed.fallback);
   });
 });
 

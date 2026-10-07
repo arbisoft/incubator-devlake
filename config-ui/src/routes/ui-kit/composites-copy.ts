@@ -91,6 +91,9 @@ export const COMPOSITES_COPY = {
   },
   formModal: {
     open: 'Open',
+    openSingle: 'Open without cancel',
+    openTall: 'Open with a tall body',
+    tallLine: (index: number) => `Line ${index} of a body taller than the viewport`,
     title: 'Add a new webhook',
     field: 'Webhook name',
     hint: 'Give your webhook a unique name to help you identify it later.',
@@ -112,6 +115,7 @@ export const COMPOSITES_COPY = {
   },
   connectionHealth: {
     message: 'dial tcp 10.0.0.1:443: i/o timeout',
+    reason: 'Unreachable',
     longMessage:
       'A long error message from the server that spans many words so that the tooltip has to wrap rather than run off the screen.',
     retests: (count: number) => `Retests started: ${count}`,

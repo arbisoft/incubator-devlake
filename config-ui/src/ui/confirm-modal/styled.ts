@@ -19,12 +19,14 @@
 import { Modal } from 'antd';
 import styled from 'styled-components';
 
-import { textStyle } from '@/ui/style-helpers';
+import { scrollableModal, textStyle } from '@/ui/style-helpers';
 
 import { CONFIRM_TONE } from './constants';
 import type { ConfirmModalProps } from './types';
 
 export const Dialog = styled(Modal)`
+  ${scrollableModal}
+
   .ant-modal-title {
     ${textStyle('h3')}
   }

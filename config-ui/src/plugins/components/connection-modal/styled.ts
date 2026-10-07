@@ -16,35 +16,21 @@
  *
  */
 
-import { CopyOutlined } from '@ant-design/icons';
-import { Button, message } from 'antd';
-import { CopyToClipboard } from 'react-copy-to-clipboard';
+import { Modal } from 'antd';
 import styled from 'styled-components';
 
-import { TextTooltip } from '@/components';
+import { scrollableModal } from '@/ui/style-helpers';
 
-const Wrapper = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 8px;
-  color: ${({ theme }) => theme.colors.text};
-  background: ${({ theme }) => theme.colors.infoBg};
+export const Dialog = styled(Modal)`
+  ${scrollableModal}
+
+  .ant-modal-header {
+    margin-bottom: ${({ theme }) => theme.space.lg}px;
+  }
 `;
 
-interface Props {
-  content: string;
-}
-
-export const CopyText = ({ content }: Props) => {
-  return (
-    <Wrapper>
-      <TextTooltip style={{ width: '90%' }} content={content}>
-        {content}
-      </TextTooltip>
-      <CopyToClipboard text={content} onCopy={() => message.success('Copy successfully.')}>
-        <Button icon={<CopyOutlined />} />
-      </CopyToClipboard>
-    </Wrapper>
-  );
-};
+export const TitleRow = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.xs}px;
+`;

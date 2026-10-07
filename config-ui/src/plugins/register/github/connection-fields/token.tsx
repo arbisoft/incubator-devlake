@@ -179,7 +179,6 @@ export const Token = ({
           <S.Input key={i}>
             <div className="input">
               <Input.Password
-                style={{ width: 386 }}
                 placeholder="Token"
                 value={value}
                 onChange={(e) => handleChangeToken(i, e.target.value)}

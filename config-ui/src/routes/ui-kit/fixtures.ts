@@ -151,3 +151,6 @@ export const TABLE_SELECTED_ROWS = [1, 3];
 
 export const HEALTH_RETEST_MS = 1200;
 export const HEALTH_TESTED_AT_OFFSET_MS = 5 * 60_000;
+
+export const SHELL_SAMPLE =
+  'curl https://example.com/api/rest/plugins/webhook/connections/1/issues -X \'POST\' -H \'Authorization: Bearer {API_KEY}\' -d \'{"issueKey": "DLK-1234", "title": "an incident"}\'';

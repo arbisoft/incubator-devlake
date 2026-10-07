@@ -61,6 +61,11 @@ describe('DataTable', () => {
     expect(within(table).getByText('Beta')).toBeTruthy();
   });
 
+  it('shows no pager when pagination is turned off', () => {
+    const { container } = setup({ pagination: false });
+    expect(container.querySelector('.ant-pagination')).toBeNull();
+  });
+
   it('renders the empty state when there is no data', () => {
     setup({ dataSource: [] });
     expect(screen.getByRole('heading', { name: EMPTY.title })).toBeTruthy();

@@ -89,6 +89,30 @@ describe('useHealthChecks', () => {
     expect(testMock).toHaveBeenCalledTimes(1);
   });
 
+  it('does not test a connection that another check is already testing', async () => {
+    let finish: () => void = () => undefined;
+    testMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = () => resolve({ success: true, message: '' });
+        }),
+    );
+    const store = configureStore({
+      reducer: { connections: connectionsSlice.reducer },
+      preloadedState: { connections: connectionsSlice.getInitialState() },
+    });
+    const wrapper = ({ children }: { children: ReactNode }) => <Provider store={store}>{children}</Provider>;
+    const first = renderHook(() => useHealthChecks(), { wrapper });
+    const second = renderHook(() => useHealthChecks(), { wrapper });
+    first.result.current.check([connection(1)]);
+    await waitFor(() => expect(testMock).toHaveBeenCalledTimes(1));
+    second.result.current.check([connection(1)]);
+    await Promise.resolve();
+    finish();
+    await waitFor(() => expect(store.getState().connections.health['github-1']).toBeDefined());
+    expect(testMock).toHaveBeenCalledTimes(1);
+  });
+
   it('runs at most the limit at once', async () => {
     let inFlight = 0;
     let peak = 0;

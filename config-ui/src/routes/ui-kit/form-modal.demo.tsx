@@ -27,16 +27,21 @@ import { DemoCase, DemoSection } from './demo-section';
 import { HEALTH_RETEST_MS } from './fixtures';
 
 const { formModal: text } = COPY;
+const TALL_LINES = 40;
 const WIDTHS = Object.values(MODAL_WIDTH);
 
 export const FormModalDemo = () => {
   const [width, setWidth] = useState<ModalWidth>();
   const [long, setLong] = useState(false);
+  const [single, setSingle] = useState(false);
+  const [tall, setTall] = useState(false);
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const close = () => {
     setWidth(undefined);
     setLong(false);
+    setSingle(false);
+    setTall(false);
     setName('');
   };
   const submit = () => {
@@ -55,13 +60,16 @@ export const FormModalDemo = () => {
             <Button key={size} onClick={() => setWidth(size)}>{`${text.open}: ${size}`}</Button>
           ))}
           <Button onClick={() => setLong(true)}>{`${COPY.cases.longText}: ${text.open}`}</Button>
+          <Button onClick={() => setSingle(true)}>{text.openSingle}</Button>
+          <Button onClick={() => setTall(true)}>{text.openTall}</Button>
         </Space>
       </DemoCase>
       <FormModal
-        open={width !== undefined || long}
+        open={width !== undefined || long || single || tall}
         title={long ? text.longTitle : text.title}
         icon={<ApiOutlined aria-hidden />}
         submitLabel={text.submit}
+        showCancel={!single}
         width={width ?? MODAL_WIDTH.SM}
         loading={loading}
         submitDisabled={name.trim() === ''}
@@ -69,6 +77,7 @@ export const FormModalDemo = () => {
         onSubmit={submit}
         onCancel={close}
       >
+        {tall && Array.from({ length: TALL_LINES }, (_, index) => <p key={index}>{text.tallLine(index + 1)}</p>)}
         <Space orientation="vertical" size="small">
           <label htmlFor="ui-kit-webhook-name">{text.field}</label>
           <Input

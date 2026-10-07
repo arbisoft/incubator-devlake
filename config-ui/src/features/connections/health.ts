@@ -16,6 +16,7 @@
  *
  */
 import { IConnectionStatus, type IConnection } from '@/types';
+import { CONNECTION_HEALTH_STATE, toUserMessage, type ConnectionHealthProps } from '@/ui';
 
 import {
   CREDENTIAL_MESSAGE,
@@ -27,6 +28,7 @@ import {
   HEALTH_TTL_MS,
   MESSAGE_MAX_LENGTH,
   REJECTED_STATUSES,
+  TEST_ERROR_MAP,
   UNREACHABLE_MESSAGE,
   UNREACHABLE_STATUSES,
   COPY,
@@ -131,3 +133,19 @@ export const writeStoredHealth = (health: ConnectionHealthMap) => {
 
 export const countFailed = (connections: IConnection[], health: ConnectionHealthMap) =>
   connections.filter((connection) => health[connection.unique]?.status === IConnectionStatus.OFFLINE).length;
+
+type HealthView = Pick<ConnectionHealthProps, 'state' | 'testedAt' | 'label' | 'message'>;
+
+export const toHealthView = (entry: ConnectionHealthEntry | undefined): HealthView => {
+  if (!entry) return { state: CONNECTION_HEALTH_STATE.UNKNOWN };
+  const { status, reason, message, testedAt } = entry;
+  if (status === IConnectionStatus.ONLINE) return { state: CONNECTION_HEALTH_STATE.ONLINE, testedAt, message };
+  return {
+    state: CONNECTION_HEALTH_STATE.OFFLINE,
+    testedAt,
+    label: reason && failureLabel(reason),
+    message,
+  };
+};
+
+export const toTestErrorMessage = (error: unknown) => toUserMessage(error, TEST_ERROR_MAP, COPY.testFailed.fallback);

@@ -15,13 +15,8 @@
  * limitations under the License.
  *
  */
-import { Modal } from 'antd';
-
-import { ConnectionForm, ConnectionList, getPluginConfig } from '@/plugins';
-import { PluginIcon } from '@/ui';
-
-import { COPY, MANAGE_MODAL_WIDTH } from './constants';
-import { ModalTitle } from './styled';
+import { ConnectionForm, ConnectionList, ConnectionModal } from '@/plugins';
+import { MODAL_WIDTH } from '@/ui';
 
 type ManageModalProps = {
   open: boolean;
@@ -33,31 +28,19 @@ type ManageModalProps = {
   onCreated: (plugin: string, id: ID) => void;
 };
 
-export const ManageModal = ({ open, plugin, isForm, onClose, onAfterClose, onCreate, onCreated }: ManageModalProps) => {
-  const config = getPluginConfig(plugin);
-
-  return (
-    <Modal
-      open={open}
-      width={MANAGE_MODAL_WIDTH}
-      centered
-      destroyOnHidden
-      footer={null}
-      title={
-        <ModalTitle>
-          <PluginIcon icon={config.icon} size="md" />
-          <span>{COPY.manageTitle(config.name)}</span>
-        </ModalTitle>
-      }
-      onCancel={onClose}
-      afterClose={onAfterClose}
-    >
-      {plugin &&
-        (isForm ? (
-          <ConnectionForm plugin={plugin} onSuccess={(id) => onCreated(plugin, id)} />
-        ) : (
-          <ConnectionList plugin={plugin} onCreate={onCreate} />
-        ))}
-    </Modal>
-  );
-};
+export const ManageModal = ({ open, plugin, isForm, onClose, onAfterClose, onCreate, onCreated }: ManageModalProps) => (
+  <ConnectionModal
+    open={open}
+    plugin={plugin}
+    width={isForm ? MODAL_WIDTH.MD : MODAL_WIDTH.LG}
+    onCancel={onClose}
+    afterClose={onAfterClose}
+  >
+    {plugin &&
+      (isForm ? (
+        <ConnectionForm plugin={plugin} onSuccess={(id) => onCreated(plugin, id)} />
+      ) : (
+        <ConnectionList plugin={plugin} onCreate={onCreate} />
+      ))}
+  </ConnectionModal>
+);

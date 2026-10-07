@@ -42,7 +42,6 @@ export const COPY = {
   },
   showAll: 'Show all integrations',
   clearFilters: 'Clear filters',
-  manageTitle: (name: string) => `Manage Connections: ${name}`,
 };
 
 export const CATALOG_SORT = { ACTIVE: 'active', NAME: 'name' } as const;
@@ -56,7 +55,5 @@ export const CATEGORY_ALL = 'all';
 export const CONNECTED_ONLY = { ON: 'on', OFF: 'off' } as const;
 
 export const OTEL_INTEGRATION_KEY = 'claude_otel';
-
-export const MANAGE_MODAL_WIDTH = 820;
 
 export const MANAGE_DIALOG_MODE = { LIST: 'list', FORM: 'form' } as const;

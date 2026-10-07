@@ -30,12 +30,14 @@ export const FormModal = ({
   icon,
   submitLabel,
   cancelLabel = COMMON_COPY.cancel,
+  showCancel = true,
   width = MODAL_WIDTH.MD,
   loading,
   submitDisabled,
   disabledReason,
   onSubmit,
   onCancel,
+  afterClose,
   children,
 }: FormModalProps) => {
   const { layout } = useTheme();
@@ -54,6 +56,7 @@ export const FormModal = ({
         </TitleRow>
       }
       onCancel={onCancel}
+      afterClose={afterClose}
       footer={
         <Footer>
           <Tooltip title={reason}>
@@ -66,7 +69,7 @@ export const FormModal = ({
               {submitLabel}
             </SubmitButton>
           </Tooltip>
-          <Button onClick={onCancel}>{cancelLabel}</Button>
+          {showCancel && <Button onClick={onCancel}>{cancelLabel}</Button>}
         </Footer>
       }
     >

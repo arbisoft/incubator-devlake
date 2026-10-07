@@ -99,7 +99,6 @@ export const IdentityCenterConfig = ({ initialValues, values, setValues, setErro
         description="Optional. Provide if you want DevLake to resolve user display names (format d-xxxxxxxxxx)."
       >
         <Input
-          style={{ width: 386 }}
           placeholder="d-1234567890"
           value={identityStoreId}
           onChange={handleStoreIdChange}
@@ -113,7 +112,6 @@ export const IdentityCenterConfig = ({ initialValues, values, setValues, setErro
         description="Optional. Required only when Identity Store ID is provided (e.g. us-east-1)."
       >
         <Input
-          style={{ width: 386 }}
           placeholder="us-east-1"
           value={identityStoreRegion}
           onChange={handleRegionChange}

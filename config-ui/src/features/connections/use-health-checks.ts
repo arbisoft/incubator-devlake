@@ -27,6 +27,9 @@ import { HEALTH_CONCURRENCY } from './constants';
 import { findStaleConnections, isHealthFresh } from './health';
 import { checkConnectionHealth } from './slice';
 
+// Connections being tested by any check on the page, so two lists never test the same one at once.
+const testing = new Set<string>();
+
 export const useHealthChecks = () => {
   const dispatch = useAppDispatch();
   const store = useStore<RootState>();
@@ -37,8 +40,13 @@ export const useHealthChecks = () => {
       const healthNow = () => store.getState().connections.health;
       for (const connection of findStaleConnections(connections, healthNow(), Date.now())) {
         void enqueue(connection.unique, async () => {
-          if (isHealthFresh(healthNow()[connection.unique], Date.now())) return;
-          await dispatch(checkConnectionHealth(connection));
+          if (testing.has(connection.unique) || isHealthFresh(healthNow()[connection.unique], Date.now())) return;
+          testing.add(connection.unique);
+          try {
+            await dispatch(checkConnectionHealth(connection));
+          } finally {
+            testing.delete(connection.unique);
+          }
         });
       }
     },

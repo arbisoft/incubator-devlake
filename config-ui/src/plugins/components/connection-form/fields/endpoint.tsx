@@ -16,8 +16,7 @@
  *
  */
 
-import type { RadioChangeEvent } from 'antd';
-import { Radio, Input } from 'antd';
+import { Radio, Input, type RadioChangeEvent } from 'antd';
 import { useState, useEffect } from 'react';
 
 import { Block } from '@/components';
@@ -101,7 +100,7 @@ export const ConnectionEndpoint = ({
             description={subLabel ?? `If you are using ${name} Server, please enter the endpoint URL.`}
             required
           >
-            <Input style={{ width: 386 }} placeholder="Your Endpoint URL" value={value} onChange={handleChangeValue} />
+            <Input placeholder="Your Endpoint URL" value={value} onChange={handleChangeValue} />
           </Block>
         )}
       </>
@@ -110,13 +109,7 @@ export const ConnectionEndpoint = ({
 
   return (
     <Block title="Endpoint URL" description={subLabel ?? `Provide the ${name} instance API endpoint.`} required>
-      <Input
-        style={{ width: 386 }}
-        disabled={disabled}
-        placeholder="Your Endpoint URL"
-        value={value}
-        onChange={handleChangeValue}
-      />
+      <Input disabled={disabled} placeholder="Your Endpoint URL" value={value} onChange={handleChangeValue} />
     </Block>
   );
 };
