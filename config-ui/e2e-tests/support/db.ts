@@ -139,6 +139,16 @@ export function hiddenOtelConnectionCount(teamName: string): number {
   );
 }
 
+// Removes the connections of a test team with their credentials and project placements, after the API has revoked and hidden them.
+export function deleteOtelConnectionsOfTeam(teamName: string): void {
+  const team = teamName.replace(/'/g, "''");
+  runSql(`
+    DELETE FROM _tool_claude_code_otel_connection_projects WHERE connection_id IN (SELECT id FROM _tool_claude_code_otel_connections WHERE team_name = '${team}');
+    DELETE FROM _tool_claude_code_otel_credentials WHERE connection_id IN (SELECT id FROM _tool_claude_code_otel_connections WHERE team_name = '${team}');
+    DELETE FROM _tool_claude_code_otel_connections WHERE team_name = '${team}';
+  `);
+}
+
 // Pipelines outlive their blueprint and cannot be deleted through the API, so cleanup removes the rows named after test blueprints.
 export function deletePipelinesNamedLike(prefix: string): void {
   const pattern = `${prefix.replace(/'/g, "''")}%`;

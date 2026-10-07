@@ -216,6 +216,16 @@ export class ProjectPage extends BasePage {
     return (await deleted).status();
   }
 
+  get nameInput(): Locator {
+    return this.page.getByRole('heading', { name: 'Project Name' }).locator('xpath=following-sibling::input');
+  }
+
+  // Renames the project from its Settings tab and saves.
+  async renameProject(newName: string): Promise<void> {
+    await this.nameInput.fill(newName);
+    await this.page.getByRole('button', { name: 'Save' }).click();
+  }
+
   async deleteProject(): Promise<void> {
     await this.page.getByRole('button', { name: 'Delete Project' }).click();
     await this.confirmDialog('Are you sure you want to delete this Project?');

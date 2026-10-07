@@ -460,6 +460,29 @@ export async function findOtelConnection(
   return (await listOtelConnections(api)).find((it) => it.connection.teamName === teamName);
 }
 
+// Creates a Claude Code OTel connection placed under the given projects; its one-time credential is not returned.
+export async function createOtelConnection(
+  api: APIRequestContext,
+  teamName: string,
+  projectNames: string[],
+): Promise<ApiOtelConnection> {
+  return json(
+    await api.post('/plugins/claude_otel/connections', { data: { teamName, projectNames } }),
+    'create otel connection',
+  );
+}
+
+// Revokes (when still active) and hides every connection of a team, so its projects can be deleted.
+export async function retireOtelConnections(api: APIRequestContext, teamName: string): Promise<void> {
+  const entries = (await listOtelConnections(api)).filter((it) => it.connection.teamName === teamName);
+  for (const { connection } of entries) {
+    if (connection.status === 'active') {
+      await api.post(`/plugins/claude_otel/connections/${connection.id}/revoke`);
+    }
+    await api.post(`/plugins/claude_otel/connections/${connection.id}/hide`);
+  }
+}
+
 // Credential statuses of a connection, sorted so a spec can compare them with toEqual.
 export const otelCredentialStatuses = (entry: ApiOtelConnection | undefined): string[] =>
   (entry?.credentials ?? []).map((c) => c.status).sort();
