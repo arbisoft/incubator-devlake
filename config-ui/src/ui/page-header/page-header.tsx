@@ -25,7 +25,15 @@ import { COPY } from './constants';
 import { Actions, Description, Heading, Root, Title, TitleRow } from './styled';
 import type { PageHeaderProps } from './types';
 
-export const PageHeader = ({ title, description, breadcrumbs, status, switcher, actions }: PageHeaderProps) => {
+export const PageHeader = ({
+  title,
+  showTitle = true,
+  description,
+  breadcrumbs,
+  status,
+  switcher,
+  actions,
+}: PageHeaderProps) => {
   useDocumentTitle(title);
 
   return (
@@ -36,14 +44,16 @@ export const PageHeader = ({ title, description, breadcrumbs, status, switcher, 
           items={breadcrumbs.map(({ label, path }) => ({ title: path ? <Link to={path}>{label}</Link> : label }))}
         />
       )}
-      <Heading>
-        <TitleRow>
-          <Title>{title}</Title>
-          {status}
-          {switcher}
-        </TitleRow>
-        {actions && <Actions>{actions}</Actions>}
-      </Heading>
+      {(showTitle || status || switcher || actions) && (
+        <Heading>
+          <TitleRow>
+            {showTitle && <Title>{title}</Title>}
+            {status}
+            {switcher}
+          </TitleRow>
+          {actions && <Actions>{actions}</Actions>}
+        </Heading>
+      )}
       {description && <Description>{description}</Description>}
     </Root>
   );

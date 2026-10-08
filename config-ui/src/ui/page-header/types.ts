@@ -22,6 +22,7 @@ import type { Crumb } from '@/ui/types';
 
 export type PageHeaderProps = {
   title: string;
+  showTitle?: boolean;
   description?: ReactNode;
   breadcrumbs?: Crumb[];
   status?: ReactNode;
