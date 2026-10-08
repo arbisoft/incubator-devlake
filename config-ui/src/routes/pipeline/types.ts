@@ -16,7 +16,9 @@
  *
  */
 
-import type { FILTER_PARAM, PIPELINE_COLUMN, STAGE_STATE } from './constants';
+import type { ITask } from '@/types';
+
+import type { FILTER_PARAM, PIPELINE_COLUMN, STAGE_STATE, TASK_CELL } from './constants';
 
 export type PipelineSortKey = typeof PIPELINE_COLUMN.STARTED_AT | typeof PIPELINE_COLUMN.COMPLETED_AT;
 
@@ -24,9 +26,8 @@ export type PipelineFilters = Record<(typeof FILTER_PARAM)[keyof typeof FILTER_P
 
 export type StageState = (typeof STAGE_STATE)[keyof typeof STAGE_STATE];
 
-export type LegacyPagination = {
-  total: number;
-  current: number;
-  pageSize: number;
-  onChange: (page: number) => void;
-};
+export type PipelineStage = { key: string; tasks: ITask[]; state: StageState };
+
+export type TaskCell =
+  | { kind: typeof TASK_CELL.PENDING | typeof TASK_CELL.FAILED | typeof TASK_CELL.CANCELLED }
+  | { kind: typeof TASK_CELL.PROGRESS; finished: number; total: number; counted: boolean };

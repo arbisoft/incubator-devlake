@@ -84,27 +84,57 @@ export const COPY = {
     title: 'No pipelines match this blueprint',
     description: 'Pick another blueprint, or clear the filter.',
   },
-  info: {
+  summary: {
+    label: 'Pipeline summary',
     status: 'Status',
     startedAt: 'Started at',
     duration: 'Duration',
-    stage: 'Current Stage',
-    tasksCompleted: 'Tasks Completed',
+    stage: 'Current stage',
+    tasks: 'Tasks',
+    tasksValue: (finished: number, total: number) => `${finished} / ${total} completed`,
     failed: 'Pipeline failed. Hover over a failed task below to see the reason.',
     cancel: 'Cancel pipeline',
     rerun: 'Rerun pipeline',
   },
-  tasks: {
-    stage: (key: string) => `Stage ${key}`,
-    toggle: 'Show or hide the tasks',
+  stage: {
+    label: (key: string | number) => `Stage ${key}`,
+    failedCount: (failed: number, total: number) => `${failed} of ${total} tasks failed`,
+    state: {
+      [STAGE_STATE.SUCCESS]: 'Complete',
+      [STAGE_STATE.LOADING]: 'In progress',
+      [STAGE_STATE.ERROR]: 'Failed',
+      [STAGE_STATE.CANCEL]: 'Cancelled',
+      [STAGE_STATE.READY]: 'Pending',
+    } satisfies Record<(typeof STAGE_STATE)[keyof typeof STAGE_STATE], string>,
   },
   task: {
     label: (id: string | number) => `Task${id}`,
-    pending: 'Subtasks pending',
-    running: 'Subtasks running',
-    completed: 'All Subtasks completed',
-    failed: 'Task failed: hover to view the reason',
-    cancelled: 'Subtasks canceled',
+    pending: 'Pending',
+    failed: 'Failed',
+    cancelled: 'Cancelled',
+    subtasks: (finished: number, total: number) => `${finished} of ${total} subtasks`,
     rerun: 'Rerun task',
   },
+  detail: { title: (id: string | number) => `Pipeline ${id} details` },
+  loading: 'Loading pipeline',
+  actions: {
+    cancelled: 'Pipeline cancelled.',
+    cancelFailed: 'The pipeline could not be cancelled. Try again in a moment.',
+    rerunStarted: 'Rerun started.',
+    rerunFailed: 'The rerun could not be started. Try again in a moment.',
+    rerunBusy: 'This pipeline has nothing to rerun right now. Wait for running tasks to finish and try again.',
+    taskRerunStarted: 'Task rerun started.',
+    taskRerunFailed: 'The task could not be rerun. Try again in a moment.',
+  },
 };
+
+const HTTP_BAD_REQUEST = '400';
+
+export const RERUN_ERROR_MAP: Record<string, string> = { [HTTP_BAD_REQUEST]: COPY.actions.rerunBusy };
+
+export const TASK_CELL = {
+  PENDING: 'pending',
+  PROGRESS: 'progress',
+  FAILED: 'failed',
+  CANCELLED: 'cancelled',
+} as const;

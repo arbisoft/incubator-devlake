@@ -27,7 +27,8 @@ export type ListParams = Pagination & KeywordParams & SortParams<'name' | 'creat
 export const list = (data: ListParams, signal?: AbortSignal): Promise<{ count: number; projects: IProject[] }> =>
   request('/projects', { data, signal });
 
-export const get = (name: string): Promise<IProject> => request(`/projects/${encodeName(name)}`);
+export const get = (name: string, signal?: AbortSignal): Promise<IProject> =>
+  request(`/projects/${encodeName(name)}`, { signal });
 
 export const checkName = (name: string) => request(`/projects/${encodeName(name)}/check`);
 

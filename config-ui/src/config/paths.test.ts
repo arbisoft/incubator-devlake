@@ -55,4 +55,11 @@ describe('PATHS', () => {
     expect(Object.values(PROJECT_TAB)).toEqual(['blueprint', 'webhooks', 'claude-code-otel', 'settings']);
     expect(ROUTE_SEGMENTS.PROJECT_TAB(PROJECT_TAB.SETTINGS)).toBe('projects/:pname/settings');
   });
+
+  it('keeps the blueprint view route segments in step with the view paths', () => {
+    expect(ROUTE_SEGMENTS.PROJECT_BLUEPRINT_VIEW(BLUEPRINT_VIEW.CONFIGURATION)).toBe(
+      'projects/:pname/blueprint/configuration',
+    );
+    expect(ROUTE_SEGMENTS.BLUEPRINT_VIEW(BLUEPRINT_VIEW.CONFIGURATION)).toBe('blueprints/:id/configuration');
+  });
 });

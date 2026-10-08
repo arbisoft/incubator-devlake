@@ -28,5 +28,8 @@ const TAB_ORDER: ProjectTab[] = [
   PROJECT_TAB.SETTINGS,
 ];
 
+export const toProjectTab = (key: string | undefined): ProjectTab =>
+  TAB_ORDER.find((tab) => tab === key) ?? PROJECT_TAB.BLUEPRINT;
+
 export const getProjectTabs = (pname: string): ProjectRouteTab[] =>
   TAB_ORDER.map((key) => ({ key, label: COPY.tabs[key], path: PATHS.PROJECT_TAB(pname, key) }));

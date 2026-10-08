@@ -16,102 +16,93 @@
  *
  */
 
-import { Tabs, message } from 'antd';
+import { message } from 'antd';
 import axios from 'axios';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import API from '@/api';
-import { PageHeader, PageLoading } from '@/components';
+import { PageLoading } from '@/components';
 import { PATHS, PROJECT_TAB } from '@/config';
 import { useRefreshData } from '@/hooks';
-import { BlueprintDetail, FromEnum } from '@/routes';
-import { useDocumentTitle, useRouteTab } from '@/ui/hooks';
+import { BLUEPRINT_CONTEXT, BlueprintDetail, getProjectBlueprintViews, useBlueprintView } from '@/routes';
+import {
+  EmptyState,
+  EMPTY_STATE_SIZE,
+  ListPage,
+  PageHeader,
+  RouteTabs,
+  ROUTE_TABS_VARIANT,
+  useLastLoaded,
+  useRefreshVersion,
+} from '@/ui';
+import { useRouteTab } from '@/ui/hooks';
 
 import { ClaudeCodeOtelPanel } from './claude-code-otel-panel';
 import { COPY } from './constants';
 import { SettingsPanel } from './settings-panel';
-import * as S from './styled';
-import { getProjectTabs } from './utils';
+import { getProjectTabs, toProjectTab } from './utils';
 import { WebhooksPanel } from './webhooks-panel';
 
+const NOT_FOUND_REDIRECT_DELAY_MS = 100;
+
 export const ProjectDetailPage = () => {
-  const [version, setVersion] = useState(1);
-
-  const { pname } = useParams() as { pname: string };
+  const { pname = '' } = useParams();
   const navigate = useNavigate();
-
-  useDocumentTitle(pname);
+  const { version, refresh } = useRefreshVersion();
 
   const tabs = useMemo(() => getProjectTabs(pname), [pname]);
-  const activeTab = useRouteTab(tabs);
+  const activeTab = toProjectTab(useRouteTab(tabs));
+  const views = useMemo(() => getProjectBlueprintViews(pname), [pname]);
+  const view = useBlueprintView(views);
 
-  const { ready, data, error } = useRefreshData(() => API.project.get(pname), [pname, version]);
-
-  // Keep the loaded project on screen during refreshes so open panels and dialogs are not unmounted.
-  const lastLoaded = useRef<{ pname: string; project: NonNullable<typeof data> } | null>(null);
-  if (data) {
-    lastLoaded.current = { pname, project: data };
-  }
-  const project = data ?? (!error && lastLoaded.current?.pname === pname ? lastLoaded.current.project : undefined);
+  const { ready, data, error } = useRefreshData((signal) => API.project.get(pname, signal), [pname, version]);
+  const loaded = useLastLoaded(data, pname);
+  const project = error ? undefined : loaded;
 
   useEffect(() => {
     if (axios.isAxiosError(error) && error.response?.status === 404) {
-      message.error(`Project not found with project name: ${pname}`);
-      setTimeout(() => {
-        navigate(PATHS.PROJECTS(), { replace: true });
-      }, 100);
+      message.error(COPY.notFound(pname));
+      const timer = setTimeout(() => navigate(PATHS.PROJECTS(), { replace: true }), NOT_FOUND_REDIRECT_DELAY_MS);
+      return () => clearTimeout(timer);
     }
   }, [error, navigate, pname]);
-
-  const handleChangeTab = (key: string) => {
-    const target = tabs.find((tab) => tab.key === key);
-    if (target) navigate(target.path);
-  };
-
-  const handleRefresh = () => {
-    setVersion((v) => v + 1);
-  };
 
   if (!project) {
     return !ready && !error ? <PageLoading /> : null;
   }
 
+  const panels = {
+    [PROJECT_TAB.BLUEPRINT]: project.blueprint ? (
+      <BlueprintDetail blueprintId={project.blueprint.id} context={BLUEPRINT_CONTEXT.PROJECT} view={view} />
+    ) : (
+      <EmptyState
+        size={EMPTY_STATE_SIZE.SECTION}
+        title={COPY.noBlueprint.title}
+        description={COPY.noBlueprint.description}
+      />
+    ),
+    [PROJECT_TAB.WEBHOOKS]: <WebhooksPanel project={project} onRefresh={refresh} />,
+    [PROJECT_TAB.CLAUDE_CODE_OTEL]: <ClaudeCodeOtelPanel projectName={project.name} />,
+    [PROJECT_TAB.SETTINGS]: <SettingsPanel project={project} onRefresh={refresh} />,
+  };
+
   return (
-    <PageHeader
-      breadcrumbs={[
-        { name: 'Projects', path: PATHS.PROJECTS() },
-        { name: project.name, path: PATHS.PROJECT_TAB(pname, PROJECT_TAB.BLUEPRINT) },
-      ]}
-    >
-      <S.Wrapper>
-        <Tabs
-          items={[
-            {
-              key: PROJECT_TAB.BLUEPRINT,
-              label: COPY.tabs[PROJECT_TAB.BLUEPRINT],
-              children: <BlueprintDetail id={project.blueprint.id} from={FromEnum.project} />,
-            },
-            {
-              key: PROJECT_TAB.WEBHOOKS,
-              label: COPY.tabs[PROJECT_TAB.WEBHOOKS],
-              children: <WebhooksPanel project={project} onRefresh={handleRefresh} />,
-            },
-            {
-              key: PROJECT_TAB.CLAUDE_CODE_OTEL,
-              label: COPY.tabs[PROJECT_TAB.CLAUDE_CODE_OTEL],
-              children: <ClaudeCodeOtelPanel projectName={project.name} />,
-            },
-            {
-              key: PROJECT_TAB.SETTINGS,
-              label: COPY.tabs[PROJECT_TAB.SETTINGS],
-              children: <SettingsPanel project={project} onRefresh={handleRefresh} />,
-            },
-          ]}
-          activeKey={activeTab}
-          onChange={handleChangeTab}
-        />
-      </S.Wrapper>
-    </PageHeader>
+    <ListPage>
+      <PageHeader
+        title={project.name}
+        breadcrumbs={[
+          { label: COPY.breadcrumbProjects, path: PATHS.PROJECTS() },
+          { label: project.name, path: PATHS.PROJECT_TAB(pname, PROJECT_TAB.BLUEPRINT) },
+        ]}
+        switcher={
+          activeTab === PROJECT_TAB.BLUEPRINT ? (
+            <RouteTabs items={views} variant={ROUTE_TABS_VARIANT.SEGMENTED} />
+          ) : undefined
+        }
+      />
+      <RouteTabs items={tabs} variant={ROUTE_TABS_VARIANT.TABS} />
+      {panels[activeTab]}
+    </ListPage>
   );
 };

@@ -23,7 +23,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 import API from '@/api';
 import { PageLoading, PageHeader, ExternalLink } from '@/components';
-import { PATHS, PROJECT_TAB } from '@/config';
+import { BLUEPRINT_VIEW, PATHS, PROJECT_TAB } from '@/config';
 import { useRefreshData } from '@/hooks';
 import { DataScopeSelect } from '@/plugins';
 import { useDocumentTitle } from '@/ui/hooks';
@@ -94,11 +94,7 @@ export const BlueprintConnectionDetailPage = () => {
     });
 
     if (success) {
-      navigate(pname ? PATHS.PROJECT_TAB(pname, PROJECT_TAB.BLUEPRINT) : PATHS.BLUEPRINT(blueprint.id), {
-        state: {
-          activeKey: 'status',
-        },
-      });
+      navigate(pname ? PATHS.PROJECT_TAB(pname, PROJECT_TAB.BLUEPRINT) : PATHS.BLUEPRINT(blueprint.id));
     }
   };
 
@@ -127,11 +123,11 @@ export const BlueprintConnectionDetailPage = () => {
           </div>
         ),
         onCancel: () => {
-          navigate(pname ? PATHS.PROJECT_TAB(pname, PROJECT_TAB.BLUEPRINT) : PATHS.BLUEPRINT(blueprint.id), {
-            state: {
-              tab: 'configuration',
-            },
-          });
+          navigate(
+            pname
+              ? PATHS.PROJECT_BLUEPRINT_VIEW(pname, BLUEPRINT_VIEW.CONFIGURATION)
+              : PATHS.BLUEPRINT_VIEW(blueprint.id, BLUEPRINT_VIEW.CONFIGURATION),
+          );
         },
       });
     }

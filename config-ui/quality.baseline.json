@@ -1,7 +1,7 @@
 {
   "eslint": {
     "@typescript-eslint/no-explicit-any": {
-      "errors": 259,
+      "errors": 258,
       "warnings": 0
     },
     "@typescript-eslint/no-unused-vars": {
@@ -54,11 +54,11 @@
     },
     "react-hooks/refs": {
       "errors": 0,
-      "warnings": 35
+      "warnings": 24
     },
     "react-hooks/set-state-in-effect": {
       "errors": 0,
-      "warnings": 31
+      "warnings": 29
     },
     "react/jsx-key": {
       "errors": 1,
@@ -94,7 +94,7 @@
     },
     "sonarjs/no-nested-conditional": {
       "errors": 0,
-      "warnings": 13
+      "warnings": 12
     },
     "sonarjs/no-nested-template-literals": {
       "errors": 1,
@@ -123,7 +123,7 @@
   },
   "knip": [],
   "jscpd": {
-    "clones": 105,
-    "duplicatedLines": 1890
+    "clones": 104,
+    "duplicatedLines": 1873
   }
 }

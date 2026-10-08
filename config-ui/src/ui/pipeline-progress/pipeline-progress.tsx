@@ -18,6 +18,8 @@
 
 import { Progress, type ProgressProps } from 'antd';
 
+import { COMMON_COPY } from '@/ui/constants';
+
 import { COPY, PERCENT_MAX, PIPELINE_PROGRESS_STATUS, PROGRESS_STROKE } from './constants';
 import { Bar, Cell, Percent } from './styled';
 import type { PipelineProgressProps, PipelineProgressStatus } from './types';
@@ -30,6 +32,15 @@ const ANTD_STATUS: Record<PipelineProgressStatus, ProgressProps['status']> = {
 };
 
 export const PipelineProgress = ({ status, finished, total }: PipelineProgressProps) => {
+  // Without a total there is nothing to measure; only a running pipeline keeps its bar.
+  if (total <= 0 && status !== PIPELINE_PROGRESS_STATUS.RUNNING) {
+    return (
+      <Cell>
+        <Percent aria-label={COPY.noTasks}>{COMMON_COPY.emptyValue}</Percent>
+      </Cell>
+    );
+  }
+
   const percent = total > 0 ? Math.min(PERCENT_MAX, Math.round((finished / total) * PERCENT_MAX)) : 0;
   return (
     <Cell>

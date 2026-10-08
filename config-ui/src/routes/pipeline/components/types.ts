@@ -16,11 +16,11 @@
  *
  */
 
-import type { IPipeline, IPipelineStatus } from '@/types';
+import type { IPipeline, IPipelineStatus, ITask } from '@/types';
 import type { DataTableProps } from '@/ui';
 
 import type { PIPELINE_ROW_ACTION } from '../constants';
-import type { LegacyPagination, PipelineSortKey } from '../types';
+import type { PipelineSortKey, PipelineStage } from '../types';
 
 export type PipelineRowAction = (typeof PIPELINE_ROW_ACTION)[keyof typeof PIPELINE_ROW_ACTION];
 
@@ -42,5 +42,17 @@ export type PipelineTableProps = Pick<DataTableProps<IPipeline, PipelineSortKey>
   empty?: DataTableProps<IPipeline, PipelineSortKey>['empty'];
   loading: boolean;
   dataSource: IPipeline[];
-  pagination?: LegacyPagination;
+  pagination?: DataTableProps<IPipeline, PipelineSortKey>['pagination'];
 };
+
+export type PipelinePanelProps = { id: ID };
+
+export type PipelineSummaryProps = { pipeline: IPipeline; onChanged: () => void };
+
+export type PipelineStagesProps = { tasks: ITask[]; onChanged: () => void };
+
+export type PipelineStageProps = { stage: PipelineStage; onChanged: () => void };
+
+export type PipelineTaskProps = { task: ITask; onChanged: () => void };
+
+export type PipelineDetailModalProps = { open: boolean; id: ID; onClose: () => void; afterClose?: () => void };

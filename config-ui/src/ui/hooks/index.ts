@@ -20,6 +20,7 @@ export * from './use-concurrency-queue';
 export * from './use-confirm-flow';
 export * from './use-document-title';
 export * from './use-in-view';
+export * from './use-last-loaded';
 export * from './use-list-state';
 export * from './use-modal-form';
 export * from './use-refresh-version';

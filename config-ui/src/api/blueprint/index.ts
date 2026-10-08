@@ -27,7 +27,7 @@ export type ListParams = Pagination & { type: string; enable?: boolean } & Keywo
 export const list = (data: ListParams, signal?: AbortSignal): Promise<{ count: number; blueprints: IBlueprint[] }> =>
   request('/blueprints', { data, signal });
 
-export const get = (id: ID): Promise<IBlueprint> => request(`/blueprints/${id}`);
+export const get = (id: ID, signal?: AbortSignal): Promise<IBlueprint> => request(`/blueprints/${id}`, { signal });
 
 export const create = (data: any) =>
   request('/blueprints', {
@@ -39,7 +39,8 @@ export const remove = (id: ID) => request(`/blueprints/${id}`, { method: 'delete
 
 export const update = (id: ID, data: Partial<IBlueprint>) => request(`/blueprints/${id}`, { method: 'patch', data });
 
-export const pipelines = (id: ID, data?: Pagination) => request(`/blueprints/${id}/pipelines`, { data });
+export const pipelines = (id: ID, data?: Pagination, signal?: AbortSignal) =>
+  request(`/blueprints/${id}/pipelines`, { data, signal });
 
 type TriggerQuery = {
   skipCollectors?: boolean;

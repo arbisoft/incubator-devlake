@@ -16,135 +16,78 @@
  *
  */
 
-import { RedoOutlined } from '@ant-design/icons';
-import { Button, Tooltip } from 'antd';
-import { useState, useMemo } from 'react';
+import { ReloadOutlined } from '@ant-design/icons';
+import { Tooltip } from 'antd';
+import { useState } from 'react';
 
 import API from '@/api';
 import { TextTooltip } from '@/components';
 import { getPluginConfig } from '@/plugins';
-import { ITask, IPipelineStatus } from '@/types';
+import { IconButton, PipelineProgress } from '@/ui';
+import { toUserMessage } from '@/ui/utils';
 import { operator } from '@/utils';
 
-import { COPY } from '../constants';
-import * as S from '../styled';
+import { COPY, TASK_CELL } from '../constants';
+import { PIPELINE_PROGRESS_STATUS_MAP } from '../status-tone';
+import { getTaskName } from '../task-name';
+import { canRerunTask, getStageState, getTaskCell } from '../utils';
 
 import { PipelineDuration } from './duration';
+import { Task, TaskAction, TaskCell, TaskFailed, TaskId, TaskName, TaskTime } from './styled';
+import type { PipelineTaskProps } from './types';
 
-interface Props {
-  task: ITask;
-}
+const INACTIVE_CELLS: string[] = [TASK_CELL.PENDING, TASK_CELL.CANCELLED];
 
-export const PipelineTask = ({ task }: Props) => {
+export const PipelineTask = ({ task, onChanged }: PipelineTaskProps) => {
   const [operating, setOperating] = useState(false);
-
-  const { id, beganAt, finishedAt, status, errorName, progressDetail } = task;
-
-  const [, name] = useMemo(() => {
-    const config = getPluginConfig(task.plugin);
-    const { options } = task;
-
-    let { name } = config;
-
-    switch (true) {
-      case ['github', 'github_graphql'].includes(config.plugin):
-        name = `${name}:${options.name}`;
-        break;
-      case ['gitextractor'].includes(config.plugin):
-        name = `${name}:${options.name}`;
-        break;
-      case ['dora'].includes(config.plugin):
-        name = `${name}:${options.projectName}`;
-        break;
-      case ['gitlab'].includes(config.plugin):
-        name = `${name}:${options.projectId}`;
-        break;
-      case ['bitbucket'].includes(config.plugin):
-        name = `${name}:${options.fullName}`;
-        break;
-      case ['tapd'].includes(config.plugin):
-        name = `${name}:${options.workspaceId}`;
-        break;
-      case ['jira'].includes(config.plugin):
-        name = `${name}:${options.boardId}`;
-        break;
-      case ['jenkins'].includes(config.plugin):
-        name = `${name}:${options.fullName}`;
-        break;
-      case ['sonarqube'].includes(config.plugin):
-        name = `${name}:${options.projectKey}`;
-        break;
-      case ['zentao'].includes(config.plugin):
-        if (options.projectId) {
-          name = `${name}:project/${options.projectId}`;
-        } else {
-          name = `${name}:product/${options.productId}`;
-        }
-        break;
-      case ['refdiff'].includes(config.plugin):
-        name = `${name}:${options.repoId ?? options.projectName}`;
-        break;
-      case ['bamboo'].includes(config.plugin):
-        name = `${name}:${options.planKey}`;
-        break;
-      case ['azuredevops_go'].includes(config.plugin):
-        name = `ado:${options.name}`;
-        break;
-      case ['argocd'].includes(config.plugin):
-        name = `${name}:${options.ApplicationName}`;
-        break;
-    }
-
-    return [config.icon, name];
-  }, [task]);
+  const { id, plugin, options, status, beganAt, finishedAt, errorName } = task;
+  const config = getPluginConfig(plugin);
+  const name = getTaskName(config.plugin, config.name, options);
+  const cell = getTaskCell(task);
 
   const handleRerun = async () => {
-    await operator(() => API.task.rertun(id), { setOperating });
+    const [success] = await operator(() => API.task.rertun(id), {
+      setOperating,
+      formatMessage: () => COPY.actions.taskRerunStarted,
+      formatReason: (error) => toUserMessage(error, {}, COPY.actions.taskRerunFailed),
+    });
+    if (success) onChanged();
   };
 
   return (
-    <S.Task>
-      <div className="info">
-        <div className="title">
-          <strong>{COPY.task.label(id)}</strong>
-          <span>
-            <TextTooltip content={name}>{name}</TextTooltip>
-          </span>
-        </div>
-        {[status === IPipelineStatus.CREATED, IPipelineStatus.PENDING].includes(status) && <p>{COPY.task.pending}</p>}
-
-        {[IPipelineStatus.ACTIVE, IPipelineStatus.RUNNING].includes(status) && (
-          <p>
-            {COPY.task.running}
-            <S.SubtaskCount>
-              {progressDetail?.finishedSubTasks}/{progressDetail?.totalSubTasks}
-            </S.SubtaskCount>
-          </p>
-        )}
-
-        {status === IPipelineStatus.COMPLETED && <p>{COPY.task.completed}</p>}
-
-        {status === IPipelineStatus.FAILED && (
-          <TextTooltip content={errorName}>
-            <p className="error">{COPY.task.failed}</p>
-          </TextTooltip>
-        )}
-
-        {status === IPipelineStatus.CANCELLED && <p>{COPY.task.cancelled}</p>}
-      </div>
-      <div className="duration">
+    <Task $state={getStageState([task])} $inactive={INACTIVE_CELLS.includes(cell.kind)}>
+      <TaskId>{COPY.task.label(id)}</TaskId>
+      <TaskName>
+        <TextTooltip content={name}>{name}</TextTooltip>
+      </TaskName>
+      <TaskTime>
         <PipelineDuration status={status} beganAt={beganAt} finishedAt={finishedAt} />
-        {[
-          IPipelineStatus.COMPLETED,
-          IPipelineStatus.PARTIAL,
-          IPipelineStatus.FAILED,
-          IPipelineStatus.CANCELLED,
-        ].includes(status) && (
-          <Tooltip title={COPY.task.rerun}>
-            <Button loading={operating} icon={<RedoOutlined />} aria-label={COPY.task.rerun} onClick={handleRerun} />
+      </TaskTime>
+      <TaskCell>
+        {cell.kind === TASK_CELL.PROGRESS && (
+          <Tooltip title={cell.counted ? COPY.task.subtasks(cell.finished, cell.total) : undefined}>
+            <div>
+              <PipelineProgress
+                status={PIPELINE_PROGRESS_STATUS_MAP[status]}
+                finished={cell.finished}
+                total={cell.total}
+              />
+            </div>
           </Tooltip>
         )}
-      </div>
-    </S.Task>
+        {cell.kind === TASK_CELL.PENDING && COPY.task.pending}
+        {cell.kind === TASK_CELL.CANCELLED && COPY.task.cancelled}
+        {cell.kind === TASK_CELL.FAILED && (
+          <Tooltip title={errorName}>
+            <TaskFailed>{COPY.task.failed}</TaskFailed>
+          </Tooltip>
+        )}
+      </TaskCell>
+      <TaskAction>
+        {canRerunTask(status) && (
+          <IconButton icon={<ReloadOutlined />} label={COPY.task.rerun} loading={operating} onClick={handleRerun} />
+        )}
+      </TaskAction>
+    </Task>
   );
 };

@@ -21,19 +21,13 @@ import { Button, Tooltip, type TableColumnsType } from 'antd';
 import { Link } from 'react-router-dom';
 
 import { TextTooltip } from '@/components';
-import { getCron, PATHS } from '@/config';
+import { BLUEPRINT_VIEW, getCron, PATHS } from '@/config';
 import { ConnectionName } from '@/features';
 import { IBPMode, type IBlueprint } from '@/types';
 import { OverflowList, RowLink, StatusBadge } from '@/ui';
 import { formatTime } from '@/utils';
 
-import {
-  BLUEPRINT_COLUMN,
-  BLUEPRINT_STATUS_TONE,
-  CONFIGURATION_TAB_STATE,
-  COPY,
-  MAX_VISIBLE_CONNECTIONS,
-} from './constants';
+import { BLUEPRINT_COLUMN, BLUEPRINT_STATUS_TONE, COPY, MAX_VISIBLE_CONNECTIONS } from './constants';
 import { toStatusKey } from './utils';
 
 type ColumnOptions = { onConfigure: (id: ID) => void };
@@ -60,7 +54,7 @@ export const getColumns = ({ onConfigure }: ColumnOptions): TableColumnsType<IBl
     dataIndex: 'name',
     sorter: true,
     render: (name: string, { id }) => (
-      <RowLink to={PATHS.BLUEPRINT(id)} state={CONFIGURATION_TAB_STATE}>
+      <RowLink to={PATHS.BLUEPRINT_VIEW(id, BLUEPRINT_VIEW.CONFIGURATION)}>
         <TextTooltip content={name}>{name}</TextTooltip>
       </RowLink>
     ),

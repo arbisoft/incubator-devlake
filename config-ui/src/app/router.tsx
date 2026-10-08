@@ -19,7 +19,7 @@
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router-dom';
 
 import { PageLoading } from '@/components';
-import { PATHS, PROJECT_TAB, ROUTE_SEGMENTS } from '@/config';
+import { BLUEPRINT_VIEW, PATHS, PROJECT_TAB, ROUTE_SEGMENTS } from '@/config';
 import {
   DBMigrate,
   Onboard,
@@ -64,6 +64,16 @@ const projectTabRoutes: RouteObject[] = Object.values(PROJECT_TAB).map((tab) => 
   element: <ProjectDetailPage />,
 }));
 
+const projectBlueprintViewRoutes: RouteObject[] = [BLUEPRINT_VIEW.CONFIGURATION].map((view) => ({
+  path: ROUTE_SEGMENTS.PROJECT_BLUEPRINT_VIEW(view),
+  element: <ProjectDetailPage />,
+}));
+
+const blueprintViewRoutes: RouteObject[] = [BLUEPRINT_VIEW.CONFIGURATION].map((view) => ({
+  path: ROUTE_SEGMENTS.BLUEPRINT_VIEW(view),
+  element: <BlueprintDetailPage />,
+}));
+
 export const routes: RouteObject[] = [
   {
     path: ROUTE_SEGMENTS.ROOT,
@@ -104,6 +114,7 @@ export const routes: RouteObject[] = [
         element: <ParamRedirect to={({ pname = '' }) => PATHS.PROJECT_TAB(pname, PROJECT_TAB.BLUEPRINT)} />,
       },
       ...projectTabRoutes,
+      ...projectBlueprintViewRoutes,
       {
         path: ROUTE_SEGMENTS.PROJECT_CONNECTION,
         element: <BlueprintConnectionDetailPage />,
@@ -133,6 +144,7 @@ export const routes: RouteObject[] = [
             path: ROUTE_SEGMENTS.BLUEPRINT,
             element: <BlueprintDetailPage />,
           },
+          ...blueprintViewRoutes,
           {
             path: ROUTE_SEGMENTS.BLUEPRINT_CONNECTION,
             element: <BlueprintConnectionDetailPage />,

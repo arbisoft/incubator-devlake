@@ -29,20 +29,19 @@ import { getPluginConfig } from '@/plugins';
 import { IBlueprint, IBPMode } from '@/types';
 import { formatTime, operator } from '@/utils';
 
-import { FromEnum } from '../types';
 import { validRawPlan } from '../utils';
 
 import { AdvancedEditor, UpdateNameDialog, UpdatePolicyDialog, AddConnectionDialog } from './components';
-import * as S from './styled';
+import * as S from './configuration-styled';
 
 interface Props {
-  from: FromEnum;
   blueprint: IBlueprint;
+  connectionPath: (plugin: string, connectionId: ID) => string;
   onRefresh: () => void;
-  onChangeTab: (tab: string) => void;
+  onShowStatus: () => void;
 }
 
-export const ConfigurationPanel = ({ from, blueprint, onRefresh, onChangeTab }: Props) => {
+export const ConfigurationPanel = ({ blueprint, connectionPath, onRefresh, onShowStatus }: Props) => {
   const [type, setType] = useState<'name' | 'policy' | 'add-connection'>();
   const [rawPlan, setRawPlan] = useState('');
   const [operating, setOperating] = useState(false);
@@ -114,7 +113,7 @@ export const ConfigurationPanel = ({ from, blueprint, onRefresh, onChangeTab }: 
 
     if (success) {
       onRefresh();
-      onChangeTab('status');
+      onShowStatus();
     }
   };
 
@@ -202,15 +201,7 @@ export const ConfigurationPanel = ({ from, blueprint, onRefresh, onChangeTab }: 
                       <span>{cs.scope.length} data scope</span>
                     </div>
                     <div className="link">
-                      <Link
-                        to={
-                          from === FromEnum.blueprint
-                            ? PATHS.BLUEPRINT_CONNECTION(blueprint.id, cs.plugin, cs.connectionId)
-                            : PATHS.PROJECT_CONNECTION(blueprint.projectName, cs.plugin, cs.connectionId)
-                        }
-                      >
-                        Edit Data Scope and Scope Config
-                      </Link>
+                      <Link to={connectionPath(cs.plugin, cs.connectionId)}>Edit Data Scope and Scope Config</Link>
                     </div>
                   </S.ConnectionItem>
                 ))}

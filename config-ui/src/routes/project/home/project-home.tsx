@@ -22,13 +22,13 @@ import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import API from '@/api';
-import { PATHS, PROJECT_TAB } from '@/config';
+import { BLUEPRINT_VIEW, PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
 import { OnboardTour } from '@/routes/onboard/components';
 import { DataTable, ListPage, ListToolbar, PageHeader, buildListEmpty, useListState, useRefreshVersion } from '@/ui';
 
 import { NewProjectModal } from './components';
-import { CONFIGURATION_TAB_STATE, COPY } from './constants';
+import { COPY } from './constants';
 import type { ProjectRow, ProjectSortKey } from './types';
 import { useProjectColumns } from './use-project-columns';
 import { toProjectRow } from './utils';
@@ -53,7 +53,7 @@ export const ProjectHomePage = () => {
   );
 
   const handleConfigure = useCallback(
-    (name: string) => navigate(PATHS.PROJECT_TAB(name, PROJECT_TAB.BLUEPRINT), { state: CONFIGURATION_TAB_STATE }),
+    (name: string) => navigate(PATHS.PROJECT_BLUEPRINT_VIEW(name, BLUEPRINT_VIEW.CONFIGURATION)),
     [navigate],
   );
   const { columns, tourRefs } = useProjectColumns(handleConfigure);

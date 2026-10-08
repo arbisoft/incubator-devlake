@@ -16,6 +16,29 @@
  *
  */
 
-import styled from 'styled-components';
+import { useTheme } from 'styled-components';
 
-export const Wrapper = styled.div``;
+import { COPY } from '../constants';
+
+import { PipelinePanel } from './panel';
+import { DetailDialog } from './styled';
+import type { PipelineDetailModalProps } from './types';
+
+export const PipelineDetailModal = ({ open, id, onClose, afterClose }: PipelineDetailModalProps) => {
+  const { layout } = useTheme();
+
+  return (
+    <DetailDialog
+      open={open}
+      centered
+      destroyOnHidden
+      footer={null}
+      width={layout.modalWidth.lg}
+      title={COPY.detail.title(id)}
+      onCancel={onClose}
+      afterClose={afterClose}
+    >
+      <PipelinePanel id={id} />
+    </DetailDialog>
+  );
+};

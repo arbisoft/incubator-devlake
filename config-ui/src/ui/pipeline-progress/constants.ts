@@ -27,5 +27,6 @@ export const PROGRESS_STROKE = 6;
 export const PERCENT_MAX = 100;
 
 export const COPY = {
+  noTasks: 'No tasks',
   summary: (finished: number, total: number) => `${finished} of ${total} tasks finished`,
 };

@@ -75,8 +75,9 @@ export type LayoutTokens = {
   markTileSize: number;
   wordmarkWidth: number;
   confirmModalWidth: number;
-  pipelineTaskHeight: number;
+  pipelineTaskIdWidth: number;
   pipelineTaskDurationWidth: number;
+  pipelineProgressWidth: number;
   catalogCardMinWidth: number;
   segmentInset: number;
   segmentPaddingBlock: number;
@@ -139,8 +140,9 @@ export const LAYOUT: LayoutTokens = {
   markTileSize: 32,
   wordmarkWidth: 120,
   confirmModalWidth: 416,
-  pipelineTaskHeight: 80,
-  pipelineTaskDurationWidth: 80,
+  pipelineTaskIdWidth: 84,
+  pipelineTaskDurationWidth: 64,
+  pipelineProgressWidth: 250,
   catalogCardMinWidth: 272,
   segmentInset: 2,
   segmentPaddingBlock: 3,

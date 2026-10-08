@@ -20,21 +20,14 @@ import { SettingOutlined } from '@ant-design/icons';
 import { Button, Tooltip, type TableColumnsType } from 'antd';
 import { useMemo, useRef } from 'react';
 
-import { getCron, PATHS } from '@/config';
+import { BLUEPRINT_VIEW, getCron, PATHS } from '@/config';
 import { ConnectionName } from '@/features';
 import { PipelineStatusBadge } from '@/routes/pipeline';
 import { OverflowList, RowLink } from '@/ui';
 import { formatTime } from '@/utils';
 
 import { OtelConnectionName } from './components';
-import {
-  CONFIGURATION_TAB_STATE,
-  CONNECTION_ENTRY_KIND,
-  COPY,
-  MAX_VISIBLE_CONNECTIONS,
-  NO_CONNECTIONS,
-  PROJECT_COLUMN,
-} from './constants';
+import { CONNECTION_ENTRY_KIND, COPY, MAX_VISIBLE_CONNECTIONS, NO_CONNECTIONS, PROJECT_COLUMN } from './constants';
 import type { ProjectRow } from './types';
 import { getConnectionEntries } from './utils';
 
@@ -51,7 +44,7 @@ export const useProjectColumns = (onConfigure: (name: string) => void) => {
         dataIndex: 'name',
         sorter: true,
         render: (name: string) => (
-          <RowLink to={PATHS.PROJECT(name)} state={CONFIGURATION_TAB_STATE} ref={nameRef}>
+          <RowLink to={PATHS.PROJECT_BLUEPRINT_VIEW(name, BLUEPRINT_VIEW.CONFIGURATION)} ref={nameRef}>
             {name}
           </RowLink>
         ),

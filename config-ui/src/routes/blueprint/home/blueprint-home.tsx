@@ -22,7 +22,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import API from '@/api';
-import { PATHS } from '@/config';
+import { BLUEPRINT_VIEW, PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
 import type { IBlueprint } from '@/types';
 import {
@@ -39,7 +39,7 @@ import {
 
 import { getColumns } from './columns';
 import { NewBlueprintModal } from './components';
-import { CONFIGURATION_TAB_STATE, COPY, LIST_FILTER, STATUS_FILTER, TYPE_FILTER_ALL } from './constants';
+import { COPY, LIST_FILTER, STATUS_FILTER, TYPE_FILTER_ALL } from './constants';
 import { TypeSelect } from './styled';
 import type { BlueprintFilters, BlueprintSortKey } from './types';
 import { buildBlueprintQuery, getTypeOptions } from './utils';
@@ -64,7 +64,7 @@ export const BlueprintHomePage = () => {
 
   const navigate = useNavigate();
   const columns = useMemo(
-    () => getColumns({ onConfigure: (id) => navigate(PATHS.BLUEPRINT(id), { state: CONFIGURATION_TAB_STATE }) }),
+    () => getColumns({ onConfigure: (id) => navigate(PATHS.BLUEPRINT_VIEW(id, BLUEPRINT_VIEW.CONFIGURATION)) }),
     [navigate],
   );
 

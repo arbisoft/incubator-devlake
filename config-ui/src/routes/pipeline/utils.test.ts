@@ -16,11 +16,24 @@
  *
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import type { IPipeline } from '@/types';
+import { IPipelineStatus, type IPipeline, type ITask } from '@/types';
 
-import { buildPipelineQuery, pickConfig, toBlueprintOptions, toTablePagination } from './utils';
+import { STAGE_STATE, TASK_CELL } from './constants';
+import {
+  areTasksSettled,
+  buildPipelineQuery,
+  canRerunTask,
+  getPipelineActions,
+  getStageState,
+  getStageTimes,
+  getTaskCell,
+  groupStages,
+  isPipelineFinished,
+  pickConfig,
+  toBlueprintOptions,
+} from './utils';
 
 describe('pipeline list query', () => {
   const QUERY = { page: 2, pageSize: 10, sortBy: 'beganAt', sortOrder: 'desc' } as const;
@@ -60,14 +73,154 @@ describe('pickConfig', () => {
   });
 });
 
-describe('toTablePagination', () => {
-  it('adapts the legacy shape and resets to the first page on a size change', () => {
-    const onChange = vi.fn();
-    const adapted = toTablePagination({ current: 3, pageSize: 10, total: 42, onChange });
-    expect(adapted).toMatchObject({ page: 3, pageSize: 10, total: 42 });
-    adapted.onPageChange(4);
-    expect(onChange).toHaveBeenLastCalledWith(4);
-    adapted.onPageSizeChange();
-    expect(onChange).toHaveBeenLastCalledWith(1);
+const task = (overrides: Partial<ITask>): ITask => ({
+  id: 1,
+  plugin: 'github',
+  status: IPipelineStatus.COMPLETED,
+  pipelineRow: 1,
+  pipelineCol: 1,
+  beganAt: null,
+  finishedAt: null,
+  options: {},
+  message: '',
+  errorName: '',
+  ...overrides,
+});
+
+describe('getPipelineActions', () => {
+  it.each([
+    [IPipelineStatus.ACTIVE, { cancel: true, rerun: false }],
+    [IPipelineStatus.RUNNING, { cancel: true, rerun: false }],
+    [IPipelineStatus.RERUN, { cancel: true, rerun: false }],
+    [IPipelineStatus.CREATED, { cancel: false, rerun: false }],
+    [IPipelineStatus.PENDING, { cancel: false, rerun: false }],
+    [IPipelineStatus.COMPLETED, { cancel: false, rerun: false }],
+    [IPipelineStatus.PARTIAL, { cancel: false, rerun: true }],
+    [IPipelineStatus.FAILED, { cancel: false, rerun: true }],
+    [IPipelineStatus.CANCELLED, { cancel: false, rerun: true }],
+  ])('offers the valid actions for %s', (status, expected) => {
+    expect(getPipelineActions(status)).toEqual(expected);
+  });
+});
+
+describe('isPipelineFinished and canRerunTask', () => {
+  it('treat the four finished statuses as done', () => {
+    expect(Object.values(IPipelineStatus).filter(isPipelineFinished)).toEqual([
+      IPipelineStatus.COMPLETED,
+      IPipelineStatus.PARTIAL,
+      IPipelineStatus.FAILED,
+      IPipelineStatus.CANCELLED,
+    ]);
+    expect(Object.values(IPipelineStatus).filter(canRerunTask)).toEqual(
+      Object.values(IPipelineStatus).filter(isPipelineFinished),
+    );
+  });
+});
+
+describe('getStageState', () => {
+  it.each([
+    [[IPipelineStatus.COMPLETED, IPipelineStatus.COMPLETED], STAGE_STATE.SUCCESS],
+    [[IPipelineStatus.COMPLETED, IPipelineStatus.RUNNING], STAGE_STATE.LOADING],
+    [[IPipelineStatus.COMPLETED, IPipelineStatus.FAILED], STAGE_STATE.ERROR],
+    [[IPipelineStatus.COMPLETED, IPipelineStatus.CANCELLED], STAGE_STATE.CANCEL],
+    [[IPipelineStatus.PENDING, IPipelineStatus.CREATED], STAGE_STATE.READY],
+    [[IPipelineStatus.RUNNING, IPipelineStatus.FAILED], STAGE_STATE.LOADING],
+  ])('reads %j as %s', (statuses, expected) => {
+    expect(getStageState(statuses.map((status) => task({ status })))).toBe(expected);
+  });
+});
+
+describe('groupStages', () => {
+  it('groups tasks by stage in numeric order and each stage by task id', () => {
+    const stages = groupStages([
+      task({ id: 5, pipelineRow: 10 }),
+      task({ id: 3, pipelineRow: 2 }),
+      task({ id: 2, pipelineRow: 2 }),
+      task({ id: 1, pipelineRow: 1, status: IPipelineStatus.FAILED }),
+    ]);
+    expect(stages.map(({ key }) => key)).toEqual(['1', '2', '10']);
+    expect(stages[1].tasks.map(({ id }) => id)).toEqual([2, 3]);
+    expect(stages[0].state).toBe(STAGE_STATE.ERROR);
+  });
+
+  it('is empty without tasks', () => {
+    expect(groupStages([])).toEqual([]);
+  });
+});
+
+const T_START = '2026-01-01T00:00:10.000Z';
+const T_EARLY = '2026-01-01T00:00:05.000Z';
+const T_END = '2026-01-01T00:00:20.000Z';
+const T_LATE = '2026-01-01T00:01:00.000Z';
+
+describe('getStageTimes', () => {
+  it('spans the earliest start to the latest finish once every task settled', () => {
+    const times = getStageTimes([
+      task({ beganAt: T_START, finishedAt: T_END }),
+      task({ beganAt: T_EARLY, finishedAt: T_LATE }),
+    ]);
+    expect(times).toEqual({ beganAt: T_EARLY, finishedAt: T_LATE });
+  });
+
+  it('has no finish while a task still runs', () => {
+    const times = getStageTimes([
+      task({ beganAt: T_START, finishedAt: T_END }),
+      task({ status: IPipelineStatus.RUNNING, beganAt: T_START }),
+    ]);
+    expect(times.finishedAt).toBeNull();
+    expect(times.beganAt).toBe(T_START);
+  });
+
+  it('has no times before anything started', () => {
+    expect(getStageTimes([task({ status: IPipelineStatus.PENDING })])).toEqual({ beganAt: null, finishedAt: null });
+  });
+});
+
+describe('getTaskCell', () => {
+  it('shows progress from the subtask counts of a running task', () => {
+    const cell = getTaskCell(
+      task({ status: IPipelineStatus.RUNNING, progressDetail: { finishedSubTasks: 13, totalSubTasks: 20 } }),
+    );
+    expect(cell).toEqual({ kind: TASK_CELL.PROGRESS, finished: 13, total: 20, counted: true });
+  });
+
+  it('shows no progress for a running task without counts', () => {
+    expect(getTaskCell(task({ status: IPipelineStatus.RUNNING }))).toMatchObject({
+      finished: 0,
+      total: 0,
+      counted: false,
+    });
+  });
+
+  it('shows a finished task as complete', () => {
+    const cell = getTaskCell(
+      task({ status: IPipelineStatus.COMPLETED, progressDetail: { finishedSubTasks: 3, totalSubTasks: 4 } }),
+    );
+    expect(cell).toEqual({ kind: TASK_CELL.PROGRESS, finished: 4, total: 4, counted: true });
+  });
+
+  it('shows a finished task without subtask counts as a full bar', () => {
+    expect(getTaskCell(task({ status: IPipelineStatus.COMPLETED }))).toEqual({
+      kind: TASK_CELL.PROGRESS,
+      finished: 1,
+      total: 1,
+      counted: false,
+    });
+  });
+
+  it.each([
+    [IPipelineStatus.PENDING, TASK_CELL.PENDING],
+    [IPipelineStatus.CREATED, TASK_CELL.PENDING],
+    [IPipelineStatus.FAILED, TASK_CELL.FAILED],
+    [IPipelineStatus.CANCELLED, TASK_CELL.CANCELLED],
+  ])('shows %s as %s', (status, kind) => {
+    expect(getTaskCell(task({ status }))).toEqual({ kind });
+  });
+});
+
+describe('areTasksSettled', () => {
+  it('is true only when no task is pending or running', () => {
+    expect(areTasksSettled([task({}), task({ status: IPipelineStatus.FAILED })])).toBe(true);
+    expect(areTasksSettled([task({}), task({ status: IPipelineStatus.RUNNING })])).toBe(false);
   });
 });

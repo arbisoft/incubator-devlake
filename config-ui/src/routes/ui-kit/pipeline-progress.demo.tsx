@@ -37,6 +37,16 @@ export const PipelineProgressDemo = () => (
         <PipelineProgress status="pending" finished={0} total={0} />
       </Narrow>
     </DemoCase>
+    <DemoCase label={COPY.cases.noTotalFinished}>
+      <Narrow>
+        <PipelineProgress status="completed" finished={0} total={0} />
+      </Narrow>
+    </DemoCase>
+    <DemoCase label={COPY.cases.noTotalRunning}>
+      <Narrow>
+        <PipelineProgress status="running" finished={0} total={0} />
+      </Narrow>
+    </DemoCase>
     <DemoCase label={COPY.cases.overshoot}>
       <Narrow>
         <PipelineProgress status="completed" finished={14} total={12} />

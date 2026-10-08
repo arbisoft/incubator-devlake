@@ -16,9 +16,17 @@
  *
  */
 
-import { PROJECT_TAB, type ProjectTab } from '@/config';
+import { PROJECT_TAB } from '@/config/route-keys';
+import type { ProjectTab } from '@/config/types';
 
 export const COPY = {
+  breadcrumbProjects: 'Projects',
+  notFound: (name: string) => `Project not found with project name: ${name}`,
+  tabsLabel: 'Project sections',
+  noBlueprint: {
+    title: 'This project has no blueprint',
+    description: 'The blueprint is created with the project. Without one there is no status or configuration to show.',
+  },
   tabs: {
     [PROJECT_TAB.BLUEPRINT]: 'Blueprint',
     [PROJECT_TAB.WEBHOOKS]: 'Webhooks',

@@ -16,7 +16,15 @@
  *
  */
 
-export enum FromEnum {
-  project = 'PROJECT',
-  blueprint = 'BLUEPRINT',
-}
+import { useState } from 'react';
+
+// Keeps the last loaded value of the same scope on screen while a refetch is pending.
+export const useLastLoaded = <T, S>(value: T | undefined, scope: S): T | undefined => {
+  const [last, setLast] = useState<{ scope: S; value: T }>();
+
+  if (value !== undefined && (last?.value !== value || last.scope !== scope)) {
+    setLast({ scope, value });
+  }
+
+  return value ?? (last?.scope === scope ? last.value : undefined);
+};
