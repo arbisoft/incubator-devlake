@@ -18,8 +18,6 @@
 
 // Src files that fail the strict reskin rules today; remove a file from here when it is cleaned.
 export const RESKIN_LINT_PENDING = [
-  'src/routes/change-password.tsx',
-  'src/routes/login/index.tsx',
   'src/routes/otel/attention.tsx',
   'src/routes/otel/ingestion-health.tsx',
   'src/routes/otel/modals.tsx',

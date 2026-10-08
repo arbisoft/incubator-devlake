@@ -16,24 +16,18 @@
  *
  */
 
-import { Alert, Button, Form, Input, Typography } from 'antd';
+import { Alert, Form, Input } from 'antd';
 import { useEffect, useState } from 'react';
 
 import API from '@/api';
-import { TipLayout } from '@/components';
 import { PATHS } from '@/config';
 import { useDocumentTitle } from '@/ui/hooks';
 
-import { COPY } from './change-password.constants';
-import { ChangePasswordCard } from './change-password.styled';
+import { AuthLayout } from '../login/auth-layout';
+import { ActionButton, Notices } from '../login/styled';
 
-const { Title } = Typography;
-
-type PasswordChangeValues = {
-  currentPassword?: string;
-  password: string;
-  confirmPassword: string;
-};
+import { COPY, MIN_PASSWORD_LENGTH } from './constants';
+import type { PasswordChangeValues } from './types';
 
 export const ChangePassword = () => {
   useDocumentTitle(COPY.title);
@@ -75,7 +69,7 @@ export const ChangePassword = () => {
       await API.auth.changeLocalPassword({ currentPassword: values.currentPassword, password: values.password });
       window.location.assign(PATHS.CONNECTIONS());
     } catch {
-      setError('Unable to change the password. Check the current password and try again.');
+      setError(COPY.failed);
     } finally {
       setLoading(false);
     }
@@ -84,51 +78,48 @@ export const ChangePassword = () => {
   if (!ready) return null;
 
   return (
-    <TipLayout>
-      <ChangePasswordCard>
-        <Title level={3}>Change your password</Title>
-        {mustChangePassword && (
-          <Alert type="info" title="Choose a new password to continue." style={{ marginBottom: 16 }} />
+    <AuthLayout title={COPY.heading}>
+      <Notices>
+        {mustChangePassword && <Alert type="info" title={COPY.forcedNotice} />}
+        {error && <Alert type="error" title={error} />}
+      </Notices>
+      <Form<PasswordChangeValues> layout="vertical" onFinish={changePassword} requiredMark={false}>
+        {!mustChangePassword && (
+          <Form.Item
+            label={COPY.currentLabel}
+            name="currentPassword"
+            rules={[{ required: true, message: COPY.currentRequired }]}
+          >
+            <Input.Password autoComplete="current-password" />
+          </Form.Item>
         )}
-        {error && <Alert type="error" title={error} style={{ marginBottom: 16 }} />}
-        <Form<PasswordChangeValues> layout="vertical" onFinish={changePassword} requiredMark={false}>
-          {!mustChangePassword && (
-            <Form.Item
-              label="Current password"
-              name="currentPassword"
-              rules={[{ required: true, message: 'Enter your current password.' }]}
-            >
-              <Input.Password autoComplete="current-password" />
-            </Form.Item>
-          )}
-          <Form.Item
-            label="New password"
-            name="password"
-            rules={[{ required: true, min: 15, message: 'Use at least 15 characters.' }]}
-          >
-            <Input.Password autoComplete="new-password" />
-          </Form.Item>
-          <Form.Item
-            label="Confirm new password"
-            name="confirmPassword"
-            dependencies={['password']}
-            rules={[
-              { required: true, message: 'Confirm your new password.' },
-              ({ getFieldValue }) => ({
-                validator: (_, value) =>
-                  !value || getFieldValue('password') === value
-                    ? Promise.resolve()
-                    : Promise.reject(new Error('Passwords do not match.')),
-              }),
-            ]}
-          >
-            <Input.Password autoComplete="new-password" />
-          </Form.Item>
-          <Button type="primary" htmlType="submit" block loading={loading}>
-            Change password
-          </Button>
-        </Form>
-      </ChangePasswordCard>
-    </TipLayout>
+        <Form.Item
+          label={COPY.newLabel}
+          name="password"
+          rules={[{ required: true, min: MIN_PASSWORD_LENGTH, message: COPY.tooShort }]}
+        >
+          <Input.Password autoComplete="new-password" />
+        </Form.Item>
+        <Form.Item
+          label={COPY.confirmLabel}
+          name="confirmPassword"
+          dependencies={['password']}
+          rules={[
+            { required: true, message: COPY.confirmRequired },
+            ({ getFieldValue }) => ({
+              validator: (_, value) =>
+                !value || getFieldValue('password') === value
+                  ? Promise.resolve()
+                  : Promise.reject(new Error(COPY.mismatch)),
+            }),
+          ]}
+        >
+          <Input.Password autoComplete="new-password" />
+        </Form.Item>
+        <ActionButton type="primary" htmlType="submit" block loading={loading}>
+          {COPY.submit}
+        </ActionButton>
+      </Form>
+    </AuthLayout>
   );
 };

@@ -16,6 +16,8 @@
  *
  */
 
-export const COPY = {
-  title: 'Change password',
+export type PasswordChangeValues = {
+  currentPassword?: string;
+  password: string;
+  confirmPassword: string;
 };

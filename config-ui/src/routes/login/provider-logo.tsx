@@ -16,11 +16,17 @@
  *
  */
 
-export * from './action';
-export * from './block';
-export * from './loading';
-export * from './logo';
-export * from './markdown';
-export * from './message';
-export * from './page-header';
-export * from './tooltip';
+import { KeyOutlined } from '@ant-design/icons';
+
+import { LogoImage } from './styled';
+import type { ProviderLogoProps } from './types';
+import { matchProviderLogo } from './utils';
+
+export const ProviderLogo = ({ issuerHost }: ProviderLogoProps) => {
+  const logo = matchProviderLogo(issuerHost);
+  return logo ? (
+    <LogoImage src={logo.src} alt={logo.alt} $adaptive={Boolean(logo.adaptive)} />
+  ) : (
+    <KeyOutlined aria-hidden />
+  );
+};

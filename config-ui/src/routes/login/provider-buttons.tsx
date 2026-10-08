@@ -16,33 +16,28 @@
  *
  */
 
-import styled from 'styled-components';
+import type { Provider } from '@/api/auth';
 
-export const Wrapper = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding-top: 100px;
-  height: 100vh;
-  background-color: ${({ theme }) => theme.colors.bgLayout};
-  box-sizing: border-box;
-`;
+import { COPY } from './constants';
+import { ProviderLogo } from './provider-logo';
+import { ActionButton, Section } from './styled';
 
-export const Inner = styled.div`
-  margin: 32px auto 0;
-  width: 820px;
+type ProviderButtonsProps = {
+  providers: Provider[];
+  onSelect: (provider: Provider) => void;
+};
 
-  h2 {
-    display: flex;
-    align-items: center;
-    margin: 0;
-  }
-
-  p {
-    margin: 16px 0;
-
-    &.warning {
-      color: ${({ theme }) => theme.colors.warningAlt};
-    }
-  }
-`;
+export const ProviderButtons = ({ providers, onSelect }: ProviderButtonsProps) => (
+  <Section>
+    {providers.map((provider) => (
+      <ActionButton
+        key={provider.name}
+        block
+        icon={<ProviderLogo issuerHost={provider.issuerHost} />}
+        onClick={() => onSelect(provider)}
+      >
+        {COPY.continueWith(provider.displayName)}
+      </ActionButton>
+    ))}
+  </Section>
+);

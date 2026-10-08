@@ -16,10 +16,37 @@
  *
  */
 
-import { Card } from 'antd';
-import styled from 'styled-components';
+import type { ReactNode } from 'react';
 
-export const ChangePasswordCard = styled(Card)`
-  max-width: 480px;
-  margin: 0 auto;
-`;
+import type { PROVIDER_ID } from './constants';
+
+export type ProviderId = (typeof PROVIDER_ID)[keyof typeof PROVIDER_ID];
+
+export type ProviderRule = {
+  id: ProviderId;
+  hosts?: string[];
+  suffixes?: string[];
+  contains?: string[];
+};
+
+export type ProviderLogoEntry = {
+  id: ProviderId;
+  src: string;
+  alt: string;
+  adaptive?: boolean;
+};
+
+export type LocalLoginValues = {
+  loginName: string;
+  password: string;
+};
+
+export type ProviderLogoProps = {
+  issuerHost?: string;
+};
+
+export type AuthLayoutProps = {
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
+};

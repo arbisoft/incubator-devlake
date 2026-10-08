@@ -16,19 +16,19 @@
  *
  */
 
-import { Logo } from '@/components';
+export const MIN_PASSWORD_LENGTH = 15;
 
-import * as S from './styled';
-
-interface Props {
-  children: React.ReactNode;
-}
-
-export const TipLayout = ({ children }: Props) => {
-  return (
-    <S.Wrapper>
-      <Logo />
-      <S.Inner>{children}</S.Inner>
-    </S.Wrapper>
-  );
+export const COPY = {
+  title: 'Change password',
+  heading: 'Change your password',
+  forcedNotice: 'Choose a new password to continue.',
+  currentLabel: 'Current password',
+  currentRequired: 'Enter your current password.',
+  newLabel: 'New password',
+  tooShort: `Use at least ${MIN_PASSWORD_LENGTH} characters.`,
+  confirmLabel: 'Confirm new password',
+  confirmRequired: 'Confirm your new password.',
+  mismatch: 'Passwords do not match.',
+  submit: 'Change password',
+  failed: 'Unable to change the password. Check the current password and try again.',
 };
