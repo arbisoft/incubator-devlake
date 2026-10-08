@@ -57,6 +57,8 @@ export const USER_COLUMN = {
   ACTIONS: 'actions',
 } as const;
 
+export const USER_FILTER = { STATUS: 'status' } as const;
+
 export const DOMAIN_COLUMN = { DOMAIN: 'domain', ROLE: 'defaultRole', STATUS: 'status', ACTIONS: 'actions' } as const;
 
 export const ACCESS_STATUS_TONE = {
@@ -162,8 +164,8 @@ export const COPY = {
       description: 'Add your first user to give them access to DevLake.',
     },
     noResults: {
-      title: 'No users match your search',
-      description: 'Try a different email or name.',
+      title: 'No users match your search or filter',
+      description: 'Try a different email or name, or clear the status filter.',
     },
   },
   domains: {
@@ -257,6 +259,11 @@ export const COPY = {
     },
   },
 };
+
+export const USER_STATUS_FILTER_OPTIONS = Object.values(ACCESS_STATUS).map((value) => ({
+  value,
+  text: COPY.users.status[value],
+}));
 
 export const LIFECYCLE_CONFIRM: Record<
   (typeof LIFECYCLE_SUBJECT)[keyof typeof LIFECYCLE_SUBJECT],

@@ -18,6 +18,8 @@
 
 import type { AccessDomain, AccessRole, AccessStatus, AccessUser } from '@/api/access';
 
+import type { StatusColumnFilter } from '../columns.types';
+
 export type UserColumnActions = {
   onRoleChange: (user: AccessUser, role: AccessRole) => void;
   onStatusChange: (user: AccessUser, status: AccessStatus) => void;
@@ -26,6 +28,7 @@ export type UserColumnActions = {
   onResetLocalCredential: (user: AccessUser) => void;
   onRemoveLocalCredential: (user: AccessUser) => void;
   localAuthEnabled: boolean;
+  statusFilter: StatusColumnFilter;
 };
 
 export type DomainColumnActions = {

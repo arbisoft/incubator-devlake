@@ -79,26 +79,48 @@ const compare = (a: UserRow, b: UserRow, key: string) =>
 
 const empty = { title: text.emptyTitle, description: text.emptyDescription, size: EMPTY_STATE_SIZE.SECTION };
 
+const STATUS_FILTER_KEY = 'status';
+
 const ServerTable = () => {
   const list = useListState<string, Record<string, string>>(TABLE_LIST_DEFAULTS);
+  const status = list.filters[STATUS_FILTER_KEY];
+  const serverColumns = useMemo(
+    () =>
+      columns.map((column) =>
+        column.key === STATUS_FILTER_KEY
+          ? {
+              ...column,
+              filters: [
+                { text: text.active, value: 'active' },
+                { text: text.inactive, value: 'inactive' },
+              ],
+              filterMultiple: false,
+              filteredValue: status ? [status] : null,
+            }
+          : column,
+      ),
+    [status],
+  );
   const sorted = useMemo(() => {
     const { sort } = list;
-    if (!sort) return TABLE_ROWS;
+    const rows = status ? TABLE_ROWS.filter((row) => row.status === status) : TABLE_ROWS;
+    if (!sort) return rows;
     const factor = sort.sortOrder === SORT_ORDER.ASC ? 1 : -1;
-    return [...TABLE_ROWS].sort((a, b) => factor * compare(a, b, sort.sortBy));
-  }, [list]);
+    return [...rows].sort((a, b) => factor * compare(a, b, sort.sortBy));
+  }, [list, status]);
   const start = (list.page - 1) * list.pageSize;
 
   return (
     <>
       <DataTable<UserRow>
-        columns={columns}
+        columns={serverColumns}
         dataSource={sorted.slice(start, start + list.pageSize)}
         rowKey="id"
         loading={false}
         ariaLabel={text.ariaLabel}
         empty={empty}
         list={list}
+        onFilterChange={(filters) => list.setFilter(STATUS_FILTER_KEY, String(filters[STATUS_FILTER_KEY]?.[0] ?? ''))}
         total={sorted.length}
       />
       <Mono>{JSON.stringify(list.toQuery())}</Mono>

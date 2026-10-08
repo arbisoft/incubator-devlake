@@ -80,6 +80,7 @@ export const getUserColumns = (actions: UserColumnActions): TableColumnsType<Acc
     title: COPY.users.columns.status,
     getStatus: (user) => user.status,
     labels: COPY.users.status,
+    filter: actions.statusFilter,
   }),
   {
     key: USER_COLUMN.LOCAL_PASSWORD,
