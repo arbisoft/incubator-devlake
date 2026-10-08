@@ -17,12 +17,14 @@
  */
 
 import { Alert, Button, type TableColumnsType } from 'antd';
+import { useMemo } from 'react';
 
 import type { AiSourcePreference } from '@/api/otel';
 import { DataTable, EMPTY_STATE_SIZE, SectionCard } from '@/ui';
 
 import { COPY, POLICY_COLUMN, PREFERRED_SOURCE } from './constants';
 import type { OtelSourcePolicyProps } from './types';
+import { useClientPagination } from './use-client-pagination';
 
 const COLUMNS: TableColumnsType<AiSourcePreference> = [
   { key: POLICY_COLUMN.WORKSPACE, title: COPY.policy.columns.workspace, dataIndex: 'workspaceKey', ellipsis: true },
@@ -31,7 +33,11 @@ const COLUMNS: TableColumnsType<AiSourcePreference> = [
 ];
 
 export const OtelSourcePolicy = ({ loading, failed, preferences, onRetry }: OtelSourcePolicyProps) => {
-  const active = (preferences ?? []).filter(({ preferredSource }) => preferredSource === PREFERRED_SOURCE);
+  const active = useMemo(
+    () => (preferences ?? []).filter(({ preferredSource }) => preferredSource === PREFERRED_SOURCE),
+    [preferences],
+  );
+  const { rows, pagination } = useClientPagination(active);
 
   return (
     <SectionCard title={COPY.policy.title} description={COPY.policy.description}>
@@ -48,8 +54,8 @@ export const OtelSourcePolicy = ({ loading, failed, preferences, onRetry }: Otel
         ariaLabel={COPY.policy.tableLabel}
         loading={loading}
         columns={COLUMNS}
-        dataSource={active}
-        pagination={false}
+        dataSource={rows}
+        pagination={pagination}
         empty={{ ...COPY.policy.empty, size: EMPTY_STATE_SIZE.SECTION }}
       />
     </SectionCard>

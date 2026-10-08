@@ -44,6 +44,7 @@ import { OtelIngestionHealth } from './ingestion-health';
 import { OtelSourcePolicy } from './source-policy';
 import { Hint } from './styled';
 import type { LifecycleAction, OtelModal, PendingCredentialFocus } from './types';
+import { useClientPagination } from './use-client-pagination';
 import { useOtelAction } from './use-otel-action';
 import { getCreateIntent, hasRecoveryRequired, hasStorageNeedsApplying, notifyOtelAttentionChanged } from './utils';
 
@@ -70,6 +71,7 @@ export const Otel = () => {
   const projectOptions = projectOptionsQuery.data;
 
   const rows = useMemo(() => connections.data ?? [], [connections.data]);
+  const { rows: pageRows, pagination } = useClientPagination(rows);
   const failed = connections.data === undefined && connections.error !== undefined;
 
   const showCredential = useCallback((response: OtelConnectionResponse) => {
@@ -163,8 +165,8 @@ export const Otel = () => {
           ariaLabel={COPY.connections.tableLabel}
           loading={connections.data === undefined && !failed}
           columns={columns}
-          dataSource={rows}
-          pagination={false}
+          dataSource={pageRows}
+          pagination={pagination}
           empty={empty}
         />
       </SectionCard>

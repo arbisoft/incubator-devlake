@@ -177,7 +177,7 @@ export const getConnectionColumns = ({
     key: CONNECTION_COLUMN.ACTIONS,
     title: COPY.connections.columns.actions,
     width: LAYOUT.otelActionsColumnWidth,
-    align: 'right',
+    align: 'center',
     render: (_, record) => (
       <ActionRow>
         <IconButton

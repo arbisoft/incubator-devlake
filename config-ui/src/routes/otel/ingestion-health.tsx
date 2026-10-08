@@ -25,7 +25,6 @@ import { useRefreshData } from '@/hooks';
 import {
   CODE_LANGUAGE,
   CodeBlock,
-  DEFAULT_PAGE,
   DataTable,
   DetailDrawer,
   EMPTY_STATE_SIZE,
@@ -35,25 +34,24 @@ import {
   StatusBadge,
 } from '@/ui';
 
-import { BATCH_PAGE_SIZE_OPTIONS, COPY, DEFAULT_BATCH_PAGE_SIZE } from './constants';
+import { COPY } from './constants';
 import { getBatchColumns } from './ingestion-columns';
 import { Hint, Stack } from './styled';
 import { INGESTION_STATE_TONE } from './tones';
 import type { OtelIngestionHealthProps } from './types';
+import { useClientPagination } from './use-client-pagination';
 import { formatAge, getConverterLabel } from './utils';
 
 export const OtelIngestionHealth = ({ loading, failed, status, onRetry }: OtelIngestionHealthProps) => {
   const [batchId, setBatchId] = useState<ID>();
   const [payloadVersion, setPayloadVersion] = useState(0);
-  const [page, setPage] = useState(DEFAULT_PAGE);
-  const [pageSize, setPageSize] = useState<number>(DEFAULT_BATCH_PAGE_SIZE);
   const payload = useRefreshData(
     (signal) => (batchId === undefined ? Promise.resolve(undefined) : API.otel.metricBatchPayload(batchId, signal)),
     [batchId, payloadVersion],
   );
 
   const batches = useMemo(() => status?.recentBatches ?? [], [status]);
-  const rows = useMemo(() => batches.slice((page - 1) * pageSize, page * pageSize), [batches, page, pageSize]);
+  const { rows, pagination } = useClientPagination(batches);
   const columns = useMemo(() => getBatchColumns((batch) => setBatchId(batch.id)), []);
 
   const metrics = status && [
@@ -112,17 +110,7 @@ export const OtelIngestionHealth = ({ loading, failed, status, onRetry }: OtelIn
           columns={columns}
           dataSource={rows}
           empty={{ ...COPY.health.emptyBatches, size: EMPTY_STATE_SIZE.SECTION }}
-          pagination={{
-            page,
-            pageSize,
-            total: batches.length,
-            pageSizeOptions: BATCH_PAGE_SIZE_OPTIONS,
-            onPageChange: setPage,
-            onPageSizeChange: (size) => {
-              setPageSize(size);
-              setPage(DEFAULT_PAGE);
-            },
-          }}
+          pagination={pagination}
         />
       </SectionCard>
       <DetailDrawer open={batchId !== undefined} title={COPY.health.payloadTitle} onClose={() => setBatchId(undefined)}>
