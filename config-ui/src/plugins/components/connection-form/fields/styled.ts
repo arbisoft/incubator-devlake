@@ -23,7 +23,7 @@ export const RateLimit = styled.div`
   align-items: center;
 
   & > span {
-    margin-left: 8px;
+    margin-left: ${({ theme }) => theme.space.xs}px;
   }
 `;
 
