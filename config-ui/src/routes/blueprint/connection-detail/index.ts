@@ -16,8 +16,4 @@
  *
  */
 
-export const COPY = {
-  breadcrumbAdvanced: 'Advanced',
-  breadcrumbBlueprints: 'Blueprints',
-  detailTitle: (id: string) => `Blueprint ${id}`,
-};
+export * from './connection-detail';

@@ -1,7 +1,7 @@
 {
   "eslint": {
     "@typescript-eslint/no-explicit-any": {
-      "errors": 258,
+      "errors": 245,
       "warnings": 0
     },
     "@typescript-eslint/no-unused-vars": {
@@ -29,7 +29,7 @@
       "warnings": 0
     },
     "no-duplicate-imports": {
-      "errors": 8,
+      "errors": 7,
       "warnings": 0
     },
     "no-empty": {
@@ -38,11 +38,11 @@
     },
     "prefer-destructuring": {
       "errors": 0,
-      "warnings": 14
+      "warnings": 13
     },
     "react-hooks/exhaustive-deps": {
       "errors": 0,
-      "warnings": 67
+      "warnings": 64
     },
     "react-hooks/globals": {
       "errors": 0,
@@ -58,14 +58,14 @@
     },
     "react-hooks/set-state-in-effect": {
       "errors": 0,
-      "warnings": 29
+      "warnings": 25
     },
     "react/jsx-key": {
       "errors": 1,
       "warnings": 0
     },
     "react/no-array-index-key": {
-      "errors": 6,
+      "errors": 4,
       "warnings": 0
     },
     "react/no-unescaped-entities": {
@@ -85,7 +85,7 @@
       "warnings": 20
     },
     "sonarjs/no-globals-shadowing": {
-      "errors": 2,
+      "errors": 1,
       "warnings": 0
     },
     "sonarjs/no-ignored-exceptions": {
@@ -104,10 +104,6 @@
       "errors": 1,
       "warnings": 0
     },
-    "sonarjs/prefer-single-boolean-return": {
-      "errors": 1,
-      "warnings": 0
-    },
     "sonarjs/prefer-specific-assertions": {
       "errors": 5,
       "warnings": 0
@@ -123,7 +119,7 @@
   },
   "knip": [],
   "jscpd": {
-    "clones": 104,
-    "duplicatedLines": 1873
+    "clones": 103,
+    "duplicatedLines": 1859
   }
 }

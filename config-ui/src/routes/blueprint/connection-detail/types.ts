@@ -16,11 +16,22 @@
  *
  */
 
-import styled from 'styled-components';
+import type { IBlueprint } from '@/types';
 
-export const Top = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 36px;
-`;
+import type { FOLLOW_UP } from './constants';
+
+export type FollowUpKind = (typeof FOLLOW_UP)[keyof typeof FOLLOW_UP];
+
+export type ConnectionRef = { plugin: string; connectionId: number };
+
+export type DetailScope = { pname?: string; blueprintId: ID };
+
+export type DetailRoutes = { status: string; configuration: string; connection: string };
+
+export type ConnectionDetailData = { blueprint: IBlueprint; connectionName: string };
+
+export type ConnectionDetailViewProps = ConnectionDetailData &
+  ConnectionRef & {
+    pname?: string;
+    onChanged: () => void;
+  };
