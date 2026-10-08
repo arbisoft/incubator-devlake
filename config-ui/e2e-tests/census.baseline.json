@@ -179,8 +179,8 @@
       "fixmes": 0
     },
     "settings/users.spec.ts": {
-      "tests": 3,
-      "expects": 12,
+      "tests": 4,
+      "expects": 21,
       "backend": 0,
       "skips": 0,
       "fixmes": 0

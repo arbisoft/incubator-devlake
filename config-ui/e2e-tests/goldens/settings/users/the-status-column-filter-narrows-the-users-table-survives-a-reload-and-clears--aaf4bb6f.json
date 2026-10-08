@@ -1,0 +1,7 @@
+{
+  "titlePath": [
+    "Settings users status filter",
+    "the Status column filter narrows the users table, survives a reload and clears"
+  ],
+  "writes": []
+}
