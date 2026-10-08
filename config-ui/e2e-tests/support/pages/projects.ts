@@ -22,6 +22,7 @@ import { BLUEPRINT_VIEW, COMMON_COPY, PROJECT_DETAIL_COPY, PROJECT_HOME_COPY as 
 import { BlueprintViews, type BlueprintViewKey } from './blueprint-detail';
 import { BasePage, Screen, urlEndingWith, firstCellTexts, paginationPage, pipelineRowById, tableRow } from './common';
 import { PATHS, PROJECT_TABS, ProjectTabKey } from './paths';
+import { ProjectOtel, ProjectSettings, ProjectWebhooks } from './project-tab-panels';
 
 const PROJECT_TAB_LABEL = PROJECT_DETAIL_COPY.tabs;
 
@@ -241,18 +242,45 @@ export class ProjectPage extends BasePage {
     return (await deleted).status();
   }
 
-  get nameInput(): Locator {
-    return this.page.getByRole('heading', { name: 'Project Name' }).locator('xpath=following-sibling::input');
+  get settings(): ProjectSettings {
+    return new ProjectSettings(this.page, this.projectName);
   }
 
-  // Renames the project from its Settings tab and saves.
+  get webhooks(): ProjectWebhooks {
+    return new ProjectWebhooks(this.page);
+  }
+
+  get otel(): ProjectOtel {
+    return new ProjectOtel(this.page);
+  }
+
+  get nameInput(): Locator {
+    return this.settings.nameInput;
+  }
+
   async renameProject(newName: string): Promise<void> {
-    await this.nameInput.fill(newName);
-    await this.page.getByRole('button', { name: 'Save' }).click();
+    await this.settings.rename(newName);
   }
 
   async deleteProject(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Delete Project' }).click();
-    await this.confirmDialog('Are you sure you want to delete this Project?');
+    await this.settings.deleteProject();
+  }
+
+  tabPanel(tab: ProjectTabKey): Locator {
+    const panels: Record<ProjectTabKey, Locator> = {
+      blueprint: this.views.viewContent(BLUEPRINT_VIEW.STATUS),
+      webhooks: this.region(PROJECT_DETAIL_COPY.webhooks.title),
+      'claude-code-otel': this.region(PROJECT_DETAIL_COPY.otel.title),
+      settings: this.region(PROJECT_DETAIL_COPY.settings.details),
+    };
+    return panels[tab];
+  }
+
+  private region(name: string): Locator {
+    return this.page.getByRole('region', { name, exact: true });
+  }
+
+  get noBlueprintHeading(): Locator {
+    return this.page.getByRole('heading', { name: PROJECT_DETAIL_COPY.noBlueprint.title });
   }
 }

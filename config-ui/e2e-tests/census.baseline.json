@@ -143,6 +143,13 @@
       "skips": 0,
       "fixmes": 0
     },
+    "projects/project-tabs.spec.ts": {
+      "tests": 9,
+      "expects": 43,
+      "backend": 6,
+      "skips": 0,
+      "fixmes": 0
+    },
     "projects/projects-list.spec.ts": {
       "tests": 2,
       "expects": 16,

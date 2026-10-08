@@ -194,7 +194,8 @@ export async function putGithubScope(
 export interface ApiProject {
   name: string;
   description?: string;
-  blueprint?: ApiBlueprint;
+  blueprint?: ApiBlueprint | null;
+  metrics?: { pluginName: string; pluginOption: { prToIssueRegexp?: string }; enable: boolean }[];
   [key: string]: unknown;
 }
 
@@ -288,7 +289,7 @@ export async function triggerBlueprint(api: APIRequestContext, blueprintId: numb
   await expect.poll(async () => (await listBlueprintPipelines(api, blueprintId)).length).toBeGreaterThan(0);
 }
 
-async function deleteBlueprint(api: APIRequestContext, blueprintId: number): Promise<void> {
+export async function deleteBlueprint(api: APIRequestContext, blueprintId: number): Promise<void> {
   await cancelPipelinesOfBlueprint(api, blueprintId);
   await api.delete(`/blueprints/${blueprintId}`);
 }
@@ -347,6 +348,10 @@ export const isTerminalPipelineStatus = (status: string) => !ACTIVE_PIPELINE_STA
 
 export async function listWebhooks(api: APIRequestContext): Promise<{ id: number; name: string }[]> {
   return json(await api.get('/plugins/webhook/connections'), 'list webhooks');
+}
+
+export async function createWebhook(api: APIRequestContext, name: string): Promise<{ id: number; name: string }> {
+  return json(await api.post('/plugins/webhook/connections', { data: { name } }), `create webhook ${name}`);
 }
 
 export async function deleteWebhooksByPrefix(api: APIRequestContext): Promise<void> {

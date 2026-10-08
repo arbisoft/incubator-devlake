@@ -1,0 +1,18 @@
+{
+  "titlePath": [
+    "project tabs",
+    "deleting a project removes its placement and leaves the shared connection to the others"
+  ],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/plugins/claude_otel/projects/e2e-*/removal-preflight",
+      "body": null
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/projects/e2e-*",
+      "body": null
+    }
+  ]
+}
