@@ -32,7 +32,6 @@ export type SidebarTokens = {
   itemActiveBg: string;
   itemActiveText: string;
   logoFilter: string;
-  markBg: string;
 };
 
 type TypographyStyle = { fontSize: number; lineHeight: number; fontWeight: number; letterSpacing: number };
@@ -85,8 +84,8 @@ export type LayoutTokens = {
   navIconSize: number;
   railIconSize: number;
   avatarSize: number;
-  markTileSize: number;
-  wordmarkWidth: number;
+  brandMarkHeight: number;
+  poweredByMarkSize: number;
   confirmModalWidth: number;
   pipelineTaskIdWidth: number;
   pipelineTaskDurationWidth: number;
@@ -183,8 +182,8 @@ export const LAYOUT: LayoutTokens = {
   navIconSize: 14,
   railIconSize: 18,
   avatarSize: 32,
-  markTileSize: 32,
-  wordmarkWidth: 120,
+  brandMarkHeight: 28,
+  poweredByMarkSize: 20,
   confirmModalWidth: 416,
   pipelineTaskIdWidth: 84,
   pipelineTaskDurationWidth: 64,

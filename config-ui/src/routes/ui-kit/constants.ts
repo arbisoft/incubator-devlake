@@ -139,6 +139,7 @@ export const COPY = {
     withCounts: 'With counts',
     statusTones: 'Loading and status tones',
     customTitle: 'Custom brand title (TITLE_CUSTOM)',
+    poweredBy: 'Powered-by row (sidebar footer, expanded only)',
     manyItems: 'Many items',
     sizes: 'Sizes',
     fallback: 'Unknown plugin (fallback icon)',

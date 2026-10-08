@@ -16,7 +16,7 @@
  *
  */
 
-import { BrandBlock } from '@/ui';
+import { BrandBlock, PoweredByRow } from '@/ui';
 
 import { COPY, SECTION } from './constants';
 import { DemoCase, DemoSection } from './demo-section';
@@ -35,6 +35,11 @@ export const BrandBlockDemo = () => (
           <BrandBlock collapsed />
         </DarkBox>
       </Row>
+    </DemoCase>
+    <DemoCase label={COPY.cases.poweredBy}>
+      <DarkBox $wide>
+        <PoweredByRow />
+      </DarkBox>
     </DemoCase>
     <DemoCase label={COPY.cases.customTitle}>
       <Row>

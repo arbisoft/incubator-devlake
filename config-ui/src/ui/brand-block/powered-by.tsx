@@ -16,6 +16,13 @@
  *
  */
 
-export * from './brand-block';
-export type * from './types';
-export * from './powered-by';
+import { POWERED_BY } from '@/config/brand';
+
+import { PoweredBy, PoweredByMark } from './styled';
+
+export const PoweredByRow = () => (
+  <PoweredBy>
+    <PoweredByMark aria-hidden />
+    {POWERED_BY}
+  </PoweredBy>
+);

@@ -142,4 +142,5 @@ export const MenuFrame = styled.div`
 export const Footer = styled.div`
   flex: none;
   padding: ${({ theme }) => theme.space.xs}px ${({ theme }) => theme.space.sm}px ${({ theme }) => theme.space.md}px;
+  border-top: 1px solid ${({ theme }) => theme.sidebar.divider};
 `;

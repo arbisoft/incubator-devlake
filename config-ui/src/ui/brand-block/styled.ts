@@ -18,41 +18,66 @@
 
 import styled from 'styled-components';
 
+import ArbisoftMark from '@/images/brand/arbisoft-mark.svg?react';
+import DevlakeMark from '@/images/brand/devlake-mark.svg?react';
 import { textStyle } from '@/ui/style-helpers';
 
 export const Root = styled.div<{ $collapsed: boolean }>`
   display: flex;
-  flex-direction: column;
-  align-items: ${({ $collapsed }) => ($collapsed ? 'center' : 'flex-start')};
-  justify-content: center;
-  gap: ${({ theme }) => theme.space.xxs}px;
+  align-items: center;
+  justify-content: ${({ $collapsed }) => ($collapsed ? 'center' : 'flex-start')};
   height: ${({ theme }) => theme.layout.sidebarHeaderHeight}px;
   min-width: 0;
   padding-inline: ${({ theme, $collapsed }) => ($collapsed ? 0 : theme.space.md)}px;
 `;
 
-export const Wordmark = styled.img`
-  display: block;
-  width: ${({ theme }) => theme.layout.wordmarkWidth}px;
-  max-width: 100%;
-  height: auto;
-  filter: ${({ theme }) => theme.sidebar.logoFilter};
+export const Lockup = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.sm}px;
+  min-width: 0;
 `;
 
-export const PoweredBy = styled.span`
+export const BrandMark = styled(ArbisoftMark)`
+  flex: none;
+  width: auto;
+  height: ${({ theme }) => theme.layout.brandMarkHeight}px;
+  color: ${({ theme }) => theme.sidebar.text};
+`;
+
+export const Names = styled.div`
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+`;
+
+export const BrandName = styled.span`
+  ${textStyle('h3')}
+  color: ${({ theme }) => theme.sidebar.text};
+  white-space: nowrap;
+`;
+
+export const ProductName = styled.span`
   ${textStyle('caption')}
   color: ${({ theme }) => theme.sidebar.textMuted};
   white-space: nowrap;
 `;
 
-export const MarkTile = styled.span`
-  display: inline-flex;
+export const PoweredBy = styled.p`
+  ${textStyle('caption')}
+  display: flex;
   align-items: center;
-  justify-content: center;
-  width: ${({ theme }) => theme.layout.markTileSize}px;
-  height: ${({ theme }) => theme.layout.markTileSize}px;
-  background: ${({ theme }) => theme.sidebar.markBg};
-  border-radius: ${({ theme }) => theme.radius.md}px;
+  gap: ${({ theme }) => theme.space.xs}px;
+  margin: 0 0 ${({ theme }) => theme.space.xxs}px;
+  padding-inline: ${({ theme }) => theme.space.sm}px;
+  color: ${({ theme }) => theme.sidebar.textMuted};
+  white-space: nowrap;
+`;
+
+export const PoweredByMark = styled(DevlakeMark)`
+  flex: none;
+  width: ${({ theme }) => theme.layout.poweredByMarkSize}px;
+  height: ${({ theme }) => theme.layout.poweredByMarkSize}px;
 `;
 
 export const CustomTitle = styled.h2`
