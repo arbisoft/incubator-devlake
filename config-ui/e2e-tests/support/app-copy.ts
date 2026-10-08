@@ -60,3 +60,6 @@ export { COPY as NOT_FOUND_COPY } from '../../src/routes/not-found/constants';
 export { COPY as ONBOARD_COPY } from '../../src/routes/onboard/constants';
 export { COPY as LOGIN_COPY, PROVIDER_ID } from '../../src/routes/login/constants';
 export { COPY as CHANGE_PASSWORD_COPY } from '../../src/routes/change-password/constants';
+export { COPY as OTEL_COPY } from '../../src/routes/otel/constants';
+export { COPY as OTEL_MODAL_COPY } from '../../src/routes/otel/components/constants';
+export { OTEL_INGESTION_STATE, OTEL_STATUS } from '../../src/api/otel/constants';

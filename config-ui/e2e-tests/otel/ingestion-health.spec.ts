@@ -48,6 +48,11 @@ test.describe.serial('Ingestion health panel renders degraded/unhealthy states',
     await expect(otel.ingestionHeading).toBeVisible();
     await expect(otel.healthStatus('degraded')).toBeVisible({ timeout: 15_000 });
     await expect(otel.healthMessage('raw backlog is older than 5 minutes')).toBeVisible();
+    await otel.openFirstPayload();
+    await expect(otel.payloadDrawer).toBeVisible();
+    await otel.closePayloadWithEscape();
+    await expect(otel.payloadDrawer).not.toBeVisible();
+    await expect(otel.firstPayloadButton).toBeFocused();
     runSql(CLEANUP_SQL);
   });
 

@@ -117,14 +117,21 @@
     },
     "otel/claude-code-otel.spec.ts": {
       "tests": 4,
-      "expects": 72,
+      "expects": 86,
       "backend": 9,
       "skips": 0,
       "fixmes": 0
     },
     "otel/ingestion-health.spec.ts": {
       "tests": 2,
-      "expects": 6,
+      "expects": 9,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "otel/otel-dialogs.spec.ts": {
+      "tests": 3,
+      "expects": 21,
       "backend": 0,
       "skips": 0,
       "fixmes": 0

@@ -24,6 +24,17 @@ import { API_URL } from './env';
 const CSRF_TOKEN = 'e2e-csrf-token';
 
 const E2E_PREFIX = 'e2e-';
+const MILLISECONDS_PER_SECOND = 1000;
+const DEFAULT_OTEL_RESTART_COOLDOWN_SECONDS = 30;
+const OTEL_RESTART_COOLDOWN_MARGIN_MS = MILLISECONDS_PER_SECOND;
+const configuredOtelRestartCooldown = Number(process.env.OTEL_RESTART_COOLDOWN_SECONDS);
+const OTEL_RESTART_COOLDOWN_MS =
+  (Number.isFinite(configuredOtelRestartCooldown) && configuredOtelRestartCooldown > 0
+    ? configuredOtelRestartCooldown
+    : DEFAULT_OTEL_RESTART_COOLDOWN_SECONDS) * MILLISECONDS_PER_SECOND;
+
+export const waitForOtelRestartCooldown = () =>
+  new Promise<void>((resolve) => setTimeout(resolve, OTEL_RESTART_COOLDOWN_MS + OTEL_RESTART_COOLDOWN_MARGIN_MS));
 
 export const uniqueName = (label: string) =>
   `${E2E_PREFIX}${label}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
