@@ -16,16 +16,12 @@
       "errors": 2,
       "warnings": 0
     },
-    "jsx-a11y/no-autofocus": {
-      "errors": 1,
-      "warnings": 0
-    },
     "max-lines": {
       "errors": 0,
       "warnings": 14
     },
     "no-console": {
-      "errors": 2,
+      "errors": 1,
       "warnings": 0
     },
     "no-duplicate-imports": {
@@ -50,14 +46,14 @@
     },
     "react-hooks/refs": {
       "errors": 0,
-      "warnings": 24
+      "warnings": 14
     },
     "react-hooks/set-state-in-effect": {
       "errors": 0,
       "warnings": 23
     },
     "react/no-array-index-key": {
-      "errors": 4,
+      "errors": 3,
       "warnings": 0
     },
     "react/no-unescaped-entities": {
@@ -107,7 +103,7 @@
   },
   "knip": [],
   "jscpd": {
-    "clones": 102,
-    "duplicatedLines": 1852
+    "clones": 101,
+    "duplicatedLines": 1842
   }
 }

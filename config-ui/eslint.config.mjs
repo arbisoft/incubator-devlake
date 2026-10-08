@@ -25,7 +25,6 @@ import headers from 'eslint-plugin-headers';
 import react from 'eslint-plugin-react';
 import globals from 'globals';
 
-import { RESKIN_LINT_PENDING } from './eslint.reskin-pending.mjs';
 
 const licenseHeader = `Licensed to the Apache Software Foundation (ASF) under one or more
 contributor license agreements.  See the NOTICE file distributed with
@@ -43,7 +42,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 `;
 
-// Reskin-owned directories (plan 3.10); every phase removes the files it cleans from RESKIN_LINT_PENDING.
+// Reskin-owned directories.
 const RESKIN_OWNED = ['src/ui/**', 'src/theme/**', 'src/config/**', 'src/routes/**', 'src/app/**'];
 const COLOR_LITERAL = String.raw`#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(`;
 const COLOR_MESSAGE = 'No colour literals outside src/theme; use theme tokens.';
@@ -127,7 +126,6 @@ export default tseslint.config(
   },
   {
     files: RESKIN_OWNED.map((glob) => `${glob}/*.{ts,tsx,js,jsx}`),
-    ignores: RESKIN_LINT_PENDING,
     plugins: { react },
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
@@ -138,7 +136,6 @@ export default tseslint.config(
   },
   {
     files: RESKIN_OWNED.filter((glob) => glob !== 'src/theme/**').map((glob) => `${glob}/*.{ts,tsx,js,jsx}`),
-    ignores: RESKIN_LINT_PENDING,
     rules: {
       // styled-components CSS lives in TemplateElement nodes, so Literal alone would miss it.
       'no-restricted-syntax': [
