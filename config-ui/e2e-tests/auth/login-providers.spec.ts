@@ -17,7 +17,7 @@
  */
 import { test, expect } from '../fixtures';
 import { uniqueName } from '../support/api';
-import { LOGIN_COPY, PROVIDER_ID } from '../support/app-copy';
+import { LOGIN_COPY, LOGIN_PARAMS, PROVIDER_ID } from '../support/app-copy';
 import { API_URL } from '../support/env';
 import { LoginPage, StubProvider } from '../support/pages/login';
 
@@ -77,5 +77,14 @@ test.describe('Login provider buttons', () => {
     for (const { displayName } of providers) {
       await expect(loginPage.providerButton(displayName)).toBeVisible();
     }
+  });
+});
+
+test.describe('Login error state', () => {
+  test('shows the access denied message when the page is opened with error=access_denied', async ({ page }) => {
+    const loginPage = new LoginPage(page);
+    await loginPage.openWithError(LOGIN_PARAMS.ACCESS_DENIED);
+    await expect(loginPage.heading).toBeVisible();
+    await expect(loginPage.accessDeniedAlert).toBeVisible();
   });
 });

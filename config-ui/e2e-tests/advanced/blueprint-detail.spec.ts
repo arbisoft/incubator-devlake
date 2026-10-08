@@ -27,13 +27,15 @@ import {
   deleteBlueprintsByPrefix,
   deleteProject,
   getBlueprint,
+  listBlueprintsByKeyword,
   listBlueprintPipelines,
   triggerBlueprint,
   uniqueName,
 } from '../support/api';
-import { BLUEPRINT_VIEW } from '../support/app-copy';
+import { BLUEPRINT_DETAIL_COPY, BLUEPRINT_VIEW } from '../support/app-copy';
 import { deletePipelinesNamedLike } from '../support/db';
 import { BlueprintDetailPage } from '../support/pages/blueprint-detail';
+import { BlueprintPage } from '../support/pages/blueprints';
 import { ProjectPage } from '../support/pages/projects';
 
 const VIEWS = Object.values(BLUEPRINT_VIEW);
@@ -180,5 +182,41 @@ test.describe.serial('Blueprint detail views and pipeline panel', () => {
     await expect(detail.nameSection).toContainText(renamed);
 
     expect((await getBlueprint(api, blueprint.id)).name).toBe(renamed);
+  });
+
+  test('the enabled switch on the Status view is saved to the API and kept after a reload', async ({ page }) => {
+    const toggled = await createBlueprint(api, `${prefix}-toggle`);
+    const detail = new BlueprintDetailPage(page, toggled.id);
+    await detail.open();
+    await expect(detail.enabledSwitch).toBeChecked();
+    await detail.toggleEnabled();
+    await expect(detail.toast(BLUEPRINT_DETAIL_COPY.messages.updated)).toBeVisible();
+    await expect(detail.enabledSwitch).not.toBeChecked();
+    expect((await getBlueprint(api, toggled.id)).enable).toBe(false);
+
+    await detail.reload();
+    await expect(detail.enabledSwitch).not.toBeChecked();
+  });
+
+  test('Delete asks for confirmation, then lands on the list without the blueprint', async ({ page }) => {
+    const doomed = await createBlueprint(api, `${prefix}-doomed`);
+    const detail = new BlueprintDetailPage(page, doomed.id);
+    await detail.open();
+    await detail.requestDelete();
+    await expect(detail.deleteDialog(doomed.name)).toBeVisible();
+
+    await detail.cancelDelete(doomed.name);
+    await expect(detail.deleteDialog(doomed.name)).toBeHidden();
+    expect((await getBlueprint(api, doomed.id)).id).toBe(doomed.id);
+
+    await detail.requestDelete();
+    await detail.confirmDelete(doomed.name);
+    await expect(detail.toast(BLUEPRINT_DETAIL_COPY.messages.deleted)).toBeVisible();
+    const list = new BlueprintPage(page);
+    await expect(page).toHaveURL(list.urlPattern);
+    await expect(list.ready).toBeVisible();
+    await list.search(doomed.name);
+    await expect(list.noResults()).toBeVisible();
+    expect(await listBlueprintsByKeyword(api, doomed.name)).toEqual([]);
   });
 });

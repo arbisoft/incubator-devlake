@@ -15,7 +15,7 @@
  * limitations under the License.
  *
  */
-import { Locator } from '@playwright/test';
+import { Download, Locator } from '@playwright/test';
 
 import { PIPELINE_COPY as COPY } from '../app-copy';
 
@@ -76,6 +76,14 @@ export class PipelinesPage extends BasePage implements Screen {
       .getByRole('button', { name: COPY.rowActions.label(id) })
       .click();
     await this.page.getByRole('menuitem', { name: COPY.rowActions.configuration }).click();
+  }
+
+  // Starts the row's Download Logs action and returns the browser download it triggers.
+  async downloadLogs(id: number): Promise<Download> {
+    const download = this.page.waitForEvent('download');
+    await this.rowActionsButton(id).click();
+    await this.page.getByRole('menuitem', { name: COPY.rowActions.downloadLogs }).click();
+    return download;
   }
 
   rowActionsButton(id: number): Locator {

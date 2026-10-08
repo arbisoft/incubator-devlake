@@ -4,9 +4,9 @@
   },
   "specs": {
     "advanced/blueprint-detail.spec.ts": {
-      "tests": 8,
-      "expects": 44,
-      "backend": 5,
+      "tests": 10,
+      "expects": 57,
+      "backend": 8,
       "skips": 0,
       "fixmes": 0
     },
@@ -18,8 +18,8 @@
       "fixmes": 0
     },
     "advanced/pipelines.spec.ts": {
-      "tests": 5,
-      "expects": 23,
+      "tests": 7,
+      "expects": 26,
       "backend": 1,
       "skips": 0,
       "fixmes": 0
@@ -39,8 +39,8 @@
       "fixmes": 0
     },
     "auth/login-providers.spec.ts": {
-      "tests": 3,
-      "expects": 9,
+      "tests": 4,
+      "expects": 11,
       "backend": 0,
       "skips": 0,
       "fixmes": 0

@@ -29,7 +29,7 @@ import {
   triggerBlueprint,
   uniqueName,
 } from '../support/api';
-import { PIPELINE_COPY } from '../support/app-copy';
+import { PIPELINE_COPY, PIPELINE_LOGS_FILE_NAME } from '../support/app-copy';
 import { deletePipelinesNamedLike } from '../support/db';
 import { PipelinesPage } from '../support/pages/pipelines';
 
@@ -131,5 +131,21 @@ test.describe.serial('Pipelines list blueprint filter, sort and configuration dr
     await pipelines.pressEscape();
     await expect(pipelines.detailDialog(pipelineId)).toBeHidden();
     await expect(pipelines.rowActionsButton(pipelineId)).toBeFocused();
+  });
+
+  test('Download Logs starts a download of the pipeline log archive', async ({ page }) => {
+    const [pipelineId] = pipelineIdsA;
+    const pipelines = new PipelinesPage(page);
+    await pipelines.openWithQuery(`blueprintId=${blueprintA.id}`);
+    const download = await pipelines.downloadLogs(pipelineId);
+    expect(download.suggestedFilename()).toBe(PIPELINE_LOGS_FILE_NAME);
+  });
+
+  test('a pipeline URL opened directly shows its panel', async ({ page }) => {
+    const [pipelineId] = pipelineIdsA;
+    const pipelines = new PipelinesPage(page);
+    await pipelines.openDetail(pipelineId);
+    await expect(pipelines.detailHeading(pipelineId)).toBeVisible();
+    await expect(pipelines.tasksCompletedLabel).toBeVisible();
   });
 });

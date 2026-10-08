@@ -1,0 +1,7 @@
+{
+  "titlePath": [
+    "Login error state",
+    "shows the access denied message when the page is opened with error=access_denied"
+  ],
+  "writes": []
+}

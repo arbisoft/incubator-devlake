@@ -19,8 +19,11 @@ import { Locator, Page } from '@playwright/test';
 
 import {
   BLUEPRINT_CONFIGURATION_COPY as CONFIG_COPY,
+  BLUEPRINT_CONFIRM,
+  BLUEPRINT_CONFIRM_KIND,
   BLUEPRINT_DETAIL_COPY as COPY,
   BLUEPRINT_VIEW,
+  COMMON_COPY,
   DATA_SCOPE_SELECT_COPY,
   CUSTOM_CRON_FIELDS,
   SYNC_POLICY_COPY,
@@ -164,6 +167,30 @@ export class BlueprintViews extends BasePage {
 
   get pipelineTasksLabel(): Locator {
     return pipelineTasksLabel(this.page);
+  }
+
+  get enabledSwitch(): Locator {
+    return this.page.getByRole('switch');
+  }
+
+  async toggleEnabled(): Promise<void> {
+    await this.enabledSwitch.click();
+  }
+
+  async requestDelete(): Promise<void> {
+    await this.page.getByRole('button', { name: COPY.actions.delete, exact: true }).click();
+  }
+
+  deleteDialog(blueprintName: string): Locator {
+    return this.dialog(BLUEPRINT_CONFIRM[BLUEPRINT_CONFIRM_KIND.DELETE].title(blueprintName));
+  }
+
+  async cancelDelete(blueprintName: string): Promise<void> {
+    await this.deleteDialog(blueprintName).getByRole('button', { name: COMMON_COPY.cancel, exact: true }).click();
+  }
+
+  async confirmDelete(blueprintName: string): Promise<void> {
+    await this.deleteDialog(blueprintName).getByRole('button', { name: COPY.actions.delete, exact: true }).click();
   }
 
   async collectData(): Promise<void> {
