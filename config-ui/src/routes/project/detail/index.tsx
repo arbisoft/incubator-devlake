@@ -96,7 +96,7 @@ export const ProjectDetailPage = () => {
           { label: project.name, path: PATHS.PROJECT_TAB(pname, PROJECT_TAB.BLUEPRINT) },
         ]}
         switcher={
-          activeTab === PROJECT_TAB.BLUEPRINT ? (
+          activeTab === PROJECT_TAB.BLUEPRINT && project.blueprint ? (
             <RouteTabs items={views} variant={ROUTE_TABS_VARIANT.SEGMENTED} />
           ) : undefined
         }
