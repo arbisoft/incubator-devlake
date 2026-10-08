@@ -98,6 +98,13 @@ describe('PipelinePanel', () => {
     expect(screen.getByText(COPY.stage.state.success)).toBeTruthy();
   });
 
+  it('shows a retry when the first load fails, then recovers on its own', async () => {
+    pipelines.get.mockRejectedValueOnce(new Error('boom'));
+    load(IPipelineStatus.COMPLETED, [task({})]);
+    expect(await screen.findByText(COPY.loadFailed)).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: COPY.stage.label(1) }, { timeout: 3000 })).toBeTruthy();
+  });
+
   it('offers cancel, and not rerun, while the pipeline runs', async () => {
     load(IPipelineStatus.RUNNING, [task({ status: IPipelineStatus.RUNNING })]);
     fireEvent.click(await screen.findByRole('button', { name: COPY.summary.cancel }));

@@ -16,13 +16,15 @@
  *
  */
 
+import { Button } from 'antd';
+
 import API from '@/api';
 import { Loading } from '@/components';
 import { useAutoRefresh } from '@/hooks';
 import type { IPipeline, ITask } from '@/types';
-import { useRefreshVersion } from '@/ui';
+import { COMMON_COPY, EMPTY_ILLUSTRATION, EMPTY_STATE_SIZE, EmptyState, useRefreshVersion } from '@/ui';
 
-import { COPY } from '../constants';
+import { COPY, LOAD_RETRY } from '../constants';
 import { areTasksSettled, isPipelineFinished } from '../utils';
 
 import { PipelineStages } from './stages';
@@ -33,12 +35,29 @@ import type { PipelinePanelProps } from './types';
 export const PipelinePanel = ({ id }: PipelinePanelProps) => {
   const { version, refresh } = useRefreshVersion();
 
-  const { data: pipeline } = useAutoRefresh<IPipeline>(() => API.pipeline.get(id), [id, version], {
+  const { data: pipeline, error } = useAutoRefresh<IPipeline>((signal) => API.pipeline.get(id, signal), [id, version], {
     cancel: (data) => !!data && isPipelineFinished(data.status),
+    retryOnError: LOAD_RETRY,
   });
-  const { data: tasks } = useAutoRefresh<ITask[]>(async () => (await API.pipeline.tasks(id)).tasks, [id, version], {
-    cancel: (data) => !!data && areTasksSettled(data),
-  });
+  const { data: tasks } = useAutoRefresh<ITask[]>(
+    async (signal) => (await API.pipeline.tasks(id, signal)).tasks,
+    [id, version],
+    {
+      cancel: (data) => !!data && areTasksSettled(data),
+      retryOnError: LOAD_RETRY,
+    },
+  );
+
+  if (!pipeline && error !== undefined) {
+    return (
+      <EmptyState
+        illustration={EMPTY_ILLUSTRATION.ERROR}
+        size={EMPTY_STATE_SIZE.SECTION}
+        title={COPY.loadFailed}
+        action={<Button onClick={refresh}>{COMMON_COPY.retry}</Button>}
+      />
+    );
+  }
 
   if (!pipeline) {
     return (

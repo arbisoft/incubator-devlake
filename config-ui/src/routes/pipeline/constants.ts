@@ -117,6 +117,7 @@ export const COPY = {
   },
   detail: { title: (id: string | number) => `Pipeline ${id} details` },
   loading: 'Loading pipeline',
+  loadFailed: 'The pipeline could not be loaded.',
   actions: {
     cancelled: 'Pipeline cancelled.',
     cancelFailed: 'The pipeline could not be cancelled. Try again in a moment.',
@@ -129,6 +130,8 @@ export const COPY = {
 };
 
 const HTTP_BAD_REQUEST = '400';
+
+export const LOAD_RETRY = { delay: 1000, limit: 3 } as const;
 
 export const RERUN_ERROR_MAP: Record<string, string> = { [HTTP_BAD_REQUEST]: COPY.actions.rerunBusy };
 
