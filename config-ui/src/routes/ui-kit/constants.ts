@@ -129,6 +129,7 @@ export const COPY = {
     withIcon: 'With icon',
     withAction: 'With action',
     withValue: 'With value',
+    notes: 'With notes and a disabled confirm',
     clearable: 'Clearable',
     withCounts: 'With counts',
     statusTones: 'Loading and status tones',

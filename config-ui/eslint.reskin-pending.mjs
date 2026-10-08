@@ -37,6 +37,4 @@ export const RESKIN_LINT_PENDING = [
   'src/routes/otel/otel.tsx',
   'src/routes/otel/source-policy.tsx',
   'src/routes/otel/styled.ts',
-  'src/routes/project/detail/settings-panel.tsx',
-  'src/routes/project/detail/webhooks-panel.tsx',
 ];

@@ -16,36 +16,25 @@
  *
  */
 
-import { Card } from 'antd';
-import styled from 'styled-components';
+import { QuestionCircleOutlined } from '@ant-design/icons';
+import { Popover } from 'antd';
 
-import Img from '@/images/no-data.svg';
+import { COPY } from './constants';
+import { Examples, HelpButton } from './styled';
 
-const Wrapper = styled(Card)`
-  text-align: center;
-
-  img {
-    display: inline-block;
-    width: 120px;
-    height: 120px;
-  }
-
-  .action {
-    margin-top: 24px;
-  }
-`;
-
-interface Props {
-  text: React.ReactNode;
-  action?: React.ReactNode;
-}
-
-export const NoData = ({ text, action }: Props) => {
-  return (
-    <Wrapper>
-      <img src={Img} alt="" />
-      <p>{text}</p>
-      <div className="action">{action}</div>
-    </Wrapper>
-  );
-};
+export const RegexHelp = () => (
+  <Popover
+    trigger={['hover', 'focus']}
+    content={
+      <Examples>
+        {COPY.settings.linker.examples.map((example) => (
+          <p key={example}>{example}</p>
+        ))}
+      </Examples>
+    }
+  >
+    <HelpButton type="button" aria-label={COPY.settings.linker.help}>
+      <QuestionCircleOutlined />
+    </HelpButton>
+  </Popover>
+);

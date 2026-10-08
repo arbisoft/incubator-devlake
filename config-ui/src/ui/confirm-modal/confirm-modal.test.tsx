@@ -77,6 +77,15 @@ describe('ConfirmModal', () => {
     expect(screen.getByRole('button', { name: 'Keep it' })).toBeTruthy();
   });
 
+  it('shows extra notes under the description and can disable the confirm action', () => {
+    const { onConfirm } = setup({ confirmDisabled: true, children: <p>Shared keys stay active.</p> });
+    expect(screen.getByText('Shared keys stay active.')).toBeTruthy();
+    const confirm = screen.getByRole<HTMLButtonElement>('button', { name: CONFIRM });
+    expect(confirm.disabled).toBe(true);
+    fireEvent.click(confirm);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
   it('closes on Escape', () => {
     const { onCancel } = setup();
     pressEscape(screen.getByRole('dialog', { name: TITLE }));

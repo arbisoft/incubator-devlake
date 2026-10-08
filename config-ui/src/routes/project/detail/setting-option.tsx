@@ -16,23 +16,20 @@
  *
  */
 
-import type { ReactNode } from 'react';
+import { Checkbox } from 'antd';
 
-import type { CONFIRM_TONE } from './constants';
+import { Option, OptionExtra, OptionHint, OptionLabel } from './styled';
+import type { SettingOptionProps } from './types';
 
-type ConfirmTone = (typeof CONFIRM_TONE)[keyof typeof CONFIRM_TONE];
-
-export type ConfirmModalProps = {
-  open: boolean;
-  tone: ConfirmTone;
-  title: string;
-  description: string;
-  confirmLabel: string;
-  cancelLabel?: string;
-  loading?: boolean;
-  confirmDisabled?: boolean;
-  children?: ReactNode;
-  onConfirm: () => void;
-  onCancel: () => void;
-  afterClose?: () => void;
-};
+export const SettingOption = ({ label, description, checked, aside, onChange, children }: SettingOptionProps) => (
+  <Option>
+    <Checkbox checked={checked} onChange={(event) => onChange(event.target.checked)}>
+      <OptionLabel>{label}</OptionLabel>
+    </Checkbox>
+    <OptionHint>
+      {description}
+      {aside}
+    </OptionHint>
+    {children && <OptionExtra>{children}</OptionExtra>}
+  </Option>
+);

@@ -65,6 +65,8 @@ export const COMPOSITES_COPY = {
     defaultDescription: 'Everyone signed in sees the new look on their next page load.',
     defaultConfirm: 'Apply branding',
     keep: 'Keep my branding',
+    note: 'Shared credentials stay active for their other projects.',
+    blocked: 'Revoke the connection first, then delete.',
     longTitle: 'Delete the project with an extraordinarily long name that goes past the width of the dialog?',
   },
   formField: {

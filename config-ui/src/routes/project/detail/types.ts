@@ -16,7 +16,48 @@
  *
  */
 
+import type { ReactNode } from 'react';
+
 import type { ProjectTab } from '@/config';
+import type { IProject } from '@/types';
 import type { RouteTab } from '@/ui/types';
 
+import type { DELETE_WARNING } from './constants';
+
 export type ProjectRouteTab = RouteTab & { key: ProjectTab };
+
+export type DeleteWarning = (typeof DELETE_WARNING)[keyof typeof DELETE_WARNING];
+
+export type OtelPlacementState = { hasPlacements: boolean; hasActiveFinal: boolean };
+
+export type SettingsForm = {
+  name: string;
+  dora: boolean;
+  linker: boolean;
+  linkerRegexp: string;
+  issueTrace: boolean;
+};
+
+export type ProjectPayload = Pick<IProject, 'name' | 'description' | 'metrics'>;
+
+export type ProjectPanelProps = { project: IProject; onRefresh: () => void };
+
+export type SettingOptionProps = {
+  label: string;
+  description: string;
+  checked: boolean;
+  aside?: ReactNode;
+  onChange: (checked: boolean) => void;
+  children?: ReactNode;
+};
+
+export type DeleteProjectModalProps = {
+  open: boolean;
+  name: string;
+  warnings: DeleteWarning[];
+  loading: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+};
+
+export type ClaudeCodeOtelPanelProps = { projectName: string };
