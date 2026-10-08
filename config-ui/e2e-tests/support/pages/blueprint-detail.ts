@@ -17,9 +17,16 @@
  */
 import { Locator, Page } from '@playwright/test';
 
-import { BLUEPRINT_DETAIL_COPY as COPY, BLUEPRINT_VIEW } from '../app-copy';
+import {
+  BLUEPRINT_CONFIGURATION_COPY as CONFIG_COPY,
+  BLUEPRINT_DETAIL_COPY as COPY,
+  BLUEPRINT_VIEW,
+  DATA_SCOPE_SELECT_COPY,
+  CUSTOM_CRON_FIELDS,
+  SYNC_POLICY_COPY,
+} from '../app-copy';
 
-import { BasePage, Screen, pipelineRowById, segmentedOption } from './common';
+import { BasePage, Screen, chooseOption, pipelineRowById, segmentedOption } from './common';
 import { PATHS } from './paths';
 import {
   openPipelineRowDetail,
@@ -41,9 +48,85 @@ export class BlueprintViews extends BasePage {
     return this.page.locator('.ant-segmented-item-selected').filter({ hasText: COPY.views[view] });
   }
 
-  // The Configurations view is not rebuilt yet, so its heading is still a literal.
   get syncPolicyHeading(): Locator {
-    return this.page.getByRole('heading', { name: 'Sync Policy' });
+    return this.page.getByRole('heading', { name: CONFIG_COPY.policy.title, exact: true });
+  }
+
+  // The sync policy section; its rows hold the time range, the frequency and skip on fail.
+  get syncPolicy(): Locator {
+    return this.page.getByRole('region', { name: CONFIG_COPY.policy.title, exact: true });
+  }
+
+  get nameSection(): Locator {
+    return this.page.getByRole('region', { name: CONFIG_COPY.name.title, exact: true });
+  }
+
+  get editNameButton(): Locator {
+    return this.page.getByRole('button', { name: CONFIG_COPY.name.edit });
+  }
+
+  async renameBlueprint(name: string): Promise<void> {
+    await this.editNameButton.click();
+    const dialog = this.dialog(CONFIG_COPY.name.modalTitle);
+    await dialog.getByRole('textbox', { name: CONFIG_COPY.name.label }).fill(name);
+    await dialog.getByRole('button', { name: CONFIG_COPY.name.submit, exact: true }).click();
+  }
+
+  get editSyncPolicyButton(): Locator {
+    return this.page.getByRole('button', { name: CONFIG_COPY.policy.edit });
+  }
+
+  async openSyncPolicy(): Promise<void> {
+    await this.editSyncPolicyButton.click();
+  }
+
+  get syncPolicyDialog(): Locator {
+    return this.dialog(SYNC_POLICY_COPY.modal.title);
+  }
+
+  // Picks the last 30 days, a custom cron of "<minute> <hour> * * *", and skip-on-failure in the open sync policy dialog.
+  async fillSyncPolicy(minute: string, hour: string): Promise<void> {
+    const dialog = this.syncPolicyDialog;
+    await dialog.getByText('Last 30 days').click();
+    await dialog.getByRole('radio', { name: 'Custom' }).check();
+    await dialog.getByRole('textbox', { name: CUSTOM_CRON_FIELDS[0] }).fill(minute);
+    await dialog.getByRole('textbox', { name: CUSTOM_CRON_FIELDS[1] }).fill(hour);
+    await dialog.getByRole('checkbox').check();
+  }
+
+  async saveSyncPolicy(): Promise<void> {
+    await this.syncPolicyDialog.getByRole('button', { name: SYNC_POLICY_COPY.modal.submit, exact: true }).click();
+  }
+
+  get addConnectionButton(): Locator {
+    return this.page.getByRole('button', { name: CONFIG_COPY.connections.add });
+  }
+
+  async addConnectionWithScope(connectionName: string, scopeFullName: string): Promise<void> {
+    await this.addConnectionButton.click();
+    const select = this.dialog(new RegExp(`^${CONFIG_COPY.addConnection.title}$`));
+    await select.getByRole('combobox').click();
+    await chooseOption(this.page, connectionName);
+    await select.getByRole('button', { name: CONFIG_COPY.addConnection.next, exact: true }).click();
+    const scopes = this.dialog(CONFIG_COPY.addConnection.scopesTitle);
+    await scopes.getByText(scopeFullName, { exact: true }).click();
+    await scopes.getByRole('button', { name: DATA_SCOPE_SELECT_COPY.save, exact: true }).click();
+  }
+
+  connectionCard(connectionName: string): Locator {
+    return this.page.getByRole('article', { name: connectionName, exact: true });
+  }
+
+  async openConnectionScopes(connectionName: string): Promise<void> {
+    await this.connectionCard(connectionName).getByRole('link', { name: CONFIG_COPY.connections.editScope }).click();
+  }
+
+  dataScopeCount(count: number): Locator {
+    return this.page.getByText(CONFIG_COPY.connections.scopeCount(count), { exact: true });
+  }
+
+  connectionLabel(connectionName: string): Locator {
+    return this.page.getByText(connectionName);
   }
 
   // What each view shows once it has loaded.

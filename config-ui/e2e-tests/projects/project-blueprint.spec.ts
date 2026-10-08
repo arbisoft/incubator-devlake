@@ -123,7 +123,7 @@ test.describe.serial('Project, blueprint, pipeline and webhook flows', () => {
 
     await projectPage.reload();
     await projectPage.openView(BLUEPRINT_VIEW.CONFIGURATION);
-    const policyRow = projectPage.firstRow;
+    const policyRow = projectPage.syncPolicy;
     await expect(policyRow).toContainText('Custom');
     await expect(policyRow).toContainText('to Now');
     await expect(policyRow).toContainText('Enabled');
@@ -183,7 +183,7 @@ test.describe.serial('Project, blueprint, pipeline and webhook flows', () => {
     await blueprints.openView(BLUEPRINT_VIEW.CONFIGURATION);
     await expect(blueprints.connectionLabel(connectionName)).toBeVisible();
     await expect(blueprints.dataScopeCount(1)).toBeVisible();
-    const policyRow = blueprints.firstRow;
+    const policyRow = blueprints.syncPolicy;
     await expect(policyRow).toContainText('Custom');
     await expect(policyRow).toContainText('Enabled');
   });

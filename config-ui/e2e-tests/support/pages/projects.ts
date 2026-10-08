@@ -20,18 +20,7 @@ import { Locator, Page } from '@playwright/test';
 import { BLUEPRINT_VIEW, COMMON_COPY, PROJECT_DETAIL_COPY, PROJECT_HOME_COPY as COPY, WEBHOOK_COPY } from '../app-copy';
 
 import { BlueprintViews, type BlueprintViewKey } from './blueprint-detail';
-import {
-  BasePage,
-  Screen,
-  urlEndingWith,
-  cronFieldInputs,
-  firstCellTexts,
-  paginationPage,
-  pipelineRowById,
-  sectionHeaderButton,
-  chooseOption,
-  tableRow,
-} from './common';
+import { BasePage, Screen, urlEndingWith, firstCellTexts, paginationPage, pipelineRowById, tableRow } from './common';
 import { PATHS, PROJECT_TABS, ProjectTabKey } from './paths';
 
 const PROJECT_TAB_LABEL = PROJECT_DETAIL_COPY.tabs;
@@ -166,41 +155,32 @@ export class ProjectPage extends BasePage {
     return this.page.getByRole('link', { name: this.projectName });
   }
 
+  get syncPolicy(): Locator {
+    return this.views.syncPolicy;
+  }
+
   dataScopeCount(count: number): Locator {
-    return this.page.getByText(`${count} data scope`);
+    return this.views.dataScopeCount(count);
   }
 
   connectionLabel(connectionName: string): Locator {
-    return this.page.getByText(connectionName);
+    return this.views.connectionLabel(connectionName);
   }
 
   async addConnectionWithScope(connectionName: string, scopeFullName: string): Promise<void> {
-    await this.page.getByRole('button', { name: 'Add a Connection' }).click();
-    const dialog = this.dialog(/Add a Connection/);
-    await dialog.getByRole('combobox').click();
-    await chooseOption(this.page, connectionName);
-    await dialog.getByRole('button', { name: 'Next' }).click();
-    await dialog.getByText(scopeFullName, { exact: true }).click();
-    await dialog.getByRole('button', { name: 'Save' }).click();
+    await this.views.addConnectionWithScope(connectionName, scopeFullName);
   }
 
   async openSyncPolicy(): Promise<void> {
-    await sectionHeaderButton(this.page, 'Sync Policy').click();
+    await this.views.openSyncPolicy();
   }
 
-  // Picks the last 30 days, a custom cron of "<minute> <hour> * * *", and skip-on-failure in the open sync policy dialog.
   async fillSyncPolicy(minute: string, hour: string): Promise<void> {
-    const dialog = this.dialog('Set Sync Policy');
-    await dialog.getByText('Last 30 days').click();
-    await dialog.getByRole('radio', { name: 'Custom' }).check();
-    const fields = cronFieldInputs(dialog);
-    await fields.nth(0).fill(minute);
-    await fields.nth(1).fill(hour);
-    await dialog.getByRole('checkbox').check();
+    await this.views.fillSyncPolicy(minute, hour);
   }
 
   async saveSyncPolicy(): Promise<void> {
-    await this.dialog('Set Sync Policy').getByRole('button', { name: 'Save' }).click();
+    await this.views.saveSyncPolicy();
   }
 
   async collectData(): Promise<void> {

@@ -22,6 +22,7 @@ export { COPY as LAYOUT_COPY, THEME_LABEL } from '../../src/routes/layout/consta
 export { COPY as SIDEBAR_COPY } from '../../src/ui/sidebar-nav/constants';
 export { COPY as ACCOUNT_BLOCK_COPY } from '../../src/ui/account-block/constants';
 export { COMMON_COPY } from '../../src/ui/constants';
+export { COPY as PAGE_HEADER_COPY } from '../../src/ui/page-header/constants';
 export { BLUEPRINT_VIEW, PROJECT_TAB } from '../../src/config/route-keys';
 export { COPY as CONNECTIONS_COPY, CATALOG_FILTER, DETAIL_COPY } from '../../src/routes/connection/constants';
 export { COPY as SCOPE_TABLE_COPY } from '../../src/routes/connection/scope-table/constants';
@@ -45,6 +46,10 @@ export {
 } from '../../src/routes/blueprint/home/constants';
 export { COPY as PIPELINE_COPY } from '../../src/routes/pipeline/constants';
 export { COPY as BLUEPRINT_DETAIL_COPY } from '../../src/routes/blueprint/detail/constants';
+export { COPY as BLUEPRINT_CONFIGURATION_COPY } from '../../src/routes/blueprint/detail/configuration/constants';
+export { COPY as SYNC_POLICY_COPY, CUSTOM_CRON_FIELDS } from '../../src/routes/blueprint/sync-policy/constants';
+export { COPY as BLUEPRINT_CONNECTION_COPY } from '../../src/routes/blueprint/connection-detail/constants';
+export { COPY as DATA_SCOPE_SELECT_COPY } from '../../src/plugins/components/data-scope-select/constants';
 export { COPY as PROJECT_DETAIL_COPY } from '../../src/routes/project/detail/constants';
 export { COPY as SETTINGS_COPY } from '../../src/routes/settings/constants';
 export { COPY as AUTH_COPY } from '../../src/routes/settings/authentication/constants';

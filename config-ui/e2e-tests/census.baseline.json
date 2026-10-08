@@ -4,9 +4,9 @@
   },
   "specs": {
     "advanced/blueprint-detail.spec.ts": {
-      "tests": 5,
-      "expects": 29,
-      "backend": 0,
+      "tests": 8,
+      "expects": 44,
+      "backend": 5,
       "skips": 0,
       "fixmes": 0
     },
@@ -119,6 +119,13 @@
       "tests": 2,
       "expects": 6,
       "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "projects/blueprint-connection.spec.ts": {
+      "tests": 5,
+      "expects": 19,
+      "backend": 2,
       "skips": 0,
       "fixmes": 0
     },

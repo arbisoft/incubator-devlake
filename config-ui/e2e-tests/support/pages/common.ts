@@ -77,9 +77,6 @@ export const iconButton = (scope: Page | Locator, iconName: string): Locator =>
 
 const tabByName = (page: Page, name: string): Locator => page.getByRole('tab', { name, exact: true });
 
-// The five cron inputs (minute, hour, day, month, week) of the Custom sync frequency.
-export const cronFieldInputs = (dialog: Locator): Locator => dialog.locator('input.ant-input');
-
 export const pipelineRowById = (page: Page, id: number): Locator =>
   page.locator('tbody tr.ant-table-row').filter({ has: page.getByRole('cell', { name: String(id), exact: true }) });
 
@@ -91,9 +88,6 @@ export const selectBox = (scope: Page | Locator): Locator => scope.locator('.ant
 
 export const tagWithText = (scope: Page | Locator, text: string | RegExp): Locator =>
   scope.locator('.ant-tag').filter({ hasText: text });
-
-export const sectionHeaderButton = (page: Page, heading: string): Locator =>
-  page.locator('h3', { hasText: heading }).getByRole('button');
 
 // AntD 6 Empty renders both an SVG title and a description with the same text; target the description.
 const emptyState = (page: Page, text: string): Locator =>

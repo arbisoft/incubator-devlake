@@ -77,7 +77,7 @@ export class BlueprintPage extends BasePage implements Screen {
   }
 
   async openView(view: BlueprintViewKey): Promise<void> {
-    await new BlueprintViews(this.page).openView(view);
+    await this.views.openView(view);
   }
 
   blueprintRow(name: string): Locator {
@@ -92,11 +92,19 @@ export class BlueprintPage extends BasePage implements Screen {
     await this.blueprintRow(name).getByRole('link', { name }).click();
   }
 
+  private get views(): BlueprintViews {
+    return new BlueprintViews(this.page);
+  }
+
+  get syncPolicy(): Locator {
+    return this.views.syncPolicy;
+  }
+
   dataScopeCount(count: number): Locator {
-    return this.page.getByText(`${count} data scope`);
+    return this.views.dataScopeCount(count);
   }
 
   connectionLabel(connectionName: string): Locator {
-    return this.page.getByText(connectionName);
+    return this.views.connectionLabel(connectionName);
   }
 }

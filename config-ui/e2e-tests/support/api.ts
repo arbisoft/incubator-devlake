@@ -267,6 +267,21 @@ export async function createBlueprint(
   );
 }
 
+export async function getBlueprint(api: APIRequestContext, blueprintId: number): Promise<ApiBlueprint> {
+  return json(await api.get(`/blueprints/${blueprintId}`), `get blueprint ${blueprintId}`);
+}
+
+export async function setBlueprintConnections(
+  api: APIRequestContext,
+  blueprint: ApiBlueprint,
+  connections: ApiBlueprint['connections'],
+): Promise<ApiBlueprint> {
+  return json(
+    await api.patch(`/blueprints/${blueprint.id}`, { data: { ...blueprint, connections } }),
+    `update blueprint ${blueprint.id}`,
+  );
+}
+
 // A blueprint with no connections answers 400 yet still records a pipeline that completes at once.
 export async function triggerBlueprint(api: APIRequestContext, blueprintId: number): Promise<void> {
   await api.post(`/blueprints/${blueprintId}/trigger`, { data: { skipCollectors: false, fullSync: false } });

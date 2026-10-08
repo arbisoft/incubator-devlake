@@ -26,6 +26,7 @@ import {
   createProject,
   deleteBlueprintsByPrefix,
   deleteProject,
+  getBlueprint,
   listBlueprintPipelines,
   triggerBlueprint,
   uniqueName,
@@ -36,6 +37,7 @@ import { BlueprintDetailPage } from '../support/pages/blueprint-detail';
 import { ProjectPage } from '../support/pages/projects';
 
 const VIEWS = Object.values(BLUEPRINT_VIEW);
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 test.describe.serial('Blueprint detail views and pipeline panel', () => {
   let api: APIRequestContext;
@@ -132,5 +134,51 @@ test.describe.serial('Blueprint detail views and pipeline panel', () => {
     await detail.pressEscape();
     await expect(detail.pipelineDetailDialog(pipelineId)).toBeHidden();
     await expect(detail.rowMenuButton(pipelineId)).toBeFocused();
+  });
+
+  test('the sync policy of an advanced blueprint is edited, kept after a reload and saved to the API', async ({
+    page,
+  }) => {
+    const detail = new BlueprintDetailPage(page, blueprint.id);
+    await detail.open(BLUEPRINT_VIEW.CONFIGURATION);
+    await detail.openSyncPolicy();
+    await detail.fillSyncPolicy('45', '6');
+    const before = Date.now();
+    await detail.saveSyncPolicy();
+    await expect(detail.toast('Update blueprint successful.')).toBeVisible();
+    await expect(detail.syncPolicyDialog).toBeHidden();
+
+    await detail.reload();
+    await expect(detail.syncPolicy).toContainText('Custom');
+    await expect(detail.syncPolicy).toContainText('to Now');
+    await expect(detail.syncPolicy).toContainText('Enabled');
+
+    const current = await getBlueprint(api, blueprint.id);
+    expect(current.cronConfig).toBe('45 6 * * *');
+    expect(current.isManual).toBe(false);
+    expect(current.skipOnFail).toBe(true);
+    expect(Math.abs(new Date(current.timeAfter as string).getTime() - (before - 30 * DAY_MS))).toBeLessThan(2 * DAY_MS);
+  });
+
+  test('Escape closes the sync policy dialog and focus returns to its edit button', async ({ page }) => {
+    const detail = new BlueprintDetailPage(page, blueprint.id);
+    await detail.open(BLUEPRINT_VIEW.CONFIGURATION);
+    await detail.openSyncPolicy();
+    await expect(detail.syncPolicyDialog).toBeVisible();
+
+    await detail.pressEscape();
+    await expect(detail.syncPolicyDialog).toBeHidden();
+    await expect(detail.editSyncPolicyButton).toBeFocused();
+  });
+
+  test('renaming an advanced blueprint is saved and shown', async ({ page }) => {
+    const renamed = `${prefix}-renamed`;
+    const detail = new BlueprintDetailPage(page, blueprint.id);
+    await detail.open(BLUEPRINT_VIEW.CONFIGURATION);
+    await detail.renameBlueprint(renamed);
+    await expect(detail.toast('Update blueprint successful.')).toBeVisible();
+    await expect(detail.nameSection).toContainText(renamed);
+
+    expect((await getBlueprint(api, blueprint.id)).name).toBe(renamed);
   });
 });
