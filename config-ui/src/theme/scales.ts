@@ -65,6 +65,7 @@ export type LayoutTokens = {
   searchMaxWidth: number;
   connectionNameWidth: number;
   sortSelectWidth: number;
+  datePickerWidth: number;
   statusDotSize: number;
   sidebarHeaderHeight: number;
   sidebarControlSize: number;
@@ -130,6 +131,7 @@ export const LAYOUT: LayoutTokens = {
   searchMaxWidth: 400,
   connectionNameWidth: 200,
   sortSelectWidth: 168,
+  datePickerWidth: 224,
   statusDotSize: 6,
   sidebarHeaderHeight: 70,
   sidebarControlSize: 28,

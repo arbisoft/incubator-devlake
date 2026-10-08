@@ -20,17 +20,16 @@ import { FileDoneOutlined } from '@ant-design/icons';
 import { Input, Radio } from 'antd';
 
 import API from '@/api';
-import { cronPresets } from '@/config';
 import { IBPMode } from '@/types';
 import { FormField, FormModal, useModalForm } from '@/ui';
 import { operator } from '@/utils';
 
+import { DEFAULT_PRESET } from '../../sync-policy';
 import { COPY } from '../constants';
 import { buildBlueprintCreatePayload } from '../utils';
 
 import type { NewBlueprintModalProps } from './types';
 
-const [DEFAULT_PRESET] = cronPresets;
 const INITIAL_FORM = { name: '', mode: IBPMode.NORMAL };
 
 export const NewBlueprintModal = ({ open, onClose, onCreated }: NewBlueprintModalProps) => {

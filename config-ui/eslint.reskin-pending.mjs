@@ -18,12 +18,6 @@
 
 // Src files that fail the strict reskin rules today; remove a file from here when it is cleaned.
 export const RESKIN_LINT_PENDING = [
-  'src/routes/blueprint/connection-detail/index.tsx',
-  'src/routes/blueprint/detail/components/add-connection-dialog/index.tsx',
-  'src/routes/blueprint/detail/components/sync-policy/index.tsx',
-  'src/routes/blueprint/detail/components/update-policy-dialog/index.tsx',
-  'src/routes/blueprint/detail/configuration-panel.tsx',
-  'src/routes/blueprint/detail/configuration-styled.ts',
   'src/routes/change-password.tsx',
   'src/routes/db-migrate/index.tsx',
   'src/routes/error/index.tsx',

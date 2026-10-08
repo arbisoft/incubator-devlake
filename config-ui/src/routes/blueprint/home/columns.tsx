@@ -21,11 +21,13 @@ import { Button, Tooltip, type TableColumnsType } from 'antd';
 import { Link } from 'react-router-dom';
 
 import { TextTooltip } from '@/components';
-import { BLUEPRINT_VIEW, getCron, PATHS } from '@/config';
+import { BLUEPRINT_VIEW, PATHS } from '@/config';
 import { ConnectionName } from '@/features';
 import { IBPMode, type IBlueprint } from '@/types';
 import { OverflowList, RowLink, StatusBadge } from '@/ui';
 import { formatTime } from '@/utils';
+
+import { getFrequencyLabel, getNextRunTime } from '../sync-policy';
 
 import { BLUEPRINT_COLUMN, BLUEPRINT_STATUS_TONE, COPY, MAX_VISIBLE_CONNECTIONS } from './constants';
 import { toStatusKey } from './utils';
@@ -63,12 +65,12 @@ export const getColumns = ({ onConfigure }: ColumnOptions): TableColumnsType<IBl
   {
     key: BLUEPRINT_COLUMN.FREQUENCY,
     title: COPY.columns.frequency,
-    render: (_, { isManual, cronConfig }) => getCron(isManual, cronConfig).label,
+    render: (_, { isManual, cronConfig }) => getFrequencyLabel(isManual, cronConfig),
   },
   {
     key: BLUEPRINT_COLUMN.NEXT_RUN,
     title: COPY.columns.nextRun,
-    render: (_, { isManual, cronConfig }) => formatTime(getCron(isManual, cronConfig).nextTime),
+    render: (_, { isManual, cronConfig }) => formatTime(getNextRunTime(isManual, cronConfig)),
   },
   {
     key: BLUEPRINT_COLUMN.PROJECT,

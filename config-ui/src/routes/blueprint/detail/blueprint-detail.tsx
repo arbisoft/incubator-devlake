@@ -21,7 +21,7 @@ import { useNavigate } from 'react-router-dom';
 import { PageLoading } from '@/components';
 import { BLUEPRINT_VIEW } from '@/config';
 
-import { ConfigurationPanel } from './configuration-panel';
+import { BlueprintConfiguration } from './configuration';
 import { useBlueprintDetail } from './hooks';
 import { BlueprintStatus } from './status';
 import type { BlueprintDetailProps } from './types';
@@ -47,7 +47,7 @@ export const BlueprintDetail = ({ blueprintId, context, view }: BlueprintDetailP
       onRefresh={refresh}
     />
   ) : (
-    <ConfigurationPanel
+    <BlueprintConfiguration
       blueprint={blueprint}
       connectionPath={(plugin, connectionId) => routes.connection(blueprint, plugin, connectionId)}
       onRefresh={refresh}

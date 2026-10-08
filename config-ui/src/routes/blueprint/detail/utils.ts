@@ -16,10 +16,12 @@
  *
  */
 
-import { BLUEPRINT_VIEW, type BlueprintView, getCron, PATHS, PROJECT_TAB } from '@/config';
+import { BLUEPRINT_VIEW, type BlueprintView, PATHS, PROJECT_TAB } from '@/config';
 import type { IBlueprint } from '@/types';
 import type { RouteTab } from '@/ui/types';
 import { formatTime } from '@/utils';
+
+import { getNextRunTime } from '../sync-policy';
 
 import { BLUEPRINT_CONTEXT, BLUEPRINT_VIEW_ORDER, COPY, NEXT_RUN_FORMAT } from './constants';
 import type { BlueprintContext, BlueprintViewPaths } from './types';
@@ -45,7 +47,7 @@ export const getAdvancedBlueprintViews = (id: ID) =>
 export const getNextRunLabel = (isManual: boolean, cronConfig: string) =>
   isManual
     ? COPY.actions.manual
-    : COPY.actions.nextRun(formatTime(getCron(isManual, cronConfig).nextTime, NEXT_RUN_FORMAT));
+    : COPY.actions.nextRun(formatTime(getNextRunTime(isManual, cronConfig), NEXT_RUN_FORMAT));
 
 type ContextRoutes = {
   status: (blueprint: IBlueprint) => string;

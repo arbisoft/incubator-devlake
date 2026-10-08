@@ -16,31 +16,28 @@
  *
  */
 
-import styled from 'styled-components';
+import type { IBPMode } from '@/types';
 
-export const Wrapper = styled.div`
-  .timezone {
-    margin-bottom: 16px;
-  }
+export type SyncPolicyValues = {
+  isManual: boolean;
+  cronConfig: string;
+  skipOnFail: boolean;
+  timeAfter: string | null;
+};
 
-  .quick-selection {
-    margin-bottom: 8px;
-  }
+export type SyncPolicyFormProps = {
+  values: SyncPolicyValues;
+  showTimeFilter: boolean;
+  onChange: (patch: Partial<SyncPolicyValues>) => void;
+};
 
-  .time-selection {
-    display: flex;
-    align-items: center;
+export type SyncPolicyModalProps = {
+  open: boolean;
+  mode: IBPMode;
+  values: SyncPolicyValues;
+  loading: boolean;
+  onSubmit: (values: SyncPolicyValues) => void;
+  onCancel: () => void;
+};
 
-    strong {
-      margin-left: 8px;
-    }
-  }
-
-  .cron {
-    display: flex;
-  }
-`;
-
-export const Error = styled.div`
-  color: ${({ theme }) => theme.colors.errorAlt};
-`;
+export type QuickRange = { key: string; label: string; date: Date };

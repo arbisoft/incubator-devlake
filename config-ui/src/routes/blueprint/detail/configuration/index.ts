@@ -16,29 +16,4 @@
  *
  */
 
-export enum IBPMode {
-  ADVANCED = 'ADVANCED',
-  NORMAL = 'NORMAL',
-}
-
-export type BlueprintConnectionPayload = {
-  pluginName: string;
-  connectionId: ID;
-  scopes?: Array<{
-    scopeId: ID;
-  }>;
-};
-
-export interface IBlueprint {
-  id: ID;
-  name: string;
-  projectName: string;
-  mode: IBPMode;
-  enable: boolean;
-  isManual: boolean;
-  cronConfig: string;
-  skipOnFail: boolean;
-  plan: any;
-  timeAfter: null | string;
-  connections: BlueprintConnectionPayload[];
-}
+export * from './configuration';
