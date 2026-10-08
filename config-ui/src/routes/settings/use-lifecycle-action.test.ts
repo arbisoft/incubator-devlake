@@ -17,12 +17,14 @@
  */
 
 import { act, renderHook } from '@testing-library/react';
+import { message } from 'antd';
+import { AxiosError, AxiosHeaders, HttpStatusCode } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import API from '@/api';
 import { ACCESS_ROLE, ACCESS_STATUS, type AccessDomain, type AccessUser } from '@/api/access';
 
-import { COPY, LIFECYCLE_ACTION, LIFECYCLE_SUBJECT } from './constants';
+import { ACCESS_ERROR, COPY, LIFECYCLE_ACTION, LIFECYCLE_SUBJECT } from './constants';
 import type { LifecycleAction } from './types';
 import { useLifecycleAction, type LifecycleTarget } from './use-lifecycle-action';
 
@@ -183,5 +185,34 @@ describe('useLifecycleAction', () => {
       status: ACCESS_STATUS.ACTIVE,
     });
     expect(onDone).toHaveBeenCalledTimes(2);
+  });
+
+  describe('failure toasts', () => {
+    const lastAdminError = () =>
+      new AxiosError('Request failed', 'ERR_BAD_REQUEST', undefined, undefined, {
+        status: HttpStatusCode.BadRequest,
+        statusText: 'Bad Request',
+        headers: {},
+        config: { headers: new AxiosHeaders() },
+        data: { message: 'keep at least one active customer administrator' },
+      });
+
+    it('shows safe copy when a role change is refused', async () => {
+      const { result, onDone } = setup();
+      access.updateUser.mockRejectedValue(lastAdminError());
+      await act(async () => result.current.changeRole(USER_TARGET, ACCESS_ROLE.MEMBER));
+      expect(message.error).toHaveBeenCalledWith(ACCESS_ERROR.LAST_ADMIN);
+      expect(onDone).not.toHaveBeenCalled();
+    });
+
+    it('shows safe copy when disabling a user or a domain fails, never the raw error', async () => {
+      const { result } = setup();
+      access.updateUser.mockRejectedValue(lastAdminError());
+      access.updateDomain.mockRejectedValue(new Error('error saving access domain: sql'));
+      await act(async () => result.current.start(LIFECYCLE_ACTION.DISABLE, USER_TARGET));
+      await act(async () => result.current.start(LIFECYCLE_ACTION.DISABLE, DOMAIN_TARGET));
+      expect(message.error).toHaveBeenNthCalledWith(1, ACCESS_ERROR.LAST_ADMIN);
+      expect(message.error).toHaveBeenNthCalledWith(2, ACCESS_ERROR.REQUEST_FAILED);
+    });
   });
 });

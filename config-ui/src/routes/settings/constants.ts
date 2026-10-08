@@ -16,6 +16,8 @@
  *
  */
 
+import { HttpStatusCode } from 'axios';
+
 import {
   ACCESS_ERROR_CODE,
   ACCESS_ROLE,
@@ -89,6 +91,9 @@ export const ACCESS_ERROR = {
     'OIDC provider was saved, but Grafana OAuth synchronization failed. Use Retry Grafana to complete synchronization.',
   LOCAL_DUPLICATE_USER: 'This username already has a DevLake local password.',
   LOCAL_INVALID_USER: 'Enter a valid username, then try again.',
+  INVALID_UPDATE: 'Choose a valid role and status, then try again.',
+  LAST_ADMIN: 'Keep at least one active customer administrator.',
+  ENTRY_NOT_FOUND: 'This entry no longer exists. Refresh the page and try again.',
 } as const;
 
 export const CREATE_USER_ERROR_MAP: Record<string, string> = {
@@ -110,6 +115,13 @@ export const CREATE_DOMAIN_ERROR_MAP: Record<string, string> = {
   [ACCESS_ERROR_CODE.INVALID_DOMAIN]: ACCESS_ERROR.INVALID_DOMAIN,
 };
 
+export const UPDATE_ACCESS_ERROR_MAP: Record<string, string> = {
+  [ACCESS_ERROR_CODE.INVALID_USER]: ACCESS_ERROR.INVALID_UPDATE,
+  [ACCESS_ERROR_CODE.INVALID_DOMAIN]: ACCESS_ERROR.INVALID_UPDATE,
+  [HttpStatusCode.NotFound]: ACCESS_ERROR.ENTRY_NOT_FOUND,
+};
+
+export const LAST_ADMIN_SERVER_TEXT = 'keep at least one active customer administrator';
 export const DUPLICATE_USER_SERVER_TEXT = 'this email already has a DevLake access entry';
 export const DUPLICATE_DOMAIN_SERVER_TEXT = 'this domain already has a DevLake access policy';
 

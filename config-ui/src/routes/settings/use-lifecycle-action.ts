@@ -31,7 +31,7 @@ import { operator } from '@/utils';
 
 import { LIFECYCLE_ACTION, LIFECYCLE_CONFIRM, LIFECYCLE_SUBJECT } from './constants';
 import type { LifecycleAction, LifecycleSubject } from './types';
-import { getDomainLabel, getLocalCredentialError, getUserLabel } from './utils';
+import { getDomainLabel, getLocalCredentialError, getUpdateAccessError, getUserLabel } from './utils';
 
 export type LifecycleTarget =
   | { subject: Extract<LifecycleSubject, 'user'>; item: AccessUser }
@@ -89,7 +89,7 @@ export const useLifecycleAction = ({ onDone, onCredential }: Options) => {
       if (!request) return false;
       const [success, response] = await operator(request, {
         setOperating: setLoading,
-        formatReason: CREDENTIAL_ACTIONS.includes(next.action) ? getLocalCredentialError : undefined,
+        formatReason: CREDENTIAL_ACTIONS.includes(next.action) ? getLocalCredentialError : getUpdateAccessError,
       });
       if (success) {
         if (next.action === LIFECYCLE_ACTION.RESET_PASSWORD && response) onCredential?.(response);
@@ -109,13 +109,16 @@ export const useLifecycleAction = ({ onDone, onCredential }: Options) => {
 
   const changeRole = useCallback(
     async (target: LifecycleTarget, role: AccessRole) => {
-      const [success] = await operator(async () => {
-        if (target.subject === LIFECYCLE_SUBJECT.USER) {
-          await API.access.updateUser(target.item.id, { role, status: target.item.status });
-        } else {
-          await API.access.updateDomain(target.item.id, { defaultRole: role, status: target.item.status });
-        }
-      });
+      const [success] = await operator(
+        async () => {
+          if (target.subject === LIFECYCLE_SUBJECT.USER) {
+            await API.access.updateUser(target.item.id, { role, status: target.item.status });
+          } else {
+            await API.access.updateDomain(target.item.id, { defaultRole: role, status: target.item.status });
+          }
+        },
+        { formatReason: getUpdateAccessError },
+      );
       if (success) onDone();
     },
     [onDone],

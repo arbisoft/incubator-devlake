@@ -35,8 +35,10 @@ import {
   CREATE_USER_ERROR_MAP,
   DUPLICATE_DOMAIN_SERVER_TEXT,
   DUPLICATE_USER_SERVER_TEXT,
+  LAST_ADMIN_SERVER_TEXT,
   LOCAL_CREDENTIAL_ERROR_MAP,
   PAGE_SIZE_OPTIONS,
+  UPDATE_ACCESS_ERROR_MAP,
 } from './constants';
 
 export { ACCESS_ERROR };
@@ -90,6 +92,15 @@ export const getCreateUserError = (error: unknown) => {
 
 export const getLocalCredentialError = (error: unknown) =>
   mapAccessError(error, BAD_REQUEST_OR_NOT_FOUND, LOCAL_CREDENTIAL_ERROR_MAP, ACCESS_ERROR.REQUEST_FAILED);
+
+export const getUpdateAccessError = (error: unknown) => {
+  const mapped = mapAccessError(error, BAD_REQUEST_OR_NOT_FOUND, UPDATE_ACCESS_ERROR_MAP, '');
+  if (mapped) return mapped;
+
+  const message = serverMessage(error);
+  if (message.toLowerCase().includes(LAST_ADMIN_SERVER_TEXT)) return ACCESS_ERROR.LAST_ADMIN;
+  return message || ACCESS_ERROR.REQUEST_FAILED;
+};
 
 export const getCreateDomainError = (error: unknown) => {
   const mapped = mapAccessError(error, BAD_REQUEST_ONLY, CREATE_DOMAIN_ERROR_MAP, '');
