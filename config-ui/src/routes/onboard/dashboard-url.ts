@@ -16,8 +16,12 @@
  *
  */
 
-import { request } from '@/utils';
+import { ONBOARD_PLUGIN } from './constants';
 
-export const get = (key: string, signal?: AbortSignal) => request(`/store/${key}`, { signal });
-
-export const set = (key: string, value: unknown) => request(`/store/${key}`, { method: 'PUT', data: value });
+export const DASHBOARD_URL: Record<string, string> = {
+  [ONBOARD_PLUGIN.GITHUB]: import.meta.env.DEVLAKE_DASHBOARD_URL_GITHUB,
+  [ONBOARD_PLUGIN.GITLAB]: import.meta.env.DEVLAKE_DASHBOARD_URL_GITLAB,
+  [ONBOARD_PLUGIN.BITBUCKET]: import.meta.env.DEVLAKE_DASHBOARD_URL_BITBUCKET,
+  [ONBOARD_PLUGIN.AZURE_DEVOPS]: import.meta.env.DEVLAKE_DASHBOARD_URL_AZUREDEVOPS,
+  [ONBOARD_PLUGIN.ASANA]: import.meta.env.DEVLAKE_DASHBOARD_URL_ASANA,
+};

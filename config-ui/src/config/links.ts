@@ -22,6 +22,7 @@ export const LINKS = {
   DOCS: DOC_URL.TUTORIAL,
   API: '/api/swagger/index.html',
   GITHUB: 'https://github.com/apache/devlake',
+  GITHUB_NEW_ISSUE: 'https://github.com/apache/devlake/issues/new/choose',
   DATA_ENTITIES: 'https://devlake.apache.org/docs/DataModels/DevLakeDomainLayerSchema',
   WEBHOOK_SCHEMA: {
     INCIDENT: 'https://devlake.apache.org/docs/Plugins/webhook#register-issues---update-or-create-issues',

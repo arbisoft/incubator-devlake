@@ -16,8 +16,19 @@
  *
  */
 
-import { request } from '@/utils';
+import { useRefreshData } from '@/hooks';
 
-export const get = (key: string, signal?: AbortSignal) => request(`/store/${key}`, { signal });
+import { GUIDE_ROOT } from './constants';
 
-export const set = (key: string, value: unknown) => request(`/store/${key}`, { method: 'PUT', data: value });
+export const useGuide = (step: string, name?: string) => {
+  const { data } = useRefreshData(
+    async (signal) => {
+      if (!name) return '';
+      const res = await fetch(`${GUIDE_ROOT}/${step}/${name}.md`, { signal });
+      return res.ok ? res.text() : '';
+    },
+    [step, name],
+  );
+
+  return data ?? '';
+};

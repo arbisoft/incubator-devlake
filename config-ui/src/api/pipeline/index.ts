@@ -44,4 +44,5 @@ export const log = (id: ID) => request(`/pipelines/${id}/logging.tar.gz`);
 
 export const tasks = (id: ID, signal?: AbortSignal) => request(`/pipelines/${id}/tasks`, { signal });
 
-export const subTasks = (id: ID): Promise<SubTasksRes> => request(`/pipelines/${id}/subtasks`);
+export const subTasks = (id: ID, signal?: AbortSignal): Promise<SubTasksRes> =>
+  request(`/pipelines/${id}/subtasks`, { signal });

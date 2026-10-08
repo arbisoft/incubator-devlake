@@ -16,8 +16,25 @@
  *
  */
 
-import { request } from '@/utils';
+import { Button } from 'antd';
 
-export const get = (key: string, signal?: AbortSignal) => request(`/store/${key}`, { signal });
+import { COPY } from './constants';
+import * as S from './styled';
 
-export const set = (key: string, value: unknown) => request(`/store/${key}`, { method: 'PUT', data: value });
+type StepActionsProps = {
+  loading: boolean;
+  nextDisabled: boolean;
+  onPrevious: () => void;
+  onNext: () => void;
+};
+
+export const StepActions = ({ loading, nextDisabled, onPrevious, onNext }: StepActionsProps) => (
+  <S.Actions>
+    <Button ghost type="primary" loading={loading} onClick={onPrevious}>
+      {COPY.previous}
+    </Button>
+    <Button type="primary" loading={loading} disabled={nextDisabled} onClick={onNext}>
+      {COPY.next}
+    </Button>
+  </S.Actions>
+);

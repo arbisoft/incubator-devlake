@@ -16,8 +16,27 @@
  *
  */
 
-import { request } from '@/utils';
+import { Button } from 'antd';
 
-export const get = (key: string, signal?: AbortSignal) => request(`/store/${key}`, { signal });
+import { EMPTY_ILLUSTRATION, EMPTY_STATE_SIZE, EmptyState, StandalonePage } from '@/ui';
 
-export const set = (key: string, value: unknown) => request(`/store/${key}`, { method: 'PUT', data: value });
+import { COPY, SECTION } from './constants';
+import { DemoCase, DemoSection } from './demo-section';
+
+const { emptyState: text } = COPY;
+
+export const StandalonePageDemo = () => (
+  <DemoSection id={SECTION.STANDALONE_PAGE} title={COPY.sections.standalonePage}>
+    <DemoCase label={`${COPY.cases.page}, ${COPY.cases.withAction}`}>
+      <StandalonePage>
+        <EmptyState
+          illustration={EMPTY_ILLUSTRATION.EMPTY}
+          title={text.emptyTitle}
+          description={text.emptyDescription}
+          action={<Button type="primary">{text.add}</Button>}
+          size={EMPTY_STATE_SIZE.PAGE}
+        />
+      </StandalonePage>
+    </DemoCase>
+  </DemoSection>
+);

@@ -18,4 +18,7 @@
 
 export const COPY = {
   title: 'Page not found',
+  heading: '404 Not Found',
+  description: 'This is an invalid address.',
+  home: 'Go HomePage',
 };

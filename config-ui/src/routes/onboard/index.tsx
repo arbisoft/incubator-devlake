@@ -16,8 +16,6 @@
  *
  */
 
-import { CloseOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
-import { theme, Layout, Modal } from 'antd';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -27,8 +25,9 @@ import { PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
 import { useDocumentTitle } from '@/ui/hooks';
 
+import { ExitControl } from './components';
+import { STORE_KEY } from './components/constants';
 import { COPY } from './constants';
-import type { Record } from './context';
 import { Context } from './context';
 import { Step0 } from './step-0';
 import { Step1 } from './step-1';
@@ -36,21 +35,7 @@ import { Step2 } from './step-2';
 import { Step3 } from './step-3';
 import { Step4 } from './step-4';
 import * as S from './styled';
-
-const steps = [
-  {
-    step: 1,
-    title: 'Create Project',
-  },
-  {
-    step: 2,
-    title: 'Configure Connection',
-  },
-  {
-    step: 3,
-    title: 'Add data scope',
-  },
-];
+import type { OnboardRecord } from './types';
 
 interface Props {
   logo?: React.ReactNode;
@@ -61,19 +46,13 @@ export const Onboard = ({ logo, title }: Props) => {
   useDocumentTitle(COPY.title);
 
   const [step, setStep] = useState(0);
-  const [records, setRecords] = useState<Record[]>([]);
+  const [records, setRecords] = useState<OnboardRecord[]>([]);
   const [projectName, setProjectName] = useState<string>();
   const [plugin, setPlugin] = useState<string>();
 
   const navigate = useNavigate();
 
-  const {
-    token: { colorPrimary },
-  } = theme.useToken();
-
-  const [modal, contextHolder] = Modal.useModal();
-
-  const { ready, data } = useRefreshData(() => API.store.get('onboard'));
+  const { ready, data } = useRefreshData((signal) => API.store.get(STORE_KEY, signal));
 
   useEffect(() => {
     if (ready && data) {
@@ -84,15 +63,9 @@ export const Onboard = ({ logo, title }: Props) => {
     }
   }, [ready, data]);
 
-  const handleClose = () => {
-    modal.confirm({
-      width: 820,
-      title: 'Are you sure to exit the onboarding session?',
-      content: 'You can get back to this session via the card on top of the Projects page.',
-      icon: <ExclamationCircleOutlined />,
-      okText: 'Confirm',
-      onOk: () => navigate(PATHS.ROOT()),
-    });
+  const handleExit = async () => {
+    navigate(PATHS.ROOT());
+    return true;
   };
 
   if (!ready) {
@@ -109,28 +82,25 @@ export const Onboard = ({ logo, title }: Props) => {
         plugin,
         setStep,
         setRecords,
-        setProjectName: setProjectName,
-        setPlugin: setPlugin,
+        setProjectName,
+        setPlugin,
       }}
     >
-      <Layout style={{ minHeight: '100vh' }}>
+      <S.Page>
         <S.Inner>
           {step === 0 ? (
             <Step0 logo={logo} title={title} />
           ) : (
             <>
               <S.Header>
-                <h1>Connect to your first repository</h1>
-                <CloseOutlined
-                  style={{ fontSize: 18, color: 'var(--devlake-color-text-subdued)', cursor: 'pointer' }}
-                  onClick={handleClose}
-                />
+                <S.Title>{COPY.heading}</S.Title>
+                <ExitControl onExit={handleExit} />
               </S.Header>
               <S.Content>
                 {[1, 2, 3].includes(step) && (
                   <S.Step>
-                    {steps.map((it) => (
-                      <S.StepItem key={it.step} $activated={it.step === step} $activatedColor={colorPrimary}>
+                    {COPY.steps.map((it) => (
+                      <S.StepItem key={it.step} $activated={it.step === step}>
                         <span>{it.step}</span>
                         <span>{it.title}</span>
                       </S.StepItem>
@@ -145,8 +115,7 @@ export const Onboard = ({ logo, title }: Props) => {
             </>
           )}
         </S.Inner>
-        {contextHolder}
-      </Layout>
+      </S.Page>
     </Context.Provider>
   );
 };

@@ -16,8 +16,23 @@
  *
  */
 
-import { request } from '@/utils';
+import styled from 'styled-components';
 
-export const get = (key: string, signal?: AbortSignal) => request(`/store/${key}`, { signal });
+export const Page = styled.main`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: ${({ theme }) => theme.layout.contentGutter}px;
+  box-sizing: border-box;
+  color: ${({ theme }) => theme.colors.text};
+  background: ${({ theme }) => theme.colors.bgLayout};
+`;
 
-export const set = (key: string, value: unknown) => request(`/store/${key}`, { method: 'PUT', data: value });
+export const Panel = styled.div`
+  width: 100%;
+  max-width: ${({ theme }) => theme.layout.standalonePanelWidth}px;
+  background: ${({ theme }) => theme.colors.bgContainer};
+  border: 1px solid ${({ theme }) => theme.colors.borderSubtle};
+  border-radius: ${({ theme }) => theme.radius.lg}px;
+`;

@@ -16,8 +16,11 @@
  *
  */
 
-import { request } from '@/utils';
+import { Page, Panel } from './styled';
+import type { StandalonePageProps } from './types';
 
-export const get = (key: string, signal?: AbortSignal) => request(`/store/${key}`, { signal });
-
-export const set = (key: string, value: unknown) => request(`/store/${key}`, { method: 'PUT', data: value });
+export const StandalonePage = ({ children }: StandalonePageProps) => (
+  <Page>
+    <Panel>{children}</Panel>
+  </Page>
+);

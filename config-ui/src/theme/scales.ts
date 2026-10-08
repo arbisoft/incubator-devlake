@@ -62,6 +62,7 @@ export type LayoutTokens = {
   focusRingWidth: number;
   keyValueLabelWidth: number;
   emptyStateTextWidth: number;
+  standalonePanelWidth: number;
   searchMaxWidth: number;
   connectionNameWidth: number;
   sortSelectWidth: number;
@@ -90,6 +91,17 @@ export type LayoutTokens = {
   scopeRowHeight: number;
   scopeCheckboxSize: number;
   fieldMaxWidth: number;
+  wizardWidth: number;
+  wizardContentWidth: number;
+  wizardPanelHeight: number;
+  wizardFormWidth: number;
+  wizardStepMarkSize: number;
+  wizardConnectorWidth: number;
+  wizardSectionGap: number;
+  wizardResultSize: number;
+  wizardLogNameWidth: number;
+  wizardLogStatusWidth: number;
+  wizardActionWidth: number;
 };
 export type ZIndexTokens = { sidebar: number; flyout: number; drawer: number; modal: number };
 export type MotionTokens = { fast: number; base: number; easing: string };
@@ -129,6 +141,7 @@ export const LAYOUT: LayoutTokens = {
   focusRingWidth: 2,
   keyValueLabelWidth: 112,
   emptyStateTextWidth: 452,
+  standalonePanelWidth: 600,
   searchMaxWidth: 400,
   connectionNameWidth: 200,
   sortSelectWidth: 168,
@@ -157,6 +170,17 @@ export const LAYOUT: LayoutTokens = {
   scopeRowHeight: 40,
   scopeCheckboxSize: 16,
   fieldMaxWidth: 600,
+  wizardWidth: 1200,
+  wizardContentWidth: 860,
+  wizardPanelHeight: 450,
+  wizardFormWidth: 540,
+  wizardStepMarkSize: 32,
+  wizardConnectorWidth: 100,
+  wizardSectionGap: 144,
+  wizardResultSize: 120,
+  wizardLogNameWidth: 220,
+  wizardLogStatusWidth: 150,
+  wizardActionWidth: 280,
 };
 
 // antd's popup layer is 1000 (modal, drawer); dropdowns 1050; the sidebar sits below them.

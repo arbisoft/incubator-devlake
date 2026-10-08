@@ -16,93 +16,50 @@
  *
  */
 
-import { ExclamationCircleOutlined, CloseOutlined } from '@ant-design/icons';
-import { Modal, Flex, Button } from 'antd';
+import { Button } from 'antd';
 import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import styled from 'styled-components';
 
 import API from '@/api';
 import { Logo } from '@/components';
 import { PATHS } from '@/config';
 import { operator } from '@/utils';
 
+import { ExitControl } from './components';
+import { STORE_KEY } from './components/constants';
+import { COPY, WIZARD_STEP } from './constants';
 import { Context } from './context';
-
-const Wrapper = styled.div`
-  .logo {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 200px;
-  }
-
-  h1 {
-    margin-bottom: 24px;
-    font-size: 64px;
-    font-weight: 400;
-
-    & > span {
-      color: #e8471c;
-    }
-  }
-
-  h4 {
-    margin-bottom: 70px;
-    font-size: 16px;
-    font-weight: 400;
-  }
-
-  .action {
-    margin: 0 auto;
-    width: 280px;
-  }
-`;
+import * as S from './styled';
 
 interface Props {
   logo?: React.ReactNode;
   title?: React.ReactNode;
 }
 
-export const Step0 = ({ logo = <Logo direction="horizontal" />, title = 'DevLake' }: Props) => {
+export const Step0 = ({ logo = <Logo direction="horizontal" />, title = COPY.defaultProduct }: Props) => {
   const [operating, setOperating] = useState(false);
 
   const navigate = useNavigate();
 
-  const [modal, contextHolder] = Modal.useModal();
-
   const { step, records, done, projectName, plugin, setStep } = useContext(Context);
 
-  const handleClose = () => {
-    modal.confirm({
-      width: 820,
-      title: 'Are you sure to exit the onboarding session?',
-      content: 'You can get back to this session via the card on top of the Projects page.',
-      icon: <ExclamationCircleOutlined />,
-      okText: 'Confirm',
-      onOk: async () => {
-        const [success] = await operator(
-          () => API.store.set('onboard', { step: 0, records, done, projectName, plugin }),
-          {
-            setOperating,
-            hideToast: true,
-          },
-        );
+  const handleExit = async () => {
+    const [success] = await operator(
+      () => API.store.set(STORE_KEY, { step: WIZARD_STEP.WELCOME, records, done, projectName, plugin }),
+      { setOperating, hideToast: true },
+    );
 
-        if (success) {
-          navigate(PATHS.ROOT());
-        }
-      },
-    });
+    if (success) {
+      navigate(PATHS.ROOT());
+    }
+
+    return success;
   };
 
   const handleSubmit = async () => {
     const [success] = await operator(
-      async () => API.store.set('onboard', { step: 1, records, done, projectName, plugin }),
-      {
-        setOperating,
-        hideToast: true,
-      },
+      async () => API.store.set(STORE_KEY, { step: WIZARD_STEP.PROJECT, records, done, projectName, plugin }),
+      { setOperating, hideToast: true },
     );
 
     if (success) {
@@ -111,26 +68,22 @@ export const Step0 = ({ logo = <Logo direction="horizontal" />, title = 'DevLake
   };
 
   return (
-    <Wrapper>
-      {contextHolder}
-      <div className="logo">
+    <div>
+      <S.HeroBar>
         {logo}
-        <CloseOutlined
-          style={{ fontSize: 18, color: 'var(--devlake-color-text-subdued)', cursor: 'pointer' }}
-          onClick={handleClose}
-        />
-      </div>
-      <Flex vertical justify="center" align="center">
-        <h1>
-          Welcome to <span>{title}</span>
-        </h1>
-        <h4>With just a few clicks, you can integrate your initial DevOps tool and observe engineering metrics.</h4>
-        <div className="action">
+        <ExitControl onExit={handleExit} />
+      </S.HeroBar>
+      <S.Hero>
+        <S.Welcome>
+          {COPY.welcome} <span>{title}</span>
+        </S.Welcome>
+        <S.Subtitle>{COPY.subtitle}</S.Subtitle>
+        <S.Start>
           <Button block size="large" type="primary" loading={operating} onClick={handleSubmit}>
-            Connect to your first repository
+            {COPY.start}
           </Button>
-        </div>
-      </Flex>
-    </Wrapper>
+        </S.Start>
+      </S.Hero>
+    </div>
   );
 };

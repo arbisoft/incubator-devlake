@@ -16,8 +16,19 @@
  *
  */
 
-import { request } from '@/utils';
+import styled from 'styled-components';
 
-export const get = (key: string, signal?: AbortSignal) => request(`/store/${key}`, { signal });
+import { textStyle } from '@/ui/style-helpers';
 
-export const set = (key: string, value: unknown) => request(`/store/${key}`, { method: 'PUT', data: value });
+export const Actions = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.md}px;
+`;
+
+export const Warning = styled.p`
+  ${textStyle('body')}
+  margin: 0;
+  color: ${({ theme }) => theme.colors.warningText};
+`;

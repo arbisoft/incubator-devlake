@@ -16,8 +16,5 @@
  *
  */
 
-import { request } from '@/utils';
-
-export const get = (key: string, signal?: AbortSignal) => request(`/store/${key}`, { signal });
-
-export const set = (key: string, value: unknown) => request(`/store/${key}`, { method: 'PUT', data: value });
+export * from './standalone-page';
+export type * from './types';

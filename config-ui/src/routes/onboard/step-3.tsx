@@ -16,30 +16,28 @@
  *
  */
 
-import { Flex, Button } from 'antd';
-import { useState, useContext, useEffect, useMemo } from 'react';
+import { useState, useContext, useMemo } from 'react';
 
 import API from '@/api';
-import { Markdown } from '@/components';
 import { DataScopeRemote, getPluginScopeName } from '@/plugins';
+import type { ScopeItem } from '@/plugins/components/data-scope-remote/types';
 import { operator } from '@/utils';
 
+import { STORE_KEY } from './components/constants';
+import { COPY, GUIDE_STEP, WIZARD_STEP } from './constants';
 import { Context } from './context';
+import { StepActions } from './step-actions';
 import * as S from './styled';
+import { useGuide } from './use-guide';
 import { buildOnboardBlueprintUpdatePayload } from './utils';
 
 export const Step3 = () => {
-  const [QA, setQA] = useState('');
   const [operating, setOperating] = useState(false);
-  const [scopes, setScopes] = useState<any[]>([]);
+  const [scopes, setScopes] = useState<ScopeItem[]>([]);
 
   const { step, records, done, projectName, plugin, setStep, setRecords } = useContext(Context);
 
-  useEffect(() => {
-    fetch(`/onboard/step-3/${plugin}.md`)
-      .then((res) => res.text())
-      .then((text) => setQA(text));
-  }, [plugin]);
+  const guide = useGuide(GUIDE_STEP.SCOPE, plugin);
 
   const connectionId = useMemo(() => {
     const record = records.find((it) => it.plugin === plugin);
@@ -53,7 +51,6 @@ export const Step3 = () => {
 
     const [success] = await operator(
       async () => {
-        // 1. create a new project
         const { blueprint } = await API.project.create({
           name: projectName,
           description: '',
@@ -66,16 +63,12 @@ export const Step3 = () => {
           ],
         });
 
-        // 2. add data scopes to the connection
         await API.scope.batch(plugin, connectionId, { data: scopes.map((it) => it.data) });
 
-        // 3. add data scopes to the blueprint
         await API.blueprint.update(blueprint.id, buildOnboardBlueprintUpdatePayload(plugin, connectionId, scopes));
 
-        // 4. trigger this blueprint
         await API.blueprint.trigger(blueprint.id, { skipCollectors: false, fullSync: false });
 
-        // 5. get current run pipeline
         const pipeline = await API.blueprint.pipelines(blueprint.id);
 
         const newRecords = records.map((it) =>
@@ -91,9 +84,8 @@ export const Step3 = () => {
 
         setRecords(newRecords);
 
-        // 6. update store
-        await API.store.set('onboard', {
-          step: 4,
+        await API.store.set(STORE_KEY, {
+          step: WIZARD_STEP.RESULT,
           records: newRecords,
           done,
           projectName,
@@ -102,7 +94,7 @@ export const Step3 = () => {
       },
       {
         setOperating,
-        formatMessage: () => 'Congratulations！You have successfully connected to your first repository!',
+        formatMessage: () => COPY.scope.congratulations,
       },
     );
 
@@ -118,7 +110,7 @@ export const Step3 = () => {
   return (
     <>
       <S.StepContent>
-        <div className="content">
+        <S.Form>
           <DataScopeRemote
             mode="single"
             plugin={plugin}
@@ -126,17 +118,15 @@ export const Step3 = () => {
             selectedScope={scopes}
             onChangeSelectedScope={setScopes}
           />
-        </div>
-        <Markdown className="qa">{QA}</Markdown>
+        </S.Form>
+        <S.Guide>{guide}</S.Guide>
       </S.StepContent>
-      <Flex style={{ marginTop: 36 }} justify="space-between">
-        <Button ghost type="primary" loading={operating} onClick={() => setStep(step - 1)}>
-          Previous Step
-        </Button>
-        <Button type="primary" loading={operating} disabled={!scopes.length} onClick={handleSubmit}>
-          Next Step
-        </Button>
-      </Flex>
+      <StepActions
+        loading={operating}
+        nextDisabled={!scopes.length}
+        onPrevious={() => setStep(step - 1)}
+        onNext={handleSubmit}
+      />
     </>
   );
 };

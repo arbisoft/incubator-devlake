@@ -18,32 +18,18 @@
 
 import { createContext } from 'react';
 
-export type Record = {
-  plugin: string;
-  connectionId: ID;
-  blueprintId: ID;
-  pipelineId: ID;
-  scopeName: string;
-};
+import type { OnboardContextValue } from './types';
 
-const initialValue: {
-  step: number;
-  records: Record[];
-  done: boolean;
-  projectName?: string;
-  plugin?: string;
-  setStep: (value: number) => void;
-  setRecords: (value: Record[]) => void;
-  setProjectName: (value: string) => void;
-  setPlugin: (value: string) => void;
-} = {
+const noop = () => {};
+
+const initialValue: OnboardContextValue = {
   step: 0,
   records: [],
   done: false,
-  setStep: () => {},
-  setRecords: () => {},
-  setProjectName: () => {},
-  setPlugin: () => {},
+  setStep: noop,
+  setRecords: noop,
+  setProjectName: noop,
+  setPlugin: noop,
 };
 
 export const Context = createContext(initialValue);

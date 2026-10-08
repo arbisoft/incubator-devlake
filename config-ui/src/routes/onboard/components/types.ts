@@ -18,7 +18,7 @@
 
 import type { ProgressBannerProps } from '@/ui';
 
-import type { Record as OnboardRecord } from '../context';
+import type { OnboardRecord } from '../types';
 
 import type { BANNER_ACTION, ONBOARD_STATUS } from './constants';
 

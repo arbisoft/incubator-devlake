@@ -49,6 +49,7 @@ export * from './search-input';
 export * from './section-card';
 export * from './sidebar-nav';
 export * from './sort-select';
+export * from './standalone-page';
 export * from './status-badge';
 export * from './toolbar';
 export type * from './types';
