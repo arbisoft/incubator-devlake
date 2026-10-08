@@ -120,7 +120,8 @@ export class ConnectionDetailPage extends BasePage {
   }
 
   async openAddScope(): Promise<void> {
-    await this.page.getByRole('button', { name: DETAIL_COPY.addScope }).click();
+    // An empty table repeats the toolbar's add button; both open the same picker, so take the toolbar's.
+    await this.page.getByRole('button', { name: DETAIL_COPY.addScope }).first().click();
   }
 
   async searchRemoteScope(text: string): Promise<void> {
