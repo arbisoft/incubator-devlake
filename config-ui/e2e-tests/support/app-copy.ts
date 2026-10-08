@@ -58,3 +58,5 @@ export { COPY as SORT_SELECT_COPY } from '../../src/ui/sort-select/constants';
 export { COPY as DB_MIGRATE_COPY } from '../../src/routes/db-migrate/constants';
 export { COPY as NOT_FOUND_COPY } from '../../src/routes/not-found/constants';
 export { COPY as ONBOARD_COPY } from '../../src/routes/onboard/constants';
+export { COPY as LOGIN_COPY, PROVIDER_ID } from '../../src/routes/login/constants';
+export { COPY as CHANGE_PASSWORD_COPY } from '../../src/routes/change-password/constants';

@@ -38,6 +38,13 @@
       "skips": 1,
       "fixmes": 0
     },
+    "auth/login-providers.spec.ts": {
+      "tests": 3,
+      "expects": 9,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
     "auth/rebase-matrix.spec.ts": {
       "tests": 5,
       "expects": 51,

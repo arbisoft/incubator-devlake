@@ -18,7 +18,15 @@
 import { Locator, Page } from '@playwright/test';
 
 import { LinkableProvider, PageResponse } from '../api';
-import { ACCOUNT_BLOCK_COPY, COMMON_COPY, LAYOUT_COPY, NOT_FOUND_COPY, SIDEBAR_COPY, THEME_LABEL } from '../app-copy';
+import {
+  ACCOUNT_BLOCK_COPY,
+  CHANGE_PASSWORD_COPY,
+  COMMON_COPY,
+  LAYOUT_COPY,
+  NOT_FOUND_COPY,
+  SIDEBAR_COPY,
+  THEME_LABEL,
+} from '../app-copy';
 import { APP_URL } from '../env';
 
 import { BasePage, iconButton } from './common';
@@ -252,25 +260,25 @@ export class ShellPage extends BasePage {
   }
 
   get changePasswordTitle(): Locator {
-    return this.page.getByText('Change your password');
+    return this.page.getByText(CHANGE_PASSWORD_COPY.heading);
   }
 
   get changePasswordPrompt(): Locator {
-    return this.page.getByText('Choose a new password to continue.');
+    return this.page.getByText(CHANGE_PASSWORD_COPY.forcedNotice);
   }
 
   get passwordTooShortError(): Locator {
-    return this.page.getByText('Use at least 15 characters.');
+    return this.page.getByText(CHANGE_PASSWORD_COPY.tooShort);
   }
 
   get passwordMismatchError(): Locator {
-    return this.page.getByText('Passwords do not match.');
+    return this.page.getByText(CHANGE_PASSWORD_COPY.mismatch);
   }
 
   async changePassword(password: string, confirmation: string = password): Promise<void> {
     await passwordInputs(this.page).first().fill(password);
     await passwordInputs(this.page).nth(1).fill(confirmation);
-    await this.page.getByRole('button', { name: 'Change password' }).click();
+    await this.page.getByRole('button', { name: CHANGE_PASSWORD_COPY.submit }).click();
   }
 
   // The account block name is the button text when expanded and its label on the rail.
