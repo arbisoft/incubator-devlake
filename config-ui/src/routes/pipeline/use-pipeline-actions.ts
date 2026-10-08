@@ -16,13 +16,21 @@
  *
  */
 
+import { saveAs } from 'file-saver';
 import { useState } from 'react';
 
 import API from '@/api';
+import { DEVLAKE_ENDPOINT } from '@/config';
 import { toUserMessage } from '@/ui/utils';
 import { operator } from '@/utils';
 
-import { COPY, RERUN_ERROR_MAP } from './constants';
+import { COPY, LOGS_FILE_NAME, RERUN_ERROR_MAP } from './constants';
+
+export const downloadPipelineLogs = async (id: ID) => {
+  if (await API.pipeline.log(id)) {
+    saveAs(`${DEVLAKE_ENDPOINT}/pipelines/${id}/${LOGS_FILE_NAME}`, LOGS_FILE_NAME);
+  }
+};
 
 export const usePipelineActions = (id: ID, onDone: () => void) => {
   const [operating, setOperating] = useState(false);

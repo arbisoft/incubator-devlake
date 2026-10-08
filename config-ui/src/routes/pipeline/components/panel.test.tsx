@@ -31,13 +31,15 @@ vi.mock('antd', async (importOriginal) =>
   (await import('@/ui/__tests__/antd-message-mock')).withMockedMessage(await importOriginal<typeof import('antd')>()),
 );
 
+vi.mock('file-saver', () => ({ saveAs: vi.fn() }));
+
 vi.mock('@/plugins', () => ({
   getPluginConfig: (plugin: string) => ({ plugin, name: plugin.toUpperCase(), icon: '' }),
 }));
 
 vi.mock('@/api', () => ({
   default: {
-    pipeline: { get: vi.fn(), tasks: vi.fn(), remove: vi.fn(), rerun: vi.fn() },
+    pipeline: { get: vi.fn(), tasks: vi.fn(), remove: vi.fn(), rerun: vi.fn(), log: vi.fn() },
     task: { rertun: vi.fn() },
   },
 }));
@@ -103,6 +105,15 @@ describe('PipelinePanel', () => {
     load(IPipelineStatus.COMPLETED, [task({})]);
     expect(await screen.findByText(COPY.loadFailed)).toBeTruthy();
     expect(await screen.findByRole('heading', { name: COPY.stage.label(1) }, { timeout: 3000 })).toBeTruthy();
+  });
+
+  it('opens the JSON configuration and downloads the logs from the page', async () => {
+    pipelines.log.mockResolvedValue(true);
+    load(IPipelineStatus.COMPLETED, [task({})]);
+    fireEvent.click(await screen.findByRole('button', { name: COPY.rowActions.configuration }));
+    expect(await screen.findByText(COPY.drawer.heading)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: COPY.rowActions.downloadLogs }));
+    await waitFor(() => expect(pipelines.log).toHaveBeenCalledWith(9));
   });
 
   it('offers cancel, and not rerun, while the pipeline runs', async () => {

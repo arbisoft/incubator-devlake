@@ -17,8 +17,8 @@
  */
 import { useParams } from 'react-router-dom';
 
-import { PageHeader } from '@/components';
 import { PATHS } from '@/config';
+import { ListPage, PageHeader } from '@/ui';
 import { useDocumentTitle } from '@/ui/hooks';
 
 import { PipelinePanel } from './components';
@@ -30,17 +30,16 @@ export const Pipeline = () => {
   useDocumentTitle(COPY.detailTitle(id as string));
 
   return (
-    <PageHeader
-      breadcrumbs={[
-        { name: COPY.breadcrumbAdvanced, path: PATHS.BLUEPRINTS() },
-        { name: COPY.title, path: PATHS.PIPELINES() },
-        {
-          name: id as string,
-          path: PATHS.PIPELINE(id as string),
-        },
-      ]}
-    >
+    <ListPage>
+      <PageHeader
+        title={COPY.detailTitle(id as string)}
+        breadcrumbs={[
+          { label: COPY.breadcrumbAdvanced, path: PATHS.BLUEPRINTS() },
+          { label: COPY.title, path: PATHS.PIPELINES() },
+          { label: id as string },
+        ]}
+      />
       <PipelinePanel id={id as string} />
-    </PageHeader>
+    </ListPage>
   );
 };
