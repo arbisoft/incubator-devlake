@@ -17,7 +17,7 @@
  */
 import { Download, Locator } from '@playwright/test';
 
-import { PIPELINE_COPY as COPY } from '../app-copy';
+import { PAGE_HEADER_COPY, PIPELINE_COPY as COPY } from '../app-copy';
 
 import {
   BasePage,
@@ -118,8 +118,11 @@ export class PipelinesPage extends BasePage implements Screen {
     await this.visit(PATHS.pipeline(id));
   }
 
-  detailHeading(id: number): Locator {
-    return this.page.getByRole('heading', { level: 1, name: COPY.detailTitle(String(id)), exact: true });
+  detailBreadcrumb(id: number): Locator {
+    return this.page
+      .getByRole('navigation', { name: PAGE_HEADER_COPY.breadcrumb })
+      .locator('.ant-breadcrumb-link')
+      .getByText(COPY.detailTitle(String(id)), { exact: true });
   }
 
   get tasksCompletedLabel(): Locator {

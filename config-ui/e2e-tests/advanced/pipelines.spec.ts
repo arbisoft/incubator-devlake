@@ -145,7 +145,7 @@ test.describe.serial('Pipelines list blueprint filter, sort and configuration dr
     const [pipelineId] = pipelineIdsA;
     const pipelines = new PipelinesPage(page);
     await pipelines.openDetail(pipelineId);
-    await expect(pipelines.detailHeading(pipelineId)).toBeVisible();
+    await expect(pipelines.detailBreadcrumb(pipelineId)).toBeVisible();
     await expect(pipelines.tasksCompletedLabel).toBeVisible();
   });
 });
