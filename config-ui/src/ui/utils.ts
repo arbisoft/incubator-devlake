@@ -41,8 +41,8 @@ export const toUserMessage = (error: unknown, map: Record<string, string>, fallb
   return hit ? map[hit] : fallback;
 };
 
-export const formatDateTime = (value: TimeInput) =>
-  value === null || value === undefined ? COMMON_COPY.emptyValue : formatTime(new Date(value), DATE_TIME_FORMAT);
+export const formatDateTime = (value: TimeInput, format = DATE_TIME_FORMAT) =>
+  value === null || value === undefined ? COMMON_COPY.emptyValue : formatTime(new Date(value), format);
 
 export const formatRelativeTime = (value: TimeInput, now: Date | number = Date.now()) => {
   if (value === null || value === undefined) return COMMON_COPY.emptyValue;

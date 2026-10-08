@@ -16,12 +16,7 @@
  *
  */
 
-import type { BRAND_TONE } from './constants';
+import type { Button } from 'antd';
+import type { ComponentProps } from 'react';
 
-export type BrandTone = (typeof BRAND_TONE)[keyof typeof BRAND_TONE];
-
-export type BrandBlockProps = {
-  collapsed?: boolean;
-  tone?: BrandTone;
-  title?: string;
-};
+export type CellButtonProps = Omit<ComponentProps<typeof Button>, 'type' | 'size'>;

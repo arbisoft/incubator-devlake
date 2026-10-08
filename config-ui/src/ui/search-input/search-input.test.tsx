@@ -19,6 +19,7 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { getTheme } from '@/theme/tokens';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 import { COMMON_COPY } from '@/ui/constants';
 
@@ -33,6 +34,13 @@ const setup = (props: { value?: string; allowClear?: boolean } = {}) => {
 };
 
 describe('SearchInput', () => {
+  it('may shrink to a minimum width so a toolbar can keep one row', () => {
+    const { input } = setup();
+    const root = input.closest('.ant-space-compact') as Element;
+    expect(getComputedStyle(root).minWidth).toBe(`${getTheme('light').layout.searchMinWidth}px`);
+    expect(getComputedStyle(root).flexShrink).toBe('1');
+  });
+
   it('submits the trimmed keyword on Enter', () => {
     const { input, onSearch } = setup();
     fireEvent.change(input, { target: { value: '  jira ' } });

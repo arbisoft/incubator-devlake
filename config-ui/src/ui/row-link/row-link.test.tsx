@@ -35,6 +35,17 @@ describe('RowLink', () => {
     expect(screen.getByRole('link', { name: 'alpha' }).getAttribute('href')).toBe('/projects/alpha');
   });
 
+  it('is not underlined until hovered', () => {
+    renderWithTheme(
+      <MemoryRouter>
+        <RowLink to="/a" variant={ROW_LINK_VARIANT.LINK}>
+          linked
+        </RowLink>
+      </MemoryRouter>,
+    );
+    expect(getComputedStyle(screen.getByRole('link', { name: 'linked' })).textDecorationLine).toBe('none');
+  });
+
   it('colours the link variant differently from the default text colour', () => {
     renderWithTheme(
       <MemoryRouter>

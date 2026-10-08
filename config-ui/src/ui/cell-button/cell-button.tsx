@@ -16,12 +16,7 @@
  *
  */
 
-import type { BRAND_TONE } from './constants';
+import { FlushButton } from './styled';
+import type { CellButtonProps } from './types';
 
-export type BrandTone = (typeof BRAND_TONE)[keyof typeof BRAND_TONE];
-
-export type BrandBlockProps = {
-  collapsed?: boolean;
-  tone?: BrandTone;
-  title?: string;
-};
+export const CellButton = (props: CellButtonProps) => <FlushButton {...props} type="link" />;

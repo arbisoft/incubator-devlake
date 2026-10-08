@@ -16,19 +16,30 @@
  *
  */
 
-import styled from 'styled-components';
+import styled, { type DefaultTheme } from 'styled-components';
 
 import ArbisoftMark from '@/images/brand/arbisoft-mark.svg?react';
 import DevlakeMark from '@/images/brand/devlake-mark.svg?react';
 import { textStyle } from '@/ui/style-helpers';
 
-export const Root = styled.div<{ $collapsed: boolean }>`
+import { BRAND_TONE } from './constants';
+import type { BrandTone } from './types';
+
+type ToneProps = { $tone: BrandTone };
+
+const primaryColor = ({ theme, $tone }: ToneProps & { theme: DefaultTheme }) =>
+  $tone === BRAND_TONE.PAGE ? theme.colors.text : theme.sidebar.text;
+
+const mutedColor = ({ theme, $tone }: ToneProps & { theme: DefaultTheme }) =>
+  $tone === BRAND_TONE.PAGE ? theme.colors.textSecondary : theme.sidebar.textMuted;
+
+export const Root = styled.div<{ $collapsed: boolean } & ToneProps>`
   display: flex;
   align-items: center;
   justify-content: ${({ $collapsed }) => ($collapsed ? 'center' : 'flex-start')};
-  height: ${({ theme }) => theme.layout.sidebarHeaderHeight}px;
+  height: ${({ theme, $tone }) => ($tone === BRAND_TONE.PAGE ? 'auto' : `${theme.layout.sidebarHeaderHeight}px`)};
   min-width: 0;
-  padding-inline: ${({ theme, $collapsed }) => ($collapsed ? 0 : theme.space.md)}px;
+  padding-inline: ${({ theme, $collapsed, $tone }) => ($collapsed || $tone === BRAND_TONE.PAGE ? 0 : theme.space.md)}px;
 `;
 
 export const Lockup = styled.div`
@@ -38,11 +49,11 @@ export const Lockup = styled.div`
   min-width: 0;
 `;
 
-export const BrandMark = styled(ArbisoftMark)`
+export const BrandMark = styled(ArbisoftMark)<ToneProps>`
   flex: none;
   width: auto;
   height: ${({ theme }) => theme.layout.brandMarkHeight}px;
-  color: ${({ theme }) => theme.sidebar.text};
+  color: ${primaryColor};
 `;
 
 export const Names = styled.div`
@@ -51,15 +62,15 @@ export const Names = styled.div`
   min-width: 0;
 `;
 
-export const BrandName = styled.span`
+export const BrandName = styled.span<ToneProps>`
   ${textStyle('h3')}
-  color: ${({ theme }) => theme.sidebar.text};
+  color: ${primaryColor};
   white-space: nowrap;
 `;
 
-export const ProductName = styled.span`
+export const ProductName = styled.span<ToneProps>`
   ${textStyle('caption')}
-  color: ${({ theme }) => theme.sidebar.textMuted};
+  color: ${mutedColor};
   white-space: nowrap;
 `;
 
@@ -80,16 +91,16 @@ export const PoweredByMark = styled(DevlakeMark)`
   height: ${({ theme }) => theme.layout.poweredByMarkSize}px;
 `;
 
-export const CustomTitle = styled.h2`
+export const CustomTitle = styled.h2<ToneProps>`
   ${textStyle('h3')}
   margin: 0;
   overflow: hidden;
-  color: ${({ theme }) => theme.sidebar.text};
+  color: ${primaryColor};
   text-overflow: ellipsis;
   white-space: nowrap;
 `;
 
-export const CustomInitial = styled.span`
+export const CustomInitial = styled.span<ToneProps>`
   ${textStyle('bodyMedium')}
-  color: ${({ theme }) => theme.sidebar.text};
+  color: ${primaryColor};
 `;

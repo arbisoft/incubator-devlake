@@ -79,6 +79,7 @@ export const COMPOSITES_COPY = {
   },
   listPage: { title: 'Projects', search: 'Search projects', add: 'New project', row: 'edly-Github' },
   rowLink: { label: 'devlake pilot-Blueprint' },
+  cellButton: { label: 'devlake pilot-Blueprint' },
   useModalForm: {
     field: 'Name',
     reset: 'Reset',

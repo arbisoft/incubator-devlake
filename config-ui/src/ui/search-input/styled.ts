@@ -20,6 +20,8 @@ import { Space } from 'antd';
 import styled from 'styled-components';
 
 export const Compact = styled(Space.Compact)`
-  width: ${({ theme }) => theme.layout.searchMaxWidth}px;
-  max-width: 100%;
+  width: 100%;
+  max-width: ${({ theme }) => theme.layout.searchMaxWidth}px;
+  flex: 1 1 ${({ theme }) => theme.layout.searchMinWidth}px;
+  min-width: ${({ theme }) => theme.layout.searchMinWidth}px;
 `;

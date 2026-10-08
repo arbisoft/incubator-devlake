@@ -31,9 +31,11 @@ export const Group = styled.div`
   flex-wrap: wrap;
   align-items: center;
   gap: ${({ theme }) => theme.space.sm}px;
+  flex: 1 1 0;
   min-width: 0;
 `;
 
 export const EndGroup = styled(Group)`
+  flex: 0 0 auto;
   margin-left: auto;
 `;

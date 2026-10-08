@@ -74,10 +74,12 @@ export type LayoutTokens = {
   authGlowInsetX: number;
   authGlowInsetBottom: number;
   searchMaxWidth: number;
+  searchMinWidth: number;
   connectionNameWidth: number;
   sortSelectWidth: number;
   datePickerWidth: number;
   statusDotSize: number;
+  stageDotSize: number;
   sidebarHeaderHeight: number;
   sidebarControlSize: number;
   railItemWidth: number;
@@ -104,6 +106,7 @@ export type LayoutTokens = {
   segmentPaddingInline: number;
   modalWidth: { sm: number; md: number; lg: number };
   modalViewportMargin: number;
+  modalTitleIconSize: number;
   scopePaneHeight: number;
   scopePaneHeightCompact: number;
   scopeRowHeight: number;
@@ -172,10 +175,12 @@ export const LAYOUT: LayoutTokens = {
   authGlowInsetX: -180,
   authGlowInsetBottom: -130,
   searchMaxWidth: 400,
+  searchMinWidth: 140,
   connectionNameWidth: 200,
   sortSelectWidth: 168,
   datePickerWidth: 224,
   statusDotSize: 6,
+  stageDotSize: 10,
   sidebarHeaderHeight: 70,
   sidebarControlSize: 28,
   railItemWidth: 48,
@@ -202,6 +207,7 @@ export const LAYOUT: LayoutTokens = {
   segmentPaddingInline: 11,
   modalWidth: { sm: 520, md: 600, lg: 800 },
   modalViewportMargin: 40,
+  modalTitleIconSize: 26,
   scopePaneHeight: 300,
   scopePaneHeightCompact: 200,
   scopeRowHeight: 40,

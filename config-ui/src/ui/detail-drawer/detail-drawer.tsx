@@ -37,7 +37,15 @@ export const DetailDrawer = ({ open, title, status, onClose, footer, children }:
   }, [open, opener]);
 
   return (
-    <Panel open={open} size={layout.drawerWidth} title={title} footer={footer} destroyOnHidden onClose={onClose}>
+    <Panel
+      open={open}
+      size={layout.drawerWidth}
+      closable={{ placement: 'end' }}
+      title={title}
+      footer={footer}
+      destroyOnHidden
+      onClose={onClose}
+    >
       {status && <StatusRow>{status}</StatusRow>}
       {children}
     </Panel>

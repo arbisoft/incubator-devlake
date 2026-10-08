@@ -32,7 +32,10 @@ export const Label = styled.label`
 `;
 
 export const Required = styled.span`
+  ${textStyle('caption')}
   margin-left: ${({ theme }) => theme.space.xxs}px;
+  line-height: 0;
+  vertical-align: super;
   color: ${({ theme }) => theme.colors.error};
 `;
 

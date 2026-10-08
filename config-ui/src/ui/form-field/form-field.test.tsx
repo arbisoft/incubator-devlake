@@ -53,6 +53,15 @@ describe('FormField', () => {
     expect(input.getAttribute('aria-required')).toBe('true');
   });
 
+  it('raises the required mark above the label baseline', () => {
+    const { container } = renderWithTheme(
+      <FormField label={LABEL} required>
+        {(control) => <input {...control} />}
+      </FormField>,
+    );
+    expect(getComputedStyle(container.querySelector('label span') as Element).verticalAlign).toBe('super');
+  });
+
   it('adds no description or required attributes when they are not given', () => {
     renderWithTheme(<FormField label={LABEL}>{(control) => <input {...control} />}</FormField>);
     const input = screen.getByRole('textbox', { name: LABEL });

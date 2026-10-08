@@ -16,12 +16,23 @@
  *
  */
 
-import type { BRAND_TONE } from './constants';
+import { fireEvent, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
-export type BrandTone = (typeof BRAND_TONE)[keyof typeof BRAND_TONE];
+import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
-export type BrandBlockProps = {
-  collapsed?: boolean;
-  tone?: BrandTone;
-  title?: string;
-};
+import { CellButton } from './cell-button';
+
+describe('CellButton', () => {
+  it('renders a button that calls onClick', () => {
+    const onClick = vi.fn();
+    renderWithTheme(<CellButton onClick={onClick}>open</CellButton>);
+    fireEvent.click(screen.getByRole('button', { name: 'open' }));
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('has no inline padding so it lines up with its column header', () => {
+    renderWithTheme(<CellButton>open</CellButton>);
+    expect(getComputedStyle(screen.getByRole('button', { name: 'open' })).paddingInline).toBe('0px');
+  });
+});

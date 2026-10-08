@@ -17,5 +17,6 @@
  */
 
 export * from './brand-block';
+export { BRAND_TONE } from './constants';
 export type * from './types';
 export * from './powered-by';

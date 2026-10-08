@@ -16,12 +16,10 @@
  *
  */
 
-import type { BRAND_TONE } from './constants';
+import { Button } from 'antd';
+import styled from 'styled-components';
 
-export type BrandTone = (typeof BRAND_TONE)[keyof typeof BRAND_TONE];
-
-export type BrandBlockProps = {
-  collapsed?: boolean;
-  tone?: BrandTone;
-  title?: string;
-};
+export const FlushButton = styled(Button)`
+  height: auto;
+  padding-inline: 0;
+`;

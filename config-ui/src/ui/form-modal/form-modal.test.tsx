@@ -64,6 +64,12 @@ describe('FormModal', () => {
     expect(screen.getByRole('textbox', { name: FIELD })).toBeTruthy();
   });
 
+  it('sizes the title icon from the theme', () => {
+    setup({ icon: <svg data-testid="title-icon" /> });
+    const size = getComputedStyle(screen.getByTestId('title-icon').parentElement as Element).fontSize;
+    expect(size).toBe(`${getTheme('light').layout.modalTitleIconSize}px`);
+  });
+
   it('submits and cancels', () => {
     const { onSubmit, onCancel } = setup();
     fireEvent.click(screen.getByRole('button', { name: SUBMIT }));

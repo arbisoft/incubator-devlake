@@ -23,6 +23,7 @@ import { focusRingStyle } from '@/ui/style-helpers';
 
 export const Anchor = styled(Link)<{ $link: boolean }>`
   color: ${({ theme, $link }) => ($link ? theme.colors.link : theme.colors.text)};
+  text-decoration: none;
   border-radius: ${({ theme }) => theme.radius.sm}px;
 
   ${({ $link }) =>

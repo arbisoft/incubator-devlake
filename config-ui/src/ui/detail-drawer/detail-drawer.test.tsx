@@ -37,6 +37,17 @@ describe('DetailDrawer', () => {
     expect(screen.getByText('body')).toBeTruthy();
   });
 
+  it('puts the close button after the title', () => {
+    renderWithTheme(
+      <DetailDrawer open title={TITLE} onClose={vi.fn()}>
+        <p>body</p>
+      </DetailDrawer>,
+    );
+    const title = screen.getByText(TITLE);
+    const close = screen.getByRole('button', { name: /close/i });
+    expect(title.compareDocumentPosition(close) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('returns focus to the element that opened it once it has closed', async () => {
     const Harness = () => {
       const [open, setOpen] = useState(false);

@@ -16,12 +16,18 @@
  *
  */
 
-import type { BRAND_TONE } from './constants';
+import { CellButton } from '@/ui';
 
-export type BrandTone = (typeof BRAND_TONE)[keyof typeof BRAND_TONE];
+import { COPY, SECTION } from './constants';
+import { DemoCase, DemoSection } from './demo-section';
 
-export type BrandBlockProps = {
-  collapsed?: boolean;
-  tone?: BrandTone;
-  title?: string;
-};
+export const CellButtonDemo = () => (
+  <DemoSection id={SECTION.CELL_BUTTON} title={COPY.sections.cellButton}>
+    <DemoCase label={COPY.cases.default}>
+      <CellButton>{COPY.cellButton.label}</CellButton>
+    </DemoCase>
+    <DemoCase label={COPY.cases.disabled}>
+      <CellButton disabled>{COPY.cellButton.label}</CellButton>
+    </DemoCase>
+  </DemoSection>
+);

@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { COMMON_COPY } from './constants';
+import { COMMON_COPY, SHORT_DATE_TIME_FORMAT } from './constants';
 import { formatDateTime, formatRelativeTime, toUserMessage } from './utils';
 
 const NOW = new Date(2026, 8, 4, 16, 20, 0);
@@ -45,6 +45,10 @@ describe('toUserMessage', () => {
 describe('formatDateTime', () => {
   it('formats local date and time', () => {
     expect(formatDateTime(new Date(2026, 8, 4, 16, 20))).toBe('2026-09-04 16:20');
+  });
+
+  it('formats the short form when asked', () => {
+    expect(formatDateTime(new Date(2026, 8, 4, 16, 20), SHORT_DATE_TIME_FORMAT)).toBe('4 Sep 2026, 16:20');
   });
 
   it('renders a placeholder for empty values', () => {

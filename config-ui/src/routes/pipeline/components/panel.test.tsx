@@ -20,6 +20,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import API from '@/api';
+import { WEIGHT } from '@/theme/scales';
 import { IPipelineStatus, type IPipeline, type ITask } from '@/types';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
@@ -98,6 +99,12 @@ describe('PipelinePanel', () => {
     expect(screen.getByRole('heading', { name: COPY.stage.label(2) })).toBeTruthy();
     expect(screen.getByText(COPY.stage.state.loading)).toBeTruthy();
     expect(screen.getByText(COPY.stage.state.success)).toBeTruthy();
+  });
+
+  it('draws the stage title at medium weight', async () => {
+    load(IPipelineStatus.COMPLETED, [task({})]);
+    const heading = await screen.findByRole('heading', { name: COPY.stage.label(1) });
+    expect(getComputedStyle(heading).fontWeight).toBe(String(WEIGHT.medium));
   });
 
   it('shows a retry when the first load fails, then recovers on its own', async () => {

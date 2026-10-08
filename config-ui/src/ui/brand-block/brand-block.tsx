@@ -18,33 +18,33 @@
 
 import { TITLE_CUSTOM } from '@/config/brand';
 
-import { COPY } from './constants';
+import { BRAND_TONE, COPY } from './constants';
 import { BrandMark, BrandName, CustomInitial, CustomTitle, Lockup, Names, ProductName, Root } from './styled';
 import type { BrandBlockProps } from './types';
 
-export const BrandBlock = ({ collapsed, title = TITLE_CUSTOM }: BrandBlockProps) => {
+export const BrandBlock = ({ collapsed = false, tone = BRAND_TONE.SIDEBAR, title = TITLE_CUSTOM }: BrandBlockProps) => {
   if (title) {
     return (
-      <Root $collapsed={collapsed}>
+      <Root $collapsed={collapsed} $tone={tone}>
         {collapsed ? (
-          <CustomInitial role="img" aria-label={title}>
+          <CustomInitial $tone={tone} role="img" aria-label={title}>
             {title.charAt(0).toUpperCase()}
           </CustomInitial>
         ) : (
-          <CustomTitle>{title}</CustomTitle>
+          <CustomTitle $tone={tone}>{title}</CustomTitle>
         )}
       </Root>
     );
   }
 
   return (
-    <Root $collapsed={collapsed}>
+    <Root $collapsed={collapsed} $tone={tone}>
       <Lockup>
-        <BrandMark role="img" aria-label={COPY.markAlt} />
+        <BrandMark $tone={tone} role="img" aria-label={COPY.markAlt} />
         {!collapsed && (
           <Names>
-            <BrandName>{COPY.brandName}</BrandName>
-            <ProductName>{COPY.productName}</ProductName>
+            <BrandName $tone={tone}>{COPY.brandName}</BrandName>
+            <ProductName $tone={tone}>{COPY.productName}</ProductName>
           </Names>
         )}
       </Lockup>

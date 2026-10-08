@@ -17,33 +17,42 @@
  */
 
 import { EllipsisOutlined, UserOutlined } from '@ant-design/icons';
-import { Dropdown } from 'antd';
+import { ConfigProvider, Dropdown } from 'antd';
+import { useMemo } from 'react';
+import { useTheme } from 'styled-components';
 
 import { COPY } from './constants';
 import { Avatar, Copy, Expanded, Name, Rail, Secondary } from './styled';
 import type { AccountBlockProps } from './types';
-import { getInitials } from './utils';
+import { getInitials, getMenuTheme } from './utils';
 
-export const AccountBlock = ({ name, secondary, collapsed, menu, onOpenChange }: AccountBlockProps) => (
-  <Dropdown
-    menu={{ items: menu }}
-    trigger={collapsed ? ['hover', 'click'] : ['click']}
-    placement="topLeft"
-    onOpenChange={onOpenChange}
-  >
-    {collapsed ? (
-      <Rail type="button" aria-label={COPY.menu(name)}>
-        <Avatar aria-hidden>{getInitials(name)}</Avatar>
-      </Rail>
-    ) : (
-      <Expanded type="button">
-        <UserOutlined aria-hidden />
-        <Copy>
-          <Name>{name}</Name>
-          <Secondary>{secondary}</Secondary>
-        </Copy>
-        <EllipsisOutlined aria-hidden />
-      </Expanded>
-    )}
-  </Dropdown>
-);
+export const AccountBlock = ({ name, secondary, collapsed, menu, onOpenChange }: AccountBlockProps) => {
+  const { sidebar, shadow } = useTheme();
+  const menuTheme = useMemo(() => getMenuTheme(sidebar, shadow), [sidebar, shadow]);
+
+  return (
+    <ConfigProvider theme={menuTheme}>
+      <Dropdown
+        menu={{ items: menu }}
+        trigger={collapsed ? ['hover', 'click'] : ['click']}
+        placement="topLeft"
+        onOpenChange={onOpenChange}
+      >
+        {collapsed ? (
+          <Rail type="button" aria-label={COPY.menu(name)}>
+            <Avatar aria-hidden>{getInitials(name)}</Avatar>
+          </Rail>
+        ) : (
+          <Expanded type="button">
+            <UserOutlined aria-hidden />
+            <Copy>
+              <Name>{name}</Name>
+              <Secondary>{secondary}</Secondary>
+            </Copy>
+            <EllipsisOutlined aria-hidden />
+          </Expanded>
+        )}
+      </Dropdown>
+    </ConfigProvider>
+  );
+};

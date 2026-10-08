@@ -20,10 +20,11 @@ import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { POWERED_BY } from '@/config/brand';
+import { getTheme } from '@/theme/tokens';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
 import { BrandBlock } from './brand-block';
-import { COPY } from './constants';
+import { BRAND_TONE, COPY } from './constants';
 import { PoweredByRow } from './powered-by';
 
 const CUSTOM_TITLE = 'Acme Analytics';
@@ -52,6 +53,27 @@ describe('BrandBlock', () => {
   it('shows the custom title initial when collapsed', () => {
     renderWithTheme(<BrandBlock collapsed title={CUSTOM_TITLE} />);
     expect(screen.getByRole('img', { name: CUSTOM_TITLE }).textContent).toBe('A');
+  });
+});
+
+const normaliseColor = (value: string) => {
+  const probe = document.createElement('span');
+  probe.style.color = value;
+  return probe.style.color;
+};
+
+describe('BrandBlock page tone', () => {
+  it('uses the normal text colours on the page', () => {
+    renderWithTheme(<BrandBlock tone={BRAND_TONE.PAGE} title="" />);
+    const { colors } = getTheme('light');
+    expect(getComputedStyle(screen.getByText(COPY.brandName)).color).toBe(normaliseColor(colors.text));
+    expect(getComputedStyle(screen.getByText(COPY.productName)).color).toBe(normaliseColor(colors.textSecondary));
+  });
+
+  it('uses the sidebar colours by default', () => {
+    renderWithTheme(<BrandBlock title="" />);
+    const { sidebar } = getTheme('light');
+    expect(getComputedStyle(screen.getByText(COPY.brandName)).color).toBe(normaliseColor(sidebar.text));
   });
 });
 
