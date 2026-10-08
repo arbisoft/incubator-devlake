@@ -88,6 +88,7 @@ export type LayoutTokens = {
   avatarSize: number;
   brandMarkHeight: number;
   poweredByMarkSize: number;
+  metricTileMinWidth: number;
   confirmModalWidth: number;
   pipelineTaskIdWidth: number;
   pipelineTaskDurationWidth: number;
@@ -189,6 +190,7 @@ export const LAYOUT: LayoutTokens = {
   avatarSize: 32,
   brandMarkHeight: 28,
   poweredByMarkSize: 20,
+  metricTileMinWidth: 160,
   confirmModalWidth: 416,
   pipelineTaskIdWidth: 84,
   pipelineTaskDurationWidth: 64,

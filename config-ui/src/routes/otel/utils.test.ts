@@ -20,11 +20,13 @@ import { AxiosError, AxiosHeaders, HttpStatusCode } from 'axios';
 import { describe, expect, it } from 'vitest';
 
 import { OTEL_STATUS } from '@/api/otel/constants';
-import { COMMON_COPY } from '@/ui';
+import { COMMON_COPY, METRIC_TILE_TONE } from '@/ui';
 
 import { CONNECTION_STATE, COPY, LIFECYCLE_ACTION } from './constants';
 import {
   formatAge,
+  getBacklogTone,
+  getPermanentErrorTone,
   getAttentionDescription,
   getAttentionState,
   getConverterLabel,
@@ -187,5 +189,15 @@ describe('routes/otel/utils', () => {
     const lease = { leaseUntil: '', updatedAt: '', ageSeconds: 0 };
     expect(getConverterLabel({ converterLease: { ...lease, active: true } })).toBe(COPY.health.converter.active);
     expect(getConverterLabel({ converterLease: { ...lease, active: false } })).toBe(COPY.health.converter.expired);
+  });
+
+  it('tones the backlog age and the permanent errors at the backend health thresholds', () => {
+    expect(getBacklogTone(undefined)).toBe(METRIC_TILE_TONE.DEFAULT);
+    expect(getBacklogTone(299)).toBe(METRIC_TILE_TONE.DEFAULT);
+    expect(getBacklogTone(300)).toBe(METRIC_TILE_TONE.WARNING);
+    expect(getBacklogTone(1800)).toBe(METRIC_TILE_TONE.DANGER);
+    expect(getPermanentErrorTone(0)).toBe(METRIC_TILE_TONE.DEFAULT);
+    expect(getPermanentErrorTone(1)).toBe(METRIC_TILE_TONE.WARNING);
+    expect(getPermanentErrorTone(5)).toBe(METRIC_TILE_TONE.DANGER);
   });
 });

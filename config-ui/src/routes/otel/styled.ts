@@ -43,6 +43,12 @@ export const Stack = styled.div`
   gap: ${({ theme }) => theme.space.md}px;
 `;
 
+export const MetricGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(${({ theme }) => theme.layout.metricTileMinWidth}px, 1fr));
+  gap: ${({ theme }) => theme.space.md}px;
+`;
+
 export const Hint = styled.p`
   ${textStyle('body')}
   margin: 0;

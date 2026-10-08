@@ -28,7 +28,7 @@ import {
   DataTable,
   DetailDrawer,
   EMPTY_STATE_SIZE,
-  KeyValueList,
+  MetricTile,
   SectionCard,
   STATUS_BADGE_VARIANT,
   StatusBadge,
@@ -36,11 +36,11 @@ import {
 
 import { COPY } from './constants';
 import { getBatchColumns } from './ingestion-columns';
-import { Hint, Stack } from './styled';
+import { Hint, MetricGrid, Stack } from './styled';
 import { INGESTION_STATE_TONE } from './tones';
 import type { OtelIngestionHealthProps } from './types';
 import { useClientPagination } from './use-client-pagination';
-import { formatAge, getConverterLabel } from './utils';
+import { formatAge, getBacklogTone, getConverterLabel, getPermanentErrorTone } from './utils';
 
 export const OtelIngestionHealth = ({ loading, failed, status, onRetry }: OtelIngestionHealthProps) => {
   const [batchId, setBatchId] = useState<ID>();
@@ -57,12 +57,28 @@ export const OtelIngestionHealth = ({ loading, failed, status, onRetry }: OtelIn
   const metrics = status && [
     { label: COPY.health.metrics.pending, value: status.batchCounts.pending ?? 0 },
     { label: COPY.health.metrics.retrying, value: status.batchCounts.retryable_error ?? 0 },
-    { label: COPY.health.metrics.oldestBacklog, value: formatAge(status.oldestNonterminal?.ageSeconds) },
-    { label: COPY.health.metrics.permanentErrors, value: status.recentPermanentErrors },
+    {
+      label: COPY.health.metrics.oldestBacklog,
+      value: formatAge(status.oldestNonterminal?.ageSeconds),
+      tone: getBacklogTone(status.oldestNonterminal?.ageSeconds),
+    },
+    {
+      label: COPY.health.metrics.permanentErrors,
+      value: status.recentPermanentErrors,
+      tone: getPermanentErrorTone(status.recentPermanentErrors),
+    },
     { label: COPY.health.metrics.converter, value: getConverterLabel(status) },
   ];
   const healthContent = () => {
-    if (metrics) return <KeyValueList items={metrics} />;
+    if (metrics) {
+      return (
+        <MetricGrid>
+          {metrics.map((metric) => (
+            <MetricTile key={metric.label} bordered {...metric} />
+          ))}
+        </MetricGrid>
+      );
+    }
     if (failed) {
       return (
         <Alert

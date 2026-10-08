@@ -20,8 +20,14 @@ import { METRIC_TILE_TONE } from './constants';
 import { Hint, Label, Tile, Value } from './styled';
 import type { MetricTileProps } from './types';
 
-export const MetricTile = ({ label, value, hint, tone = METRIC_TILE_TONE.DEFAULT }: MetricTileProps) => (
-  <Tile $tone={tone}>
+export const MetricTile = ({
+  label,
+  value,
+  hint,
+  tone = METRIC_TILE_TONE.DEFAULT,
+  bordered = false,
+}: MetricTileProps) => (
+  <Tile $tone={tone} $bordered={bordered}>
     <Label $tone={tone}>{label}</Label>
     <Value $tone={tone} title={String(value)}>
       {value}

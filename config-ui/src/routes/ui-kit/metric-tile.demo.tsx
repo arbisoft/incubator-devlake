@@ -36,6 +36,13 @@ export const MetricTileDemo = () => (
         </TopRow>
       </Framed>
     </DemoCase>
+    <DemoCase label={COPY.cases.metricTones}>
+      <TopRow>
+        <MetricTile label={text.label} value={6} bordered />
+        <MetricTile label={text.warning} value={text.warningValue} tone={METRIC_TILE_TONE.WARNING} bordered />
+        <MetricTile label={text.failed} value={5} tone={METRIC_TILE_TONE.DANGER} bordered />
+      </TopRow>
+    </DemoCase>
     <DemoCase label={COPY.cases.onBrand}>
       <BrandBackdrop>
         <MetricTile label={text.onBrandLabel} value={text.onBrandValue} tone={METRIC_TILE_TONE.ON_BRAND} />

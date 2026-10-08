@@ -25,4 +25,5 @@ export type MetricTileProps = {
   value: string | number;
   hint?: string;
   tone?: MetricTileTone;
+  bordered?: boolean;
 };
