@@ -16,12 +16,12 @@
  *
  */
 
-import { MetricTile } from '@/ui';
+import { METRIC_TILE_TONE, MetricTile } from '@/ui';
 
 import { COPY, SECTION } from './constants';
 import { DemoCase, DemoSection } from './demo-section';
 import { METRIC_LONG_VALUE, METRIC_TIME } from './fixtures';
-import { Framed, Narrow, TopRow } from './styled';
+import { BrandBackdrop, Framed, Narrow, TopRow } from './styled';
 
 const { metricTile: text } = COPY;
 
@@ -35,6 +35,11 @@ export const MetricTileDemo = () => (
           <MetricTile {...METRIC_TIME} />
         </TopRow>
       </Framed>
+    </DemoCase>
+    <DemoCase label={COPY.cases.onBrand}>
+      <BrandBackdrop>
+        <MetricTile label={text.onBrandLabel} value={text.onBrandValue} tone={METRIC_TILE_TONE.ON_BRAND} />
+      </BrandBackdrop>
     </DemoCase>
     <DemoCase label={COPY.cases.overflow}>
       <Narrow>

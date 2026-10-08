@@ -23,7 +23,7 @@ import { EMPTY_ILLUSTRATION, EMPTY_STATE_SIZE, EmptyState, StandalonePage } from
 import { COPY, SECTION } from './constants';
 import { DemoCase, DemoSection } from './demo-section';
 
-const { emptyState: text } = COPY;
+const { emptyState: text, standalonePage: asideText } = COPY;
 
 export const StandalonePageDemo = () => (
   <DemoSection id={SECTION.STANDALONE_PAGE} title={COPY.sections.standalonePage}>
@@ -37,6 +37,9 @@ export const StandalonePageDemo = () => (
           size={EMPTY_STATE_SIZE.PAGE}
         />
       </StandalonePage>
+    </DemoCase>
+    <DemoCase label={COPY.cases.withAside}>
+      <StandalonePage aside={asideText.aside}>{asideText.body}</StandalonePage>
     </DemoCase>
   </DemoSection>
 );

@@ -16,6 +16,23 @@
  *
  */
 
-export { METRIC_TILE_TONE } from './constants';
-export * from './metric-tile';
-export type * from './types';
+import { screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+
+import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
+
+import { StandalonePage } from './standalone-page';
+
+describe('StandalonePage', () => {
+  it('renders its children inside the main landmark', () => {
+    renderWithTheme(<StandalonePage>Body</StandalonePage>);
+    expect(screen.getByRole('main').textContent).toBe('Body');
+    expect(screen.queryByRole('complementary')).toBeNull();
+  });
+
+  it('renders the aside beside the content when one is given', () => {
+    renderWithTheme(<StandalonePage aside="Brand">Body</StandalonePage>);
+    expect(screen.getByRole('complementary').textContent).toBe('Brand');
+    expect(screen.getByRole('main').textContent).toContain('Body');
+  });
+});

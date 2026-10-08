@@ -20,4 +20,5 @@ import type { ReactNode } from 'react';
 
 export type StandalonePageProps = {
   children: ReactNode;
+  aside?: ReactNode;
 };

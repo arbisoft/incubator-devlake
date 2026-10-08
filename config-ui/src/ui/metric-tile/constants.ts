@@ -16,6 +16,4 @@
  *
  */
 
-export { METRIC_TILE_TONE } from './constants';
-export * from './metric-tile';
-export type * from './types';
+export const METRIC_TILE_TONE = { DEFAULT: 'default', ON_BRAND: 'onBrand' } as const;

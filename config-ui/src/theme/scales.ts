@@ -36,7 +36,8 @@ export type SidebarTokens = {
 };
 
 type TypographyStyle = { fontSize: number; lineHeight: number; fontWeight: number; letterSpacing: number };
-type TypographyKey = 'display' | 'h1' | 'h2' | 'h3' | 'body' | 'bodyMedium' | 'bodyLarge' | 'caption' | 'captionStrong';
+type TypographyKey =
+  'hero' | 'display' | 'h1' | 'h2' | 'h3' | 'body' | 'bodyMedium' | 'bodyLarge' | 'caption' | 'captionStrong';
 export type TypographyTokens = {
   fontFamily: string;
   monoFamily: string;
@@ -63,6 +64,16 @@ export type LayoutTokens = {
   keyValueLabelWidth: number;
   emptyStateTextWidth: number;
   standalonePanelWidth: number;
+  authAsideWidth: number;
+  authFormWidth: number;
+  authActionHeight: number;
+  authWordmarkWidth: number;
+  authProviderLogoSize: number;
+  authGlowSize: number;
+  authGlowBlur: number;
+  authGlowOpacity: number;
+  authGlowInsetX: number;
+  authGlowInsetBottom: number;
   searchMaxWidth: number;
   connectionNameWidth: number;
   sortSelectWidth: number;
@@ -115,6 +126,7 @@ export const TYPOGRAPHY: TypographyTokens = {
   fontFamily: FONT_FAMILY,
   monoFamily: MONO_FAMILY,
   scale: {
+    hero: { fontSize: 34, lineHeight: 40, fontWeight: WEIGHT.bold, letterSpacing: -0.8 },
     display: { fontSize: 30, lineHeight: 36, fontWeight: WEIGHT.semibold, letterSpacing: -0.6 },
     h1: { fontSize: 24, lineHeight: 32, fontWeight: WEIGHT.bold, letterSpacing: -0.4 },
     h2: { fontSize: 20, lineHeight: 28, fontWeight: WEIGHT.semibold, letterSpacing: -0.2 },
@@ -142,6 +154,16 @@ export const LAYOUT: LayoutTokens = {
   keyValueLabelWidth: 112,
   emptyStateTextWidth: 452,
   standalonePanelWidth: 600,
+  authAsideWidth: 620,
+  authFormWidth: 360,
+  authActionHeight: 44,
+  authWordmarkWidth: 108,
+  authProviderLogoSize: 18,
+  authGlowSize: 560,
+  authGlowBlur: 90,
+  authGlowOpacity: 0.45,
+  authGlowInsetX: -180,
+  authGlowInsetBottom: -130,
   searchMaxWidth: 400,
   connectionNameWidth: 200,
   sortSelectWidth: 168,

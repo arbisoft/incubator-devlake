@@ -36,3 +36,56 @@ export const Panel = styled.div`
   border: 1px solid ${({ theme }) => theme.colors.borderSubtle};
   border-radius: ${({ theme }) => theme.radius.lg}px;
 `;
+
+export const Split = styled.main`
+  display: flex;
+  min-height: 100vh;
+  color: ${({ theme }) => theme.colors.text};
+  background: ${({ theme }) => theme.colors.bgContainer};
+
+  @media (max-width: ${({ theme }) => theme.layout.breakpointTablet - 1}px) {
+    flex-direction: column;
+  }
+`;
+
+export const Aside = styled.aside`
+  position: relative;
+  display: flex;
+  flex: 0 0 ${({ theme }) => theme.layout.authAsideWidth}px;
+  flex-direction: column;
+  overflow: hidden;
+  color: ${({ theme }) => theme.sidebar.text};
+  background: ${({ theme }) => theme.sidebar.bg};
+
+  &::before {
+    content: '';
+    position: absolute;
+    bottom: ${({ theme }) => theme.layout.authGlowInsetBottom}px;
+    left: ${({ theme }) => theme.layout.authGlowInsetX}px;
+    width: ${({ theme }) => theme.layout.authGlowSize}px;
+    height: ${({ theme }) => theme.layout.authGlowSize}px;
+    background: ${({ theme }) => theme.colors.primary};
+    border-radius: 50%;
+    opacity: ${({ theme }) => theme.layout.authGlowOpacity};
+    filter: blur(${({ theme }) => theme.layout.authGlowBlur}px);
+    pointer-events: none;
+  }
+
+  > * {
+    position: relative;
+  }
+
+  @media (max-width: ${({ theme }) => theme.layout.breakpointTablet - 1}px) {
+    flex: none;
+  }
+`;
+
+export const Content = styled.div`
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: ${({ theme }) => theme.layout.contentGutter}px;
+  box-sizing: border-box;
+`;

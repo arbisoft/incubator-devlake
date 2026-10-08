@@ -155,3 +155,10 @@ export const NarrowCard = styled(Narrow)`
   padding: 0;
   border: 0;
 `;
+
+export const BrandBackdrop = styled(Narrow)`
+  padding: ${({ theme }) => theme.space.md}px;
+  color: ${({ theme }) => theme.sidebar.text};
+  background: ${({ theme }) => theme.sidebar.bg};
+  border: 0;
+`;

@@ -16,8 +16,13 @@
  *
  */
 
+import type { METRIC_TILE_TONE } from './constants';
+
+export type MetricTileTone = (typeof METRIC_TILE_TONE)[keyof typeof METRIC_TILE_TONE];
+
 export type MetricTileProps = {
   label: string;
   value: string | number;
   hint?: string;
+  tone?: MetricTileTone;
 };

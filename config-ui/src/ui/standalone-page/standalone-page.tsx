@@ -16,11 +16,17 @@
  *
  */
 
-import { Page, Panel } from './styled';
+import { Aside, Content, Page, Panel, Split } from './styled';
 import type { StandalonePageProps } from './types';
 
-export const StandalonePage = ({ children }: StandalonePageProps) => (
-  <Page>
-    <Panel>{children}</Panel>
-  </Page>
-);
+export const StandalonePage = ({ children, aside }: StandalonePageProps) =>
+  aside ? (
+    <Split>
+      <Aside>{aside}</Aside>
+      <Content>{children}</Content>
+    </Split>
+  ) : (
+    <Page>
+      <Panel>{children}</Panel>
+    </Page>
+  );
