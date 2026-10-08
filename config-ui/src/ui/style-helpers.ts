@@ -85,3 +85,10 @@ export const scrollableModal = ({ theme }: { theme: DefaultTheme }) => css`
     overflow-y: auto;
   }
 `;
+
+export const paddedCardSurface = ({ theme }: { theme: DefaultTheme }) => css`
+  padding: ${theme.space.lg}px;
+  background: ${theme.colors.bgContainer};
+  border: 1px solid ${theme.colors.borderSubtle};
+  border-radius: ${theme.radius.lg}px;
+`;

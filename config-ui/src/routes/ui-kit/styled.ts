@@ -18,7 +18,7 @@
 
 import styled from 'styled-components';
 
-import { textStyle } from '@/ui/style-helpers';
+import { paddedCardSurface, textStyle } from '@/ui/style-helpers';
 
 export const Page = styled.main`
   min-height: 100vh;
@@ -43,10 +43,7 @@ export const PageTitle = styled.h1`
 
 export const Section = styled.section`
   margin-bottom: ${({ theme }) => theme.space.xl}px;
-  padding: ${({ theme }) => theme.space.lg}px;
-  background: ${({ theme }) => theme.colors.bgContainer};
-  border: 1px solid ${({ theme }) => theme.colors.borderSubtle};
-  border-radius: ${({ theme }) => theme.radius.lg}px;
+  ${paddedCardSurface}
 `;
 
 export const SectionTitle = styled.h2`

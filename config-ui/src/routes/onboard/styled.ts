@@ -20,7 +20,7 @@ import { Input } from 'antd';
 import styled from 'styled-components';
 
 import { Markdown } from '@/components';
-import { textStyle, toneColors } from '@/ui/style-helpers';
+import { paddedCardSurface, textStyle, toneColors } from '@/ui/style-helpers';
 import type { StatusTone } from '@/ui/types';
 
 export const Page = styled.div`
@@ -214,10 +214,7 @@ export const Start = styled.div`
 
 export const Result = styled.div`
   margin-top: ${({ theme }) => theme.layout.wizardSectionGap}px;
-  padding: ${({ theme }) => theme.space.lg}px;
-  background: ${({ theme }) => theme.colors.bgContainer};
-  border: 1px solid ${({ theme }) => theme.colors.borderSubtle};
-  border-radius: ${({ theme }) => theme.radius.lg}px;
+  ${paddedCardSurface}
 `;
 
 export const ResultTop = styled.div`
