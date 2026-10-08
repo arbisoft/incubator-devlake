@@ -16,7 +16,7 @@
  *
  */
 
-import { Alert, Divider } from 'antd';
+import { Alert } from 'antd';
 import { useState } from 'react';
 
 import API from '@/api';
@@ -30,7 +30,7 @@ import { AuthLayout } from './auth-layout';
 import { COPY, LOGIN_ERROR_MAP, LOGIN_PARAMS } from './constants';
 import { LocalLoginForm } from './local-login-form';
 import { ProviderButtons } from './provider-buttons';
-import { Hint, Note, Notices } from './styled';
+import { Hint, Note, Notices, OrDivider } from './styled';
 import type { LocalLoginValues } from './types';
 import { normalizeLoginReturnPath } from './utils';
 
@@ -78,7 +78,7 @@ export const Login = () => {
         {localLoginError && <Alert type="error" title={localLoginError} />}
       </Notices>
       {localEnabled && <LocalLoginForm pending={localLoginPending} onSubmit={startLocalLogin} />}
-      {localEnabled && providers.length > 0 && <Divider plain>{COPY.divider}</Divider>}
+      {localEnabled && providers.length > 0 && <OrDivider plain>{COPY.divider}</OrDivider>}
       {providers.length > 0 && <ProviderButtons providers={providers} onSelect={startOIDC} />}
       {providers.length === 0 && apiKeyEnabled && <Hint>{COPY.apiKeyHint}</Hint>}
       {noProviders && <Alert type="warning" title={COPY.noProviders} description={COPY.noProvidersHint} />}

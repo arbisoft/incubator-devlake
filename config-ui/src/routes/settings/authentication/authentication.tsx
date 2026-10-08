@@ -31,6 +31,8 @@ import {
   ListPage,
   PageHeader,
   SectionCard,
+  STATUS_BADGE_VARIANT,
+  StatusBadge,
   Toolbar,
   buildListEmpty,
   useRefreshVersion,
@@ -40,7 +42,7 @@ import { getAuthenticationState } from '../utils';
 
 import { getProviderColumns } from './columns';
 import { ProviderEditor } from './components';
-import { COPY } from './constants';
+import { AUTHENTICATION_STATE_TONE, COPY } from './constants';
 import { useProviderActions } from './use-provider-actions';
 
 export const SettingsAuthentication = () => {
@@ -64,6 +66,7 @@ export const SettingsAuthentication = () => {
 
   const providers = useMemo(() => data?.providerResult.providers ?? [], [data]);
   const loadFailed = data?.providerResult.loadFailed ?? false;
+  const authenticationState = getAuthenticationState(providers);
   const enabledProviderCount = useMemo(() => providers.filter((provider) => provider.enabled).length, [providers]);
 
   const openEditor = useCallback(
@@ -107,7 +110,13 @@ export const SettingsAuthentication = () => {
         end={
           <Space size="small">
             <Tooltip title={COPY.stateTooltip}>
-              <Button onClick={() => openEditor(providers[0])}>{getAuthenticationState(providers)}</Button>
+              <span>
+                <StatusBadge
+                  tone={AUTHENTICATION_STATE_TONE[authenticationState]}
+                  label={authenticationState}
+                  variant={STATUS_BADGE_VARIANT.DOT}
+                />
+              </span>
             </Tooltip>
             {addButton}
           </Space>

@@ -17,14 +17,14 @@
  */
 
 import type { AccessAuditEvent } from '@/api/access';
-import { COMMON_COPY, formatDateTime } from '@/ui';
+import { COMMON_COPY, SHORT_DATE_TIME_FORMAT, formatDateTime } from '@/ui';
 
 import { COPY } from './constants';
 import type { ActivityRow } from './types';
 
 export const toActivityRow = (event: AccessAuditEvent): ActivityRow => ({
   id: event.id,
-  when: formatDateTime(event.createdAt),
+  when: formatDateTime(event.createdAt, SHORT_DATE_TIME_FORMAT),
   action: event.action,
   actor: event.actorEmail || COPY.system,
   target: event.targetEmail || COMMON_COPY.emptyValue,

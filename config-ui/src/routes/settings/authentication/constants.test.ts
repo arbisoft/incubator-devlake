@@ -20,7 +20,14 @@ import { describe, expect, it } from 'vitest';
 
 import { STATUS_TONE } from '@/ui';
 
-import { OIDC_PROVIDER_STATUS, OIDC_PROVIDER_STATUS_TONE, PROVIDER_ACTION, PROVIDER_CONFIRM } from './constants';
+import {
+  AUTHENTICATION_STATE,
+  AUTHENTICATION_STATE_TONE,
+  OIDC_PROVIDER_STATUS,
+  OIDC_PROVIDER_STATUS_TONE,
+  PROVIDER_ACTION,
+  PROVIDER_CONFIRM,
+} from './constants';
 
 describe('OIDC provider status tones', () => {
   it('maps every provider status to a status tone', () => {
@@ -32,6 +39,13 @@ describe('OIDC provider status tones', () => {
     expect(OIDC_PROVIDER_STATUS_TONE[OIDC_PROVIDER_STATUS.RETIRED]).toBe(STATUS_TONE.NEUTRAL);
     expect(OIDC_PROVIDER_STATUS_TONE[OIDC_PROVIDER_STATUS.DISABLED]).toBe(STATUS_TONE.NEUTRAL);
     expect(OIDC_PROVIDER_STATUS_TONE[OIDC_PROVIDER_STATUS.FAILED]).toBe(STATUS_TONE.ERROR);
+  });
+});
+
+describe('authentication state tones', () => {
+  it('maps every authentication state to a status tone', () => {
+    expect(Object.keys(AUTHENTICATION_STATE_TONE).sort()).toEqual(Object.values(AUTHENTICATION_STATE).sort());
+    expect(AUTHENTICATION_STATE_TONE[AUTHENTICATION_STATE.OIDC_ACTIVE]).toBe(STATUS_TONE.SUCCESS);
   });
 });
 

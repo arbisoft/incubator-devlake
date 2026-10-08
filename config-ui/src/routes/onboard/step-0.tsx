@@ -21,8 +21,8 @@ import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import API from '@/api';
-import { Logo } from '@/components';
 import { PATHS } from '@/config';
+import { BRAND_TONE, BrandBlock } from '@/ui';
 import { operator } from '@/utils';
 
 import { ExitControl } from './components';
@@ -36,7 +36,7 @@ interface Props {
   title?: React.ReactNode;
 }
 
-export const Step0 = ({ logo = <Logo direction="horizontal" />, title = COPY.defaultProduct }: Props) => {
+export const Step0 = ({ logo = <BrandBlock tone={BRAND_TONE.PAGE} />, title = COPY.defaultProduct }: Props) => {
   const [operating, setOperating] = useState(false);
 
   const navigate = useNavigate();
