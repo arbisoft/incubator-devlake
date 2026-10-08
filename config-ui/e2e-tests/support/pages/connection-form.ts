@@ -19,7 +19,7 @@ import { Locator, Page } from '@playwright/test';
 
 import { CONNECTION_FORM_COPY } from '../app-copy';
 
-// The create or edit form of a plugin connection, shown inside its "Manage Connections" dialog.
+// The create or edit form of a plugin connection, shown inside its "Manage connections" dialog.
 export class ConnectionForm {
   constructor(
     private readonly page: Page,

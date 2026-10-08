@@ -23,7 +23,7 @@ import { BasePage, tableRow } from './common';
 
 const WEBHOOK_PLUGIN_NAME = 'Webhook';
 
-// The webhook list inside the "Manage Connections: Webhook" dialog, with the dialogs it opens.
+// The webhook list inside the "Manage connections: Webhook" dialog, with the dialogs it opens.
 export class WebhooksDialog extends BasePage {
   get manage(): Locator {
     return this.dialog(CONNECTION_MODAL_COPY.title(WEBHOOK_PLUGIN_NAME));
