@@ -37,6 +37,18 @@ export const withSortOrder = <T extends object>(columns: TableColumnsType<T>, so
     return { ...column, sortOrder: active ? sortOrder : null };
   });
 
+const leafColumns = <T extends object>(columns: TableColumnsType<T>): TableColumnsType<T> =>
+  columns.flatMap((column) =>
+    'children' in column && column.children?.length ? leafColumns(column.children) : [column],
+  );
+
+export const getHorizontalScroll = <T extends object>(columns: TableColumnsType<T>): number | 'max-content' => {
+  const widths = leafColumns(columns).map(({ width }) => width);
+  if (widths.length === 0 || widths.some((width) => typeof width !== 'number')) return 'max-content';
+  const numericWidths = widths as number[];
+  return numericWidths.reduce((total, width) => total + width, 0);
+};
+
 export const toSortState = <T extends object, S extends string = string>(
   sorter: SorterResult<T> | SorterResult<T>[],
 ): SortState<S> | undefined => {

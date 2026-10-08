@@ -122,6 +122,7 @@ export const COPY = {
   },
   cases: {
     default: 'Default',
+    focusRestoration: 'Focus restoration',
     empty: 'Empty',
     loading: 'Loading',
     error: 'Error',
@@ -177,6 +178,7 @@ export const COPY = {
     withStatus: 'With status',
     withSwitcherAndActions: 'With switcher and actions',
     sortAndPaginate: 'Server sort and pagination (useListState, URL-backed)',
+    fixedWidthTable: 'Fixed-width columns with a bounded horizontal scroll area',
     selectable: 'With row selection',
     tabs: 'Tabs',
     segmented: 'Segmented',
@@ -204,7 +206,7 @@ export const COPY = {
     long: 'A very long link label that keeps going past the edge of the narrow container',
   },
   codeBlock: { copy: 'Copy JSON', copyCommand: 'Copy command', plain: 'Plain log line that is not JSON' },
-  iconButton: { edit: 'Edit item', remove: 'Delete item' },
+  iconButton: { edit: 'Edit item', remove: 'Delete item', restoreFocus: 'Restore focus' },
   emptyState: {
     emptyTitle: 'Nothing here yet',
     emptyDescription: 'Items you add will show up in this list.',

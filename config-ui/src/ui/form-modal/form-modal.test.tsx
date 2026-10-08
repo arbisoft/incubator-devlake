@@ -32,6 +32,12 @@ const SUBMIT = 'Save';
 const FIELD = 'Webhook name';
 const REASON = 'Enter a name first';
 
+const normaliseColor = (value: string) => {
+  const probe = document.createElement('span');
+  probe.style.color = value;
+  return probe.style.color;
+};
+
 const setup = (props: Partial<FormModalProps> = {}) => {
   const onSubmit = vi.fn();
   const onCancel = vi.fn();
@@ -70,6 +76,10 @@ describe('FormModal', () => {
     const { onSubmit } = setup({ submitDisabled: true, disabledReason: REASON });
     const submit = screen.getByRole('button', { name: SUBMIT });
     expect(submit.getAttribute('aria-disabled')).toBe('true');
+    const { colors } = getTheme('light');
+    expect(getComputedStyle(submit).backgroundColor).toBe(normaliseColor(colors.bgTableHeader));
+    expect(getComputedStyle(submit).color).toBe(normaliseColor(colors.textDisabled));
+    expect(getComputedStyle(submit).borderColor).toBe(normaliseColor(colors.border));
     fireEvent.click(submit);
     expect(onSubmit).not.toHaveBeenCalled();
     fireEvent.mouseEnter(submit);

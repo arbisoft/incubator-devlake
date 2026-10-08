@@ -40,6 +40,14 @@ describe('IconButton', () => {
     expect(onClick).toHaveBeenCalledOnce();
   });
 
+  it('forwards a button ref for route-owned focus restoration', () => {
+    const buttonRef = vi.fn();
+    renderWithTheme(
+      <IconButton icon={<span aria-hidden>i</span>} label={LABEL} onClick={vi.fn()} buttonRef={buttonRef} />,
+    );
+    expect(buttonRef).toHaveBeenCalledWith(screen.getByRole('button', { name: LABEL }));
+  });
+
   it('shows its label as a tooltip', async () => {
     setup();
     fireEvent.mouseEnter(screen.getByRole('button', { name: LABEL }));

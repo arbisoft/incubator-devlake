@@ -16,7 +16,7 @@
  *
  */
 
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 
 import type { ICON_BUTTON_TONE } from './constants';
 
@@ -26,5 +26,6 @@ export type IconButtonProps = {
   tone?: (typeof ICON_BUTTON_TONE)[keyof typeof ICON_BUTTON_TONE];
   disabled?: boolean;
   loading?: boolean;
+  buttonRef?: Ref<HTMLButtonElement>;
   onClick: () => void;
 };
