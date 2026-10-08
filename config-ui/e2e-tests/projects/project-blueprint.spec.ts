@@ -35,6 +35,7 @@ import {
   uniqueName,
   type ApiBlueprint,
 } from '../support/api';
+import { BLUEPRINT_VIEW } from '../support/app-copy';
 import { deletePipelinesNamedLike } from '../support/db';
 import { BlueprintPage } from '../support/pages/blueprints';
 import { PipelinesPage } from '../support/pages/pipelines';
@@ -100,7 +101,7 @@ test.describe.serial('Project, blueprint, pipeline and webhook flows', () => {
   test('add the connection and scope to the project blueprint', async ({ page }) => {
     const projectPage = new ProjectPage(page, projectName);
     await projectPage.open();
-    await projectPage.openTab('Configuration');
+    await projectPage.openView(BLUEPRINT_VIEW.CONFIGURATION);
     await projectPage.addConnectionWithScope(connectionName, SCOPE_FULL_NAME);
     await expect(projectPage.toast('Update blueprint successful.')).toBeVisible();
 
@@ -113,7 +114,7 @@ test.describe.serial('Project, blueprint, pipeline and webhook flows', () => {
   test('edit the sync policy and see it persisted after a reload', async ({ page }) => {
     const projectPage = new ProjectPage(page, projectName);
     await projectPage.open();
-    await projectPage.openTab('Configuration');
+    await projectPage.openView(BLUEPRINT_VIEW.CONFIGURATION);
     await projectPage.openSyncPolicy();
     await projectPage.fillSyncPolicy('15', '3');
     const before = Date.now();
@@ -121,7 +122,7 @@ test.describe.serial('Project, blueprint, pipeline and webhook flows', () => {
     await expect(projectPage.toast('Update blueprint successful.')).toBeVisible();
 
     await projectPage.reload();
-    await projectPage.openTab('Configuration');
+    await projectPage.openView(BLUEPRINT_VIEW.CONFIGURATION);
     const policyRow = projectPage.firstRow;
     await expect(policyRow).toContainText('Custom');
     await expect(policyRow).toContainText('to Now');
@@ -143,7 +144,7 @@ test.describe.serial('Project, blueprint, pipeline and webhook flows', () => {
     const projectPage = new ProjectPage(page, projectName);
     const pipelines = new PipelinesPage(page);
     await projectPage.open();
-    await projectPage.openTab('Status');
+    await projectPage.openView(BLUEPRINT_VIEW.STATUS);
     await projectPage.collectData();
     await expect(projectPage.toast('Trigger blueprint successful.')).toBeVisible();
 
@@ -179,7 +180,7 @@ test.describe.serial('Project, blueprint, pipeline and webhook flows', () => {
 
     await blueprints.openBlueprint(blueprint.name);
     await expect(page).toHaveURL(blueprints.detailUrlPattern(blueprint.id));
-    await blueprints.openTab('Configuration');
+    await blueprints.openView(BLUEPRINT_VIEW.CONFIGURATION);
     await expect(blueprints.connectionLabel(connectionName)).toBeVisible();
     await expect(blueprints.dataScopeCount(1)).toBeVisible();
     const policyRow = blueprints.firstRow;

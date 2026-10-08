@@ -19,6 +19,7 @@ import { Locator } from '@playwright/test';
 
 import { BLUEPRINT_HOME_COPY as COPY } from '../app-copy';
 
+import { BlueprintViews, type BlueprintViewKey } from './blueprint-detail';
 import { BasePage, Screen, firstCellTexts, segmentedOption, urlEndingWith } from './common';
 import { PATHS } from './paths';
 
@@ -72,7 +73,11 @@ export class BlueprintPage extends BasePage implements Screen {
   }
 
   detailUrlPattern(id: number): RegExp {
-    return new RegExp(`${PATHS.blueprint(id)}$`);
+    return new RegExp(`${PATHS.blueprint(id)}(/configuration)?$`);
+  }
+
+  async openView(view: BlueprintViewKey): Promise<void> {
+    await new BlueprintViews(this.page).openView(view);
   }
 
   blueprintRow(name: string): Locator {

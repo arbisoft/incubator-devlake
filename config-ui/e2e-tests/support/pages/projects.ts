@@ -17,8 +17,9 @@
  */
 import { Locator, Page } from '@playwright/test';
 
-import { COMMON_COPY, PROJECT_HOME_COPY as COPY, WEBHOOK_COPY } from '../app-copy';
+import { BLUEPRINT_VIEW, COMMON_COPY, PROJECT_DETAIL_COPY, PROJECT_HOME_COPY as COPY, WEBHOOK_COPY } from '../app-copy';
 
+import { BlueprintViews, type BlueprintViewKey } from './blueprint-detail';
 import {
   BasePage,
   Screen,
@@ -33,13 +34,7 @@ import {
 } from './common';
 import { PATHS, PROJECT_TABS, ProjectTabKey } from './paths';
 
-// Outer project tab labels, keyed by their URL segment.
-const PROJECT_TAB_LABEL: Record<ProjectTabKey, string> = {
-  blueprint: 'Blueprint',
-  webhooks: 'Webhooks',
-  'claude-code-otel': 'Claude Code OTel',
-  settings: 'Settings',
-};
+const PROJECT_TAB_LABEL = PROJECT_DETAIL_COPY.tabs;
 
 export class ProjectsPage extends BasePage implements Screen {
   async open(): Promise<void> {
@@ -108,9 +103,47 @@ export class ProjectPage extends BasePage {
     await this.visit(PATHS.project(this.projectName));
   }
 
-  // The bare project URL redirects to its first tab.
+  // The bare project URL redirects to its first tab, and the project list opens its Configurations view.
   get urlPattern(): RegExp {
-    return this.tabUrlPattern('blueprint');
+    return new RegExp(`${PATHS.projectTab(this.projectName, 'blueprint')}(/configuration)?$`);
+  }
+
+  private get views(): BlueprintViews {
+    return new BlueprintViews(this.page);
+  }
+
+  async openView(view: BlueprintViewKey): Promise<void> {
+    await this.views.openView(view);
+  }
+
+  viewOption(view: BlueprintViewKey): Locator {
+    return this.views.viewOption(view);
+  }
+
+  selectedViewOption(view: BlueprintViewKey): Locator {
+    return this.views.selectedViewOption(view);
+  }
+
+  viewContent(view: BlueprintViewKey): Locator {
+    return this.views.viewContent(view);
+  }
+
+  get syncPolicyHeading(): Locator {
+    return this.views.syncPolicyHeading;
+  }
+
+  get historicalPipelinesHeading(): Locator {
+    return this.views.historicalPipelinesHeading;
+  }
+
+  viewUrlPattern(view: BlueprintViewKey): RegExp {
+    const base = PATHS.projectTab(this.projectName, 'blueprint');
+    return new RegExp(view === BLUEPRINT_VIEW.STATUS ? `${base}$` : `${base}/${view}$`);
+  }
+
+  async openViewDirect(view: BlueprintViewKey): Promise<void> {
+    const base = PATHS.projectTab(this.projectName, 'blueprint');
+    await this.visit(view === BLUEPRINT_VIEW.STATUS ? base : `${base}/${view}`);
   }
 
   get tabs(): readonly ProjectTabKey[] {
@@ -171,11 +204,23 @@ export class ProjectPage extends BasePage {
   }
 
   async collectData(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Collect Data' }).click();
+    await this.views.collectData();
   }
 
   get currentPipelineLabel(): Locator {
-    return this.page.getByText('Current Pipeline');
+    return this.views.currentPipelineHeading;
+  }
+
+  async openPipelineDetail(id: number): Promise<void> {
+    await this.views.openPipelineDetail(id);
+  }
+
+  pipelineDetailDialog(id: number): Locator {
+    return this.views.pipelineDetailDialog(id);
+  }
+
+  rowMenuButton(id: number): Locator {
+    return this.views.rowMenuButton(id);
   }
 
   pipelineRow(id: number): Locator {

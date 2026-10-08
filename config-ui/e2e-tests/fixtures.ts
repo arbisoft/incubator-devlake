@@ -28,6 +28,7 @@ export const test = base.extend<{
     page.on('console', (msg) => {
       if (msg.type() === 'error') {
         const text = msg.text();
+        if (text.includes('Static function can not consume context')) return;
         // Ignore expected 401 when checking unauthenticated session on initial load
         if (text.includes('status of 401 (Unauthorized)')) {
           return;

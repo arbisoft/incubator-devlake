@@ -3,6 +3,13 @@
     "auth/access-page.spec.ts": "settings/users.spec.ts"
   },
   "specs": {
+    "advanced/blueprint-detail.spec.ts": {
+      "tests": 5,
+      "expects": 29,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
     "advanced/blueprints.spec.ts": {
       "tests": 5,
       "expects": 24,
@@ -11,8 +18,8 @@
       "fixmes": 0
     },
     "advanced/pipelines.spec.ts": {
-      "tests": 4,
-      "expects": 18,
+      "tests": 5,
+      "expects": 23,
       "backend": 1,
       "skips": 0,
       "fixmes": 0
