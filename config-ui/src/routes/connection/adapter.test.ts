@@ -17,7 +17,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { OTEL_CONNECTION_STATUS, OTEL_CREDENTIAL_STATUS, type OtelConnectionResponse } from '@/api/otel';
+import { OTEL_STATUS, type OtelConnectionResponse } from '@/api/otel';
 import { PATHS } from '@/config';
 import type { ConnectionHealthMap } from '@/features/connections';
 import { INTEGRATION_CATEGORY, PLUGIN_CATALOG } from '@/plugins/catalog';
@@ -53,8 +53,8 @@ const connection = (plugin: string, id: number) => ({ plugin, id, unique: `${plu
 
 const otel = (
   overrides: Partial<OtelConnectionResponse> = {},
-  credentialStatuses: string[] = [OTEL_CREDENTIAL_STATUS.ACTIVE],
-  status: string = OTEL_CONNECTION_STATUS.ACTIVE,
+  credentialStatuses: string[] = [OTEL_STATUS.ACTIVE],
+  status: string = OTEL_STATUS.ACTIVE,
 ) =>
   ({
     connection: { status },
@@ -82,12 +82,7 @@ describe('summarizeOtelCredentials', () => {
   });
 
   it('counts only active credentials of ready connections', () => {
-    const ready = otel({}, [
-      OTEL_CREDENTIAL_STATUS.ACTIVE,
-      OTEL_CREDENTIAL_STATUS.ACTIVE,
-      OTEL_CREDENTIAL_STATUS.REVOKED,
-      OTEL_CREDENTIAL_STATUS.RETIRING,
-    ]);
+    const ready = otel({}, [OTEL_STATUS.ACTIVE, OTEL_STATUS.ACTIVE, OTEL_STATUS.REVOKED, OTEL_STATUS.RETIRING]);
     expect(summarizeOtelCredentials([ready]).active).toBe(2);
   });
 
@@ -166,7 +161,7 @@ describe('toIntegrationSummaries', () => {
 
   it('counts active OTel connections and summarizes their credentials', () => {
     const items = build({
-      otelConnections: [otel(), otel({}, [], OTEL_CONNECTION_STATUS.REVOKED), otel({ recoveryRequired: true })],
+      otelConnections: [otel(), otel({}, [], OTEL_STATUS.REVOKED), otel({ recoveryRequired: true })],
     });
     expect(find(OTEL_INTEGRATION_KEY, items)).toMatchObject({
       connections: 2,

@@ -16,5 +16,6 @@
  *
  */
 
-// Src files that fail the strict reskin rules today; remove a file from here when it is cleaned.
-export const RESKIN_LINT_PENDING = [];
+export * from './create-modal';
+export * from './projects-modal';
+export * from './snippet-modal';

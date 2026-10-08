@@ -35,4 +35,5 @@ export const LINKS = {
     AI: 'https://cron-ai.vercel.app/',
   },
   SLACK: 'https://join.slack.com/t/devlake-io/shared_invite/zt-26ulybksw-IDrJYuqY1FrdjlMMJhs53Q',
+  CLAUDE_CODE_MANAGED_SETTINGS: 'https://claude.ai/admin-settings/claude-code',
 } as const;

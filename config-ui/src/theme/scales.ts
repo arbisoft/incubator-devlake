@@ -92,6 +92,14 @@ export type LayoutTokens = {
   pipelineTaskDurationWidth: number;
   pipelineProgressWidth: number;
   catalogCardMinWidth: number;
+  otelTeamColumnWidth: number;
+  otelProjectsColumnWidth: number;
+  otelOrganizationColumnWidth: number;
+  otelEndpointColumnWidth: number;
+  otelStatusColumnWidth: number;
+  otelCredentialsColumnWidth: number;
+  otelUpdatedColumnWidth: number;
+  otelActionsColumnWidth: number;
   segmentInset: number;
   segmentPaddingBlock: number;
   segmentPaddingInline: number;
@@ -182,6 +190,14 @@ export const LAYOUT: LayoutTokens = {
   pipelineTaskDurationWidth: 64,
   pipelineProgressWidth: 250,
   catalogCardMinWidth: 272,
+  otelTeamColumnWidth: 120,
+  otelProjectsColumnWidth: 120,
+  otelOrganizationColumnWidth: 120,
+  otelEndpointColumnWidth: 140,
+  otelStatusColumnWidth: 110,
+  otelCredentialsColumnWidth: 110,
+  otelUpdatedColumnWidth: 90,
+  otelActionsColumnWidth: 250,
   segmentInset: 2,
   segmentPaddingBlock: 3,
   segmentPaddingInline: 11,

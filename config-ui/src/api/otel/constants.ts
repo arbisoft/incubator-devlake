@@ -16,5 +16,36 @@
  *
  */
 
-// Src files that fail the strict reskin rules today; remove a file from here when it is cleaned.
-export const RESKIN_LINT_PENDING = [];
+export const OTEL_STATUS = {
+  ACTIVE: 'active',
+  RETIRING: 'retiring',
+  REVOKED: 'revoked',
+} as const;
+
+export const AI_METRIC_FAMILY = {
+  CORE_ACTIVITY: 'core_activity',
+  MODEL_USAGE: 'model_usage',
+  TOOL_USAGE: 'tool_usage',
+} as const;
+
+export const OTEL_INGESTION_STATE = {
+  HEALTHY: 'healthy',
+  DEGRADED: 'degraded',
+  UNHEALTHY: 'unhealthy',
+} as const;
+
+export const OTEL_BATCH_STATUS = {
+  PENDING: 'pending',
+  PROCESSING: 'processing',
+  PROCESSED: 'processed',
+  RETRYABLE_ERROR: 'retryable_error',
+  PERMANENT_ERROR: 'permanent_error',
+} as const;
+
+export const OTEL_ACTION_PATH = {
+  ROTATE: 'rotate',
+  REVOKE: 'revoke',
+  HIDE: 'hide',
+  FINALIZE_ROTATION: 'finalize-rotation',
+  APPLY: 'apply',
+} as const;

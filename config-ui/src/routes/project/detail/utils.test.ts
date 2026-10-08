@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { OTEL_CONNECTION_STATUS, type OtelConnectionResponse } from '@/api/otel';
+import { OTEL_STATUS, type OtelConnectionResponse } from '@/api/otel';
 import { PROJECT_TAB } from '@/config';
 import { IBPMode, type IBlueprint, type IProject } from '@/types';
 
@@ -167,17 +167,14 @@ describe('project delete warnings', () => {
   });
 
   it('says the placements are removed when they are shared or revoked', () => {
-    const shared = getOtelPlacementState([placement(OTEL_CONNECTION_STATUS.ACTIVE, 2)]);
-    const revoked = getOtelPlacementState([placement(OTEL_CONNECTION_STATUS.REVOKED, 1)]);
+    const shared = getOtelPlacementState([placement(OTEL_STATUS.ACTIVE, 2)]);
+    const revoked = getOtelPlacementState([placement(OTEL_STATUS.REVOKED, 1)]);
     expect(getDeleteWarnings(shared)).toEqual([DELETE_WARNING.OTEL_REMOVED]);
     expect(getDeleteWarnings(revoked)).toEqual([DELETE_WARNING.OTEL_REMOVED]);
   });
 
   it('blocks the delete when this project is the last placement of an active connection', () => {
-    const state = getOtelPlacementState([
-      placement(OTEL_CONNECTION_STATUS.ACTIVE, 2),
-      placement(OTEL_CONNECTION_STATUS.ACTIVE, 1),
-    ]);
+    const state = getOtelPlacementState([placement(OTEL_STATUS.ACTIVE, 2), placement(OTEL_STATUS.ACTIVE, 1)]);
     expect(state).toEqual({ hasPlacements: true, hasActiveFinal: true });
     expect(getDeleteWarnings(state)).toEqual([DELETE_WARNING.OTEL_FINAL_ACTIVE]);
   });

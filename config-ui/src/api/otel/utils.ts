@@ -16,5 +16,15 @@
  *
  */
 
-// Src files that fail the strict reskin rules today; remove a file from here when it is cleaned.
-export const RESKIN_LINT_PENDING = [];
+import { request } from '@/utils';
+
+import type { OTEL_ACTION_PATH } from './constants';
+import type { OtelConnectionResponse } from './types';
+
+export const OTEL_BASE_PATH = '/plugins/claude_otel';
+export const CONNECTIONS_PATH = `${OTEL_BASE_PATH}/connections`;
+
+export const otelAction =
+  (action: (typeof OTEL_ACTION_PATH)[keyof typeof OTEL_ACTION_PATH]) =>
+  (id: ID): Promise<OtelConnectionResponse> =>
+    request(`${CONNECTIONS_PATH}/${id}/${action}`, { method: 'POST' });

@@ -19,11 +19,13 @@
 import { Button, type TableColumnsType } from 'antd';
 
 import type { OtelConnectionResponse } from '@/api/otel';
+import { COPY as OTEL_COPY } from '@/routes/otel/constants';
+import { CONNECTION_STATE_TONE } from '@/routes/otel/tones';
 import { getOtelConnectionStatus } from '@/routes/otel/utils';
 import { STATUS_BADGE_VARIANT, StatusBadge } from '@/ui';
 import { STATUS_TONE } from '@/ui/constants';
 
-import { COPY, OTEL_COLUMN, OTEL_STATUS_TONE } from './constants';
+import { COPY, OTEL_COLUMN } from './constants';
 
 export const getClaudeCodeOtelProjectColumns = (onManage: () => void): TableColumnsType<OtelConnectionResponse> => [
   { key: OTEL_COLUMN.TEAM, title: COPY.otel.columns.team, dataIndex: ['connection', 'teamName'] },
@@ -46,7 +48,13 @@ export const getClaudeCodeOtelProjectColumns = (onManage: () => void): TableColu
     title: COPY.otel.columns.status,
     render: (_, record) => {
       const status = getOtelConnectionStatus(record);
-      return <StatusBadge tone={OTEL_STATUS_TONE[status]} label={status} variant={STATUS_BADGE_VARIANT.DOT} />;
+      return (
+        <StatusBadge
+          tone={CONNECTION_STATE_TONE[status]}
+          label={OTEL_COPY.state[status]}
+          variant={STATUS_BADGE_VARIANT.DOT}
+        />
+      );
     },
   },
   {

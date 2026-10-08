@@ -16,17 +16,18 @@
  *
  */
 
-import { Alert, Button } from 'antd';
+import { Button } from 'antd';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import API from '@/api';
 import { PATHS } from '@/config';
 
-import { OTEL_ATTENTION_CHANGED_EVENT, OTEL_REFRESH_INTERVAL_MS, OTEL_VISIBILITY_THROTTLE_MS } from './constants';
-import { getAttentionDescription, getAttentionState, isSameAttentionState, type OtelAttentionState } from './utils';
+import { COPY, OTEL_ATTENTION_CHANGED_EVENT, OTEL_REFRESH_INTERVAL_MS, OTEL_VISIBILITY_THROTTLE_MS } from './constants';
+import { AttentionAlert, AttentionRegion } from './styled';
+import type { OtelAttentionState } from './types';
+import { getAttentionDescription, getAttentionState, isSameAttentionState } from './utils';
 
-// Surface credential activation problems globally without changing DevLake's core pipeline UX.
 export const OtelAttention = () => {
   const [attention, setAttention] = useState<OtelAttentionState>();
   const mounted = useRef(false);
@@ -38,18 +39,19 @@ export const OtelAttention = () => {
     if (!force && document.visibilityState === 'hidden') return;
 
     abortController.current?.abort();
-    abortController.current = new AbortController();
+    const controller = new AbortController();
+    abortController.current = controller;
     try {
-      const connections = await API.otel.list(abortController.current.signal);
+      const connections = await API.otel.list(controller.signal);
       lastRefreshedAt.current = Date.now();
       const nextAttention = getAttentionState(connections);
-      if (mounted.current) {
+      if (mounted.current && !controller.signal.aborted) {
         setAttention((currentAttention) =>
           isSameAttentionState(currentAttention, nextAttention) ? currentAttention : nextAttention,
         );
       }
     } catch {
-      // Silent failure for background polling banner; avoid intrusive UI/console noise.
+      return;
     }
   }, []);
 
@@ -87,20 +89,18 @@ export const OtelAttention = () => {
   const description = getAttentionDescription(attention);
 
   return (
-    <div role="region" aria-live="polite" aria-label="Claude Code telemetry attention">
-      <Alert
-        banner
+    <AttentionRegion role="region" aria-live="polite" aria-label={COPY.attention.region}>
+      <AttentionAlert
         showIcon
         type={storageRecovery ? 'error' : 'warning'}
-        title="Claude Code telemetry needs attention."
+        title={COPY.attention.title}
         description={description}
         action={
           <Button type="link" onClick={() => navigate(PATHS.OTEL())}>
-            Manage Claude Code OTel
+            {COPY.attention.manage}
           </Button>
         }
-        style={{ marginBottom: 24 }}
       />
-    </div>
+    </AttentionRegion>
   );
 };
