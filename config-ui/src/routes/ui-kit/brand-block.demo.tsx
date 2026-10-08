@@ -44,6 +44,13 @@ export const BrandBlockDemo = () => (
         <PoweredByRow />
       </DarkBox>
     </DemoCase>
+    <DemoCase label={COPY.cases.poweredByVersion}>
+      <DarkBox $wide>
+        <PoweredByRow>
+          <span>{COPY.brandBlock.versionLine}</span>
+        </PoweredByRow>
+      </DarkBox>
+    </DemoCase>
     <DemoCase label={COPY.cases.customTitle}>
       <Row>
         <DarkBox $wide>

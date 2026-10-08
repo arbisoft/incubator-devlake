@@ -27,12 +27,13 @@ export const Root = styled.header`
   min-width: 0;
 `;
 
-export const Heading = styled.div`
+export const Heading = styled.div<{ $untitled: boolean }>`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: ${({ theme }) => theme.space.md}px;
+  margin-top: ${({ theme, $untitled }) => ($untitled ? theme.space.xs : 0)}px;
 `;
 
 export const TitleRow = styled.div`

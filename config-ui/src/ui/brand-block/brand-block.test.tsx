@@ -28,6 +28,7 @@ import { BRAND_TONE, COPY } from './constants';
 import { PoweredByRow } from './powered-by';
 
 const CUSTOM_TITLE = 'Acme Analytics';
+const CHILD_LINE = 'Version v1.0.2@3a9c1f2';
 
 describe('BrandBlock', () => {
   it('shows the mark with the two-line name when expanded', () => {
@@ -81,5 +82,15 @@ describe('PoweredByRow', () => {
   it('shows the powered-by text', () => {
     renderWithTheme(<PoweredByRow />);
     expect(screen.getByText(POWERED_BY)).toBeTruthy();
+  });
+
+  it('shows the child line under the powered-by text', () => {
+    renderWithTheme(
+      <PoweredByRow>
+        <span>{CHILD_LINE}</span>
+      </PoweredByRow>,
+    );
+    expect(screen.getByText(POWERED_BY)).toBeTruthy();
+    expect(screen.getByText(CHILD_LINE)).toBeTruthy();
   });
 });

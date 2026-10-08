@@ -45,7 +45,7 @@ export const PageHeader = ({
         />
       )}
       {(showTitle || status || switcher || actions) && (
-        <Heading>
+        <Heading $untitled={!showTitle}>
           <TitleRow>
             {showTitle && <Title>{title}</Title>}
             {status}

@@ -18,11 +18,15 @@
 
 import { POWERED_BY } from '@/config/brand';
 
-import { PoweredBy, PoweredByMark } from './styled';
+import { PoweredBy, PoweredByMark, PoweredByText } from './styled';
+import type { PoweredByRowProps } from './types';
 
-export const PoweredByRow = () => (
+export const PoweredByRow = ({ children }: PoweredByRowProps) => (
   <PoweredBy>
     <PoweredByMark aria-hidden />
-    {POWERED_BY}
+    <PoweredByText>
+      <span>{POWERED_BY}</span>
+      {children}
+    </PoweredByText>
   </PoweredBy>
 );

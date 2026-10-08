@@ -74,15 +74,27 @@ export const ProductName = styled.span<ToneProps>`
   white-space: nowrap;
 `;
 
-export const PoweredBy = styled.p`
+export const PoweredBy = styled.div`
   ${textStyle('caption')}
   display: flex;
   align-items: center;
   gap: ${({ theme }) => theme.space.xs}px;
-  margin: 0 0 ${({ theme }) => theme.space.xxs}px;
+  margin: 0 0 ${({ theme }) => theme.space.xs}px;
   padding-inline: ${({ theme }) => theme.space.sm}px;
   color: ${({ theme }) => theme.sidebar.textMuted};
   white-space: nowrap;
+`;
+
+export const PoweredByText = styled.div`
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+
+  > * {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 `;
 
 export const PoweredByMark = styled(DevlakeMark)`

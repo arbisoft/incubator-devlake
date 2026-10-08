@@ -162,7 +162,11 @@ export const COMPOSITES_COPY = {
     dashboard: 'Check dashboard',
     finish: 'Finish',
   },
-  brandBlock: { note: 'Always on the dark sidebar background.', customTitle: 'Acme Analytics' },
+  brandBlock: {
+    note: 'Always on the dark sidebar background.',
+    customTitle: 'Acme Analytics',
+    versionLine: 'Version v1.0.2@3a9c1f2',
+  },
   accountBlock: {
     name: 'Jane Admin',
     secondary: 'Admin',

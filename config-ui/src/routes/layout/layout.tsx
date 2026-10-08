@@ -95,8 +95,9 @@ export const Layout = () => {
           header={<BrandBlock collapsed={collapsed} />}
           footer={
             <>
-              {!collapsed && <PoweredByRow />}
-              {!collapsed && version && <Version>{COPY.account.version(version)}</Version>}
+              {!collapsed && (
+                <PoweredByRow>{version && <Version>{COPY.account.version(version)}</Version>}</PoweredByRow>
+              )}
               <AccountBlock
                 name={name}
                 secondary={secondary}

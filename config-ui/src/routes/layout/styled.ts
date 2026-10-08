@@ -20,12 +20,7 @@ import styled from 'styled-components';
 
 import { textStyle } from '@/ui/style-helpers';
 
-export const Version = styled.p`
+export const Version = styled.span`
   ${textStyle('caption')}
-  margin: 0 0 ${({ theme }) => theme.space.xs}px;
-  padding-inline: ${({ theme }) => theme.space.sm}px;
-  overflow: hidden;
   color: ${({ theme }) => theme.sidebar.textMuted};
-  text-overflow: ellipsis;
-  white-space: nowrap;
 `;
