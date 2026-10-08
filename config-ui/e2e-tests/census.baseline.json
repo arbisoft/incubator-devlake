@@ -171,6 +171,13 @@
       "skips": 0,
       "fixmes": 0
     },
+    "shell/db-migrate.spec.ts": {
+      "tests": 1,
+      "expects": 7,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
     "shell/navigation.spec.ts": {
       "tests": 5,
       "expects": 31,

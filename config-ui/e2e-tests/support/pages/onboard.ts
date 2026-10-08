@@ -17,6 +17,8 @@
  */
 import { Locator } from '@playwright/test';
 
+import { ONBOARD_COPY } from '../app-copy';
+
 import { BasePage } from './common';
 import { PATHS } from './paths';
 
@@ -26,22 +28,22 @@ export class OnboardPage extends BasePage {
   }
 
   get welcome(): Locator {
-    return this.page.getByText('Welcome to');
+    return this.page.getByText(ONBOARD_COPY.welcome);
   }
 
   async startFirstRepository(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Connect to your first repository' }).click();
+    await this.page.getByRole('button', { name: ONBOARD_COPY.start }).click();
   }
 
   get firstRepositoryHeading(): Locator {
-    return this.page.getByRole('heading', { name: 'Connect to your first repository' });
+    return this.page.getByRole('heading', { name: ONBOARD_COPY.heading });
   }
 
   get projectNameInput(): Locator {
-    return this.page.getByPlaceholder('Your Project Name');
+    return this.page.getByPlaceholder(ONBOARD_COPY.project.namePlaceholder);
   }
 
   get nextStepButton(): Locator {
-    return this.page.getByRole('button', { name: 'Next Step' });
+    return this.page.getByRole('button', { name: ONBOARD_COPY.next });
   }
 }

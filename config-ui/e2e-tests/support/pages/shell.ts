@@ -18,7 +18,7 @@
 import { Locator, Page } from '@playwright/test';
 
 import { LinkableProvider, PageResponse } from '../api';
-import { ACCOUNT_BLOCK_COPY, COMMON_COPY, LAYOUT_COPY, SIDEBAR_COPY, THEME_LABEL } from '../app-copy';
+import { ACCOUNT_BLOCK_COPY, COMMON_COPY, LAYOUT_COPY, NOT_FOUND_COPY, SIDEBAR_COPY, THEME_LABEL } from '../app-copy';
 import { APP_URL } from '../env';
 
 import { BasePage, iconButton } from './common';
@@ -165,15 +165,15 @@ export class ShellPage extends BasePage {
   }
 
   get notFoundTitle(): Locator {
-    return this.page.getByText('404 Not Found');
+    return this.page.getByText(NOT_FOUND_COPY.heading);
   }
 
   get notFoundMessage(): Locator {
-    return this.page.getByText('This is an invalid address.');
+    return this.page.getByText(NOT_FOUND_COPY.description);
   }
 
   async goHome(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Go HomePage' }).click();
+    await this.page.getByRole('button', { name: NOT_FOUND_COPY.home }).click();
   }
 
   get accountMenu(): Locator {

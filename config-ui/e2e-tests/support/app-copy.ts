@@ -55,3 +55,6 @@ export { COPY as SETTINGS_COPY } from '../../src/routes/settings/constants';
 export { COPY as AUTH_COPY } from '../../src/routes/settings/authentication/constants';
 export { COPY as ACTIVITY_COPY } from '../../src/routes/settings/activity/constants';
 export { COPY as SORT_SELECT_COPY } from '../../src/ui/sort-select/constants';
+export { COPY as DB_MIGRATE_COPY } from '../../src/routes/db-migrate/constants';
+export { COPY as NOT_FOUND_COPY } from '../../src/routes/not-found/constants';
+export { COPY as ONBOARD_COPY } from '../../src/routes/onboard/constants';
