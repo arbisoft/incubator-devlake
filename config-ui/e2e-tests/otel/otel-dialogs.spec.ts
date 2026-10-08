@@ -58,6 +58,7 @@ test.describe.serial('Claude Code OTel dialogs', () => {
     const otel = new OtelPage(page);
     await otel.open();
     const row = otel.connectionRow(teamName);
+    await row.reveal();
     await expect(row.root).toBeVisible();
 
     const dialog = await row.openProjects();
@@ -98,6 +99,7 @@ test.describe.serial('Claude Code OTel dialogs', () => {
     await otel.routeRestartRequired(teamName);
     await otel.open();
     const row = otel.connectionRow(teamName);
+    await row.reveal();
     await expect(row.root).toBeVisible();
 
     const dialog = await row.openApplyDialog();

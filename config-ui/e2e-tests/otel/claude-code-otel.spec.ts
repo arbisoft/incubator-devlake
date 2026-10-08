@@ -152,6 +152,7 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
 
     // 12. Verify newly created row in table
     const row = otel.connectionRow(testTeamName);
+    await row.reveal();
     await expect(row.root).toBeVisible();
     await expect(row.pendingFirstTelemetry).toBeVisible();
     const created = await findOtelConnection(api, testTeamName);
@@ -160,6 +161,7 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     expect(created?.projects.map((p) => p.name)).toEqual([projectName]);
     await expect(async () => {
       await otel.reload();
+      await row.reveal();
       await expect(row.root).toBeVisible({ timeout: 5000 });
       await expect(row.ready).toBeVisible({ timeout: 3000 });
     }).toPass({ timeout: 70_000, intervals: [3000] });
@@ -172,6 +174,7 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     const otel = new OtelPage(page);
     await otel.open();
     const newRow = otel.connectionRow(testTeamName);
+    await newRow.reveal();
     await expect(newRow.root).toBeVisible();
     await expect(newRow.pendingFirstTelemetry).toBeVisible();
 
@@ -227,6 +230,7 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
 
     // 4. The row shows the bound organization, and every listed row matches the API
     await otel.reload();
+    await newRow.reveal();
     await expect(newRow.root).toBeVisible();
     expect(await newRow.organization()).toBe(organizationId);
     await expect(newRow.pendingFirstTelemetry).toHaveCount(0);
@@ -256,10 +260,9 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     const otelPreferences = preferences.filter((preference) => preference.preferredSource === 'otel');
 
     await expect(otel.policyHeading).toBeVisible();
-    await expect(otel.policyCells('otel')).toHaveCount(otelPreferences.length);
-    for (const preference of otelPreferences) {
-      await expect(otel.policyMetricFamily(preference.metricFamily)).toBeVisible();
-    }
+    const shownPolicy = (await otel.policyRows()).filter(({ source }) => source === 'otel');
+    expect(shownPolicy).toHaveLength(otelPreferences.length);
+    expect(shownPolicy.map(({ family }) => family).sort()).toEqual(otelPreferences.map((it) => it.metricFamily).sort());
     await expect(otel.policyControls).toHaveCount(0);
   });
 
@@ -269,6 +272,7 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     await expect(page).toHaveURL(/.*\/otel/);
 
     const row = otel.connectionRow(testTeamName);
+    await row.reveal();
     await expect(row.root).toBeVisible();
 
     // 1. ROTATE

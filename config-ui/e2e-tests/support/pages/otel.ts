@@ -15,7 +15,7 @@
  * limitations under the License.
  *
  */
-import { Locator, Page } from '@playwright/test';
+import { Locator, Page, expect } from '@playwright/test';
 
 import { COMMON_COPY, OTEL_COPY, OTEL_INGESTION_STATE, OTEL_MODAL_COPY, OTEL_STATUS } from '../app-copy';
 
@@ -41,11 +41,13 @@ type LifecycleKey = keyof typeof OTEL_COPY.confirm;
 type IngestionState = (typeof OTEL_INGESTION_STATE)[keyof typeof OTEL_INGESTION_STATE];
 const FIRST_PAYLOAD_BUTTON_NAME = new RegExp(`^${OTEL_COPY.health.viewPayloadFor('')}`);
 
-const columnCell = async (table: Locator, row: Locator, column: string): Promise<Locator> => {
-  const header = table.getByRole('columnheader', { name: column, exact: true });
-  const index = await header.evaluate((element) => (element as HTMLTableCellElement).cellIndex);
-  return row.getByRole('cell').nth(index);
-};
+const columnIndex = (table: Locator, column: string): Promise<number> =>
+  table
+    .getByRole('columnheader', { name: column, exact: true })
+    .evaluate((element) => (element as HTMLTableCellElement).cellIndex);
+
+const columnCell = async (table: Locator, row: Locator, column: string): Promise<Locator> =>
+  row.getByRole('cell').nth(await columnIndex(table, column));
 
 // The "Generate Claude Settings" form.
 export class OtelCredentialDialog {
@@ -208,6 +210,14 @@ export class OtelConnectionRow {
 
   private get table(): Locator {
     return this.page.getByRole('table', { name: OTEL_COPY.connections.tableLabel, exact: true });
+  }
+
+  // Pages the connections table forward until this row is on screen; call it once the list has loaded.
+  async reveal(): Promise<void> {
+    const section = this.page.getByRole('region', { name: OTEL_COPY.connections.title, exact: true });
+    const next = section.locator('.ant-pagination-next:not(.ant-pagination-disabled) button');
+    await expect(tableRows(section).first()).toBeVisible();
+    while ((await this.root.count()) === 0 && (await next.count()) > 0) await next.click();
   }
 
   private async credentials(): Promise<Locator> {
@@ -408,12 +418,25 @@ export class OtelPage extends BasePage implements Screen {
     return this.page.getByRole('region', { name: OTEL_COPY.policy.title, exact: true });
   }
 
-  policyCells(name: string): Locator {
-    return this.policySection.getByRole('cell', { name, exact: true });
-  }
-
-  policyMetricFamily(name: string): Locator {
-    return this.policySection.getByRole('cell', { name, exact: true }).first();
+  // Every row of the source policy table, read page by page; call it once the table has rows.
+  async policyRows(): Promise<{ family: string; source: string }[]> {
+    const table = this.policySection.getByRole('table', { name: OTEL_COPY.policy.tableLabel, exact: true });
+    const next = this.policySection.locator('.ant-pagination-next:not(.ant-pagination-disabled) button');
+    const activePage = this.policySection.locator('.ant-pagination-item-active');
+    await expect(tableRows(table).first()).toBeVisible();
+    const familyIndex = await columnIndex(table, OTEL_COPY.policy.columns.family);
+    const sourceIndex = await columnIndex(table, OTEL_COPY.policy.columns.source);
+    const rows: { family: string; source: string }[] = [];
+    for (;;) {
+      for (const row of await tableRows(table).all()) {
+        const cells = await row.getByRole('cell').allInnerTexts();
+        rows.push({ family: cells[familyIndex], source: cells[sourceIndex] });
+      }
+      if ((await next.count()) === 0) return rows;
+      const current = Number(await activePage.innerText());
+      await next.click();
+      await expect(activePage).toHaveText(String(current + 1));
+    }
   }
 
   get policyControls(): Locator {
