@@ -141,8 +141,9 @@ export const Chips = styled.ul`
   flex-wrap: wrap;
   gap: ${({ theme }) => theme.space.xs}px;
   margin: 0;
-  padding: 0;
+  padding: ${({ theme }) => theme.space.sm}px 0 0;
   list-style: none;
+  border-top: 1px solid ${({ theme }) => theme.colors.border};
 `;
 
 export const Chip = styled(Tag).attrs({ as: 'li' })`
