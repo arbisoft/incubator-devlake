@@ -16,11 +16,19 @@
  *
  */
 
-import type { OtelConnectionResponse } from '@/api/otel';
+import type { Ref } from 'react';
 
-export type OtelConnectionNameProps = {
-  connection: OtelConnectionResponse;
+import type { ProjectReadiness } from '../../readiness';
+import type { ConnectionDetail, ConnectionEntry } from '../types';
+
+export type ConnectionsCellProps = {
+  entries: ConnectionEntry[];
+  buttonRef: Ref<HTMLButtonElement>;
 };
+
+export type ConnectionsPopoverProps = { details: ConnectionDetail[] };
+export type ReadinessCellProps = { readiness?: ProjectReadiness };
+export type ReadinessPopoverProps = { readiness: ProjectReadiness };
 
 export type NewProjectModalProps = {
   open: boolean;

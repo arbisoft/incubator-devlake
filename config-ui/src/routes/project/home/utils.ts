@@ -16,11 +16,17 @@
  *
  */
 
-import type { OtelConnectionResponse } from '@/api/otel';
-import type { IProject } from '@/types';
+import { createElement } from 'react';
 
-import { CONNECTION_ENTRY_KIND, PROJECT_METRICS } from './constants';
-import type { ConnectionEntry, ProjectRow } from './types';
+import type { OtelConnectionResponse } from '@/api/otel';
+import { WEBHOOK_PLUGIN } from '@/features/connections/constants';
+import { getPluginConfig } from '@/plugins';
+import { INTEGRATION_CATEGORY, getCatalogEntry } from '@/plugins/catalog';
+import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?react';
+import type { IConnection, IProject, IWebhook } from '@/types';
+
+import { CONNECTION_ENTRY_KIND, COPY, PROJECT_METRICS } from './constants';
+import type { CategoryCount, ConnectionDetail, ConnectionEntry, ProjectRow } from './types';
 
 export const toProjectRow = (project: IProject, otelConnections: OtelConnectionResponse[] = []): ProjectRow => ({
   name: project.name,
@@ -53,3 +59,36 @@ export const getConnectionEntries = ({ connections, otelConnections }: ProjectRo
     connection,
   })),
 ];
+
+export const describeConnectionEntry = (
+  entry: ConnectionEntry,
+  connections: IConnection[],
+  webhooks: IWebhook[],
+): ConnectionDetail => {
+  if (entry.kind === CONNECTION_ENTRY_KIND.OTEL) {
+    return {
+      key: entry.key,
+      name: entry.connection.connection.name,
+      pluginLabel: COPY.otelPluginLabel,
+      category: INTEGRATION_CATEGORY.AI_ANALYTICS,
+      icon: () => createElement(ClaudeCodeOtelIcon),
+    };
+  }
+
+  const { pluginName, connectionId } = entry.connection;
+  const config = getPluginConfig(pluginName);
+  const connection = connections.find(({ unique }) => unique === `${pluginName}-${connectionId}`);
+  const webhook = pluginName === WEBHOOK_PLUGIN ? webhooks.find(({ id }) => id === connectionId) : undefined;
+  return {
+    key: entry.key,
+    name: connection?.name ?? webhook?.name ?? `${pluginName}/connection/${connectionId}`,
+    pluginLabel: config.name,
+    category: getCatalogEntry(config).category,
+    icon: config.icon,
+  };
+};
+
+export const countCategories = (details: ConnectionDetail[]): CategoryCount[] =>
+  Object.values(INTEGRATION_CATEGORY)
+    .map((category) => ({ category, count: details.filter((detail) => detail.category === category).length }))
+    .filter(({ count }) => count > 0);

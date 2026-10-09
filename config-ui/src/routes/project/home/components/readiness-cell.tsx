@@ -16,6 +16,26 @@
  *
  */
 
-export * from './connections-cell';
-export * from './new-project-modal';
-export * from './readiness-cell';
+import { Popover } from 'antd';
+
+import { COMMON_COPY } from '@/ui';
+
+import { ReadinessMeter } from '../../readiness';
+import { PercentLabel, TriggerButton } from '../styled';
+
+import { ReadinessPopover } from './readiness-popover';
+import type { ReadinessCellProps } from './types';
+
+const POPOVER_TRIGGERS: ('hover' | 'focus')[] = ['hover', 'focus'];
+
+export const ReadinessCell = ({ readiness }: ReadinessCellProps) => {
+  if (!readiness) return COMMON_COPY.emptyValue;
+  return (
+    <Popover trigger={POPOVER_TRIGGERS} content={<ReadinessPopover readiness={readiness} />}>
+      <TriggerButton type="button">
+        <ReadinessMeter readiness={readiness} />
+        <PercentLabel>{readiness.percentLabel ?? COMMON_COPY.emptyValue}</PercentLabel>
+      </TriggerButton>
+    </Popover>
+  );
+};

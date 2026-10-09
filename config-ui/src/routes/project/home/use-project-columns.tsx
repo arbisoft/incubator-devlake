@@ -21,19 +21,20 @@ import { Button, Tooltip, type TableColumnsType } from 'antd';
 import { useMemo, useRef } from 'react';
 
 import { BLUEPRINT_VIEW, getCron, PATHS } from '@/config';
-import { ConnectionName } from '@/features';
 import { PipelineStatusBadge } from '@/routes/pipeline';
-import { OverflowList, RowLink } from '@/ui';
+import { RowLink } from '@/ui';
 import { formatTime } from '@/utils';
 
-import { OtelConnectionName } from './components';
-import { CONNECTION_ENTRY_KIND, COPY, MAX_VISIBLE_CONNECTIONS, NO_CONNECTIONS, PROJECT_COLUMN } from './constants';
+import type { ProjectReadiness } from '../readiness';
+
+import { ConnectionsCell, ReadinessCell } from './components';
+import { COPY, NO_CONNECTIONS, PROJECT_COLUMN } from './constants';
 import type { ProjectRow } from './types';
 import { getConnectionEntries } from './utils';
 
-export const useProjectColumns = (onConfigure: (name: string) => void) => {
+export const useProjectColumns = (onConfigure: (name: string) => void, readiness: Map<string, ProjectReadiness>) => {
   const nameRef = useRef<HTMLAnchorElement>(null);
-  const connectionRef = useRef<HTMLUListElement>(null);
+  const connectionRef = useRef<HTMLButtonElement>(null);
   const configRef = useRef<HTMLButtonElement>(null);
 
   const columns = useMemo<TableColumnsType<ProjectRow>>(
@@ -57,22 +58,14 @@ export const useProjectColumns = (onConfigure: (name: string) => void) => {
           return entries.length === 0 ? (
             NO_CONNECTIONS
           ) : (
-            <OverflowList
-              listRef={connectionRef}
-              max={MAX_VISIBLE_CONNECTIONS}
-              moreLabel={COPY.moreConnections}
-              items={entries.map(({ key, ...entry }) => ({
-                key,
-                node:
-                  entry.kind === CONNECTION_ENTRY_KIND.PLUGIN ? (
-                    <ConnectionName plugin={entry.connection.pluginName} connectionId={entry.connection.connectionId} />
-                  ) : (
-                    <OtelConnectionName connection={entry.connection} />
-                  ),
-              }))}
-            />
+            <ConnectionsCell entries={entries} buttonRef={connectionRef} />
           );
         },
+      },
+      {
+        key: PROJECT_COLUMN.READINESS,
+        title: COPY.columns.readiness,
+        render: (_, { name }) => <ReadinessCell readiness={readiness.get(name)} />,
       },
       {
         key: PROJECT_COLUMN.FREQUENCY,
@@ -116,7 +109,7 @@ export const useProjectColumns = (onConfigure: (name: string) => void) => {
         ),
       },
     ],
-    [onConfigure],
+    [onConfigure, readiness],
   );
 
   return { columns, tourRefs: { nameRef, connectionRef, configRef } };

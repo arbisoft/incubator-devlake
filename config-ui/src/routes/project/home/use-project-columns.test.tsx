@@ -16,13 +16,20 @@
  *
  */
 
-import { fireEvent, renderHook, screen, waitFor } from '@testing-library/react';
+import { configureStore } from '@reduxjs/toolkit';
+import { fireEvent, renderHook, screen, waitFor, within } from '@testing-library/react';
 import type { TableColumnsType } from 'antd';
+import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
+import type { ComplianceScorecardRow } from '@/api/compliance-scorecard';
+import { connectionsSlice } from '@/features/connections';
+import { INTEGRATION_CATEGORY } from '@/plugins/catalog';
 import { IPipelineStatus } from '@/types';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
+
+import { COPY as READINESS_COPY, toReadinessMap } from '../readiness';
 
 import { COPY, MAX_VISIBLE_CONNECTIONS, PROJECT_COLUMN } from './constants';
 import type { ProjectRow } from './types';
@@ -38,16 +45,44 @@ const ROW: ProjectRow = {
   lastRunCompletedAt: null,
 };
 
-const columnsFor = (onConfigure = vi.fn()) => renderHook(() => useProjectColumns(onConfigure)).result.current.columns;
+const SCORECARD_ROW: ComplianceScorecardRow = {
+  Project: 'alpha',
+  'Issue Visibility': '✅ Jira',
+  'PR Visibility': '✅ GitHub',
+  'AI Visibility': '❌ Not available',
+  Compliance: '⚠️ 66.6%',
+};
+
+const columnsFor = (onConfigure = vi.fn(), rows: ComplianceScorecardRow[] = [SCORECARD_ROW]) =>
+  renderHook(() => useProjectColumns(onConfigure, toReadinessMap(rows))).result.current.columns;
+
+const makeStore = () =>
+  configureStore({
+    reducer: { connections: connectionsSlice.reducer },
+    preloadedState: {
+      connections: {
+        ...connectionsSlice.getInitialState(),
+        connections: [{ unique: 'github-1', plugin: 'github', id: 1, name: 'arbisoft/website' }],
+      },
+    },
+  } as never);
+
+const otelRows = (count: number) =>
+  Array.from({ length: count }, (_, index) => ({
+    connection: { id: index + 1, name: `team-${index + 1}` },
+    projects: [],
+  })) as never;
 
 const find = (all: TableColumnsType<ProjectRow>, key: string) => all.find((item) => item.key === key);
 
-const renderCell = (key: string, record: ProjectRow, value?: unknown) => {
-  const col = find(columnsFor(), key);
+const renderCell = (key: string, record: ProjectRow, value?: unknown, rows?: ComplianceScorecardRow[]) => {
+  const col = find(columnsFor(vi.fn(), rows), key);
   return renderWithTheme(
-    <MemoryRouter>
-      <>{col && 'render' in col && col.render?.(value, record, 0)}</>
-    </MemoryRouter>,
+    <Provider store={makeStore()}>
+      <MemoryRouter>
+        <>{col && 'render' in col && col.render?.(value, record, 0)}</>
+      </MemoryRouter>
+    </Provider>,
   );
 };
 
@@ -69,23 +104,78 @@ describe('useProjectColumns', () => {
     expect(screen.getByText(COPY.noConnections)).toBeTruthy();
   });
 
-  it('lists the OTel connection names', () => {
+  it('names the trigger after every connection while the icons stay hidden', () => {
     const otelConnections = [{ connection: { id: 3, name: 'claude-team' }, projects: [] }] as never;
-    renderCell(PROJECT_COLUMN.CONNECTIONS, { ...ROW, otelConnections });
-    expect(screen.getByText('claude-team')).toBeTruthy();
+    renderCell(PROJECT_COLUMN.CONNECTIONS, {
+      ...ROW,
+      connections: [{ pluginName: 'github', connectionId: 1 }],
+      otelConnections,
+    });
+    const trigger = screen.getByRole('button', { name: COPY.connectionsLabel(['arbisoft/website', 'claude-team']) });
+    expect(trigger.querySelector('ul, li')).toBeNull();
   });
 
-  it('caps the connections and keeps the rest reachable from a focusable toggle', async () => {
-    const otelConnections = [1, 2, 3, 4].map((id) => ({
-      connection: { id, name: `team-${id}` },
-      projects: [],
-    })) as never;
+  it('caps the icons and shows the rest as a count', () => {
+    const otelConnections = otelRows(7);
     renderCell(PROJECT_COLUMN.CONNECTIONS, { ...ROW, otelConnections });
-    const hidden = 4 - MAX_VISIBLE_CONNECTIONS;
-    expect(screen.queryByText('team-3')).toBeNull();
-    fireEvent.focus(screen.getByRole('button', { name: COPY.moreConnections(hidden) }));
-    await waitFor(() => expect(screen.getByText('team-4')).toBeTruthy());
-    expect(screen.getByText('team-3')).toBeTruthy();
+    const trigger = screen.getByRole('button');
+    expect(trigger.querySelectorAll('svg, img, [class*="Icon"]').length).toBeGreaterThan(0);
+    expect(screen.getByText(COPY.moreConnections(7 - MAX_VISIBLE_CONNECTIONS))).toBeTruthy();
+  });
+
+  it('lists every connection, with plugin and category, in the popover', async () => {
+    const otelConnections = otelRows(7);
+    renderCell(PROJECT_COLUMN.CONNECTIONS, {
+      ...ROW,
+      connections: [{ pluginName: 'github', connectionId: 1 }],
+      otelConnections,
+    });
+    fireEvent.focus(screen.getByRole('button'));
+    await waitFor(() => expect(screen.getByText('team-7')).toBeTruthy());
+    expect(screen.getByText(COPY.connectionsPopover.title)).toBeTruthy();
+    expect(screen.getByText(COPY.connectionsPopover.subtitle('GitHub', INTEGRATION_CATEGORY.CODE_SCM))).toBeTruthy();
+    const aiChip = screen.getByText(INTEGRATION_CATEGORY.AI_ANALYTICS).closest('li') as HTMLElement;
+    expect(within(aiChip).getByText('7')).toBeTruthy();
+    const scmChip = screen.getByText(INTEGRATION_CATEGORY.CODE_SCM).closest('li') as HTMLElement;
+    expect(within(scmChip).getByText('1')).toBeTruthy();
+  });
+
+  it('shows the empty value when the project has no scorecard row', () => {
+    renderCell(PROJECT_COLUMN.READINESS, { ...ROW, name: 'missing' });
+    expect(screen.getByText('-')).toBeTruthy();
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('shows the meter and the API percentage in a focusable trigger', () => {
+    renderCell(PROJECT_COLUMN.READINESS, ROW);
+    expect(screen.getByRole('img', { name: READINESS_COPY.summary(2, 3) })).toBeTruthy();
+    expect(screen.getByRole('button').querySelector('ul, li, div')).toBeNull();
+    expect(screen.getByRole('button').textContent).toContain('66.6%');
+  });
+
+  it('opens the breakdown with the missing hint and a link to the configurations', async () => {
+    renderCell(PROJECT_COLUMN.READINESS, ROW);
+    fireEvent.focus(screen.getByRole('button'));
+    await waitFor(() => expect(screen.getByText(READINESS_COPY.title)).toBeTruthy());
+    expect(screen.getByText(COPY.readinessPopover.projectSummary(2, 3))).toBeTruthy();
+    expect(screen.getByText('Jira')).toBeTruthy();
+    expect(screen.getByText(READINESS_COPY.notAvailable)).toBeTruthy();
+    expect(screen.getByText(READINESS_COPY.missingHint([READINESS_COPY.signals.ai.missing]))).toBeTruthy();
+    const link = screen.getByRole('link', { name: READINESS_COPY.addConnection });
+    expect(link.getAttribute('href')).toContain('alpha');
+  });
+
+  it('omits the footer when every signal is available', async () => {
+    renderCell(PROJECT_COLUMN.READINESS, ROW, undefined, [
+      { ...SCORECARD_ROW, 'AI Visibility': '✅ Claude Code (OTel)', Compliance: '✅ 100%' },
+    ]);
+    fireEvent.focus(screen.getByRole('button'));
+    await waitFor(() => expect(screen.getByText(READINESS_COPY.title)).toBeTruthy());
+    expect(screen.queryByRole('link', { name: READINESS_COPY.addConnection })).toBeNull();
+  });
+
+  it('keeps the readiness column unsortable', () => {
+    expect(find(columnsFor(), PROJECT_COLUMN.READINESS)).not.toHaveProperty('sorter');
   });
 
   it('shows a dash when the project has not run', () => {

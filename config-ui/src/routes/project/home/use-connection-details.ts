@@ -16,16 +16,14 @@
  *
  */
 
-import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?react';
-import { PluginIcon } from '@/ui';
+import { selectAllConnections, selectWebhooks } from '@/features/connections/slice';
+import { useAppSelector } from '@/hooks';
 
-import { OtelLabel, OtelName } from '../styled';
+import type { ConnectionDetail, ConnectionEntry } from './types';
+import { describeConnectionEntry } from './utils';
 
-import type { OtelConnectionNameProps } from './types';
-
-export const OtelConnectionName = ({ connection }: OtelConnectionNameProps) => (
-  <OtelName>
-    <PluginIcon icon={() => <ClaudeCodeOtelIcon />} size="md" />
-    <OtelLabel title={connection.connection.name}>{connection.connection.name}</OtelLabel>
-  </OtelName>
-);
+export const useConnectionDetails = (entries: ConnectionEntry[]): ConnectionDetail[] => {
+  const connections = useAppSelector(selectAllConnections);
+  const webhooks = useAppSelector(selectWebhooks);
+  return entries.map((entry) => describeConnectionEntry(entry, connections, webhooks));
+};

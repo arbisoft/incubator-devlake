@@ -16,6 +16,16 @@
  *
  */
 
-export * from './connections-cell';
-export * from './new-project-modal';
-export * from './readiness-cell';
+import { METER_SIZE, SegmentedMeter } from '@/ui';
+
+import { COPY } from './constants';
+import type { ReadinessMeterProps } from './types';
+
+export const ReadinessMeter = ({ readiness, large = false }: ReadinessMeterProps) => (
+  <SegmentedMeter
+    total={readiness.total}
+    filled={readiness.available}
+    size={large ? METER_SIZE.MD : METER_SIZE.SM}
+    label={COPY.summary(readiness.available, readiness.total)}
+  />
+);

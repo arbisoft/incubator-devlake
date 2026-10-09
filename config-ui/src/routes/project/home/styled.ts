@@ -18,16 +18,155 @@
 
 import styled from 'styled-components';
 
-export const OtelName = styled.span`
+import { focusRingStyle, textStyle } from '@/ui/style-helpers';
+
+import { Tag } from '../readiness';
+
+export const IconLabel = styled.span`
   display: inline-flex;
+`;
+
+export const IconRow = styled.span`
+  display: inline-flex;
+  flex-wrap: nowrap;
   align-items: center;
   gap: ${({ theme }) => theme.space.xxs}px;
+`;
+
+export const MoreCount = styled(Tag)`
+  color: ${({ theme }) => theme.colors.primary};
+  background: ${({ theme }) => theme.colors.primarySubtle};
+  border-radius: ${({ theme }) => theme.radius.pill}px;
+  white-space: nowrap;
+`;
+
+export const TriggerButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.xs}px;
+  max-width: 100%;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: ${({ theme }) => theme.radius.sm}px;
+  cursor: default;
+
+  &:focus-visible {
+    ${focusRingStyle}
+  }
+`;
+
+export const PercentLabel = styled.span`
+  ${textStyle('caption')}
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
+
+export const PopoverBody = styled.div<{ $width: number }>`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.sm}px;
+  width: ${({ $width }) => $width}px;
+  max-width: 100%;
+`;
+
+export const PopoverHead = styled.div`
+  ${textStyle('bodyMedium')}
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.sm}px;
+  color: ${({ theme }) => theme.colors.text};
+`;
+
+export const PopoverCount = styled(Tag)`
+  border-radius: ${({ theme }) => theme.radius.pill}px;
+`;
+
+export const PopoverSubtitle = styled.p`
+  ${textStyle('caption')}
+  margin: 0;
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
+
+export const PopoverList = styled.ul`
+  display: flex;
+  flex-direction: column;
+  max-height: ${({ theme }) => theme.layout.popoverListMaxHeight}px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+`;
+
+export const PopoverRow = styled.li`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.sm}px;
+  padding: ${({ theme }) => theme.space.xs}px 0;
+
+  & + & {
+    border-top: 1px solid ${({ theme }) => theme.colors.borderSubtle};
+  }
+`;
+
+export const RowCopy = styled.div`
+  display: flex;
+  flex-direction: column;
+  flex: 1;
   min-width: 0;
 `;
 
-export const OtelLabel = styled.span`
-  max-width: ${({ theme }) => theme.layout.connectionNameWidth}px;
+export const RowTitle = styled.span`
+  ${textStyle('bodyMedium')}
+  color: ${({ theme }) => theme.colors.text};
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+`;
+
+export const RowSubtitle = styled.span`
+  ${textStyle('caption')}
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
+
+export const SourceText = styled.span`
+  ${textStyle('captionStrong')}
+  color: ${({ theme }) => theme.colors.textSecondary};
+  text-align: right;
+`;
+
+export const Chips = styled.ul`
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${({ theme }) => theme.space.xs}px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+`;
+
+export const Chip = styled(Tag).attrs({ as: 'li' })`
+  ${textStyle('caption')}
+  display: inline-flex;
+  gap: ${({ theme }) => theme.space.xs}px;
+`;
+
+export const ChipCount = styled.span`
+  ${textStyle('captionStrong')}
+  color: ${({ theme }) => theme.colors.text};
+`;
+
+export const PopoverFooter = styled.div`
+  ${textStyle('caption')}
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.space.sm}px;
+  color: ${({ theme }) => theme.colors.textSecondary};
+
+  a {
+    ${textStyle('captionStrong')}
+    color: ${({ theme }) => theme.colors.link};
+    white-space: nowrap;
+  }
 `;

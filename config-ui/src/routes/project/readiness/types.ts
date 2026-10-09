@@ -16,6 +16,20 @@
  *
  */
 
-export * from './connections-cell';
-export * from './new-project-modal';
-export * from './readiness-cell';
+import type { READINESS_SIGNAL, SIGNAL_STATE } from './constants';
+
+export type ReadinessSignalKey = (typeof READINESS_SIGNAL)[keyof typeof READINESS_SIGNAL];
+export type ReadinessSignalState = (typeof SIGNAL_STATE)[keyof typeof SIGNAL_STATE];
+
+export type ReadinessSignal = { key: ReadinessSignalKey; state: ReadinessSignalState; sources: string[] };
+
+export type ProjectReadiness = {
+  project: string;
+  signals: ReadinessSignal[];
+  available: number;
+  total: number;
+  percentLabel: string | null;
+};
+
+export type ReadinessMeterProps = { readiness: ProjectReadiness; large?: boolean };
+export type SignalStatusIconProps = { state: ReadinessSignalState; large?: boolean };

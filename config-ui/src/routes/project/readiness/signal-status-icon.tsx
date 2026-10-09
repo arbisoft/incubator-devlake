@@ -16,6 +16,23 @@
  *
  */
 
-export * from './connections-cell';
-export * from './new-project-modal';
-export * from './readiness-cell';
+import { CheckOutlined, CloseOutlined, QuestionOutlined } from '@ant-design/icons';
+
+import { COPY, SIGNAL_STATE } from './constants';
+import { IconBox } from './styled';
+import type { SignalStatusIconProps } from './types';
+
+const ICONS = {
+  [SIGNAL_STATE.AVAILABLE]: CheckOutlined,
+  [SIGNAL_STATE.MISSING]: CloseOutlined,
+  [SIGNAL_STATE.UNKNOWN]: QuestionOutlined,
+};
+
+export const SignalStatusIcon = ({ state, large = false }: SignalStatusIconProps) => {
+  const Icon = ICONS[state];
+  return (
+    <IconBox role="img" aria-label={COPY.state[state]} $state={state} $large={large}>
+      <Icon aria-hidden />
+    </IconBox>
+  );
+};
