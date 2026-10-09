@@ -21,8 +21,8 @@ import classNames from 'classnames';
 
 import { IPipelineStatus } from '@/types';
 
-import * as S from '../styled';
 import * as C from '../constant';
+import * as S from '../styled';
 
 interface Props {
   status: IPipelineStatus;

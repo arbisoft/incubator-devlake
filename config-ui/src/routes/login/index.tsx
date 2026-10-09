@@ -16,8 +16,8 @@
  *
  */
 
-import { useEffect, useState } from 'react';
 import { Card, Button, Typography, Alert, Form, Input, Space } from 'antd';
+import { useEffect, useState } from 'react';
 
 import API from '@/api';
 import type { Methods, Provider } from '@/api/auth';

@@ -16,8 +16,8 @@
  *
  */
 
-import { useState, useEffect } from 'react';
 import { Modal } from 'antd';
+import { useState, useEffect } from 'react';
 
 import { IBlueprint, IBPMode } from '@/types';
 

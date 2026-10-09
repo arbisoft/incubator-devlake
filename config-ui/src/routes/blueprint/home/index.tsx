@@ -16,10 +16,10 @@
  *
  */
 
-import { useState, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
 import { PlusOutlined, SettingOutlined } from '@ant-design/icons';
 import { Flex, Table, Modal, Radio, Button, Input, Tag } from 'antd';
+import { useState, useMemo } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
 import API from '@/api';
 import { PageHeader, Block, TextTooltip, IconButton } from '@/components';
@@ -29,8 +29,8 @@ import { useRefreshData } from '@/hooks';
 import { IBlueprint, IBPMode } from '@/types';
 import { formatTime, operator } from '@/utils';
 
-import { buildBlueprintCreatePayload } from './utils';
 import * as S from './styled';
+import { buildBlueprintCreatePayload } from './utils';
 
 export const BlueprintHomePage = () => {
   const [version, setVersion] = useState(1);

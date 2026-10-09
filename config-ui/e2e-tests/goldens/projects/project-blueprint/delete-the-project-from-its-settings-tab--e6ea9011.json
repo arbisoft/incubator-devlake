@@ -1,0 +1,10 @@
+{
+  "titlePath": ["Project, blueprint, pipeline and webhook flows", "delete the project from its Settings tab"],
+  "writes": [
+    {
+      "method": "DELETE",
+      "path": "/api/projects/e2e-*",
+      "body": null
+    }
+  ]
+}

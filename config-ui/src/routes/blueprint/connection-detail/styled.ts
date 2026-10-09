@@ -24,32 +24,3 @@ export const Top = styled.div`
   justify-content: space-between;
   margin-bottom: 36px;
 `;
-
-export const ActionDelete = styled.div`
-  padding: 16px 24px;
-`;
-
-export const Entities = styled.div`
-  margin-bottom: 24px;
-
-  h4 {
-    margin-bottom: 16px;
-  }
-
-  ul {
-    display: flex;
-    align-items: center;
-
-    li::after {
-      content: ',';
-    }
-
-    li:last-child::after {
-      content: '';
-    }
-
-    li + li {
-      margin-left: 4px;
-    }
-  }
-`;

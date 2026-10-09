@@ -16,17 +16,17 @@
  *
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
 import { RedoOutlined, PlusOutlined } from '@ant-design/icons';
-import { Flex, Select, Button, Checkbox, message } from 'antd';
 import { useDebounce } from 'ahooks';
+import { Flex, Select, Button, Checkbox, message } from 'antd';
 import axios from 'axios';
 import type { McsItem } from 'miller-columns-select';
 import MillerColumnsSelect from 'miller-columns-select';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 import API from '@/api';
-import { PATHS } from '@/config';
 import { Loading, Block, ExternalLink, Message } from '@/components';
+import { PATHS } from '@/config';
 import { getPluginScopeId, getPluginScopeName } from '@/plugins';
 
 const loadAllPageSize = 1000;

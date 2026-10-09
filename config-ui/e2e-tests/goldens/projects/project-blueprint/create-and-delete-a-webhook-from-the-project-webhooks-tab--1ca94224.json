@@ -1,0 +1,372 @@
+{
+  "titlePath": [
+    "Project, blueprint, pipeline and webhook flows",
+    "create and delete a webhook from the project Webhooks tab"
+  ],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/plugins/webhook/connections",
+      "body": {
+        "name": "e2e-*"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/blueprints/:id",
+      "body": {
+        "afterPlan": null,
+        "beforePlan": null,
+        "connections": [
+          {
+            "connectionId": "<masked>",
+            "pluginName": "github",
+            "scopes": [
+              {
+                "scopeId": "<masked>"
+              }
+            ]
+          },
+          {
+            "connectionId": "<masked>",
+            "pluginName": "webhook"
+          }
+        ],
+        "createdAt": "<masked>",
+        "cronConfig": "15 3 * * *",
+        "enable": true,
+        "fullSync": false,
+        "id": "<masked>",
+        "isManual": false,
+        "labels": [],
+        "mode": "NORMAL",
+        "name": "e2e-*-Blueprint",
+        "plan": [
+          [
+            {
+              "options": {
+                "projectMappings": [
+                  {
+                    "projectName": "e2e-*",
+                    "scopes": [
+                      {
+                        "rowId": "<masked>",
+                        "table": "repos"
+                      },
+                      {
+                        "rowId": "<masked>",
+                        "table": "cicd_scopes"
+                      },
+                      {
+                        "rowId": "<masked>",
+                        "table": "boards"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "plugin": "org",
+              "subtasks": ["setProjectMapping"]
+            }
+          ],
+          [
+            {
+              "options": {
+                "connectionId": "<masked>",
+                "excludeFileExtensions": null,
+                "fullName": "e2e-org/e2e-repo",
+                "name": "e2e-org/e2e-repo",
+                "pluginName": "github",
+                "projectName": "e2e-*",
+                "proxy": "",
+                "repoId": "<masked>",
+                "url": "https://git:************************@github.com/e2e-org/e2e-repo.git"
+              },
+              "plugin": "gitextractor",
+              "subtasks": null
+            },
+            {
+              "options": {
+                "connectionId": "<masked>",
+                "fullName": "e2e-org/e2e-repo",
+                "githubId": "<masked>",
+                "name": "e2e-org/e2e-repo",
+                "projectName": "e2e-*"
+              },
+              "plugin": "github_graphql",
+              "subtasks": [
+                "Collect Milestones",
+                "Extract Milestones",
+                "Collect Issues",
+                "Extract Issues",
+                "Collect Pull Requests",
+                "Extract Pull Requests",
+                "Collect Workflow Runs",
+                "Extract Workflow Runs",
+                "Collect Job Runs",
+                "Extract Jobs",
+                "Collect Comments",
+                "Extract Comments",
+                "Collect Events",
+                "Extract Events",
+                "Collect PR Review Comments",
+                "Extract PR Review Comments",
+                "Collect Users",
+                "Extract Users",
+                "Convert Workflow Runs",
+                "Convert Jobs",
+                "Enrich PR Issues",
+                "Convert Repos",
+                "Convert Issues",
+                "Convert Issue Labels",
+                "Convert PR Commits",
+                "Convert Pull Requests",
+                "Convert PR Reviews",
+                "Convert PR Labels",
+                "Convert PR Issues",
+                "Convert Issue Assignees",
+                "Convert Issue Comments",
+                "Convert PR Comments",
+                "Convert Reviews",
+                "Convert Milestones",
+                "Convert Users",
+                "Collect Deployments",
+                "Extract Deployments",
+                "Convert Deployments",
+                "Collect Releases",
+                "Extract Releases",
+                "Convert Releases"
+              ]
+            }
+          ],
+          [
+            {
+              "options": {
+                "projectName": "e2e-*"
+              },
+              "plugin": "dora",
+              "subtasks": ["generateDeployments", "generateDeploymentCommits", "enrichPrevSuccessDeploymentCommits"]
+            },
+            {
+              "options": {
+                "projectName": "e2e-*",
+                "scopeIds": null
+              },
+              "plugin": "issue_trace",
+              "subtasks": ["ConvertIssueStatusHistory", "ConvertIssueAssigneeHistory"]
+            }
+          ],
+          [
+            {
+              "options": {
+                "projectName": "e2e-*"
+              },
+              "plugin": "refdiff",
+              "subtasks": ["calculateDeploymentCommitsDiff"]
+            }
+          ],
+          [
+            {
+              "options": {
+                "projectName": "e2e-*"
+              },
+              "plugin": "dora",
+              "subtasks": ["calculateChangeLeadTime", "ConvertIssuesToIncidents", "ConnectIncidentToDeployment"]
+            }
+          ]
+        ],
+        "priority": 0,
+        "projectName": "e2e-*",
+        "skipCollectors": false,
+        "skipOnFail": true,
+        "timeAfter": "<masked>",
+        "updatedAt": "<masked>"
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/plugins/webhook/connections/:id",
+      "body": null
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/blueprints/:id",
+      "body": {
+        "afterPlan": null,
+        "beforePlan": null,
+        "connections": [
+          {
+            "connectionId": "<masked>",
+            "pluginName": "github",
+            "scopes": [
+              {
+                "scopeId": "<masked>"
+              }
+            ]
+          }
+        ],
+        "createdAt": "<masked>",
+        "cronConfig": "15 3 * * *",
+        "enable": true,
+        "fullSync": false,
+        "id": "<masked>",
+        "isManual": false,
+        "labels": [],
+        "mode": "NORMAL",
+        "name": "e2e-*-Blueprint",
+        "plan": [
+          [
+            {
+              "options": {
+                "projectMappings": [
+                  {
+                    "projectName": "e2e-*",
+                    "scopes": [
+                      {
+                        "rowId": "<masked>",
+                        "table": "repos"
+                      },
+                      {
+                        "rowId": "<masked>",
+                        "table": "cicd_scopes"
+                      },
+                      {
+                        "rowId": "<masked>",
+                        "table": "boards"
+                      },
+                      {
+                        "rowId": "<masked>",
+                        "table": "cicd_scopes"
+                      },
+                      {
+                        "rowId": "<masked>",
+                        "table": "boards"
+                      },
+                      {
+                        "rowId": "<masked>",
+                        "table": "repos"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "plugin": "org",
+              "subtasks": ["setProjectMapping"]
+            }
+          ],
+          [
+            {
+              "options": {
+                "connectionId": "<masked>",
+                "excludeFileExtensions": null,
+                "fullName": "e2e-org/e2e-repo",
+                "name": "e2e-org/e2e-repo",
+                "pluginName": "github",
+                "projectName": "e2e-*",
+                "proxy": "",
+                "repoId": "<masked>",
+                "url": "https://git:************************@github.com/e2e-org/e2e-repo.git"
+              },
+              "plugin": "gitextractor",
+              "subtasks": null
+            },
+            {
+              "options": {
+                "connectionId": "<masked>",
+                "fullName": "e2e-org/e2e-repo",
+                "githubId": "<masked>",
+                "name": "e2e-org/e2e-repo",
+                "projectName": "e2e-*"
+              },
+              "plugin": "github_graphql",
+              "subtasks": [
+                "Collect Milestones",
+                "Extract Milestones",
+                "Collect Issues",
+                "Extract Issues",
+                "Collect Pull Requests",
+                "Extract Pull Requests",
+                "Collect Workflow Runs",
+                "Extract Workflow Runs",
+                "Collect Job Runs",
+                "Extract Jobs",
+                "Collect Comments",
+                "Extract Comments",
+                "Collect Events",
+                "Extract Events",
+                "Collect PR Review Comments",
+                "Extract PR Review Comments",
+                "Collect Users",
+                "Extract Users",
+                "Convert Workflow Runs",
+                "Convert Jobs",
+                "Enrich PR Issues",
+                "Convert Repos",
+                "Convert Issues",
+                "Convert Issue Labels",
+                "Convert PR Commits",
+                "Convert Pull Requests",
+                "Convert PR Reviews",
+                "Convert PR Labels",
+                "Convert PR Issues",
+                "Convert Issue Assignees",
+                "Convert Issue Comments",
+                "Convert PR Comments",
+                "Convert Reviews",
+                "Convert Milestones",
+                "Convert Users",
+                "Collect Deployments",
+                "Extract Deployments",
+                "Convert Deployments",
+                "Collect Releases",
+                "Extract Releases",
+                "Convert Releases"
+              ]
+            }
+          ],
+          [
+            {
+              "options": {
+                "projectName": "e2e-*"
+              },
+              "plugin": "dora",
+              "subtasks": ["generateDeployments", "generateDeploymentCommits", "enrichPrevSuccessDeploymentCommits"]
+            },
+            {
+              "options": {
+                "projectName": "e2e-*",
+                "scopeIds": null
+              },
+              "plugin": "issue_trace",
+              "subtasks": ["ConvertIssueStatusHistory", "ConvertIssueAssigneeHistory"]
+            }
+          ],
+          [
+            {
+              "options": {
+                "projectName": "e2e-*"
+              },
+              "plugin": "refdiff",
+              "subtasks": ["calculateDeploymentCommitsDiff"]
+            }
+          ],
+          [
+            {
+              "options": {
+                "projectName": "e2e-*"
+              },
+              "plugin": "dora",
+              "subtasks": ["calculateChangeLeadTime", "ConvertIssuesToIncidents", "ConnectIncidentToDeployment"]
+            }
+          ]
+        ],
+        "priority": 0,
+        "projectName": "e2e-*",
+        "skipCollectors": false,
+        "skipOnFail": true,
+        "timeAfter": "<masked>",
+        "updatedAt": "<masked>"
+      }
+    }
+  ]
+}

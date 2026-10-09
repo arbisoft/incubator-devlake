@@ -16,8 +16,8 @@
  *
  */
 
-import { useState } from 'react';
 import { Button, Input, Select, Table, Tag, Tooltip } from 'antd';
+import { useState } from 'react';
 
 // UnionRow is one line of the union-by-name mapping table. `presentIn` holds
 // the labels of the attached projects whose bundle contains the value;

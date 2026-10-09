@@ -16,8 +16,8 @@
  *
  */
 
-import { Link } from 'react-router-dom';
 import { RightOutlined } from '@ant-design/icons';
+import { Link } from 'react-router-dom';
 
 import * as S from './styled';
 

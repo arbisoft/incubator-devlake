@@ -18,26 +18,4 @@
 
 import styled from 'styled-components';
 
-export const Wrapper = styled.div`
-  & > .action {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
-  }
-`;
-
 export const DialogWrapper = styled.div``;
-
-export const Label = styled.label`
-  font-size: 16px;
-  font-weight: 600;
-`;
-
-export const LabelInfo = styled.i`
-  color: ${({ theme }) => theme.colors.secondary};
-`;
-
-export const LabelDescription = styled.p`
-  margin: 0;
-`;

@@ -19,8 +19,8 @@
 import axios, { HttpStatusCode } from 'axios';
 
 import { type OtelConnectionResponse, OTEL_CONNECTION_STATUS } from '../../api/otel/types';
-
 import { formatPlural } from '../../utils/text';
+
 import { OTEL_ATTENTION_CHANGED_EVENT, OTEL_CONNECTION_DISPLAY_STATUS, OTEL_ERROR } from './constants';
 
 const SAFE_LIFECYCLE_MESSAGE_STATUSES: readonly number[] = [HttpStatusCode.BadRequest];
@@ -53,9 +53,9 @@ export const getAttentionState = (connections: AttentionTarget[]): OtelAttention
     { connectionsNeedingAttention: 0, restartRequired: 0, recoveryRequired: 0 },
   );
 
-export const formatConnectionCount = (count: number) => formatPlural(count, 'connection');
+const formatConnectionCount = (count: number) => formatPlural(count, 'connection');
 
-export const withVerb = (count: number, singular: string, plural: string) =>
+const withVerb = (count: number, singular: string, plural: string) =>
   `${formatConnectionCount(count)} ${count === 1 ? singular : plural}`;
 
 export const isSameAttentionState = (left?: OtelAttentionState, right?: OtelAttentionState) =>
