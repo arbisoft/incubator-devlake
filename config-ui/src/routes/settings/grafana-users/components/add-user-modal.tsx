@@ -97,10 +97,18 @@ export const AddUserModal = ({ open, onClose, onChanged, onPassword }: AddUserMo
 
   const handlePick = (option?: DevlakeUserOption) => {
     setPicked(option && { value: option.value, label: option.label });
-    if (!option) return;
+    if (!option) {
+      reset();
+      return;
+    }
     setField('email', option.email);
     setField('name', option.name);
     setField('password', generatePassword());
+  };
+
+  const handleIdentityChange = (field: 'email' | 'name', value: string) => {
+    setPicked(undefined);
+    setField(field, value);
   };
 
   const handleSubmit = async () => {
@@ -145,7 +153,7 @@ export const AddUserModal = ({ open, onClose, onChanged, onPassword }: AddUserMo
           error={values.email.length > 0 && !isValidEmail(values.email) ? copy.invalidEmail : undefined}
           required
           disabled={retrying}
-          onChange={(value) => setField('email', value)}
+          onChange={(value) => handleIdentityChange('email', value)}
         />
         <TextField
           label={copy.name.label}
@@ -153,7 +161,7 @@ export const AddUserModal = ({ open, onClose, onChanged, onPassword }: AddUserMo
           value={values.name}
           required
           disabled={retrying}
-          onChange={(value) => setField('name', value)}
+          onChange={(value) => handleIdentityChange('name', value)}
         />
         <PasswordField value={values.password} disabled={retrying} onChange={(value) => setField('password', value)} />
         <FormField label={copy.role.label} required>

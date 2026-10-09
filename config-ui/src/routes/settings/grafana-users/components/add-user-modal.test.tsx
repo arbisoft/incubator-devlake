@@ -34,6 +34,7 @@ import {
 } from './__tests__/add-user-modal-helpers';
 
 import './__tests__/add-user-modal-basic-cases';
+import './__tests__/add-user-modal-picker-cases';
 import './__tests__/add-user-modal-retry-cases';
 
 describe('AddUserModal initial form', () => {
