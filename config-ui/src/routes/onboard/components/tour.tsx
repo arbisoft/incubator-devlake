@@ -21,35 +21,36 @@ import { Tour } from 'antd';
 import API from '@/api';
 import { useRefreshData } from '@/hooks';
 
+import { COPY } from '../constants';
+
+import { ONBOARD_DONE_STEP, STORE_KEY } from './constants';
+import type { OnboardStore } from './types';
+
 interface Props {
   nameRef: React.RefObject<HTMLAnchorElement | null>;
-  connectionRef: React.RefObject<HTMLUListElement | null>;
+  connectionRef: React.RefObject<HTMLButtonElement | null>;
   configRef: React.RefObject<HTMLAnchorElement | HTMLButtonElement | null>;
 }
 
 export const OnboardTour = ({ nameRef, connectionRef, configRef }: Props) => {
-  const { ready, data } = useRefreshData(() => API.store.get('onboard'), []);
+  const { ready, data } = useRefreshData<OnboardStore | null>(() => API.store.get(STORE_KEY), []);
 
   const steps = [
     {
-      title: 'This is the project you just created.',
-      description: 'Project is the basic management unit',
+      ...COPY.tour.project,
       target: nameRef.current,
     },
     {
-      title: 'A connection is automatically created and associated with the project.',
-      description: 'The full connection list can be found at the Connections menu.',
+      ...COPY.tour.connection,
       target: connectionRef.current,
     },
     {
-      title: 'Click here to configure project',
-      description:
-        'You can adjust the data scope,  time range and sync frequency of the project. You can also add scope config to transform the raw data before writing to the database.',
+      ...COPY.tour.configure,
       target: configRef.current,
     },
   ];
 
-  if (!ready || !data || data.step !== 4 || data.done) {
+  if (!ready || !data || data.step !== ONBOARD_DONE_STEP || data.done) {
     return null;
   }
 

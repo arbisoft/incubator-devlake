@@ -19,7 +19,7 @@
 import type { AxiosRequestConfig } from 'axios';
 import axios from 'axios';
 
-import { DEVLAKE_ENDPOINT } from '@/config';
+import { DEVLAKE_ENDPOINT, PATHS } from '@/config';
 
 const instance = axios.create({
   baseURL: DEVLAKE_ENDPOINT,
@@ -69,7 +69,7 @@ const redirectToLoginIfSessionIsReallyGone = async () => {
     verifyingSession = false;
   }
   const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
-  window.location.replace(`/login?return_url=${returnUrl}`);
+  window.location.replace(`${PATHS.LOGIN()}?return_url=${returnUrl}`);
 };
 
 // A 401 from a plugin connection test is the remote credential failing, not a DevLake session expiry.
@@ -83,7 +83,7 @@ instance.interceptors.response.use(
     const requestUrl = error.config?.url as string | undefined;
 
     if (status === 428) {
-      window.location.replace('/db-migrate');
+      window.location.replace(PATHS.DB_MIGRATE());
     }
 
     if (status === 401 && !isLoginRoute() && !isPluginConnectionTest(requestUrl)) {

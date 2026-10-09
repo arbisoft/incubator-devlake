@@ -18,10 +18,11 @@
 
 import { request } from '@/utils';
 
-import * as apiKey from './api-key';
 import * as access from './access';
+import * as apiKey from './api-key';
 import * as auth from './auth';
 import * as blueprint from './blueprint';
+import * as complianceScorecard from './compliance-scorecard';
 import * as connection from './connection';
 import * as otel from './otel';
 import * as pipeline from './pipeline';
@@ -36,11 +37,12 @@ const migrate = () => request('/proceed-db-migration');
 const ping = () => request('/ping');
 const version = (signal?: AbortSignal): Promise<{ version: string }> => request('/version', { signal });
 
-export const API = {
+const API = {
   access,
   apiKey,
   auth,
   blueprint,
+  complianceScorecard,
   connection,
   otel,
   pipeline,

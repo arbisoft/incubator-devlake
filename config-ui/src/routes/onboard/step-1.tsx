@@ -16,30 +16,29 @@
  *
  */
 
-import { useState, useEffect, useContext } from 'react';
+import { message } from 'antd';
+import { useState, useContext } from 'react';
 import { Link } from 'react-router-dom';
-import { Input, Flex, Button, message } from 'antd';
 
 import API from '@/api';
-import { Block, Markdown } from '@/components';
+import { Block } from '@/components';
 import { PATHS } from '@/config';
 import { ConnectionSelect } from '@/plugins';
 import { operator } from '@/utils';
 
+import { STORE_KEY } from './components/constants';
+import { CONNECTION_OPTIONS, COPY, DEFAULT_GUIDE, GUIDE_STEP, WIZARD_STEP } from './constants';
 import { Context } from './context';
+import { StepActions } from './step-actions';
 import * as S from './styled';
+import { useGuide } from './use-guide';
 
 export const Step1 = () => {
-  const [QA, setQA] = useState('');
   const [operating, setOperating] = useState(false);
 
   const { step, records, done, projectName, plugin, setStep, setProjectName, setPlugin } = useContext(Context);
 
-  useEffect(() => {
-    fetch(`/onboard/step-1/${plugin ? plugin : 'default'}.md`)
-      .then((res) => res.text())
-      .then((text) => setQA(text));
-  }, [plugin]);
+  const guide = useGuide(GUIDE_STEP.PROJECT, plugin ?? DEFAULT_GUIDE);
 
   const handleSubmit = async () => {
     if (!projectName || !plugin) {
@@ -52,14 +51,14 @@ export const Step1 = () => {
     });
 
     if (res.exist) {
-      message.error(`Project name "${projectName}" already exists, please try another name.`);
+      message.error(COPY.project.nameTaken(projectName));
       return;
     }
 
-    const [success] = await operator(() => API.store.set('onboard', { step: 2, records, done, projectName, plugin }), {
-      setOperating,
-      hideToast: true,
-    });
+    const [success] = await operator(
+      () => API.store.set(STORE_KEY, { step: WIZARD_STEP.CONNECTION, records, done, projectName, plugin }),
+      { setOperating, hideToast: true },
+    );
 
     if (success) {
       setStep(step + 1);
@@ -69,68 +68,39 @@ export const Step1 = () => {
   return (
     <>
       <S.StepContent>
-        <div className="content">
-          <Block
-            title="Project Name"
-            description="Give your project a unique name with letters, numbers, -, _ or /"
-            required
-          >
-            <Input
-              style={{ width: 386 }}
-              placeholder="Your Project Name"
+        <S.Form>
+          <Block title={COPY.project.name} description={COPY.project.nameDescription} required>
+            <S.NameInput
+              placeholder={COPY.project.namePlaceholder}
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
             />
           </Block>
           <Block
-            title="Data Connection"
+            title={COPY.project.connection}
             description={
-              <p>
-                For self-managed GitLab/GitHub/Bitbucket, please skip the onboarding and configure via{' '}
-                <Link to={PATHS.CONNECTIONS()}>Data Connections</Link>.
-              </p>
+              <>
+                {COPY.project.connectionDescription} <Link to={PATHS.CONNECTIONS()}>{COPY.dataConnections}</Link>.
+              </>
             }
             required
           >
             <ConnectionSelect
-              placeholder="Select a Data Connection"
-              options={[
-                {
-                  plugin: 'github',
-                  value: 'github',
-                  label: 'GitHub',
-                },
-                {
-                  plugin: 'gitlab',
-                  value: 'gitlab',
-                  label: 'GitLab',
-                },
-                {
-                  plugin: 'bitbucket',
-                  value: 'bitbucket',
-                  label: 'Bitbucket',
-                },
-                {
-                  plugin: 'azuredevops',
-                  value: 'azuredevops',
-                  label: 'Azure DevOps',
-                },
-              ]}
+              placeholder={COPY.project.connectionPlaceholder}
+              options={CONNECTION_OPTIONS}
               value={plugin}
               onChange={setPlugin}
             />
           </Block>
-        </div>
-        <Markdown className="qa">{QA}</Markdown>
+        </S.Form>
+        <S.Guide>{guide}</S.Guide>
       </S.StepContent>
-      <Flex style={{ marginTop: 64 }} justify="space-between">
-        <Button ghost type="primary" loading={operating} onClick={() => setStep(step - 1)}>
-          Previous Step
-        </Button>
-        <Button type="primary" loading={operating} disabled={!projectName || !plugin} onClick={handleSubmit}>
-          Next Step
-        </Button>
-      </Flex>
+      <StepActions
+        loading={operating}
+        nextDisabled={!projectName || !plugin}
+        onPrevious={() => setStep(step - 1)}
+        onNext={handleSubmit}
+      />
     </>
   );
 };

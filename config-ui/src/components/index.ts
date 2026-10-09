@@ -18,12 +18,7 @@
 
 export * from './action';
 export * from './block';
-export * from './inspector';
 export * from './loading';
-export * from './logo';
 export * from './markdown';
 export * from './message';
-export * from './no-data';
-export * from './page-header';
-export * from './tip-layout';
 export * from './tooltip';

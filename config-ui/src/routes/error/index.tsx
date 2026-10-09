@@ -16,42 +16,40 @@
  *
  */
 
+import { Button } from 'antd';
 import { useRouteError, useNavigate } from 'react-router-dom';
-import { CloseCircleOutlined } from '@ant-design/icons';
-import { Card, Space, Flex, Button } from 'antd';
 
-import { TipLayout } from '@/components';
-import { PATHS } from '@/config';
+import { LINKS, PATHS } from '@/config';
+import { EMPTY_ILLUSTRATION, EMPTY_STATE_SIZE, EmptyState, StandalonePage } from '@/ui';
+import { useDocumentTitle } from '@/ui/hooks';
 
-export const Error = () => {
-  const error = useRouteError() as Error;
+import { COPY } from './constants';
+
+export const ErrorPage = () => {
+  useDocumentTitle(COPY.title);
+
+  const error = useRouteError();
 
   const navigate = useNavigate();
-  const handleResetError = () => navigate(PATHS.ROOT());
 
   return (
-    <TipLayout>
-      <Card>
-        <Space>
-          <CloseCircleOutlined style={{ fontSize: 20, color: 'var(--devlake-color-error)' }} />
-          <h2 style={{ color: 'var(--devlake-color-error)' }}>{error.toString() || 'Unknown Error'}</h2>
-        </Space>
-        <p>
-          Please try again, if the problem persists include the above error message when filing a bug report on{' '}
-          <strong>GitHub</strong>. You can also message us on <strong>Slack</strong> to engage with community members
-          for solutions to common issues.
-        </p>
-        <Flex justify="center">
-          <Space>
-            <Button type="primary" onClick={handleResetError}>
-              Continue
+    <StandalonePage>
+      <EmptyState
+        illustration={EMPTY_ILLUSTRATION.ERROR}
+        title={String(error ?? '') || COPY.unknown}
+        description={COPY.description}
+        size={EMPTY_STATE_SIZE.PAGE}
+        action={
+          <>
+            <Button type="primary" onClick={() => navigate(PATHS.ROOT())}>
+              {COPY.continue}
             </Button>
-            <Button onClick={() => window.open('https://github.com/apache/devlake', '_blank', 'noopener,noreferrer')}>
-              Visit GitHub
+            <Button href={LINKS.GITHUB} target="_blank" rel="noopener noreferrer">
+              {COPY.github}
             </Button>
-          </Space>
-        </Flex>
-      </Card>
-    </TipLayout>
+          </>
+        }
+      />
+    </StandalonePage>
   );
 };

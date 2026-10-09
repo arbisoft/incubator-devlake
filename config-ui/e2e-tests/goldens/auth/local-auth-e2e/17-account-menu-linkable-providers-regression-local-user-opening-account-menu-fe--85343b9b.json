@@ -1,0 +1,24 @@
+{
+  "titlePath": [
+    "Local Password Authentication - Phases 1-4 Full E2E Suite",
+    "17. Account Menu & Linkable Providers Regression: Local user opening account menu fetches linkable providers (200 OK) without 401 logout redirect"
+  ],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/access/local-users",
+      "body": {
+        "displayName": "",
+        "loginName": "e2e_*",
+        "role": "member"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/local/change-password",
+      "body": {
+        "password": "<masked>"
+      }
+    }
+  ]
+}

@@ -17,7 +17,6 @@
  */
 
 export * from './api-keys';
-export * from './access';
 export * from './blueprint';
 export * from './connection';
 
@@ -31,3 +30,5 @@ export * from './onboard';
 export * from './otel';
 export * from './pipeline';
 export * from './project';
+export * from './redirect';
+export * from './settings';

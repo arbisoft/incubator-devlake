@@ -43,6 +43,7 @@ const (
 	LargePageSize   = 50
 
 	invalidPageSizeMessage = "pageSize must be 10, 25, or 50"
+	invalidStatusMessage   = "status must be active or disabled"
 
 	ErrCodeDuplicateUser            = "DUPLICATE_USER"
 	ErrCodeDuplicateDomain          = "DUPLICATE_DOMAIN"
@@ -333,6 +334,25 @@ func (query PageQuery) Normalize() (PageQuery, bool) {
 }
 
 func (query PageQuery) Offset() int { return (query.Page - 1) * query.PageSize }
+
+// UserListQuery is PageQuery plus an optional case-insensitive email or display name filter and an optional status filter.
+type UserListQuery struct {
+	PageQuery
+	Keyword string `form:"keyword"`
+	Status  string `form:"status"`
+}
+
+func (query UserListQuery) Normalize() (UserListQuery, errors.Error) {
+	page, valid := query.PageQuery.Normalize()
+	if !valid {
+		return UserListQuery{}, errors.BadInput.New(invalidPageSizeMessage)
+	}
+	if query.Status != "" && !validStatus(query.Status) {
+		return UserListQuery{}, errors.BadInput.New(invalidStatusMessage)
+	}
+	query.PageQuery = page
+	return query, nil
+}
 
 type PaginatedUsers struct {
 	Users    []AccessUser `json:"users"`

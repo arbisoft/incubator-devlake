@@ -16,8 +16,8 @@
  *
  */
 
-import { ChangeEvent, useEffect, useMemo, useRef } from 'react';
 import { Input, Radio } from 'antd';
+import { ChangeEvent, useEffect, useMemo, useRef } from 'react';
 
 import { Block } from '@/components';
 
@@ -169,7 +169,6 @@ export const AwsCredentials = ({ type, initialValues, values, setValues, setErro
             required
           >
             <Input
-              style={{ width: 386 }}
               placeholder="AKIAIOSFODNN7EXAMPLE"
               value={accessKeyId}
               onChange={handleAccessKeyChange}
@@ -186,7 +185,6 @@ export const AwsCredentials = ({ type, initialValues, values, setValues, setErro
             required
           >
             <Input.Password
-              style={{ width: 386 }}
               placeholder={isUpdate ? '********' : 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'}
               value={secretAccessKey}
               onChange={handleSecretKeyChange}
@@ -222,7 +220,6 @@ export const AwsCredentials = ({ type, initialValues, values, setValues, setErro
 
       <Block title="AWS Region" description="Region of the S3 bucket, e.g. us-east-1" required>
         <Input
-          style={{ width: 386 }}
           placeholder="us-east-1"
           value={region}
           onChange={handleRegionChange}

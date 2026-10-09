@@ -1,0 +1,13 @@
+{
+  "titlePath": [
+    "Blueprint detail views and pipeline panel",
+    "Delete asks for confirmation, then lands on the list without the blueprint"
+  ],
+  "writes": [
+    {
+      "method": "DELETE",
+      "path": "/api/blueprints/:id",
+      "body": null
+    }
+  ]
+}

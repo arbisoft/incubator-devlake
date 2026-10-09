@@ -237,6 +237,7 @@ type ProviderInfo struct {
 	Name        string `json:"name"`
 	DisplayName string `json:"displayName"`
 	LoginURL    string `json:"loginUrl"`
+	IssuerHost  string `json:"issuerHost,omitempty"`
 }
 
 type Methods struct {
@@ -254,6 +255,15 @@ type APIKey struct {
 type LocalPasswordMethod struct {
 	Enabled  bool   `json:"enabled"`
 	LoginURL string `json:"loginUrl"`
+}
+
+// issuerHost returns only the host of an issuer URL, or "" when it cannot be parsed.
+func issuerHost(issuerURL string) string {
+	u, err := url.Parse(strings.TrimSpace(issuerURL))
+	if err != nil {
+		return ""
+	}
+	return u.Host
 }
 
 func GetMethods(c *gin.Context) { defaultService.GetMethods(c) }
@@ -275,6 +285,7 @@ func (s *Service) GetMethods(c *gin.Context) {
 				Name:        name,
 				DisplayName: pc.DisplayName,
 				LoginURL:    PathLogin + "?provider=" + url.QueryEscape(name),
+				IssuerHost:  issuerHost(pc.IssuerURL),
 			})
 		}
 	}

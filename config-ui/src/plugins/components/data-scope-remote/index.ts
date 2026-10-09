@@ -17,3 +17,5 @@
  */
 
 export * from './data-scope-remote';
+export * from './data-scope-remote-modal';
+export * from './scope-panes';

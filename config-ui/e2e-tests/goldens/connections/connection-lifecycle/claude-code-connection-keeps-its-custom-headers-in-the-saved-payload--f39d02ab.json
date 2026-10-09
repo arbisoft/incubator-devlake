@@ -1,0 +1,27 @@
+{
+  "titlePath": ["claude_code connection keeps its custom headers in the saved payload"],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/plugins/claude_code/connections",
+      "body": {
+        "customHeaders": [
+          {
+            "key": "Ocp-Apim-Subscription-Key",
+            "value": "e2e-header-secret-aaaa1111"
+          },
+          {
+            "key": "X-E2E-Trace",
+            "value": "e2e-header-secret-bbbb2222"
+          }
+        ],
+        "endpoint": "https://api.anthropic.com",
+        "name": "e2e-*",
+        "organization": "org_e2e_headers",
+        "proxy": "",
+        "rateLimitPerHour": 1000,
+        "token": "<masked>"
+      }
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+// App copy that page objects reuse; this depth keeps the relative path short.
+export { COPY as UI_KIT_COPY } from '../../src/routes/ui-kit/constants';
+export { COPY as LAYOUT_COPY, THEME_LABEL } from '../../src/routes/layout/constants';
+export { COPY as SIDEBAR_COPY } from '../../src/ui/sidebar-nav/constants';
+export { COPY as ACCOUNT_BLOCK_COPY } from '../../src/ui/account-block/constants';
+export { COMMON_COPY } from '../../src/ui/constants';
+export { COPY as PAGE_HEADER_COPY } from '../../src/ui/page-header/constants';
+export { BLUEPRINT_VIEW, PROJECT_TAB } from '../../src/config/route-keys';
+export { COPY as CONNECTIONS_COPY, CATALOG_FILTER, DETAIL_COPY } from '../../src/routes/connection/constants';
+export { COPY as SCOPE_TABLE_COPY } from '../../src/routes/connection/scope-table/constants';
+export { COPY as DATA_SCOPE_REMOTE_COPY } from '../../src/plugins/components/data-scope-remote/constants';
+export { COPY as SCOPE_CONFIG_COPY } from '../../src/plugins/components/scope-config/constants';
+export { COPY as SCOPE_CONFIG_FORM_COPY } from '../../src/plugins/components/scope-config-form/constants';
+export { COPY as SCOPE_CONFIG_SELECT_COPY } from '../../src/plugins/components/scope-config-select/constants';
+export { COPY as WEBHOOK_COPY } from '../../src/plugins/register/webhook/constants';
+export { COPY as CONNECTION_LIST_COPY } from '../../src/plugins/components/connection-list/constants';
+export { COPY as CONNECTION_FORM_COPY } from '../../src/plugins/components/connection-form/constants';
+export { COPY as CONNECTION_HEALTH_COPY } from '../../src/ui/connection-health/constants';
+export { COPY as CONNECTION_MODAL_COPY } from '../../src/plugins/components/connection-modal/constants';
+export { COPY as INTEGRATION_CARD_COPY } from '../../src/ui/integration-card/constants';
+export { HEALTH_STORAGE_KEY, HEALTH_TTL_MS } from '../../src/features/connections/constants';
+export { INTEGRATION_CATEGORY } from '../../src/plugins/catalog';
+export { COPY as API_KEYS_COPY } from '../../src/routes/api-keys/constants';
+export { COPY as PROJECT_HOME_COPY } from '../../src/routes/project/home/constants';
+export {
+  COPY as BLUEPRINT_HOME_COPY,
+  STATUS_FILTER as BLUEPRINT_STATUS_FILTER,
+} from '../../src/routes/blueprint/home/constants';
+export { COPY as PIPELINE_COPY, LOGS_FILE_NAME as PIPELINE_LOGS_FILE_NAME } from '../../src/routes/pipeline/constants';
+export {
+  COPY as BLUEPRINT_DETAIL_COPY,
+  CONFIRM as BLUEPRINT_CONFIRM,
+  CONFIRM_KIND as BLUEPRINT_CONFIRM_KIND,
+} from '../../src/routes/blueprint/detail/constants';
+export { COPY as BLUEPRINT_CONFIGURATION_COPY } from '../../src/routes/blueprint/detail/configuration/constants';
+export { COPY as SYNC_POLICY_COPY, CUSTOM_CRON_FIELDS } from '../../src/routes/blueprint/sync-policy/constants';
+export { COPY as BLUEPRINT_CONNECTION_COPY } from '../../src/routes/blueprint/connection-detail/constants';
+export { COPY as DATA_SCOPE_SELECT_COPY } from '../../src/plugins/components/data-scope-select/constants';
+export { COPY as READINESS_COPY, READINESS_SIGNAL } from '../../src/routes/project/readiness/constants';
+export { COPY as PROJECT_DETAIL_COPY } from '../../src/routes/project/detail/constants';
+export { COPY as SETTINGS_COPY } from '../../src/routes/settings/constants';
+export { COPY as AUTH_COPY } from '../../src/routes/settings/authentication/constants';
+export { COPY as ACTIVITY_COPY } from '../../src/routes/settings/activity/constants';
+export { COPY as SORT_SELECT_COPY } from '../../src/ui/sort-select/constants';
+export { COPY as DB_MIGRATE_COPY } from '../../src/routes/db-migrate/constants';
+export { COPY as NOT_FOUND_COPY } from '../../src/routes/not-found/constants';
+export { COPY as ONBOARD_COPY } from '../../src/routes/onboard/constants';
+export { COPY as LOGIN_COPY, LOGIN_PARAMS, PROVIDER_ID } from '../../src/routes/login/constants';
+export { COPY as CHANGE_PASSWORD_COPY } from '../../src/routes/change-password/constants';
+export { COPY as OTEL_COPY } from '../../src/routes/otel/constants';
+export { COPY as OTEL_MODAL_COPY } from '../../src/routes/otel/components/constants';
+export { OTEL_INGESTION_STATE, OTEL_STATUS } from '../../src/api/otel/constants';

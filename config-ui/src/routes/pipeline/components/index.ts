@@ -16,7 +16,6 @@
  *
  */
 
-export * from './status';
+export * from './status-badge';
 export * from './table';
-export * from './info';
-export * from './tasks';
+export * from './panel';

@@ -16,8 +16,8 @@
  *
  */
 
-import { useEffect } from 'react';
 import { Input } from 'antd';
+import { useEffect } from 'react';
 
 import { Block } from '@/components';
 
@@ -58,12 +58,7 @@ export const ConnectionSecretKey = ({
 
   return (
     <Block title={label ?? 'SecretKey'} description={subLabel ? subLabel : null} required>
-      <Input.Password
-        style={{ width: 386 }}
-        placeholder={placeholder ?? 'Your SecretKey'}
-        value={value}
-        onChange={handleChange}
-      />
+      <Input.Password placeholder={placeholder ?? 'Your SecretKey'} value={value} onChange={handleChange} />
     </Block>
   );
 };
