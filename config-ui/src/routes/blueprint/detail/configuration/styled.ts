@@ -37,7 +37,7 @@ export const Grid = styled.div`
   display: grid;
   grid-template-columns: repeat(
     auto-fill,
-    minmax(min(100%, ${({ theme }) => theme.layout.catalogCardMinWidth}px), 1fr)
+    minmax(min(100%, ${({ theme }) => theme.layout.connectionCardMinWidth}px), 1fr)
   );
   gap: ${({ theme }) => theme.space.md}px;
 `;
