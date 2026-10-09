@@ -82,6 +82,7 @@ type grafanaOrgUser struct {
 	Role       string   `json:"role"`
 	IsDisabled bool     `json:"isDisabled"`
 	LastSeenAt string   `json:"lastSeenAt"`
+	Created    string   `json:"created"`
 	AuthLabels []string `json:"authLabels"`
 }
 

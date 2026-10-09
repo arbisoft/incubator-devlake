@@ -838,3 +838,45 @@ func TestExportedMethodsRefuseNonAdminsWithoutCallingGrafana(t *testing.T) {
 		}
 	}
 }
+
+func TestListUsersOmitsPlaceholderLastSeenAt(t *testing.T) {
+	f := newFakeGrafana(t)
+	f.orgUsers = []grafanaOrgUser{
+		{UserID: 2, Login: "never@example.com", Email: "never@example.com", Role: "Viewer", Created: "2026-10-09T12:00:00Z", LastSeenAt: "2016-10-09T12:01:08Z"},
+		{UserID: 3, Login: "seen@example.com", Email: "seen@example.com", Role: "Viewer", Created: "2026-10-01T12:00:00Z", LastSeenAt: "2026-10-08T09:00:00Z"},
+		{UserID: 4, Login: "junk@example.com", Email: "junk@example.com", Role: "Viewer", LastSeenAt: "not-a-time"},
+	}
+	f.globalUsers = []grafanaGlobalUser{
+		{ID: 2, Login: "never@example.com", Email: "never@example.com"},
+		{ID: 3, Login: "seen@example.com", Email: "seen@example.com"},
+		{ID: 4, Login: "junk@example.com", Email: "junk@example.com"},
+	}
+	service := f.service(t, nil, seedMappings())
+
+	result, err := service.ListUsers(t.Context(), customerAdmin(), ListQuery{Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, u := range result.Users {
+		raw, err := json.Marshal(u)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var fields map[string]any
+		if err := json.Unmarshal(raw, &fields); err != nil {
+			t.Fatal(err)
+		}
+		if v, ok := fields["lastSeenAt"]; ok {
+			got[u.Email], _ = v.(string)
+		} else {
+			got[u.Email] = "<omitted>"
+		}
+	}
+	want := map[string]string{"never@example.com": "<omitted>", "seen@example.com": "2026-10-08T09:00:00Z", "junk@example.com": "<omitted>"}
+	for email, w := range want {
+		if got[email] != w {
+			t.Errorf("%s lastSeenAt = %q, want %q", email, got[email], w)
+		}
+	}
+}

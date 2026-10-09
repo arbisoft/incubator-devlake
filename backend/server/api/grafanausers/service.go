@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	basecontext "github.com/apache/incubator-devlake/core/context"
 	"github.com/apache/incubator-devlake/core/errors"
@@ -230,7 +231,7 @@ func (s *Service) ListUsers(ctx context.Context, admin *access.Principal, query 
 			Role:       user.Role,
 			Disabled:   user.IsDisabled,
 			SSO:        len(user.AuthLabels) > 0,
-			LastSeenAt: user.LastSeenAt,
+			LastSeenAt: seenAt(user),
 			Protected:  admins[user.Login],
 			Projects:   projectsOrEmpty(projectsByLogin[user.Login]),
 		})
@@ -343,4 +344,16 @@ func projectsOrEmpty(projects []string) []string {
 	sorted := append([]string(nil), projects...)
 	sort.Strings(sorted)
 	return sorted
+}
+
+// seenAt drops Grafana's placeholder lastSeenAt for accounts that never signed in.
+func seenAt(user grafanaOrgUser) string {
+	seen, err := time.Parse(time.RFC3339, user.LastSeenAt)
+	if err != nil {
+		return ""
+	}
+	if created, err := time.Parse(time.RFC3339, user.Created); err == nil && seen.Before(created) {
+		return ""
+	}
+	return user.LastSeenAt
 }
