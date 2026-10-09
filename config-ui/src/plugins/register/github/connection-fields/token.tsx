@@ -16,9 +16,9 @@
  *
  */
 
-import { useEffect, useState } from 'react';
 import { CloseOutlined, PlusOutlined, CheckCircleFilled, WarningFilled, CloseCircleFilled } from '@ant-design/icons';
 import { Input, Button } from 'antd';
+import { useEffect, useState } from 'react';
 
 import API from '@/api';
 import { Block, ExternalLink, Loading } from '@/components';
@@ -179,7 +179,6 @@ export const Token = ({
           <S.Input key={i}>
             <div className="input">
               <Input.Password
-                style={{ width: 386 }}
                 placeholder="Token"
                 value={value}
                 onChange={(e) => handleChangeToken(i, e.target.value)}

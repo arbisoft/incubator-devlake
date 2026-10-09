@@ -23,9 +23,9 @@ import * as tapd from './tapd';
 import * as webhook from './webhook';
 import * as youtrack from './youtrack';
 
-export const list = (): Promise<[{ plugin: string }]> => request('/plugins');
+const list = (): Promise<[{ plugin: string }]> => request('/plugins');
 
-export const plugin = {
+const plugin = {
   list,
   jira,
   tapd,

@@ -19,12 +19,16 @@
 import { IPipeline } from '@/types';
 import { request } from '@/utils';
 
+import type { SortParams } from '../types';
+
 import { SubTasksRes } from './types';
 
-export const list = (params: Pagination): Promise<{ count: number; pipelines: IPipeline[] }> =>
-  request('/pipelines', { data: params });
+export type ListParams = Pagination & SortParams<'id' | 'beganAt' | 'finishedAt'> & { blueprint_id?: ID };
 
-export const get = (id: ID) => request(`/pipelines/${id}`);
+export const list = (params: ListParams, signal?: AbortSignal): Promise<{ count: number; pipelines: IPipeline[] }> =>
+  request('/pipelines', { data: params, signal });
+
+export const get = (id: ID, signal?: AbortSignal) => request(`/pipelines/${id}`, { signal });
 
 export const remove = (id: ID) =>
   request(`/pipelines/${id}`, {
@@ -38,6 +42,6 @@ export const rerun = (id: ID) =>
 
 export const log = (id: ID) => request(`/pipelines/${id}/logging.tar.gz`);
 
-export const tasks = (id: ID) => request(`/pipelines/${id}/tasks`);
+export const tasks = (id: ID, signal?: AbortSignal) => request(`/pipelines/${id}/tasks`, { signal });
 
 export const subTasks = (id: ID): Promise<SubTasksRes> => request(`/pipelines/${id}/subtasks`);

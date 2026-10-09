@@ -16,35 +16,37 @@
  *
  */
 
+import { useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
 
-import { PageHeader } from '@/components';
 import { PATHS } from '@/config';
+import { ListPage, PageHeader, RouteTabs, ROUTE_TABS_VARIANT } from '@/ui';
 
-import { FromEnum } from '../types';
+import { COPY as BLUEPRINT_COPY } from '../constants';
 
 import { BlueprintDetail } from './blueprint-detail';
-
-const brandName = import.meta.env.DEVLAKE_BRAND_NAME ?? 'DevLake';
+import { BLUEPRINT_CONTEXT } from './constants';
+import { useBlueprintView } from './hooks';
+import { getAdvancedBlueprintViews } from './utils';
 
 export const BlueprintDetailPage = () => {
-  const { id } = useParams() as { id: string };
+  const { id = '' } = useParams();
+
+  const views = useMemo(() => getAdvancedBlueprintViews(id), [id]);
+  const view = useBlueprintView(views);
 
   return (
-    <PageHeader
-      breadcrumbs={[
-        { name: 'Advanced', path: PATHS.BLUEPRINTS() },
-        { name: 'Blueprints', path: PATHS.BLUEPRINTS() },
-        { name: id, path: PATHS.BLUEPRINT(id) },
-      ]}
-    >
-      <Helmet>
-        <title>
-          {`Blueprints:${id}`} - {brandName}
-        </title>
-      </Helmet>
-      <BlueprintDetail id={id} from={FromEnum.blueprint} />
-    </PageHeader>
+    <ListPage>
+      <PageHeader
+        title={BLUEPRINT_COPY.detailTitle(id)}
+        breadcrumbs={[
+          { label: BLUEPRINT_COPY.breadcrumbAdvanced, path: PATHS.BLUEPRINTS() },
+          { label: BLUEPRINT_COPY.breadcrumbBlueprints, path: PATHS.BLUEPRINTS() },
+          { label: id },
+        ]}
+        switcher={<RouteTabs items={views} variant={ROUTE_TABS_VARIANT.SEGMENTED} />}
+      />
+      <BlueprintDetail blueprintId={id} context={BLUEPRINT_CONTEXT.ADVANCED} view={view} />
+    </ListPage>
   );
 };

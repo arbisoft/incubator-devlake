@@ -16,10 +16,10 @@
  *
  */
 
-import { useState, useEffect } from 'react';
 import { CheckCircleOutlined, CloseCircleOutlined, CaretRightOutlined } from '@ant-design/icons';
-import type { CheckboxChangeEvent } from 'antd/lib/checkbox';
 import { theme, Form, Collapse, Input, Tag, Checkbox } from 'antd';
+import type { CheckboxChangeEvent } from 'antd/lib/checkbox';
+import { useState, useEffect } from 'react';
 
 import { HelpTooltip, ExternalLink } from '@/components';
 import { DOC_URL } from '@/release';

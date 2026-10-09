@@ -16,8 +16,8 @@
  *
  */
 
-import { useState, useContext, useEffect, useMemo } from 'react';
 import { Flex, Button } from 'antd';
+import { useState, useContext, useEffect, useMemo } from 'react';
 
 import API from '@/api';
 import { Markdown } from '@/components';
@@ -125,7 +125,6 @@ export const Step3 = () => {
             connectionId={connectionId}
             selectedScope={scopes}
             onChangeSelectedScope={setScopes}
-            footer={null}
           />
         </div>
         <Markdown className="qa">{QA}</Markdown>

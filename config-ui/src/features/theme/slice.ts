@@ -21,7 +21,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { RootState } from '@/app/store';
 import type { ThemeMode, ResolvedTheme } from '@/theme/tokens';
 
-export const THEME_STORAGE_KEY = 'devlake.theme';
+const THEME_STORAGE_KEY = 'devlake.theme';
 
 const NEXT_MODE: Record<ThemeMode, ThemeMode> = {
   light: 'dark',
@@ -74,9 +74,7 @@ export const themeSlice = createSlice({
   },
 });
 
-export const { setMode, cycleMode } = themeSlice.actions;
-
-export default themeSlice.reducer;
+export const { setMode } = themeSlice.actions;
 
 export const selectThemeMode = (state: RootState): ThemeMode => state.theme.mode;
 

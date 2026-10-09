@@ -16,8 +16,8 @@
  *
  */
 
-import { useEffect } from 'react';
 import { Input } from 'antd';
+import { useEffect } from 'react';
 
 import { Block } from '@/components';
 
@@ -55,12 +55,7 @@ export const ConnectionUsername = ({
 
   return (
     <Block title={label ?? 'Username'} description={subLabel ? subLabel : null} required>
-      <Input
-        style={{ width: 386 }}
-        placeholder={placeholder ?? 'Your Username'}
-        value={value}
-        onChange={handleChange}
-      />
+      <Input placeholder={placeholder ?? 'Your Username'} value={value} onChange={handleChange} />
     </Block>
   );
 };

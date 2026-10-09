@@ -1,0 +1,7 @@
+{
+  "titlePath": [
+    "Projects list search, sort and pagination",
+    "a search with no match shows the empty state and keeps the keyword"
+  ],
+  "writes": []
+}

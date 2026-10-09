@@ -16,41 +16,45 @@
  *
  */
 
-import type { NavigateFunction } from 'react-router-dom';
-import { Button, Tag } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import { Button, type TableColumnsType } from 'antd';
 
-import { type OtelConnectionResponse } from '@/api/otel';
-import { PATHS } from '@/config';
-import { OTEL_CONNECTION_DISPLAY_STATUS } from '@/routes/otel/constants';
+import type { OtelConnectionResponse } from '@/api/otel';
 import { getOtelConnectionStatus } from '@/routes/otel/utils';
+import { STATUS_BADGE_VARIANT, StatusBadge } from '@/ui';
+import { STATUS_TONE } from '@/ui/constants';
 
-export const getClaudeCodeOtelProjectColumns = (navigate: NavigateFunction): ColumnsType<OtelConnectionResponse> => [
+import { COPY, OTEL_COLUMN, OTEL_STATUS_TONE } from './constants';
+
+export const getClaudeCodeOtelProjectColumns = (onManage: () => void): TableColumnsType<OtelConnectionResponse> => [
+  { key: OTEL_COLUMN.TEAM, title: COPY.otel.columns.team, dataIndex: ['connection', 'teamName'] },
   {
-    title: 'Team',
-    dataIndex: ['connection', 'teamName'],
-  },
-  {
-    title: 'Placement',
-    render: (_, record) =>
-      record.projects.length > 1 ? (
-        <Tag color="blue">Shared across {record.projects.length} projects</Tag>
+    key: OTEL_COLUMN.PLACEMENT,
+    title: COPY.otel.columns.placement,
+    render: (_, { projects }) =>
+      projects.length > 1 ? (
+        <StatusBadge
+          tone={STATUS_TONE.INFO}
+          label={COPY.otel.shared(projects.length)}
+          variant={STATUS_BADGE_VARIANT.TEXT}
+        />
       ) : (
-        <Tag>Project only</Tag>
+        <StatusBadge tone={STATUS_TONE.NEUTRAL} label={COPY.otel.projectOnly} variant={STATUS_BADGE_VARIANT.DOT} />
       ),
   },
   {
-    title: 'Status',
+    key: OTEL_COLUMN.STATUS,
+    title: COPY.otel.columns.status,
     render: (_, record) => {
       const status = getOtelConnectionStatus(record);
-      return <Tag color={status === OTEL_CONNECTION_DISPLAY_STATUS.READY ? 'green' : 'default'}>{status}</Tag>;
+      return <StatusBadge tone={OTEL_STATUS_TONE[status]} label={status} variant={STATUS_BADGE_VARIANT.DOT} />;
     },
   },
   {
-    title: '',
-    render: () => (
-      <Button size="small" onClick={() => navigate(PATHS.OTEL())}>
-        Manage
+    key: OTEL_COLUMN.ACTIONS,
+    align: 'right',
+    render: (_, { connection }) => (
+      <Button aria-label={COPY.otel.manageFor(connection.teamName)} onClick={onManage}>
+        {COPY.otel.manage}
       </Button>
     ),
   },

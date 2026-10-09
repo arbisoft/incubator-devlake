@@ -35,10 +35,13 @@ type PaginatedApiKeys struct {
 }
 
 // @Summary Get list of api keys
-// @Description GET /api-keys?page=1&pageSize=10
+// @Description GET /api-keys?page=1&pageSize=10&keyword=search_text&sortBy=createdAt&sortOrder=desc
 // @Tags framework/api-keys
 // @Param page query int false "query"
 // @Param pageSize query int false "query"
+// @Param keyword query string false "case-insensitive match on the key name"
+// @Param sortBy query string false "sort column, defaults to createdAt" Enums(name, expiredAt, createdAt)
+// @Param sortOrder query string false "sort direction, defaults to desc" Enums(asc, desc)
 // @Success 200  {object} PaginatedApiKeys
 // @Failure 400  {string} errcode.Error "Bad Request"
 // @Failure 500  {string} errcode.Error "Internal Error"
@@ -52,6 +55,10 @@ func GetApiKeys(c *gin.Context) {
 	}
 	apiKeys, count, err := services.GetApiKeys(&query)
 	if err != nil {
+		if e, ok := err.(errors.Error); ok && e.GetType() == errors.BadInput {
+			shared.ApiOutputError(c, e)
+			return
+		}
 		shared.ApiOutputAbort(c, errors.Default.Wrap(err, "error getting api keys"))
 		return
 	}

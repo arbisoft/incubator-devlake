@@ -16,12 +16,13 @@
  *
  */
 
-import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { ConfigProvider } from 'antd';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { ThemeProvider as StyledThemeProvider } from 'styled-components';
 
-import { useAppSelector } from '@/hooks';
+import { PRIMARY_OVERRIDE } from '@/config/brand';
 import { selectThemeMode, resolveThemeMode } from '@/features/theme/slice';
+import { useAppSelector } from '@/hooks';
 
 import { getTheme, ResolvedTheme } from './tokens';
 
@@ -31,6 +32,7 @@ interface Props {
 
 const CSS_VAR_MAP: Record<string, keyof ReturnType<typeof getTheme>['colors']> = {
   '--devlake-color-text': 'text',
+  '--devlake-color-text-secondary': 'textSecondary',
   '--devlake-color-text-muted': 'textTertiary',
   '--devlake-color-text-body': 'textBody',
   '--devlake-color-text-subdued': 'textMuted',
@@ -62,8 +64,7 @@ export const ThemeProvider = ({ children }: Props) => {
     return () => media.removeEventListener('change', onChange);
   }, [mode]);
 
-  const customPrimary = import.meta.env.DEVLAKE_COLOR_CUSTOM;
-  const theme = useMemo(() => getTheme(resolved, customPrimary), [resolved, customPrimary]);
+  const theme = useMemo(() => getTheme(resolved, PRIMARY_OVERRIDE), [resolved]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;

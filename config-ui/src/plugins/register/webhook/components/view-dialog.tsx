@@ -16,131 +16,85 @@
  *
  */
 
-import { useState, useMemo } from 'react';
-import { Modal, Button } from 'antd';
+import { useMemo, useState } from 'react';
 
-import { useAppDispatch, useAppSelector } from '@/hooks';
-import { Block, CopyText, ExternalLink, Message } from '@/components';
-import { selectWebhook, renewWebhookApiKey } from '@/features';
-import { IWebhook } from '@/types';
+import { renewWebhookApiKey } from '@/features';
+import { useAppDispatch } from '@/hooks';
+import { CODE_LANGUAGE, CodeBlock, CONFIRM_TONE, ConfirmModal, FormModal, MODAL_WIDTH, toUserMessage } from '@/ui';
 import { operator } from '@/utils';
 
-import { transformURI } from './utils';
+import { COPY, ERROR_MAP, FALLBACK_ERROR } from '../constants';
+import { Group, GroupTitle, Hint, Intro, KeyRow, Notice, Stack } from '../styled';
+import type { WebhookDialogProps } from '../types';
+import { buildCommands, getApiPrefix } from '../utils';
 
-import * as S from '../styled';
+import { WebhookCommands } from './webhook-commands';
+import { WebhookIcon } from './webhook-icon';
 
-interface Props {
-  initialId: ID;
-  onCancel: () => void;
-}
-
-export const ViewDialog = ({ initialId, onCancel }: Props) => {
-  const [open, setOpen] = useState(false);
+export const ViewDialog = ({ open, webhook, onCancel, afterClose }: WebhookDialogProps) => {
+  const [confirming, setConfirming] = useState(false);
   const [operating, setOperating] = useState(false);
   const [apiKey, setApiKey] = useState('');
-
   const dispatch = useAppDispatch();
-  const webhook = useAppSelector((state) => selectWebhook(state, initialId)) as IWebhook;
-  const prefix = useMemo(() => `${window.location.origin}/api`, []);
+  const commands = useMemo(
+    () => buildCommands(getApiPrefix(window.location.origin), webhook, apiKey),
+    [webhook, apiKey],
+  );
 
-  const URI = transformURI(prefix, webhook, apiKey);
-
-  const handleGenerateNewKey = async () => {
-    const [success, res] = await operator(async () => await dispatch(renewWebhookApiKey(initialId)).unwrap(), {
+  const handleRenew = async () => {
+    const [success, res] = await operator(() => dispatch(renewWebhookApiKey(webhook.id)).unwrap(), {
       setOperating,
+      formatMessage: () => COPY.view.renewSuccess,
+      formatReason: (error) => toUserMessage(error, ERROR_MAP, FALLBACK_ERROR.renew),
     });
 
     if (success) {
       setApiKey(res.apiKey);
-      setOpen(false);
+      setConfirming(false);
     }
   };
 
   return (
-    <Modal open width={820} centered title="View Webhook" footer={null} onCancel={onCancel}>
-      <S.Wrapper>
-        <p>
-          Copy the following CURL commands to your issue tracking or CI/CD tools to push `Incidents` and `Deployments`
-          by making a POST to DevLake. Please replace the {'{'}API_KEY{'}'} in the following URLs.
-        </p>
-        <Block title="Incident">
-          <h5>Post to register/update an incident</h5>
-          <CopyText content={URI.postIssuesEndpoint} />
-          <p>
-            See the{' '}
-            <ExternalLink link="https://devlake.apache.org/docs/Plugins/webhook#register-issues---update-or-create-issues">
-              full payload schema
-            </ExternalLink>
-            .
-          </p>
-          <h5>Post to close a registered incident</h5>
-          <CopyText content={URI.closeIssuesEndpoint} />
-          <p>
-            See the{' '}
-            <ExternalLink link="https://devlake.apache.org/docs/Plugins/webhook#register-issues---close-issues-optional">
-              full payload schema
-            </ExternalLink>
-            .
-          </p>
-        </Block>
-        <Block title="Deployments">
-          <h5>Post to register a deployment</h5>
-          <CopyText content={URI.postDeploymentsCurl} />
-          <p>
-            See the{' '}
-            <ExternalLink link="https://devlake.apache.org/docs/Plugins/webhook#deployment">
-              full payload schema
-            </ExternalLink>
-            .
-          </p>
-        </Block>
-        <Block title="Pull Requests">
-          <h5>Post to register/update a pull_request</h5>
-          <CopyText content={URI.postPullRequestsEndpoint} />
-          <p>
-            See the{' '}
-            <ExternalLink link="https://devlake.apache.org/docs/Plugins/webhook#pull_requests">
-              full payload schema
-            </ExternalLink>
-            .
-          </p>
-        </Block>
-        <Block
-          title="API Key"
-          description="If you have forgotten your API key, you can revoke the previous key and generate a new one as a replacement."
-        >
-          {!apiKey ? (
-            <Button type="primary" onClick={() => setOpen(true)}>
-              Revoke and generate a new key
-            </Button>
-          ) : (
-            <>
-              <S.ApiKey>
-                <CopyText content={apiKey} />
-                <span>No Expiration</span>
-              </S.ApiKey>
-              <S.Tips>
-                <strong>Please copy your key now. You will not be able to see it again.</strong>
-              </S.Tips>
-            </>
-          )}
-        </Block>
-      </S.Wrapper>
-      <Modal
+    <>
+      <FormModal
         open={open}
-        width={820}
-        centered
-        title="Are you sure you want to revoke the previous API key and  generate a new one?"
-        okText="Confirm"
-        cancelText="Go Back"
-        okButtonProps={{
-          loading: operating,
-        }}
-        onCancel={() => setOpen(false)}
-        onOk={handleGenerateNewKey}
+        icon={<WebhookIcon />}
+        title={COPY.view.title}
+        submitLabel={COPY.view.renew}
+        showCancel={false}
+        width={MODAL_WIDTH.LG}
+        afterClose={afterClose}
+        onSubmit={() => setConfirming(true)}
+        onCancel={onCancel}
       >
-        <Message content="Once this action is done, the previous API key will become invalid and you will need to enter the new key in the application that uses this Webhook API." />
-      </Modal>
-    </Modal>
+        <Stack>
+          <Intro>{COPY.view.intro}</Intro>
+          <WebhookCommands commands={commands} />
+          <Group>
+            <GroupTitle>{COPY.view.keyTitle}</GroupTitle>
+            <Hint>{COPY.view.keyDescription}</Hint>
+            {apiKey && (
+              <>
+                <KeyRow>
+                  <CodeBlock value={apiKey} language={CODE_LANGUAGE.SHELL} copyLabel={COPY.view.copyKey} />
+                  <span>{COPY.view.noExpiration}</span>
+                </KeyRow>
+                <Notice>{COPY.view.keyNotice}</Notice>
+              </>
+            )}
+          </Group>
+        </Stack>
+      </FormModal>
+      <ConfirmModal
+        open={confirming}
+        tone={CONFIRM_TONE.DANGER}
+        title={COPY.view.renewTitle(webhook.name)}
+        description={COPY.view.renewDescription}
+        confirmLabel={COPY.view.renewConfirm}
+        loading={operating}
+        onConfirm={handleRenew}
+        onCancel={() => setConfirming(false)}
+      />
+    </>
   );
 };

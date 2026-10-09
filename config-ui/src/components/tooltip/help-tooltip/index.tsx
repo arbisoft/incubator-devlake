@@ -19,7 +19,6 @@
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import type { TooltipProps } from 'antd';
 import { Tooltip } from 'antd';
-
 import styled from 'styled-components';
 
 const Wrapper = styled.span`

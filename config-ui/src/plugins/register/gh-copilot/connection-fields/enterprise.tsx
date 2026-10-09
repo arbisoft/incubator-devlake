@@ -16,8 +16,8 @@
  *
  */
 
-import { useEffect, useMemo } from 'react';
 import { Input } from 'antd';
+import { useEffect, useMemo } from 'react';
 
 import { Block } from '@/components';
 
@@ -57,7 +57,6 @@ export const Enterprise = ({ type, initialValues, values, setValues, setErrors }
       description="Enter the GitHub enterprise slug for enterprise-wide aggregate metrics and per-user data. At least one of Organization or Enterprise Slug is required. For the most complete data, provide both."
     >
       <Input
-        style={{ width: 386 }}
         placeholder="e.g. my-enterprise"
         status={error ? 'error' : ''}
         value={values.enterprise ?? ''}

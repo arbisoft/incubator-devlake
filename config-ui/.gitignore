@@ -47,3 +47,6 @@ yarn-error.log*
 # ide & workspace files
 /.nova
 *.sublime*
+
+# jscpd formatter output
+/.jscpd-tmp

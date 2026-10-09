@@ -1,0 +1,18 @@
+{
+  "titlePath": [
+    "authenticated shell",
+    "onboarding",
+    "/onboard opens and steps forward, and the store is restored afterwards"
+  ],
+  "writes": [
+    {
+      "method": "PUT",
+      "path": "/api/store/onboard",
+      "body": {
+        "done": false,
+        "records": [],
+        "step": 1
+      }
+    }
+  ]
+}

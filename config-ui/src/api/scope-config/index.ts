@@ -20,19 +20,19 @@ import { request } from '@/utils';
 
 import { ICheck } from './types';
 
-export const list = (plugin: string, connectionId: ID) =>
-  request(`/plugins/${plugin}/connections/${connectionId}/scope-configs`);
+export const list = (plugin: string, connectionId: ID, signal?: AbortSignal) =>
+  request(`/plugins/${plugin}/connections/${connectionId}/scope-configs`, { signal });
 
 export const get = (plugin: string, connectionId: ID, id: ID) =>
   request(`/plugins/${plugin}/connections/${connectionId}/scope-configs/${id}`);
 
-export const create = (plugin: string, connectionId: ID, data: any) =>
+export const create = (plugin: string, connectionId: ID, data: Record<string, unknown>) =>
   request(`/plugins/${plugin}/connections/${connectionId}/scope-configs`, {
     method: 'post',
     data,
   });
 
-export const update = (plugin: string, connectionId: ID, id: ID, data: any) =>
+export const update = (plugin: string, connectionId: ID, id: ID, data: Record<string, unknown>) =>
   request(`/plugins/${plugin}/connections/${connectionId}/scope-configs/${id}`, {
     method: 'patch',
     data,

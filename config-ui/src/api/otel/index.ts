@@ -58,8 +58,8 @@ export const apply = otelAction('apply');
 
 export const listProjects = (): Promise<OtelProject[]> => request('/plugins/claude_otel/projects');
 
-export const listForProject = (projectName: string): Promise<OtelConnectionResponse[]> =>
-  request(`/plugins/claude_otel/projects/${encodeURIComponent(projectName)}/connections`);
+export const listForProject = (projectName: string, signal?: AbortSignal): Promise<OtelConnectionResponse[]> =>
+  request(`/plugins/claude_otel/projects/${encodeURIComponent(projectName)}/connections`, { signal });
 
 export const updateProjects = (id: ID, projectNames: string[]): Promise<OtelProject[]> =>
   request(`${basePath}/${id}/projects`, {
