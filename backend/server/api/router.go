@@ -32,6 +32,7 @@ import (
 
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/server/api/blueprints"
+	compliancescorecard "github.com/apache/incubator-devlake/server/api/compliance_scorecard"
 	"github.com/apache/incubator-devlake/server/api/domainlayer"
 	"github.com/apache/incubator-devlake/server/api/grafanarole"
 	"github.com/apache/incubator-devlake/server/api/pipelines"
@@ -68,6 +69,9 @@ func RegisterRouter(r *gin.Engine, basicRes context.BasicRes) {
 
 	r.POST("/push/:tableName", push.Post)
 	r.GET("/domainlayer/repos", domainlayer.ReposIndex)
+
+	// compliance scorecard api
+	r.GET("/compliance-scorecard", compliancescorecard.Get)
 
 	// plugin api
 	r.GET("/plugininfo", plugininfo.Get)
