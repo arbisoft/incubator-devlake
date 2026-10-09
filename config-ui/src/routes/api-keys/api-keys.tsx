@@ -16,229 +16,122 @@
  *
  */
 
-import { useState, useMemo } from 'react';
 import { PlusOutlined } from '@ant-design/icons';
-import { Flex, Table, Modal, Input, Select, Button, Tag } from 'antd';
-import dayjs from 'dayjs';
+import { Button } from 'antd';
+import { useMemo, useState } from 'react';
 
 import API from '@/api';
-import { PageHeader, Block, ExternalLink, CopyText, Message } from '@/components';
-import { PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
-import { operator, formatTime } from '@/utils';
+import type { IApiKey } from '@/types';
+import {
+  CONFIRM_TONE,
+  ConfirmModal,
+  DataTable,
+  ListPage,
+  ListToolbar,
+  PageHeader,
+  buildListEmpty,
+  useListState,
+  useRefreshVersion,
+} from '@/ui';
+import { operator } from '@/utils';
 
-import * as C from './constant';
-import * as S from './styled';
+import { getColumns } from './columns';
+import { GeneratedKeyModal, NewKeyModal } from './components';
+import { COPY } from './constants';
+import type { KeySortKey } from './types';
+import { getPathPrefix } from './utils';
 
 export const ApiKeys = () => {
-  const [version, setVersion] = useState(1);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-  const [operating, setOperating] = useState(false);
-  const [modal, setModal] = useState<'create' | 'show' | 'delete'>();
-  const [currentId, setCurrentId] = useState<string>();
-  const [currentKey, setCurrentKey] = useState<string>('');
-  const [form, setForm] = useState<{
-    name: string;
-    expiredAt?: string;
-    allowedPath: string;
-  }>({
-    name: '',
-    expiredAt: C.timeOptions[1].value,
-    allowedPath: '.*',
-  });
+  const list = useListState<KeySortKey, Record<string, never>>({ filters: {} });
+  const { keyword } = list;
+  const { version, refresh } = useRefreshVersion();
+  const [creating, setCreating] = useState(false);
+  const [generatedKey, setGeneratedKey] = useState<string>();
+  const [generatedOpen, setGeneratedOpen] = useState(false);
+  const [revokeTarget, setRevokeTarget] = useState<IApiKey>();
+  const [revokeOpen, setRevokeOpen] = useState(false);
+  const [revoking, setRevoking] = useState(false);
 
-  const { data, ready } = useRefreshData(() => API.apiKey.list({ page, pageSize }), [version, page, pageSize]);
+  const { data, ready, error } = useRefreshData(() => API.apiKey.list(list.query), [version, list.query]);
 
-  const prefix = useMemo(() => `${window.location.origin}/api/rest/`, []);
-  const [dataSource, total] = useMemo(() => [data?.apikeys ?? [], data?.count ?? 0], [data]);
-  const hasError = useMemo(() => !form.name || !form.allowedPath, [form]);
+  const pathPrefix = useMemo(() => getPathPrefix(window.location.origin), []);
+  const columns = useMemo(
+    () =>
+      getColumns({
+        pathPrefix,
+        onRevoke: (key) => {
+          setRevokeTarget(key);
+          setRevokeOpen(true);
+        },
+      }),
+    [pathPrefix],
+  );
 
-  const timeSelectedValue = useMemo(() => {
-    return C.timeOptions.find((it) => it.value === form.expiredAt || !it.value)?.value;
-  }, [form.expiredAt]);
-
-  const handleCancel = () => {
-    setModal(undefined);
-  };
-
-  const handleSubmit = async () => {
-    const [success, res] = await operator(() => API.apiKey.create(form), {
-      setOperating,
-    });
-
-    if (success) {
-      setVersion(version + 1);
-      setModal('show');
-      setCurrentKey(res.apiKey);
-      setForm({
-        name: '',
-        expiredAt: C.timeOptions[1].value,
-        allowedPath: '.*',
-      });
-    }
+  const handleCreated = (apiKey: string) => {
+    setCreating(false);
+    setGeneratedKey(apiKey);
+    setGeneratedOpen(true);
+    refresh();
   };
 
   const handleRevoke = async () => {
-    if (!currentId) return;
-
-    const [success] = await operator(() => API.apiKey.remove(currentId));
-
+    if (!revokeTarget) return;
+    const [success] = await operator(() => API.apiKey.remove(revokeTarget.id), { setOperating: setRevoking });
     if (success) {
-      setVersion(version + 1);
-      setCurrentId(undefined);
-      handleCancel();
+      setRevokeOpen(false);
+      refresh();
     }
   };
 
+  const newKeyButton = (
+    <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreating(true)}>
+      {COPY.newKey}
+    </Button>
+  );
+
+  const empty = buildListEmpty({
+    failed: error !== undefined,
+    onRetry: refresh,
+    filtered: keyword !== '',
+    empty: {
+      ...COPY.empty,
+      action: newKeyButton,
+    },
+    noResults: COPY.noResults,
+  });
+
   return (
-    <PageHeader
-      breadcrumbs={[{ name: 'API Keys', path: PATHS.APIKEYS() }]}
-      description="You can generate and manage your API keys to access the DevLake API."
-    >
-      <Flex style={{ marginBottom: 16 }} justify="flex-end">
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setModal('create')}>
-          New API Key
-        </Button>
-      </Flex>
-      <Table
+    <ListPage>
+      <PageHeader title={COPY.title} description={COPY.description} />
+      <ListToolbar list={list} searchPlaceholder={COPY.searchPlaceholder} end={newKeyButton} />
+      <DataTable<IApiKey, KeySortKey>
         rowKey="id"
-        size="middle"
-        loading={!ready}
-        columns={[
-          {
-            title: 'Key Name',
-            dataIndex: 'name',
-            key: 'name',
-            width: 300,
-          },
-          {
-            title: 'Expiration',
-            dataIndex: 'expiredAt',
-            key: 'expiredAt',
-            width: 200,
-            render: (val) => (
-              <div>
-                <span>{val ? formatTime(val, 'YYYY-MM-DD') : 'No expiration'}</span>
-                {dayjs().isAfter(dayjs(val)) && <Tag style={{ marginLeft: 8 }}>Expired</Tag>}
-              </div>
-            ),
-          },
-          {
-            title: 'Allowed Path',
-            dataIndex: 'allowedPath',
-            key: 'allowedPath',
-            render: (val) => `${prefix}${val}`,
-          },
-          {
-            title: '',
-            dataIndex: 'id',
-            key: 'id',
-            width: 100,
-            render: (id) => (
-              <Button
-                size="small"
-                type="primary"
-                danger
-                onClick={() => {
-                  setCurrentId(id);
-                  setModal('delete');
-                }}
-              >
-                Revoke
-              </Button>
-            ),
-          },
-        ]}
-        dataSource={dataSource}
-        pagination={{
-          current: page,
-          pageSize,
-          total,
-          onChange: ((newPage: number, newPageSize: number) => {
-            setPage(newPage);
-            if (newPageSize !== pageSize) {
-              setPageSize(newPageSize);
-            }
-          }) as (newPage: number) => void,
-        }}
+        ariaLabel={COPY.tableLabel}
+        loading={!ready && error === undefined}
+        columns={columns}
+        dataSource={data?.apikeys ?? []}
+        empty={empty}
+        list={list}
+        total={data?.count ?? 0}
       />
-      {modal === 'create' && (
-        <Modal
-          open
-          width={820}
-          centered
-          title="Generate a New API Key"
-          okText="Generate"
-          okButtonProps={{
-            disabled: hasError,
-            loading: operating,
-          }}
-          onCancel={handleCancel}
-          onOk={handleSubmit}
-        >
-          <Block title="API Key Name" description="Give your API key a unique name to identify in the future." required>
-            <Input
-              style={{ width: 386 }}
-              placeholder="My API Key"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
-          </Block>
-          <Block title="Expiration" description="Set an expiration time for your API key." required>
-            <Select
-              style={{ width: 386 }}
-              options={C.timeOptions}
-              value={timeSelectedValue}
-              onChange={(value) => setForm({ ...form, expiredAt: value ? value : undefined })}
-            />
-          </Block>
-          <Block
-            title="Allowed Path"
-            description={
-              <p>
-                Enter a Regular Expression that matches the API URL(s) from the{' '}
-                <ExternalLink link="/api/swagger/index.html">DevLake API docs</ExternalLink>. The default Regular
-                Expression is set to all APIs.
-              </p>
-            }
-            required
-          >
-            <S.InputContainer>
-              <span>{prefix}</span>
-              <Input
-                placeholder=""
-                value={form.allowedPath}
-                onChange={(e) => setForm({ ...form, allowedPath: e.target.value })}
-              />
-            </S.InputContainer>
-          </Block>
-        </Modal>
-      )}
-      {modal === 'show' && (
-        <Modal open width={820} centered title="Your API key has been generated!" footer={null} onCancel={handleCancel}>
-          <div style={{ marginBottom: 16 }}>
-            Please make sure to copy your API key now. You will not be able to see it again.
-          </div>
-          <CopyText content={currentKey} />
-        </Modal>
-      )}
-      {modal === 'delete' && (
-        <Modal
-          open
-          width={820}
-          centered
-          title="Are you sure you want to revoke this API key?"
-          okText="Confirm"
-          okButtonProps={{
-            loading: operating,
-          }}
-          onCancel={handleCancel}
-          onOk={handleRevoke}
-        >
-          <Message content="Any applications or scripts using this API key will no longer be able to access the DevLake API. You cannot undo this action." />
-        </Modal>
-      )}
-    </PageHeader>
+      <NewKeyModal open={creating} onClose={() => setCreating(false)} onCreated={handleCreated} />
+      <GeneratedKeyModal
+        open={generatedOpen}
+        apiKey={generatedKey}
+        onClose={() => setGeneratedOpen(false)}
+        onClosed={() => setGeneratedKey(undefined)}
+      />
+      <ConfirmModal
+        open={revokeOpen}
+        tone={CONFIRM_TONE.DANGER}
+        title={COPY.confirm.title(revokeTarget?.name ?? '')}
+        description={COPY.confirm.description}
+        confirmLabel={COPY.confirm.confirm}
+        loading={revoking}
+        onConfirm={handleRevoke}
+        onCancel={() => setRevokeOpen(false)}
+      />
+    </ListPage>
   );
 };

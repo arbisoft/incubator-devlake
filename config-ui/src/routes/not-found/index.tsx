@@ -16,13 +16,19 @@
  *
  */
 
-import { useNavigate } from 'react-router-dom';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
 import { Card, Space, Flex, Button } from 'antd';
+import { useNavigate } from 'react-router-dom';
 
 import { TipLayout } from '@/components';
+import { PATHS } from '@/config';
+import { useDocumentTitle } from '@/ui/hooks';
+
+import { COPY } from './constants';
 
 export const NotFound = () => {
+  useDocumentTitle(COPY.title);
+
   const navigate = useNavigate();
 
   return (
@@ -36,7 +42,7 @@ export const NotFound = () => {
         </h2>
         <p>This is an invalid address.</p>
         <Flex justify="center">
-          <Button type="primary" onClick={() => navigate('/')}>
+          <Button type="primary" onClick={() => navigate(PATHS.ROOT())}>
             Go HomePage
           </Button>
         </Flex>

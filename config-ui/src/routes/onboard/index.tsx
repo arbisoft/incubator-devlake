@@ -16,17 +16,18 @@
  *
  */
 
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
 import { CloseOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { theme, Layout, Modal } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import API from '@/api';
 import { PageLoading } from '@/components';
 import { PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
+import { useDocumentTitle } from '@/ui/hooks';
 
+import { COPY } from './constants';
 import type { Record } from './context';
 import { Context } from './context';
 import { Step0 } from './step-0';
@@ -51,14 +52,14 @@ const steps = [
   },
 ];
 
-const brandName = import.meta.env.DEVLAKE_BRAND_NAME ?? 'DevLake';
-
 interface Props {
   logo?: React.ReactNode;
   title?: React.ReactNode;
 }
 
 export const Onboard = ({ logo, title }: Props) => {
+  useDocumentTitle(COPY.title);
+
   const [step, setStep] = useState(0);
   const [records, setRecords] = useState<Record[]>([]);
   const [projectName, setProjectName] = useState<string>();
@@ -112,9 +113,6 @@ export const Onboard = ({ logo, title }: Props) => {
         setPlugin: setPlugin,
       }}
     >
-      <Helmet>
-        <title>Onboard - {brandName}</title>
-      </Helmet>
       <Layout style={{ minHeight: '100vh' }}>
         <S.Inner>
           {step === 0 ? (

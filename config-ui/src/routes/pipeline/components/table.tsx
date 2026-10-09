@@ -16,121 +16,100 @@
  *
  */
 
-import { useState } from 'react';
-import { CodeOutlined, FileZipOutlined, RightOutlined } from '@ant-design/icons';
-import { Table, Space, Modal } from 'antd';
-import { pick } from 'lodash';
+import { Modal } from 'antd';
 import { saveAs } from 'file-saver';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTheme } from 'styled-components';
 
 import API from '@/api';
 import { DEVLAKE_ENDPOINT } from '@/config';
-import { IconButton, Inspector } from '@/components';
-import { IPipeline } from '@/types';
-import { formatTime } from '@/utils';
+import type { IPipeline } from '@/types';
+import { DataTable, EMPTY_STATE_SIZE } from '@/ui';
 
-import { PipelineStatus } from './status';
-import { PipelineDuration } from './duration';
+import { getPipelineColumns } from '../columns';
+import { COPY, LOGS_FILE_NAME, PIPELINE_ROW_ACTION } from '../constants';
+import type { PipelineSortKey } from '../types';
+import { pickConfig, toTablePagination } from '../utils';
+
+import { PipelineConfigDrawer } from './config-drawer';
 import { PipelineTasks } from './tasks';
+import type { PipelineRowAction, PipelineTableProps } from './types';
 
-interface Props {
-  loading: boolean;
-  dataSource: IPipeline[];
-  pagination?: {
-    total: number;
-    current: number;
-    pageSize: number;
-    onChange: (page: number) => void;
-  };
-}
+const DEFAULT_EMPTY = { ...COPY.empty, size: EMPTY_STATE_SIZE.SECTION };
 
-export const PipelineTable = ({ loading, dataSource, pagination }: Props) => {
-  const [JSON, setJSON] = useState<any>(null);
-  const [id, setId] = useState<ID | null>(null);
+export const PipelineTable = ({
+  loading,
+  dataSource,
+  pagination,
+  list,
+  total,
+  empty = DEFAULT_EMPTY,
+}: PipelineTableProps) => {
+  const { layout } = useTheme();
+  const [configTarget, setConfigTarget] = useState<IPipeline>();
+  const [configOpen, setConfigOpen] = useState(false);
+  const [detailId, setDetailId] = useState<ID>();
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [opener, setOpener] = useState<HTMLElement | null>(null);
 
-  const handleShowJSON = (row: IPipeline) => {
-    setJSON(pick(row, ['id', 'name', 'plan', 'skipOnFail']));
-  };
+  useEffect(() => {
+    if (!configOpen && !detailOpen) opener?.focus();
+  }, [configOpen, detailOpen, opener]);
 
-  const handleDownloadLog = async (id: ID) => {
-    const res = await API.pipeline.log(id);
-    if (res) {
-      saveAs(`${DEVLAKE_ENDPOINT}/pipelines/${id}/logging.tar.gz`, 'logging.tar.gz');
-    }
-  };
+  const handleRowAction = useCallback(
+    async (action: PipelineRowAction, pipeline: IPipeline, trigger: HTMLElement | null) => {
+      setOpener(trigger);
+      if (action === PIPELINE_ROW_ACTION.CONFIGURATION) {
+        setConfigTarget(pipeline);
+        setConfigOpen(true);
+      } else if (action === PIPELINE_ROW_ACTION.DETAIL) {
+        setDetailId(pipeline.id);
+        setDetailOpen(true);
+      } else if (await API.pipeline.log(pipeline.id)) {
+        saveAs(`${DEVLAKE_ENDPOINT}/pipelines/${pipeline.id}/${LOGS_FILE_NAME}`, LOGS_FILE_NAME);
+      }
+    },
+    [],
+  );
 
-  const handleShowDetails = (id: ID) => {
-    setId(id);
-  };
+  const sortable = list !== undefined;
+  const columns = useMemo(
+    () => getPipelineColumns({ sortable, onRowAction: handleRowAction }),
+    [sortable, handleRowAction],
+  );
 
   return (
     <>
-      <Table
+      <DataTable<IPipeline, PipelineSortKey>
         rowKey="id"
-        size="middle"
+        ariaLabel={COPY.tableLabel}
         loading={loading}
-        columns={[
-          {
-            title: 'ID',
-            dataIndex: 'id',
-            key: 'id',
-            align: 'center',
-          },
-          {
-            title: 'Blueprint Name',
-            dataIndex: 'name',
-            key: 'name',
-            align: 'center',
-          },
-          {
-            title: 'Status',
-            dataIndex: 'status',
-            key: 'status',
-            align: 'center',
-            render: (val) => <PipelineStatus status={val} />,
-          },
-          {
-            title: 'Started at',
-            dataIndex: 'beganAt',
-            key: 'beganAt',
-            align: 'center',
-            render: (val) => formatTime(val),
-          },
-          {
-            title: 'Completed at',
-            dataIndex: 'finishedAt',
-            key: 'finishedAt',
-            align: 'center',
-            render: (val) => formatTime(val),
-          },
-          {
-            title: 'Duration',
-            key: 'duration',
-            align: 'center',
-            render: (_, { status, beganAt, finishedAt }) => (
-              <PipelineDuration status={status} beganAt={beganAt} finishedAt={finishedAt} />
-            ),
-          },
-          {
-            title: '',
-            dataIndex: 'id',
-            key: 'action',
-            align: 'center',
-            render: (id: ID, row) => (
-              <Space>
-                <IconButton icon={<CodeOutlined />} helptip="Configuration" onClick={() => handleShowJSON(row)} />
-                <IconButton icon={<FileZipOutlined />} helptip="Download Logs" onClick={() => handleDownloadLog(id)} />
-                <IconButton icon={<RightOutlined />} helptip="Detail" onClick={() => handleShowDetails(id)} />
-              </Space>
-            ),
-          },
-        ]}
+        columns={columns}
         dataSource={dataSource}
-        pagination={pagination}
+        empty={empty}
+        list={list}
+        total={total}
+        pagination={pagination && toTablePagination(pagination)}
       />
-      {JSON && <Inspector open title={`Pipeline ${JSON?.id}`} data={JSON} onClose={() => setJSON(null)} />}
-      {id && (
-        <Modal open width={820} centered title={`Pipeline ${id}`} footer={null} onCancel={() => setId(null)}>
-          <PipelineTasks id={id} />
+      {configTarget && (
+        <PipelineConfigDrawer
+          open={configOpen}
+          id={configTarget.id}
+          config={pickConfig(configTarget)}
+          onClose={() => setConfigOpen(false)}
+        />
+      )}
+      {detailId !== undefined && (
+        <Modal
+          open={detailOpen}
+          centered
+          destroyOnHidden
+          footer={null}
+          width={layout.modalWidth.lg}
+          title={COPY.drawer.title(detailId)}
+          onCancel={() => setDetailOpen(false)}
+        >
+          <PipelineTasks id={detailId} />
         </Modal>
       )}
     </>

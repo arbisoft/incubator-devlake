@@ -60,6 +60,8 @@ export const GRAFANA_URL = trimSlash(process.env.E2E_GRAFANA_URL ?? 'http://loca
 export const PROMETHEUS_URL = trimSlash(process.env.E2E_PROMETHEUS_URL ?? 'http://localhost:9090');
 export const COLLECTOR_URL = trimSlash(process.env.E2E_COLLECTOR_URL ?? 'http://localhost:8889');
 export const OTLP_HTTP_URL = trimSlash(process.env.E2E_OTLP_HTTP_URL ?? 'http://localhost:4318');
+// A `yarn start` server; /ui-kit is absent from the production build.
+export const UI_KIT_URL = process.env.E2E_UI_KIT_URL ? trimSlash(process.env.E2E_UI_KIT_URL) : '';
 
 export const E2E_USER_PREFIX = 'e2e_';
 

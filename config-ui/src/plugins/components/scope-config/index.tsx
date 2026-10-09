@@ -16,9 +16,9 @@
  *
  */
 
-import { useState } from 'react';
 import { LinkOutlined, EditOutlined } from '@ant-design/icons';
 import { theme, Button, Modal, Flex, Space } from 'antd';
+import { useState } from 'react';
 import styled from 'styled-components';
 
 import API from '@/api';
@@ -28,8 +28,8 @@ import { getPluginConfig } from '@/plugins';
 import { operator } from '@/utils';
 
 import { PluginName } from '../plugin-name';
-import { ScopeConfigSelect } from '../scope-config-select';
 import { ScopeConfigForm } from '../scope-config-form';
+import { ScopeConfigSelect } from '../scope-config-select';
 
 const Wrapper = styled.div``;
 

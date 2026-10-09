@@ -61,3 +61,7 @@ export const OTEL_SOURCE_POLICY = {
 export const OTEL_ATTENTION_CHANGED_EVENT = 'devlake:otel-attention-changed';
 export const OTEL_REFRESH_INTERVAL_MS = 30_000;
 export const OTEL_VISIBILITY_THROTTLE_MS = 10_000;
+
+export const COPY = {
+  title: 'Claude Code OTel',
+};

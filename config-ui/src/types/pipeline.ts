@@ -37,4 +37,8 @@ export interface IPipeline {
   finishedTasks: number;
   totalTasks: number;
   message: string;
+  name?: string;
+  blueprintId?: ID;
+  plan?: unknown;
+  skipOnFail?: boolean;
 }

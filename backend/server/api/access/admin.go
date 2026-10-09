@@ -19,23 +19,30 @@ package access
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
 )
 
-func (s *Service) ListUsers(query PageQuery) (*PaginatedUsers, errors.Error) {
+func (s *Service) ListUsers(query UserListQuery) (*PaginatedUsers, errors.Error) {
 	query, valid := query.Normalize()
 	if !valid {
 		return nil, errors.BadInput.New(invalidPageSizeMessage)
 	}
-	count, err := s.db.Count(dal.From(&AccessUser{}), dal.Where("hidden_at IS NULL"))
+	filters := []dal.Clause{dal.Where("hidden_at IS NULL")}
+	if keyword := strings.ToLower(query.Keyword); keyword != "" {
+		pattern := "%" + keyword + "%"
+		filters = append(filters, dal.Where("(LOWER(email) LIKE ? OR LOWER(display_name) LIKE ?)", pattern, pattern))
+	}
+	count, err := s.db.Count(append([]dal.Clause{dal.From(&AccessUser{})}, filters...)...)
 	if err != nil {
 		return nil, errors.Default.Wrap(err, "error counting access users")
 	}
 	users := make([]AccessUser, 0)
-	if err := s.db.All(&users, dal.Where("hidden_at IS NULL"), dal.Orderby("email ASC"), dal.Offset(query.Offset()), dal.Limit(query.PageSize)); err != nil {
+	listClauses := append(filters, dal.Orderby("email ASC"), dal.Offset(query.Offset()), dal.Limit(query.PageSize))
+	if err := s.db.All(&users, listClauses...); err != nil {
 		return nil, errors.Default.Wrap(err, "error listing access users")
 	}
 	if err := s.decorateLocalCredentials(users); err != nil {

@@ -16,33 +16,20 @@
  *
  */
 
+import { EyeOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+import { Table, Button, Modal } from 'antd';
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { EyeOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
-import { theme, Table, Button, Modal } from 'antd';
-import styled from 'styled-components';
 
-import { selectConnections } from '@/features/connections';
 import { PATHS } from '@/config';
+import { selectConnections } from '@/features/connections';
 import { useAppSelector } from '@/hooks';
 import { getPluginConfig, ConnectionStatus, ConnectionForm } from '@/plugins';
 import { WebHookConnection } from '@/plugins/register/webhook';
+import { PluginIcon } from '@/ui';
 
-const ModalTitle = styled.div`
-  display: flex;
-  align-items: center;
-
-  .icon {
-    display: inline-flex;
-    margin-right: 8px;
-    width: 24px;
-
-    & > svg {
-      width: 100%;
-      height: 100%;
-    }
-  }
-`;
+import { COLUMN_WIDTH, COPY, MODAL_WIDTH } from './constants';
+import { CreateButton, ModalTitle } from './styled';
 
 interface Props {
   plugin: string;
@@ -54,10 +41,6 @@ export const ConnectionList = ({ plugin, onCreate }: Props) => {
   const [connectionId, setConnectionId] = useState<ID>();
 
   const pluginConfig = useMemo(() => getPluginConfig(plugin), [plugin]);
-
-  const {
-    token: { colorPrimary },
-  } = theme.useToken();
 
   const connections = useAppSelector((state) => selectConnections(state, plugin));
 
@@ -84,27 +67,27 @@ export const ConnectionList = ({ plugin, onCreate }: Props) => {
         size="small"
         columns={[
           {
-            title: 'Connection Name',
+            title: COPY.connectionName,
             dataIndex: 'name',
             key: 'name',
           },
           {
-            title: 'Status',
+            title: COPY.status,
             key: 'status',
-            width: 200,
+            width: COLUMN_WIDTH,
             render: (_, row) => <ConnectionStatus connection={row} />,
           },
           {
             title: '',
             key: 'link',
-            width: 200,
+            width: COLUMN_WIDTH,
             render: (_, { plugin, id }) => (
               <>
                 <Button type="link" icon={<EyeOutlined />} onClick={() => navigate(PATHS.CONNECTION(plugin, id))}>
-                  Details
+                  {COPY.details}
                 </Button>
                 <Button type="link" icon={<EditOutlined />} onClick={() => handleShowForm(id)}>
-                  Edit
+                  {COPY.edit}
                 </Button>
               </>
             ),
@@ -113,18 +96,18 @@ export const ConnectionList = ({ plugin, onCreate }: Props) => {
         dataSource={connections}
         pagination={false}
       />
-      <Button style={{ marginTop: 16 }} type="primary" icon={<PlusOutlined />} onClick={() => onCreate()}>
-        Create a New Connection
-      </Button>
+      <CreateButton type="primary" icon={<PlusOutlined />} onClick={() => onCreate()}>
+        {COPY.create}
+      </CreateButton>
       <Modal
         destroyOnClose
         open={open}
-        width={820}
+        width={MODAL_WIDTH}
         centered
         title={
           <ModalTitle>
-            <span className="icon">{pluginConfig.icon({ color: colorPrimary })}</span>
-            <span className="name">Manage Connections: {pluginConfig.name}</span>
+            <PluginIcon icon={pluginConfig.icon} size="md" />
+            <span className="name">{COPY.manage(pluginConfig.name)}</span>
           </ModalTitle>
         }
         footer={null}

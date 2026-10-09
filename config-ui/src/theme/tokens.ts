@@ -16,7 +16,29 @@
  *
  */
 
-import { theme as antdTheme, ThemeConfig } from 'antd';
+import { generate } from '@ant-design/colors';
+import type { ThemeConfig } from 'antd';
+
+import { buildAntdConfig } from './antd-config';
+import { PALETTE } from './palette';
+import {
+  buildShadow,
+  LAYOUT,
+  MOTION,
+  RADIUS,
+  SPACE,
+  TYPOGRAPHY,
+  Z_INDEX,
+  type BrandTokens,
+  type LayoutTokens,
+  type MotionTokens,
+  type RadiusTokens,
+  type ShadowTokens,
+  type SidebarTokens,
+  type SpaceTokens,
+  type TypographyTokens,
+  type ZIndexTokens,
+} from './scales';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type ResolvedTheme = 'light' | 'dark';
@@ -32,7 +54,7 @@ const primaryShades = {
   tint100: '#F0F4FE',
 };
 
-export type AppThemeColors = {
+type BaseThemeColors = {
   // Brand
   primary: string;
   primaryHover: string;
@@ -79,10 +101,19 @@ export type AppThemeColors = {
 export interface AppTheme {
   mode: ResolvedTheme;
   colors: AppThemeColors;
+  brand: BrandTokens;
+  sidebar: SidebarTokens;
+  typography: TypographyTokens;
+  space: SpaceTokens;
+  radius: RadiusTokens;
+  shadow: ShadowTokens;
+  layout: LayoutTokens;
+  zIndex: ZIndexTokens;
+  motion: MotionTokens;
   antd: ThemeConfig;
 }
 
-const lightColors: AppThemeColors = {
+const lightColors: BaseThemeColors = {
   primary: primaryShades.base,
   primaryHover: primaryShades.dark,
 
@@ -121,7 +152,7 @@ const lightColors: AppThemeColors = {
   textDisabled: 'rgba(0, 0, 0, 0.25)',
 };
 
-const darkColors: AppThemeColors = {
+const darkColors: BaseThemeColors = {
   primary: primaryShades.base,
   primaryHover: primaryShades.lighter,
 
@@ -160,29 +191,69 @@ const darkColors: AppThemeColors = {
   textDisabled: '#70727F',
 };
 
-const buildAntdConfig = (colors: AppThemeColors, mode: ResolvedTheme): ThemeConfig => ({
-  algorithm: mode === 'dark' ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
-  token: {
-    colorPrimary: colors.primary,
-    colorSuccess: colors.success,
-    colorError: colors.error,
-    colorWarning: colors.warning,
-    colorBgLayout: colors.bgLayout,
-    colorBgContainer: colors.bgContainer,
-    colorBgElevated: colors.bgElevated,
-    colorBorder: colors.border,
-    colorBorderSecondary: colors.borderSubtle,
-    colorText: colors.text,
-    colorTextSecondary: colors.textSecondary,
-    colorTextTertiary: colors.textTertiary,
-    colorTextDisabled: colors.textDisabled,
-  },
-});
+// ---- Fork tokens (reskin, plan 4.2). Upstream colour objects above stay untouched; values below override them. ----
+
+type ForkThemeColors = {
+  link: string;
+  iconBrand: string;
+  focusRing: string;
+  primarySubtle: string;
+  selectedBg: string;
+  onSelected: string;
+  bgTableHeader: string;
+  primaryActive: string;
+  errorActive: string;
+  successText: string;
+  warningText: string;
+  infoText: string;
+  warningBg: string;
+  infoTintBg: string;
+};
+
+export type AppThemeColors = BaseThemeColors & ForkThemeColors;
+
+const SHADE_HOVER_INDEX = 4;
+const SHADE_ACTIVE_INDEX = 6;
+
+export const deriveShades = (base: string): { hover: string; active: string } => {
+  const shades = generate(base);
+  return { hover: shades[SHADE_HOVER_INDEX], active: shades[SHADE_ACTIVE_INDEX] };
+};
+
+const withBrandOverride = (colors: AppThemeColors, custom: string): AppThemeColors => {
+  const { hover, active } = deriveShades(custom);
+  return {
+    ...colors,
+    primary: custom,
+    link: custom,
+    focusRing: custom,
+    iconBrand: custom,
+    primaryHover: hover,
+    primaryActive: active,
+  };
+};
 
 const buildTheme = (mode: ResolvedTheme, customPrimary?: string): AppTheme => {
+  const palette = PALETTE[mode];
   const base = mode === 'dark' ? darkColors : lightColors;
-  const colors = customPrimary ? { ...base, primary: customPrimary, primaryHover: customPrimary } : base;
-  return { mode, colors, antd: buildAntdConfig(colors, mode) };
+  const merged: AppThemeColors = { ...base, ...palette.colors };
+  const colors = customPrimary ? withBrandOverride(merged, customPrimary) : merged;
+  const { sidebar } = palette;
+  const shadow = buildShadow(mode);
+  return {
+    mode,
+    colors,
+    brand: palette.brand,
+    sidebar,
+    typography: TYPOGRAPHY,
+    space: SPACE,
+    radius: RADIUS,
+    shadow,
+    layout: LAYOUT,
+    zIndex: Z_INDEX,
+    motion: MOTION,
+    antd: buildAntdConfig(colors, mode, sidebar, shadow),
+  };
 };
 
 export const getTheme = (mode: ResolvedTheme, customPrimary?: string): AppTheme => buildTheme(mode, customPrimary);

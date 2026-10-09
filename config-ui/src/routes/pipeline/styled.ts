@@ -16,25 +16,13 @@
  *
  */
 
+import { Select } from 'antd';
 import styled from 'styled-components';
 
-export const StatusWrapper = styled.div`
-  &.ready,
-  &.cancel {
-    color: ${({ theme }) => theme.colors.textTertiary};
-  }
+import { textStyle } from '@/ui/style-helpers';
 
-  &.loading {
-    color: ${({ theme }) => theme.colors.primary};
-  }
-
-  &.success {
-    color: ${({ theme }) => theme.colors.success};
-  }
-
-  &.error {
-    color: ${({ theme }) => theme.colors.error};
-  }
+export const BlueprintSelect = styled(Select)`
+  width: ${({ theme }) => theme.layout.searchMaxWidth}px;
 `;
 
 export const Info = styled.div`
@@ -53,7 +41,7 @@ export const Info = styled.div`
     }
 
     & > span {
-      font-size: 12px;
+      ${textStyle('caption')}
       color: ${({ theme }) => theme.colors.textTertiary};
       text-align: center;
     }
@@ -62,19 +50,19 @@ export const Info = styled.div`
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-top: 8px;
+      margin-top: ${({ theme }) => theme.space.xs}px;
     }
   }
 
   p.message {
-    margin: 8px 0 0;
+    margin: ${({ theme }) => theme.space.xs}px 0 0;
     color: ${({ theme }) => theme.colors.error};
   }
 `;
 
 export const Tasks = styled.div`
   position: relative;
-  padding-right: 36px;
+  padding-right: ${({ theme }) => theme.space.xl}px;
 
   .inner {
     overflow: auto;
@@ -96,7 +84,7 @@ export const TasksHeader = styled.ul`
     justify-content: space-between;
     align-items: center;
     flex: 0 0 30%;
-    padding: 8px 12px;
+    padding: ${({ theme }) => theme.space.xs}px ${({ theme }) => theme.space.sm}px;
 
     &.ready,
     &.cancel {
@@ -121,22 +109,22 @@ export const TasksHeader = styled.ul`
   }
 
   li + li {
-    margin-left: 16px;
+    margin-left: ${({ theme }) => theme.space.md}px;
   }
 `;
 
-export const TasksList = styled.ul`
-  display: flex;
+export const TasksList = styled.ul<{ $open: boolean }>`
+  display: ${({ $open }) => ($open ? 'flex' : 'none')};
   align-items: flex-start;
 
   li {
     flex: 0 0 30%;
-    padding-bottom: 8px;
+    padding-bottom: ${({ theme }) => theme.space.xs}px;
     overflow: hidden;
   }
 
   li + li {
-    margin-left: 16px;
+    margin-left: ${({ theme }) => theme.space.md}px;
   }
 `;
 
@@ -144,8 +132,8 @@ export const Task = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 0;
-  height: 80px;
+  padding: ${({ theme }) => theme.space.md}px 0;
+  height: ${({ theme }) => theme.layout.pipelineTaskHeight}px;
   border-bottom: 1px solid ${({ theme }) => theme.colors.borderTask};
   box-sizing: border-box;
 
@@ -156,14 +144,10 @@ export const Task = styled.div`
     .title {
       display: flex;
       align-items: center;
-      margin-bottom: 8px;
-
-      & > img {
-        width: 20px;
-      }
+      margin-bottom: ${({ theme }) => theme.space.xs}px;
 
       & > strong {
-        margin: 0 4px;
+        margin: 0 ${({ theme }) => theme.space.xxs}px;
       }
 
       & > span {
@@ -173,9 +157,9 @@ export const Task = styled.div`
     }
 
     p {
-      padding-left: 26px;
+      padding-left: ${({ theme }) => theme.space.lg}px;
       margin: 0;
-      font-size: 12px;
+      ${textStyle('caption')}
       overflow: hidden;
       white-space: nowrap;
       text-overflow: ellipsis;
@@ -190,7 +174,11 @@ export const Task = styled.div`
     display: flex;
     flex-direction: column;
     align-items: center;
-    flex: 0 0 80px;
+    flex: 0 0 ${({ theme }) => theme.layout.pipelineTaskDurationWidth}px;
     text-align: right;
   }
+`;
+
+export const SubtaskCount = styled.strong`
+  margin-left: ${({ theme }) => theme.space.xs}px;
 `;

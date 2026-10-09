@@ -41,11 +41,6 @@ export const Wrapper = styled.div`
   }
 `;
 
-export const Input = styled.div`
-  display: flex;
-  align-items: center;
-`;
-
 export const Error = styled.div`
   color: ${({ theme }) => theme.colors.errorAlt};
 `;

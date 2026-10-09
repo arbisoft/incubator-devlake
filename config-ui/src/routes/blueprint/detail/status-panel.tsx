@@ -16,10 +16,10 @@
  *
  */
 
-import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { MoreOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Card, Modal, Switch, Button, Tooltip, Dropdown, Flex, Space } from 'antd';
+import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import API from '@/api';
 import { Message } from '@/components';

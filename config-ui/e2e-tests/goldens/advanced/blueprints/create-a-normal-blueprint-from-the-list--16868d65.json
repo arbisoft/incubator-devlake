@@ -1,0 +1,18 @@
+{
+  "titlePath": ["Blueprints list search, status filter and create", "create a normal blueprint from the list"],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/blueprints",
+      "body": {
+        "connections": [],
+        "cronConfig": "0 0 * * *",
+        "enable": true,
+        "isManual": false,
+        "mode": "NORMAL",
+        "name": "e2e-*-new-normal",
+        "skipOnFail": true
+      }
+    }
+  ]
+}

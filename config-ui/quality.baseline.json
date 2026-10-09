@@ -1,0 +1,149 @@
+{
+  "eslint": {
+    "@typescript-eslint/no-explicit-any": {
+      "errors": 320,
+      "warnings": 0
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "errors": 12,
+      "warnings": 0
+    },
+    "eqeqeq": {
+      "errors": 2,
+      "warnings": 0
+    },
+    "jsx-a11y/alt-text": {
+      "errors": 2,
+      "warnings": 0
+    },
+    "jsx-a11y/click-events-have-key-events": {
+      "errors": 5,
+      "warnings": 0
+    },
+    "jsx-a11y/no-autofocus": {
+      "errors": 1,
+      "warnings": 0
+    },
+    "jsx-a11y/no-noninteractive-element-interactions": {
+      "errors": 4,
+      "warnings": 0
+    },
+    "jsx-a11y/no-static-element-interactions": {
+      "errors": 1,
+      "warnings": 0
+    },
+    "max-lines": {
+      "errors": 0,
+      "warnings": 18
+    },
+    "no-console": {
+      "errors": 3,
+      "warnings": 0
+    },
+    "no-duplicate-imports": {
+      "errors": 15,
+      "warnings": 0
+    },
+    "no-empty": {
+      "errors": 0,
+      "warnings": 3
+    },
+    "prefer-destructuring": {
+      "errors": 0,
+      "warnings": 17
+    },
+    "react-hooks/exhaustive-deps": {
+      "errors": 0,
+      "warnings": 74
+    },
+    "react-hooks/globals": {
+      "errors": 0,
+      "warnings": 2
+    },
+    "react-hooks/immutability": {
+      "errors": 0,
+      "warnings": 1
+    },
+    "react-hooks/refs": {
+      "errors": 0,
+      "warnings": 35
+    },
+    "react-hooks/set-state-in-effect": {
+      "errors": 0,
+      "warnings": 40
+    },
+    "react/display-name": {
+      "errors": 1,
+      "warnings": 0
+    },
+    "react/jsx-key": {
+      "errors": 1,
+      "warnings": 0
+    },
+    "react/no-array-index-key": {
+      "errors": 6,
+      "warnings": 0
+    },
+    "react/no-unescaped-entities": {
+      "errors": 18,
+      "warnings": 0
+    },
+    "sonarjs/cognitive-complexity": {
+      "errors": 4,
+      "warnings": 0
+    },
+    "sonarjs/no-clear-text-protocols": {
+      "errors": 2,
+      "warnings": 0
+    },
+    "sonarjs/no-duplicate-string": {
+      "errors": 0,
+      "warnings": 20
+    },
+    "sonarjs/no-globals-shadowing": {
+      "errors": 2,
+      "warnings": 0
+    },
+    "sonarjs/no-ignored-exceptions": {
+      "errors": 1,
+      "warnings": 0
+    },
+    "sonarjs/no-nested-conditional": {
+      "errors": 0,
+      "warnings": 17
+    },
+    "sonarjs/no-nested-template-literals": {
+      "errors": 2,
+      "warnings": 0
+    },
+    "sonarjs/prefer-native-axios-alternative": {
+      "errors": 1,
+      "warnings": 0
+    },
+    "sonarjs/prefer-native-lodash-alternative": {
+      "errors": 2,
+      "warnings": 0
+    },
+    "sonarjs/prefer-single-boolean-return": {
+      "errors": 1,
+      "warnings": 0
+    },
+    "sonarjs/prefer-specific-assertions": {
+      "errors": 5,
+      "warnings": 0
+    },
+    "sonarjs/super-linear-regex": {
+      "errors": 4,
+      "warnings": 0
+    },
+    "sonarjs/unused-import": {
+      "errors": 1,
+      "warnings": 0
+    }
+  },
+  "knip": [],
+  "jscpd": {
+    "clones": 112,
+    "duplicatedLines": 1985
+  }
+}

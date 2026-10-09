@@ -15,25 +15,29 @@
  * limitations under the License.
  *
  */
-import { useParams } from 'react-router-dom';
 import { Card } from 'antd';
+import { useParams } from 'react-router-dom';
 
 import { PageHeader } from '@/components';
 import { PATHS } from '@/config';
+import { useDocumentTitle } from '@/ui/hooks';
 
 import { PipelineInfo, PipelineTasks } from './components';
+import { COPY } from './constants';
 
 export const Pipeline = () => {
   const { id } = useParams();
 
+  useDocumentTitle(COPY.detailTitle(id as string));
+
   return (
     <PageHeader
       breadcrumbs={[
-        { name: 'Advanced', path: PATHS.BLUEPRINTS() },
-        { name: 'Pipelines', path: PATHS.PIPELINES() },
+        { name: COPY.breadcrumbAdvanced, path: PATHS.BLUEPRINTS() },
+        { name: COPY.title, path: PATHS.PIPELINES() },
         {
           name: id as string,
-          path: `/pipelines/${id}`,
+          path: PATHS.PIPELINE(id as string),
         },
       ]}
     >

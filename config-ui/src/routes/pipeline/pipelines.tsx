@@ -15,45 +15,94 @@
  * limitations under the License.
  *
  */
-import { useState, useMemo } from 'react';
+
+import { useDebounce } from 'ahooks';
+import { useMemo, useState } from 'react';
 
 import API from '@/api';
-import { PageHeader } from '@/components';
 import { PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
+import { buildListEmpty, ListPage, PageHeader, SORT_ORDER, Toolbar, useListState, useRefreshVersion } from '@/ui';
 
 import { PipelineTable } from './components';
+import {
+  BLUEPRINT_OPTIONS_LIMIT,
+  BLUEPRINT_SEARCH_DEBOUNCE_MS,
+  BLUEPRINT_TYPE_ALL,
+  COPY,
+  FILTER_PARAM,
+} from './constants';
+import { BlueprintSelect } from './styled';
+import type { PipelineFilters, PipelineSortKey } from './types';
+import { buildPipelineQuery, toBlueprintOptions } from './utils';
+
+const DEFAULT_FILTERS: PipelineFilters = { [FILTER_PARAM.BLUEPRINT]: '' };
 
 export const Pipelines = () => {
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const list = useListState<PipelineSortKey, PipelineFilters>({ filters: DEFAULT_FILTERS });
+  const { filters } = list;
+  const { version, refresh } = useRefreshVersion();
 
-  const { ready, data } = useRefreshData(() => API.pipeline.list({ page, pageSize }), [page, pageSize]);
+  const { ready, data, error } = useRefreshData(
+    () => API.pipeline.list(buildPipelineQuery(list.query, filters)),
+    [version, list.query, filters.blueprintId],
+  );
+  const [searchInput, setSearch] = useState('');
+  const search = useDebounce(searchInput, { wait: BLUEPRINT_SEARCH_DEBOUNCE_MS });
+  const { data: blueprints } = useRefreshData(
+    () =>
+      API.blueprint.list({
+        page: 1,
+        pageSize: BLUEPRINT_OPTIONS_LIMIT,
+        type: BLUEPRINT_TYPE_ALL,
+        keyword: search || undefined,
+        sortBy: 'name',
+        sortOrder: SORT_ORDER.ASC,
+      }),
+    [search],
+  );
+  const { data: selected } = useRefreshData(
+    async () => (filters.blueprintId ? API.blueprint.get(filters.blueprintId) : undefined),
+    [filters.blueprintId],
+  );
 
-  const [dataSource, total] = useMemo(() => [(data?.pipelines ?? []).map((it) => it), data?.count ?? 0], [data]);
+  const options = useMemo(() => toBlueprintOptions(blueprints?.blueprints, selected), [blueprints, selected]);
+
+  const empty = buildListEmpty({
+    failed: error !== undefined,
+    onRetry: refresh,
+    filtered: filters.blueprintId !== '',
+    empty: COPY.empty,
+    noResults: COPY.noResults,
+  });
 
   return (
-    <PageHeader
-      breadcrumbs={[
-        { name: 'Advanced', path: PATHS.BLUEPRINTS() },
-        { name: 'Pipelines', path: PATHS.PIPELINES() },
-      ]}
-    >
-      <PipelineTable
-        loading={!ready}
-        dataSource={dataSource}
-        pagination={{
-          current: page,
-          pageSize,
-          total,
-          onChange: ((newPage: number, newPageSize: number) => {
-            setPage(newPage);
-            if (newPageSize !== pageSize) {
-              setPageSize(newPageSize);
-            }
-          }) as (newPage: number) => void,
-        }}
+    <ListPage>
+      <PageHeader
+        title={COPY.title}
+        breadcrumbs={[{ label: COPY.breadcrumbAdvanced, path: PATHS.BLUEPRINTS() }, { label: COPY.title }]}
       />
-    </PageHeader>
+      <Toolbar
+        start={
+          <BlueprintSelect
+            allowClear
+            showSearch={{ filterOption: false, onSearch: setSearch }}
+            size="large"
+            value={filters.blueprintId || undefined}
+            placeholder={COPY.blueprintFilter.placeholder}
+            aria-label={COPY.blueprintFilter.label}
+            options={options}
+            onChange={(blueprintId) => list.setFilter(FILTER_PARAM.BLUEPRINT, String(blueprintId ?? ''))}
+          />
+        }
+      />
+      <PipelineTable
+        loading={!ready && error === undefined}
+        dataSource={data?.pipelines ?? []}
+        empty={empty}
+        list={list}
+        total={data?.count ?? 0}
+      />
+    </ListPage>
   );
 };

@@ -16,21 +16,24 @@
  *
  */
 
+import { WarningOutlined } from '@ant-design/icons';
+import { theme, Badge, Modal } from 'antd';
 import { Fragment, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { theme, Badge, Modal } from 'antd';
-import { WarningOutlined } from '@ant-design/icons';
 
-import { selectPlugins, selectAllConnections, selectWebhooks } from '@/features/connections';
 import API from '@/api';
 import { OTEL_CREDENTIAL_STATUS } from '@/api/otel';
 import { PATHS } from '@/config';
+import { selectPlugins, selectAllConnections, selectWebhooks } from '@/features/connections';
 import { useAppSelector, useRefreshData } from '@/hooks';
 import { getPluginConfig, ConnectionList, ConnectionForm } from '@/plugins';
+import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?react';
+import { useDocumentTitle } from '@/ui/hooks';
 import { formatPlural } from '@/utils';
 
-import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?react';
+import { COPY } from './constants';
 import * as S from './styled';
+import { useDeprecationNotice } from './use-deprecation-notice';
 
 const SORT_START_WITH = ['o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'];
 const CLAUDE_PLUGIN = 'claude_code';
@@ -57,6 +60,8 @@ export const splitPluginsByInitial = (plugins: string[], nameOf: (plugin: string
 };
 
 export const Connections = () => {
+  useDocumentTitle(COPY.title);
+
   const [type, setType] = useState<'list' | 'form'>();
   const [plugin, setPlugin] = useState('');
 
@@ -92,9 +97,10 @@ export const Connections = () => {
   );
 
   const filterWebhookPlugins = plugins.filter((p) => p !== 'webhook');
-  const deprecatedPlugin = filterWebhookPlugins
-    .map((plugin) => getPluginConfig(plugin))
-    .find((config) => config?.isDeprecated && config.deprecationMessage);
+  const { notice: deprecatedPlugin, dismiss: dismissDeprecation } = useDeprecationNotice(
+    filterWebhookPlugins,
+    connections,
+  );
 
   const [firstPlugins, secondPlugins] = useMemo(
     () => splitPluginsByInitial(filterWebhookPlugins, (plugin) => getPluginConfig(plugin)?.name ?? plugin),
@@ -165,11 +171,11 @@ export const Connections = () => {
       <h5>You can create and manage data connections for the following data sources and use them in your Projects.</h5>
       {deprecatedPlugin?.deprecationMessage && (
         <S.DeprecationAlert
-          closable
+          closable={{ onClose: dismissDeprecation }}
           showIcon
           type="warning"
           icon={<WarningOutlined />}
-          message="Plugin deprecation notice"
+          message={COPY.deprecationTitle}
           description={deprecatedPlugin.deprecationMessage}
         />
       )}

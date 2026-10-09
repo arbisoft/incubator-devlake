@@ -39,18 +39,6 @@ export const Wrapper = styled.div`
   }
 `;
 
-export const Action = styled.div`
-  color: ${({ theme }) => theme.colors.primary};
-
-  span {
-    cursor: pointer;
-  }
-
-  span + span {
-    margin-left: 8px;
-  }
-`;
-
 export const ApiKey = styled.div`
   display: flex;
   align-items: center;
