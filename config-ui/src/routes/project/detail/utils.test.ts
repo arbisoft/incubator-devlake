@@ -139,6 +139,10 @@ describe('project settings form', () => {
     });
   });
 
+  it('treats a project without a metrics list as having none enabled', () => {
+    expect(readSettingsForm({ ...PROJECT, metrics: null as never }).dora).toBe(false);
+  });
+
   it('sends the same payload the page has always sent', () => {
     expect(
       buildProjectPayload({ name: 'n', dora: true, linker: false, linkerRegexp: '(y)', issueTrace: true }),
