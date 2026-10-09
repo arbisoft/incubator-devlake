@@ -40,6 +40,13 @@ export const Primary = styled(Line)`
   color: ${({ theme }) => theme.colors.text};
 `;
 
+export const PrimaryRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.xs}px;
+  min-width: 0;
+`;
+
 export const Secondary = styled(Line)`
   ${textStyle('caption')}
   color: ${({ theme }) => theme.colors.textSecondary};

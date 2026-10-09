@@ -16,17 +16,23 @@
  *
  */
 
-import { IdentityCell } from '@/ui';
+import { IdentityCell, STATUS_BADGE_VARIANT, STATUS_TONE, StatusBadge } from '@/ui';
 
 import { COPY, SECTION } from './constants';
 import { DemoCase, DemoSection } from './demo-section';
-import { IDENTITY, IDENTITY_LONG } from './fixtures';
+import { IDENTITY, IDENTITY_LONG, IDENTITY_TAG } from './fixtures';
 import { Narrow } from './styled';
 
 export const IdentityCellDemo = () => (
   <DemoSection id={SECTION.IDENTITY_CELL} title={COPY.sections.identityCell}>
     <DemoCase label={COPY.cases.default}>
       <IdentityCell {...IDENTITY} />
+    </DemoCase>
+    <DemoCase label={COPY.cases.withAdornment}>
+      <IdentityCell
+        {...IDENTITY}
+        adornment={<StatusBadge tone={STATUS_TONE.INFO} label={IDENTITY_TAG} variant={STATUS_BADGE_VARIANT.TEXT} />}
+      />
     </DemoCase>
     <DemoCase label={COPY.cases.empty}>
       <IdentityCell primary={IDENTITY.primary} />

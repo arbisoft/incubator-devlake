@@ -135,6 +135,7 @@ export const COPY = {
     longText: 'Long text, narrow container',
     overflow: 'Overflow',
     withIcon: 'With icon',
+    withAdornment: 'With an adornment',
     withAction: 'With action',
     withAside: 'With a brand aside',
     onBrand: 'On the brand panel',
