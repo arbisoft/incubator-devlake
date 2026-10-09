@@ -37,3 +37,39 @@ export const NoticeIcon = styled.span`
   display: inline-flex;
   color: ${({ theme }) => toneColors(theme)[STATUS_TONE.WARNING].dot};
 `;
+
+export const OrphanList = styled.ul`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.sm}px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+`;
+
+export const OrphanRow = styled.li`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.md}px;
+  padding: ${({ theme }) => theme.space.sm}px 0;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.borderSubtle};
+`;
+
+export const OrphanAccount = styled.span`
+  ${textStyle('body')}
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+`;
+
+export const OrphanProjects = styled.div`
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: ${({ theme }) => theme.space.xxs}px;
+  min-width: 0;
+`;
+
+export const NoticeText = styled.span`
+  flex: 1 1 auto;
+`;

@@ -16,14 +16,34 @@
  *
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { ACCESS_STATUS } from '@/api/access/constants';
+import { ACCESS_ROLE, ACCESS_STATUS, type AccessUser } from '@/api/access';
 import { GRAFANA_ERROR_CODE, GRAFANA_ROLE } from '@/api/grafana-users/constants';
 import type { GrafanaUser } from '@/api/grafana-users/types';
 
-import { COPY } from './constants';
-import { getUnavailableMessage, getUserIdentity, toGrafanaListParams, toUserStatus } from './utils';
+import {
+  COPY,
+  GENERATED_PASSWORD_LENGTH,
+  GRAFANA_MENU_ACTION,
+  PASSWORD_ALPHABET,
+  PASSWORD_MIN_LENGTH,
+} from './constants';
+import {
+  buildCreateBody,
+  buildDetailsPatch,
+  buildProjectOptions,
+  generatePassword,
+  getMenuActions,
+  getPartialUserId,
+  getUnavailableMessage,
+  getUserIdentity,
+  hasPatchChanges,
+  isValidNewUser,
+  toDevlakeUserOption,
+  toGrafanaListParams,
+  toUserStatus,
+} from './utils';
 
 const EMAIL = 'ann@example.com';
 
@@ -86,5 +106,134 @@ describe('getUnavailableMessage', () => {
     const fallback = COPY.errors[GRAFANA_ERROR_CODE.UNAVAILABLE];
     expect(getUnavailableMessage({ code: 'SOMETHING_ELSE' })).toBe(fallback);
     expect(getUnavailableMessage(undefined)).toBe(fallback);
+  });
+});
+
+describe('generatePassword', () => {
+  it('makes 24 characters from the alphabet, without ambiguous ones', () => {
+    const password = generatePassword();
+    expect(password).toHaveLength(GENERATED_PASSWORD_LENGTH);
+    expect(GENERATED_PASSWORD_LENGTH).toBe(24);
+    expect([...password].every((char) => PASSWORD_ALPHABET.includes(char))).toBe(true);
+    expect(PASSWORD_ALPHABET).not.toMatch(/[0O1lI]/);
+  });
+
+  it('draws from crypto.getRandomValues and rejects values that would skew the choice', () => {
+    const fillWith =
+      (value: number) =>
+      <T extends ArrayBufferView>(array: T): T => {
+        new Uint32Array(array.buffer, array.byteOffset, array.byteLength / Uint32Array.BYTES_PER_ELEMENT).fill(value);
+        return array;
+      };
+    const spy = vi
+      .spyOn(crypto, 'getRandomValues')
+      .mockImplementationOnce(fillWith(2 ** 32 - 1))
+      .mockImplementationOnce(fillWith(0));
+    const password = generatePassword(4, 'abc');
+    expect(spy).toHaveBeenCalledTimes(2);
+    spy.mockRestore();
+    expect(password).toBe('aaaa');
+  });
+
+  it('gives a different password each time', () => {
+    expect(generatePassword()).not.toBe(generatePassword());
+  });
+});
+
+describe('isValidNewUser', () => {
+  const valid = { email: EMAIL, name: 'Ann', password: 'x'.repeat(PASSWORD_MIN_LENGTH) };
+
+  it('needs a valid email, a name and a long enough password', () => {
+    expect(isValidNewUser(valid)).toBe(true);
+    expect(isValidNewUser({ ...valid, email: 'ann' })).toBe(false);
+    expect(isValidNewUser({ ...valid, name: '  ' })).toBe(false);
+    expect(isValidNewUser({ ...valid, password: 'x'.repeat(PASSWORD_MIN_LENGTH - 1) })).toBe(false);
+  });
+});
+
+describe('buildDetailsPatch', () => {
+  it('sends only the fields that changed', () => {
+    expect(buildDetailsPatch(user, { name: 'Ann', email: EMAIL })).toEqual({ name: undefined, email: undefined });
+    expect(buildDetailsPatch(user, { name: ' Anna ', email: EMAIL })).toEqual({ name: 'Anna', email: undefined });
+    expect(buildDetailsPatch(user, { name: 'Ann', email: ' NEW@Example.com ' })).toEqual({
+      name: undefined,
+      email: 'new@example.com',
+    });
+  });
+
+  it('reports whether anything changed', () => {
+    expect(hasPatchChanges({ name: undefined, email: undefined })).toBe(false);
+    expect(hasPatchChanges({ name: 'Anna' })).toBe(true);
+  });
+});
+
+describe('buildCreateBody', () => {
+  it('normalises the email and trims the name', () => {
+    expect(
+      buildCreateBody({
+        email: ' Ann@Example.com ',
+        name: ' Ann ',
+        password: 'p',
+        role: GRAFANA_ROLE.EDITOR,
+        projects: ['a'],
+      }),
+    ).toEqual({ email: EMAIL, name: 'Ann', role: GRAFANA_ROLE.EDITOR, projectNames: ['a'], password: 'p' });
+  });
+});
+
+describe('getPartialUserId', () => {
+  const failed = (data: unknown) => ({ response: { data } });
+
+  it('reads the user id of a partial failure', () => {
+    expect(getPartialUserId(failed({ code: GRAFANA_ERROR_CODE.PARTIAL, userId: 9 }))).toBe(9);
+    expect(getPartialUserId(failed({ code: GRAFANA_ERROR_CODE.PARTIAL, userId: '9' }))).toBe('9');
+  });
+
+  it('ignores other codes, a missing id and non-error values', () => {
+    expect(getPartialUserId(failed({ code: GRAFANA_ERROR_CODE.USER_EXISTS, userId: 9 }))).toBeUndefined();
+    expect(getPartialUserId(failed({ code: GRAFANA_ERROR_CODE.PARTIAL }))).toBeUndefined();
+    expect(getPartialUserId(failed('text'))).toBeUndefined();
+    expect(getPartialUserId(undefined)).toBeUndefined();
+    expect(getPartialUserId(new Error('x'))).toBeUndefined();
+  });
+});
+
+describe('buildProjectOptions', () => {
+  it('keeps selected names first and drops duplicates', () => {
+    expect(buildProjectOptions(['b', 'z'], ['a', 'b'])).toEqual([
+      { value: 'b', label: 'b' },
+      { value: 'z', label: 'z' },
+      { value: 'a', label: 'a' },
+    ]);
+  });
+});
+
+describe('toDevlakeUserOption', () => {
+  it('shows name and email, falling back to whichever exists', () => {
+    const base: AccessUser = {
+      id: 1,
+      issuer: 'i',
+      subject: 's',
+      role: ACCESS_ROLE.MEMBER,
+      status: ACCESS_STATUS.ACTIVE,
+      hasLocalCredential: false,
+      displayName: 'Ann',
+      email: EMAIL,
+    };
+    const option = toDevlakeUserOption(base);
+    expect(option).toEqual({ value: 1, label: `Ann (${EMAIL})`, email: EMAIL, name: 'Ann' });
+    expect(toDevlakeUserOption({ ...base, displayName: '', email: EMAIL }).label).toBe(EMAIL);
+    expect(toDevlakeUserOption({ ...base, email: undefined })).toMatchObject({ label: 'Ann', email: '' });
+  });
+});
+
+describe('getMenuActions', () => {
+  it('offers details and password for a normal account', () => {
+    expect(getMenuActions(user)).toEqual([GRAFANA_MENU_ACTION.DETAILS, GRAFANA_MENU_ACTION.PASSWORD]);
+  });
+
+  it('offers only details for an SSO account and nothing for a protected one', () => {
+    expect(getMenuActions({ ...user, sso: true })).toEqual([GRAFANA_MENU_ACTION.DETAILS]);
+    expect(getMenuActions({ ...user, protected: true })).toEqual([]);
   });
 });

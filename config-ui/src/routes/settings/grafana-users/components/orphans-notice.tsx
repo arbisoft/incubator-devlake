@@ -17,17 +17,21 @@
  */
 
 import { WarningOutlined } from '@ant-design/icons';
+import { Button } from 'antd';
 
 import { COPY } from '../constants';
 
-import { Notice, NoticeIcon } from './styled';
+import { Notice, NoticeIcon, NoticeText } from './styled';
 import type { OrphansNoticeProps } from './types';
 
-export const OrphansNotice = ({ count }: OrphansNoticeProps) => (
+export const OrphansNotice = ({ count, onReview }: OrphansNoticeProps) => (
   <Notice>
     <NoticeIcon aria-hidden>
       <WarningOutlined />
     </NoticeIcon>
-    <span>{COPY.orphans.notice(count)}</span>
+    <NoticeText>{COPY.orphans.notice(count)}</NoticeText>
+    <Button size="small" onClick={onReview}>
+      {COPY.actions.review}
+    </Button>
   </Notice>
 );

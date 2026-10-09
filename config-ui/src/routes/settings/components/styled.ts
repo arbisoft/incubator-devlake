@@ -16,6 +16,7 @@
  *
  */
 
+import { Modal } from 'antd';
 import styled from 'styled-components';
 
 import { textStyle } from '@/ui/style-helpers';
@@ -46,4 +47,26 @@ export const FieldError = styled.p`
   ${textStyle('caption')}
   margin: ${({ theme }) => theme.space.xxs}px 0 0;
   color: ${({ theme }) => theme.colors.errorActive};
+`;
+
+export const Dialog = styled(Modal)`
+  .ant-modal-title {
+    ${textStyle('h3')}
+  }
+
+  .ant-modal-header {
+    margin-bottom: ${({ theme }) => theme.space.lg}px;
+  }
+`;
+
+export const TitleRow = styled.span`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.xs}px;
+`;
+
+export const Hint = styled.p`
+  ${textStyle('body')}
+  margin: 0 0 ${({ theme }) => theme.space.md}px;
+  color: ${({ theme }) => theme.colors.textSecondary};
 `;

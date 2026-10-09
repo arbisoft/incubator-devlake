@@ -36,6 +36,7 @@ import {
   useRefreshVersion,
 } from '@/ui';
 
+import { TemporaryPasswordModal, type TemporaryCredential } from '../components';
 import {
   ACCESS_MODAL,
   COPY,
@@ -52,14 +53,7 @@ import { useLifecycleAction } from '../use-lifecycle-action';
 import { toAccessPagination, toStatusFilter } from '../utils';
 
 import { getDomainColumns, getUserColumns } from './columns';
-import {
-  AddDomainModal,
-  AddLocalCredentialModal,
-  AddLocalUserModal,
-  AddUserModal,
-  TemporaryPasswordModal,
-  type TemporaryCredential,
-} from './components';
+import { AddDomainModal, AddLocalCredentialModal, AddLocalUserModal, AddUserModal } from './components';
 
 export const DevlakeUsers = () => {
   const list = useListState<string, Record<string, string>>({

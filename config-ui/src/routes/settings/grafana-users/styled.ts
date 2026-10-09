@@ -16,11 +16,15 @@
  *
  */
 
-export * from './access-form-modal';
-export * from './form-note';
-export * from './login-name-field';
-export * from './role-field';
-export * from './temporary-password-modal';
-export * from './text-field';
-export type * from './types';
-export { Dialog, Fields, Hint, TitleRow } from './styled';
+import styled from 'styled-components';
+
+export const ProjectsCell = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.xs}px;
+`;
+
+export const ProjectChips = styled.div`
+  flex: 0 1 auto;
+  min-width: 0;
+`;

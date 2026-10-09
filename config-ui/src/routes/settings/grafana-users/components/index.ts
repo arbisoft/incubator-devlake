@@ -16,6 +16,12 @@
  *
  */
 
+export * from './add-user-modal';
+export * from './edit-details-modal';
 export * from './grafana-unavailable';
+export * from './more-menu';
+export * from './orphans-modal';
 export * from './orphans-notice';
+export * from './projects-modal';
+export * from './set-password-modal';
 export * from './users-card';

@@ -16,29 +16,30 @@
  *
  */
 
-import { Modal } from 'antd';
-import styled from 'styled-components';
+import { vi } from 'vitest';
 
-import { textStyle } from '@/ui/style-helpers';
+export const mockedAntdMessage = {
+  success: vi.fn(),
+  error: vi.fn(),
+  warning: vi.fn(),
+  info: vi.fn(),
+};
 
-export const Dialog = styled(Modal)`
-  .ant-modal-title {
-    ${textStyle('h3')}
-  }
+export const withMockedAntdMessage = async (importOriginal: () => Promise<typeof import('antd')>) => ({
+  ...(await importOriginal()),
+  message: mockedAntdMessage,
+});
 
-  .ant-modal-header {
-    margin-bottom: ${({ theme }) => theme.space.lg}px;
-  }
-`;
-
-export const TitleRow = styled.span`
-  display: flex;
-  align-items: center;
-  gap: ${({ theme }) => theme.space.xs}px;
-`;
-
-export const Hint = styled.p`
-  ${textStyle('body')}
-  margin: 0 0 ${({ theme }) => theme.space.md}px;
-  color: ${({ theme }) => theme.colors.textSecondary};
-`;
+export const mockGrafanaUsersApi = () => ({
+  default: {
+    grafanaUsers: {
+      createUser: vi.fn(),
+      updateUser: vi.fn(),
+      setProjects: vi.fn(),
+      setPassword: vi.fn(),
+      clearOrphan: vi.fn(),
+    },
+    project: { list: vi.fn() },
+    access: { listUsers: vi.fn() },
+  },
+});

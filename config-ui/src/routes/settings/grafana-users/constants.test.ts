@@ -20,7 +20,7 @@ import { describe, expect, it } from 'vitest';
 
 import { GRAFANA_ERROR_CODE } from '@/api/grafana-users/constants';
 
-import { COPY, GRAFANA_ERROR_MAP } from './constants';
+import { COPY, GRAFANA_ERROR_MAP, GRAFANA_FLOW_ERRORS } from './constants';
 
 describe('Grafana error copy', () => {
   it.each(Object.values(GRAFANA_ERROR_CODE))('maps %s to its copy', (code) => {
@@ -33,6 +33,15 @@ describe('Grafana error copy', () => {
     const flowMap: Record<string, string> = { ...GRAFANA_ERROR_MAP, [GRAFANA_ERROR_CODE.USER_EXISTS]: override };
     expect(flowMap[GRAFANA_ERROR_CODE.USER_EXISTS]).toBe(override);
     expect(flowMap[GRAFANA_ERROR_CODE.UNAVAILABLE]).toBe(COPY.errors[GRAFANA_ERROR_CODE.UNAVAILABLE]);
+  });
+
+  it('lets each flow override the base map after the spread and keep the other codes', () => {
+    const code = GRAFANA_ERROR_CODE.USER_PROTECTED;
+    expect(GRAFANA_FLOW_ERRORS.ROLE[code]).not.toBe(GRAFANA_ERROR_MAP[code]);
+    expect(GRAFANA_FLOW_ERRORS.ROLE[GRAFANA_ERROR_CODE.UNAVAILABLE]).toBe(
+      GRAFANA_ERROR_MAP[GRAFANA_ERROR_CODE.UNAVAILABLE],
+    );
+    expect(GRAFANA_FLOW_ERRORS.CREATE).toEqual(GRAFANA_ERROR_MAP);
   });
 
   it('never says username or login', () => {

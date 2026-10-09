@@ -22,27 +22,37 @@ import { Button, Select, Space, Tooltip, type TableColumnType } from 'antd';
 import { ACCESS_STATUS, type AccessRole, type AccessStatus } from '@/api/access';
 import { StatusBadge } from '@/ui';
 
-import type { ActionsColumnOptions, RoleColumnOptions, StatusColumnOptions } from './columns.types';
+import type { ActionsColumnOptions, RoleColumnOptions, RoleOption, StatusColumnOptions } from './columns.types';
 import { ACCESS_STATUS_TONE, ROLE_OPTIONS } from './constants';
 
-export const buildRoleColumn = <T extends object>({
+export const buildRoleColumn = <T extends object, R extends string = AccessRole>({
   key,
   title,
+  options = ROLE_OPTIONS as unknown as RoleOption<R>[],
   getRole,
   getLabel,
+  getLockedReason,
   onChange,
-}: RoleColumnOptions<T>): TableColumnType<T> => ({
+}: RoleColumnOptions<T, R>): TableColumnType<T> => ({
   key,
   title,
-  render: (_, record) => (
-    <Select<AccessRole>
-      size="small"
-      aria-label={getLabel(record)}
-      value={getRole(record)}
-      options={ROLE_OPTIONS}
-      onChange={(role) => onChange(record, role)}
-    />
-  ),
+  render: (_, record) => {
+    const role = getRole(record);
+    if (!options.some((option) => option.value === role)) return role;
+    const lockedReason = getLockedReason?.(record);
+    return (
+      <Tooltip title={lockedReason}>
+        <Select<R>
+          size="small"
+          aria-label={getLabel(record)}
+          value={role as R}
+          options={options}
+          disabled={lockedReason !== undefined}
+          onChange={(next) => onChange(record, next)}
+        />
+      </Tooltip>
+    );
+  },
 });
 
 export const buildStatusColumn = <T extends object>({
@@ -71,6 +81,9 @@ export const buildActionsColumn = <T extends object>({
   getStatus,
   getName,
   labels,
+  canToggle = () => true,
+  canRemove = () => true,
+  renderExtra,
   onToggle,
   onRemove,
 }: ActionsColumnOptions<T>): TableColumnType<T> => ({
@@ -83,22 +96,27 @@ export const buildActionsColumn = <T extends object>({
     const nextStatus: AccessStatus = active ? ACCESS_STATUS.DISABLED : ACCESS_STATUS.ACTIVE;
     return (
       <Space size="small">
-        <Button
-          danger={active}
-          aria-label={active ? labels.disableFor(name) : labels.enableFor(name)}
-          onClick={() => onToggle(record, nextStatus)}
-        >
-          {active ? labels.disable : labels.enable}
-        </Button>
-        <Tooltip title={labels.removeFor(name)}>
+        {canToggle(record) && (
           <Button
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
-            aria-label={labels.removeFor(name)}
-            onClick={() => onRemove(record)}
-          />
-        </Tooltip>
+            danger={active}
+            aria-label={active ? labels.disableFor(name) : labels.enableFor(name)}
+            onClick={() => onToggle(record, nextStatus)}
+          >
+            {active ? labels.disable : labels.enable}
+          </Button>
+        )}
+        {renderExtra?.(record)}
+        {canRemove(record) && (
+          <Tooltip title={labels.removeFor(name)}>
+            <Button
+              type="text"
+              danger
+              icon={<DeleteOutlined />}
+              aria-label={labels.removeFor(name)}
+              onClick={() => onRemove(record)}
+            />
+          </Tooltip>
+        )}
       </Space>
     );
   },

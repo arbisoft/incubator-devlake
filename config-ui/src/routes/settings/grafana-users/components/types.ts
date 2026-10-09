@@ -16,9 +16,40 @@
  *
  */
 
-export type OrphansNoticeProps = { count: number };
+import type { LabeledValue } from 'antd/es/select';
+
+import type { GrafanaOrphan, GrafanaUser } from '@/api/grafana-users/types';
+
+import type { DevlakeUserOption, GrafanaMenuAction, OneTimePassword } from '../types';
+
+export type OrphansNoticeProps = { count: number; onReview: () => void };
 
 export type GrafanaUnavailableProps = {
   message: string;
   onRetry: () => void;
+};
+
+export type PasswordFieldProps = { value: string; disabled?: boolean; onChange: (value: string) => void };
+
+export type ProjectsPickerProps = { value: string[]; onChange: (value: string[]) => void };
+
+export type DevlakeUserSelectProps = {
+  value?: LabeledValue;
+  disabled?: boolean;
+  onPick: (option?: DevlakeUserOption) => void;
+};
+
+type DialogBase = { open: boolean; onClose: () => void; onChanged: () => void };
+
+export type AddUserModalProps = DialogBase & { onPassword: (credential: OneTimePassword) => void };
+
+export type UserDialogProps = DialogBase & { user?: GrafanaUser };
+
+export type SetPasswordModalProps = UserDialogProps & { onPassword: (credential: OneTimePassword) => void };
+
+export type OrphansModalProps = DialogBase & { orphans: GrafanaOrphan[] };
+
+export type GrafanaMoreMenuProps = {
+  user: GrafanaUser;
+  onSelect: (action: GrafanaMenuAction) => void;
 };

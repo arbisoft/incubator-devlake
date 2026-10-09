@@ -29,15 +29,26 @@ import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 import { COPY, MAX_VISIBLE_PROJECTS } from './constants';
 import { GrafanaUsers } from './grafana-users';
 
-vi.mock('@/api', () => ({ default: { grafanaUsers: { status: vi.fn(), listUsers: vi.fn() } } }));
+vi.mock('antd', async (importOriginal) => {
+  const { withMockedAntdMessage } = await import('../__tests__/test-utils');
+  return withMockedAntdMessage(importOriginal);
+});
+
+vi.mock('@/api', () => ({
+  default: { grafanaUsers: { status: vi.fn(), listUsers: vi.fn(), setPassword: vi.fn() } },
+}));
 
 const status = vi.mocked(API.grafanaUsers.status);
 const listUsers = vi.mocked(API.grafanaUsers.listUsers);
+const setPassword = vi.mocked(API.grafanaUsers.setPassword);
+const EMAIL = 'ann@example.com';
+const USER_NAME = 'Ann Lee';
+const MODAL_SELECTOR = '.ant-modal';
 
 const user = (patch: Partial<GrafanaUser>): GrafanaUser => ({
   id: 1,
-  email: 'ann@example.com',
-  name: 'Ann Lee',
+  email: EMAIL,
+  name: USER_NAME,
   role: GRAFANA_ROLE.VIEWER,
   disabled: false,
   sso: false,
@@ -66,6 +77,7 @@ describe('GrafanaUsers', () => {
   beforeEach(() => {
     status.mockReset().mockResolvedValue({ available: true });
     listUsers.mockReset().mockResolvedValue(list());
+    setPassword.mockReset().mockResolvedValue(undefined);
   });
 
   it('shows the status copy with a retry, and no search, table or list call, when Grafana is unavailable', async () => {
@@ -98,7 +110,7 @@ describe('GrafanaUsers', () => {
       }),
     );
     setup();
-    expect(await screen.findByText('Ann Lee')).toBeTruthy();
+    expect(await screen.findByText(USER_NAME)).toBeTruthy();
     expect(screen.getByRole('table', { name: COPY.tableLabel })).toBeTruthy();
     expect(screen.getByRole('img', { name: COPY.sso.label })).toBeTruthy();
     expect(screen.getByText(GRAFANA_ROLE.ADMIN)).toBeTruthy();
@@ -111,7 +123,7 @@ describe('GrafanaUsers', () => {
 
   it('asks for the page and keyword in the URL', async () => {
     setup('/?keyword=ann&page=2&pageSize=25');
-    await screen.findByText('Ann Lee');
+    await screen.findByText(USER_NAME);
     expect(listUsers).toHaveBeenCalledWith({ page: 2, pageSize: 25, query: 'ann' }, expect.any(AbortSignal));
   });
 
@@ -135,7 +147,7 @@ describe('GrafanaUsers', () => {
 
     listUsers.mockResolvedValue(list());
     setup();
-    await screen.findByText('Ann Lee');
+    await screen.findByText(USER_NAME);
     expect(screen.queryByText(/saved dashboard mapping/)).toBeNull();
   });
 
@@ -156,8 +168,30 @@ describe('GrafanaUsers', () => {
     listUsers.mockRejectedValueOnce(new Error('boom'));
     setup('/?keyword=ann');
     fireEvent.click(await screen.findByRole('button', { name: COMMON_COPY.retry }));
-    expect(await screen.findByText('Ann Lee')).toBeTruthy();
+    expect(await screen.findByText(USER_NAME)).toBeTruthy();
     expect(listUsers).toHaveBeenCalledTimes(2);
     expect(listUsers.mock.calls[1][0]).toEqual(listUsers.mock.calls[0][0]);
+  });
+
+  it('shows the one-time password after a password change, then clears it when the dialog closes', async () => {
+    const password = 'a-long-enough-password';
+    setup();
+    fireEvent.click(await screen.findByRole('button', { name: COPY.actions.moreFor(EMAIL) }));
+    fireEvent.click(await screen.findByText(COPY.actions.setPassword));
+    fireEvent.change(await screen.findByLabelText(new RegExp(`^${COPY.password.label}`)), {
+      target: { value: password },
+    });
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`${COPY.setPassword.submit}$`) }));
+
+    const shown = await screen.findByLabelText(COPY.password.oneTime.passwordFor(EMAIL));
+    expect((shown as HTMLInputElement).value).toBe(password);
+    expect(screen.getByText(COPY.password.oneTime.hint(EMAIL))).toBeTruthy();
+    expect(listUsers).toHaveBeenCalledTimes(2);
+
+    fireEvent.click(screen.getByRole('button', { name: COPY.password.oneTime.done }));
+    const otp = screen.getByText(COPY.password.oneTime.title).closest(MODAL_SELECTOR) as HTMLElement;
+    await waitFor(() => expect(otp.classList.contains('ant-zoom-leave-active')).toBe(true));
+    fireEvent.transitionEnd(otp);
+    await waitFor(() => expect(screen.queryAllByLabelText(COPY.password.oneTime.passwordFor(EMAIL))).toHaveLength(0));
   });
 });
