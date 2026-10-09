@@ -52,6 +52,7 @@ export type ShadowTokens = {
   flyout: string;
   popover: string;
 };
+type MeterSegmentTokens = { width: number; height: number; gap: number };
 export type LayoutTokens = {
   sidebarWidth: number;
   sidebarRailWidth: number;
@@ -94,6 +95,7 @@ export type LayoutTokens = {
   pipelineTaskDurationWidth: number;
   pipelineProgressWidth: number;
   catalogCardMinWidth: number;
+  connectionCardMinWidth: number;
   otelTeamColumnWidth: number;
   otelProjectsColumnWidth: number;
   otelOrganizationColumnWidth: number;
@@ -102,6 +104,11 @@ export type LayoutTokens = {
   otelCredentialsColumnWidth: number;
   otelUpdatedColumnWidth: number;
   otelActionsColumnWidth: number;
+  meterSegment: { sm: MeterSegmentTokens; md: MeterSegmentTokens };
+  readinessPopoverWidth: number;
+  popoverListMaxHeight: number;
+  connectionsPopoverWidth: number;
+  signalIconSize: { sm: number; md: number };
   segmentInset: number;
   segmentPaddingBlock: number;
   segmentPaddingInline: number;
@@ -196,6 +203,7 @@ export const LAYOUT: LayoutTokens = {
   pipelineTaskDurationWidth: 64,
   pipelineProgressWidth: 250,
   catalogCardMinWidth: 272,
+  connectionCardMinWidth: 256,
   otelTeamColumnWidth: 120,
   otelProjectsColumnWidth: 120,
   otelOrganizationColumnWidth: 120,
@@ -204,6 +212,11 @@ export const LAYOUT: LayoutTokens = {
   otelCredentialsColumnWidth: 110,
   otelUpdatedColumnWidth: 90,
   otelActionsColumnWidth: 250,
+  meterSegment: { sm: { width: 13, height: 6, gap: 3 }, md: { width: 22, height: 8, gap: 4 } },
+  readinessPopoverWidth: 380,
+  popoverListMaxHeight: 320,
+  connectionsPopoverWidth: 370,
+  signalIconSize: { sm: 16, md: 20 },
   segmentInset: 2,
   segmentPaddingBlock: 3,
   segmentPaddingInline: 11,

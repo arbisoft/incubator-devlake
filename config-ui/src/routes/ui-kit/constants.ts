@@ -29,6 +29,7 @@ export const SECTION = {
   EMPTY_STATE: 'emptyState',
   METRIC_TILE: 'metricTile',
   PIPELINE_PROGRESS: 'pipelineProgress',
+  SEGMENTED_METER: 'segmentedMeter',
   SEARCH_INPUT: 'searchInput',
   FILTER_TABS: 'filterTabs',
   SORT_SELECT: 'sortSelect',
@@ -84,6 +85,7 @@ export const COPY = {
     emptyState: 'EmptyState',
     metricTile: 'MetricTile',
     pipelineProgress: 'PipelineProgress',
+    segmentedMeter: 'SegmentedMeter',
     searchInput: 'SearchInput',
     filterTabs: 'FilterTabs',
     sortSelect: 'SortSelect',
@@ -241,6 +243,10 @@ export const COPY = {
     longLabel: 'Records synced across every connected source this month',
   },
   pipelineProgress: { status: (status: string) => `Status ${status}` },
+  segmentedMeter: {
+    tone: { none: 'No segments filled', partial: 'Partly filled', complete: 'All filled' },
+    label: (filled: number, total: number) => `${filled} of ${total} signals available`,
+  },
   searchInput: {
     placeholder: 'Search users',
     submitted: (keyword: string) => `Last search: "${keyword}"`,
