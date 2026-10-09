@@ -23,7 +23,7 @@ import { useCallback, useState } from 'react';
 
 import API from '@/api';
 import { GRAFANA_ROLE } from '@/api/grafana-users/constants';
-import type { GrafanaRole } from '@/api/grafana-users/types';
+import type { GrafanaRole, GrafanaUser } from '@/api/grafana-users/types';
 import { FormField, FormModal, useModalForm } from '@/ui';
 import { operator } from '@/utils';
 
@@ -49,10 +49,35 @@ type AddForm = { email: string; name: string; password: string; role: GrafanaRol
 
 const INITIAL_FORM: AddForm = { email: '', name: '', password: '', role: GRAFANA_ROLE.VIEWER, projects: [] };
 const copy = COPY.add;
+const PARTIAL_LOOKUP_PAGE_SIZE = 100;
 
-const finishPartial = async (id: ID, { role, projects }: AddForm): Promise<void> => {
-  if (role !== GRAFANA_ROLE.VIEWER) await API.grafanaUsers.updateUser(id, { role });
-  if (projects.length > 0) await API.grafanaUsers.setProjects(id, projects);
+const findPartialUser = async (id: ID, email: string): Promise<GrafanaUser | undefined> => {
+  let pageCount = 1;
+  for (let page = 1; page <= pageCount; page++) {
+    const result = await API.grafanaUsers.listUsers({
+      query: email,
+      page,
+      pageSize: PARTIAL_LOOKUP_PAGE_SIZE,
+    });
+    const found = result.users.find((user) => String(user.id) === String(id));
+    if (found) return found;
+
+    // The list count excludes the management user, which may still occupy a page slot.
+    pageCount = Math.max(pageCount, Math.ceil((result.count + 1) / PARTIAL_LOOKUP_PAGE_SIZE));
+  }
+  return undefined;
+};
+
+const sameProjectSet = (left: string[], right: string[]): boolean => {
+  const leftSet = new Set(left);
+  const rightSet = new Set(right);
+  return leftSet.size === rightSet.size && [...leftSet].every((project) => rightSet.has(project));
+};
+
+const finishPartial = async (id: ID, { email, role, projects }: AddForm): Promise<void> => {
+  const current = await findPartialUser(id, normalizeEmail(email));
+  if (!current || current.role !== role) await API.grafanaUsers.updateUser(id, { role });
+  if (!current || !sameProjectSet(current.projects, projects)) await API.grafanaUsers.setProjects(id, projects);
 };
 
 export const AddUserModal = ({ open, onClose, onChanged, onPassword }: AddUserModalProps) => {

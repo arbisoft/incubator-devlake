@@ -33,6 +33,7 @@ export const withMockedAntdMessage = async (importOriginal: () => Promise<typeof
 export const mockGrafanaUsersApi = () => ({
   default: {
     grafanaUsers: {
+      listUsers: vi.fn(),
       createUser: vi.fn(),
       updateUser: vi.fn(),
       setProjects: vi.fn(),
