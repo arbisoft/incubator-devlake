@@ -276,6 +276,16 @@ func PatchProject(name string, body map[string]interface{}) (*models.ApiOutputPr
 		if err != nil {
 			return nil, err
 		}
+
+		// UserProjectMapping
+		err = tx.UpdateColumn(
+			&models.UserProjectMapping{},
+			"project_name", project.Name,
+			dal.Where("project_name = ?", name),
+		)
+		if err != nil {
+			return nil, err
+		}
 		if projectService != nil {
 			if err := projectService.RenameProject(tx, name, project.Name); err != nil {
 				return nil, err
