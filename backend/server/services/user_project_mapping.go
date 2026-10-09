@@ -78,3 +78,106 @@ func DeleteAllMappingsForUser(userLogin string) errors.Error {
 	}
 	return nil
 }
+
+// GetUserProjectMappingsForLogins returns the mappings of the given logins in one query, ordered by login then project.
+func GetUserProjectMappingsForLogins(userLogins []string) ([]*models.UserProjectMapping, errors.Error) {
+	mappings := make([]*models.UserProjectMapping, 0)
+	if len(userLogins) == 0 {
+		return mappings, nil
+	}
+	err := db.All(&mappings, dal.Where("user_login IN ?", userLogins), dal.Orderby("user_login, project_name"))
+	if err != nil {
+		return nil, errors.Default.Wrap(err, "error getting user project mappings for logins")
+	}
+	return mappings, nil
+}
+
+// GetUserProjectMappingLogins returns the distinct logins that have at least one mapping.
+func GetUserProjectMappingLogins() ([]string, errors.Error) {
+	var logins []string
+	err := db.Pluck("user_login", &logins, dal.From(&models.UserProjectMapping{}), dal.Groupby("user_login"), dal.Orderby("user_login"))
+	if err != nil {
+		return nil, errors.Default.Wrap(err, "error getting user project mapping logins")
+	}
+	return logins, nil
+}
+
+// inMappingTransaction runs work and then during in one transaction; any error or panic rolls everything back.
+func inMappingTransaction(work func(tx dal.Transaction) errors.Error, during func() errors.Error) (err errors.Error) {
+	tx := db.Begin()
+	defer func() {
+		if r := recover(); r != nil || err != nil {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				logger.Error(rollbackErr, "user project mapping: failed to rollback")
+			}
+			if r != nil {
+				err = errors.Default.New("user project mapping transaction panicked")
+			}
+		}
+	}()
+	if err = work(tx); err != nil {
+		return err
+	}
+	if during != nil {
+		if err = during(); err != nil {
+			return err
+		}
+	}
+	err = tx.Commit()
+	return err
+}
+
+// ReplaceUserProjectMappings makes the login's mapped projects exactly the given set.
+func ReplaceUserProjectMappings(login string, projectNames []string) errors.Error {
+	return inMappingTransaction(func(tx dal.Transaction) errors.Error {
+		var err errors.Error
+		if len(projectNames) == 0 {
+			err = tx.Delete(&models.UserProjectMapping{}, dal.Where("user_login = ?", login))
+		} else {
+			err = tx.Delete(&models.UserProjectMapping{}, dal.Where("user_login = ? AND project_name NOT IN ?", login, projectNames))
+		}
+		if err != nil {
+			return errors.Default.Wrap(err, "error removing user project mappings")
+		}
+		for _, name := range projectNames {
+			if err = tx.CreateIfNotExist(&models.UserProjectMapping{UserLogin: login, ProjectName: name}); err != nil {
+				return errors.Default.Wrap(err, "error adding user project mapping")
+			}
+		}
+		return nil
+	}, nil)
+}
+
+// MoveUserProjectMappings re-keys the old login's rows to the new login, replacing any rows already stored under the new one.
+// It returns how many rows under the new login were dropped; during runs inside the transaction and a failure rolls back.
+func MoveUserProjectMappings(oldLogin, newLogin string, during func() errors.Error) (int64, errors.Error) {
+	var dropped int64
+	err := inMappingTransaction(func(tx dal.Transaction) errors.Error {
+		count, err := tx.Count(dal.From(&models.UserProjectMapping{}), dal.Where("user_login = ?", newLogin))
+		if err != nil {
+			return errors.Default.Wrap(err, "error counting user project mappings")
+		}
+		dropped = count
+		if err = tx.Delete(&models.UserProjectMapping{}, dal.Where("user_login = ?", newLogin)); err != nil {
+			return errors.Default.Wrap(err, "error removing user project mappings")
+		}
+		if err = tx.UpdateColumn(&models.UserProjectMapping{}, "user_login", newLogin, dal.Where("user_login = ?", oldLogin)); err != nil {
+			return errors.Default.Wrap(err, "error moving user project mappings")
+		}
+		return nil
+	}, during)
+	if err != nil {
+		return 0, err
+	}
+	return dropped, nil
+}
+
+// DeleteUserProjectMappingsForLogin removes every row of the login; during runs inside the transaction and a failure rolls back.
+func DeleteUserProjectMappingsForLogin(login string, during func() errors.Error) errors.Error {
+	return inMappingTransaction(func(tx dal.Transaction) errors.Error {
+		if err := tx.Delete(&models.UserProjectMapping{}, dal.Where("user_login = ?", login)); err != nil {
+			return errors.Default.Wrap(err, "error deleting user project mappings")
+		}
+		return nil
+	}, during)
+}
