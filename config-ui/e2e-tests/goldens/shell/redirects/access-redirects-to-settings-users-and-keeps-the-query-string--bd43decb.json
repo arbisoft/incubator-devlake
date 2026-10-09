@@ -1,0 +1,7 @@
+{
+  "titlePath": [
+    "legacy routes and url-based project tabs",
+    "/access redirects to /settings/users and keeps the query string"
+  ],
+  "writes": []
+}

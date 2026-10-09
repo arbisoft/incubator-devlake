@@ -19,7 +19,8 @@
 import { redirect } from 'react-router-dom';
 
 import API from '@/api';
-import { PATH_PREFIX } from './constants';
+import { PATHS } from '@/config';
+
 import { canManageAccess } from './guard';
 
 export const accessLoader = async () => {
@@ -27,5 +28,5 @@ export const accessLoader = async () => {
   if (canManageAccess(access)) {
     return null;
   }
-  return redirect(PATH_PREFIX || '/');
+  return redirect(PATHS.ROOT());
 };

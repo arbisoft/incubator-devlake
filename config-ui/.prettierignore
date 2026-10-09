@@ -16,3 +16,5 @@
 
 dist
 node_modules
+# Appended-only guide; keep the original lines as they are
+LINT_TOOLING_SETUP.md

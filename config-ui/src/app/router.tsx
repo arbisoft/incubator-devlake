@@ -16,8 +16,10 @@
  *
  */
 
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate, type RouteObject } from 'react-router-dom';
 
+import { PageLoading } from '@/components';
+import { PATHS, PROJECT_TAB, ROUTE_SEGMENTS } from '@/config';
 import {
   DBMigrate,
   Onboard,
@@ -40,29 +42,45 @@ import {
   Access,
   accessLoader,
   NotFound,
+  ParamRedirect,
 } from '@/routes';
 
 const PATH_PREFIX = import.meta.env.DEVLAKE_PATH_PREFIX ?? '';
 
-export const router = createBrowserRouter([
+const devRoutes: RouteObject[] = import.meta.env.DEV
+  ? [
+      {
+        path: `${PATHS.UI_KIT()}/${ROUTE_SEGMENTS.WILDCARD}`,
+        hydrateFallbackElement: <PageLoading />,
+        lazy: async () => ({ Component: (await import('@/routes/ui-kit')).UiKit }),
+      },
+    ]
+  : [];
+
+const projectTabRoutes: RouteObject[] = Object.values(PROJECT_TAB).map((tab) => ({
+  path: ROUTE_SEGMENTS.PROJECT_TAB(tab),
+  element: <ProjectDetailPage />,
+}));
+
+export const routes: RouteObject[] = [
   {
-    path: '/',
-    element: <Navigate to={PATH_PREFIX ? PATH_PREFIX : '/connections'} />,
+    path: ROUTE_SEGMENTS.ROOT,
+    element: <Navigate to={PATH_PREFIX ? PATH_PREFIX : PATHS.CONNECTIONS()} />,
   },
   {
-    path: `${PATH_PREFIX}/db-migrate`,
+    path: `${PATH_PREFIX}/${ROUTE_SEGMENTS.DB_MIGRATE}`,
     element: <DBMigrate />,
   },
   {
-    path: `${PATH_PREFIX}/login`,
+    path: `${PATH_PREFIX}/${ROUTE_SEGMENTS.LOGIN}`,
     element: <Login />,
   },
   {
-    path: `${PATH_PREFIX}/change-password`,
+    path: `${PATH_PREFIX}/${ROUTE_SEGMENTS.CHANGE_PASSWORD}`,
     element: <ChangePassword />,
   },
   {
-    path: `${PATH_PREFIX}/onboard`,
+    path: `${PATH_PREFIX}/${ROUTE_SEGMENTS.ONBOARD}`,
     element: <Onboard />,
   },
   {
@@ -73,70 +91,99 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <Navigate to="projects" />,
+        element: <Navigate to={ROUTE_SEGMENTS.PROJECTS} />,
       },
       {
-        path: 'projects',
+        path: ROUTE_SEGMENTS.PROJECTS,
         element: <ProjectHomePage />,
       },
       {
-        path: 'projects/:pname',
-        element: <ProjectDetailPage />,
+        path: ROUTE_SEGMENTS.PROJECT,
+        element: <ParamRedirect to={({ pname = '' }) => PATHS.PROJECT_TAB(pname, PROJECT_TAB.BLUEPRINT)} />,
       },
+      ...projectTabRoutes,
       {
-        path: 'projects/:pname/:unique',
+        path: ROUTE_SEGMENTS.PROJECT_CONNECTION,
         element: <BlueprintConnectionDetailPage />,
       },
       {
-        path: 'connections',
+        path: ROUTE_SEGMENTS.PROJECT_CONNECTION_LEGACY,
+        element: (
+          <ParamRedirect to={({ pname = '', unique = '' }) => PATHS.PROJECT_BLUEPRINT_CONNECTION(pname, unique)} />
+        ),
+      },
+      {
+        path: ROUTE_SEGMENTS.CONNECTIONS,
         element: <Connections />,
       },
       {
-        path: 'connections/:plugin/:id',
+        path: ROUTE_SEGMENTS.CONNECTION,
         element: <Connection />,
       },
       {
-        path: 'advanced',
+        path: ROUTE_SEGMENTS.ADVANCED,
         children: [
           {
-            path: 'blueprints',
+            path: ROUTE_SEGMENTS.BLUEPRINTS,
             element: <BlueprintHomePage />,
           },
           {
-            path: 'blueprints/:id',
+            path: ROUTE_SEGMENTS.BLUEPRINT,
             element: <BlueprintDetailPage />,
           },
           {
-            path: 'blueprints/:bid/:unique',
+            path: ROUTE_SEGMENTS.BLUEPRINT_CONNECTION,
             element: <BlueprintConnectionDetailPage />,
           },
           {
-            path: 'pipelines',
+            path: ROUTE_SEGMENTS.BLUEPRINT_CONNECTION_LEGACY,
+            element: (
+              <ParamRedirect to={({ bid = '', unique = '' }) => PATHS.BLUEPRINT_CONNECTION_UNIQUE(bid, unique)} />
+            ),
+          },
+          {
+            path: ROUTE_SEGMENTS.PIPELINES,
             element: <Pipelines />,
           },
           {
-            path: 'pipeline/:id',
+            path: ROUTE_SEGMENTS.PIPELINE,
             element: <Pipeline />,
           },
         ],
       },
       {
-        path: 'keys',
+        path: ROUTE_SEGMENTS.KEYS,
         element: <ApiKeys />,
       },
       {
-        path: 'access',
-        element: <Access />,
-        loader: accessLoader,
+        path: ROUTE_SEGMENTS.ACCESS,
+        element: <ParamRedirect to={PATHS.SETTINGS_USERS} />,
       },
       {
-        path: 'otel',
+        path: ROUTE_SEGMENTS.SETTINGS,
+        loader: accessLoader,
+        children: [
+          {
+            index: true,
+            element: <ParamRedirect to={PATHS.SETTINGS_USERS} />,
+          },
+          {
+            path: ROUTE_SEGMENTS.SETTINGS_USERS,
+            element: <Access />,
+          },
+        ],
+      },
+      {
+        path: ROUTE_SEGMENTS.OTEL,
         element: <Otel />,
       },
     ],
   },
+  ...devRoutes,
   {
-    path: '*',
+    path: ROUTE_SEGMENTS.WILDCARD,
     element: <NotFound />,
   },
-]);
+];
+
+export const router = createBrowserRouter(routes);

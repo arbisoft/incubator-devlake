@@ -15,16 +15,20 @@
  * limitations under the License.
  *
  */
-import { useParams } from 'react-router-dom';
 import { Card } from 'antd';
+import { useParams } from 'react-router-dom';
 
 import { PageHeader } from '@/components';
 import { PATHS } from '@/config';
+import { useDocumentTitle } from '@/ui/hooks';
 
 import { PipelineInfo, PipelineTasks } from './components';
+import { COPY } from './constants';
 
 export const Pipeline = () => {
   const { id } = useParams();
+
+  useDocumentTitle(COPY.detailTitle(id as string));
 
   return (
     <PageHeader

@@ -1,0 +1,21 @@
+{
+  "titlePath": ["sidebar", "Settings is shown to an admin and hidden from a member"],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/access/local-users",
+      "body": {
+        "displayName": "",
+        "loginName": "e2e_*",
+        "role": "member"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/local/change-password",
+      "body": {
+        "password": "<masked>"
+      }
+    }
+  ]
+}

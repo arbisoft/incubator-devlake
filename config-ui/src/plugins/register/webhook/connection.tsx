@@ -16,12 +16,12 @@
  *
  */
 
-import { useState } from 'react';
 import { EyeOutlined, FormOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { Flex, Table, Space, Button } from 'antd';
+import { useState } from 'react';
 
-import { useAppSelector } from '@/hooks';
 import { selectWebhooks } from '@/features/connections';
+import { useAppSelector } from '@/hooks';
 import { IWebhook } from '@/types';
 
 import { CreateDialog, ViewDialog, EditDialog, DeleteDialog } from './components';

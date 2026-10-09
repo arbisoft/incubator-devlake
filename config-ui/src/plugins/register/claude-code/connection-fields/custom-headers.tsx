@@ -16,8 +16,8 @@
  *
  */
 
-import { useEffect, type ChangeEvent } from 'react';
 import { Button, Input } from 'antd';
+import { useEffect, type ChangeEvent } from 'react';
 
 import { Block } from '@/components';
 

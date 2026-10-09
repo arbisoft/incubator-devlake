@@ -15,23 +15,27 @@
  * limitations under the License.
  *
  */
-import { test, expect } from '../fixtures';
 import { loginAsAdmin } from '../auth-helpers';
+import { test, expect } from '../fixtures';
+import { ActivityPage } from '../support/pages/activity';
+import { SettingsUsersPage } from '../support/pages/settings-users';
+import { ShellPage } from '../support/pages/shell';
 
 test.describe('Access Management & Authentication', () => {
   test('loads access page for authenticated admin', async ({ page, context }) => {
     await loginAsAdmin(context);
 
-    await page.goto('/access');
-    await expect(page).toHaveURL(/.*\/access/);
+    const usersPage = new SettingsUsersPage(page);
+    await usersPage.open();
+    await expect(page).toHaveURL(usersPage.urlPattern);
 
     // Verify navigation and core access sections are visible
-    await expect(page.getByRole('menu').getByText('User Management')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Allowed domains' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Recent access activity' })).toBeVisible();
+    await expect(new ShellPage(page).usersMenuItem).toBeVisible();
+    await expect(usersPage.ready).toBeVisible();
+    await expect(new ActivityPage(page).recentActivityHeading).toBeVisible();
 
     // Verify user directory heading (People / User Directory)
-    const userSection = page.getByRole('heading', { name: /People|User|Authentication/i }).first();
+    const userSection = usersPage.directoryHeading;
     await expect(userSection).toBeVisible();
   });
 });

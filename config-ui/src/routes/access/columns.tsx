@@ -16,8 +16,8 @@
  *
  */
 
-import { Button, Popconfirm, Select, Space, Tag, Tooltip } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
+import { Button, Popconfirm, Select, Space, Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 
 import {

@@ -16,10 +16,10 @@
  *
  */
 
-import { useState, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
 import { PlusOutlined, SettingOutlined } from '@ant-design/icons';
 import { Flex, Table, Modal, Radio, Button, Input, Tag } from 'antd';
+import { useState, useMemo } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
 import API from '@/api';
 import { PageHeader, Block, TextTooltip, IconButton } from '@/components';
@@ -27,12 +27,17 @@ import { getCronOptions, cronPresets, getCron, PATHS } from '@/config';
 import { ConnectionName } from '@/features';
 import { useRefreshData } from '@/hooks';
 import { IBlueprint, IBPMode } from '@/types';
+import { useDocumentTitle } from '@/ui/hooks';
 import { formatTime, operator } from '@/utils';
 
-import { buildBlueprintCreatePayload } from './utils';
+import { COPY } from '../constants';
+
 import * as S from './styled';
+import { buildBlueprintCreatePayload } from './utils';
 
 export const BlueprintHomePage = () => {
+  useDocumentTitle(COPY.title);
+
   const [version, setVersion] = useState(1);
   const [type, setType] = useState('all');
   const [page, setPage] = useState(1);

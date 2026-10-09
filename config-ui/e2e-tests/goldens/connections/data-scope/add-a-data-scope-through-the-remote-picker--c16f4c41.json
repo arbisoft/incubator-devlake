@@ -1,0 +1,34 @@
+{
+  "titlePath": ["GitHub data scope and scope config on a connection", "add a data scope through the remote picker"],
+  "writes": [
+    {
+      "method": "PUT",
+      "path": "/api/plugins/github/connections/:id/scopes",
+      "body": {
+        "data": [
+          {
+            "HTMLUrl": "https://github.com/octocat/Hello-World",
+            "_raw_data_id": 0,
+            "_raw_data_params": "",
+            "_raw_data_remark": "",
+            "_raw_data_table": "",
+            "cloneUrl": "https://github.com/octocat/Hello-World.git",
+            "connectionId": "<masked>",
+            "createdAt": "<masked>",
+            "createdDate": "<masked>",
+            "description": "My first repository on GitHub!",
+            "fullName": "octocat/Hello-World",
+            "githubId": "<masked>",
+            "language": "",
+            "name": "Hello-World",
+            "ownerId": "<masked>",
+            "parentHtmlUrl": "",
+            "parentId": 0,
+            "updatedAt": "<masked>",
+            "updatedDate": "<masked>"
+          }
+        ]
+      }
+    }
+  ]
+}

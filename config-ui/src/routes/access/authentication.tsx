@@ -16,20 +16,20 @@
  *
  */
 
-import { useMemo, useState } from 'react';
 import { PlusOutlined } from '@ant-design/icons';
 import { Alert, Button, Space, Table, Tooltip, message } from 'antd';
+import { useMemo, useState } from 'react';
 
 import API from '@/api';
 import type { OIDCCallbacks, OIDCProvider } from '@/api/access';
 import { Message } from '@/components';
 import { operator } from '@/utils';
 
+import { type ActiveOperation, type Operation, getAuthenticationColumns } from './authentication-columns';
+import { AuthenticationEditor } from './authentication-editor';
 import { OIDC_PROVIDER_MESSAGE } from './constants';
 import { SectionHeader, SectionTitle } from './styled';
 import { getAuthenticationState, getOIDCProviderError } from './utils';
-import { type ActiveOperation, type Operation, getAuthenticationColumns } from './authentication-columns';
-import { AuthenticationEditor } from './authentication-editor';
 
 type Props = {
   callbacks?: OIDCCallbacks;
