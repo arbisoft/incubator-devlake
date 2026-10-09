@@ -17,7 +17,7 @@
  */
 import { Locator, Page } from '@playwright/test';
 
-import { COMMON_COPY, SETTINGS_COPY } from '../app-copy';
+import { COMMON_COPY, SETTINGS_COPY, USER_MANAGEMENT_COPY } from '../app-copy';
 
 import { BasePage, Screen, firstCellTexts, modalWithText, selectBox, chooseOption, urlEndingWith } from './common';
 import { PATHS } from './paths';
@@ -158,15 +158,19 @@ export class SettingsUsersPage extends BasePage implements Screen {
   }
 
   get ready(): Locator {
-    return this.page.getByRole('heading', { name: SETTINGS_COPY.domains.title });
+    return this.page.getByRole('heading', { name: USER_MANAGEMENT_COPY.title, exact: true });
+  }
+
+  private get usersCard(): Locator {
+    return this.page.getByRole('region', { name: SETTINGS_COPY.users.title, exact: true });
   }
 
   get directoryHeading(): Locator {
-    return this.page.getByRole('heading', { name: SETTINGS_COPY.users.title, exact: true }).first();
+    return this.usersCard.getByRole('heading', { name: SETTINGS_COPY.users.title, exact: true });
   }
 
   get addLocalUserButton(): Locator {
-    return this.page.getByRole('button', { name: SETTINGS_COPY.users.addLocalUser });
+    return this.usersCard.getByRole('button', { name: SETTINGS_COPY.users.addLocalUser, exact: true });
   }
 
   async openAddLocalUser(): Promise<LocalUserDialog> {
@@ -191,15 +195,15 @@ export class SettingsUsersPage extends BasePage implements Screen {
   }
 
   async search(keyword: string): Promise<void> {
-    const box = this.page.getByRole('textbox', { name: SETTINGS_COPY.users.searchPlaceholder });
+    const box = this.usersCard.getByRole('textbox', { name: SETTINGS_COPY.users.searchPlaceholder, exact: true });
     await box.fill(keyword);
     await box.press('Enter');
   }
 
   get statusFilterTrigger(): Locator {
-    return this.page
-      .getByRole('region', { name: SETTINGS_COPY.users.title, exact: true })
-      .getByRole('columnheader', { name: SETTINGS_COPY.users.columns.status })
+    return this.usersCard
+      .getByRole('columnheader')
+      .filter({ has: this.page.getByText(SETTINGS_COPY.users.columns.status, { exact: true }) })
       .locator('.ant-table-filter-trigger');
   }
 
@@ -222,12 +226,12 @@ export class SettingsUsersPage extends BasePage implements Screen {
 
   // The email or login shown under each name in the users table.
   async userIdentities(): Promise<string[]> {
-    const cells = await firstCellTexts(this.page.getByRole('region', { name: SETTINGS_COPY.users.title, exact: true }));
+    const cells = await firstCellTexts(this.usersCard);
     return cells.map((text) => text.split('\n').pop()?.trim() ?? '');
   }
 
   get noResults(): Locator {
-    return this.page.getByRole('heading', { name: SETTINGS_COPY.users.noResults.title });
+    return this.usersCard.getByRole('heading', { name: SETTINGS_COPY.users.noResults.title, exact: true });
   }
 
   userRow(login: string): AccessUserRow {

@@ -57,6 +57,7 @@ export { COPY as DATA_SCOPE_SELECT_COPY } from '../../src/plugins/components/dat
 export { COPY as READINESS_COPY, READINESS_SIGNAL } from '../../src/routes/project/readiness/constants';
 export { COPY as PROJECT_DETAIL_COPY } from '../../src/routes/project/detail/constants';
 export { COPY as SETTINGS_COPY } from '../../src/routes/settings/constants';
+export { COPY as USER_MANAGEMENT_COPY } from '../../src/routes/settings/user-management/constants';
 export { COPY as AUTH_COPY } from '../../src/routes/settings/authentication/constants';
 export { COPY as ACTIVITY_COPY } from '../../src/routes/settings/activity/constants';
 export { COPY as SORT_SELECT_COPY } from '../../src/ui/sort-select/constants';
