@@ -18,6 +18,7 @@ limitations under the License.
 package grafanausers
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -27,6 +28,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/core/models"
 	"github.com/apache/incubator-devlake/server/api/access"
 )
 
@@ -90,7 +92,7 @@ func TestRoutesRefuseAZeroPrincipalFromTheCheck(t *testing.T) {
 }
 
 func TestStatusRouteAnswers200WhenUnavailable(t *testing.T) {
-	r := routeEngine(newServiceWithDependencies(nil, "", &fakeMappings{}), adminCheckReturning(customerAdmin(), nil))
+	r := routeEngine(newServiceWithDependencies(nil, "", &fakeMappings{}, nil), adminCheckReturning(customerAdmin(), nil))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/access/grafana/status", nil))
 	var body StatusResponse
@@ -124,7 +126,7 @@ func TestUsersRouteValidatesPagingAndReturnsCodes(t *testing.T) {
 		t.Fatalf("body exposes login: %s", w.Body)
 	}
 
-	down := routeEngine(newServiceWithDependencies(nil, "", &fakeMappings{}), adminCheckReturning(customerAdmin(), nil))
+	down := routeEngine(newServiceWithDependencies(nil, "", &fakeMappings{}, nil), adminCheckReturning(customerAdmin(), nil))
 	w = httptest.NewRecorder()
 	down.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/access/grafana/users", nil))
 	var apiErr access.ApiErrorResponse
@@ -146,5 +148,169 @@ func TestUsersRouteHidesGrafanaTextOnFailure(t *testing.T) {
 	}
 	if strings.Contains(w.Body.String(), fakeBodySecret) || strings.Contains(w.Body.String(), fakeManagementPassword) {
 		t.Fatalf("body leaks text: %s", w.Body)
+	}
+}
+
+type writeRoute struct {
+	name    string
+	method  string
+	path    string
+	body    string
+	success int
+}
+
+func writeRoutes() []writeRoute {
+	return []writeRoute{
+		{"create", http.MethodPost, "/access/grafana/users", `{"email":"new@example.com","name":"New","role":"Viewer","projectNames":["alpha"],"password":"` + testPassword + `"}`, http.StatusCreated},
+		{"patch", http.MethodPatch, "/access/grafana/users/2", `{"name":"Alice B"}`, http.StatusOK},
+		{"projects", http.MethodPut, "/access/grafana/users/2/projects", `{"projectNames":["beta"]}`, http.StatusOK},
+		{"password", http.MethodPut, "/access/grafana/users/2/password", `{"password":"` + testPassword + `"}`, http.StatusNoContent},
+		{"delete", http.MethodDelete, "/access/grafana/users/2", ``, http.StatusNoContent},
+		{"orphan", http.MethodDelete, "/access/grafana/orphans/ghost@example.com", ``, http.StatusNoContent},
+	}
+}
+
+func doRoute(r http.Handler, method, path, body string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(method, path, bytes.NewBufferString(body))
+	if body != "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	return w
+}
+
+func TestWriteRoutesEnforceTheAdminCheck(t *testing.T) {
+	cases := []struct {
+		name   string
+		check  adminCheck
+		status int
+	}{
+		{"no principal", adminCheckReturning(nil, errors.Unauthorized.New("native OIDC authentication is required")), http.StatusUnauthorized},
+		{"member", adminCheckReturning(nil, errors.Forbidden.New("administrator role required")), http.StatusForbidden},
+		{"directory off", adminCheckReturning(nil, errors.HttpStatus(http.StatusNotFound).New("access management is not enabled")), http.StatusNotFound},
+		{"zero principal", adminCheckReturning(&access.Principal{}, nil), http.StatusForbidden},
+	}
+	for _, route := range writeRoutes() {
+		for _, tc := range cases {
+			t.Run(route.name+"/"+tc.name, func(t *testing.T) {
+				fx := newFixture(t)
+				w := doRoute(routeEngine(fx.s, tc.check), route.method, route.path, route.body)
+				if w.Code != tc.status {
+					t.Fatalf("status = %d, want %d; body %s", w.Code, tc.status, w.Body)
+				}
+				if len(fx.f.recorded()) != 0 || len(fx.m.calls) != 0 {
+					t.Fatalf("denied request reached Grafana or the mappings: %#v %v", fx.f.recorded(), fx.m.calls)
+				}
+			})
+		}
+		t.Run(route.name+"/admin", func(t *testing.T) {
+			fx := newFixture(t)
+			fx.m.rows = append(fx.m.rows, &models.UserProjectMapping{UserLogin: "ghost@example.com", ProjectName: "alpha"})
+			w := doRoute(routeEngine(fx.s, adminCheckReturning(customerAdmin(), nil)), route.method, route.path, route.body)
+			if w.Code != route.success {
+				t.Fatalf("status = %d, want %d; body %s", w.Code, route.success, w.Body)
+			}
+			if route.success == http.StatusNoContent && w.Body.Len() != 0 {
+				t.Fatalf("204 carried a body: %s", w.Body)
+			}
+			if strings.Contains(w.Body.String(), testPassword) {
+				t.Fatal("response echoes the password")
+			}
+		})
+	}
+}
+
+func TestWriteRoutesRejectBadIdsAndBodies(t *testing.T) {
+	fx := newFixture(t)
+	r := routeEngine(fx.s, adminCheckReturning(customerAdmin(), nil))
+	for _, tc := range []struct{ method, path, body string }{
+		{http.MethodPatch, "/access/grafana/users/abc", `{"name":"x"}`},
+		{http.MethodPatch, "/access/grafana/users/0", `{"name":"x"}`},
+		{http.MethodPatch, "/access/grafana/users/-4", `{"name":"x"}`},
+		{http.MethodPut, "/access/grafana/users/1.5/projects", `{"projectNames":[]}`},
+		{http.MethodPut, "/access/grafana/users/x/password", `{"password":"` + testPassword + `"}`},
+		{http.MethodDelete, "/access/grafana/users/0", ``},
+		{http.MethodPost, "/access/grafana/users", `not json`},
+		{http.MethodPatch, "/access/grafana/users/2", `{}`},
+		{http.MethodPut, "/access/grafana/users/2/projects", `{}`},
+	} {
+		if w := doRoute(r, tc.method, tc.path, tc.body); w.Code != http.StatusBadRequest {
+			t.Fatalf("%s %s %s: status = %d, want 400", tc.method, tc.path, tc.body, w.Code)
+		}
+	}
+	fx.noWrites(t)
+}
+
+func TestWriteRoutesIgnoreALoginInTheBody(t *testing.T) {
+	fx := newFixture(t)
+	r := routeEngine(fx.s, adminCheckReturning(customerAdmin(), nil))
+	w := doRoute(r, http.MethodPost, "/access/grafana/users", `{"login":"evil","email":"New@Example.com","name":"New","role":"Viewer","projectNames":["alpha"],"password":"`+testPassword+`"}`)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d body %s", w.Code, w.Body)
+	}
+	created := fx.requestsMatching(http.MethodPost, "/api/admin/users")
+	if len(created) != 1 || created[0].body["login"] != "new@example.com" || len(fx.m.loginProjects("evil")) != 0 || len(fx.m.loginProjects("new@example.com")) != 1 {
+		t.Fatalf("created = %#v rows = %v", created, fx.m.rows)
+	}
+
+	w = doRoute(r, http.MethodPatch, "/access/grafana/users/2", `{"login":"evil","name":"Alice Z"}`)
+	put := fx.requestsMatching(http.MethodPut, "/api/users/2")
+	if w.Code != http.StatusOK || len(put) != 1 || put[0].body["login"] != "alice@example.com" || len(fx.m.loginProjects("evil")) != 0 {
+		t.Fatalf("status = %d put = %#v", w.Code, put)
+	}
+	if strings.Contains(w.Body.String(), "login") {
+		t.Fatalf("body exposes login: %s", w.Body)
+	}
+}
+
+func TestCreateRouteReturnsThePartialBodyWithTheUserId(t *testing.T) {
+	fx := newFixture(t)
+	fx.m.replaceErr = errors.Default.New("db down")
+	r := routeEngine(fx.s, adminCheckReturning(customerAdmin(), nil))
+	w := doRoute(r, http.MethodPost, "/access/grafana/users", `{"email":"n@example.com","name":"N","role":"Viewer","projectNames":["alpha"],"password":"`+testPassword+`"}`)
+	var body PartialErrorResponse
+	if w.Code != http.StatusBadGateway || json.Unmarshal(w.Body.Bytes(), &body) != nil || body.Code != ErrCodePartial || body.UserID != 101 || body.Success || body.Message == "" {
+		t.Fatalf("status = %d body %s", w.Code, w.Body)
+	}
+	if strings.Contains(w.Body.String(), testPassword) || strings.Contains(w.Body.String(), "db down") {
+		t.Fatalf("body leaks text: %s", w.Body)
+	}
+}
+
+func TestWriteRoutesReturnCodedErrors(t *testing.T) {
+	fx := newFixture(t)
+	r := routeEngine(fx.s, adminCheckReturning(customerAdmin(), nil))
+	for _, tc := range []struct {
+		method, path, body, code string
+		status                   int
+	}{
+		{http.MethodPatch, "/access/grafana/users/999", `{"name":"x"}`, ErrCodeUserNotFound, http.StatusNotFound},
+		{http.MethodPatch, "/access/grafana/users/4", `{"name":"x"}`, ErrCodeUserProtected, http.StatusForbidden},
+		{http.MethodPatch, "/access/grafana/users/3", `{"name":"x"}`, ErrCodeUserSSOManaged, http.StatusConflict},
+		{http.MethodPut, "/access/grafana/users/2/password", `{"password":"short"}`, ErrCodePasswordShort, http.StatusBadRequest},
+		{http.MethodPut, "/access/grafana/users/2/projects", `{"projectNames":["nope"]}`, ErrCodeProjectMissing, http.StatusBadRequest},
+		{http.MethodPost, "/access/grafana/users", `{"email":"alice@example.com","name":"A","role":"Viewer","password":"` + testPassword + `"}`, ErrCodeUserExists, http.StatusConflict},
+		{http.MethodDelete, "/access/grafana/orphans/alice@example.com", ``, ErrCodeUserExists, http.StatusConflict},
+	} {
+		w := doRoute(r, tc.method, tc.path, tc.body)
+		var apiErr access.ApiErrorResponse
+		if w.Code != tc.status || json.Unmarshal(w.Body.Bytes(), &apiErr) != nil || apiErr.Code != tc.code || apiErr.Success {
+			t.Fatalf("%s %s: status = %d body %s, want %d %s", tc.method, tc.path, w.Code, w.Body, tc.status, tc.code)
+		}
+	}
+}
+
+func TestOrphanRouteReceivesTheUnescapedAccount(t *testing.T) {
+	fx := newFixture(t)
+	fx.m.rows = append(fx.m.rows, &models.UserProjectMapping{UserLogin: "ghost user@example.com", ProjectName: "alpha"})
+	r := routeEngine(fx.s, adminCheckReturning(customerAdmin(), nil))
+	w := doRoute(r, http.MethodDelete, "/access/grafana/orphans/ghost%20user@example.com", "")
+	if w.Code != http.StatusNoContent || len(fx.m.loginProjects("ghost user@example.com")) != 0 {
+		t.Fatalf("status = %d rows = %v", w.Code, fx.m.rows)
+	}
+	look := fx.f.requestsTo("/api/users/lookup")
+	if len(look) != 1 || look[0].query.Get("loginOrEmail") != "ghost user@example.com" {
+		t.Fatalf("lookup = %#v", look)
 	}
 }

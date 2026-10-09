@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -44,6 +45,13 @@ type recordedRequest struct {
 	path   string
 	query  url.Values
 	user   string
+	body   map[string]interface{}
+}
+
+// fakeUser is one Grafana account; role is its org role, empty when it is not a member.
+type fakeUser struct {
+	grafanaUser
+	role string
 }
 
 type fakeGrafana struct {
@@ -60,6 +68,13 @@ type fakeGrafana struct {
 	orgStatus     int
 	globalStatus  int
 	delay         time.Duration
+
+	users  map[int64]*fakeUser
+	nextID int64
+	// forced answers a "METHOD /path" with an error status.
+	forced map[string]int
+	// noAutoJoin makes created accounts start outside the org.
+	noAutoJoin bool
 }
 
 func newFakeGrafana(t *testing.T) *fakeGrafana {
@@ -69,6 +84,9 @@ func newFakeGrafana(t *testing.T) *fakeGrafana {
 		currentStatus: http.StatusOK,
 		orgStatus:     http.StatusOK,
 		globalStatus:  http.StatusOK,
+		users:         map[int64]*fakeUser{},
+		nextID:        100,
+		forced:        map[string]int{},
 	}
 	f.server = httptest.NewServer(http.HandlerFunc(f.handle))
 	t.Cleanup(f.server.Close)
@@ -77,11 +95,22 @@ func newFakeGrafana(t *testing.T) *fakeGrafana {
 
 func (f *fakeGrafana) handle(w http.ResponseWriter, r *http.Request) {
 	user, _, _ := r.BasicAuth()
+	var body map[string]interface{}
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&body)
+	}
 	f.mu.Lock()
-	f.requests = append(f.requests, recordedRequest{method: r.Method, path: r.URL.Path, query: r.URL.Query(), user: user})
+	f.requests = append(f.requests, recordedRequest{method: r.Method, path: r.URL.Path, query: r.URL.Query(), user: user, body: body})
 	f.mu.Unlock()
 	if f.delay > 0 {
 		time.Sleep(f.delay)
+	}
+	if status := f.forced[r.Method+" "+r.URL.Path]; status != 0 {
+		f.reply(w, status, nil)
+		return
+	}
+	if f.handleWrite(w, r, body) {
+		return
 	}
 	switch {
 	case r.URL.Path == "/api/user":
@@ -131,6 +160,140 @@ func (f *fakeGrafana) reply(w http.ResponseWriter, status int, body interface{})
 	_ = json.NewEncoder(w).Encode(body)
 }
 
+func (f *fakeGrafana) put(u fakeUser) *fakeUser {
+	stored := u
+	f.users[u.ID] = &stored
+	if u.role != "" {
+		f.setOrgUser(&stored)
+	}
+	return &stored
+}
+
+func (f *fakeGrafana) setOrgUser(u *fakeUser) {
+	for i := range f.orgUsers {
+		if f.orgUsers[i].UserID == u.ID {
+			f.orgUsers[i].Role, f.orgUsers[i].IsDisabled = u.role, u.IsDisabled
+			f.orgUsers[i].Login, f.orgUsers[i].Email, f.orgUsers[i].Name = u.Login, u.Email, u.Name
+			return
+		}
+	}
+	f.orgUsers = append(f.orgUsers, grafanaOrgUser{UserID: u.ID, Login: u.Login, Email: u.Email, Name: u.Name, Role: u.role, IsDisabled: u.IsDisabled})
+}
+
+func str(body map[string]interface{}, key string) string {
+	value, _ := body[key].(string)
+	return value
+}
+
+// handleWrite serves the account endpoints from f.users and reports whether it matched the request.
+func (f *fakeGrafana) handleWrite(w http.ResponseWriter, r *http.Request, body map[string]interface{}) bool {
+	path := r.URL.Path
+	ok := func() { f.reply(w, http.StatusOK, map[string]string{"message": "ok"}) }
+	switch {
+	case r.Method == http.MethodPost && path == "/api/admin/users":
+		for _, u := range f.users {
+			if strings.EqualFold(u.Login, str(body, "login")) || strings.EqualFold(u.Email, str(body, "email")) {
+				f.reply(w, http.StatusPreconditionFailed, nil)
+				return true
+			}
+		}
+		f.nextID++
+		created := fakeUser{grafanaUser: grafanaUser{ID: f.nextID, Login: str(body, "login"), Email: str(body, "email"), Name: str(body, "name")}}
+		if !f.noAutoJoin {
+			created.role = roleViewer
+		}
+		f.put(created)
+		f.reply(w, http.StatusOK, map[string]int64{"id": f.nextID})
+		return true
+	case r.Method == http.MethodGet && path == "/api/users/lookup":
+		needle := strings.ToLower(r.URL.Query().Get("loginOrEmail"))
+		for _, u := range f.users {
+			if strings.ToLower(u.Login) == needle || strings.ToLower(u.Email) == needle {
+				f.reply(w, http.StatusOK, u.grafanaUser)
+				return true
+			}
+		}
+		http.NotFound(w, r)
+		return true
+	case r.Method == http.MethodPost && path == "/api/orgs/7/users":
+		for _, u := range f.users {
+			if u.Login == str(body, "loginOrEmail") || u.Email == str(body, "loginOrEmail") {
+				u.role = str(body, "role")
+				f.setOrgUser(u)
+				ok()
+				return true
+			}
+		}
+		http.NotFound(w, r)
+		return true
+	}
+	var id int64
+	var rest string
+	for _, prefix := range []string{"/api/admin/users/", "/api/users/", "/api/orgs/7/users/"} {
+		if strings.HasPrefix(path, prefix) {
+			parts := strings.SplitN(strings.TrimPrefix(path, prefix), "/", 2)
+			id, _ = strconv.ParseInt(parts[0], 10, 64)
+			if len(parts) == 2 {
+				rest = parts[1]
+			}
+			if id == 0 {
+				return false
+			}
+			target, found := f.users[id]
+			if !found {
+				http.NotFound(w, r)
+				return true
+			}
+			return f.handleAccount(w, r, body, prefix, rest, target)
+		}
+	}
+	return false
+}
+
+func (f *fakeGrafana) handleAccount(w http.ResponseWriter, r *http.Request, body map[string]interface{}, prefix, rest string, u *fakeUser) bool {
+	ok := func() { f.reply(w, http.StatusOK, map[string]string{"message": "ok"}) }
+	switch {
+	case prefix == "/api/users/" && r.Method == http.MethodGet && rest == "":
+		f.reply(w, http.StatusOK, u.grafanaUser)
+	case prefix == "/api/users/" && r.Method == http.MethodGet && rest == "orgs":
+		orgs := []grafanaUserOrg{}
+		if u.role != "" {
+			orgs = append(orgs, grafanaUserOrg{OrgID: 7, Role: u.role})
+		}
+		f.reply(w, http.StatusOK, orgs)
+	case prefix == "/api/users/" && r.Method == http.MethodPut && rest == "":
+		if u.IsExternal {
+			f.reply(w, http.StatusForbidden, nil)
+			return true
+		}
+		for _, other := range f.users {
+			if other.ID != u.ID && (strings.EqualFold(other.Login, str(body, "login")) || strings.EqualFold(other.Email, str(body, "email"))) {
+				f.reply(w, http.StatusPreconditionFailed, nil)
+				return true
+			}
+		}
+		u.Name, u.Email, u.Login = str(body, "name"), str(body, "email"), str(body, "login")
+		f.setOrgUser(u)
+		ok()
+	case prefix == "/api/orgs/7/users/" && r.Method == http.MethodPatch:
+		u.role = str(body, "role")
+		f.setOrgUser(u)
+		ok()
+	case prefix == "/api/admin/users/" && r.Method == http.MethodPost && (rest == "disable" || rest == "enable"):
+		u.IsDisabled = rest == "disable"
+		f.setOrgUser(u)
+		ok()
+	case prefix == "/api/admin/users/" && r.Method == http.MethodPut && rest == "password":
+		ok()
+	case prefix == "/api/admin/users/" && r.Method == http.MethodDelete && rest == "":
+		delete(f.users, u.ID)
+		ok()
+	default:
+		return false
+	}
+	return true
+}
+
 func (f *fakeGrafana) recorded() []recordedRequest {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -148,7 +311,11 @@ func (f *fakeGrafana) requestsTo(path string) []recordedRequest {
 }
 
 type fakeMappings struct {
-	rows []*models.UserProjectMapping
+	rows     []*models.UserProjectMapping
+	projects map[string]bool
+
+	replaceErr errors.Error
+	calls      []string
 }
 
 func (m *fakeMappings) mappingsForLogins(logins []string) ([]*models.UserProjectMapping, errors.Error) {
@@ -177,12 +344,117 @@ func (m *fakeMappings) mappingLogins() ([]string, errors.Error) {
 	return out, nil
 }
 
+func (m *fakeMappings) projectExists(name string) (bool, errors.Error) {
+	return m.projects[name], nil
+}
+
+func (m *fakeMappings) loginProjects(login string) []string {
+	var out []string
+	for _, row := range m.rows {
+		if row.UserLogin == login {
+			out = append(out, row.ProjectName)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func (m *fakeMappings) replaceMappings(login string, names []string) errors.Error {
+	m.calls = append(m.calls, "replace:"+login)
+	if m.replaceErr != nil {
+		return m.replaceErr
+	}
+	kept := []*models.UserProjectMapping{}
+	for _, row := range m.rows {
+		if row.UserLogin != login {
+			kept = append(kept, row)
+		}
+	}
+	for _, name := range names {
+		kept = append(kept, &models.UserProjectMapping{UserLogin: login, ProjectName: name})
+	}
+	m.rows = kept
+	return nil
+}
+
+// transact applies change and then during; a failure restores the rows as a rolled-back transaction would.
+func (m *fakeMappings) transact(change func(), during func() errors.Error) errors.Error {
+	snapshot := append([]*models.UserProjectMapping(nil), m.rows...)
+	change()
+	if during != nil {
+		if err := during(); err != nil {
+			m.rows = snapshot
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *fakeMappings) moveMappings(oldLogin, newLogin string, during func() errors.Error) (int64, errors.Error) {
+	m.calls = append(m.calls, "move:"+oldLogin+"->"+newLogin)
+	dropped := int64(len(m.loginProjects(newLogin)))
+	err := m.transact(func() {
+		kept := []*models.UserProjectMapping{}
+		for _, row := range m.rows {
+			switch row.UserLogin {
+			case newLogin:
+			case oldLogin:
+				kept = append(kept, &models.UserProjectMapping{UserLogin: newLogin, ProjectName: row.ProjectName})
+			default:
+				kept = append(kept, row)
+			}
+		}
+		m.rows = kept
+	}, during)
+	if err != nil {
+		return 0, err
+	}
+	return dropped, nil
+}
+
+func (m *fakeMappings) deleteMappings(login string, during func() errors.Error) errors.Error {
+	m.calls = append(m.calls, "delete:"+login)
+	return m.transact(func() {
+		kept := []*models.UserProjectMapping{}
+		for _, row := range m.rows {
+			if row.UserLogin != login {
+				kept = append(kept, row)
+			}
+		}
+		m.rows = kept
+	}, during)
+}
+
+type fakeAudit struct {
+	events []auditEvent
+}
+
+type auditEvent struct {
+	actor, action, target, detail string
+}
+
+func (a *fakeAudit) RecordAuditEvent(actor, action, targetEmail, detail string) {
+	a.events = append(a.events, auditEvent{actor, action, targetEmail, detail})
+}
+
+func (a *fakeAudit) last(t *testing.T) auditEvent {
+	t.Helper()
+	if len(a.events) == 0 {
+		t.Fatal("no audit event recorded")
+	}
+	return a.events[len(a.events)-1]
+}
+
 func (f *fakeGrafana) service(t *testing.T, httpClient *http.Client, mappings mappingStore) *Service {
+	return f.serviceWithAudit(t, httpClient, mappings, nil)
+}
+
+func (f *fakeGrafana) serviceWithAudit(t *testing.T, httpClient *http.Client, mappings mappingStore, audit auditRecorder) *Service {
 	client, err := newGrafanaClient(f.server.URL, fakeManagementUser, fakeManagementPassword, httpClient)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return newServiceWithDependencies(client, fakeManagementUser, mappings)
+	return newServiceWithDependencies(client, fakeManagementUser, mappings, audit)
 }
 
 func customerAdmin() *access.Principal {
@@ -233,7 +505,7 @@ func TestStatusOutcomes(t *testing.T) {
 		}
 	})
 	t.Run("not configured", func(t *testing.T) {
-		service := newServiceWithDependencies(nil, "", &fakeMappings{})
+		service := newServiceWithDependencies(nil, "", &fakeMappings{}, nil)
 		status, err := service.Status(t.Context(), customerAdmin())
 		if err != nil || status.Available || status.Code != ErrCodeNotConfigured {
 			t.Fatalf("status = %#v, err = %v", status, err)
@@ -494,7 +766,7 @@ func assertUnavailable(t *testing.T, err errors.Error) {
 
 func TestListUsersUnconfiguredMakesNoRequests(t *testing.T) {
 	f := newFakeGrafana(t)
-	service := newServiceWithDependencies(nil, "", &fakeMappings{})
+	service := newServiceWithDependencies(nil, "", &fakeMappings{}, nil)
 	_, err := service.ListUsers(t.Context(), customerAdmin(), ListQuery{Page: 1, PageSize: 20})
 	if err == nil || errorCode(err) != ErrCodeNotConfigured || err.GetType().GetHttpCode() != http.StatusServiceUnavailable {
 		t.Fatalf("err = %v", err)
@@ -527,6 +799,27 @@ func TestExportedMethodsRefuseNonAdminsWithoutCallingGrafana(t *testing.T) {
 		"ListUsers": func(s *Service, p *access.Principal) errors.Error {
 			_, err := s.ListUsers(t.Context(), p, ListQuery{Page: 1, PageSize: 20})
 			return err
+		},
+		"CreateUser": func(s *Service, p *access.Principal) errors.Error {
+			_, err := s.CreateUser(t.Context(), p, "a", CreateUserInput{Email: "n@example.com", Name: "N", Role: "Viewer", Password: testPassword})
+			return err
+		},
+		"PatchUser": func(s *Service, p *access.Principal) errors.Error {
+			_, err := s.PatchUser(t.Context(), p, "a", 2, PatchUserInput{Name: str2("x")})
+			return err
+		},
+		"SetUserProjects": func(s *Service, p *access.Principal) errors.Error {
+			_, err := s.SetUserProjects(t.Context(), p, "a", 2, ProjectsInput{ProjectNames: []string{}})
+			return err
+		},
+		"SetUserPassword": func(s *Service, p *access.Principal) errors.Error {
+			return s.SetUserPassword(t.Context(), p, "a", 2, PasswordInput{Password: testPassword})
+		},
+		"DeleteUser": func(s *Service, p *access.Principal) errors.Error {
+			return s.DeleteUser(t.Context(), p, "a", 2)
+		},
+		"ClearOrphan": func(s *Service, p *access.Principal) errors.Error {
+			return s.ClearOrphan(t.Context(), p, "a", "ghost@example.com")
 		},
 	}
 	for methodName, call := range methods {

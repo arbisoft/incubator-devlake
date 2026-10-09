@@ -20,6 +20,7 @@ package grafanausers
 
 import (
 	"context"
+	"net/http"
 	"sort"
 	"strings"
 	"sync"
@@ -35,6 +36,15 @@ import (
 type mappingStore interface {
 	mappingsForLogins(logins []string) ([]*models.UserProjectMapping, errors.Error)
 	mappingLogins() ([]string, errors.Error)
+	projectExists(name string) (bool, errors.Error)
+	replaceMappings(login string, projectNames []string) errors.Error
+	moveMappings(oldLogin, newLogin string, during func() errors.Error) (int64, errors.Error)
+	deleteMappings(login string, during func() errors.Error) errors.Error
+}
+
+// auditRecorder is the slice of the access audit log this package writes to.
+type auditRecorder interface {
+	RecordAuditEvent(actor, action, targetEmail, detail string)
 }
 
 type dbMappingStore struct{}
@@ -47,11 +57,37 @@ func (dbMappingStore) mappingLogins() ([]string, errors.Error) {
 	return services.GetUserProjectMappingLogins()
 }
 
+func (dbMappingStore) projectExists(name string) (bool, errors.Error) {
+	if name == "" {
+		return false, nil
+	}
+	if _, err := services.GetProject(name); err != nil {
+		if err.GetType().GetHttpCode() == http.StatusNotFound {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func (dbMappingStore) replaceMappings(login string, projectNames []string) errors.Error {
+	return services.ReplaceUserProjectMappings(login, projectNames)
+}
+
+func (dbMappingStore) moveMappings(oldLogin, newLogin string, during func() errors.Error) (int64, errors.Error) {
+	return services.MoveUserProjectMappings(oldLogin, newLogin, during)
+}
+
+func (dbMappingStore) deleteMappings(login string, during func() errors.Error) errors.Error {
+	return services.DeleteUserProjectMappingsForLogin(login, during)
+}
+
 // Service is the only holder of the Grafana client.
 type Service struct {
 	client         *grafanaClient
 	managementUser string
 	mappings       mappingStore
+	audit          auditRecorder
 
 	orgMu sync.Mutex
 	orgID int64
@@ -71,12 +107,12 @@ func Init(basicRes basecontext.BasicRes) {
 		if err != nil {
 			client = nil
 		}
-		defaultService = newServiceWithDependencies(client, user, dbMappingStore{})
+		defaultService = newServiceWithDependencies(client, user, dbMappingStore{}, nil)
 	})
 }
 
-func newServiceWithDependencies(client *grafanaClient, managementUser string, mappings mappingStore) *Service {
-	return &Service{client: client, managementUser: managementUser, mappings: mappings}
+func newServiceWithDependencies(client *grafanaClient, managementUser string, mappings mappingStore, audit auditRecorder) *Service {
+	return &Service{client: client, managementUser: managementUser, mappings: mappings, audit: audit}
 }
 
 func authorizeAdmin(admin *access.Principal) errors.Error {

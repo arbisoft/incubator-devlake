@@ -17,19 +17,33 @@ limitations under the License.
 
 package grafanausers
 
+import "github.com/apache/incubator-devlake/server/api/access"
+
 const (
 	ErrCodeNotConfigured  = "GRAFANA_NOT_CONFIGURED"
 	ErrCodeUnavailable    = "GRAFANA_UNAVAILABLE"
 	ErrCodeNotServerAdmin = "GRAFANA_NOT_SERVER_ADMIN"
+	ErrCodeUserExists     = "GRAFANA_USER_EXISTS"
+	ErrCodeUserNotFound   = "GRAFANA_USER_NOT_FOUND"
+	ErrCodeUserProtected  = "GRAFANA_USER_PROTECTED"
+	ErrCodeUserSSOManaged = "GRAFANA_USER_SSO_MANAGED"
+	ErrCodeLastAdmin      = "GRAFANA_LAST_ADMIN"
+	ErrCodePasswordShort  = "GRAFANA_PASSWORD_TOO_SHORT"
+	ErrCodePasswordBad    = "GRAFANA_PASSWORD_REJECTED"
+	ErrCodeProjectMissing = "PROJECT_NOT_FOUND"
+	ErrCodePartial        = "GRAFANA_PARTIAL"
 	defaultPage           = 1
 	defaultPageSize       = 20
 	maxPageSize           = 100
 	globalSearchPageSize  = 1000
 	maxGlobalSearchPages  = 1000
-	adminRequiredMessage  = "administrator role required"
-	notConfiguredMessage  = "Grafana user management is not configured"
-	unavailableMessage    = "Grafana is unavailable"
-	notServerAdminMessage = "the Grafana management identity is not a server administrator"
+	// Same limits as the local password rule in server/api/auth/local_password.go.
+	passwordMinimumCharacters = 15
+	passwordMaximumBytes      = 1024
+	adminRequiredMessage      = "administrator role required"
+	notConfiguredMessage      = "Grafana user management is not configured"
+	unavailableMessage        = "Grafana is unavailable"
+	notServerAdminMessage     = "the Grafana management identity is not a server administrator"
 )
 
 // StatusResponse reports whether Grafana user management can be used right now.
@@ -71,4 +85,42 @@ type ListQuery struct {
 	Query    string
 	Page     int
 	PageSize int
+}
+
+// CreateUserInput is the body of a create request.
+type CreateUserInput struct {
+	Email        string   `json:"email"`
+	Name         string   `json:"name"`
+	Role         string   `json:"role"`
+	ProjectNames []string `json:"projectNames"`
+	Password     string   `json:"password"`
+}
+
+// PatchUserInput is the body of an update request; absent fields are left alone.
+type PatchUserInput struct {
+	Name     *string `json:"name"`
+	Email    *string `json:"email"`
+	Role     *string `json:"role"`
+	Disabled *bool   `json:"disabled"`
+}
+
+// ProjectsInput is the full set of projects a user can see.
+type ProjectsInput struct {
+	ProjectNames []string `json:"projectNames"`
+}
+
+// PasswordInput is the body of a password change.
+type PasswordInput struct {
+	Password string `json:"password"`
+}
+
+// partialData is the error data of a create that left an account behind.
+type partialData struct {
+	userID int64
+}
+
+// PartialErrorResponse is the error body when an account was created but a later step failed.
+type PartialErrorResponse struct {
+	access.ApiErrorResponse
+	UserID int64 `json:"userId"`
 }

@@ -18,6 +18,7 @@ limitations under the License.
 package grafanausers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -102,6 +103,23 @@ type grafanaGlobalUserPage struct {
 	Users      []grafanaGlobalUser `json:"users"`
 }
 
+// grafanaUser is the account detail returned by the single-user and lookup endpoints.
+type grafanaUser struct {
+	ID             int64    `json:"id"`
+	Email          string   `json:"email"`
+	Name           string   `json:"name"`
+	Login          string   `json:"login"`
+	IsDisabled     bool     `json:"isDisabled"`
+	IsExternal     bool     `json:"isExternal"`
+	IsGrafanaAdmin bool     `json:"isGrafanaAdmin"`
+	AuthLabels     []string `json:"authLabels"`
+}
+
+type grafanaUserOrg struct {
+	OrgID int64  `json:"orgId"`
+	Role  string `json:"role"`
+}
+
 func (c *grafanaClient) currentUser(ctx context.Context) (*grafanaCurrentUser, error) {
 	user := &grafanaCurrentUser{}
 	if err := c.getJSON(ctx, grafanaCurrentUserPath, nil, user); err != nil {
@@ -133,18 +151,29 @@ func (c *grafanaClient) searchGlobalUsers(ctx context.Context, perPage, page int
 	return result, nil
 }
 
-// getJSON never returns or logs a response body; the body is decoded into out and drained.
-func (c *grafanaClient) getJSON(ctx context.Context, path string, params url.Values, out interface{}) error {
+// do never returns or logs a response body; a 2xx body is decoded into out when given, and every body is drained.
+func (c *grafanaClient) do(ctx context.Context, method, path string, params url.Values, payload, out interface{}) error {
 	target := c.baseURL + path
 	if len(params) > 0 {
 		target += "?" + params.Encode()
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	var body io.Reader
+	if payload != nil {
+		encoded, err := json.Marshal(payload)
+		if err != nil {
+			return &requestError{}
+		}
+		body = bytes.NewReader(encoded)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, target, body)
 	if err != nil {
 		return &requestError{}
 	}
 	req.SetBasicAuth(c.username, c.password)
 	req.Header.Set("Accept", "application/json")
+	if payload != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	response, err := c.client.Do(req)
 	if err != nil {
 		return &requestError{}
@@ -153,11 +182,94 @@ func (c *grafanaClient) getJSON(ctx context.Context, path string, params url.Val
 		_, _ = io.Copy(io.Discard, response.Body)
 		_ = response.Body.Close()
 	}()
-	if response.StatusCode != http.StatusOK {
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		return &requestError{status: response.StatusCode}
 	}
-	if err := json.NewDecoder(response.Body).Decode(out); err != nil {
-		return &requestError{status: response.StatusCode}
+	if out != nil {
+		if err := json.NewDecoder(response.Body).Decode(out); err != nil {
+			return &requestError{status: response.StatusCode}
+		}
 	}
 	return nil
+}
+
+func (c *grafanaClient) getJSON(ctx context.Context, path string, params url.Values, out interface{}) error {
+	return c.do(ctx, http.MethodGet, path, params, nil, out)
+}
+
+func userPath(id int64) string {
+	return "/api/users/" + strconv.FormatInt(id, 10)
+}
+
+func adminUserPath(id int64) string {
+	return "/api/admin/users/" + strconv.FormatInt(id, 10)
+}
+
+func (c *grafanaClient) createUser(ctx context.Context, name, email, login, password string) (int64, error) {
+	created := &struct {
+		ID int64 `json:"id"`
+	}{}
+	payload := map[string]string{"name": name, "email": email, "login": login, "password": password}
+	if err := c.do(ctx, http.MethodPost, "/api/admin/users", nil, payload, created); err != nil {
+		return 0, err
+	}
+	if created.ID < 1 {
+		return 0, &requestError{}
+	}
+	return created.ID, nil
+}
+
+func (c *grafanaClient) getUser(ctx context.Context, id int64) (*grafanaUser, error) {
+	user := &grafanaUser{}
+	if err := c.getJSON(ctx, userPath(id), nil, user); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+func (c *grafanaClient) lookupUser(ctx context.Context, loginOrEmail string) (*grafanaUser, error) {
+	user := &grafanaUser{}
+	if err := c.getJSON(ctx, "/api/users/lookup", url.Values{"loginOrEmail": {loginOrEmail}}, user); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+func (c *grafanaClient) userOrgs(ctx context.Context, id int64) ([]grafanaUserOrg, error) {
+	var orgs []grafanaUserOrg
+	if err := c.getJSON(ctx, userPath(id)+"/orgs", nil, &orgs); err != nil {
+		return nil, err
+	}
+	return orgs, nil
+}
+
+func (c *grafanaClient) addOrgUser(ctx context.Context, orgID int64, loginOrEmail, role string) error {
+	payload := map[string]string{"loginOrEmail": loginOrEmail, "role": role}
+	return c.do(ctx, http.MethodPost, "/api/orgs/"+strconv.FormatInt(orgID, 10)+"/users", nil, payload, nil)
+}
+
+func (c *grafanaClient) setOrgRole(ctx context.Context, orgID, id int64, role string) error {
+	path := "/api/orgs/" + strconv.FormatInt(orgID, 10) + "/users/" + strconv.FormatInt(id, 10)
+	return c.do(ctx, http.MethodPatch, path, nil, map[string]string{"role": role}, nil)
+}
+
+func (c *grafanaClient) updateProfile(ctx context.Context, id int64, name, email, login string) error {
+	payload := map[string]string{"name": name, "email": email, "login": login}
+	return c.do(ctx, http.MethodPut, userPath(id), nil, payload, nil)
+}
+
+func (c *grafanaClient) setDisabled(ctx context.Context, id int64, disabled bool) error {
+	action := "enable"
+	if disabled {
+		action = "disable"
+	}
+	return c.do(ctx, http.MethodPost, adminUserPath(id)+"/"+action, nil, nil, nil)
+}
+
+func (c *grafanaClient) setPassword(ctx context.Context, id int64, password string) error {
+	return c.do(ctx, http.MethodPut, adminUserPath(id)+"/password", nil, map[string]string{"password": password}, nil)
+}
+
+func (c *grafanaClient) deleteUser(ctx context.Context, id int64) error {
+	return c.do(ctx, http.MethodDelete, adminUserPath(id), nil, nil, nil)
 }
