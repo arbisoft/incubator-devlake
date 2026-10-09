@@ -19,13 +19,20 @@
 import { describe, expect, it } from 'vitest';
 
 import { PATHS, ROUTE_SEGMENTS } from './paths';
-import { BLUEPRINT_VIEW, PROJECT_TAB } from './route-keys';
+import { BLUEPRINT_VIEW, PROJECT_TAB, USER_MANAGEMENT_VIEW } from './route-keys';
 
 describe('PATHS', () => {
   it('builds the settings paths', () => {
     expect(PATHS.SETTINGS_USERS()).toBe('/settings/users');
+    expect(PATHS.SETTINGS_GRAFANA_USERS()).toBe('/settings/users/grafana');
     expect(PATHS.SETTINGS_AUTHENTICATION()).toBe('/settings/authentication');
     expect(PATHS.SETTINGS_ACTIVITY()).toBe('/settings/activity');
+  });
+
+  it('keeps the Grafana users segment under the settings route', () => {
+    expect(ROUTE_SEGMENTS.SETTINGS_GRAFANA_USERS).toBe('users/grafana');
+    expect(PATHS.SETTINGS_GRAFANA_USERS()).toBe(`/${ROUTE_SEGMENTS.SETTINGS}/${ROUTE_SEGMENTS.SETTINGS_GRAFANA_USERS}`);
+    expect(Object.values(USER_MANAGEMENT_VIEW)).toEqual(['devlake', 'grafana']);
   });
 
   it('builds project paths and encodes the name', () => {

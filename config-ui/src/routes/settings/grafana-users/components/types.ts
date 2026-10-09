@@ -16,8 +16,9 @@
  *
  */
 
-import type { BLUEPRINT_VIEW, PROJECT_TAB, USER_MANAGEMENT_VIEW } from './route-keys';
+export type OrphansNoticeProps = { count: number };
 
-export type ProjectTab = (typeof PROJECT_TAB)[keyof typeof PROJECT_TAB];
-export type BlueprintView = (typeof BLUEPRINT_VIEW)[keyof typeof BLUEPRINT_VIEW];
-export type UserManagementView = (typeof USER_MANAGEMENT_VIEW)[keyof typeof USER_MANAGEMENT_VIEW];
+export type GrafanaUnavailableProps = {
+  message: string;
+  onRetry: () => void;
+};

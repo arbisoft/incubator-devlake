@@ -16,8 +16,18 @@
  *
  */
 
-import type { BLUEPRINT_VIEW, PROJECT_TAB, USER_MANAGEMENT_VIEW } from './route-keys';
+import { PATHS, USER_MANAGEMENT_VIEW, type UserManagementView } from '@/config';
+import type { RouteTab } from '@/ui/types';
 
-export type ProjectTab = (typeof PROJECT_TAB)[keyof typeof PROJECT_TAB];
-export type BlueprintView = (typeof BLUEPRINT_VIEW)[keyof typeof BLUEPRINT_VIEW];
-export type UserManagementView = (typeof USER_MANAGEMENT_VIEW)[keyof typeof USER_MANAGEMENT_VIEW];
+import { COPY, USER_MANAGEMENT_VIEW_ORDER } from './constants';
+
+const VIEW_PATH: Record<UserManagementView, string> = {
+  [USER_MANAGEMENT_VIEW.DEVLAKE]: PATHS.SETTINGS_USERS(),
+  [USER_MANAGEMENT_VIEW.GRAFANA]: PATHS.SETTINGS_GRAFANA_USERS(),
+};
+
+export const getUserManagementViews = (): RouteTab[] =>
+  USER_MANAGEMENT_VIEW_ORDER.map((key) => ({ key, label: COPY.views[key], path: VIEW_PATH[key] }));
+
+export const toUserManagementView = (key: string | undefined): UserManagementView =>
+  USER_MANAGEMENT_VIEW_ORDER.find((view) => view === key) ?? USER_MANAGEMENT_VIEW.DEVLAKE;

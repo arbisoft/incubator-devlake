@@ -17,7 +17,7 @@
  */
 
 import { PlusOutlined } from '@ant-design/icons';
-import { Button, Space } from 'antd';
+import { Button } from 'antd';
 import { useCallback, useMemo, useState } from 'react';
 
 import API from '@/api';
@@ -29,15 +29,13 @@ import {
   DataTable,
   type DataTableFilters,
   EMPTY_ILLUSTRATION,
-  ListPage,
-  ListToolbar,
-  PageHeader,
   SectionCard,
   buildListEmpty,
   useListState,
   useRefreshVersion,
 } from '@/ui';
 
+import { CardToolbar } from '../components';
 import {
   ACCESS_MODAL,
   COPY,
@@ -63,7 +61,7 @@ import {
   type TemporaryCredential,
 } from './components';
 
-export const SettingsUsers = () => {
+export const DevlakeUsers = () => {
   const list = useListState<string, Record<string, string>>({
     pageSize: DEFAULT_PAGE_SIZE,
     pageSizeOptions: PAGE_SIZE_OPTIONS,
@@ -180,21 +178,19 @@ export const SettingsUsers = () => {
   });
 
   return (
-    <ListPage>
-      <PageHeader title={COPY.users.title} description={COPY.users.description} />
-      <ListToolbar
-        list={list}
-        searchPlaceholder={COPY.users.searchPlaceholder}
-        end={
-          <Space>
+    <>
+      <SectionCard
+        title={COPY.users.title}
+        count={users.data?.count}
+        actions={
+          <CardToolbar list={list} searchPlaceholder={COPY.users.searchPlaceholder}>
             {localAuthEnabled && (
               <Button onClick={() => setModal(ACCESS_MODAL.LOCAL_USER)}>{COPY.users.addLocalUser}</Button>
             )}
             {addUserButton}
-          </Space>
+          </CardToolbar>
         }
-      />
-      <SectionCard title={COPY.users.title}>
+      >
         <DataTable
           rowKey="id"
           ariaLabel={COPY.users.tableLabel}
@@ -253,6 +249,6 @@ export const SettingsUsers = () => {
         onClosed={() => setTemporaryCredential(undefined)}
       />
       <ConfirmModal {...confirmProps} />
-    </ListPage>
+    </>
   );
 };

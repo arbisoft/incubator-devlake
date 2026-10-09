@@ -53,3 +53,9 @@ export type AccessFormModalProps<T extends object> = {
   submit: (values: T, setSaving: (saving: boolean) => void) => Promise<boolean>;
   children: (values: T, setField: <K extends keyof T>(key: K, value: T[K]) => void) => ReactNode;
 };
+
+export type CardToolbarProps = {
+  list: { keyword: string; setKeyword: (keyword: string) => void };
+  searchPlaceholder: string;
+  children?: ReactNode;
+};

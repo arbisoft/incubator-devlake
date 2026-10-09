@@ -130,8 +130,7 @@ export const DUPLICATE_DOMAIN_SERVER_TEXT = 'this domain already has a DevLake a
 export const COPY = {
   actions: { enable: 'Enable', disable: 'Disable' },
   users: {
-    title: 'Users',
-    description: 'Control who can sign in to DevLake. Grafana access is managed separately, in Grafana.',
+    title: 'DevLake Users',
     searchPlaceholder: 'Search users',
     tableLabel: 'Users',
     addUser: 'Add user',

@@ -16,8 +16,18 @@
  *
  */
 
-import type { BLUEPRINT_VIEW, PROJECT_TAB, USER_MANAGEMENT_VIEW } from './route-keys';
+import { ConfigProvider } from 'antd';
 
-export type ProjectTab = (typeof PROJECT_TAB)[keyof typeof PROJECT_TAB];
-export type BlueprintView = (typeof BLUEPRINT_VIEW)[keyof typeof BLUEPRINT_VIEW];
-export type UserManagementView = (typeof USER_MANAGEMENT_VIEW)[keyof typeof USER_MANAGEMENT_VIEW];
+import { SearchInput } from '@/ui';
+
+import { Root } from './styled';
+import type { CardToolbarProps } from './types';
+
+export const CardToolbar = ({ list, searchPlaceholder, children }: CardToolbarProps) => (
+  <ConfigProvider componentSize="large">
+    <Root>
+      <SearchInput value={list.keyword} placeholder={searchPlaceholder} onSearch={list.setKeyword} allowClear />
+      {children}
+    </Root>
+  </ConfigProvider>
+);

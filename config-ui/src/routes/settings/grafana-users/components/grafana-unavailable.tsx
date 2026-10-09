@@ -16,8 +16,20 @@
  *
  */
 
-import type { BLUEPRINT_VIEW, PROJECT_TAB, USER_MANAGEMENT_VIEW } from './route-keys';
+import { Button } from 'antd';
 
-export type ProjectTab = (typeof PROJECT_TAB)[keyof typeof PROJECT_TAB];
-export type BlueprintView = (typeof BLUEPRINT_VIEW)[keyof typeof BLUEPRINT_VIEW];
-export type UserManagementView = (typeof USER_MANAGEMENT_VIEW)[keyof typeof USER_MANAGEMENT_VIEW];
+import { COMMON_COPY, EMPTY_ILLUSTRATION, EMPTY_STATE_SIZE, EmptyState } from '@/ui';
+
+import { COPY } from '../constants';
+
+import type { GrafanaUnavailableProps } from './types';
+
+export const GrafanaUnavailable = ({ message, onRetry }: GrafanaUnavailableProps) => (
+  <EmptyState
+    illustration={EMPTY_ILLUSTRATION.ERROR}
+    title={COPY.unavailable.title}
+    description={message}
+    size={EMPTY_STATE_SIZE.SECTION}
+    action={<Button onClick={onRetry}>{COMMON_COPY.retry}</Button>}
+  />
+);

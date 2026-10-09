@@ -16,8 +16,24 @@
  *
  */
 
-import type { BLUEPRINT_VIEW, PROJECT_TAB, USER_MANAGEMENT_VIEW } from './route-keys';
+import styled from 'styled-components';
 
-export type ProjectTab = (typeof PROJECT_TAB)[keyof typeof PROJECT_TAB];
-export type BlueprintView = (typeof BLUEPRINT_VIEW)[keyof typeof BLUEPRINT_VIEW];
-export type UserManagementView = (typeof USER_MANAGEMENT_VIEW)[keyof typeof USER_MANAGEMENT_VIEW];
+import { STATUS_TONE } from '@/ui/constants';
+import { textStyle, toneColors } from '@/ui/style-helpers';
+
+export const Notice = styled.div`
+  ${textStyle('body')}
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.xs}px;
+  margin-bottom: ${({ theme }) => theme.space.md}px;
+  padding: ${({ theme }) => theme.space.sm}px ${({ theme }) => theme.space.md}px;
+  color: ${({ theme }) => toneColors(theme)[STATUS_TONE.WARNING].text};
+  background: ${({ theme }) => toneColors(theme)[STATUS_TONE.WARNING].bg};
+  border-radius: ${({ theme }) => theme.radius.md}px;
+`;
+
+export const NoticeIcon = styled.span`
+  display: inline-flex;
+  color: ${({ theme }) => toneColors(theme)[STATUS_TONE.WARNING].dot};
+`;

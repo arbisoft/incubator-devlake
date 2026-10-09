@@ -82,7 +82,7 @@ export const COPY = {
     pipelines: 'Pipelines',
     apiKeys: 'API Keys',
     settings: 'Settings',
-    users: 'Users',
+    users: 'User Management',
     authentication: 'Authentication',
     activity: 'Recent Activities',
     resources: 'Resources',

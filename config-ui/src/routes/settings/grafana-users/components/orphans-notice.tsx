@@ -16,8 +16,18 @@
  *
  */
 
-import type { BLUEPRINT_VIEW, PROJECT_TAB, USER_MANAGEMENT_VIEW } from './route-keys';
+import { WarningOutlined } from '@ant-design/icons';
 
-export type ProjectTab = (typeof PROJECT_TAB)[keyof typeof PROJECT_TAB];
-export type BlueprintView = (typeof BLUEPRINT_VIEW)[keyof typeof BLUEPRINT_VIEW];
-export type UserManagementView = (typeof USER_MANAGEMENT_VIEW)[keyof typeof USER_MANAGEMENT_VIEW];
+import { COPY } from '../constants';
+
+import { Notice, NoticeIcon } from './styled';
+import type { OrphansNoticeProps } from './types';
+
+export const OrphansNotice = ({ count }: OrphansNoticeProps) => (
+  <Notice>
+    <NoticeIcon aria-hidden>
+      <WarningOutlined />
+    </NoticeIcon>
+    <span>{COPY.orphans.notice(count)}</span>
+  </Notice>
+);

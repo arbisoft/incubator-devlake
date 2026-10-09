@@ -47,3 +47,12 @@ export const FieldError = styled.p`
   margin: ${({ theme }) => theme.space.xxs}px 0 0;
   color: ${({ theme }) => theme.colors.errorActive};
 `;
+
+export const Root = styled.div`
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: ${({ theme }) => theme.space.sm}px;
+`;

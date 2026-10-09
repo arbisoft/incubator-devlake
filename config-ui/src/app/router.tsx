@@ -41,7 +41,7 @@ import {
   ApiKeys,
   SettingsActivity,
   SettingsAuthentication,
-  SettingsUsers,
+  SettingsUserManagement,
   accessLoader,
   NotFound,
   ParamRedirect,
@@ -183,7 +183,11 @@ export const routes: RouteObject[] = [
           },
           {
             path: ROUTE_SEGMENTS.SETTINGS_USERS,
-            element: <SettingsUsers />,
+            element: <SettingsUserManagement />,
+          },
+          {
+            path: ROUTE_SEGMENTS.SETTINGS_GRAFANA_USERS,
+            element: <SettingsUserManagement />,
           },
           {
             path: ROUTE_SEGMENTS.SETTINGS_AUTHENTICATION,
