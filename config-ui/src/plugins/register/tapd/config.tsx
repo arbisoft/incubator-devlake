@@ -20,8 +20,8 @@ import { ExternalLink } from '@/components';
 import { DOC_URL } from '@/release';
 import { IPluginConfig } from '@/types';
 
-import { CompanyId } from './connection-fields';
 import Icon from './assets/icon.svg?react';
+import { CompanyId } from './connection-fields';
 
 export const TAPDConfig: IPluginConfig = {
   plugin: 'tapd',

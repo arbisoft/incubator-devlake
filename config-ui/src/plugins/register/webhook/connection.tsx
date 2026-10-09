@@ -16,85 +16,87 @@
  *
  */
 
-import { useState } from 'react';
-import { EyeOutlined, FormOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
-import { Flex, Table, Space, Button } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
+import { Button } from 'antd';
+import { useMemo, useState } from 'react';
 
-import { useAppSelector } from '@/hooks';
 import { selectWebhooks } from '@/features/connections';
-import { IWebhook } from '@/types';
+import { useAppSelector } from '@/hooks';
+import type { IWebhook } from '@/types';
+import { DataTable, EMPTY_STATE_SIZE } from '@/ui';
 
-import { CreateDialog, ViewDialog, EditDialog, DeleteDialog } from './components';
+import { getColumns } from './columns';
+import { CreateDialog, DeleteDialog, EditDialog, ViewDialog } from './components';
+import { COPY, WEBHOOK_DIALOG } from './constants';
+import { Stack } from './styled';
+import type { WebHookConnectionProps, WebhookDialogKind } from './types';
 
-type Type = 'add' | 'edit' | 'show' | 'delete';
-
-interface Props {
-  filterIds?: ID[];
-  onCreateAfter?: (id: ID) => void;
-  onDeleteAfter?: (id: ID) => void;
-}
-
-export const WebHookConnection = ({ filterIds, onCreateAfter, onDeleteAfter }: Props) => {
-  const [type, setType] = useState<Type>();
-  const [currentID, setCurrentID] = useState<ID>();
+export const WebHookConnection = ({ filterIds, onCreateAfter, onDeleteAfter }: WebHookConnectionProps) => {
+  const [kind, setKind] = useState<WebhookDialogKind>();
+  const [target, setTarget] = useState<IWebhook>();
 
   const webhooks = useAppSelector(selectWebhooks);
+  const rows = useMemo(
+    () => webhooks.filter((webhook) => (filterIds ? filterIds.includes(webhook.id) : true)),
+    [webhooks, filterIds],
+  );
+  const columns = useMemo(
+    () =>
+      getColumns({
+        onOpen: (next, webhook) => {
+          setTarget(webhook);
+          setKind(next);
+        },
+      }),
+    [],
+  );
 
-  const handleHideDialog = () => {
-    setType(undefined);
-    setCurrentID(undefined);
-  };
-
-  const handleShowDialog = (t: Type, r?: IWebhook) => {
-    setType(t);
-    setCurrentID(r?.id);
-  };
+  const hide = () => setKind(undefined);
+  const forget = () => setTarget(undefined);
 
   return (
-    <Flex vertical gap="middle">
-      <Table
+    <Stack>
+      <DataTable<IWebhook>
         rowKey="id"
-        size="middle"
-        columns={[
-          {
-            title: 'ID',
-            dataIndex: 'id',
-            key: 'id',
-          },
-          {
-            title: 'Webhook Name',
-            dataIndex: 'name',
-            key: 'name',
-            render: (name, row) => <span onClick={() => handleShowDialog('show', row)}>{name}</span>,
-          },
-          {
-            title: '',
-            dataIndex: '',
-            key: 'action',
-            align: 'center',
-            render: (_, row) => (
-              <Space>
-                <Button type="primary" icon={<EyeOutlined />} onClick={() => handleShowDialog('show', row)} />
-                <Button type="primary" icon={<FormOutlined />} onClick={() => handleShowDialog('edit', row)} />
-                <Button type="primary" icon={<DeleteOutlined />} onClick={() => handleShowDialog('delete', row)} />
-              </Space>
-            ),
-          },
-        ]}
-        dataSource={webhooks.filter((cs) => (filterIds ? filterIds.includes(cs.id) : true))}
+        ariaLabel={COPY.tableLabel}
+        loading={false}
+        columns={columns}
+        dataSource={rows}
         pagination={false}
+        empty={{ ...COPY.empty, size: EMPTY_STATE_SIZE.SECTION }}
       />
-      <Flex>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => handleShowDialog('add')}>
-          Add a Webhook
+      <div>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => setKind(WEBHOOK_DIALOG.ADD)}>
+          {COPY.add}
         </Button>
-      </Flex>
-      {type === 'add' && <CreateDialog open onCancel={handleHideDialog} onSubmitAfter={(id) => onCreateAfter?.(id)} />}
-      {type === 'show' && currentID && <ViewDialog initialId={currentID} onCancel={handleHideDialog} />}
-      {type === 'edit' && currentID && <EditDialog initialId={currentID} onCancel={handleHideDialog} />}
-      {type === 'delete' && currentID && (
-        <DeleteDialog initialId={currentID} onCancel={handleHideDialog} onSubmitAfter={(id) => onDeleteAfter?.(id)} />
+      </div>
+      <CreateDialog open={kind === WEBHOOK_DIALOG.ADD} onCancel={hide} onSubmitAfter={onCreateAfter} />
+      {target && (
+        <>
+          <ViewDialog
+            key={`view-${target.id}`}
+            open={kind === WEBHOOK_DIALOG.VIEW}
+            webhook={target}
+            onCancel={hide}
+            afterClose={forget}
+          />
+          <EditDialog
+            key={`edit-${target.id}`}
+            open={kind === WEBHOOK_DIALOG.EDIT}
+            webhook={target}
+            onCancel={hide}
+            afterClose={forget}
+          />
+          <DeleteDialog
+            key={`delete-${target.id}`}
+            open={kind === WEBHOOK_DIALOG.DELETE}
+            webhook={target}
+            onCancel={hide}
+            afterClose={forget}
+            onSubmitAfter={onDeleteAfter}
+          />
+        </>
       )}
-    </Flex>
+    </Stack>
   );
 };

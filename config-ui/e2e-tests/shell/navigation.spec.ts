@@ -17,25 +17,36 @@
  */
 import { APIRequestContext, Page } from '@playwright/test';
 
-import { test, expect } from '../fixtures';
 import { loginAsAdmin } from '../auth-helpers';
+import { test, expect } from '../fixtures';
 import { adminApi } from '../support/api';
 import { fetchAuthMethods } from '../support/auth-state';
-import { catalogCard, sidebarMenu } from '../support/selectors';
+import { ApiKeysPage } from '../support/pages/api-keys';
+import { BlueprintPage } from '../support/pages/blueprints';
+import { Screen } from '../support/pages/common';
+import { ConnectionsPage } from '../support/pages/connections';
+import { LoginPage } from '../support/pages/login';
+import { OnboardPage } from '../support/pages/onboard';
+import { OtelPage } from '../support/pages/otel';
+import { PATHS } from '../support/pages/paths';
+import { PipelinesPage } from '../support/pages/pipelines';
+import { ProjectsPage } from '../support/pages/projects';
+import { SettingsUsersPage } from '../support/pages/settings-users';
+import { ShellPage } from '../support/pages/shell';
 
 interface TopLevelPage {
   path: string;
-  ready: (page: Page) => ReturnType<Page['locator']>;
+  screen: (page: Page) => Screen;
 }
 
 const TOP_LEVEL_PAGES: TopLevelPage[] = [
-  { path: '/projects', ready: (page) => page.getByRole('button', { name: 'New Project' }) },
-  { path: '/connections', ready: (page) => page.getByRole('heading', { name: 'Connections', level: 1 }) },
-  { path: '/advanced/blueprints', ready: (page) => page.getByRole('button', { name: 'New Blueprint' }) },
-  { path: '/advanced/pipelines', ready: (page) => page.getByRole('columnheader', { name: 'Blueprint Name' }) },
-  { path: '/keys', ready: (page) => page.getByRole('button', { name: 'New API Key' }) },
-  { path: '/access', ready: (page) => page.getByRole('heading', { name: 'Allowed domains' }) },
-  { path: '/otel', ready: (page) => page.getByRole('button', { name: /Generate Claude Settings/ }) },
+  { path: PATHS.projects, screen: (page) => new ProjectsPage(page) },
+  { path: PATHS.connections, screen: (page) => new ConnectionsPage(page) },
+  { path: PATHS.blueprints, screen: (page) => new BlueprintPage(page) },
+  { path: PATHS.pipelines, screen: (page) => new PipelinesPage(page) },
+  { path: PATHS.keys, screen: (page) => new ApiKeysPage(page) },
+  { path: PATHS.access, screen: (page) => new SettingsUsersPage(page) },
+  { path: PATHS.otel, screen: (page) => new OtelPage(page) },
 ];
 
 test.describe('authenticated shell', () => {
@@ -43,59 +54,65 @@ test.describe('authenticated shell', () => {
     await loginAsAdmin(context);
   });
 
-  for (const { path, ready } of TOP_LEVEL_PAGES) {
+  for (const { path, screen: createScreen } of TOP_LEVEL_PAGES) {
     test(`${path} renders its main content without browser errors`, async ({ page, browserErrors }) => {
-      await page.goto(path);
-      await expect(ready(page)).toBeVisible();
-      await expect(page).toHaveURL(new RegExp(`${path}$`));
+      const screen = createScreen(page);
+      await screen.open();
+      await expect(screen.ready).toBeVisible();
+      await expect(page).toHaveURL(screen.urlPattern);
       expect(browserErrors).toEqual([]);
     });
   }
 
   test('sidebar navigation moves between the top-level pages', async ({ page, browserErrors }) => {
-    await page.goto('/projects');
-    const menu = sidebarMenu(page);
+    const [projects, connections, blueprints, pipelines, keys, access, otel] = TOP_LEVEL_PAGES.map(({ screen }) =>
+      screen(page),
+    );
+    const shell = new ShellPage(page);
+    await projects.open();
 
-    await menu.getByRole('menuitem', { name: /Connections/ }).click();
-    await expect(page).toHaveURL(/\/connections$/);
-    await expect(TOP_LEVEL_PAGES[1].ready(page)).toBeVisible();
+    await shell.openMenuItem(/Connections/);
+    await expect(page).toHaveURL(connections.urlPattern);
+    await expect(connections.ready).toBeVisible();
 
-    await menu.getByRole('menuitem', { name: /Advanced/ }).click();
-    await menu.getByRole('menuitem', { name: 'Blueprints' }).click();
-    await expect(page).toHaveURL(/\/advanced\/blueprints$/);
-    await expect(TOP_LEVEL_PAGES[2].ready(page)).toBeVisible();
+    await shell.openMenuItem(/Advanced/);
+    await shell.openMenuItem('Blueprints');
+    await expect(page).toHaveURL(blueprints.urlPattern);
+    await expect(blueprints.ready).toBeVisible();
 
-    await menu.getByRole('menuitem', { name: 'Pipelines' }).click();
-    await expect(page).toHaveURL(/\/advanced\/pipelines$/);
-    await expect(TOP_LEVEL_PAGES[3].ready(page)).toBeVisible();
+    await shell.openMenuItem('Pipelines');
+    await expect(page).toHaveURL(pipelines.urlPattern);
+    await expect(pipelines.ready).toBeVisible();
 
-    await menu.getByRole('menuitem', { name: /API Keys/ }).click();
-    await expect(page).toHaveURL(/\/keys$/);
-    await expect(TOP_LEVEL_PAGES[4].ready(page)).toBeVisible();
+    await shell.openMenuItem(/API Keys/);
+    await expect(page).toHaveURL(keys.urlPattern);
+    await expect(keys.ready).toBeVisible();
 
-    await menu.getByRole('menuitem', { name: /User Management/ }).click();
-    await expect(page).toHaveURL(/\/access$/);
-    await expect(TOP_LEVEL_PAGES[5].ready(page)).toBeVisible();
+    await shell.openUsersMenuItem();
+    await expect(page).toHaveURL(access.urlPattern);
+    await expect(access.ready).toBeVisible();
 
-    await menu.getByRole('menuitem', { name: /Projects/ }).click();
-    await expect(page).toHaveURL(/\/projects$/);
-    await expect(TOP_LEVEL_PAGES[0].ready(page)).toBeVisible();
+    await shell.openMenuItem(/Projects/);
+    await expect(page).toHaveURL(projects.urlPattern);
+    await expect(projects.ready).toBeVisible();
 
     // The OTel page is reached from its catalog card, not the sidebar.
-    await menu.getByRole('menuitem', { name: /Connections/ }).click();
-    await catalogCard(page, 'Claude Code OTel').click();
-    await expect(page).toHaveURL(/\/otel$/);
-    await expect(TOP_LEVEL_PAGES[6].ready(page)).toBeVisible();
+    await shell.openMenuItem(/Connections/);
+    await new ConnectionsPage(page).openCard('Claude Code OTel');
+    await expect(page).toHaveURL(otel.urlPattern);
+    await expect(otel.ready).toBeVisible();
     expect(browserErrors).toEqual([]);
   });
 
   test('an unknown route shows the 404 page and its button leads back into the app', async ({ page }) => {
-    await page.goto('/e2e-no-such-page');
-    await expect(page.getByText('404 Not Found')).toBeVisible();
-    await expect(page.getByText('This is an invalid address.')).toBeVisible();
-    await page.getByRole('button', { name: 'Go HomePage' }).click();
-    await expect(page).toHaveURL(/\/projects$/);
-    await expect(TOP_LEVEL_PAGES[0].ready(page)).toBeVisible();
+    const shell = new ShellPage(page);
+    await shell.visit('/e2e-no-such-page');
+    await expect(shell.notFoundTitle).toBeVisible();
+    await expect(shell.notFoundMessage).toBeVisible();
+    await shell.goHome();
+    const projects = TOP_LEVEL_PAGES[0].screen(page);
+    await expect(page).toHaveURL(projects.urlPattern);
+    await expect(projects.ready).toBeVisible();
   });
 
   test.describe('onboarding', () => {
@@ -115,12 +132,13 @@ test.describe('authenticated shell', () => {
     });
 
     test('/onboard opens and steps forward, and the store is restored afterwards', async ({ page, browserErrors }) => {
-      await page.goto('/onboard');
-      await expect(page.getByText('Welcome to')).toBeVisible();
-      await page.getByRole('button', { name: 'Connect to your first repository' }).click();
-      await expect(page.getByRole('heading', { name: 'Connect to your first repository' })).toBeVisible();
-      await expect(page.getByPlaceholder('Your Project Name')).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Next Step' })).toBeDisabled();
+      const onboard = new OnboardPage(page);
+      await onboard.open();
+      await expect(onboard.welcome).toBeVisible();
+      await onboard.startFirstRepository();
+      await expect(onboard.firstRepositoryHeading).toBeVisible();
+      await expect(onboard.projectNameInput).toBeVisible();
+      await expect(onboard.nextStepButton).toBeDisabled();
       expect(((await (await api.get('/store/onboard')).json()) as { step: number }).step).toBe(1);
       expect(browserErrors).toEqual([]);
     });
@@ -138,15 +156,11 @@ test.describe('unauthenticated deep link', () => {
     );
     test.skip(!provider, 'No OIDC provider is configured');
 
-    await page.goto('/advanced/pipelines');
-    await expect(page).toHaveURL(/\/login\?return_url=%2Fadvanced%2Fpipelines$/);
+    const login = new LoginPage(page);
+    await new PipelinesPage(page).open();
+    await expect(page).toHaveURL(login.returnUrlPattern(PATHS.pipelines));
 
-    const providerRequest = page.waitForRequest((req) => req.url().includes(provider?.loginUrl as string));
-    await page.route(`**${provider?.loginUrl}**`, (route) =>
-      route.fulfill({ status: 200, contentType: 'text/html', body: 'stub identity provider' }),
-    );
-    await page.getByRole('button', { name: new RegExp(provider?.name as string, 'i') }).click();
-    const url = new URL((await providerRequest).url());
+    const url = await login.signInWith(provider?.name as string, provider?.loginUrl as string);
     expect(url.searchParams.get('return_url')).toBe('/advanced/pipelines');
   });
 });

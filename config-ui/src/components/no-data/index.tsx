@@ -17,10 +17,9 @@
  */
 
 import { Card } from 'antd';
+import styled from 'styled-components';
 
 import Img from '@/images/no-data.svg';
-
-import styled from 'styled-components';
 
 const Wrapper = styled(Card)`
   text-align: center;

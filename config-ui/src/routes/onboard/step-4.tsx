@@ -16,14 +16,15 @@
  *
  */
 
-import { useState, useContext, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { theme, Progress, Space, Button } from 'antd';
+import { useState, useContext, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 
 import API from '@/api';
 import { ExternalLink } from '@/components';
+import { PATHS } from '@/config';
 import { useAutoRefresh } from '@/hooks';
 import { operator } from '@/utils';
 
@@ -193,7 +194,7 @@ export const Step4 = () => {
     );
 
     if (success) {
-      navigate('/');
+      navigate(PATHS.ROOT());
     }
   };
 

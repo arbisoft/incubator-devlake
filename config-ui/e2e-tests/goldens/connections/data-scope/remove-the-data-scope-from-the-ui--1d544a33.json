@@ -1,0 +1,10 @@
+{
+  "titlePath": ["GitHub data scope and scope config on a connection", "remove the data scope from the UI"],
+  "writes": [
+    {
+      "method": "DELETE",
+      "path": "/api/plugins/github/connections/:id/scopes/:id?delete_data_only=false",
+      "body": null
+    }
+  ]
+}

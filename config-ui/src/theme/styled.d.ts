@@ -17,11 +17,9 @@
  */
 
 import 'styled-components';
-import type { AppThemeColors, ResolvedTheme } from './tokens';
+import type { AppTheme } from './tokens';
 
 declare module 'styled-components' {
-  export interface DefaultTheme {
-    mode: ResolvedTheme;
-    colors: AppThemeColors;
-  }
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- declaration merging needs an interface
+  export interface DefaultTheme extends Omit<AppTheme, 'antd'> {}
 }

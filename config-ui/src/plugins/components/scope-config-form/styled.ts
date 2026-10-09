@@ -16,6 +16,80 @@
  *
  */
 
+import { Steps } from 'antd';
 import styled from 'styled-components';
 
-export const Wrapper = styled.div``;
+import { textStyle } from '@/ui/style-helpers';
+
+export const Root = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.md}px;
+`;
+
+export const Fields = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.lg}px;
+`;
+
+export const Notice = styled.div`
+  margin-top: ${({ theme }) => theme.space.sm}px;
+`;
+
+export const Footer = styled.div`
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  gap: ${({ theme }) => theme.space.sm}px;
+  padding-top: ${({ theme }) => theme.space.md}px;
+  background: ${({ theme }) => theme.colors.bgContainer};
+`;
+
+export const Transformations = styled.div`
+  .ant-collapse {
+    background: transparent;
+  }
+
+  .ant-collapse-item {
+    margin-bottom: ${({ theme }) => theme.space.sm}px !important;
+    overflow: hidden;
+  }
+
+  .ant-collapse-header {
+    flex-direction: row-reverse;
+    justify-content: space-between;
+    ${textStyle('h3')}
+  }
+
+  && .ant-collapse-body {
+    ${textStyle('body')}
+  }
+
+  .ant-collapse-body p {
+    ${textStyle('body')}
+    color: ${({ theme }) => theme.colors.textSecondary};
+  }
+
+  && .ant-tag-filled.ant-tag-blue {
+    border-color: ${({ theme }) => theme.colors.primarySubtleBorder};
+    background: ${({ theme }) => theme.colors.primarySubtle};
+    color: ${({ theme }) => theme.colors.primary};
+  }
+`;
+
+export const Progress = styled(Steps)`
+  .ant-steps-item-finish .ant-steps-item-icon {
+    border-color: ${({ theme }) => theme.colors.primary};
+    background: ${({ theme }) => theme.colors.primary};
+  }
+
+  .ant-steps-item-finish .ant-steps-item-icon-finish {
+    color: ${({ theme }) => theme.brand.onPrimary};
+  }
+
+  .ant-steps-item-finish .ant-steps-item-rail {
+    background: ${({ theme }) => theme.colors.primary};
+  }
+`;

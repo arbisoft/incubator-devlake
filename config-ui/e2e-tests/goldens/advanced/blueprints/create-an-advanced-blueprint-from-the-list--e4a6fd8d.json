@@ -1,0 +1,18 @@
+{
+  "titlePath": ["Blueprints list search, status filter and create", "create an advanced blueprint from the list"],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/blueprints",
+      "body": {
+        "cronConfig": "0 0 * * *",
+        "enable": true,
+        "isManual": false,
+        "mode": "ADVANCED",
+        "name": "e2e-*-new-advanced",
+        "plan": [[]],
+        "skipOnFail": true
+      }
+    }
+  ]
+}

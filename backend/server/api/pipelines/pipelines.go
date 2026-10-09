@@ -67,6 +67,8 @@ func Post(c *gin.Context) {
 // @Param pagesize query int false "pagesize"
 // @Param blueprint_id query int false "blueprint_id"
 // @Param label query string false "label"
+// @Param sortBy query string false "sort column, defaults to id" Enums(id, beganAt, finishedAt)
+// @Param sortOrder query string false "sort direction, defaults to desc" Enums(asc, desc)
 // @Success 200  {object} shared.ResponsePipelines
 // @Failure 400  {string} errcode.Error "Bad Request"
 // @Failure 500  {string} errcode.Error "Internal Error"
@@ -80,6 +82,10 @@ func Index(c *gin.Context) {
 	}
 	pipelines, count, err := services.GetPipelines(&query, true)
 	if err != nil {
+		if e, ok := err.(errors.Error); ok && e.GetType() == errors.BadInput {
+			shared.ApiOutputError(c, e)
+			return
+		}
 		shared.ApiOutputError(c, errors.Default.Wrap(err, "error getting pipelines"))
 		return
 	}

@@ -16,17 +16,22 @@
  *
  */
 
-import { useState } from 'react';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
 import { Card, Space, Flex, Button } from 'antd';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import API from '@/api';
 import { TipLayout } from '@/components';
 import { PATHS } from '@/config';
+import { useDocumentTitle } from '@/ui/hooks';
 import { operator } from '@/utils';
 
+import { COPY } from './constants';
+
 export const DBMigrate = () => {
+  useDocumentTitle(COPY.title);
+
   const [operating, setOperating] = useState(false);
 
   const navigate = useNavigate();

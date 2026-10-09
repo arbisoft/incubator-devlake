@@ -19,5 +19,5 @@
 export * from './types';
 export * from './config';
 export * from './connection';
-export { default as WebhookCreateDialog } from './components/create-dialog';
-export { default as WebhookSelectorDialog } from './components/selector-dialog';
+export { CreateDialog as WebhookCreateDialog } from './components/create-dialog';
+export { SelectorDialog as WebhookSelectorDialog } from './components/selector-dialog';

@@ -19,8 +19,13 @@
 import type { IBlueprint } from '@/types';
 import { request } from '@/utils';
 
-export const list = (data: Pagination & { type: string }): Promise<{ count: number; blueprints: IBlueprint[] }> =>
-  request('/blueprints', { data });
+import type { KeywordParams, SortParams } from '../types';
+
+export type ListParams = Pagination & { type: string; enable?: boolean } & KeywordParams &
+  SortParams<'name' | 'createdAt'>;
+
+export const list = (data: ListParams, signal?: AbortSignal): Promise<{ count: number; blueprints: IBlueprint[] }> =>
+  request('/blueprints', { data, signal });
 
 export const get = (id: ID): Promise<IBlueprint> => request(`/blueprints/${id}`);
 

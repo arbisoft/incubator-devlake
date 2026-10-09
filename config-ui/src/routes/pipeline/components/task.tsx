@@ -16,9 +16,9 @@
  *
  */
 
-import { useState, useMemo } from 'react';
 import { RedoOutlined } from '@ant-design/icons';
-import { Button } from 'antd';
+import { Button, Tooltip } from 'antd';
+import { useState, useMemo } from 'react';
 
 import API from '@/api';
 import { TextTooltip } from '@/components';
@@ -26,6 +26,7 @@ import { getPluginConfig } from '@/plugins';
 import { ITask, IPipelineStatus } from '@/types';
 import { operator } from '@/utils';
 
+import { COPY } from '../constants';
 import * as S from '../styled';
 
 import { PipelineDuration } from './duration';
@@ -41,9 +42,9 @@ export const PipelineTask = ({ task }: Props) => {
 
   const [, name] = useMemo(() => {
     const config = getPluginConfig(task.plugin);
-    const options = task.options;
+    const { options } = task;
 
-    let name = config.name;
+    let { name } = config;
 
     switch (true) {
       case ['github', 'github_graphql'].includes(config.plugin):
@@ -98,45 +99,38 @@ export const PipelineTask = ({ task }: Props) => {
   }, [task]);
 
   const handleRerun = async () => {
-    const [success] = await operator(() => API.task.rertun(id), {
-      setOperating,
-    });
-
-    if (success) {
-      //   setVersion((v) => v + 1);
-    }
+    await operator(() => API.task.rertun(id), { setOperating });
   };
 
   return (
     <S.Task>
       <div className="info">
         <div className="title">
-          {/* <img src={icon} alt="" /> */}
-          <strong>Task{id}</strong>
+          <strong>{COPY.task.label(id)}</strong>
           <span>
             <TextTooltip content={name}>{name}</TextTooltip>
           </span>
         </div>
-        {[status === IPipelineStatus.CREATED, IPipelineStatus.PENDING].includes(status) && <p>Subtasks pending</p>}
+        {[status === IPipelineStatus.CREATED, IPipelineStatus.PENDING].includes(status) && <p>{COPY.task.pending}</p>}
 
         {[IPipelineStatus.ACTIVE, IPipelineStatus.RUNNING].includes(status) && (
           <p>
-            Subtasks running
-            <strong style={{ marginLeft: 8 }}>
+            {COPY.task.running}
+            <S.SubtaskCount>
               {progressDetail?.finishedSubTasks}/{progressDetail?.totalSubTasks}
-            </strong>
+            </S.SubtaskCount>
           </p>
         )}
 
-        {status === IPipelineStatus.COMPLETED && <p>All Subtasks completed</p>}
+        {status === IPipelineStatus.COMPLETED && <p>{COPY.task.completed}</p>}
 
         {status === IPipelineStatus.FAILED && (
           <TextTooltip content={errorName}>
-            <p className="error">Task failed: hover to view the reason</p>
+            <p className="error">{COPY.task.failed}</p>
           </TextTooltip>
         )}
 
-        {status === IPipelineStatus.CANCELLED && <p>Subtasks canceled</p>}
+        {status === IPipelineStatus.CANCELLED && <p>{COPY.task.cancelled}</p>}
       </div>
       <div className="duration">
         <PipelineDuration status={status} beganAt={beganAt} finishedAt={finishedAt} />
@@ -145,7 +139,11 @@ export const PipelineTask = ({ task }: Props) => {
           IPipelineStatus.PARTIAL,
           IPipelineStatus.FAILED,
           IPipelineStatus.CANCELLED,
-        ].includes(status) && <Button loading={operating} icon={<RedoOutlined />} onClick={handleRerun} />}
+        ].includes(status) && (
+          <Tooltip title={COPY.task.rerun}>
+            <Button loading={operating} icon={<RedoOutlined />} aria-label={COPY.task.rerun} onClick={handleRerun} />
+          </Tooltip>
+        )}
       </div>
     </S.Task>
   );

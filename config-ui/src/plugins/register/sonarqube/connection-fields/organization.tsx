@@ -17,9 +17,9 @@
  */
 
 import { Input } from 'antd';
+import { useEffect } from 'react';
 
 import { Block, ExternalLink } from '@/components';
-import { useEffect } from 'react';
 
 interface Props {
   type: 'create' | 'update';
@@ -65,7 +65,7 @@ export const Organization = ({ initialValues, values, setValues, setErrors }: Pr
       }
       required
     >
-      <Input style={{ width: 386 }} placeholder="e.g. org-1" value={values.org} onChange={handleChange} />
+      <Input placeholder="e.g. org-1" value={values.org} onChange={handleChange} />
     </Block>
   );
 };

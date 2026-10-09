@@ -16,29 +16,28 @@
  *
  */
 
-import { useState } from 'react';
 import { CheckCircleOutlined, CloseCircleOutlined, StopOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
-import { Button } from 'antd';
+import { Button, Tooltip } from 'antd';
 import { groupBy, sortBy } from 'lodash';
+import { useState } from 'react';
 
 import API from '@/api';
 import { Loading } from '@/components';
 import { useAutoRefresh } from '@/hooks';
 import { ITask, IPipelineStatus } from '@/types';
 
+import { COPY, STAGE_STATE } from '../constants';
 import * as S from '../styled';
+import type { StageState } from '../types';
 
 import { PipelineTask } from './task';
 
 interface Props {
   id: ID;
-  style?: React.CSSProperties;
 }
 
-export const PipelineTasks = ({ id, style }: Props) => {
+export const PipelineTasks = ({ id }: Props) => {
   const [isOpen, setIsOpen] = useState(true);
-
-  // const { version } = usePipeline();
 
   const { data } = useAutoRefresh<ITask[]>(
     async () => {
@@ -67,40 +66,40 @@ export const PipelineTasks = ({ id, style }: Props) => {
       <div className="inner">
         <S.TasksHeader>
           {Object.keys(stages).map((key) => {
-            let status;
+            let status: StageState;
 
             switch (true) {
               case !!stages[key].find((task) =>
                 [IPipelineStatus.ACTIVE, IPipelineStatus.RUNNING].includes(task.status),
               ):
-                status = 'loading';
+                status = STAGE_STATE.LOADING;
                 break;
               case stages[key].every((task) => task.status === IPipelineStatus.COMPLETED):
-                status = 'success';
+                status = STAGE_STATE.SUCCESS;
                 break;
               case !!stages[key].find((task) => task.status === IPipelineStatus.FAILED):
-                status = 'error';
+                status = STAGE_STATE.ERROR;
                 break;
               case !!stages[key].find((task) => task.status === IPipelineStatus.CANCELLED):
-                status = 'cancel';
+                status = STAGE_STATE.CANCEL;
                 break;
               default:
-                status = 'ready';
+                status = STAGE_STATE.READY;
                 break;
             }
 
             return (
               <li key={key} className={status}>
-                <strong>Stage {key}</strong>
-                {status === 'loading' && <Loading size={14} />}
-                {status === 'success' && <CheckCircleOutlined />}
-                {status === 'error' && <CloseCircleOutlined />}
-                {status === 'cancel' && <StopOutlined />}
+                <strong>{COPY.tasks.stage(key)}</strong>
+                {status === STAGE_STATE.LOADING && <Loading size={14} />}
+                {status === STAGE_STATE.SUCCESS && <CheckCircleOutlined />}
+                {status === STAGE_STATE.ERROR && <CloseCircleOutlined />}
+                {status === STAGE_STATE.CANCEL && <StopOutlined />}
               </li>
             );
           })}
         </S.TasksHeader>
-        <S.TasksList style={{ display: isOpen ? 'flex' : 'none' }}>
+        <S.TasksList $open={isOpen}>
           {Object.keys(stages).map((key) => (
             <li key={key}>
               {stages[key].map((task) => (
@@ -110,12 +109,15 @@ export const PipelineTasks = ({ id, style }: Props) => {
           ))}
         </S.TasksList>
       </div>
-      <Button
-        size="small"
-        className="collapse-control"
-        icon={isOpen ? <DownOutlined /> : <UpOutlined />}
-        onClick={handleToggleOpen}
-      />
+      <Tooltip title={COPY.tasks.toggle}>
+        <Button
+          size="small"
+          className="collapse-control"
+          aria-label={COPY.tasks.toggle}
+          icon={isOpen ? <DownOutlined /> : <UpOutlined />}
+          onClick={handleToggleOpen}
+        />
+      </Tooltip>
     </S.Tasks>
   );
 };

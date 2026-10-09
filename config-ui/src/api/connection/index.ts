@@ -70,8 +70,9 @@ export const test = (
       | 'customHeaders'
     >
   >,
+  timeout?: number,
 ): Promise<IConnectionTestResult> =>
-  request(`/plugins/${plugin}/connections/${connectionId}/test`, { method: 'post', data: payload });
+  request(`/plugins/${plugin}/connections/${connectionId}/test`, { method: 'post', data: payload, timeout });
 
 export const testOld = (
   plugin: string,

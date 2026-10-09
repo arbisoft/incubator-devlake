@@ -16,9 +16,9 @@
  *
  */
 
-import { useState } from 'react';
 import { StopOutlined, RedoOutlined } from '@ant-design/icons';
-import { Button } from 'antd';
+import { Button, Tooltip } from 'antd';
+import { useState } from 'react';
 
 import API from '@/api';
 import { Loading } from '@/components';
@@ -26,10 +26,11 @@ import { useAutoRefresh } from '@/hooks';
 import { IPipeline, IPipelineStatus } from '@/types';
 import { formatTime, operator } from '@/utils';
 
+import { COPY } from '../constants';
 import * as S from '../styled';
 
-import { PipelineStatus } from './status';
 import { PipelineDuration } from './duration';
+import { PipelineStatusBadge } from './status-badge';
 
 interface Props {
   id: ID;
@@ -53,23 +54,11 @@ export const PipelineInfo = ({ id }: Props) => {
   });
 
   const handleCancel = async () => {
-    const [success] = await operator(() => API.pipeline.remove(id), {
-      setOperating,
-    });
-
-    if (success) {
-      // setVersion((v) => v + 1);
-    }
+    await operator(() => API.pipeline.remove(id), { setOperating });
   };
 
   const handleRerun = async () => {
-    const [success] = await operator(() => API.pipeline.rerun(id), {
-      setOperating,
-    });
-
-    if (success) {
-      // setVersion((v) => v + 1);
-    }
+    await operator(() => API.pipeline.rerun(id), { setOperating });
   };
 
   if (!data) {
@@ -82,46 +71,55 @@ export const PipelineInfo = ({ id }: Props) => {
     <S.Info>
       <ul>
         <li>
-          <span>Status</span>
+          <span>{COPY.info.status}</span>
           <strong>
-            <PipelineStatus status={status} />
+            <PipelineStatusBadge status={status} />
           </strong>
         </li>
         <li>
-          <span>Started at</span>
+          <span>{COPY.info.startedAt}</span>
           <strong>{formatTime(beganAt)}</strong>
         </li>
         <li>
-          <span>Duration</span>
+          <span>{COPY.info.duration}</span>
           <strong>
             <PipelineDuration status={status} beganAt={beganAt} finishedAt={finishedAt} />
           </strong>
         </li>
         <li>
-          <span>Current Stage</span>
+          <span>{COPY.info.stage}</span>
           <strong>{stage}</strong>
         </li>
         <li>
-          <span>Tasks Completed</span>
+          <span>{COPY.info.tasksCompleted}</span>
           <strong>
             {finishedTasks}/{totalTasks}
           </strong>
         </li>
         <li>
           {[IPipelineStatus.ACTIVE, IPipelineStatus.RUNNING, IPipelineStatus.RERUN].includes(status) && (
-            <Button loading={operating} icon={<StopOutlined />} onClick={handleCancel} />
+            <Tooltip title={COPY.info.cancel}>
+              <Button
+                loading={operating}
+                icon={<StopOutlined />}
+                aria-label={COPY.info.cancel}
+                onClick={handleCancel}
+              />
+            </Tooltip>
           )}
           {[
             IPipelineStatus.COMPLETED,
             IPipelineStatus.PARTIAL,
             IPipelineStatus.FAILED,
             IPipelineStatus.CANCELLED,
-          ].includes(status) && <Button loading={operating} icon={<RedoOutlined />} onClick={handleRerun} />}
+          ].includes(status) && (
+            <Tooltip title={COPY.info.rerun}>
+              <Button loading={operating} icon={<RedoOutlined />} aria-label={COPY.info.rerun} onClick={handleRerun} />
+            </Tooltip>
+          )}
         </li>
       </ul>
-      {IPipelineStatus.FAILED === status && (
-        <p className="'message'">Pipeline failed. Hover over a failed task below to see the reason.</p>
-      )}
+      {IPipelineStatus.FAILED === status && <p className="message">{COPY.info.failed}</p>}
     </S.Info>
   );
 };

@@ -15,14 +15,15 @@
  * limitations under the License.
  *
  */
-import { APIRequestContext, APIResponse, Playwright, expect } from '@playwright/test';
+import { APIRequestContext, APIResponse, PlaywrightWorkerArgs, expect } from '@playwright/test';
 
 import { getAdminSessionToken } from '../auth-helpers';
+
 import { API_URL } from './env';
 
 const CSRF_TOKEN = 'e2e-csrf-token';
 
-export const E2E_PREFIX = 'e2e-';
+const E2E_PREFIX = 'e2e-';
 
 export const uniqueName = (label: string) =>
   `${E2E_PREFIX}${label}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -30,7 +31,7 @@ export const uniqueName = (label: string) =>
 export const DUMMY_TOKEN = 'e2e-dummy-token-not-real';
 
 // Admin-authenticated request context against the DevLake API (session cookie plus double-submit CSRF).
-export async function adminApi(playwright: Playwright): Promise<APIRequestContext> {
+export async function adminApi(playwright: PlaywrightWorkerArgs['playwright']): Promise<APIRequestContext> {
   return playwright.request.newContext({
     baseURL: API_URL,
     extraHTTPHeaders: {
@@ -43,6 +44,20 @@ export async function adminApi(playwright: Playwright): Promise<APIRequestContex
 async function json<T>(res: APIResponse, what: string): Promise<T> {
   expect(res.ok(), `${what} failed with ${res.status()}`).toBe(true);
   return (await res.json()) as T;
+}
+
+// Result of a fetch made from inside a page, or of a response the page received.
+export interface PageResponse<T = unknown> {
+  status: number;
+  body: T | null;
+}
+
+export interface ApiMessage {
+  message?: string;
+}
+
+export interface LinkableProvider {
+  providerKey: string;
 }
 
 export interface ApiConnection {
@@ -96,7 +111,7 @@ export async function findConnectionByName(
   return (await listConnections(api, plugin)).find((c) => c.name === name);
 }
 
-export async function deleteScope(
+async function deleteScope(
   api: APIRequestContext,
   plugin: string,
   connectionId: number,
@@ -113,7 +128,10 @@ export async function deleteConnection(api: APIRequestContext, plugin: string, i
   if (scopesRes.ok()) {
     const { scopes } = (await scopesRes.json()) as ApiScopeList;
     for (const { scope } of scopes ?? []) {
-      await deleteScope(api, plugin, id, scope.githubId ?? scope.id);
+      const scopeId = scope.githubId ?? scope.id;
+      if (scopeId !== undefined) {
+        await deleteScope(api, plugin, id, scopeId);
+      }
     }
   }
   await api.delete(`/plugins/${plugin}/connections/${id}`);
@@ -128,9 +146,17 @@ export async function deleteConnectionsByPrefix(api: APIRequestContext, plugin: 
   }
 }
 
+interface ApiScope {
+  id?: string | number;
+  githubId?: number;
+  name?: string;
+  fullName?: string;
+  [key: string]: unknown;
+}
+
 export interface ApiScopeList {
   count: number;
-  scopes: { scope: Record<string, any>; scopeConfig?: Record<string, any> }[];
+  scopes: { scope: ApiScope; scopeConfig?: Record<string, unknown> }[];
 }
 
 export async function listScopes(api: APIRequestContext, plugin: string, connectionId: number): Promise<ApiScopeList> {
@@ -169,7 +195,7 @@ export interface ApiProject {
   name: string;
   description?: string;
   blueprint?: ApiBlueprint;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface ApiBlueprint {
@@ -181,7 +207,7 @@ export interface ApiBlueprint {
   timeAfter?: string | null;
   enable: boolean;
   connections: { pluginName: string; connectionId: number; scopes: { scopeId: string }[] }[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export async function createProject(api: APIRequestContext, name: string): Promise<ApiProject> {
@@ -220,12 +246,60 @@ export async function deleteProject(api: APIRequestContext, name: string): Promi
   expect(res.ok(), `delete project ${name} failed with ${res.status()}`).toBe(true);
 }
 
+export async function createBlueprint(
+  api: APIRequestContext,
+  name: string,
+  options: { enable?: boolean; connections?: ApiBlueprint['connections'] } = {},
+): Promise<ApiBlueprint> {
+  return json(
+    await api.post('/blueprints', {
+      data: {
+        name,
+        mode: 'NORMAL',
+        enable: options.enable ?? true,
+        cronConfig: '0 0 * * *',
+        isManual: false,
+        skipOnFail: true,
+        connections: options.connections ?? [],
+      },
+    }),
+    `create blueprint ${name}`,
+  );
+}
+
+// A blueprint with no connections answers 400 yet still records a pipeline that completes at once.
+export async function triggerBlueprint(api: APIRequestContext, blueprintId: number): Promise<void> {
+  await api.post(`/blueprints/${blueprintId}/trigger`, { data: { skipCollectors: false, fullSync: false } });
+  await expect.poll(async () => (await listBlueprintPipelines(api, blueprintId)).length).toBeGreaterThan(0);
+}
+
+async function deleteBlueprint(api: APIRequestContext, blueprintId: number): Promise<void> {
+  await cancelPipelinesOfBlueprint(api, blueprintId);
+  await api.delete(`/blueprints/${blueprintId}`);
+}
+
+export async function listBlueprintsByKeyword(api: APIRequestContext, keyword: string): Promise<ApiBlueprint[]> {
+  const res = await json<{ blueprints: ApiBlueprint[] }>(
+    await api.get('/blueprints', { params: { type: 'ALL', keyword, pageSize: 100 } }),
+    'list blueprints',
+  );
+  return res.blueprints ?? [];
+}
+
+export async function deleteBlueprintsByPrefix(api: APIRequestContext, prefix: string): Promise<void> {
+  for (const blueprint of await listBlueprintsByKeyword(api, prefix)) {
+    if (blueprint.name.startsWith(prefix)) {
+      await deleteBlueprint(api, blueprint.id);
+    }
+  }
+}
+
 export interface ApiPipeline {
   id: number;
   name: string;
   status: string;
   blueprintId?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 const ACTIVE_PIPELINE_STATUSES = ['TASK_CREATED', 'TASK_PENDING', 'TASK_ACTIVE', 'TASK_RUNNING', 'TASK_RERUN'];
@@ -242,7 +316,7 @@ export async function getPipeline(api: APIRequestContext, id: number): Promise<A
   return json(await api.get(`/pipelines/${id}`), `get pipeline ${id}`);
 }
 
-export async function cancelPipeline(api: APIRequestContext, id: number): Promise<void> {
+async function cancelPipeline(api: APIRequestContext, id: number): Promise<void> {
   await api.delete(`/pipelines/${id}`);
 }
 
@@ -273,7 +347,7 @@ export interface ApiKey {
   name: string;
   allowedPath: string;
   expiredAt: string | null;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export async function listApiKeys(api: APIRequestContext): Promise<ApiKey[]> {
@@ -284,6 +358,13 @@ export async function listApiKeys(api: APIRequestContext): Promise<ApiKey[]> {
   return res.apikeys ?? [];
 }
 
+export async function createApiKey(api: APIRequestContext, name: string, expiredAt?: string): Promise<ApiKey> {
+  return json(
+    await api.post('/api-keys', { data: { name, expiredAt, allowedPath: '.*', type: 'devlake' } }),
+    `create api key ${name}`,
+  );
+}
+
 export async function deleteApiKeysByPrefix(api: APIRequestContext): Promise<void> {
   for (const key of await listApiKeys(api)) {
     if (key.name.startsWith(E2E_PREFIX)) {
@@ -291,3 +372,94 @@ export async function deleteApiKeysByPrefix(api: APIRequestContext): Promise<voi
     }
   }
 }
+
+export interface ApiAccessUser {
+  id: number;
+  role: string;
+  status: string;
+  displayName: string;
+  localLoginName?: string;
+  hasLocalCredential: boolean;
+  [key: string]: unknown;
+}
+
+// Pages through the visible (non-hidden) access directory, 50 users at a time.
+export async function listAccessUsers(api: APIRequestContext): Promise<ApiAccessUser[]> {
+  const users: ApiAccessUser[] = [];
+  for (let page = 1; ; page++) {
+    const body = await json<{ users: ApiAccessUser[]; count: number }>(
+      await api.get('/access/users', { params: { page, pageSize: 50 } }),
+      'list access users',
+    );
+    users.push(...(body.users ?? []));
+    if (users.length >= body.count || (body.users ?? []).length === 0) {
+      return users;
+    }
+  }
+}
+
+// Creates an email (SSO) user that signs in later; it works with or without local auth.
+export async function createEmailUser(api: APIRequestContext, email: string): Promise<ApiAccessUser> {
+  return json<ApiAccessUser>(await api.post('/access/users', { data: { email, role: 'member' } }), 'create email user');
+}
+
+export async function findAccessUserByLogin(
+  api: APIRequestContext,
+  loginName: string,
+): Promise<ApiAccessUser | undefined> {
+  return (await listAccessUsers(api)).find((u) => u.localLoginName === loginName);
+}
+
+export interface ApiAuditEvent {
+  id: number;
+  action: string;
+  actorEmail: string;
+  targetEmail: string;
+  detail: string;
+}
+
+export async function findAuditEventByTarget(
+  api: APIRequestContext,
+  targetEmail: string,
+): Promise<ApiAuditEvent | undefined> {
+  const events = await json<ApiAuditEvent[]>(await api.get('/access/audit-events'), 'list audit events');
+  return events.find((event) => event.targetEmail === targetEmail);
+}
+
+export interface ApiOidcProvider {
+  providerKey: string;
+  enabled: boolean;
+  [key: string]: unknown;
+}
+
+async function listOidcProviders(api: APIRequestContext): Promise<ApiOidcProvider[]> {
+  return json(await api.get('/access/oidc-providers'), 'list oidc providers');
+}
+
+export async function findOidcProvider(
+  api: APIRequestContext,
+  providerKey: string,
+): Promise<ApiOidcProvider | undefined> {
+  return (await listOidcProviders(api)).find((p) => p.providerKey === providerKey);
+}
+
+export interface ApiOtelConnection {
+  connection: { id: number; teamName: string; status: string; organizationId?: string | null };
+  credentials: { id: number; status: string }[];
+  projects: { name: string }[];
+}
+
+async function listOtelConnections(api: APIRequestContext): Promise<ApiOtelConnection[]> {
+  return json(await api.get('/plugins/claude_otel/connections'), 'list otel connections');
+}
+
+export async function findOtelConnection(
+  api: APIRequestContext,
+  teamName: string,
+): Promise<ApiOtelConnection | undefined> {
+  return (await listOtelConnections(api)).find((it) => it.connection.teamName === teamName);
+}
+
+// Credential statuses of a connection, sorted so a spec can compare them with toEqual.
+export const otelCredentialStatuses = (entry: ApiOtelConnection | undefined): string[] =>
+  (entry?.credentials ?? []).map((c) => c.status).sort();
