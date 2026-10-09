@@ -16,23 +16,21 @@
  *
  */
 
-import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
 import { DeleteOutlined, FormOutlined } from '@ant-design/icons';
 import { Flex, Popconfirm, Modal, Button } from 'antd';
+import { useState } from 'react';
+import { Helmet } from 'react-helmet';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import API from '@/api';
 import { PageLoading, PageHeader, ExternalLink } from '@/components';
-import { PATHS } from '@/config';
+import { BRAND_NAME, PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
 import { DataScopeSelect } from '@/plugins';
 import { operator } from '@/utils';
 
-import { BlueprintConnectionDetailTable } from './table';
 import * as S from './styled';
-
-const brandName = import.meta.env.DEVLAKE_BRAND_NAME ?? 'DevLake';
+import { BlueprintConnectionDetailTable } from './table';
 
 export const BlueprintConnectionDetailPage = () => {
   const [version, setVersion] = useState(1);
@@ -196,7 +194,7 @@ export const BlueprintConnectionDetailPage = () => {
     >
       <Helmet>
         <title>
-          {pname ? pname : blueprint.name} - {connection.name} - {brandName}
+          {pname ? pname : blueprint.name} - {connection.name} - {BRAND_NAME}
         </title>
       </Helmet>
       <S.Top>

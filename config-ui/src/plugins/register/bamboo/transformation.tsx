@@ -16,9 +16,9 @@
  *
  */
 
-import { useState, useEffect } from 'react';
 import { CaretRightOutlined } from '@ant-design/icons';
 import { theme, Collapse, Tag, Input, Checkbox } from 'antd';
+import { useState, useEffect } from 'react';
 
 import { ExternalLink, HelpTooltip } from '@/components';
 import { DOC_URL } from '@/release';

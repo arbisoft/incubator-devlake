@@ -16,9 +16,9 @@
  *
  */
 
-import { useState, useRef } from 'react';
-import { isEqualWith } from 'lodash';
 import axios from 'axios';
+import { isEqualWith } from 'lodash';
+import { useState, useRef } from 'react';
 
 export const useRefreshData = <T>(request: (signal: AbortSignal) => Promise<T>, deps: React.DependencyList = []) => {
   const [, setVersion] = useState(0);

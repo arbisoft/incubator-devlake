@@ -16,23 +16,24 @@
  *
  */
 
-import { useState, useEffect, useMemo } from 'react';
-import { useLoaderData, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
-import { Layout as AntdLayout, Menu, Divider, Dropdown, Button, Tooltip } from 'antd';
 import { UserOutlined, SunOutlined, MoonOutlined, DesktopOutlined } from '@ant-design/icons';
+import { Layout as AntdLayout, Menu, Divider, Dropdown, Button, Tooltip } from 'antd';
+import { useState, useEffect, useMemo } from 'react';
+import { Helmet } from 'react-helmet';
+import { useLoaderData, Outlet, useNavigate, useLocation } from 'react-router-dom';
 
 import API from '@/api';
-import { PageLoading, Logo, ExternalLink } from '@/components';
-import { init, selectError, selectStatus, cycleMode, selectThemeMode } from '@/features';
-import { OnboardCard } from '@/routes/onboard/components';
-import { OtelAttention } from '@/routes/otel/attention';
-import { useAppDispatch, useAppSelector } from '@/hooks';
-
-import { ACCESS_PATH, menuItems, menuItemsMatch, headerItems } from './config';
 import type { AccessCurrent } from '@/api/access';
+import { PageLoading, Logo, ExternalLink } from '@/components';
+import { BRAND_NAME, COPYRIGHT_HIDE, TITLE_CUSTOM } from '@/config';
+import { init, selectError, selectStatus, cycleMode, selectThemeMode } from '@/features';
+import { useAppDispatch, useAppSelector } from '@/hooks';
 import { canManageAccess } from '@/routes/access/guard';
 import { useAccountMenu, useIdentityLinkNotification } from '@/routes/access/use-account-menu';
+import { OnboardCard } from '@/routes/onboard/components';
+import { OtelAttention } from '@/routes/otel/attention';
+
+import { ACCESS_PATH, menuItems, menuItemsMatch, headerItems } from './config';
 
 const themeIcon = {
   light: <SunOutlined />,
@@ -47,8 +48,6 @@ const themeLabel = {
 } as const;
 
 const { Sider, Header, Content, Footer } = AntdLayout;
-
-const brandName = import.meta.env.DEVLAKE_BRAND_NAME ?? 'DevLake';
 
 export const Layout = () => {
   const [openKeys, setOpenKeys] = useState<string[]>([]);
@@ -133,14 +132,12 @@ export const Layout = () => {
       <Helmet>
         <title>
           {title ? `${title} - ` : ''}
-          {brandName}
+          {BRAND_NAME}
         </title>
       </Helmet>
       <Sider>
-        {import.meta.env.DEVLAKE_TITLE_CUSTOM ? (
-          <h2 style={{ margin: '36px 0', textAlign: 'center', color: '#fff' }}>
-            {import.meta.env.DEVLAKE_TITLE_CUSTOM}
-          </h2>
+        {TITLE_CUSTOM ? (
+          <h2 style={{ margin: '36px 0', textAlign: 'center', color: '#fff' }}>{TITLE_CUSTOM}</h2>
         ) : (
           <Logo style={{ padding: 24 }} />
         )}
@@ -169,9 +166,7 @@ export const Layout = () => {
           }}
         >
           {headerItems
-            .filter((item) =>
-              import.meta.env.DEVLAKE_COPYRIGHT_HIDE ? !['Dashboards', 'GitHub', 'Slack'].includes(item.label) : true,
-            )
+            .filter((item) => (COPYRIGHT_HIDE ? !['Dashboards', 'GitHub', 'Slack'].includes(item.label) : true))
             .map((item, i, arr) => (
               <span key={item.label} style={{ display: 'flex', alignItems: 'center' }}>
                 <ExternalLink link={item.link} style={{ display: 'flex', alignItems: 'center' }}>
@@ -207,7 +202,7 @@ export const Layout = () => {
             <OnboardCard style={{ marginBottom: 32 }} />
             <Outlet />
           </div>
-          {!import.meta.env.DEVLAKE_COPYRIGHT_HIDE && (
+          {!COPYRIGHT_HIDE && (
             <Footer>
               <p style={{ textAlign: 'center' }}>Apache 2.0 License</p>
             </Footer>

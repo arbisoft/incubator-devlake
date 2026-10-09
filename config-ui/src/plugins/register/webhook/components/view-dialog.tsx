@@ -16,18 +16,18 @@
  *
  */
 
-import { useState, useMemo } from 'react';
 import { Modal, Button } from 'antd';
+import { useState, useMemo } from 'react';
 
-import { useAppDispatch, useAppSelector } from '@/hooks';
 import { Block, CopyText, ExternalLink, Message } from '@/components';
 import { selectWebhook, renewWebhookApiKey } from '@/features';
+import { useAppDispatch, useAppSelector } from '@/hooks';
 import { IWebhook } from '@/types';
 import { operator } from '@/utils';
 
-import { transformURI } from './utils';
-
 import * as S from '../styled';
+
+import { transformURI } from './utils';
 
 interface Props {
   initialId: ID;

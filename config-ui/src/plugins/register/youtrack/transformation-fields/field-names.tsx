@@ -27,8 +27,7 @@ export type FieldDef = {
   isMultiValue: boolean;
 };
 
-export type SlotKey =
-  'typeField' | 'stateField' | 'priorityField' | 'assigneeField' | 'storyPointField' | 'dueDateField';
+type SlotKey = 'typeField' | 'stateField' | 'priorityField' | 'assigneeField' | 'storyPointField' | 'dueDateField';
 
 type Slot = {
   key: SlotKey;

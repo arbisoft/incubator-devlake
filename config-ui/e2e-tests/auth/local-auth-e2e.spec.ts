@@ -15,24 +15,37 @@
  * limitations under the License.
  *
  */
-import { test, expect } from '../fixtures';
+import { APIRequestContext } from '@playwright/test';
+
 import { loginAsAdmin } from '../auth-helpers';
-import { API_URL, APP_URL, E2E_USER_PREFIX } from '../support/env';
-import { countLocalCredentials, passwordHashFor, resetLocalAuthState } from '../support/db';
+import { test, expect } from '../fixtures';
+import { ApiAccessUser, ApiMessage, adminApi, findAccessUserByLogin, listAccessUsers } from '../support/api';
 import { fetchAuthMethods } from '../support/auth-state';
-import {
-  accessUserRow,
-  addLocalUserModal,
-  appHeader,
-  localUserDisplayNameInput,
-  oneTimePasswordModal,
-  passwordInputs,
-  popconfirm,
-  selectBox,
-  selectOption,
-} from '../support/selectors';
+import { countLocalCredentials, mustChangePasswordFor, passwordHashFor, resetLocalAuthState } from '../support/db';
+import { API_URL, APP_URL, E2E_USER_PREFIX } from '../support/env';
+import { LoginPage } from '../support/pages/login';
+import { SettingsUsersPage } from '../support/pages/settings-users';
+import { ShellPage } from '../support/pages/shell';
 
 test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () => {
+  let api: APIRequestContext;
+
+  test.beforeAll(async ({ playwright }) => {
+    api = await adminApi(playwright);
+  });
+
+  test.afterAll(async () => {
+    await api.dispose();
+  });
+
+  // The backend directory holds the new local user as an active person with a local credential.
+  const expectLocalUser = async (login: string, role = 'member') =>
+    expect(await findAccessUserByLogin(api, login)).toMatchObject({
+      role,
+      status: 'active',
+      hasLocalCredential: true,
+    });
+
   test.beforeEach(async ({ request }) => {
     const methods = await fetchAuthMethods(request);
     test.skip(!methods.localPassword?.enabled, 'Local password authentication is disabled (auth state B is required)');
@@ -44,16 +57,17 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
   });
 
   test('1. UI Presentation: /login renders both OIDC providers and Local Sign-In form', async ({ page }) => {
-    await page.goto('/login');
+    const loginPage = new LoginPage(page);
+    await loginPage.open();
 
     // Both OIDC providers from db-backed multi-provider should be visible
-    await expect(page.getByRole('button', { name: /Sign in with Auth0/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Sign in with Google/i })).toBeVisible();
+    await expect(loginPage.providerButton('Auth0')).toBeVisible();
+    await expect(loginPage.providerButton('Google')).toBeVisible();
 
     // Local authentication form should be visible with proper labels
-    const usernameInput = page.getByLabel(/username/i);
-    const passwordInput = page.getByLabel(/password/i);
-    const signInBtn = page.getByRole('button', { name: /^Sign in$/i });
+    const usernameInput = loginPage.usernameInput;
+    const passwordInput = loginPage.passwordInput;
+    const signInBtn = loginPage.signInButton;
 
     await expect(usernameInput).toBeVisible();
     await expect(passwordInput).toBeVisible();
@@ -61,24 +75,23 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
   });
 
   test('2. Form Validation: client enforces non-empty fields', async ({ page }) => {
-    await page.goto('/login');
-    const signInBtn = page.getByRole('button', { name: /^Sign in$/i });
+    const loginPage = new LoginPage(page);
+    await loginPage.open();
 
     // Click sign in with empty fields
-    await signInBtn.click();
-    await expect(page.getByText('Enter your username.')).toBeVisible();
-    await expect(page.getByText('Enter your password.')).toBeVisible();
+    await loginPage.submit();
+    await expect(loginPage.usernameRequiredError).toBeVisible();
+    await expect(loginPage.passwordRequiredError).toBeVisible();
   });
 
   test('3. Credential Failure: generic error prevents account enumeration', async ({ page }) => {
-    await page.goto('/login');
+    const loginPage = new LoginPage(page);
+    await loginPage.open();
 
-    await page.getByLabel(/username/i).fill('nonexistent_user');
-    await page.getByLabel(/password/i).fill('NonExistentPass123!');
-    await page.getByRole('button', { name: /^Sign in$/i }).click();
+    await loginPage.signIn('nonexistent_user', 'NonExistentPass123!');
 
     // Unified security message
-    await expect(page.getByText('Invalid username or password.')).toBeVisible();
+    await expect(loginPage.invalidCredentialsError).toBeVisible();
   });
 
   test('4. Security Throttling: 5 consecutive failures triggers 429 Too Many Requests', async ({ page }) => {
@@ -106,42 +119,42 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     context,
   }) => {
     await loginAsAdmin(context);
-    await page.goto('/access');
+    const usersPage = new SettingsUsersPage(page);
+    await usersPage.open();
     await expect(page).toHaveURL(/.*\/access/);
 
     // Click Add local user button
-    const addLocalUserBtn = page.getByRole('button', { name: 'Add local user' });
-    await expect(addLocalUserBtn).toBeVisible();
-    await addLocalUserBtn.click();
+    await expect(usersPage.addLocalUserButton).toBeVisible();
+    const form = await usersPage.openAddLocalUser();
 
     // Modal should appear
-    const modal = addLocalUserModal(page);
-    await expect(modal).toBeVisible();
+    await expect(form.dialog).toBeVisible();
 
     const testLogin = `${E2E_USER_PREFIX}user_${Date.now()}`;
-    await modal.getByPlaceholder('person').fill(testLogin);
-    await localUserDisplayNameInput(modal).fill(`Display ${testLogin}`);
+    await form.fillUsername(testLogin);
+    await form.fillDisplayName(`Display ${testLogin}`);
 
     // Click Create
-    await modal.getByRole('button', { name: 'Create' }).click();
+    const otpDialog = await form.create();
 
     // One-time password modal should appear
-    const otpModal = oneTimePasswordModal(page);
-    await expect(otpModal).toBeVisible();
+    await expect(otpDialog.dialog).toBeVisible();
 
     // Capture temporary password from read-only input
-    const tempPassInput = otpModal.getByRole('textbox');
-    await expect(tempPassInput).toBeVisible();
-    const tempPassword = (await tempPassInput.inputValue()).trim();
+    await expect(otpDialog.passwordInput).toBeVisible();
+    const tempPassword = await otpDialog.readPassword();
     expect(tempPassword.length).toBeGreaterThanOrEqual(15);
 
     // Click Done to close modal
-    await otpModal.getByRole('button', { name: 'Done' }).click();
+    await otpDialog.done();
+    await expectLocalUser(testLogin);
 
     // User should appear in table with Reset button under Local password column
-    const userRow = accessUserRow(page, testLogin);
-    await expect(userRow).toBeVisible();
-    await expect(userRow.getByRole('button', { name: 'Reset' })).toBeVisible();
+    const userRow = usersPage.userRow(testLogin);
+    await expect(userRow.root).toBeVisible();
+    await expect(userRow.resetButton).toBeVisible();
+    expect(await findAccessUserByLogin(api, testLogin)).toMatchObject({ displayName: `Display ${testLogin}` });
+    expect(mustChangePasswordFor(testLogin)).toBe(true);
   });
 
   test('6. Complete Flow: Local creation -> First sign-in -> Forced change redirect -> API Gate -> Change pass -> Direct sign-in', async ({
@@ -151,86 +164,66 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
   }) => {
     // A. Create user as admin
     await loginAsAdmin(context);
-    await page.goto('/access');
+    const usersPage = new SettingsUsersPage(page);
+    await usersPage.open();
 
     const testLogin = `${E2E_USER_PREFIX}flow_${Date.now()}`;
-    await page.getByRole('button', { name: 'Add local user' }).click();
-
-    const modal = addLocalUserModal(page);
-    await modal.getByPlaceholder('person').fill(testLogin);
-    await localUserDisplayNameInput(modal).fill(`Flow ${testLogin}`);
-    await modal.getByRole('button', { name: 'Create' }).click();
-
-    const otpModal = oneTimePasswordModal(page);
-    await expect(otpModal).toBeVisible();
-    const tempPassInput = otpModal.getByRole('textbox');
-    await expect(tempPassInput).toBeVisible();
-    const tempPassword = (await tempPassInput.inputValue()).trim();
-    await otpModal.getByRole('button', { name: 'Done' }).click();
+    const otpDialog = await usersPage.createLocalUser(testLogin, { displayName: `Flow ${testLogin}` });
+    await expect(otpDialog.dialog).toBeVisible();
+    await expect(otpDialog.passwordInput).toBeVisible();
+    const tempPassword = await otpDialog.readPassword();
+    await otpDialog.done();
+    await expectLocalUser(testLogin);
+    const tempHash = passwordHashFor(testLogin);
+    expect(mustChangePasswordFor(testLogin)).toBe(true);
 
     // B. New incognito context for the local user
     const userContext = await browser.newContext({ baseURL: APP_URL });
     const userPage = await userContext.newPage();
+    const userLogin = new LoginPage(userPage);
+    const userShell = new ShellPage(userPage);
 
     // Attempt sign in with temp password
-    await userPage.goto('/login');
-    await userPage.getByLabel(/username/i).fill(testLogin);
-    await userPage.getByLabel(/password/i).fill(tempPassword);
-    await userPage.getByRole('button', { name: /^Sign in$/i }).click();
+    await userLogin.open();
+    await userLogin.signIn(testLogin, tempPassword);
 
     // Should immediately redirect to /change-password
     await expect(userPage).toHaveURL(/.*\/change-password/);
-    await expect(userPage.getByText('Change your password')).toBeVisible();
-    await expect(userPage.getByText('Choose a new password to continue.')).toBeVisible();
+    await expect(userShell.changePasswordTitle).toBeVisible();
+    await expect(userShell.changePasswordPrompt).toBeVisible();
 
     // C. Verify Server Gate: attempting to call protected API while MustChangePassword=true fails with 403
-    const gateCheck = await userPage.evaluate(async () => {
-      const resp = await fetch('/api/projects');
-      return { status: resp.status, body: await resp.json() };
-    });
+    const gateCheck = await userShell.sessionFetch<ApiMessage>('/api/projects');
     expect(gateCheck.status).toBe(403);
-    expect(gateCheck.body.message).toMatch(/password change required/i);
+    expect(gateCheck.body?.message).toMatch(/password change required/i);
 
     // D. Password complexity validation: too short password (< 15 chars)
-    const newPassInput = passwordInputs(userPage).first();
-    const confirmPassInput = passwordInputs(userPage).nth(1);
-    const changeBtn = userPage.getByRole('button', { name: 'Change password' });
-
-    await newPassInput.fill('shortpass1');
-    await confirmPassInput.fill('shortpass1');
-    await changeBtn.click();
-    await expect(userPage.getByText('Use at least 15 characters.')).toBeVisible();
+    await userShell.changePassword('shortpass1');
+    await expect(userShell.passwordTooShortError).toBeVisible();
 
     // Mismatched passwords
-    await newPassInput.fill('ValidLongPassword12345!');
-    await confirmPassInput.fill('DifferentPassword12345!');
-    await changeBtn.click();
-    await expect(userPage.getByText('Passwords do not match.')).toBeVisible();
+    await userShell.changePassword('ValidLongPassword12345!', 'DifferentPassword12345!');
+    await expect(userShell.passwordMismatchError).toBeVisible();
 
     // E. Successful password change (>= 15 characters and matching)
     const validPermanentPassword = 'PermanentPass123456789!';
-    await newPassInput.fill(validPermanentPassword);
-    await confirmPassInput.fill(validPermanentPassword);
-    await changeBtn.click();
+    await userShell.changePassword(validPermanentPassword);
 
     // Should redirect away from /change-password (to /connections)
-    await userPage.waitForURL((url) => !url.pathname.includes('/change-password'), { timeout: 10000 });
+    await userShell.waitUntilPathLeaves('/change-password', 10000);
+    expect(mustChangePasswordFor(testLogin)).toBe(false);
+    expect(passwordHashFor(testLogin)).not.toBe(tempHash);
 
     // F. Verify Server Gate is lifted
-    const gateCheckAfter = await userPage.evaluate(async () => {
-      const resp = await fetch('/api/projects');
-      return { status: resp.status };
-    });
+    const gateCheckAfter = await userShell.sessionFetch('/api/projects');
     expect(gateCheckAfter.status).toBe(200);
 
     // G. Log out and sign in with permanent password directly
-    await userPage.goto('/login');
-    await userPage.getByLabel(/username/i).fill(testLogin);
-    await userPage.getByLabel(/password/i).fill(validPermanentPassword);
-    await userPage.getByRole('button', { name: /^Sign in$/i }).click();
+    await userLogin.open();
+    await userLogin.signIn(testLogin, validPermanentPassword);
 
     // Does NOT redirect to /change-password
-    await userPage.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 10000 });
+    await userShell.waitUntilPathLeaves('/login', 10000);
     expect(userPage.url()).not.toContain('/change-password');
 
     await userContext.close();
@@ -243,59 +236,50 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
   }) => {
     // Create local user
     await loginAsAdmin(context);
-    await page.goto('/access');
+    const usersPage = new SettingsUsersPage(page);
+    await usersPage.open();
 
     const testLogin = `${E2E_USER_PREFIX}reset_${Date.now()}`;
-    await page.getByRole('button', { name: 'Add local user' }).click();
-    const modal = addLocalUserModal(page);
-    await modal.getByPlaceholder('person').fill(testLogin);
-    await localUserDisplayNameInput(modal).fill(`Reset Test ${testLogin}`);
-    await modal.getByRole('button', { name: 'Create' }).click();
-
-    const otpModal = oneTimePasswordModal(page);
-    await expect(otpModal).toBeVisible();
-    const tempPass1 = (await otpModal.getByRole('textbox').inputValue()).trim();
-    await otpModal.getByRole('button', { name: 'Done' }).click();
+    const otpDialog = await usersPage.createLocalUser(testLogin, { displayName: `Reset Test ${testLogin}` });
+    await expect(otpDialog.dialog).toBeVisible();
+    const tempPass1 = await otpDialog.readPassword();
+    await otpDialog.done();
+    await expectLocalUser(testLogin);
 
     // User completes first login and password change
     const userContext = await browser.newContext({ baseURL: APP_URL });
     const userPage = await userContext.newPage();
-    await userPage.goto('/login');
-    await userPage.getByLabel(/username/i).fill(testLogin);
-    await userPage.getByLabel(/password/i).fill(tempPass1);
-    await userPage.getByRole('button', { name: /^Sign in$/i }).click();
-    await userPage.waitForURL(/.*\/change-password/);
+    const userLogin = new LoginPage(userPage);
+    const userShell = new ShellPage(userPage);
+    await userLogin.open();
+    await userLogin.signIn(testLogin, tempPass1);
+    await userShell.waitUntilUrl(/.*\/change-password/);
 
     const userPass = 'MyUserPassword12345!';
-    await passwordInputs(userPage).first().fill(userPass);
-    await passwordInputs(userPage).nth(1).fill(userPass);
-    await userPage.getByRole('button', { name: 'Change password' }).click();
-    await userPage.waitForURL((url) => !url.pathname.includes('/change-password'));
+    await userShell.changePassword(userPass);
+    await userShell.waitUntilPathLeaves('/change-password');
+    const changedHash = passwordHashFor(testLogin);
+    expect(mustChangePasswordFor(testLogin)).toBe(false);
 
     // Admin resets user password
-    await page.goto('/access');
-    const userRow = accessUserRow(page, testLogin);
-    await expect(userRow).toBeVisible();
+    await usersPage.open();
+    const userRow = usersPage.userRow(testLogin);
+    await expect(userRow.root).toBeVisible();
 
-    // Click Reset in Local password column
-    await userRow.getByRole('button', { name: 'Reset' }).click();
-
-    // Confirm popconfirm
-    const resetConfirm = popconfirm(page);
-    await resetConfirm.getByRole('button', { name: 'Reset' }).click();
+    // Click Reset in Local password column and confirm the popup
+    const newOtpDialog = await userRow.reset();
 
     // New OTP modal appears
-    const newOtpModal = oneTimePasswordModal(page);
-    await expect(newOtpModal).toBeVisible();
-    const tempPass2 = (await newOtpModal.getByRole('textbox').inputValue()).trim();
+    await expect(newOtpDialog.dialog).toBeVisible();
+    const tempPass2 = await newOtpDialog.readPassword();
     expect(tempPass2).not.toBe(tempPass1);
-    await newOtpModal.getByRole('button', { name: 'Done' }).click();
+    await newOtpDialog.done();
+    expect(mustChangePasswordFor(testLogin)).toBe(true);
+    expect(passwordHashFor(testLogin)).not.toBe(changedHash);
+    await expectLocalUser(testLogin);
 
     // Verify user's old session is now REVOKED (returns 401)
-    const sessionCheck = await userPage.evaluate(async () => {
-      const resp = await fetch('/api/access/me');
-      return resp.status;
-    });
+    const sessionCheck = (await userShell.sessionFetch('/api/access/me')).status;
     expect(sessionCheck).toBe(401);
 
     await userContext.close();
@@ -307,56 +291,46 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     browser,
   }) => {
     await loginAsAdmin(context);
-    await page.goto('/access');
+    const usersPage = new SettingsUsersPage(page);
+    await usersPage.open();
 
     const testLogin = `${E2E_USER_PREFIX}disable_${Date.now()}`;
-    await page.getByRole('button', { name: 'Add local user' }).click();
-    const modal = addLocalUserModal(page);
-    await modal.getByPlaceholder('person').fill(testLogin);
-    await localUserDisplayNameInput(modal).fill(`Disable Test ${testLogin}`);
-    await modal.getByRole('button', { name: 'Create' }).click();
-
-    const otpModal = oneTimePasswordModal(page);
-    await expect(otpModal).toBeVisible();
-    const tempPass = (await otpModal.getByRole('textbox').inputValue()).trim();
-    await otpModal.getByRole('button', { name: 'Done' }).click();
+    const otpDialog = await usersPage.createLocalUser(testLogin, { displayName: `Disable Test ${testLogin}` });
+    await expect(otpDialog.dialog).toBeVisible();
+    const tempPass = await otpDialog.readPassword();
+    await otpDialog.done();
+    await expectLocalUser(testLogin);
 
     // User logs in and changes password
     const userContext = await browser.newContext({ baseURL: APP_URL });
     const userPage = await userContext.newPage();
-    await userPage.goto('/login');
-    await userPage.getByLabel(/username/i).fill(testLogin);
-    await userPage.getByLabel(/password/i).fill(tempPass);
-    await userPage.getByRole('button', { name: /^Sign in$/i }).click();
-    await userPage.waitForURL(/.*\/change-password/);
+    const userLogin = new LoginPage(userPage);
+    const userShell = new ShellPage(userPage);
+    await userLogin.open();
+    await userLogin.signIn(testLogin, tempPass);
+    await userShell.waitUntilUrl(/.*\/change-password/);
 
     const userPass = 'DisableTestPassword123!';
-    await passwordInputs(userPage).first().fill(userPass);
-    await passwordInputs(userPage).nth(1).fill(userPass);
-    await userPage.getByRole('button', { name: 'Change password' }).click();
-    await userPage.waitForURL((url) => !url.pathname.includes('/change-password'));
+    await userShell.changePassword(userPass);
+    await userShell.waitUntilPathLeaves('/change-password');
 
     // Admin disables user
-    await page.goto('/access');
-    const userRow = accessUserRow(page, testLogin);
-    await expect(userRow).toBeVisible();
+    await usersPage.open();
+    const userRow = usersPage.userRow(testLogin);
+    await expect(userRow.root).toBeVisible();
 
-    await userRow.getByRole('button', { name: 'Disable' }).click();
-    await expect(userRow.getByRole('button', { name: 'Enable' })).toBeVisible();
+    await userRow.disable();
+    await expect(userRow.enableButton).toBeVisible();
+    expect((await findAccessUserByLogin(api, testLogin))?.status).toBe('disabled');
 
     // User's active session is terminated
-    const sessionCheck = await userPage.evaluate(async () => {
-      const resp = await fetch('/api/access/me');
-      return resp.status;
-    });
+    const sessionCheck = (await userShell.sessionFetch('/api/access/me')).status;
     expect(sessionCheck).toBe(401);
 
     // Attempting to log in as disabled user is rejected
-    await userPage.goto('/login');
-    await userPage.getByLabel(/username/i).fill(testLogin);
-    await userPage.getByLabel(/password/i).fill(userPass);
-    await userPage.getByRole('button', { name: /^Sign in$/i }).click();
-    await expect(userPage.getByText('Invalid username or password.')).toBeVisible();
+    await userLogin.open();
+    await userLogin.signIn(testLogin, userPass);
+    await expect(userLogin.invalidCredentialsError).toBeVisible();
 
     await userContext.close();
   });
@@ -393,59 +367,51 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     browser,
   }) => {
     await loginAsAdmin(context);
-    await page.goto('/access');
+    const usersPage = new SettingsUsersPage(page);
+    await usersPage.open();
 
     const testLogin = `${E2E_USER_PREFIX}reenable_${Date.now()}`;
-    await page.getByRole('button', { name: 'Add local user' }).click();
-    const modal = addLocalUserModal(page);
-    await modal.getByPlaceholder('person').fill(testLogin);
-    await localUserDisplayNameInput(modal).fill(`Re-enable ${testLogin}`);
-    await modal.getByRole('button', { name: 'Create' }).click();
-
-    const otpModal = oneTimePasswordModal(page);
-    await expect(otpModal).toBeVisible();
-    const tempPass = (await otpModal.getByRole('textbox').inputValue()).trim();
-    await otpModal.getByRole('button', { name: 'Done' }).click();
+    const otpDialog = await usersPage.createLocalUser(testLogin, { displayName: `Re-enable ${testLogin}` });
+    await expect(otpDialog.dialog).toBeVisible();
+    const tempPass = await otpDialog.readPassword();
+    await otpDialog.done();
+    await expectLocalUser(testLogin);
 
     // User completes initial login and sets permanent password
     const userContext = await browser.newContext({ baseURL: APP_URL });
     const userPage = await userContext.newPage();
-    await userPage.goto('/login');
-    await userPage.getByLabel(/username/i).fill(testLogin);
-    await userPage.getByLabel(/password/i).fill(tempPass);
-    await userPage.getByRole('button', { name: /^Sign in$/i }).click();
-    await userPage.waitForURL(/.*\/change-password/);
+    const userLogin = new LoginPage(userPage);
+    const userShell = new ShellPage(userPage);
+    await userLogin.open();
+    await userLogin.signIn(testLogin, tempPass);
+    await userShell.waitUntilUrl(/.*\/change-password/);
 
     const userPass = 'ReenablePass123456!';
-    await passwordInputs(userPage).first().fill(userPass);
-    await passwordInputs(userPage).nth(1).fill(userPass);
-    await userPage.getByRole('button', { name: 'Change password' }).click();
-    await userPage.waitForURL((url) => !url.pathname.includes('/change-password'));
+    await userShell.changePassword(userPass);
+    await userShell.waitUntilPathLeaves('/change-password');
 
     // Admin disables user
-    await page.goto('/access');
-    const userRow = accessUserRow(page, testLogin);
-    await expect(userRow).toBeVisible();
-    await userRow.getByRole('button', { name: 'Disable' }).click();
-    await expect(userRow.getByRole('button', { name: 'Enable' })).toBeVisible();
+    await usersPage.open();
+    const userRow = usersPage.userRow(testLogin);
+    await expect(userRow.root).toBeVisible();
+    await userRow.disable();
+    await expect(userRow.enableButton).toBeVisible();
+    expect((await findAccessUserByLogin(api, testLogin))?.status).toBe('disabled');
 
     // Verify disabled user cannot log in
-    await userPage.goto('/login');
-    await userPage.getByLabel(/username/i).fill(testLogin);
-    await userPage.getByLabel(/password/i).fill(userPass);
-    await userPage.getByRole('button', { name: /^Sign in$/i }).click();
-    await expect(userPage.getByText('Invalid username or password.')).toBeVisible();
+    await userLogin.open();
+    await userLogin.signIn(testLogin, userPass);
+    await expect(userLogin.invalidCredentialsError).toBeVisible();
 
     // Admin re-enables user
-    await userRow.getByRole('button', { name: 'Enable' }).click();
-    await expect(userRow.getByRole('button', { name: 'Disable' })).toBeVisible();
+    await userRow.enable();
+    await expect(userRow.disableButton).toBeVisible();
+    await expectLocalUser(testLogin);
 
     // Verify user can now log in successfully with permanent password
-    await userPage.goto('/login');
-    await userPage.getByLabel(/username/i).fill(testLogin);
-    await userPage.getByLabel(/password/i).fill(userPass);
-    await userPage.getByRole('button', { name: /^Sign in$/i }).click();
-    await userPage.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 10000 });
+    await userLogin.open();
+    await userLogin.signIn(testLogin, userPass);
+    await userShell.waitUntilPathLeaves('/login', 10000);
     expect(userPage.url()).not.toContain('/login');
 
     await userContext.close();
@@ -458,50 +424,34 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
   }) => {
     // Admin creates local user
     await loginAsAdmin(context);
-    await page.goto('/access');
+    const usersPage = new SettingsUsersPage(page);
+    await usersPage.open();
 
     const testLogin = `${E2E_USER_PREFIX}logout_${Date.now()}`;
-    await page.getByRole('button', { name: 'Add local user' }).click();
-    const modal = addLocalUserModal(page);
-    await modal.getByPlaceholder('person').fill(testLogin);
-    await localUserDisplayNameInput(modal).fill(`Logout ${testLogin}`);
-    await modal.getByRole('button', { name: 'Create' }).click();
-
-    const otpModal = oneTimePasswordModal(page);
-    const tempPass = (await otpModal.getByRole('textbox').inputValue()).trim();
-    await otpModal.getByRole('button', { name: 'Done' }).click();
+    const otpDialog = await usersPage.createLocalUser(testLogin, { displayName: `Logout ${testLogin}` });
+    const tempPass = await otpDialog.readPassword();
+    await otpDialog.done();
+    await expectLocalUser(testLogin);
 
     // User logs in and changes password
     const userContext = await browser.newContext({ baseURL: APP_URL });
     const userPage = await userContext.newPage();
-    await userPage.goto('/login');
-    await userPage.getByLabel(/username/i).fill(testLogin);
-    await userPage.getByLabel(/password/i).fill(tempPass);
-    await userPage.getByRole('button', { name: /^Sign in$/i }).click();
-    await userPage.waitForURL(/.*\/change-password/);
+    const userLogin = new LoginPage(userPage);
+    const userShell = new ShellPage(userPage);
+    await userLogin.open();
+    await userLogin.signIn(testLogin, tempPass);
+    await userShell.waitUntilUrl(/.*\/change-password/);
 
     const userPass = 'LogoutPass1234567!';
-    await passwordInputs(userPage).first().fill(userPass);
-    await passwordInputs(userPage).nth(1).fill(userPass);
-    await userPage.getByRole('button', { name: 'Change password' }).click();
-    await userPage.waitForURL((url) => !url.pathname.includes('/change-password'));
+    await userShell.changePassword(userPass);
+    await userShell.waitUntilPathLeaves('/change-password');
 
     // Verify authenticated API call succeeds
     const meBefore = await userPage.request.get(`${APP_URL}/api/access/me`);
     expect(meBefore.status()).toBe(200);
 
     // Call logout endpoint via user page with CSRF header
-    await userPage.evaluate(async () => {
-      const csrf =
-        document.cookie
-          .split('; ')
-          .find((r) => r.startsWith('devlake_csrf='))
-          ?.split('=')[1] ?? '';
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: { 'X-CSRF-Token': csrf },
-      });
-    });
+    await userShell.sessionFetch('/api/auth/logout', { method: 'POST' });
 
     // Verify authenticated API call now returns 401
     const meAfter = await userPage.request.get(`${APP_URL}/api/access/me`);
@@ -510,8 +460,9 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     // Navigating to protected page redirects to /login
     // A blank page starts the navigation from inside, so the app's own redirect to /login cannot abort a goto.
     const freshPage = await userContext.newPage();
-    await freshPage.evaluate((url) => setTimeout(() => window.location.assign(url), 0), `${APP_URL}/connections`);
-    await freshPage.waitForURL(/.*\/login/);
+    const freshShell = new ShellPage(freshPage);
+    await freshShell.assignLocation(`${APP_URL}/connections`);
+    await freshShell.waitUntilUrl(/.*\/login/);
     expect(freshPage.url()).toContain('/login');
 
     await userContext.close();
@@ -522,20 +473,16 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     context,
   }) => {
     const adminAuth = await loginAsAdmin(context);
-    await page.goto('/access');
+    const usersPage = new SettingsUsersPage(page);
+    await usersPage.open();
 
     // Create a local user
     const testLogin = `${E2E_USER_PREFIX}removemethod_${Date.now()}`;
-    await page.getByRole('button', { name: 'Add local user' }).click();
-    const modal = addLocalUserModal(page);
-    await modal.getByPlaceholder('person').fill(testLogin);
-    await localUserDisplayNameInput(modal).fill(`RemoveMethod ${testLogin}`);
-    await modal.getByRole('button', { name: 'Create' }).click();
-
-    const otpModal = oneTimePasswordModal(page);
-    await expect(otpModal).toBeVisible();
-    const tempPass = (await otpModal.getByRole('textbox').inputValue()).trim();
-    await otpModal.getByRole('button', { name: 'Done' }).click();
+    const otpDialog = await usersPage.createLocalUser(testLogin, { displayName: `RemoveMethod ${testLogin}` });
+    await expect(otpDialog.dialog).toBeVisible();
+    const tempPass = await otpDialog.readPassword();
+    await otpDialog.done();
+    await expectLocalUser(testLogin);
 
     // Query for the created user's ID
     const usersResp = await page.request.get(`${API_URL}/access/users`, {
@@ -545,12 +492,12 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
       },
     });
     expect(usersResp.status()).toBe(200);
-    const usersData = await usersResp.json();
-    const targetUser = usersData.users.find((u: any) => u.localLoginName === testLogin);
+    const usersData: { users: ApiAccessUser[] } = await usersResp.json();
+    const targetUser = usersData.users.find((u) => u.localLoginName === testLogin);
     expect(targetUser).toBeDefined();
 
     // Admin deletes the local credential for this user
-    const delResp = await page.request.delete(`${API_URL}/access/users/${targetUser.id}/local-credential`, {
+    const delResp = await page.request.delete(`${API_URL}/access/users/${targetUser?.id}/local-credential`, {
       headers: {
         Cookie: `devlake_session=${adminAuth.token}; devlake_csrf=e2e-csrf-token`,
         'X-CSRF-Token': 'e2e-csrf-token',
@@ -568,13 +515,14 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     expect(loginAttempt.status()).toBe(401);
 
     // The credential-less person is no longer matched by resetLocalAuthState, so hide it here to avoid filling the users table.
-    const hideResp = await page.request.post(`${API_URL}/access/users/${targetUser.id}/hide`, {
+    const hideResp = await page.request.post(`${API_URL}/access/users/${targetUser?.id}/hide`, {
       headers: {
         Cookie: `devlake_session=${adminAuth.token}; devlake_csrf=e2e-csrf-token`,
         'X-CSRF-Token': 'e2e-csrf-token',
       },
     });
     expect(hideResp.status()).toBe(200);
+    expect((await listAccessUsers(api)).find((u) => u.id === targetUser?.id)).toBeUndefined();
   });
 
   test('13. Privilege Boundary: Member role cannot access /access or invoke admin user management endpoints', async ({
@@ -584,62 +532,44 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
   }) => {
     // Admin creates member user
     await loginAsAdmin(context);
-    await page.goto('/access');
+    const usersPage = new SettingsUsersPage(page);
+    await usersPage.open();
 
     const testLogin = `${E2E_USER_PREFIX}member_${Date.now()}`;
-    await page.getByRole('button', { name: 'Add local user' }).click();
-    const modal = addLocalUserModal(page);
-    await modal.getByPlaceholder('person').fill(testLogin);
-    await localUserDisplayNameInput(modal).fill(`Member ${testLogin}`);
-    // Select Member role
-    await selectBox(modal).click();
-    await selectOption(page, /^Member$/).click();
-    await modal.getByRole('button', { name: 'Create' }).click();
-
-    const otpModal = oneTimePasswordModal(page);
-    const tempPass = (await otpModal.getByRole('textbox').inputValue()).trim();
-    await otpModal.getByRole('button', { name: 'Done' }).click();
+    const otpDialog = await usersPage.createLocalUser(testLogin, {
+      displayName: `Member ${testLogin}`,
+      role: /^Member$/,
+    });
+    const tempPass = await otpDialog.readPassword();
+    await otpDialog.done();
+    await expectLocalUser(testLogin);
 
     // Member signs in and completes password change
     const memberContext = await browser.newContext({ baseURL: APP_URL });
     const memberPage = await memberContext.newPage();
-    await memberPage.goto('/login');
-    await memberPage.getByLabel(/username/i).fill(testLogin);
-    await memberPage.getByLabel(/password/i).fill(tempPass);
-    await memberPage.getByRole('button', { name: /^Sign in$/i }).click();
-    await memberPage.waitForURL(/.*\/change-password/);
+    const memberLogin = new LoginPage(memberPage);
+    const memberShell = new ShellPage(memberPage);
+    await memberLogin.open();
+    await memberLogin.signIn(testLogin, tempPass);
+    await memberShell.waitUntilUrl(/.*\/change-password/);
 
     const memberPass = 'MemberPassword12345!';
-    await passwordInputs(memberPage).first().fill(memberPass);
-    await passwordInputs(memberPage).nth(1).fill(memberPass);
-    await memberPage.getByRole('button', { name: 'Change password' }).click();
-    await memberPage.waitForURL((url) => !url.pathname.includes('/change-password'));
+    await memberShell.changePassword(memberPass);
+    await memberShell.waitUntilPathLeaves('/change-password');
 
     // Member attempts to navigate to /access directly in browser
-    await memberPage.goto('/access');
+    await new SettingsUsersPage(memberPage).open();
     // Client router accessLoader redirects member away from /access
-    await memberPage.waitForURL((url) => !url.pathname.includes('/access'), { timeout: 5000 });
+    await memberShell.waitUntilPathLeaves('/access', 5000);
     expect(memberPage.url()).not.toContain('/access');
 
     // Member attempts to call admin API POST /api/access/local-users directly
-    const apiAttempt = await memberPage.evaluate(async (loginName) => {
-      const csrf =
-        document.cookie
-          .split('; ')
-          .find((r) => r.startsWith('devlake_csrf='))
-          ?.split('=')[1] ?? '';
-      const resp = await fetch('/api/access/local-users', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': csrf,
-        },
-        body: JSON.stringify({ loginName, role: 'customer_admin' }),
-      });
-      return { status: resp.status, body: await resp.json() };
-    }, `${E2E_USER_PREFIX}hacked_admin`);
+    const apiAttempt = await memberShell.sessionFetch<ApiMessage>('/api/access/local-users', {
+      method: 'POST',
+      body: { loginName: `${E2E_USER_PREFIX}hacked_admin`, role: 'customer_admin' },
+    });
     expect(apiAttempt.status).toBe(403);
-    expect(apiAttempt.body.message).toMatch(/customer administrator access is required/i);
+    expect(apiAttempt.body?.message).toMatch(/customer administrator access is required/i);
 
     await memberContext.close();
   });
@@ -649,39 +579,36 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     context,
   }) => {
     await loginAsAdmin(context);
-    await page.goto('/access');
+    const usersPage = new SettingsUsersPage(page);
+    await usersPage.open();
 
     const testLogin = `${E2E_USER_PREFIX}dup_${Date.now()}`;
-    await page.getByRole('button', { name: 'Add local user' }).click();
-    const modal = addLocalUserModal(page);
-    const usernameInput = modal.getByPlaceholder('person');
-    const createBtn = modal.getByRole('button', { name: 'Create' });
+    const form = await usersPage.openAddLocalUser();
 
     // Client format validation: too short (<3 chars)
-    await usernameInput.fill('ab');
-    await expect(
-      page.getByText('Use 3-64 letters, numbers, dots, underscores, or hyphens, starting with a letter or number.'),
-    ).toBeVisible();
-    await expect(createBtn).toBeDisabled();
+    await form.fillUsername('ab');
+    await expect(form.formatError).toBeVisible();
+    await expect(form.createButton).toBeDisabled();
 
     // Valid format: create the user
-    await usernameInput.fill(testLogin);
-    await expect(createBtn).toBeEnabled();
-    await createBtn.click();
+    await form.fillUsername(testLogin);
+    await expect(form.createButton).toBeEnabled();
+    const otpDialog = await form.create();
 
-    const otpModal = oneTimePasswordModal(page);
-    await expect(otpModal).toBeVisible();
-    await otpModal.getByRole('button', { name: 'Done' }).click();
+    await expect(otpDialog.dialog).toBeVisible();
+    await otpDialog.done();
+    await expectLocalUser(testLogin);
 
     // Now attempt to create user with the exact same username
-    await page.getByRole('button', { name: 'Add local user' }).click();
-    const dupModal = addLocalUserModal(page);
-    await dupModal.getByPlaceholder('person').fill(testLogin);
-    await dupModal.getByRole('button', { name: 'Create' }).click();
+    const dupForm = await usersPage.openAddLocalUser();
+    await dupForm.fillUsername(testLogin);
+    await dupForm.create();
 
     // Error message displayed and modal does not succeed
-    await expect(page.getByText(/already has a DevLake (local password|access entry)/i)).toBeVisible();
-    await dupModal.getByRole('button', { name: 'Cancel' }).click();
+    await expect(dupForm.duplicateError).toBeVisible();
+    await dupForm.cancel();
+    expect(countLocalCredentials(testLogin)).toBe(1);
+    expect((await listAccessUsers(api)).filter((u) => u.localLoginName === testLogin)).toHaveLength(1);
   });
 
   test('15. Grafana Identity Boundary: Local-only user navigating to /grafana-login receives independent login fallback', async ({
@@ -691,32 +618,27 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
   }) => {
     // Admin creates local user
     await loginAsAdmin(context);
-    await page.goto('/access');
+    const usersPage = new SettingsUsersPage(page);
+    await usersPage.open();
 
     const testLogin = `${E2E_USER_PREFIX}grafana_${Date.now()}`;
-    await page.getByRole('button', { name: 'Add local user' }).click();
-    const modal = addLocalUserModal(page);
-    await modal.getByPlaceholder('person').fill(testLogin);
-    await modal.getByRole('button', { name: 'Create' }).click();
-
-    const otpModal = oneTimePasswordModal(page);
-    const tempPass = (await otpModal.getByRole('textbox').inputValue()).trim();
-    await otpModal.getByRole('button', { name: 'Done' }).click();
+    const otpDialog = await usersPage.createLocalUser(testLogin);
+    const tempPass = await otpDialog.readPassword();
+    await otpDialog.done();
+    await expectLocalUser(testLogin);
 
     // User completes first login
     const userContext = await browser.newContext({ baseURL: APP_URL });
     const userPage = await userContext.newPage();
-    await userPage.goto('/login');
-    await userPage.getByLabel(/username/i).fill(testLogin);
-    await userPage.getByLabel(/password/i).fill(tempPass);
-    await userPage.getByRole('button', { name: /^Sign in$/i }).click();
-    await userPage.waitForURL(/.*\/change-password/);
+    const userLogin = new LoginPage(userPage);
+    const userShell = new ShellPage(userPage);
+    await userLogin.open();
+    await userLogin.signIn(testLogin, tempPass);
+    await userShell.waitUntilUrl(/.*\/change-password/);
 
     const userPass = 'GrafanaFallbackPass123!';
-    await passwordInputs(userPage).first().fill(userPass);
-    await passwordInputs(userPage).nth(1).fill(userPass);
-    await userPage.getByRole('button', { name: 'Change password' }).click();
-    await userPage.waitForURL((url) => !url.pathname.includes('/change-password'));
+    await userShell.changePassword(userPass);
+    await userShell.waitUntilPathLeaves('/change-password');
 
     // Direct request to /api/access/grafana-login without following redirect
     const grafanaRedirect = await userPage.request.get(`${APP_URL}/api/access/grafana-login`, {
@@ -735,18 +657,15 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     context,
   }) => {
     const adminAuth = await loginAsAdmin(context);
-    await page.goto('/access');
+    const usersPage = new SettingsUsersPage(page);
+    await usersPage.open();
 
     // Create a local user
     const testLogin = `${E2E_USER_PREFIX}sec_${Date.now()}`;
-    await page.getByRole('button', { name: 'Add local user' }).click();
-    const modal = addLocalUserModal(page);
-    await modal.getByPlaceholder('person').fill(testLogin);
-    await modal.getByRole('button', { name: 'Create' }).click();
-
-    const otpModal = oneTimePasswordModal(page);
-    const tempPass = (await otpModal.getByRole('textbox').inputValue()).trim();
-    await otpModal.getByRole('button', { name: 'Done' }).click();
+    const otpDialog = await usersPage.createLocalUser(testLogin);
+    const tempPass = await otpDialog.readPassword();
+    await otpDialog.done();
+    await expectLocalUser(testLogin);
 
     // 1. Verify GET /access/users does NOT expose plaintext password or password hash
     const usersResp = await page.request.get(`${API_URL}/access/users`, {
@@ -795,32 +714,27 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
   }) => {
     // 1. Admin creates local user
     await loginAsAdmin(context);
-    await page.goto('/access');
+    const usersPage = new SettingsUsersPage(page);
+    await usersPage.open();
 
     const testLogin = `${E2E_USER_PREFIX}menu_${Date.now()}`;
-    await page.getByRole('button', { name: 'Add local user' }).click();
-    const modal = addLocalUserModal(page);
-    await modal.getByPlaceholder('person').fill(testLogin);
-    await modal.getByRole('button', { name: 'Create' }).click();
-
-    const otpModal = oneTimePasswordModal(page);
-    const tempPass = (await otpModal.getByRole('textbox').inputValue()).trim();
-    await otpModal.getByRole('button', { name: 'Done' }).click();
+    const otpDialog = await usersPage.createLocalUser(testLogin);
+    const tempPass = await otpDialog.readPassword();
+    await otpDialog.done();
+    await expectLocalUser(testLogin);
 
     // 2. User completes first-time login and password change
     const userContext = await browser.newContext({ baseURL: APP_URL });
     const userPage = await userContext.newPage();
-    await userPage.goto('/login');
-    await userPage.getByLabel(/username/i).fill(testLogin);
-    await userPage.getByLabel(/password/i).fill(tempPass);
-    await userPage.getByRole('button', { name: /^Sign in$/i }).click();
-    await userPage.waitForURL(/.*\/change-password/);
+    const userLogin = new LoginPage(userPage);
+    const userShell = new ShellPage(userPage);
+    await userLogin.open();
+    await userLogin.signIn(testLogin, tempPass);
+    await userShell.waitUntilUrl(/.*\/change-password/);
 
     const userPass = 'ValidLinkUser123!';
-    await passwordInputs(userPage).first().fill(userPass);
-    await passwordInputs(userPage).nth(1).fill(userPass);
-    await userPage.getByRole('button', { name: 'Change password' }).click();
-    await userPage.waitForURL((url) => !url.pathname.includes('/change-password'));
+    await userShell.changePassword(userPass);
+    await userShell.waitUntilPathLeaves('/change-password');
 
     // Verify user is in authenticated session
     await expect(userPage).not.toHaveURL(/.*\/login/);
@@ -828,33 +742,27 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     // 3. User clicks on the Account menu in the header
     // In layout.tsx: <Dropdown menu={{ items: accountMenuItems }} onOpenChange={loadLinkableProviders}>
     // <Button type="text" icon={<UserOutlined />}>{user.name || user.email || 'Account'}</Button>
-    const userMenuButton = appHeader(userPage).getByRole('button', { name: new RegExp(testLogin, 'i') });
-    await expect(userMenuButton).toBeVisible();
+    const userMenuName = new RegExp(testLogin, 'i');
+    await expect(userShell.accountButton(userMenuName)).toBeVisible();
 
-    // Intercept the /api/access/oidc-providers/linkable request
-    const linkablePromise = userPage.waitForResponse((response) =>
-      response.url().includes('/api/access/oidc-providers/linkable'),
-    );
-
-    await userMenuButton.click();
-
-    const linkableResponse = await linkablePromise;
+    // Open the menu and capture the /api/access/oidc-providers/linkable response
+    const linkableResponse = await userShell.openAccountMenu(userMenuName);
     // Regression check: Status MUST be 200 OK, not 401 Unauthorized
-    expect(linkableResponse.status()).toBe(200);
+    expect(linkableResponse.status).toBe(200);
 
-    const linkableData = await linkableResponse.json();
+    const linkableData = linkableResponse.body;
     expect(Array.isArray(linkableData)).toBe(true);
     // Enabled providers (e.g. google-one, auth0) should be returned
-    const providerKeys = linkableData.map((p: any) => p.providerKey);
+    const providerKeys = linkableData?.map((p) => p.providerKey);
     expect(providerKeys).toContain('google-one');
 
     // Regression check: Frontend global interceptor must NOT redirect user to /login
-    await userPage.waitForTimeout(2000);
+    await userShell.pause(2000);
     expect(userPage.url()).not.toContain('/login');
 
     // Menu options for linking should be visible
-    await expect(userPage.getByText(/Add Google sign-in/i)).toBeVisible();
-    await expect(userPage.getByText(/Sign out/i)).toBeVisible();
+    await expect(userShell.addGoogleSignInItem).toBeVisible();
+    await expect(userShell.signOutItem).toBeVisible();
 
     // Verify user session remains valid
     const meResp = await userPage.request.get(`${APP_URL}/api/access/me`);
@@ -879,32 +787,27 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
   }) => {
     // 1. Admin creates local user
     await loginAsAdmin(context);
-    await page.goto('/access');
+    const usersPage = new SettingsUsersPage(page);
+    await usersPage.open();
 
     const testLogin = `${E2E_USER_PREFIX}link_${Date.now()}`;
-    await page.getByRole('button', { name: 'Add local user' }).click();
-    const modal = addLocalUserModal(page);
-    await modal.getByPlaceholder('person').fill(testLogin);
-    await modal.getByRole('button', { name: 'Create' }).click();
-
-    const otpModal = oneTimePasswordModal(page);
-    const tempPass = (await otpModal.getByRole('textbox').inputValue()).trim();
-    await otpModal.getByRole('button', { name: 'Done' }).click();
+    const otpDialog = await usersPage.createLocalUser(testLogin);
+    const tempPass = await otpDialog.readPassword();
+    await otpDialog.done();
+    await expectLocalUser(testLogin);
 
     // 2. User completes first-time login
     const userContext = await browser.newContext({ baseURL: APP_URL });
     const userPage = await userContext.newPage();
-    await userPage.goto('/login');
-    await userPage.getByLabel(/username/i).fill(testLogin);
-    await userPage.getByLabel(/password/i).fill(tempPass);
-    await userPage.getByRole('button', { name: /^Sign in$/i }).click();
-    await userPage.waitForURL(/.*\/change-password/);
+    const userLogin = new LoginPage(userPage);
+    const userShell = new ShellPage(userPage);
+    await userLogin.open();
+    await userLogin.signIn(testLogin, tempPass);
+    await userShell.waitUntilUrl(/.*\/change-password/);
 
     const userPass = 'ValidLinkInit123!';
-    await passwordInputs(userPage).first().fill(userPass);
-    await passwordInputs(userPage).nth(1).fill(userPass);
-    await userPage.getByRole('button', { name: 'Change password' }).click();
-    await userPage.waitForURL((url) => !url.pathname.includes('/change-password'));
+    await userShell.changePassword(userPass);
+    await userShell.waitUntilPathLeaves('/change-password');
 
     // 3. Directly call GET /auth/link-identity?provider=google-one via user context
     // Before the fix, this endpoint returned 401 Unauthorized because GetIdentity(c) was missing.
@@ -933,34 +836,28 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
   }) => {
     // Admin (user ID 1) has both Google and Auth0 linked
     await loginAsAdmin(context);
-    await page.goto('/access');
+    const usersPage = new SettingsUsersPage(page);
+    await usersPage.open();
 
     // Click Account dropdown
-    const userMenuButton = appHeader(page).getByRole('button', {
-      name: new RegExp(`Account|${process.env.E2E_ADMIN_NAME ?? 'Account'}`, 'i'),
-    });
-    await expect(userMenuButton).toBeVisible();
+    const adminShell = new ShellPage(page);
+    const adminMenuName = new RegExp(`Account|${process.env.E2E_ADMIN_NAME ?? 'Account'}`, 'i');
+    await expect(adminShell.accountButton(adminMenuName)).toBeVisible();
 
-    const linkablePromise = page.waitForResponse((response) =>
-      response.url().includes('/api/access/oidc-providers/linkable'),
-    );
-
-    await userMenuButton.click();
-
-    const linkableResponse = await linkablePromise;
-    expect(linkableResponse.status()).toBe(200);
-    const linkableData = await linkableResponse.json();
+    const linkableResponse = await adminShell.openAccountMenu(adminMenuName);
+    expect(linkableResponse.status).toBe(200);
+    const linkableData = linkableResponse.body;
     // All enabled providers are already linked for admin user 1, so linkable array is empty
     expect(Array.isArray(linkableData)).toBe(true);
     test.skip(
-      linkableData.length > 0,
+      (linkableData?.length ?? 0) > 0,
       'Admin identity has unlinked providers; this boundary needs an admin linked to every enabled provider',
     );
-    expect(linkableData.length).toBe(0);
+    expect(linkableData?.length).toBe(0);
 
     // UI shows "No additional sign-in providers" disabled menu item
-    await expect(page.getByText('No additional sign-in providers')).toBeVisible();
-    await expect(page.getByText(/Sign out/i)).toBeVisible();
+    await expect(adminShell.noAdditionalProvidersItem).toBeVisible();
+    await expect(adminShell.signOutItem).toBeVisible();
 
     // Verify session remains intact
     expect(page.url()).not.toContain('/login');

@@ -16,14 +16,11 @@
  *
  */
 
-import { useCallback, useMemo, useState } from 'react';
-import { Button, Space, Table } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
+import { Button, Space, Table } from 'antd';
+import { useCallback, useMemo, useState } from 'react';
 
 import API from '@/api';
-import { PageHeader } from '@/components';
-import { useRefreshData } from '@/hooks';
-import { operator } from '@/utils';
 import {
   ACCESS_ROLE,
   type AccessDomain,
@@ -32,9 +29,12 @@ import {
   type AccessUser,
   type LocalCredentialResponse,
 } from '@/api/access';
+import { PageHeader } from '@/components';
+import { useRefreshData } from '@/hooks';
+import { operator } from '@/utils';
 
-import { getAuditColumns, getDomainColumns, getUserColumns } from './columns';
 import { Authentication } from './authentication';
+import { getAuditColumns, getDomainColumns, getUserColumns } from './columns';
 import { BREADCRUMBS, DEFAULT_PAGE_SIZE, PAGE_DESCRIPTION, PAGE_SIZE_OPTIONS } from './constants';
 import {
   AddLocalCredentialModal,

@@ -37,4 +37,6 @@ export const PATHS = {
   PIPELINES: () => `${PATH_PREFIX}/advanced/pipelines`,
   OTEL: () => `${PATH_PREFIX}/otel`,
   APIKEYS: () => `${PATH_PREFIX}/keys`,
+  // Dev only: the path is empty in production builds so the string never ships.
+  UI_KIT: () => (import.meta.env.DEV ? `${PATH_PREFIX}/ui-kit` : ''),
 };

@@ -16,9 +16,9 @@
  *
  */
 
-import { useState, useMemo } from 'react';
 import { RedoOutlined } from '@ant-design/icons';
 import { Button } from 'antd';
+import { useState, useMemo } from 'react';
 
 import API from '@/api';
 import { TextTooltip } from '@/components';

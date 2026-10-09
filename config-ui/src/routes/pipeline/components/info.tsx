@@ -16,9 +16,9 @@
  *
  */
 
-import { useState } from 'react';
 import { StopOutlined, RedoOutlined } from '@ant-design/icons';
 import { Button } from 'antd';
+import { useState } from 'react';
 
 import API from '@/api';
 import { Loading } from '@/components';
@@ -28,8 +28,8 @@ import { formatTime, operator } from '@/utils';
 
 import * as S from '../styled';
 
-import { PipelineStatus } from './status';
 import { PipelineDuration } from './duration';
+import { PipelineStatus } from './status';
 
 interface Props {
   id: ID;

@@ -1,0 +1,59 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+import { css, type DefaultTheme } from 'styled-components';
+
+type TextStyleKey = keyof DefaultTheme['typography']['scale'];
+
+export const textStyle =
+  (key: TextStyleKey) =>
+  ({ theme }: { theme: DefaultTheme }) => {
+    const { fontSize, lineHeight, fontWeight, letterSpacing } = theme.typography.scale[key];
+    return css`
+      font-size: ${fontSize}px;
+      line-height: ${lineHeight}px;
+      font-weight: ${fontWeight};
+      letter-spacing: ${letterSpacing}px;
+    `;
+  };
+
+export const visuallyHidden = css`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+`;
+
+export const focusRingStyle = ({ theme }: { theme: DefaultTheme }) => css`
+  outline: ${theme.layout.focusRingWidth}px solid ${theme.colors.focusRing};
+  outline-offset: ${theme.layout.focusRingWidth}px;
+`;
+
+export const motionTransition =
+  (...properties: string[]) =>
+  ({ theme }: { theme: DefaultTheme }) => css`
+    transition: ${properties.map((property) => `${property} ${theme.motion.base}ms ${theme.motion.easing}`).join(', ')};
+
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+    }
+  `;

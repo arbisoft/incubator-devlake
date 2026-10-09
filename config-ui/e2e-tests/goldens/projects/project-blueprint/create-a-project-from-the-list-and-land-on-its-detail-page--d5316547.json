@@ -1,0 +1,28 @@
+{
+  "titlePath": [
+    "Project, blueprint, pipeline and webhook flows",
+    "create a project from the list and land on its detail page"
+  ],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/projects",
+      "body": {
+        "description": "",
+        "metrics": [
+          {
+            "enable": true,
+            "pluginName": "dora",
+            "pluginOption": {}
+          },
+          {
+            "enable": true,
+            "pluginName": "issue_trace",
+            "pluginOption": {}
+          }
+        ],
+        "name": "e2e-*"
+      }
+    }
+  ]
+}

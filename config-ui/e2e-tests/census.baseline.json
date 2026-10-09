@@ -1,0 +1,110 @@
+{
+  "moves": {},
+  "specs": {
+    "auth/access-page.spec.ts": {
+      "tests": 1,
+      "expects": 5,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "auth/local-auth-e2e.spec.ts": {
+      "tests": 19,
+      "expects": 120,
+      "backend": 17,
+      "skips": 2,
+      "fixmes": 0
+    },
+    "auth/local-auth-state-a.spec.ts": {
+      "tests": 2,
+      "expects": 7,
+      "backend": 1,
+      "skips": 1,
+      "fixmes": 0
+    },
+    "auth/rebase-matrix.spec.ts": {
+      "tests": 5,
+      "expects": 51,
+      "backend": 4,
+      "skips": 1,
+      "fixmes": 0
+    },
+    "connections/catalog.spec.ts": {
+      "tests": 2,
+      "expects": 9,
+      "backend": 1,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "connections/connection-lifecycle.spec.ts": {
+      "tests": 5,
+      "expects": 32,
+      "backend": 11,
+      "skips": 1,
+      "fixmes": 0
+    },
+    "connections/data-scope.spec.ts": {
+      "tests": 3,
+      "expects": 18,
+      "backend": 8,
+      "skips": 1,
+      "fixmes": 0
+    },
+    "keys/api-keys.spec.ts": {
+      "tests": 1,
+      "expects": 14,
+      "backend": 4,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "otel/claude-code-otel.spec.ts": {
+      "tests": 4,
+      "expects": 72,
+      "backend": 9,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "otel/ingestion-health.spec.ts": {
+      "tests": 2,
+      "expects": 6,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "projects/project-blueprint.spec.ts": {
+      "tests": 8,
+      "expects": 61,
+      "backend": 9,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "shell/navigation.spec.ts": {
+      "tests": 5,
+      "expects": 31,
+      "backend": 2,
+      "skips": 1,
+      "fixmes": 0
+    },
+    "shell/theme.spec.ts": {
+      "tests": 2,
+      "expects": 23,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "smoke.spec.ts": {
+      "tests": 1,
+      "expects": 3,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "ui-kit/ui-kit.spec.ts": {
+      "tests": 1,
+      "expects": 4,
+      "backend": 0,
+      "skips": 1,
+      "fixmes": 0
+    }
+  }
+}

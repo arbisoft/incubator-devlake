@@ -16,10 +16,10 @@
  *
  */
 
-import React, { useEffect, useRef, useState } from 'react';
 import { KeyOutlined, LogoutOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { message } from 'antd';
+import React, { useEffect, useRef, useState } from 'react';
 
 import API from '@/api';
 import type { AccessCurrent, LinkableOIDCProvider } from '@/api/access';

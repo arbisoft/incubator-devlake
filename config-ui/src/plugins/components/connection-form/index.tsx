@@ -16,15 +16,15 @@
  *
  */
 
-import { useState, useEffect, useMemo } from 'react';
-import { isEqual, pick } from 'lodash';
 import { Flex, Alert, Button, message } from 'antd';
+import { isEqual, pick } from 'lodash';
+import { useState, useEffect, useMemo } from 'react';
 
 import API from '@/api';
-import { useAppDispatch, useAppSelector } from '@/hooks';
 import { ExternalLink } from '@/components';
 import { addConnection, updateConnection } from '@/features';
 import { selectConnection } from '@/features/connections';
+import { useAppDispatch, useAppSelector } from '@/hooks';
 import { getPluginConfig } from '@/plugins';
 import { ICustomHeader } from '@/types';
 import { operator } from '@/utils';

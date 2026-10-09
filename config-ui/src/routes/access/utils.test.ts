@@ -16,8 +16,8 @@
  *
  */
 
-import { describe, expect, it } from 'vitest';
 import { AxiosError, AxiosHeaders, HttpStatusCode } from 'axios';
+import { describe, expect, it } from 'vitest';
 
 // Load the routes barrel first so the config/routes import cycle resolves as it does in the app.
 import '@/routes';
@@ -29,6 +29,7 @@ import {
   type OIDCProvider,
 } from '../../api/access';
 
+import { AUTHENTICATION_STATE, OIDC_PROVIDER_STATUS, OIDC_PROVIDER_STATUS_COLOR } from './constants';
 import {
   ACCESS_ERROR,
   canActivateOIDCProvider,
@@ -47,7 +48,6 @@ import {
   canSelectGenericOIDCProvider,
   normalizeDomain,
 } from './utils';
-import { AUTHENTICATION_STATE, OIDC_PROVIDER_STATUS, OIDC_PROVIDER_STATUS_COLOR } from './constants';
 
 const createAxiosError = (status: number, data: unknown) =>
   new AxiosError('Request failed', 'ERR_BAD_REQUEST', undefined, undefined, {
