@@ -17,7 +17,6 @@
  */
 
 export * from './access-form-modal';
-export * from './card-toolbar';
 export * from './form-note';
 export * from './login-name-field';
 export * from './role-field';

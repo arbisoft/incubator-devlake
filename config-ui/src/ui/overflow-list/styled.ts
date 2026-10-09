@@ -16,20 +16,37 @@
  *
  */
 
-import styled from 'styled-components';
+import styled, { css } from 'styled-components';
 
 import { focusRingStyle, textStyle } from '@/ui/style-helpers';
 
-export const List = styled.ul`
+import { OVERFLOW_LAYOUT } from './constants';
+import type { OverflowLayout } from './types';
+
+type LayoutProps = { $layout: OverflowLayout };
+
+export const List = styled.ul<LayoutProps>`
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.space.xxs}px;
   margin: 0;
   padding: 0;
   list-style: none;
+
+  ${({ $layout }) =>
+    $layout === OVERFLOW_LAYOUT.INLINE &&
+    css`
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+
+      > li {
+        min-width: 0;
+      }
+    `}
 `;
 
-export const MoreButton = styled.button`
+export const MoreButton = styled.button<LayoutProps>`
   ${textStyle('caption')}
   padding: 0;
   color: ${({ theme }) => theme.colors.primary};
@@ -38,6 +55,14 @@ export const MoreButton = styled.button`
   border: 0;
   border-radius: ${({ theme }) => theme.radius.sm}px;
   cursor: pointer;
+
+  ${({ $layout, theme }) =>
+    $layout === OVERFLOW_LAYOUT.INLINE &&
+    css`
+      padding: 0 ${theme.space.xs}px;
+      background: ${theme.colors.primarySubtleEnd};
+      border-radius: ${theme.radius.pill}px;
+    `}
 
   &:focus-visible {
     ${focusRingStyle}

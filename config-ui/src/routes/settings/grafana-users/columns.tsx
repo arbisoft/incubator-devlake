@@ -19,7 +19,15 @@
 import type { TableColumnsType } from 'antd';
 
 import type { GrafanaUser } from '@/api/grafana-users';
-import { COMMON_COPY, IdentityCell, OverflowList, STATUS_BADGE_VARIANT, STATUS_TONE, StatusBadge } from '@/ui';
+import {
+  COMMON_COPY,
+  IdentityCell,
+  OVERFLOW_LAYOUT,
+  OverflowList,
+  STATUS_BADGE_VARIANT,
+  STATUS_TONE,
+  StatusBadge,
+} from '@/ui';
 
 import { buildStatusColumn } from '../columns';
 
@@ -49,10 +57,11 @@ const renderProjects = ({ projects }: GrafanaUser) =>
   ) : (
     <OverflowList
       max={MAX_VISIBLE_PROJECTS}
+      layout={OVERFLOW_LAYOUT.INLINE}
       moreLabel={COPY.moreProjects}
       items={projects.map((project) => ({
         key: project,
-        node: <StatusBadge tone={STATUS_TONE.NEUTRAL} label={project} variant={STATUS_BADGE_VARIANT.TEXT} />,
+        node: <StatusBadge tone={STATUS_TONE.NEUTRAL} label={project} variant={STATUS_BADGE_VARIANT.CHIP} />,
       }))}
     />
   );

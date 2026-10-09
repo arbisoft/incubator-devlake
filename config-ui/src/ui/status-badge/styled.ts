@@ -37,9 +37,12 @@ export const Badge = styled(Tag)<BadgeProps>`
   max-width: 100%;
   font-weight: ${WEIGHT.medium};
   color: ${(p) => toneColors(p.theme)[p.$tone].text};
-  background: ${(p) => (p.$variant === STATUS_BADGE_VARIANT.DOT ? toneColors(p.theme)[p.$tone].bg : 'transparent')};
+  background: ${(p) => (p.$variant !== STATUS_BADGE_VARIANT.TEXT ? toneColors(p.theme)[p.$tone].bg : 'transparent')};
   border-color: transparent;
   ${(p) => p.$variant === STATUS_BADGE_VARIANT.TEXT && `padding-inline: 0;`}
+  ${(p) =>
+    p.$variant === STATUS_BADGE_VARIANT.CHIP &&
+    `max-width: ${p.theme.layout.chipMaxWidth}px; color: ${p.theme.colors.text}; background: ${p.theme.colors.borderSubtle};`}
 `;
 
 export const Dot = styled.span<{ $tone: StatusTone }>`

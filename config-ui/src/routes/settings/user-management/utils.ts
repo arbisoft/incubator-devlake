@@ -17,7 +17,7 @@
  */
 
 import { PATHS, USER_MANAGEMENT_VIEW, type UserManagementView } from '@/config';
-import type { RouteTab } from '@/ui/types';
+import { toRouteTabs, toTabKey } from '@/ui/utils';
 
 import { COPY, USER_MANAGEMENT_VIEW_ORDER } from './constants';
 
@@ -26,8 +26,7 @@ const VIEW_PATH: Record<UserManagementView, string> = {
   [USER_MANAGEMENT_VIEW.GRAFANA]: PATHS.SETTINGS_GRAFANA_USERS(),
 };
 
-export const getUserManagementViews = (): RouteTab[] =>
-  USER_MANAGEMENT_VIEW_ORDER.map((key) => ({ key, label: COPY.views[key], path: VIEW_PATH[key] }));
+export const getUserManagementViews = () => toRouteTabs(USER_MANAGEMENT_VIEW_ORDER, COPY.views, VIEW_PATH);
 
 export const toUserManagementView = (key: string | undefined): UserManagementView =>
-  USER_MANAGEMENT_VIEW_ORDER.find((view) => view === key) ?? USER_MANAGEMENT_VIEW.DEVLAKE;
+  toTabKey(USER_MANAGEMENT_VIEW_ORDER, key, USER_MANAGEMENT_VIEW.DEVLAKE);

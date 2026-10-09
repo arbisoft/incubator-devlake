@@ -19,7 +19,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { COMMON_COPY, SHORT_DATE_TIME_FORMAT } from './constants';
-import { formatDateTime, formatRelativeTime, toUserMessage } from './utils';
+import { formatDateTime, formatRelativeTime, toRouteTabs, toTabKey, toUserMessage } from './utils';
 
 const NOW = new Date(2026, 8, 4, 16, 20, 0);
 const MINUTE = 60_000;
@@ -69,5 +69,22 @@ describe('formatRelativeTime', () => {
 
   it('renders a placeholder for empty values', () => {
     expect(formatRelativeTime(null, NOW)).toBe(COMMON_COPY.emptyValue);
+  });
+});
+
+describe('toRouteTabs', () => {
+  it('builds the tabs in order from labels and paths', () => {
+    expect(toRouteTabs(['a', 'b'] as const, { a: 'Alpha', b: 'Beta' }, { a: '/a', b: '/b' })).toEqual([
+      { key: 'a', label: 'Alpha', path: '/a' },
+      { key: 'b', label: 'Beta', path: '/b' },
+    ]);
+  });
+});
+
+describe('toTabKey', () => {
+  it('keeps a known key and falls back otherwise', () => {
+    expect(toTabKey(['a', 'b'] as const, 'b', 'a')).toBe('b');
+    expect(toTabKey(['a', 'b'] as const, 'x', 'a')).toBe('a');
+    expect(toTabKey(['a', 'b'] as const, undefined, 'a')).toBe('a');
   });
 });

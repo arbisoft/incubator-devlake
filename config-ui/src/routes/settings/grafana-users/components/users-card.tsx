@@ -20,9 +20,16 @@ import { useMemo } from 'react';
 
 import API from '@/api';
 import { useRefreshData } from '@/hooks';
-import { DataTable, EMPTY_ILLUSTRATION, SectionCard, buildListEmpty, useListState, useRefreshVersion } from '@/ui';
+import {
+  DataTable,
+  EMPTY_ILLUSTRATION,
+  ListToolbar,
+  SectionCard,
+  buildListEmpty,
+  useListState,
+  useRefreshVersion,
+} from '@/ui';
 
-import { CardToolbar } from '../../components';
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from '../../constants';
 import { getGrafanaUserColumns } from '../columns';
 import { COPY } from '../constants';
@@ -56,7 +63,7 @@ export const GrafanaUsersCard = () => {
     <SectionCard
       title={COPY.title}
       count={users.data?.count}
-      actions={<CardToolbar list={list} searchPlaceholder={COPY.searchPlaceholder} />}
+      actions={<ListToolbar list={list} searchPlaceholder={COPY.searchPlaceholder} />}
     >
       {orphanCount > 0 && <OrphansNotice count={orphanCount} />}
       <DataTable

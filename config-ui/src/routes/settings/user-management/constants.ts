@@ -30,13 +30,13 @@ export const COPY = {
   views: {
     [USER_MANAGEMENT_VIEW.DEVLAKE]: 'DevLake',
     [USER_MANAGEMENT_VIEW.GRAFANA]: 'Grafana',
-  } as Record<UserManagementView, string>,
+  } satisfies Record<UserManagementView, string>,
   breadcrumbViews: {
     [USER_MANAGEMENT_VIEW.DEVLAKE]: 'DevLake Users',
     [USER_MANAGEMENT_VIEW.GRAFANA]: 'Grafana Users',
-  } as Record<UserManagementView, string>,
+  } satisfies Record<UserManagementView, string>,
   descriptions: {
     [USER_MANAGEMENT_VIEW.DEVLAKE]: 'Manage who can sign in to DevLake.',
     [USER_MANAGEMENT_VIEW.GRAFANA]: 'Control which project dashboards each person can open in Grafana.',
-  } as Record<UserManagementView, string>,
+  } satisfies Record<UserManagementView, string>,
 };

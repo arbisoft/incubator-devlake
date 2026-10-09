@@ -29,13 +29,13 @@ import {
   DataTable,
   type DataTableFilters,
   EMPTY_ILLUSTRATION,
+  ListToolbar,
   SectionCard,
   buildListEmpty,
   useListState,
   useRefreshVersion,
 } from '@/ui';
 
-import { CardToolbar } from '../components';
 import {
   ACCESS_MODAL,
   COPY,
@@ -183,12 +183,18 @@ export const DevlakeUsers = () => {
         title={COPY.users.title}
         count={users.data?.count}
         actions={
-          <CardToolbar list={list} searchPlaceholder={COPY.users.searchPlaceholder}>
-            {localAuthEnabled && (
-              <Button onClick={() => setModal(ACCESS_MODAL.LOCAL_USER)}>{COPY.users.addLocalUser}</Button>
-            )}
-            {addUserButton}
-          </CardToolbar>
+          <ListToolbar
+            list={list}
+            searchPlaceholder={COPY.users.searchPlaceholder}
+            end={
+              <>
+                {localAuthEnabled && (
+                  <Button onClick={() => setModal(ACCESS_MODAL.LOCAL_USER)}>{COPY.users.addLocalUser}</Button>
+                )}
+                {addUserButton}
+              </>
+            }
+          />
         }
       >
         <DataTable

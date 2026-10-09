@@ -16,7 +16,7 @@
  *
  */
 
-import { OverflowList } from '@/ui';
+import { OVERFLOW_LAYOUT, OverflowList, STATUS_BADGE_VARIANT, STATUS_TONE, StatusBadge } from '@/ui';
 
 import { COPY, SECTION } from './constants';
 import { DemoCase, DemoSection } from './demo-section';
@@ -37,6 +37,19 @@ export const OverflowListDemo = () => (
     <DemoCase label={COPY.cases.longText}>
       <Narrow>
         <OverflowList items={toItems([text.longItem, ...text.items])} max={MAX_VISIBLE} moreLabel={text.more} />
+      </Narrow>
+    </DemoCase>
+    <DemoCase label={COPY.overflowList.inline}>
+      <Narrow>
+        <OverflowList
+          items={text.items.map((name) => ({
+            key: name,
+            node: <StatusBadge tone={STATUS_TONE.NEUTRAL} label={name} variant={STATUS_BADGE_VARIANT.CHIP} />,
+          }))}
+          max={MAX_VISIBLE}
+          moreLabel={text.more}
+          layout={OVERFLOW_LAYOUT.INLINE}
+        />
       </Narrow>
     </DemoCase>
   </DemoSection>

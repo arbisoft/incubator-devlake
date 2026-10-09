@@ -18,17 +18,18 @@
 
 import { Tooltip } from 'antd';
 
+import { OVERFLOW_LAYOUT } from './constants';
 import { HiddenList, List, MoreButton } from './styled';
 import type { OverflowListProps } from './types';
 import { splitOverflow } from './utils';
 
 const TOOLTIP_TRIGGERS: ('hover' | 'focus')[] = ['hover', 'focus'];
 
-export const OverflowList = ({ items, max, moreLabel, listRef }: OverflowListProps) => {
+export const OverflowList = ({ items, max, moreLabel, layout = OVERFLOW_LAYOUT.STACK, listRef }: OverflowListProps) => {
   const { visible, hidden } = splitOverflow(items, max);
 
   return (
-    <List ref={listRef}>
+    <List ref={listRef} $layout={layout}>
       {visible.map(({ key, node }) => (
         <li key={key}>{node}</li>
       ))}
@@ -44,7 +45,9 @@ export const OverflowList = ({ items, max, moreLabel, listRef }: OverflowListPro
               </HiddenList>
             }
           >
-            <MoreButton type="button">{moreLabel(hidden.length)}</MoreButton>
+            <MoreButton type="button" $layout={layout}>
+              {moreLabel(hidden.length)}
+            </MoreButton>
           </Tooltip>
         </li>
       )}

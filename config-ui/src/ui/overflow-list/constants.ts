@@ -16,18 +16,4 @@
  *
  */
 
-import { ConfigProvider } from 'antd';
-
-import { SearchInput } from '@/ui';
-
-import { Root } from './styled';
-import type { CardToolbarProps } from './types';
-
-export const CardToolbar = ({ list, searchPlaceholder, children }: CardToolbarProps) => (
-  <ConfigProvider componentSize="large">
-    <Root>
-      <SearchInput value={list.keyword} placeholder={searchPlaceholder} onSearch={list.setKeyword} allowClear />
-      {children}
-    </Root>
-  </ConfigProvider>
-);
+export const OVERFLOW_LAYOUT = { STACK: 'stack', INLINE: 'inline' } as const;

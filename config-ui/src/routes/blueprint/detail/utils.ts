@@ -18,7 +18,7 @@
 
 import { BLUEPRINT_VIEW, type BlueprintView, PATHS, PROJECT_TAB } from '@/config';
 import type { IBlueprint } from '@/types';
-import type { RouteTab } from '@/ui/types';
+import { toRouteTabs, toTabKey } from '@/ui/utils';
 import { formatTime } from '@/utils';
 
 import { getNextRunTime } from '../sync-policy';
@@ -26,11 +26,10 @@ import { getNextRunTime } from '../sync-policy';
 import { BLUEPRINT_CONTEXT, BLUEPRINT_VIEW_ORDER, COPY, NEXT_RUN_FORMAT } from './constants';
 import type { BlueprintContext, BlueprintViewPaths } from './types';
 
-const getBlueprintViews = (paths: BlueprintViewPaths): RouteTab[] =>
-  BLUEPRINT_VIEW_ORDER.map((key) => ({ key, label: COPY.views[key], path: paths[key] }));
+const getBlueprintViews = (paths: BlueprintViewPaths) => toRouteTabs(BLUEPRINT_VIEW_ORDER, COPY.views, paths);
 
 export const toBlueprintView = (key: string | undefined): BlueprintView =>
-  BLUEPRINT_VIEW_ORDER.find((view) => view === key) ?? BLUEPRINT_VIEW.STATUS;
+  toTabKey(BLUEPRINT_VIEW_ORDER, key, BLUEPRINT_VIEW.STATUS);
 
 export const getProjectBlueprintViews = (pname: string) =>
   getBlueprintViews({
