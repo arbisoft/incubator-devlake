@@ -73,7 +73,9 @@ describe('AddUserModal', () => {
     expect((screen.getByLabelText(new RegExp(`^${COPY.add.email.label}`)) as HTMLInputElement).value).toBe(EMAIL);
     expect((screen.getByLabelText(new RegExp(`^${COPY.password.label}`)) as HTMLInputElement).value).toBe(PASSWORD);
 
-    fireEvent.click(submit(COPY.add.submit));
+    const retryButton = submit(COPY.add.submit);
+    await waitFor(() => expect(retryButton.classList.contains('ant-btn-loading')).toBe(false));
+    fireEvent.click(retryButton);
     await waitFor(() => expect(props.onPassword).toHaveBeenCalledTimes(1));
     expect(grafana.createUser).toHaveBeenCalledTimes(2);
   });
