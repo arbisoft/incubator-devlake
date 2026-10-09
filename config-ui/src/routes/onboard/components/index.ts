@@ -17,5 +17,6 @@
  */
 
 export * from './card';
+export * from './exit-control';
 export * from './logs';
 export * from './tour';

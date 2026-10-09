@@ -16,167 +16,94 @@
  *
  */
 
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CloseOutlined, LoadingOutlined, CheckCircleFilled, CloseCircleFilled } from '@ant-design/icons';
-import { theme, Card, Flex, Progress, Space, Button, Modal } from 'antd';
 
 import API from '@/api';
+import { PATHS } from '@/config';
 import { useRefreshData, useAutoRefresh } from '@/hooks';
+import { ConfirmModal, CONFIRM_TONE, ProgressBanner } from '@/ui';
 import { operator } from '@/utils';
 
-import { DashboardURLMap } from '../step-4';
+import { DASHBOARD_URL } from '../dashboard-url';
 
-interface Props {
-  style?: React.CSSProperties;
-}
+import { BANNER_ACTION, COPY, FINAL_TASK_STATUSES, STORE_KEY } from './constants';
+import type { BannerAction, OnboardStore } from './types';
+import { getBannerModel, getOnboardStatus } from './utils';
 
-export const OnboardCard = ({ style }: Props) => {
+export const OnboardCard = () => {
   const [operating, setOperating] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [version, setVersion] = useState(0);
 
   const navigate = useNavigate();
 
-  const {
-    token: { green5, orange5, red5 },
-  } = theme.useToken();
+  const { ready, data } = useRefreshData<OnboardStore | null>(() => API.store.get(STORE_KEY), [version]);
 
-  const [modal, contextHolder] = Modal.useModal();
-
-  const { ready, data } = useRefreshData(() => API.store.get('onboard'), [version]);
-
-  const record = useMemo(() => (data ? data.records.find((it: any) => it.plugin === data.plugin) : null), [data]);
+  const record = useMemo(() => data?.records.find((it) => it.plugin === data.plugin), [data]);
 
   const tasksRes = useAutoRefresh(
     async () => {
-      if ((data && data.done) || !record || !record.pipelineId) {
+      if (data?.done || !record?.pipelineId) {
         return;
       }
 
-      return await API.pipeline.subTasks(record.pipelineId as string);
+      return await API.pipeline.subTasks(record.pipelineId);
     },
     [record],
     {
-      cancel: (data) => {
-        return !!(data && ['TASK_COMPLETED', 'TASK_PARTIAL', 'TASK_FAILED'].includes(data.status));
-      },
+      cancel: (tasks) => !!tasks && FINAL_TASK_STATUSES.includes(tasks.status),
     },
   );
 
-  const status = useMemo(() => {
-    if (!data || data.step !== 4) {
-      return 'prepare';
-    }
-
-    if (!tasksRes.data) {
-      return 'running';
-    }
-
-    switch (tasksRes.data.status) {
-      case 'TASK_COMPLETED':
-        return 'success';
-      case 'TASK_PARTIAL':
-        return 'partial';
-      case 'TASK_FAILED':
-        return 'failed';
-      case 'TASK_RUNNING':
-      default:
-        return 'running';
-    }
-  }, [data, tasksRes]);
-
   const handleClose = async () => {
-    modal.confirm({
-      width: 600,
-      title: 'Permanently close this entry?',
-      content: 'You will not be able to get back to the onboarding session again.',
-      okButtonProps: {
-        loading: operating,
-      },
-      okText: 'Confirm',
-      onOk: async () => {
-        const [success] = await operator(() => API.store.set('onboard', { ...data, done: true }), {
-          setOperating,
-        });
+    const [success] = await operator(() => API.store.set(STORE_KEY, { ...data, done: true }), { setOperating });
+    setConfirmOpen(false);
 
-        if (success) {
-          setVersion(version + 1);
-        }
-      },
-    });
+    if (success) {
+      setVersion(version + 1);
+    }
   };
 
   if (!ready || !data || data.done) {
     return null;
   }
 
+  const status = getOnboardStatus(data.step, tasksRes.data?.status);
+  const model = getBannerModel(status, data.step);
+
+  const handlers: Record<BannerAction, () => void> = {
+    [BANNER_ACTION.CONTINUE]: () => navigate(PATHS.ONBOARD()),
+    [BANNER_ACTION.DETAILS]: () => navigate(PATHS.ONBOARD()),
+    [BANNER_ACTION.DASHBOARD]: () => window.open(DASHBOARD_URL[data.plugin]),
+    [BANNER_ACTION.FINISH]: () => setConfirmOpen(true),
+  };
+
   return (
-    <Card style={style}>
-      <Flex style={{ paddingRight: 50 }} align="center" justify="space-between">
-        <Flex align="center">
-          {status === 'prepare' && (
-            <Progress type="circle" size={30} format={() => `${data.step}/3`} percent={(data.step / 3) * 100} />
-          )}
-          {status === 'running' && <LoadingOutlined />}
-          {status === 'success' && <CheckCircleFilled style={{ color: green5 }} />}
-          {status === 'partial' && <CheckCircleFilled style={{ color: orange5 }} />}
-          {status === 'failed' && <CloseCircleFilled style={{ color: red5 }} />}
-          <div style={{ marginLeft: 16 }}>
-            <h4>Onboarding Session</h4>
-            {['prepare', 'running'].includes(status) && (
-              <h5 style={{ fontWeight: 400 }}>
-                You are not far from connecting to your first tool. Continue to finish it.
-              </h5>
-            )}
-            {status === 'success' && (
-              <h5 style={{ fontWeight: 400 }}>The data of your first tool has been collected. Please check it out.</h5>
-            )}
-            {status === 'partial' && (
-              <h5 style={{ fontWeight: 400 }}>
-                The data of your first tool has been parted collected. Please check it out.
-              </h5>
-            )}
-            {status === 'failed' && (
-              <h5 style={{ fontWeight: 400 }}>Something went wrong with the collection process.</h5>
-            )}
-          </div>
-        </Flex>
-        {status === 'prepare' && (
-          <Space>
-            <Button type="primary" onClick={() => navigate('/onboard')}>
-              Continue
-            </Button>
-          </Space>
-        )}
-        {['running', 'failed'].includes(status) && (
-          <Space>
-            <Button type="primary" onClick={() => navigate('/onboard')}>
-              Details
-            </Button>
-          </Space>
-        )}
-        {status === 'success' && (
-          <Space>
-            <Button type="primary" onClick={() => window.open(DashboardURLMap[data.plugin])}>
-              Check Dashboard
-            </Button>
-            <Button onClick={handleClose}>Finish</Button>
-          </Space>
-        )}
-        {status === 'partial' && (
-          <Space>
-            <Button type="primary" onClick={() => navigate('/onboard')}>
-              Details
-            </Button>
-            <Button onClick={() => window.open(DashboardURLMap[data.plugin])}>Check Dashboard</Button>
-          </Space>
-        )}
-      </Flex>
-      <CloseOutlined
-        style={{ position: 'absolute', top: 10, right: 20, cursor: 'pointer', fontSize: 12 }}
-        onClick={handleClose}
+    <>
+      <ProgressBanner
+        title={model.title}
+        message={model.message}
+        tone={model.tone}
+        loading={model.loading}
+        progress={model.progress}
+        actionLabel={COPY.actions[model.primary]}
+        onAction={handlers[model.primary]}
+        secondaryAction={
+          model.secondary && { label: COPY.actions[model.secondary], onClick: handlers[model.secondary] }
+        }
+        onDismiss={() => setConfirmOpen(true)}
       />
-      {contextHolder}
-    </Card>
+      <ConfirmModal
+        open={confirmOpen}
+        tone={CONFIRM_TONE.DEFAULT}
+        title={COPY.confirm.title}
+        description={COPY.confirm.description}
+        confirmLabel={COPY.confirm.confirm}
+        loading={operating}
+        onConfirm={handleClose}
+        onCancel={() => setConfirmOpen(false)}
+      />
+    </>
   );
 };

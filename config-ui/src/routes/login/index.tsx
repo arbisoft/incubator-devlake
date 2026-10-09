@@ -16,44 +16,39 @@
  *
  */
 
-import { useEffect, useState } from 'react';
-import { Card, Button, Typography, Alert, Form, Input, Space } from 'antd';
+import { Alert, Divider } from 'antd';
+import { useState } from 'react';
 
 import API from '@/api';
-import type { Methods, Provider } from '@/api/auth';
-import { TipLayout } from '@/components';
+import type { Provider } from '@/api/auth';
 import { DEVLAKE_ENDPOINT, PATHS } from '@/config';
+import { useRefreshData } from '@/hooks';
+import { useDocumentTitle } from '@/ui/hooks';
+import { toUserMessage } from '@/ui/utils';
 
+import { AuthLayout } from './auth-layout';
+import { COPY, LOGIN_ERROR_MAP, LOGIN_PARAMS } from './constants';
+import { LocalLoginForm } from './local-login-form';
+import { ProviderButtons } from './provider-buttons';
+import { Hint, Note, Notices } from './styled';
+import type { LocalLoginValues } from './types';
 import { normalizeLoginReturnPath } from './utils';
 
-const { Title, Paragraph } = Typography;
-const ACCESS_DENIED_MESSAGE = 'Your account is not currently allowed to access DevLake.';
-
-type LocalLoginValues = {
-  loginName: string;
-  password: string;
-};
-
 export const Login = () => {
-  const [methods, setMethods] = useState<Methods | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  useDocumentTitle(COPY.title);
+
   const [localLoginPending, setLocalLoginPending] = useState(false);
   const [localLoginError, setLocalLoginError] = useState<string>();
 
   const params = new URLSearchParams(window.location.search);
-  const returnUrl = normalizeLoginReturnPath(params.get('return_url'), PATHS.ROOT());
-  const accessDenied = params.get('error') === 'access_denied';
+  const returnUrl = normalizeLoginReturnPath(params.get(LOGIN_PARAMS.RETURN_URL), PATHS.ROOT());
+  const accessDenied = params.get(LOGIN_PARAMS.ERROR) === LOGIN_PARAMS.ACCESS_DENIED;
 
-  useEffect(() => {
-    API.auth
-      .methods()
-      .then(setMethods)
-      .catch((e) => setError(e?.message ?? 'Failed to load login methods'));
-  }, []);
+  const { data: methods, error: methodsError } = useRefreshData((signal) => API.auth.methods(signal), []);
 
-  const startOIDC = (p: Provider) => {
-    const sep = p.loginUrl.includes('?') ? '&' : '?';
-    window.location.href = `${DEVLAKE_ENDPOINT}${p.loginUrl}${sep}return_url=${encodeURIComponent(returnUrl)}`;
+  const startOIDC = (provider: Provider) => {
+    const separator = provider.loginUrl.includes('?') ? '&' : '?';
+    window.location.href = `${DEVLAKE_ENDPOINT}${provider.loginUrl}${separator}return_url=${encodeURIComponent(returnUrl)}`;
   };
 
   const startLocalLogin = async (values: LocalLoginValues) => {
@@ -62,71 +57,32 @@ export const Login = () => {
     try {
       await API.auth.localLogin({ ...values, returnUrl });
       const user = await API.auth.userinfo().catch(() => null);
-      if (user?.authenticated && user.mustChangePassword) {
-        window.location.assign(PATHS.CHANGE_PASSWORD());
-        return;
-      }
-      window.location.assign(returnUrl);
-    } catch {
-      setLocalLoginError('Invalid username or password.');
+      window.location.assign(user?.authenticated && user.mustChangePassword ? PATHS.CHANGE_PASSWORD() : returnUrl);
+    } catch (error) {
+      setLocalLoginError(toUserMessage(error, LOGIN_ERROR_MAP, COPY.signInFailed));
     } finally {
       setLocalLoginPending(false);
     }
   };
 
   const providers = methods?.providers ?? [];
-  const localPassword = methods?.localPassword;
-  const apiKey = methods?.apiKey;
-  const noProviders = providers.length === 0 && !localPassword?.enabled && !apiKey?.enabled;
+  const localEnabled = Boolean(methods?.localPassword?.enabled);
+  const apiKeyEnabled = Boolean(methods?.apiKey?.enabled);
+  const noProviders = methods !== undefined && providers.length === 0 && !localEnabled && !apiKeyEnabled;
 
   return (
-    <TipLayout>
-      <Card style={{ maxWidth: 480, margin: '0 auto' }}>
-        <Title level={3} style={{ textAlign: 'center' }}>
-          Sign in to DevLake
-        </Title>
-        {error && <Alert type="error" title={error} style={{ marginBottom: 16 }} />}
-        {accessDenied && <Alert type="error" title={ACCESS_DENIED_MESSAGE} style={{ marginBottom: 16 }} />}
-        {localPassword?.enabled && (
-          <Form<LocalLoginValues> layout="vertical" onFinish={startLocalLogin} requiredMark={false}>
-            <Form.Item label="Username" name="loginName" rules={[{ required: true, message: 'Enter your username.' }]}>
-              <Input autoComplete="username" />
-            </Form.Item>
-            <Form.Item label="Password" name="password" rules={[{ required: true, message: 'Enter your password.' }]}>
-              <Input.Password autoComplete="current-password" />
-            </Form.Item>
-            {localLoginError && <Alert type="error" title={localLoginError} style={{ marginBottom: 16 }} />}
-            <Button type="primary" htmlType="submit" size="large" block loading={localLoginPending}>
-              Sign in
-            </Button>
-          </Form>
-        )}
-        {localPassword?.enabled && providers.length > 0 && (
-          <Paragraph type="secondary">Or continue with single sign-on.</Paragraph>
-        )}
-        {providers.length > 0 && (
-          <Space direction="vertical" size="middle" style={{ display: 'flex' }}>
-            {providers.map((p) => (
-              <Button key={p.name} type="primary" size="large" block onClick={() => startOIDC(p)}>
-                Sign in with {p.displayName}
-              </Button>
-            ))}
-          </Space>
-        )}
-        {providers.length === 0 && apiKey?.enabled && (
-          <Paragraph type="secondary">
-            Single Sign-On is not configured. Use an API key (Authorization: Bearer ...) to access /rest endpoints, or
-            ask your administrator to enable OIDC.
-          </Paragraph>
-        )}
-        {noProviders && methods !== null && (
-          <Alert
-            type="warning"
-            message="No login providers are enabled."
-            description="Set AUTH_ENABLED=true and configure OIDC_PROVIDERS + per-provider env vars, or sign in upstream of DevLake."
-          />
-        )}
-      </Card>
-    </TipLayout>
+    <AuthLayout title={COPY.title} subtitle={COPY.subtitle}>
+      <Notices>
+        {methodsError !== undefined && <Alert type="error" title={COPY.methodsLoadError} />}
+        {accessDenied && <Alert type="error" title={COPY.accessDenied} />}
+        {localLoginError && <Alert type="error" title={localLoginError} />}
+      </Notices>
+      {localEnabled && <LocalLoginForm pending={localLoginPending} onSubmit={startLocalLogin} />}
+      {localEnabled && providers.length > 0 && <Divider plain>{COPY.divider}</Divider>}
+      {providers.length > 0 && <ProviderButtons providers={providers} onSelect={startOIDC} />}
+      {providers.length === 0 && apiKeyEnabled && <Hint>{COPY.apiKeyHint}</Hint>}
+      {noProviders && <Alert type="warning" title={COPY.noProviders} description={COPY.noProvidersHint} />}
+      <Note>{COPY.footerNote}</Note>
+    </AuthLayout>
   );
 };

@@ -17,10 +17,10 @@
  */
 import { APIRequestContext } from '@playwright/test';
 
-import { test, expect } from '../fixtures';
 import { loginAsAdmin } from '../auth-helpers';
+import { test, expect } from '../fixtures';
 import { adminApi, createGithubConnection, deleteConnection, listScopes, uniqueName } from '../support/api';
-import { iconButton, modalByTitle, tableRow, tagWithText, toast } from '../support/selectors';
+import { ConnectionDetailPage, PLUGINS } from '../support/pages/connections';
 
 const GITHUB_TOKEN = process.env.E2E_GITHUB_TOKEN;
 const GITHUB_REPO = process.env.E2E_GITHUB_REPO;
@@ -50,37 +50,33 @@ test.describe.serial('GitHub data scope and scope config on a connection', () =>
   });
 
   test('add a data scope through the remote picker', async ({ page, browserErrors }) => {
-    await page.goto(`/connections/github/${connectionId}`);
-    await page.getByRole('button', { name: 'Add Data Scope' }).click();
-    const dialog = modalByTitle(page, 'Add Data Scope');
-    await dialog.getByPlaceholder('Search').fill(repo.split('/')[1]);
-    await dialog.getByText(repo, { exact: true }).click();
-    await expect(tagWithText(dialog, repo)).toBeVisible();
-    await dialog.getByRole('button', { name: 'Save' }).click();
-    await expect(toast(page, 'Add data scope successful.')).toBeVisible();
+    const detail = new ConnectionDetailPage(page, PLUGINS.github);
+    await detail.open(connectionId);
+    await detail.openAddScope();
+    await detail.searchRemoteScope(repo.split('/')[1]);
+    await detail.pickRemoteScope(repo);
+    await expect(detail.pickedScopeTag(repo)).toBeVisible();
+    await detail.saveAddScope();
+    await expect(detail.toast('Add data scope successful.')).toBeVisible();
 
-    await expect(tableRow(page, repo)).toBeVisible();
+    await expect(detail.scopeRow(repo)).toBeVisible();
     const { count, scopes } = await listScopes(api, 'github', connectionId);
     expect(count).toBe(1);
     expect(scopes[0].scope.fullName).toBe(repo);
     expect(scopes[0].scope.connectionId).toBe(connectionId);
-    await page.reload();
-    await expect(tableRow(page, repo)).toBeVisible();
+    await detail.reload();
+    await expect(detail.scopeRow(repo)).toBeVisible();
     expect(browserErrors).toEqual([]);
   });
 
   test('create a scope config from the UI and associate it with the scope', async ({ page }) => {
-    await page.goto(`/connections/github/${connectionId}`);
-    await iconButton(tableRow(page, repo), 'link').click();
-    const select = modalByTitle(page, 'Associate Scope Config');
-    await select.getByRole('button', { name: 'Add New Scope Config' }).click();
-    const form = modalByTitle(page, 'Add Scope Config');
-    await form.getByPlaceholder('My Scope Config 1').fill(scopeConfigName);
-    await form.getByRole('button', { name: 'Next' }).click();
-    await form.getByRole('button', { name: 'Save' }).click();
-    await expect(tableRow(select, scopeConfigName)).toBeVisible();
-    await select.getByRole('button', { name: 'Save' }).click();
-    await expect(tableRow(page, repo).getByText(scopeConfigName)).toBeVisible();
+    const detail = new ConnectionDetailPage(page, PLUGINS.github);
+    await detail.open(connectionId);
+    await detail.openAssociateScopeConfig(repo);
+    await detail.createScopeConfig(scopeConfigName);
+    await expect(detail.associateScopeConfigRow(scopeConfigName)).toBeVisible();
+    await detail.saveAssociateScopeConfig();
+    await expect(detail.scopeConfigCell(repo, scopeConfigName)).toBeVisible();
 
     const configsRes = await api.get(`/plugins/github/connections/${connectionId}/scope-configs`);
     const configs: { id: number; name: string; entities: string[] }[] = await configsRes.json();
@@ -91,18 +87,16 @@ test.describe.serial('GitHub data scope and scope config on a connection', () =>
     const { scopes } = await listScopes(api, 'github', connectionId);
     expect(scopes[0].scopeConfig?.id).toBe(created?.id);
     expect(scopes[0].scopeConfig?.name).toBe(scopeConfigName);
-    await page.reload();
-    await expect(tableRow(page, repo).getByText(scopeConfigName)).toBeVisible();
+    await detail.reload();
+    await expect(detail.scopeConfigCell(repo, scopeConfigName)).toBeVisible();
   });
 
   test('remove the data scope from the UI', async ({ page }) => {
-    await page.goto(`/connections/github/${connectionId}`);
-    await iconButton(tableRow(page, repo), 'delete').click();
-    await modalByTitle(page, 'Would you like to delete the selected Data Scope?')
-      .getByRole('button', { name: 'Confirm' })
-      .click();
-    await expect(toast(page, 'Delete Data Scope successful.')).toBeVisible();
-    await expect(tableRow(page, repo)).toHaveCount(0);
+    const detail = new ConnectionDetailPage(page, PLUGINS.github);
+    await detail.open(connectionId);
+    await detail.removeScope(repo);
+    await expect(detail.toast('Delete Data Scope successful.')).toBeVisible();
+    await expect(detail.scopeRow(repo)).toHaveCount(0);
 
     const { count } = await listScopes(api, 'github', connectionId);
     expect(count).toBe(0);

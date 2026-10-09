@@ -24,26 +24,26 @@ export const CrossDomain = styled.div`
 
   .radio-item {
     display: flex;
-    margin-top: 24px;
+    margin-top: ${({ theme }) => theme.space.lg}px;
   }
 
   .application {
-    margin-bottom: 8px;
+    margin-bottom: ${({ theme }) => theme.space.xs}px;
 
     span {
-      padding: 4px 8px;
+      padding: ${({ theme }) => theme.space.xxs}px ${({ theme }) => theme.space.xs}px;
       background-color: ${({ theme }) => theme.colors.bgMuted};
     }
 
     span + span {
-      margin-left: 8px;
+      margin-left: ${({ theme }) => theme.space.xs}px;
     }
   }
 `;
 
 export const RemoteLinkWrapper = styled.div`
   .input {
-    margin-bottom: 8px;
+    margin-bottom: ${({ theme }) => theme.space.xs}px;
   }
 
   .inner {
@@ -60,7 +60,7 @@ export const RemoteLinkWrapper = styled.div`
 export const DialogBody = styled.div`
   ul,
   pre {
-    padding: 8px 16px;
+    padding: ${({ theme }) => theme.space.xs}px ${({ theme }) => theme.space.md}px;
     max-height: 240px;
     overflow-y: auto;
     background: ${({ theme }) => theme.colors.bgMuted};

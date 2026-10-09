@@ -16,18 +16,23 @@
  *
  */
 
+import { Input } from 'antd';
 import styled from 'styled-components';
 
-export const Wrapper = styled.div`
-  width: 100%;
-  height: 100vh;
-  background-color: ${({ theme }) => theme.colors.bgLayout};
+import { Markdown } from '@/components';
+import { paddedCardSurface, textStyle, toneColors } from '@/ui/style-helpers';
+import type { StatusTone } from '@/ui/types';
+
+export const Page = styled.div`
+  min-height: 100vh;
+  background: ${({ theme }) => theme.colors.bgLayout};
 `;
 
 export const Inner = styled.div`
   margin: 0 auto;
-  padding: 36px 0;
-  width: 1200px;
+  padding: ${({ theme }) => theme.space.xl}px 0;
+  width: ${({ theme }) => theme.layout.wizardWidth}px;
+  max-width: 100%;
 `;
 
 export const Header = styled.div`
@@ -36,62 +41,56 @@ export const Header = styled.div`
   align-items: center;
 `;
 
+export const Title = styled.h1`
+  ${textStyle('h1')}
+  margin: 0;
+  color: ${({ theme }) => theme.colors.text};
+`;
+
 export const Content = styled.div`
   margin: 0 auto;
-  width: 860px;
+  width: ${({ theme }) => theme.layout.wizardContentWidth}px;
+  max-width: 100%;
 `;
 
 export const Step = styled.ul`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 100px;
-  margin-bottom: 50px;
+  margin: ${({ theme }) => theme.space.xxl}px 0;
+  padding: 0;
+  list-style: none;
 `;
 
-export const StepItem = styled.li<{ $activated: boolean; $activatedColor: string }>`
+export const StepItem = styled.li<{ $activated: boolean }>`
+  ${({ $activated }) => ($activated ? textStyle('h2') : textStyle('body'))}
   display: flex;
   align-items: center;
+  gap: ${({ theme }) => theme.space.xs}px;
   position: relative;
+  color: ${({ theme }) => theme.colors.text};
 
-  span:first-child {
+  & > span:first-child {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-right: 8px;
-    width: 32px;
-    height: 32px;
-    color: ${({ theme }) => theme.colors.textDisabled};
-    border: 1px solid ${({ theme }) => theme.colors.borderStep};
-    border-radius: 50%;
-
-    ${({ $activated, $activatedColor, theme }) =>
-      $activated
-        ? `
-          color: ${theme.colors.textInverse};
-          background-color: ${$activatedColor};
-          border: none;
-          `
-        : ''}
-  }
-
-  span:last-child {
-    ${({ $activated }) =>
-      $activated
-        ? `
-    font-size: 24px;
-    font-weight: 600;`
-        : ''}
+    width: ${({ theme }) => theme.layout.wizardStepMarkSize}px;
+    height: ${({ theme }) => theme.layout.wizardStepMarkSize}px;
+    font-size: inherit;
+    color: ${({ theme, $activated }) => ($activated ? theme.colors.textInverse : theme.colors.textSecondary)};
+    background: ${({ theme, $activated }) => ($activated ? theme.colors.primary : 'transparent')};
+    border: 1px solid ${({ theme, $activated }) => ($activated ? theme.colors.primary : theme.colors.border)};
+    border-radius: ${({ theme }) => theme.radius.pill}px;
   }
 
   &::before {
     content: '';
     position: absolute;
-    top: 18px;
-    left: -150px;
-    width: 100px;
+    top: 50%;
+    left: calc(-1 * (${({ theme }) => theme.layout.wizardConnectorWidth + theme.space.xxl}px));
+    width: ${({ theme }) => theme.layout.wizardConnectorWidth}px;
     height: 1px;
-    background-color: ${({ theme }) => theme.colors.borderStep};
+    background: ${({ theme }) => theme.colors.border};
   }
 
   &:first-child::before {
@@ -101,60 +100,166 @@ export const StepItem = styled.li<{ $activated: boolean; $activatedColor: string
 
 export const StepContent = styled.div`
   display: flex;
-  height: 450px;
-  background-color: ${({ theme }) => theme.colors.bgContainer};
-  box-shadow:
-    0px 2.4px 4.8px -0.8px rgba(0, 0, 0, 0.1),
-    0px 1.6px 8px 0px rgba(0, 0, 0, 0.07);
+  height: ${({ theme }) => theme.layout.wizardPanelHeight}px;
+  background: ${({ theme }) => theme.colors.bgContainer};
+  border: 1px solid ${({ theme }) => theme.colors.borderSubtle};
+  border-radius: ${({ theme }) => theme.radius.lg}px;
+`;
 
-  .content {
-    flex: 0 0 540px;
-    padding: 24px;
+export const Form = styled.div`
+  flex: 0 0 ${({ theme }) => theme.layout.wizardFormWidth}px;
+  padding: ${({ theme }) => theme.space.lg}px;
+  overflow-y: auto;
+
+  a {
+    color: ${({ theme }) => theme.colors.link};
+  }
+`;
+
+export const NameInput = styled(Input)`
+  max-width: ${({ theme }) => theme.layout.fieldMaxWidth}px;
+`;
+
+export const Guide = styled(Markdown)`
+  ${textStyle('body')}
+  flex: auto;
+  margin: ${({ theme }) => theme.space.sm}px 0;
+  padding: 0 ${({ theme }) => theme.space.lg}px;
+  border-left: 1px solid ${({ theme }) => theme.colors.borderSubtle};
+  overflow-y: auto;
+
+  a {
+    color: ${({ theme }) => theme.colors.link};
   }
 
-  .qa {
-    flex: auto;
-    margin: 12px 0;
-    padding: 0 24px;
-    font-size: 14px;
-    border-left: 1px solid ${({ theme }) => theme.colors.borderSubtle};
-    overflow-y: auto;
+  img {
+    width: 100%;
+  }
 
-    img {
-      width: 100%;
-    }
+  h5 {
+    margin: ${({ theme }) => theme.space.md}px 0;
+  }
 
-    h5 {
-      margin-top: 16px;
-      margin-bottom: 16px;
-    }
+  ul {
+    padding-left: 1em;
+    list-style: disc;
+  }
 
-    ul {
-      padding-left: 1em;
-      list-style: disc;
-    }
+  ol {
+    padding-left: 1.5em;
+  }
 
-    ol {
-      padding-left: 1.5em;
-    }
+  li {
+    ${textStyle('caption')}
+  }
 
-    li {
-      font-size: 12px;
-      line-height: 20px;
-    }
+  p {
+    color: ${({ theme }) => theme.colors.textSecondary};
+  }
 
-    p {
-      color: ${({ theme }) => theme.colors.textBody};
-    }
+  code {
+    ${textStyle('caption')}
+    padding: 0 ${({ theme }) => theme.space.xxs}px;
+    font-family: ${({ theme }) => theme.typography.monoFamily};
+    border-radius: ${({ theme }) => theme.radius.sm}px;
+    border: 1px solid ${({ theme }) => theme.colors.borderSubtle};
+    background: ${({ theme }) => theme.colors.bgCode};
+  }
+`;
 
-    code {
-      padding: 2px;
-      font-size: 12px;
-      font-family: Menlo;
-      line-height: 20px;
-      border-radius: 3px;
-      border: 1px solid ${({ theme }) => theme.colors.borderSubtle};
-      background: ${({ theme }) => theme.colors.bgCode};
-    }
+export const Actions = styled.div`
+  display: flex;
+  justify-content: space-between;
+  margin-top: ${({ theme }) => theme.space.xl}px;
+`;
+
+export const Connect = styled.div`
+  margin-top: ${({ theme }) => theme.space.md}px;
+`;
+
+export const Hero = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+`;
+
+export const HeroBar = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: ${({ theme }) => theme.layout.wizardSectionGap}px;
+`;
+
+export const Welcome = styled.h1`
+  ${textStyle('display')}
+  margin: 0 0 ${({ theme }) => theme.space.lg}px;
+  color: ${({ theme }) => theme.colors.text};
+
+  & > span {
+    color: ${({ theme }) => theme.colors.iconBrand};
+  }
+`;
+
+export const Subtitle = styled.p`
+  ${textStyle('bodyLarge')}
+  margin: 0 0 ${({ theme }) => theme.space.xxl}px;
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
+
+export const Start = styled.div`
+  width: ${({ theme }) => theme.layout.wizardActionWidth}px;
+  max-width: 100%;
+`;
+
+export const Result = styled.div`
+  margin-top: ${({ theme }) => theme.layout.wizardSectionGap}px;
+  ${paddedCardSurface}
+`;
+
+export const ResultTop = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.md}px;
+  margin-bottom: ${({ theme }) => theme.space.xxl}px;
+  text-align: center;
+`;
+
+export const ResultInfo = styled.div`
+  ${textStyle('h3')}
+  color: ${({ theme }) => theme.colors.text};
+`;
+
+export const ResultTip = styled.div`
+  ${textStyle('caption')}
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
+
+export const ResultActions = styled.div<{ $column?: boolean }>`
+  display: flex;
+  flex-direction: ${({ $column }) => ($column ? 'column' : 'row')};
+  align-items: center;
+  gap: ${({ theme }) => theme.space.xs}px;
+`;
+
+export const ResultIcon = styled.span<{ $tone: StatusTone }>`
+  display: inline-flex;
+  font-size: ${({ theme }) => theme.layout.wizardResultSize}px;
+  color: ${({ theme, $tone }) => toneColors(theme)[$tone].text};
+`;
+
+export const LogsTitle = styled.div`
+  ${textStyle('captionStrong')}
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
+
+export const LogsDetail = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.space.md}px;
+  margin-top: ${({ theme }) => theme.space.sm}px;
+
+  & > div {
+    flex: 1;
   }
 `;

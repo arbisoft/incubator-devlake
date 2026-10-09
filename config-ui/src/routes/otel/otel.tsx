@@ -16,227 +16,207 @@
  *
  */
 
-import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { PlusOutlined } from '@ant-design/icons';
-import { Button, Flex, message, Table } from 'antd';
+import { Alert, Button } from 'antd';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import API from '@/api';
-import { type OtelConnectionResponse } from '@/api/otel';
-import { Message, PageHeader } from '@/components';
-import { useRefreshData } from '@/hooks';
-import { operator, type OperateConfig } from '@/utils';
-import { getOtelColumns } from './columns';
+import { OTEL_STATUS, type OtelConnectionResponse } from '@/api/otel';
+import { PATHS } from '@/config';
+import { useAutoRefresh, useRefreshData } from '@/hooks';
+import {
+  ConfirmModal,
+  DataTable,
+  ListPage,
+  PageHeader,
+  SectionCard,
+  Toolbar,
+  buildListEmpty,
+  useRefreshVersion,
+} from '@/ui';
+import { EMPTY_ILLUSTRATION } from '@/ui/empty-state';
+
+import { getConnectionColumns } from './columns';
+import { CreateModal, ProjectsModal, SnippetModal } from './components';
+import { COPY, LIFECYCLE_ACTION, OTEL_MODAL, OTEL_REFRESH_INTERVAL_MS } from './constants';
 import { OtelIngestionHealth } from './ingestion-health';
 import { OtelSourcePolicy } from './source-policy';
-import { OTEL_ERROR, OTEL_LIFECYCLE_ACTION, OTEL_REFRESH_INTERVAL_MS } from './constants';
-import { OTEL_MODAL, OtelModals, type OtelLifecycleAction, type OtelModalState } from './modals';
-import {
-  getOtelCreateError,
-  getOtelLifecycleError,
-  getOtelProjectError,
-  hasRecoveryRequired,
-  hasStorageNeedsApplying,
-  notifyOtelAttentionChanged,
-} from './utils';
+import { Hint } from './styled';
+import type { LifecycleAction, OtelModal, PendingCredentialFocus } from './types';
+import { useOtelAction } from './use-otel-action';
+import { getCreateIntent, hasRecoveryRequired, hasStorageNeedsApplying, notifyOtelAttentionChanged } from './utils';
 
-// Avoid importing PATHS here: config/paths imports the routes barrel, which also exports this module.
-const OTEL_PATH = `${import.meta.env.DEVLAKE_PATH_PREFIX ?? ''}/otel`;
-const BREADCRUMBS = [{ name: 'Claude Code OTel', path: OTEL_PATH }];
-
-type OtelOperationResult<T> = { success: true; data: T } | { success: false; error: unknown };
-
-// Keep OTel lifecycle responses typed without changing the shared legacy operator contract.
-const operateOtel = async <T,>(request: () => Promise<T>, config?: OperateConfig): Promise<OtelOperationResult<T>> => {
-  const [success, result] = await operator(request, config);
-  return success ? { success: true, data: result as T } : { success: false, error: result };
-};
+const BREADCRUMBS = [{ label: COPY.breadcrumbConnections, path: PATHS.CONNECTIONS() }, { label: COPY.title }];
+const POLL = { interval: OTEL_REFRESH_INTERVAL_MS };
 
 export const Otel = () => {
-  const [version, setVersion] = useState(1);
-  const [operating, setOperating] = useState(false);
-  const [modal, setModal] = useState<OtelModalState>();
-  const [current, setCurrent] = useState<OtelConnectionResponse>();
-  const [teamName, setTeamName] = useState('');
-  const [projectNames, setProjectNames] = useState<string[]>([]);
-  const [createError, setCreateError] = useState<string>();
-  const [lifecycleError, setLifecycleError] = useState<string>();
-
+  const { version, refresh } = useRefreshVersion();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { data, ready } = useRefreshData(() => API.otel.list(), [version]);
-  const { data: projectOptions } = useRefreshData(() => API.otel.listProjects(), []);
-  const { data: ingestionStatus, ready: ingestionStatusReady } = useRefreshData(
-    () => API.otel.ingestionStatus(),
-    [version],
-  );
-  const { data: sourcePreferences } = useRefreshData(() => API.otel.listSourcePreferences(), [version]);
-  const dataSource = useMemo(() => data ?? [], [data]);
-  const columns = useMemo(
-    () =>
-      getOtelColumns(setCurrent, setModal, (connection) => {
-        setCurrent(connection);
-        setProjectNames(connection.projects.map((project) => project.name));
-        setCreateError(undefined);
-        setModal(OTEL_MODAL.PROJECTS);
-      }),
-    [],
-  );
-  const managedSettings = useMemo(
-    () => (current?.managedSettings ? JSON.stringify(current.managedSettings, null, 2) : ''),
-    [current],
-  );
+  const [intent] = useState(() => getCreateIntent(searchParams));
+  const [modal, setModal] = useState<OtelModal | undefined>(intent ? OTEL_MODAL.CREATE : undefined);
+  const [presetProject, setPresetProject] = useState(intent);
+  const [placementTarget, setPlacementTarget] = useState<OtelConnectionResponse>();
+  const [credential, setCredential] = useState<OtelConnectionResponse>();
+  const [credentialOpen, setCredentialOpen] = useState(false);
+  const generateButtonRef = useRef<HTMLButtonElement>(null);
+  const actionButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+  const pendingCredentialFocus = useRef<PendingCredentialFocus | undefined>(undefined);
 
-  const refresh = () => setVersion((v) => v + 1);
+  const connections = useAutoRefresh((signal) => API.otel.list(signal), [version], POLL);
+  const ingestion = useAutoRefresh((signal) => API.otel.ingestionStatus(signal), [version], POLL);
+  const preferences = useAutoRefresh((signal) => API.otel.listSourcePreferences(signal), [version], POLL);
+  const projectOptionsQuery = useRefreshData((signal) => API.otel.listProjects(signal), [version]);
+  const projectOptions = projectOptionsQuery.data;
 
-  useEffect(() => {
-    const projectName = searchParams.get('project');
-    if (searchParams.get('create') !== 'true' || !projectName) return;
-    setProjectNames([projectName]);
-    setModal(OTEL_MODAL.CREATE);
-    setSearchParams({}, { replace: true });
-  }, [searchParams, setSearchParams]);
+  const rows = useMemo(() => connections.data ?? [], [connections.data]);
+  const failed = connections.data === undefined && connections.error !== undefined;
+
+  const showCredential = useCallback((response: OtelConnectionResponse) => {
+    const rotated = response.credentials.some(({ status }) => status === OTEL_STATUS.RETIRING);
+    pendingCredentialFocus.current = rotated
+      ? { connectionId: response.connection.id, action: LIFECYCLE_ACTION.FINALIZE }
+      : {};
+    setCredential(response);
+    setCredentialOpen(true);
+  }, []);
+  const { start, confirmProps } = useOtelAction({ onDone: refresh, onCredential: showCredential });
 
   useEffect(() => {
-    const interval = window.setInterval(refresh, OTEL_REFRESH_INTERVAL_MS);
-    return () => window.clearInterval(interval);
+    if (intent) setSearchParams({}, { replace: true });
+  }, [intent, setSearchParams]);
+
+  const closeModal = useCallback(() => {
+    setModal(undefined);
+    setPresetProject(undefined);
   }, []);
 
-  const closeModal = () => {
-    setLifecycleError(undefined);
-    setCreateError(undefined);
-    setModal(undefined);
-  };
+  const closeCredential = useCallback(() => {
+    setCredential(undefined);
+  }, []);
 
-  const handleCreate = async () => {
-    setCreateError(undefined);
-    const result = await operateOtel(() => API.otel.create({ teamName, projectNames }), {
-      hideToast: true,
-      setOperating,
-    });
-    if (result.success) {
-      setCurrent(result.data);
-      setTeamName('');
-      setProjectNames([]);
-      setModal(OTEL_MODAL.SNIPPET);
-      refresh();
-      notifyOtelAttentionChanged();
-      return;
-    }
+  const registerActionButton = useCallback(
+    (connectionId: string | number, action: LifecycleAction, button: HTMLButtonElement | null) => {
+      const key = `${connectionId}:${action}`;
+      if (button) actionButtonRefs.current.set(key, button);
+      else actionButtonRefs.current.delete(key);
+    },
+    [],
+  );
 
-    setCreateError(getOtelCreateError(result.error));
-  };
+  useEffect(() => {
+    const pending = pendingCredentialFocus.current;
+    if (credentialOpen || credential || !pending) return;
 
-  const handleUpdateProjects = async () => {
-    if (!current) return;
-    setCreateError(undefined);
-    const result = await operateOtel(() => API.otel.updateProjects(current.connection.id, projectNames), {
-      hideToast: true,
-      setOperating,
-    });
-    if (!result.success) {
-      setCreateError(getOtelProjectError(result.error));
-      return;
-    }
-    setCurrent({ ...current, projects: result.data });
-    setModal(undefined);
-    refresh();
-    message.success('Claude Code OTel project placements updated.');
-  };
+    const target =
+      pending.action && pending.connectionId !== undefined
+        ? actionButtonRefs.current.get(`${pending.connectionId}:${pending.action}`)
+        : generateButtonRef.current;
+    if (!target || target.disabled) return;
 
-  const handleAction = async (action: OtelLifecycleAction) => {
-    if (!current?.connection.id) return;
-    setLifecycleError(undefined);
-    const apiCalls: Record<OtelLifecycleAction, () => Promise<OtelConnectionResponse>> = {
-      [OTEL_LIFECYCLE_ACTION.ROTATE]: () => API.otel.rotate(current.connection.id),
-      [OTEL_LIFECYCLE_ACTION.REVOKE]: () => API.otel.revoke(current.connection.id),
-      [OTEL_LIFECYCLE_ACTION.HIDE]: () => API.otel.hide(current.connection.id),
-      [OTEL_LIFECYCLE_ACTION.FINALIZE]: () => API.otel.finalizeRotation(current.connection.id),
-      [OTEL_LIFECYCLE_ACTION.APPLY]: () => API.otel.apply(current.connection.id),
-    };
+    target.focus();
+    pendingCredentialFocus.current = undefined;
+  }, [credential, credentialOpen, rows]);
 
-    const result = await operateOtel(apiCalls[action], { hideToast: true, setOperating });
-    if (!result.success) {
-      setLifecycleError(getOtelLifecycleError(result.error));
-      return;
-    }
+  const columns = useMemo(
+    () =>
+      getConnectionColumns({
+        onManageProjects: (connection) => {
+          setPlacementTarget(connection);
+          setModal(OTEL_MODAL.PROJECTS);
+        },
+        onAction: start,
+        onActionButtonRef: registerActionButton,
+      }),
+    [registerActionButton, start],
+  );
 
-    const response = result.data;
-    setCurrent(response);
-    refresh();
-    notifyOtelAttentionChanged();
-    const postActionHandlers: Partial<Record<OtelLifecycleAction, (response: OtelConnectionResponse) => boolean>> = {
-      [OTEL_LIFECYCLE_ACTION.HIDE]: () => {
-        setModal(undefined);
-        return true;
-      },
-      [OTEL_LIFECYCLE_ACTION.APPLY]: (response) => {
-        if (response.restartRequired) {
-          setLifecycleError(response.restartHint || OTEL_ERROR.APPLY);
-          return true;
-        }
-        message.success('Credential changes applied.');
-        return false;
-      },
-    };
-    if (postActionHandlers[action]?.(response)) return;
-
-    setModal(response.managedSettings ? OTEL_MODAL.SNIPPET : undefined);
-  };
+  const empty = buildListEmpty({
+    failed,
+    onRetry: refresh,
+    filtered: false,
+    empty: { ...COPY.connections.empty, illustration: EMPTY_ILLUSTRATION.NO_CONNECTION },
+    noResults: COPY.connections.empty,
+  });
 
   return (
-    <PageHeader
-      breadcrumbs={BREADCRUMBS}
-      description="Generate and manage the Basic Auth credential used by Claude Code telemetry."
-    >
-      <Flex style={{ marginBottom: 16 }} justify="flex-end">
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          loading={operating}
-          onClick={() => {
-            setTeamName('');
-            setProjectNames([]);
-            setCreateError(undefined);
-            setModal(OTEL_MODAL.CREATE);
-          }}
-        >
-          Generate Claude Settings
-        </Button>
-      </Flex>
-      {hasRecoveryRequired(dataSource) && (
-        <Message content="The Collector credential verifier is unavailable. Revoke the affected connection, then generate new Claude settings to restore telemetry." />
-      )}
-      {hasStorageNeedsApplying(dataSource) && (
-        <Message content="Credential storage differs from the registered credentials. Select Apply to reconcile the telemetry endpoint." />
-      )}
-      <OtelSourcePolicy preferences={sourcePreferences} />
-      <OtelIngestionHealth loading={!ingestionStatusReady} status={ingestionStatus} />
-      <Table
-        rowKey={(record) => record.connection.id}
-        size="middle"
-        loading={!ready}
-        dataSource={dataSource}
-        columns={columns}
+    <ListPage>
+      <PageHeader title={COPY.title} description={COPY.description} breadcrumbs={BREADCRUMBS} />
+      <Toolbar
+        end={
+          <Button
+            ref={generateButtonRef}
+            type="primary"
+            icon={<PlusOutlined aria-hidden />}
+            onClick={() => setModal(OTEL_MODAL.CREATE)}
+          >
+            {COPY.generate}
+          </Button>
+        }
       />
-
-      <OtelModals
-        modal={modal}
-        current={current}
-        teamName={teamName}
-        projectNames={projectNames}
+      {hasRecoveryRequired(rows) && <Alert type="error" showIcon title={COPY.notices.recovery} />}
+      {hasStorageNeedsApplying(rows) && <Alert type="warning" showIcon title={COPY.notices.storage} />}
+      <SectionCard title={COPY.connections.title} count={connections.data && rows.length}>
+        {rows.length > 0 && <Hint>{COPY.connections.scrollHint}</Hint>}
+        <DataTable
+          rowKey={({ connection }) => connection.id}
+          ariaLabel={COPY.connections.tableLabel}
+          loading={connections.data === undefined && !failed}
+          columns={columns}
+          dataSource={rows}
+          pagination={false}
+          empty={empty}
+        />
+      </SectionCard>
+      <OtelIngestionHealth
+        loading={ingestion.data === undefined && ingestion.error === undefined}
+        failed={ingestion.data === undefined && ingestion.error !== undefined}
+        status={ingestion.data}
+        onRetry={refresh}
+      />
+      <OtelSourcePolicy
+        loading={preferences.data === undefined && preferences.error === undefined}
+        failed={preferences.data === undefined && preferences.error !== undefined}
+        preferences={preferences.data}
+        onRetry={refresh}
+      />
+      {projectOptionsQuery.error !== undefined && (
+        <Alert
+          type="error"
+          showIcon
+          title={COPY.projectOptionsUnavailable}
+          action={<Button onClick={refresh}>{COPY.health.retry}</Button>}
+        />
+      )}
+      <CreateModal
+        open={modal === OTEL_MODAL.CREATE}
+        presetProject={presetProject}
         projectOptions={projectOptions ?? []}
-        createError={createError}
-        lifecycleError={lifecycleError}
-        operating={operating}
-        managedSettings={managedSettings}
         onClose={closeModal}
-        onCreate={handleCreate}
-        onTeamNameChange={setTeamName}
-        onProjectNamesChange={setProjectNames}
-        onClearCreateError={() => setCreateError(undefined)}
-        onAction={handleAction}
-        onUpdateProjects={handleUpdateProjects}
+        onCreated={(response) => {
+          closeModal();
+          showCredential(response);
+          refresh();
+          notifyOtelAttentionChanged();
+        }}
       />
-    </PageHeader>
+      <ProjectsModal
+        open={modal === OTEL_MODAL.PROJECTS}
+        connection={placementTarget}
+        projectOptions={projectOptions ?? []}
+        onClose={closeModal}
+        onSaved={() => {
+          closeModal();
+          refresh();
+        }}
+      />
+      <SnippetModal
+        open={credentialOpen}
+        credential={credential}
+        onClose={() => setCredentialOpen(false)}
+        onClosed={closeCredential}
+      />
+      <ConfirmModal {...confirmProps} />
+    </ListPage>
   );
 };

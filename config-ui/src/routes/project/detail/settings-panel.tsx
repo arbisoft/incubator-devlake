@@ -16,139 +16,73 @@
  *
  */
 
-import { useEffect, useState } from 'react';
+import { Button, Input } from 'antd';
+import { isEqual } from 'lodash';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Flex, Space, Card, Modal, Input, Checkbox, Button, message } from 'antd';
 
 import API from '@/api';
-import { OTEL_CONNECTION_STATUS } from '@/api/otel';
-import { Block, HelpTooltip, Message } from '@/components';
-import { PATHS } from '@/config';
+import { PATHS, PROJECT_TAB } from '@/config';
 import { useRefreshData } from '@/hooks';
-import { IProject } from '@/types';
+import { getOtelProjectError } from '@/routes/otel/utils';
+import { FormField, SectionCard, Toolbar, toUserMessage } from '@/ui';
 import { operator } from '@/utils';
 
-import { getOtelProjectError } from '@/routes/otel/utils';
+import { COPY, DEFAULT_PR_ISSUE_REGEXP, DELETE_ERROR_MAP, SAVE_ERROR_MAP } from './constants';
+import { DeleteProjectModal } from './delete-project-modal';
+import { RegexHelp } from './regex-help';
+import { SettingOption } from './setting-option';
+import { FieldBox, Fields, Footer, Stack } from './styled';
+import type { ProjectPanelProps, SettingsForm } from './types';
+import { buildProjectPayload, getDeleteWarnings, getOtelPlacementState, readSettingsForm } from './utils';
 
-const RegexPrIssueDefaultValue = '(?mi)(Closes)[\\s]*.*(((and )?#\\d+[ ]*)+)';
-
-interface Props {
-  project: IProject;
-  onRefresh: () => void;
-}
-
-export const SettingsPanel = ({ project, onRefresh }: Props) => {
-  const [name, setName] = useState('');
-  const [dora, setDora] = useState({
-    enable: false,
-  });
-  const [linker, setLinker] = useState({
-    enable: false,
-    prToIssueRegexp: '',
-  });
-  const [issueTrace, setIssueTrace] = useState({
-    enable: false,
-  });
+export const SettingsPanel = ({ project, onRefresh }: ProjectPanelProps) => {
+  const [source, setSource] = useState(project);
+  const [form, setForm] = useState(() => readSettingsForm(project));
   const [operating, setOperating] = useState(false);
-  const [open, setOpen] = useState(false);
-
+  const [deleting, setDeleting] = useState(false);
   const navigate = useNavigate();
-  const { data: otelConnections, ready: otelConnectionsReady } = useRefreshData(
-    () => API.otel.listForProject(project.name),
+
+  const { data: otelConnections, ready: otelReady } = useRefreshData(
+    (signal) => API.otel.listForProject(project.name, signal),
     [project.name],
   );
-  const hasOtelPlacements = Boolean(otelConnections?.length);
-  const hasActiveFinalOtelPlacement = Boolean(
-    otelConnections?.some(
-      (connection) =>
-        connection.connection.status === OTEL_CONNECTION_STATUS.ACTIVE && connection.projects.length === 1,
-    ),
-  );
+  const placements = getOtelPlacementState(otelConnections);
+  const dirty = !isEqual(form, readSettingsForm(project));
 
-  useEffect(() => {
-    const dora = project.metrics.find((ms) => ms.pluginName === 'dora');
-    const linker = project.metrics.find((ms) => ms.pluginName === 'linker');
-    const issueTrace = project.metrics.find((ms) => ms.pluginName === 'issue_trace');
+  if (source !== project) {
+    setSource(project);
+    setForm(readSettingsForm(project));
+  }
 
-    setName(project.name);
-    setDora({
-      enable: dora?.enable ?? false,
+  const setField = <K extends keyof SettingsForm>(key: K, value: SettingsForm[K]) =>
+    setForm((current) => ({ ...current, [key]: value }));
+
+  const handleSave = async () => {
+    const [success] = await operator(() => API.project.update(project.name, buildProjectPayload(form)), {
+      setOperating,
+      formatMessage: () => COPY.settings.saved,
+      formatReason: (error) => toUserMessage(error, SAVE_ERROR_MAP, COPY.settings.saveFailed),
     });
-    setLinker({
-      enable: linker?.enable ?? false,
-      prToIssueRegexp: linker?.pluginOption?.prToIssueRegexp ?? RegexPrIssueDefaultValue,
-    });
-    setIssueTrace({
-      enable: issueTrace?.enable ?? false,
-    });
-  }, [project]);
 
-  const handleUpdate = async () => {
-    if (name !== project.name && hasOtelPlacements) {
-      message.error('Remove Claude Code OTel project placements before renaming this project.');
-      return;
-    }
-    const [success] = await operator(
-      () =>
-        API.project.update(project.name, {
-          name,
-          description: '',
-          metrics: [
-            {
-              pluginName: 'dora',
-              pluginOption: {},
-              enable: dora.enable,
-            },
-            {
-              pluginName: 'linker',
-              pluginOption: {
-                prToIssueRegexp: linker.prToIssueRegexp,
-              },
-              enable: linker.enable,
-            },
-            {
-              pluginName: 'issue_trace',
-              pluginOption: {},
-              enable: issueTrace.enable,
-            },
-          ],
-        }),
-      {
-        setOperating,
-      },
-    );
-
-    if (success) {
-      onRefresh();
-      navigate(PATHS.PROJECT(name), {
-        state: {
-          tabId: 'settings',
-        },
-      });
-    }
-  };
-
-  const handleShowDeleteDialog = () => {
-    setOpen(true);
-  };
-
-  const handleHideDeleteDialog = () => {
-    setOpen(false);
+    if (!success) return;
+    // The new name's page loads the saved project itself, so only an unchanged name needs a refresh.
+    if (form.name === project.name) onRefresh();
+    else navigate(PATHS.PROJECT_TAB(form.name, PROJECT_TAB.SETTINGS));
   };
 
   const handleDelete = async () => {
-    if (hasOtelPlacements) {
+    if (placements.hasPlacements) {
       const [prepared] = await operator(() => API.otel.validateProjectRemoval(project.name), {
         setOperating,
         formatReason: getOtelProjectError,
       });
-      if (!prepared) {
-        return;
-      }
+      if (!prepared) return;
     }
     const [success] = await operator(() => API.project.remove(project.name), {
       setOperating,
-      formatMessage: () => 'Delete project successful.',
+      formatMessage: () => COPY.settings.delete.success,
+      formatReason: (error) => toUserMessage(error, DELETE_ERROR_MAP, COPY.settings.delete.failed),
     });
 
     if (success) {
@@ -157,112 +91,71 @@ export const SettingsPanel = ({ project, onRefresh }: Props) => {
   };
 
   return (
-    <Flex vertical>
-      <Space direction="vertical" size="large">
-        <Card>
-          <Block title="Project Name" description="Edit your project name with letters, numbers, -, _ or /" required>
-            <Input
-              style={{ width: 386 }}
-              value={name}
-              disabled={hasOtelPlacements}
-              onChange={(e) => setName(e.target.value)}
-            />
-            {hasOtelPlacements && (
-              <Message content="Remove the project's Claude Code OTel placements before renaming it. This keeps project-configured telemetry links stable." />
-            )}
-          </Block>
-          <Block
-            title={
-              <Checkbox checked={dora.enable} onChange={(e) => setDora({ enable: e.target.checked })}>
-                Enable DORA Metrics
-              </Checkbox>
-            }
-            description="DORA metrics are four widely-adopted metrics for measuring software delivery performance."
-          />
-          <Block
-            title={
-              <Checkbox checked={linker.enable} onChange={(e) => setLinker({ ...linker, enable: e.target.checked })}>
-                Associate pull requests with issues
-              </Checkbox>
-            }
-            description={
-              <span>
-                Parse the issue key with the regex from the title and description of the pull requests in this project.
-                <HelpTooltip
-                  overlayInnerStyle={{ width: 500 }}
-                  content={
-                    <>
-                      <div>
-                        Example 1 - If your PR title or description contains a Jira issue key in the format 'Closes
-                        [DI-123](www.yourdomain.atlassian.net/browse/di-123)', please use the following regex template:{' '}
-                        (?mi)Closes[\s]*.*(((and)?https://\S+.atlassian.net/browse/\S+[ ]*)+)
-                      </div>
-                      <div>
-                        Example 2 - If your PR title or description contains a GitHub issue key in the format 'Resolves
-                        www.github.com/namespace/repo_name/issues/123)', please use the following regex template:{' '}
-                        (?mi)Resolves[\s]*.*(((and)?https://github.com/%s/issues/\d+[ ]*)+)
-                      </div>
-                    </>
-                  }
-                />
-              </span>
-            }
-          >
-            {linker.enable && (
-              <Input
-                style={{ width: 600 }}
-                placeholder={RegexPrIssueDefaultValue}
-                value={linker.prToIssueRegexp}
-                onChange={(e) => setLinker({ ...linker, prToIssueRegexp: e.target.value })}
-              />
-            )}
-          </Block>
-          <Block
-            title={
-              <Checkbox checked={issueTrace.enable} onChange={(e) => setIssueTrace({ enable: e.target.checked })}>
-                Enable issue trace
-              </Checkbox>
-            }
-            description="Parse the issue status and assignee history from issue changelogs. Currently, only Jira issues are supported."
-          />
-          <Block>
-            <Button type="primary" loading={operating} disabled={!name} onClick={handleUpdate}>
-              Save
-            </Button>
-          </Block>
-        </Card>
-        <Flex justify="center">
-          <Button type="primary" danger disabled={!otelConnectionsReady} onClick={handleShowDeleteDialog}>
-            Delete Project
+    <Stack>
+      <Toolbar
+        end={
+          <Button danger disabled={!otelReady} onClick={() => setDeleting(true)}>
+            {COPY.settings.delete.open}
           </Button>
-        </Flex>
-      </Space>
-      <Modal
-        open={open}
-        width={820}
-        centered
-        title="Are you sure you want to delete this Project?"
-        okText="Confirm"
-        okButtonProps={{
-          loading: operating,
-          disabled: hasActiveFinalOtelPlacement,
-        }}
-        onCancel={handleHideDeleteDialog}
-        onOk={handleDelete}
-      >
-        <Flex vertical gap={12}>
-          <Message content="This operation cannot be undone. Deleting this project will remove all associated project settings and data. This action does not delete any data connections or the data collected through them." />
-          {hasOtelPlacements && (
-            <Message
-              content={
-                hasActiveFinalOtelPlacement
-                  ? 'This project is the final placement for an active Claude Code OTel connection. Revoke that connection before deleting the project.'
-                  : 'Claude Code OTel placements will be removed from this project. Shared credentials remain active for their other projects.'
-              }
+        }
+      />
+      <SectionCard title={COPY.settings.details}>
+        <Fields>
+          <FieldBox>
+            <FormField label={COPY.settings.name.label} description={COPY.settings.name.description} required>
+              {(control) => (
+                <Input {...control} value={form.name} onChange={(event) => setField('name', event.target.value)} />
+              )}
+            </FormField>
+          </FieldBox>
+          <div>
+            <SettingOption
+              label={COPY.settings.dora.label}
+              description={COPY.settings.dora.description}
+              checked={form.dora}
+              onChange={(checked) => setField('dora', checked)}
             />
-          )}
-        </Flex>
-      </Modal>
-    </Flex>
+            <SettingOption
+              label={COPY.settings.linker.label}
+              description={COPY.settings.linker.description}
+              checked={form.linker}
+              aside={<RegexHelp />}
+              onChange={(checked) => setField('linker', checked)}
+            >
+              {form.linker && (
+                <Input
+                  aria-label={COPY.settings.linker.regexLabel}
+                  placeholder={DEFAULT_PR_ISSUE_REGEXP}
+                  value={form.linkerRegexp}
+                  onChange={(event) => setField('linkerRegexp', event.target.value)}
+                />
+              )}
+            </SettingOption>
+            <SettingOption
+              label={COPY.settings.issueTrace.label}
+              description={COPY.settings.issueTrace.description}
+              checked={form.issueTrace}
+              onChange={(checked) => setField('issueTrace', checked)}
+            />
+          </div>
+          <Footer>
+            <Button type="primary" loading={operating} disabled={!form.name} onClick={handleSave}>
+              {COPY.settings.save}
+            </Button>
+            <Button disabled={!dirty || operating} onClick={() => setForm(readSettingsForm(project))}>
+              {COPY.settings.discard}
+            </Button>
+          </Footer>
+        </Fields>
+      </SectionCard>
+      <DeleteProjectModal
+        open={deleting}
+        name={project.name}
+        warnings={getDeleteWarnings(placements)}
+        loading={operating}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleting(false)}
+      />
+    </Stack>
   );
 };

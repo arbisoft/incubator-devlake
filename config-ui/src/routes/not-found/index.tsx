@@ -16,31 +16,33 @@
  *
  */
 
+import { Button } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { ExclamationCircleOutlined } from '@ant-design/icons';
-import { Card, Space, Flex, Button } from 'antd';
 
-import { TipLayout } from '@/components';
+import { PATHS } from '@/config';
+import { EMPTY_ILLUSTRATION, EMPTY_STATE_SIZE, EmptyState, StandalonePage } from '@/ui';
+import { useDocumentTitle } from '@/ui/hooks';
+
+import { COPY } from './constants';
 
 export const NotFound = () => {
+  useDocumentTitle(COPY.title);
+
   const navigate = useNavigate();
 
   return (
-    <TipLayout>
-      <Card>
-        <h2>
-          <Space>
-            <ExclamationCircleOutlined style={{ fontSize: 20, color: 'var(--devlake-color-warning-alt)' }} />
-            <span>404 Not Found</span>
-          </Space>
-        </h2>
-        <p>This is an invalid address.</p>
-        <Flex justify="center">
-          <Button type="primary" onClick={() => navigate('/')}>
-            Go HomePage
+    <StandalonePage>
+      <EmptyState
+        illustration={EMPTY_ILLUSTRATION.EMPTY}
+        title={COPY.heading}
+        description={COPY.description}
+        size={EMPTY_STATE_SIZE.PAGE}
+        action={
+          <Button type="primary" onClick={() => navigate(PATHS.ROOT())}>
+            {COPY.home}
           </Button>
-        </Flex>
-      </Card>
-    </TipLayout>
+        }
+      />
+    </StandalonePage>
   );
 };

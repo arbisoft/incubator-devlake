@@ -16,22 +16,26 @@
  *
  */
 
-import axios, { HttpStatusCode } from 'axios';
+import { HttpStatusCode } from 'axios';
 
-import { type OtelConnectionResponse, OTEL_CONNECTION_STATUS } from '../../api/otel/types';
+import { OTEL_STATUS, type OtelConnectionResponse, type OtelIngestionStatus } from '@/api/otel';
+import { toUserMessage } from '@/ui/utils';
+import { formatPlural } from '@/utils/text';
 
-import { formatPlural } from '../../utils/text';
-import { OTEL_ATTENTION_CHANGED_EVENT, OTEL_CONNECTION_DISPLAY_STATUS, OTEL_ERROR } from './constants';
-
-const SAFE_LIFECYCLE_MESSAGE_STATUSES: readonly number[] = [HttpStatusCode.BadRequest];
-
-type OtelErrorResponse = { message?: unknown };
-
-export type OtelAttentionState = {
-  connectionsNeedingAttention: number;
-  restartRequired: number;
-  recoveryRequired: number;
-};
+import {
+  CONNECTION_STATE,
+  APPLY_ERROR_MAP,
+  COPY,
+  CREATE_ERROR_MAP,
+  CREATE_INTENT_PARAM,
+  LIFECYCLE_ACTION,
+  LIFECYCLE_ERROR_MAP,
+  OTEL_ATTENTION_CHANGED_EVENT,
+  PROJECT_ERROR_MAP,
+  RESTART_HINT_MARKER,
+  SECONDS_PER_MINUTE,
+} from './constants';
+import type { ConnectionState, LifecycleAction, OtelAttentionState } from './types';
 
 type AttentionTarget = {
   restartRequired?: boolean;
@@ -41,6 +45,27 @@ type AttentionTarget = {
 type OtelConnectionStatusTarget = Pick<OtelConnectionResponse, 'recoveryRequired' | 'restartRequired'> & {
   connection: Pick<OtelConnectionResponse['connection'], 'status'>;
 };
+
+type ActionTarget = Pick<OtelConnectionResponse, 'recoveryRequired' | 'restartRequired'> & {
+  connection: Pick<OtelConnectionResponse['connection'], 'status'>;
+  credentials: readonly { status: string }[];
+};
+
+const hasCredentialStatus = ({ credentials }: Pick<ActionTarget, 'credentials'>, status: string) =>
+  credentials.some((credential) => credential.status === status);
+
+const ACTION_ALLOWED: Record<LifecycleAction, (target: ActionTarget) => boolean> = {
+  [LIFECYCLE_ACTION.ROTATE]: (target) =>
+    target.connection.status === OTEL_STATUS.ACTIVE &&
+    !target.recoveryRequired &&
+    !hasCredentialStatus(target, OTEL_STATUS.RETIRING),
+  [LIFECYCLE_ACTION.APPLY]: (target) => target.restartRequired,
+  [LIFECYCLE_ACTION.FINALIZE]: (target) => hasCredentialStatus(target, OTEL_STATUS.RETIRING),
+  [LIFECYCLE_ACTION.REVOKE]: (target) => target.connection.status === OTEL_STATUS.ACTIVE,
+  [LIFECYCLE_ACTION.HIDE]: (target) => target.connection.status === OTEL_STATUS.REVOKED,
+};
+
+export const isActionAllowed = (action: LifecycleAction, target: ActionTarget) => ACTION_ALLOWED[action](target);
 
 export const getAttentionState = (connections: AttentionTarget[]): OtelAttentionState =>
   connections.reduce(
@@ -52,11 +77,6 @@ export const getAttentionState = (connections: AttentionTarget[]): OtelAttention
     }),
     { connectionsNeedingAttention: 0, restartRequired: 0, recoveryRequired: 0 },
   );
-
-export const formatConnectionCount = (count: number) => formatPlural(count, 'connection');
-
-export const withVerb = (count: number, singular: string, plural: string) =>
-  `${formatConnectionCount(count)} ${count === 1 ? singular : plural}`;
 
 export const isSameAttentionState = (left?: OtelAttentionState, right?: OtelAttentionState) =>
   left?.connectionsNeedingAttention === right?.connectionsNeedingAttention &&
@@ -73,37 +93,28 @@ export const getOtelConnectionStatus = ({
   connection,
   recoveryRequired,
   restartRequired,
-}: OtelConnectionStatusTarget) => {
-  if (connection.status === OTEL_CONNECTION_STATUS.REVOKED) return OTEL_CONNECTION_DISPLAY_STATUS.REVOKED;
-  if (restartRequired || recoveryRequired) return OTEL_CONNECTION_DISPLAY_STATUS.ACTION_REQUIRED;
-  return OTEL_CONNECTION_DISPLAY_STATUS.READY;
+}: OtelConnectionStatusTarget): ConnectionState => {
+  if (connection.status === OTEL_STATUS.REVOKED) return CONNECTION_STATE.REVOKED;
+  if (restartRequired || recoveryRequired) return CONNECTION_STATE.ACTION_REQUIRED;
+  return CONNECTION_STATE.READY;
 };
 
 export const getAttentionDescription = (attention: OtelAttentionState): string => {
-  const parts: string[] = [];
+  const copy = COPY.attention;
   const details: string[] = [];
-
   if (attention.recoveryRequired > 0) {
-    details.push(`${formatPlural(attention.recoveryRequired, 'connection')} requiring credential storage recovery`);
+    details.push(copy.recoveryDetail(formatPlural(attention.recoveryRequired, 'connection')));
   }
   if (attention.restartRequired > 0) {
-    details.push(`${formatPlural(attention.restartRequired, 'connection')} with pending credential changes`);
+    details.push(copy.restartDetail(formatPlural(attention.restartRequired, 'connection')));
   }
 
-  const totalSummary = `${withVerb(
-    attention.connectionsNeedingAttention,
-    'needs attention',
-    'need attention',
-  )}: ${details.join('; ')}.`;
-  parts.push(totalSummary);
-
-  if (attention.recoveryRequired > 0) {
-    parts.push('Revoke affected connections and generate new Claude settings to restore telemetry.');
-  }
-  if (attention.restartRequired > 0) {
-    parts.push('Open Claude Code OTel to apply pending credential changes.');
-  }
-
+  const verb = attention.connectionsNeedingAttention === 1 ? copy.needsAttention : copy.needAttention;
+  const parts = [
+    copy.summary(formatPlural(attention.connectionsNeedingAttention, 'connection'), verb, details.join('; ')),
+  ];
+  if (attention.recoveryRequired > 0) parts.push(copy.recoveryAdvice);
+  if (attention.restartRequired > 0) parts.push(copy.restartAdvice);
   return parts.join(' ');
 };
 
@@ -111,42 +122,34 @@ export const notifyOtelAttentionChanged = () => {
   window.dispatchEvent(new Event(OTEL_ATTENTION_CHANGED_EVENT));
 };
 
-// Surface only explicit validation messages; unexpected backend failures remain generic.
-export const getOtelCreateError = (error: unknown) => {
-  if (axios.isAxiosError(error) && error.response?.status === HttpStatusCode.ServiceUnavailable) {
-    return OTEL_ERROR.CREDENTIAL_STORAGE;
-  }
-  if (!axios.isAxiosError<OtelErrorResponse>(error) || error.response?.status !== HttpStatusCode.BadRequest) {
-    return OTEL_ERROR.CREATE;
-  }
-
-  const serverMessage = typeof error.response.data?.message === 'string' ? error.response.data.message : '';
-  if (serverMessage.includes('a Claude Code OTel connection already exists for this team'))
-    return OTEL_ERROR.DUPLICATE_TEAM;
-
-  return serverMessage || OTEL_ERROR.CREATE;
+export const formatAge = (seconds?: number) => {
+  if (seconds === undefined) return COPY.health.none;
+  return seconds < SECONDS_PER_MINUTE
+    ? COPY.health.seconds(seconds)
+    : COPY.health.minutes(Math.floor(seconds / SECONDS_PER_MINUTE));
 };
 
-// Project placement requests accept only server-side validated project names, so 400 messages are safe to show.
-export const getOtelProjectError = (error: unknown) => {
-  if (!axios.isAxiosError<OtelErrorResponse>(error) || error.response?.status !== HttpStatusCode.BadRequest) {
-    return OTEL_ERROR.PROJECTS;
-  }
-  const serverMessage = typeof error.response.data?.message === 'string' ? error.response.data.message : '';
-  return serverMessage || OTEL_ERROR.PROJECTS;
+export const getConverterLabel = ({ converterLease }: Pick<OtelIngestionStatus, 'converterLease'>) => {
+  if (!converterLease) return COPY.health.converter.unavailable;
+  return converterLease.active ? COPY.health.converter.active : COPY.health.converter.expired;
 };
 
-// Surface only known operational responses; filesystem details and stack traces stay server-side.
-export const getOtelLifecycleError = (error: unknown) => {
-  if (!axios.isAxiosError<OtelErrorResponse>(error)) return OTEL_ERROR.LIFECYCLE;
+export const getOtelCreateError = (error: unknown) => toUserMessage(error, CREATE_ERROR_MAP, COPY.errors.create);
 
-  const { status, data } = error.response ?? {};
-  if (status === HttpStatusCode.ServiceUnavailable) return OTEL_ERROR.CREDENTIAL_STORAGE;
+export const getOtelProjectError = (error: unknown) => toUserMessage(error, PROJECT_ERROR_MAP, COPY.errors.projects);
 
-  const serverMessage = typeof data?.message === 'string' ? data.message : '';
-  if (status !== undefined && SAFE_LIFECYCLE_MESSAGE_STATUSES.includes(status)) {
-    return serverMessage || OTEL_ERROR.LIFECYCLE;
-  }
+export const getOtelLifecycleError = (error: unknown) =>
+  toUserMessage(error, LIFECYCLE_ERROR_MAP, COPY.errors.lifecycle);
 
-  return OTEL_ERROR.LIFECYCLE;
+export const getOtelApplyError = (response: Pick<OtelConnectionResponse, 'restartHint'>) => {
+  const hint = response.restartHint?.toLowerCase() ?? '';
+  let status: HttpStatusCode | undefined;
+  if (hint.includes(RESTART_HINT_MARKER.COOLDOWN)) status = HttpStatusCode.TooManyRequests;
+  else if (hint.includes(RESTART_HINT_MARKER.IN_PROGRESS)) status = HttpStatusCode.Conflict;
+  return toUserMessage({ response: { status } }, APPLY_ERROR_MAP, COPY.errors.apply);
+};
+
+export const getCreateIntent = (params: URLSearchParams) => {
+  const projectName = params.get(CREATE_INTENT_PARAM.PROJECT);
+  return params.get(CREATE_INTENT_PARAM.CREATE) === 'true' && projectName ? projectName : undefined;
 };

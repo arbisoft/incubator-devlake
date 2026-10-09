@@ -16,145 +16,88 @@
  *
  */
 
-import { useState, useMemo } from 'react';
+import { Alert, Button, Tooltip } from 'antd';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { PlusOutlined } from '@ant-design/icons';
-import { Alert, Button } from 'antd';
 
 import API from '@/api';
-import { NoData } from '@/components';
-import type { WebhookItemType } from '@/plugins/register/webhook';
-import { WebhookCreateDialog, WebhookSelectorDialog, WebHookConnection } from '@/plugins/register/webhook';
-import { IProject } from '@/types';
+import { PATHS, PROJECT_TAB } from '@/config';
+import { WebhookSelectorDialog, WebHookConnection, type WebhookItemType } from '@/plugins/register/webhook';
+import type { IBlueprint } from '@/types';
+import { SectionCard } from '@/ui';
 import { operator } from '@/utils';
 
-interface Props {
-  project: IProject;
-  onRefresh: () => void;
-}
+import { COPY } from './constants';
+import { NoticeBody, NoticeText, Stack } from './styled';
+import type { ProjectPanelProps } from './types';
+import { attachWebhooks, detachWebhook, getWebhookIds } from './utils';
 
-export const WebhooksPanel = ({ project, onRefresh }: Props) => {
-  const [type, setType] = useState<'selectExist' | 'create'>();
+export const WebhooksPanel = ({ project, onRefresh }: ProjectPanelProps) => {
+  const [selecting, setSelecting] = useState(false);
   const [operating, setOperating] = useState(false);
 
-  const webhookIds = useMemo(
-    () =>
-      project.blueprint
-        ? project.blueprint.connections.filter((cs) => cs.pluginName === 'webhook').map((cs: any) => cs.connectionId)
-        : [],
-    [project],
-  );
+  const { blueprint } = project;
+  const webhookIds = useMemo(() => getWebhookIds(blueprint), [blueprint]);
 
-  const handleCancel = () => {
-    setType(undefined);
-  };
-
-  const handleCreate = async (id: ID) => {
-    const payload = {
-      ...project.blueprint,
-      connections: [
-        ...project.blueprint.connections,
-        {
-          pluginName: 'webhook',
-          connectionId: id,
-        },
-      ],
-    };
-
-    const [success] = await operator(() => API.blueprint.update(project.blueprint.id, payload), {
+  const update = async (next: (current: IBlueprint) => IBlueprint, done: string) => {
+    if (!blueprint) return false;
+    const [success] = await operator(() => API.blueprint.update(blueprint.id, next(blueprint)), {
       setOperating,
+      formatMessage: () => done,
+      formatReason: () => COPY.webhooks.updateFailed,
     });
-
-    if (success) {
-      onRefresh();
-    }
+    if (success) onRefresh();
+    return success;
   };
+
+  const handleCreate = (id: ID) => update((current) => attachWebhooks(current, [id]), COPY.webhooks.attached);
+
+  const handleDelete = (id: ID) => update((current) => detachWebhook(current, id), COPY.webhooks.detached);
 
   const handleSelect = async (items: WebhookItemType[]) => {
-    const payload = {
-      ...project.blueprint,
-      connections: [
-        ...project.blueprint.connections,
-        ...items.map((it) => ({
-          pluginName: 'webhook',
-          connectionId: it.id,
-        })),
-      ],
-    };
-
-    const [success] = await operator(() => API.blueprint.update(project.blueprint.id, payload), {
-      setOperating,
-    });
-
-    if (success) {
-      handleCancel();
-      onRefresh();
+    const ids = items.map((item) => item.id);
+    if (await update((current) => attachWebhooks(current, ids), COPY.webhooks.attached)) {
+      setSelecting(false);
     }
   };
 
-  const handleDelete = async (id: ID) => {
-    const payload = {
-      ...project.blueprint,
-      connections: project.blueprint.connections.filter(
-        (cs) => !(cs.pluginName === 'webhook' && cs.connectionId === id),
-      ),
-    };
-
-    const [success] = await operator(() => API.blueprint.update(project.blueprint.id, payload), {
-      setOperating,
-    });
-
-    if (success) {
-      onRefresh();
-    }
-  };
+  const disabledReason = blueprint ? undefined : COPY.webhooks.noBlueprint;
 
   return (
-    <>
+    <Stack>
       <Alert
-        style={{ marginBottom: 24 }}
-        message={
-          <>
-            <div>
-              The data pushed by Webhooks will only be calculated for DORA in the next run of the Blueprint of this
-              project because DORA relies on the post-processing of "deployments," "incidents," and "pull requests"
-              triggered by running the blueprint.
-            </div>
-            <div style={{ marginTop: 16 }}>
-              To calculate DORA after receiving Webhook data immediately, you can visit the{' '}
-              <b style={{ textDecoration: 'underline' }}>
-                <Link to={`${window.location.pathname}?tab=status`}>Status tab</Link>
-              </b>{' '}
-              of the Blueprint page and click on Run Now.
-            </div>
-          </>
+        title={
+          <NoticeBody>
+            <NoticeText>{COPY.webhooks.notice.dora}</NoticeText>
+            <NoticeText>
+              {COPY.webhooks.notice.beforeLink}{' '}
+              <Link to={PATHS.PROJECT_TAB(project.name, PROJECT_TAB.BLUEPRINT)}>{COPY.webhooks.notice.link}</Link>{' '}
+              {COPY.webhooks.notice.afterLink}
+            </NoticeText>
+          </NoticeBody>
         }
       />
-      {!webhookIds.length ? (
-        <>
-          <NoData
-            text="Push `incidents` or `deployments` from your tools by incoming webhooks."
-            action={
-              <>
-                <Button type="primary" icon={<PlusOutlined />} onClick={() => setType('create')}>
-                  Add a Webhook
-                </Button>
-                <div style={{ margin: '8px 0' }}>or</div>
-                <Button type="primary" onClick={() => setType('selectExist')}>
-                  Select Existing Webhooks
-                </Button>
-              </>
-            }
-          />
-        </>
-      ) : (
-        <WebHookConnection filterIds={webhookIds} onCreateAfter={handleCreate} onDeleteAfter={handleDelete} />
-      )}
-      {/* Outside the empty-state branch so attaching the first webhook keeps the one-time key dialog open. */}
-      {type === 'create' && <WebhookCreateDialog open onCancel={handleCancel} onSubmitAfter={handleCreate} />}
-      {type === 'selectExist' && (
-        <WebhookSelectorDialog open saving={operating} onCancel={handleCancel} onSubmit={handleSelect} />
-      )}
-    </>
+      <SectionCard title={COPY.webhooks.title} count={webhookIds.length}>
+        <WebHookConnection
+          filterIds={webhookIds}
+          addDisabledReason={disabledReason}
+          extraActions={
+            <Tooltip title={disabledReason}>
+              <Button disabled={!blueprint} onClick={() => setSelecting(true)}>
+                {COPY.webhooks.selectExisting}
+              </Button>
+            </Tooltip>
+          }
+          onCreateAfter={handleCreate}
+          onDeleteAfter={handleDelete}
+        />
+      </SectionCard>
+      <WebhookSelectorDialog
+        open={selecting}
+        saving={operating}
+        onCancel={() => setSelecting(false)}
+        onSubmit={handleSelect}
+      />
+    </Stack>
   );
 };

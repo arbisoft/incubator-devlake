@@ -16,57 +16,62 @@
  *
  */
 
+import { PlusOutlined } from '@ant-design/icons';
+import { Button } from 'antd';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Card, Space, Table, Typography } from 'antd';
 
 import API from '@/api';
-import { type OtelConnectionResponse } from '@/api/otel';
+import type { OtelConnectionResponse } from '@/api/otel';
 import { PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
-
-import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?react';
+import { DataTable, SectionCard, buildListEmpty, useRefreshVersion } from '@/ui';
 
 import { getClaudeCodeOtelProjectColumns } from './claude-code-otel-columns';
-
-type ClaudeCodeOtelPanelProps = {
-  projectName: string;
-};
+import { COPY } from './constants';
+import { Note } from './styled';
+import type { ClaudeCodeOtelPanelProps } from './types';
 
 export const ClaudeCodeOtelPanel = ({ projectName }: ClaudeCodeOtelPanelProps) => {
   const navigate = useNavigate();
-  const { data, ready } = useRefreshData(() => API.otel.listForProject(projectName), [projectName]);
+  const { version, refresh } = useRefreshVersion();
+  const { data, ready, error } = useRefreshData(
+    (signal) => API.otel.listForProject(projectName, signal),
+    [projectName, version],
+  );
   const connections = data ?? [];
+  const columns = useMemo(() => getClaudeCodeOtelProjectColumns(() => navigate(PATHS.OTEL())), [navigate]);
 
   return (
-    <Card
-      title={
-        <Space>
-          <ClaudeCodeOtelIcon width={20} height={20} />
-          <span>Claude Code OTel</span>
-        </Space>
-      }
-      extra={
+    <SectionCard
+      title={COPY.otel.title}
+      count={ready ? connections.length : undefined}
+      actions={
         <Button
           type="primary"
+          icon={<PlusOutlined />}
           onClick={() => navigate(`${PATHS.OTEL()}?project=${encodeURIComponent(projectName)}&create=true`)}
         >
-          Add Claude Code OTel
+          {COPY.otel.add}
         </Button>
       }
     >
-      <Table<OtelConnectionResponse>
+      <DataTable<OtelConnectionResponse>
         rowKey={(record) => record.connection.id}
-        size="small"
-        loading={!ready}
+        ariaLabel={COPY.otel.tableLabel}
+        loading={!ready && error === undefined}
         pagination={false}
         dataSource={connections}
-        locale={{ emptyText: 'No Claude Code OTel connections are linked to this project.' }}
-        columns={getClaudeCodeOtelProjectColumns(navigate)}
+        columns={columns}
+        empty={buildListEmpty({
+          failed: error !== undefined,
+          onRetry: refresh,
+          filtered: false,
+          empty: COPY.otel.empty,
+          noResults: COPY.otel.empty,
+        })}
       />
-      <Typography.Text type="secondary">
-        This project shows telemetry configured for its linked teams. Shared teams appear in every linked project and do
-        not represent repository-level attribution.
-      </Typography.Text>
-    </Card>
+      <Note>{COPY.otel.note}</Note>
+    </SectionCard>
   );
 };

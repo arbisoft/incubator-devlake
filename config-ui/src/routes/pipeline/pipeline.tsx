@@ -16,33 +16,30 @@
  *
  */
 import { useParams } from 'react-router-dom';
-import { Card } from 'antd';
 
-import { PageHeader } from '@/components';
 import { PATHS } from '@/config';
+import { ListPage, PageHeader } from '@/ui';
+import { useDocumentTitle } from '@/ui/hooks';
 
-import { PipelineInfo, PipelineTasks } from './components';
+import { PipelinePanel } from './components';
+import { COPY } from './constants';
 
 export const Pipeline = () => {
   const { id } = useParams();
 
+  useDocumentTitle(COPY.detailTitle(id as string));
+
   return (
-    <PageHeader
-      breadcrumbs={[
-        { name: 'Advanced', path: PATHS.BLUEPRINTS() },
-        { name: 'Pipelines', path: PATHS.PIPELINES() },
-        {
-          name: id as string,
-          path: `/pipelines/${id}`,
-        },
-      ]}
-    >
-      <Card>
-        <PipelineInfo id={id as string} />
-      </Card>
-      <Card>
-        <PipelineTasks id={id as string} />
-      </Card>
-    </PageHeader>
+    <ListPage>
+      <PageHeader
+        title={COPY.detailTitle(id as string)}
+        breadcrumbs={[
+          { label: COPY.breadcrumbAdvanced, path: PATHS.BLUEPRINTS() },
+          { label: COPY.title, path: PATHS.PIPELINES() },
+          { label: id as string },
+        ]}
+      />
+      <PipelinePanel id={id as string} />
+    </ListPage>
   );
 };

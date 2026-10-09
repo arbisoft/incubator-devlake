@@ -16,120 +16,129 @@
  *
  */
 
-import { useState } from 'react';
-import { Button, Descriptions, Flex, message, Modal, Table, Tag, Typography } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import { Alert, Button, Skeleton } from 'antd';
+import { useMemo, useState } from 'react';
 
 import API from '@/api';
-import { OTEL_INGESTION_STATE, type OtelIngestionStatus, type OtelMetricBatchSummary } from '@/api/otel';
-import { formatTime } from '@/utils';
+import { OTEL_INGESTION_STATE } from '@/api/otel';
+import { useRefreshData } from '@/hooks';
+import {
+  CODE_LANGUAGE,
+  CodeBlock,
+  DEFAULT_PAGE,
+  DataTable,
+  DetailDrawer,
+  EMPTY_STATE_SIZE,
+  KeyValueList,
+  SectionCard,
+  STATUS_BADGE_VARIANT,
+  StatusBadge,
+} from '@/ui';
 
-const stateColor = {
-  [OTEL_INGESTION_STATE.HEALTHY]: 'green',
-  [OTEL_INGESTION_STATE.DEGRADED]: 'orange',
-  [OTEL_INGESTION_STATE.UNHEALTHY]: 'red',
-} as const;
+import { BATCH_PAGE_SIZE_OPTIONS, COPY, DEFAULT_BATCH_PAGE_SIZE } from './constants';
+import { getBatchColumns } from './ingestion-columns';
+import { Hint, Stack } from './styled';
+import { INGESTION_STATE_TONE } from './tones';
+import type { OtelIngestionHealthProps } from './types';
+import { formatAge, getConverterLabel } from './utils';
 
-const formatAge = (seconds?: number) => {
-  if (seconds === undefined) return 'None';
-  if (seconds < 60) return `${seconds}s`;
-  return `${Math.floor(seconds / 60)}m`;
-};
+export const OtelIngestionHealth = ({ loading, failed, status, onRetry }: OtelIngestionHealthProps) => {
+  const [batchId, setBatchId] = useState<ID>();
+  const [payloadVersion, setPayloadVersion] = useState(0);
+  const [page, setPage] = useState(DEFAULT_PAGE);
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_BATCH_PAGE_SIZE);
+  const payload = useRefreshData(
+    (signal) => (batchId === undefined ? Promise.resolve(undefined) : API.otel.metricBatchPayload(batchId, signal)),
+    [batchId, payloadVersion],
+  );
 
-const converterState = (status: OtelIngestionStatus) => {
-  if (!status.converterLease) return 'Unavailable';
-  return status.converterLease.active ? 'Active' : 'Lease expired';
-};
+  const batches = useMemo(() => status?.recentBatches ?? [], [status]);
+  const rows = useMemo(() => batches.slice((page - 1) * pageSize, page * pageSize), [batches, page, pageSize]);
+  const columns = useMemo(() => getBatchColumns((batch) => setBatchId(batch.id)), []);
 
-type OtelIngestionHealthProps = {
-  loading: boolean;
-  status?: OtelIngestionStatus;
-};
-
-export const OtelIngestionHealth = ({ loading, status }: OtelIngestionHealthProps) => {
-  const [payload, setPayload] = useState<unknown>();
-  const [payloadLoading, setPayloadLoading] = useState(false);
-  const [payloadOpen, setPayloadOpen] = useState(false);
-  const payloadText = payloadLoading ? 'Loading...' : (JSON.stringify(payload, null, 2) ?? '');
-
-  const viewPayload = async (batch: OtelMetricBatchSummary) => {
-    setPayloadLoading(true);
-    setPayloadOpen(true);
-    try {
-      setPayload(await API.otel.metricBatchPayload(batch.id));
-    } catch {
-      setPayloadOpen(false);
-      message.error('Unable to load the telemetry payload.');
-    } finally {
-      setPayloadLoading(false);
+  const metrics = status && [
+    { label: COPY.health.metrics.pending, value: status.batchCounts.pending ?? 0 },
+    { label: COPY.health.metrics.retrying, value: status.batchCounts.retryable_error ?? 0 },
+    { label: COPY.health.metrics.oldestBacklog, value: formatAge(status.oldestNonterminal?.ageSeconds) },
+    { label: COPY.health.metrics.permanentErrors, value: status.recentPermanentErrors },
+    { label: COPY.health.metrics.converter, value: getConverterLabel(status) },
+  ];
+  const healthContent = () => {
+    if (metrics) return <KeyValueList items={metrics} />;
+    if (failed) {
+      return (
+        <Alert
+          type="error"
+          showIcon
+          title={COPY.health.unavailable}
+          action={<Button onClick={onRetry}>{COPY.health.retry}</Button>}
+        />
+      );
     }
+    if (loading) return <Hint>{COPY.health.loading}</Hint>;
+    return <Hint>{COPY.health.unavailable}</Hint>;
   };
 
-  const columns: ColumnsType<OtelMetricBatchSummary> = [
-    { title: 'Received', dataIndex: 'receivedAt', render: (value) => formatTime(value) },
-    { title: 'Status', dataIndex: 'status', render: (value) => <Tag>{value}</Tag> },
-    { title: 'Datapoints', dataIndex: 'datapointCount', align: 'right' },
-    {
-      title: '',
-      width: 120,
-      render: (_, batch) => (
-        <Button size="small" onClick={() => viewPayload(batch)}>
-          View payload
-        </Button>
-      ),
-    },
-  ];
-
   return (
-    <Flex vertical gap={12} style={{ marginBottom: 16 }}>
-      <Flex justify="space-between" align="center">
-        <Typography.Title level={5} style={{ margin: 0 }}>
-          Telemetry ingestion
-        </Typography.Title>
-        {status && <Tag color={stateColor[status.state]}>{status.state}</Tag>}
-      </Flex>
-      {status ? (
-        <Descriptions bordered size="small" column={{ xs: 1, sm: 2, lg: 4 }}>
-          <Descriptions.Item label="Pending">{status.batchCounts.pending ?? 0}</Descriptions.Item>
-          <Descriptions.Item label="Retrying">{status.batchCounts.retryable_error ?? 0}</Descriptions.Item>
-          <Descriptions.Item label="Oldest backlog">
-            {formatAge(status.oldestNonterminal?.ageSeconds)}
-          </Descriptions.Item>
-          <Descriptions.Item label="Permanent errors (24h)">{status.recentPermanentErrors}</Descriptions.Item>
-          <Descriptions.Item label="Converter">{converterState(status)}</Descriptions.Item>
-        </Descriptions>
-      ) : (
-        <Typography.Text type="secondary">
-          {loading ? 'Loading ingestion status...' : 'Ingestion status is unavailable.'}
-        </Typography.Text>
-      )}
-      {status?.reasons.length ? <Typography.Text type="warning">{status.reasons.join('; ')}</Typography.Text> : null}
-      <Table<OtelMetricBatchSummary>
-        size="small"
-        rowKey="id"
-        pagination={{
-          defaultPageSize: 10,
-          pageSizeOptions: [10, 20, 50, 100],
-          showSizeChanger: true,
-        }}
-        loading={loading}
-        dataSource={status?.recentBatches ?? []}
-        columns={columns}
-      />
-      <Modal
-        title="OTLP payload"
-        open={payloadOpen}
-        footer={null}
-        width={900}
-        onCancel={() => {
-          setPayloadOpen(false);
-          setPayload(undefined);
-        }}
+    <>
+      <SectionCard
+        title={COPY.health.title}
+        actions={
+          status && (
+            <StatusBadge
+              tone={INGESTION_STATE_TONE[status.state]}
+              label={COPY.health.state[status.state]}
+              variant={STATUS_BADGE_VARIANT.DOT}
+            />
+          )
+        }
       >
-        <Typography.Paragraph copyable={{ text: payloadText }}>
-          <pre style={{ maxHeight: 520, overflow: 'auto', margin: 0 }}>{payloadText}</pre>
-        </Typography.Paragraph>
-      </Modal>
-    </Flex>
+        <Stack>
+          {healthContent()}
+          {status && status.reasons.length > 0 && (
+            <Alert
+              type={status.state === OTEL_INGESTION_STATE.UNHEALTHY ? 'error' : 'warning'}
+              showIcon
+              title={status.reasons.join('; ')}
+            />
+          )}
+        </Stack>
+      </SectionCard>
+      <SectionCard title={COPY.health.batchesTitle} count={status ? batches.length : undefined}>
+        <DataTable
+          rowKey="id"
+          ariaLabel={COPY.health.tableLabel}
+          loading={loading}
+          columns={columns}
+          dataSource={rows}
+          empty={{ ...COPY.health.emptyBatches, size: EMPTY_STATE_SIZE.SECTION }}
+          pagination={{
+            page,
+            pageSize,
+            total: batches.length,
+            pageSizeOptions: BATCH_PAGE_SIZE_OPTIONS,
+            onPageChange: setPage,
+            onPageSizeChange: (size) => {
+              setPageSize(size);
+              setPage(DEFAULT_PAGE);
+            },
+          }}
+        />
+      </SectionCard>
+      <DetailDrawer open={batchId !== undefined} title={COPY.health.payloadTitle} onClose={() => setBatchId(undefined)}>
+        {payload.error !== undefined && (
+          <Alert
+            type="error"
+            showIcon
+            title={COPY.health.payloadError}
+            action={<Button onClick={() => setPayloadVersion((version) => version + 1)}>{COPY.health.retry}</Button>}
+          />
+        )}
+        {payload.error === undefined && !payload.ready && <Skeleton active />}
+        {payload.ready && (
+          <CodeBlock value={payload.data} language={CODE_LANGUAGE.JSON} copyLabel={COPY.health.payloadCopy} />
+        )}
+      </DetailDrawer>
+    </>
   );
 };

@@ -16,55 +16,37 @@
  *
  */
 
-import { useState, useEffect, useMemo } from 'react';
-import { useLoaderData, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
-import { Layout as AntdLayout, Menu, Divider, Dropdown, Button, Tooltip } from 'antd';
-import { UserOutlined, SunOutlined, MoonOutlined, DesktopOutlined } from '@ant-design/icons';
+import { useEffect, useMemo } from 'react';
+import { Outlet, useLoaderData, useLocation } from 'react-router-dom';
 
 import API from '@/api';
-import { PageLoading, Logo, ExternalLink } from '@/components';
-import { init, selectError, selectStatus, cycleMode, selectThemeMode } from '@/features';
+import { PageLoading } from '@/components';
+import { COPYRIGHT_HIDE, PATHS } from '@/config';
+import { init, selectError, selectStatus, selectThemeMode, setMode } from '@/features';
+import { useAppDispatch, useAppSelector } from '@/hooks';
 import { OnboardCard } from '@/routes/onboard/components';
 import { OtelAttention } from '@/routes/otel/attention';
-import { useAppDispatch, useAppSelector } from '@/hooks';
+import { AccountBlock, AppShell, BrandBlock, SidebarNav, useSidebarCollapsed } from '@/ui';
 
-import { ACCESS_PATH, menuItems, menuItemsMatch, headerItems } from './config';
-import type { AccessCurrent } from '@/api/access';
-import { canManageAccess } from '@/routes/access/guard';
-import { useAccountMenu, useIdentityLinkNotification } from '@/routes/access/use-account-menu';
-
-const themeIcon = {
-  light: <SunOutlined />,
-  dark: <MoonOutlined />,
-  system: <DesktopOutlined />,
-} as const;
-
-const themeLabel = {
-  light: 'Light theme',
-  dark: 'Dark theme',
-  system: 'Follow system',
-} as const;
-
-const { Sider, Header, Content, Footer } = AntdLayout;
-
-const brandName = import.meta.env.DEVLAKE_BRAND_NAME ?? 'DevLake';
+import { COPY } from './constants';
+import { getNavItems } from './nav';
+import { Version } from './styled';
+import type { LayoutData } from './types';
+import { useAccountMenu, useIdentityLinkNotification } from './use-account-menu';
+import { getAccountLabels } from './utils';
 
 export const Layout = () => {
-  const [openKeys, setOpenKeys] = useState<string[]>([]);
-  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  const { version, plugins, user, access } = useLoaderData() as LayoutData;
+  const [collapsed, setCollapsed] = useSidebarCollapsed();
+  const { pathname } = useLocation();
 
-  const { version, plugins, user, access } = useLoaderData() as {
-    version: string;
-    plugins: string[];
-    user: { authenticated: boolean; name: string; email: string; authenticationMethod: 'local' | 'oidc' | '' } | null;
-    access: AccessCurrent | null;
-  };
+  const dispatch = useAppDispatch();
+  const status = useAppSelector(selectStatus);
+  const error = useAppSelector(selectError);
+  const themeMode = useAppSelector(selectThemeMode);
 
-  const visibleMenuItems = useMemo(
-    () => menuItems.filter((item) => item.key !== ACCESS_PATH || canManageAccess(access)),
-    [access],
-  );
+  const navItems = useMemo(() => getNavItems({ access, copyrightHide: COPYRIGHT_HIDE }), [access]);
+  const { name, secondary } = getAccountLabels(user, access);
 
   const handleLogout = async () => {
     try {
@@ -73,147 +55,66 @@ export const Layout = () => {
         window.location.href = res.logoutUrl;
         return;
       }
-    } catch (e) {
+    } catch {
       // fall through to /login regardless
     }
-    window.location.href = '/login';
+    window.location.href = PATHS.LOGIN();
   };
 
-  const { accountMenuItems, loadLinkableProviders } = useAccountMenu({ user: user ?? undefined, access, handleLogout });
+  const { accountMenuItems, loadLinkableProviders } = useAccountMenu({
+    version,
+    user,
+    access,
+    themeMode,
+    onSelectTheme: (mode) => dispatch(setMode(mode)),
+    handleLogout,
+  });
   useIdentityLinkNotification();
-
-  const navigate = useNavigate();
-  const { pathname } = useLocation();
-
-  const dispatch = useAppDispatch();
-  const status = useAppSelector(selectStatus);
-  const error = useAppSelector(selectError);
-  const themeMode = useAppSelector(selectThemeMode);
 
   useEffect(() => {
     dispatch(init(plugins));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the loader re-runs on search changes, but plugins init once per mount
   }, []);
-
-  useEffect(() => {
-    const curMenuItem = menuItemsMatch[pathname];
-    const parentKey = curMenuItem?.parentKey;
-    if (parentKey) {
-      setOpenKeys([parentKey]);
-    }
-  }, []);
-
-  useEffect(() => {
-    const selectedKeys = pathname.split('/').reduce((acc, cur, i, arr) => {
-      if (i === 0) {
-        acc.push('/');
-        return acc;
-      } else {
-        acc.push(`${arr.slice(0, i + 1).join('/')}`);
-        return acc;
-      }
-    }, [] as string[]);
-    setSelectedKeys(selectedKeys);
-  }, [pathname]);
-
-  const title = useMemo(() => {
-    const curMenuItem = menuItemsMatch[pathname];
-    return curMenuItem?.label ?? '';
-  }, [pathname]);
 
   if (['idle', 'loading'].includes(status)) {
     return <PageLoading />;
   }
 
   if (status === 'failed') {
-    throw error.message;
+    throw error?.message;
   }
 
   return (
-    <AntdLayout style={{ height: '100%', overflow: 'hidden' }}>
-      <Helmet>
-        <title>
-          {title ? `${title} - ` : ''}
-          {brandName}
-        </title>
-      </Helmet>
-      <Sider>
-        {import.meta.env.DEVLAKE_TITLE_CUSTOM ? (
-          <h2 style={{ margin: '36px 0', textAlign: 'center', color: '#fff' }}>
-            {import.meta.env.DEVLAKE_TITLE_CUSTOM}
-          </h2>
-        ) : (
-          <Logo style={{ padding: 24 }} />
-        )}
-        <Menu
-          mode="inline"
-          theme="dark"
-          items={visibleMenuItems}
-          openKeys={openKeys}
-          selectedKeys={selectedKeys}
-          onClick={({ key }) => navigate(key)}
-          onOpenChange={(keys) => setOpenKeys(keys)}
-        />
-        <div style={{ position: 'absolute', right: 0, bottom: 20, left: 0, color: '#fff', textAlign: 'center' }}>
-          {version}
-        </div>
-      </Sider>
-      <AntdLayout>
-        <Header
-          style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            alignItems: 'center',
-            padding: '0 24px',
-            height: 50,
-            background: 'transparent',
-          }}
-        >
-          {headerItems
-            .filter((item) =>
-              import.meta.env.DEVLAKE_COPYRIGHT_HIDE ? !['Dashboards', 'GitHub', 'Slack'].includes(item.label) : true,
-            )
-            .map((item, i, arr) => (
-              <span key={item.label} style={{ display: 'flex', alignItems: 'center' }}>
-                <ExternalLink link={item.link} style={{ display: 'flex', alignItems: 'center' }}>
-                  {item.icon}
-                  <span style={{ marginLeft: 4 }}>{item.label}</span>
-                </ExternalLink>
-                {i !== arr.length - 1 && <Divider type="vertical" />}
-              </span>
-            ))}
-          <Divider type="vertical" />
-          <Tooltip title={themeLabel[themeMode]}>
-            <Button
-              type="text"
-              aria-label={themeLabel[themeMode]}
-              icon={themeIcon[themeMode]}
-              onClick={() => dispatch(cycleMode())}
-            />
-          </Tooltip>
-          {user?.authenticated && (
+    <AppShell
+      sidebar={
+        <SidebarNav
+          items={navItems}
+          activePath={pathname}
+          collapsed={collapsed}
+          onCollapsedChange={setCollapsed}
+          header={<BrandBlock collapsed={collapsed} />}
+          footer={
             <>
-              <Divider type="vertical" />
-              <Dropdown menu={{ items: accountMenuItems }} placement="bottomRight" onOpenChange={loadLinkableProviders}>
-                <Button type="text" icon={<UserOutlined />}>
-                  {user.name || user.email || 'Account'}
-                </Button>
-              </Dropdown>
+              {!collapsed && version && <Version>{COPY.account.version(version)}</Version>}
+              <AccountBlock
+                name={name}
+                secondary={secondary}
+                collapsed={collapsed}
+                menu={accountMenuItems}
+                onOpenChange={loadLinkableProviders}
+              />
             </>
-          )}
-        </Header>
-        <Content style={{ overflowY: 'auto' }}>
-          <div style={{ padding: 24, margin: '0 auto', maxWidth: 1280 }}>
-            <OtelAttention />
-            <OnboardCard style={{ marginBottom: 32 }} />
-            <Outlet />
-          </div>
-          {!import.meta.env.DEVLAKE_COPYRIGHT_HIDE && (
-            <Footer>
-              <p style={{ textAlign: 'center' }}>Apache 2.0 License</p>
-            </Footer>
-          )}
-        </Content>
-      </AntdLayout>
-    </AntdLayout>
+          }
+        />
+      }
+      banner={
+        <>
+          <OtelAttention />
+          <OnboardCard />
+        </>
+      }
+    >
+      <Outlet />
+    </AppShell>
   );
 };

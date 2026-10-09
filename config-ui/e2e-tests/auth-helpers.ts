@@ -15,12 +15,13 @@
  * limitations under the License.
  *
  */
-import { BrowserContext } from '@playwright/test';
 import { execFileSync } from 'child_process';
 import path from 'path';
 
-import { APP_URL, REPO_ROOT, requireEnv } from './support/env';
+import { BrowserContext } from '@playwright/test';
+
 import { dbDsn } from './support/db';
+import { APP_URL, REPO_ROOT, requireEnv } from './support/env';
 
 const CSRF_TOKEN = 'e2e-csrf-token';
 
