@@ -42,6 +42,8 @@ export type ProjectPayload = Pick<IProject, 'name' | 'description' | 'metrics'>;
 
 export type ProjectPanelProps = { project: IProject; onRefresh: () => void };
 
+export type ReadinessCardProps = { projectName: string };
+
 export type SettingOptionProps = {
   label: string;
   description: string;

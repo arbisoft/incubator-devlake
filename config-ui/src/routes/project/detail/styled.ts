@@ -132,3 +132,89 @@ export const Note = styled.p`
   margin: ${({ theme }) => theme.space.md}px 0 0;
   color: ${({ theme }) => theme.colors.textSecondary};
 `;
+
+export const ReadinessSummary = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+`;
+
+export const SummaryMain = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.sm}px;
+`;
+
+export const ReadinessPercent = styled.span`
+  ${textStyle('h2')}
+  color: ${({ theme }) => theme.colors.text};
+`;
+
+export const SummaryCount = styled.span`
+  ${textStyle('caption')}
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
+
+export const SignalList = styled.ul`
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid ${({ theme }) => theme.colors.borderSubtle};
+  border-radius: ${({ theme }) => theme.radius.sm}px;
+`;
+
+export const SignalRow = styled.li`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.sm}px;
+  padding: ${({ theme }) => theme.space.sm}px ${({ theme }) => theme.space.md}px;
+
+  & + & {
+    border-top: 1px solid ${({ theme }) => theme.colors.borderSubtle};
+  }
+`;
+
+export const SignalCopy = styled.div`
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+`;
+
+export const SignalName = styled.span`
+  ${textStyle('bodyMedium')}
+  color: ${({ theme }) => theme.colors.text};
+`;
+
+export const SignalDescription = styled.span`
+  ${textStyle('caption')}
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
+
+export const SignalAside = styled.div`
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.sm}px;
+`;
+
+export const SignalNote = styled.span`
+  ${textStyle('caption')}
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
+
+export const SourceTags = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: ${({ theme }) => theme.space.xs}px;
+`;
+
+export const ReadinessNote = styled.p`
+  ${textStyle('caption')}
+  margin: ${({ theme }) => theme.space.md}px 0 0;
+  padding: ${({ theme }) => theme.space.sm}px ${({ theme }) => theme.space.md}px;
+  color: ${({ theme }) => theme.colors.warningText};
+  background: ${({ theme }) => theme.colors.warningBg};
+  border-radius: ${({ theme }) => theme.radius.lg}px;
+`;

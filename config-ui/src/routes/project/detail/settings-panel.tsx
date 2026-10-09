@@ -31,6 +31,7 @@ import { operator } from '@/utils';
 
 import { COPY, DEFAULT_PR_ISSUE_REGEXP, DELETE_ERROR_MAP, SAVE_ERROR_MAP } from './constants';
 import { DeleteProjectModal } from './delete-project-modal';
+import { ReadinessCard } from './readiness-card';
 import { RegexHelp } from './regex-help';
 import { SettingOption } from './setting-option';
 import { FieldBox, Fields, Footer, Stack } from './styled';
@@ -149,6 +150,7 @@ export const SettingsPanel = ({ project, onRefresh }: ProjectPanelProps) => {
           </Footer>
         </Fields>
       </SectionCard>
+      <ReadinessCard projectName={project.name} />
       <DeleteProjectModal
         open={deleting}
         name={project.name}

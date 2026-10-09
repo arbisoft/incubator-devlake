@@ -105,6 +105,16 @@ export const COPY = {
         'This project is the final placement for an active Claude Code OTel connection. Revoke that connection before deleting the project.',
     },
   },
+  readiness: {
+    description: 'Whether this project has the data DevLake needs for its core dashboards.',
+    listLabel: 'Readiness signals',
+    note: 'Readiness counts data DevLake has collected. It changes after a blueprint run collects new data. A project needs all three signals to reach 100%.',
+    loadFailed: 'The readiness report could not be loaded.',
+    empty: {
+      title: 'No readiness data yet',
+      description: 'This project is not in the readiness report yet.',
+    },
+  },
   tabs: {
     [PROJECT_TAB.BLUEPRINT]: 'Blueprint',
     [PROJECT_TAB.WEBHOOKS]: 'Webhooks',
