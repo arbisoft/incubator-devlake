@@ -150,6 +150,13 @@
       "skips": 0,
       "fixmes": 0
     },
+    "projects/project-readiness.spec.ts": {
+      "tests": 6,
+      "expects": 24,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
     "projects/project-rename.spec.ts": {
       "tests": 1,
       "expects": 7,

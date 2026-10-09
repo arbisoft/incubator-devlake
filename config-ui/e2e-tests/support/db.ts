@@ -157,3 +157,46 @@ export function deletePipelinesNamedLike(prefix: string): void {
     DELETE FROM _devlake_pipelines WHERE name LIKE '${pattern}';
   `);
 }
+
+export interface ReadinessSeed {
+  boardId: string;
+  repoId: string;
+}
+
+// Identifiers of the collected-data rows a readiness spec seeds; every id embeds the token so cleanup can find it.
+export const readinessSeedIds = (token: string): ReadinessSeed => ({
+  boardId: `jira:${token}-board`,
+  repoId: `github:${token}-repo`,
+});
+
+// Gives the project a Jira board with one issue and a GitHub repo with one pull request, the minimum the readiness report counts as collected.
+export function seedProjectCollectedData(projectName: string, { boardId, repoId }: ReadinessSeed): void {
+  const project = projectName.replace(/'/g, "''");
+  runSql(`
+    INSERT INTO boards (id) VALUES ('${boardId}');
+    INSERT INTO board_issues (board_id, issue_id) VALUES ('${boardId}', '${boardId}-issue');
+    INSERT INTO repos (id) VALUES ('${repoId}');
+    INSERT INTO pull_requests (id, base_repo_id) VALUES ('${repoId}-pr', '${repoId}');
+    INSERT INTO project_mapping (project_name, \`table\`, row_id) VALUES ('${project}', 'boards', '${boardId}'), ('${project}', 'repos', '${repoId}');
+  `);
+}
+
+// One OTel activity row for a connection, which counts as AI data for every project that connection is placed under.
+export function seedOtelActivity(token: string, connectionId: number): void {
+  runSql(
+    `INSERT INTO ai_activities (id, provider, source_type, source_connection_id) VALUES ('${token}-ai', 'claude', 'otel', ${connectionId});`,
+  );
+}
+
+// Removes every row seeded for the token, whether or not the test that created it passed.
+export function deleteReadinessSeed(token: string): void {
+  const like = `%${token}%`;
+  runSql(`
+    DELETE FROM project_mapping WHERE row_id LIKE '${like}';
+    DELETE FROM board_issues WHERE board_id LIKE '${like}';
+    DELETE FROM boards WHERE id LIKE '${like}';
+    DELETE FROM pull_requests WHERE id LIKE '${like}';
+    DELETE FROM repos WHERE id LIKE '${like}';
+    DELETE FROM ai_activities WHERE id LIKE '${like}';
+  `);
+}

@@ -20,6 +20,7 @@ import { Locator } from '@playwright/test';
 import { PROJECT_DETAIL_COPY as COPY, WEBHOOK_COPY } from '../app-copy';
 
 import { BasePage, tableRow } from './common';
+import { ProjectReadinessCard } from './project-readiness';
 
 const SETTINGS_COPY = COPY.settings;
 
@@ -29,6 +30,10 @@ export class ProjectSettings extends BasePage {
     private readonly projectName: string,
   ) {
     super(page);
+  }
+
+  get readinessCard(): ProjectReadinessCard {
+    return new ProjectReadinessCard(this.page);
   }
 
   get nameInput(): Locator {

@@ -22,6 +22,9 @@ export const TEST_ACTION_HEADER = 'x-e2e-test-action';
 // Placeholder written in place of a masked body value; the key stays so a dropped field still shows in a golden.
 export const GOLDEN_MASK = '<masked>';
 
+// Display name of the webhook plugin in connection lists; the plugin's config component cannot be imported outside the browser build.
+export const WEBHOOK_PLUGIN_LABEL = 'Webhook';
+
 // Body and query keys (case-insensitive) whose values change per run or are secrets.
 export const GOLDEN_MASKED_KEYS: readonly string[] = [
   'id',

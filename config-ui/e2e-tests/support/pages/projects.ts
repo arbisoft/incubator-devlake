@@ -22,6 +22,7 @@ import { BLUEPRINT_VIEW, COMMON_COPY, PROJECT_DETAIL_COPY, PROJECT_HOME_COPY as 
 import { BlueprintViews, type BlueprintViewKey } from './blueprint-detail';
 import { BasePage, Screen, urlEndingWith, firstCellTexts, paginationPage, pipelineRowById, tableRow } from './common';
 import { PATHS, PROJECT_TABS, ProjectTabKey } from './paths';
+import { ProjectsReadiness } from './project-readiness';
 import { ProjectOtel, ProjectSettings, ProjectWebhooks } from './project-tab-panels';
 
 const PROJECT_TAB_LABEL = PROJECT_DETAIL_COPY.tabs;
@@ -74,6 +75,10 @@ export class ProjectsPage extends BasePage implements Screen {
 
   projectRow(name: string): Locator {
     return this.row(name);
+  }
+
+  get readiness(): ProjectsReadiness {
+    return new ProjectsReadiness(this.page);
   }
 
   async openProject(name: string): Promise<void> {
