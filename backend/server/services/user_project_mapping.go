@@ -78,3 +78,26 @@ func DeleteAllMappingsForUser(userLogin string) errors.Error {
 	}
 	return nil
 }
+
+// GetUserProjectMappingsForLogins returns the mappings of the given logins in one query, ordered by login then project.
+func GetUserProjectMappingsForLogins(userLogins []string) ([]*models.UserProjectMapping, errors.Error) {
+	mappings := make([]*models.UserProjectMapping, 0)
+	if len(userLogins) == 0 {
+		return mappings, nil
+	}
+	err := db.All(&mappings, dal.Where("user_login IN ?", userLogins), dal.Orderby("user_login, project_name"))
+	if err != nil {
+		return nil, errors.Default.Wrap(err, "error getting user project mappings for logins")
+	}
+	return mappings, nil
+}
+
+// GetUserProjectMappingLogins returns the distinct logins that have at least one mapping.
+func GetUserProjectMappingLogins() ([]string, errors.Error) {
+	var logins []string
+	err := db.Pluck("user_login", &logins, dal.From(&models.UserProjectMapping{}), dal.Groupby("user_login"), dal.Orderby("user_login"))
+	if err != nil {
+		return nil, errors.Default.Wrap(err, "error getting user project mapping logins")
+	}
+	return logins, nil
+}
