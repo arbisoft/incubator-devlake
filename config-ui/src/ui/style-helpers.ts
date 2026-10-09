@@ -72,19 +72,27 @@ export const toneColors = ({ colors }: DefaultTheme): Record<StatusTone, ToneCol
 });
 
 // Keeps a modal inside the viewport: the header and footer stay put and the body scrolls.
-export const scrollableModal = ({ theme }: { theme: DefaultTheme }) => css`
-  .ant-modal-container {
-    display: flex;
-    flex-direction: column;
-    max-height: calc(100vh - ${theme.layout.modalViewportMargin * 2}px);
-  }
+export const scrollableModal = ({ theme }: { theme: DefaultTheme }) => {
+  // Keep the full shared focus outline visible while preserving the modal's content box.
+  const focusRingGutter = theme.layout.focusRingWidth * 2;
 
-  .ant-modal-body {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-  }
-`;
+  return css`
+    .ant-modal-container {
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100vh - ${theme.layout.modalViewportMargin * 2}px);
+    }
+
+    .ant-modal-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      margin: -${focusRingGutter}px;
+      padding: ${focusRingGutter}px;
+      scroll-padding: ${focusRingGutter}px;
+      overflow-y: auto;
+    }
+  `;
+};
 
 export const paddedCardSurface = ({ theme }: { theme: DefaultTheme }) => css`
   padding: ${theme.space.lg}px;
