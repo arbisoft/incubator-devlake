@@ -2,27 +2,7 @@
   "apiVersion": "dashboard.grafana.app/v2",
   "kind": "Dashboard",
   "metadata": {
-    "name": "ai_raw_volume",
-    "namespace": "default",
-    "uid": "rAzlLc91JHOBnIWr478W80D0DfL1puVcOiHbwO886okX",
-    "resourceVersion": "1791467711084018",
-    "generation": 21,
-    "creationTimestamp": "2026-09-28T14:14:56Z",
-    "labels": {
-      "grafana.app/deprecatedInternalID": "200"
-    },
-    "annotations": {
-      "grafana.app/createdBy": "provisioning:",
-      "grafana.app/managedBy": "classic-file-provisioning",
-      "grafana.app/managerAllowsEdits": "true",
-      "grafana.app/managerId": "My Dashboard",
-      "grafana.app/saved-from-ui": "Grafana v13.2.2 (1bea008f7e)",
-      "grafana.app/sourceChecksum": "8267506e3cd42e79de571fea17ee5538",
-      "grafana.app/sourcePath": "AI Impact/AI Raw Volume & Delivery Outcomes.json",
-      "grafana.app/sourceTimestamp": "1790675986",
-      "grafana.app/updatedBy": "user:efuxtnbz6jnk0f",
-      "grafana.app/updatedTimestamp": "2026-10-08T13:55:11Z"
-    }
+    "name": "ai_raw_volume"
   },
   "spec": {
     "annotations": [
@@ -393,7 +373,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT SUM(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens) AS \"Tokens Burned\"\nFROM ai_model_usages amu\nWHERE ('__all' IN ($developer_id) OR amu.user_email IN ($developer_id))\nAND source_connection_id IN (\n  SELECT cp.connection_id \n  FROM _tool_claude_code_otel_connection_projects cp\n  INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n  WHERE cp.project_name IN (\n    SELECT upm_g.project_name \n    FROM user_project_mapping upm_g \n    WHERE upm_g.user_login = ${__user.login:sqlstring} \n      AND upm_g.project_name IN ($project)\n    ) \n    AND (c.team_slug REGEXP '^(${otel_teams:regex})$' \n    AND c.team_slug IN (\n      SELECT c_g.team_slug \n      FROM _tool_claude_code_otel_connections c_g \n      JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id \n      JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name \n      WHERE upm_g.user_login = ${__user.login:sqlstring}\n      )\n    )\n)\nAND $__timeFilter(date)",
+                        "rawSql": "SELECT SUM(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens) AS \"Tokens Burned\"\nFROM ai_model_usages amu\nWHERE ('__all' IN ($developer_id) OR amu.user_email IN ($developer_id) OR amu.account_id IN ($developer_id))\nAND source_connection_id IN (\n  SELECT cp.connection_id \n  FROM _tool_claude_code_otel_connection_projects cp\n  INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n  WHERE cp.project_name IN (\n    SELECT upm_g.project_name \n    FROM user_project_mapping upm_g \n    WHERE upm_g.user_login = ${__user.login:sqlstring} \n      AND upm_g.project_name IN ($project)\n    ) \n    AND (c.team_slug REGEXP '^(${otel_teams:regex})$' \n    AND c.team_slug IN (\n      SELECT c_g.team_slug \n      FROM _tool_claude_code_otel_connections c_g \n      JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id \n      JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name \n      WHERE upm_g.user_login = ${__user.login:sqlstring}\n      )\n    )\n)\nAND $__timeFilter(date)",
                         "sql": {
                           "columns": [
                             {
@@ -489,7 +469,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT SUM(num_sessions) AS \"Sessions\"\nFROM ai_activities aa\nWHERE record_kind = 'canonical_activity'\n  AND ('__all' IN ($developer_id) OR aa.user_email IN ($developer_id))\n  AND source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  )\n  AND $__timeFilter(date)",
+                        "rawSql": "SELECT SUM(num_sessions) AS \"Sessions\"\nFROM ai_activities aa\nWHERE record_kind = 'canonical_activity'\n  AND ('__all' IN ($developer_id) OR aa.user_email IN ($developer_id) OR aa.account_id IN ($developer_id))\n  AND source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  )\n  AND $__timeFilter(date)",
                         "sql": {
                           "columns": [
                             {
@@ -680,7 +660,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT SUM(lines_added) AS \"Lines Added\"\nFROM ai_activities aa\nWHERE record_kind = 'canonical_activity'\n  AND ('__all' IN ($developer_id) OR aa.user_email IN ($developer_id))\n  AND source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  )\n  AND $__timeFilter(date)",
+                        "rawSql": "SELECT SUM(lines_added) AS \"Lines Added\"\nFROM ai_activities aa\nWHERE record_kind = 'canonical_activity'\n  AND ('__all' IN ($developer_id) OR aa.user_email IN ($developer_id) OR aa.account_id IN ($developer_id))\n  AND source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  )\n  AND $__timeFilter(date)",
                         "sql": {
                           "columns": [
                             {
@@ -776,7 +756,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT SUM(lines_removed) AS \"Lines Removed\"\nFROM ai_activities aa\nWHERE record_kind = 'canonical_activity'\n  AND ('__all' IN ($developer_id) OR aa.user_email IN ($developer_id))\n  AND source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  )\n  AND $__timeFilter(date)",
+                        "rawSql": "SELECT SUM(lines_removed) AS \"Lines Removed\"\nFROM ai_activities aa\nWHERE record_kind = 'canonical_activity'\n  AND ('__all' IN ($developer_id) OR aa.user_email IN ($developer_id) OR aa.account_id IN ($developer_id))\n  AND source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  )\n  AND $__timeFilter(date)",
                         "sql": {
                           "columns": [
                             {

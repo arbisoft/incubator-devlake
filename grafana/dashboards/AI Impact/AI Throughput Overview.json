@@ -1,1024 +1,1621 @@
 {
-  "annotations": {
-    "list": [
-      {
-        "builtIn": 1,
-        "datasource": {
-          "type": "datasource",
-          "uid": "grafana"
-        },
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "type": "dashboard"
-      }
-    ]
+  "apiVersion": "dashboard.grafana.app/v2",
+  "kind": "Dashboard",
+  "metadata": {
+    "name": "ai_throughput_overview"
   },
-  "editable": true,
-  "fiscalYearStartMonth": 0,
-  "graphTooltip": 0,
-  "id": null,
-  "links": [],
-  "panels": [
-    {
-      "datasource": null,
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      },
-      "id": 1,
-      "options": {
-        "code": {
-          "language": "plaintext",
-          "showLineNumbers": false,
-          "showMiniMap": false
-        },
-        "content": "**How to read this dashboard**\n\n- **Escaped Defect Rate** counts issues whose normalized `type` is `BUG`/`INCIDENT`, or whose `original_type` contains `bug`, `defect`, or `incident`. The SQL does not inspect issue labels, so labels alone do not qualify; projects without matching type data can show zero even when defects exist. Check the \"Defect-Rate Coverage by Project\" table below before interpreting the rate.\n- **Contributors** is deduplicated by `accounts.full_name` (falling back to the PR author name when no account matches), because one engineer can accumulate several `accounts` rows as their git client runs from different machines and IPs. This narrows the overcount but doesn't fully collapse it — see the \"Distinct-Account Sanity Check\" table below for the residual gap.\n- **AI Spend and the AI side of Cost per Merged PR are Claude Code OTel-only** (`ai_model_usages`) and use both the Project and Claude Code OTel Teams filters. The PR denominator uses the Project filter only; the team filter does not narrow PRs.",
-        "mode": "markdown"
-      },
-      "pluginVersion": "11.0.0",
-      "title": "About this dashboard",
-      "type": "text"
-    },
-    {
-      "datasource": "mysql",
-      "description": "Total estimated AI spend, Claude Code OTel-only, scoped to the selected project(s)/team(s) (`SUM(ai_model_usages.estimated_cost_usd)`).",
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "currencyUSD"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 0,
-        "y": 8
-      },
-      "id": 2,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "11.0.0",
-      "targets": [
-        {
-          "datasource": "mysql",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT SUM(estimated_cost_usd) AS \"AI Spend\"\nFROM ai_model_usages\nWHERE ('__all' IN ($developer_id) OR user_email IN ($developer_id)) AND source_connection_id IN (\n  SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n  INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n  WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n)\nAND $__timeFilter(date)",
-          "refId": "A"
-        }
-      ],
-      "title": "AI Spend",
-      "type": "stat"
-    },
-    {
-      "datasource": "mysql",
-      "description": "Merged pull requests, scoped to the selected project(s).",
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 8
-      },
-      "id": 3,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "11.0.0",
-      "targets": [
-        {
-          "datasource": "mysql",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) AS \"PRs Merged\"\nFROM project_pr_metrics ppm\nJOIN pull_requests pr ON pr.id = ppm.id\nWHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer_id) OR pr.author_id IN ($developer_id) OR pr.author_id IN (SELECT a_dev.id FROM accounts a_dev WHERE a_dev.email IN ($developer_id)))",
-          "refId": "A"
-        }
-      ],
-      "title": "PRs Merged",
-      "type": "stat"
-    },
-    {
-      "datasource": "mysql",
-      "description": "Counts resolved domain issues linked to boards in the selected project(s), where `type` is not BUG/INCIDENT/EPIC and `original_type` does not contain bug/defect/incident/epic. This query does not inspect labels, and SQL's `type NOT IN` also excludes rows with a NULL type. It uses `resolution_date` as the completion signal rather than tracker-specific status strings; the result therefore includes any remaining issue types, not only Jira Tasks/Sub-tasks.",
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "purple",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 12,
-        "y": 8
-      },
-      "id": 4,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "11.0.0",
-      "targets": [
-        {
-          "datasource": "mysql",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) AS \"Tasks Done\"\nFROM issues i\nJOIN board_issues bi ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\nWHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n  AND i.type NOT IN ('BUG','INCIDENT','EPIC') AND LOWER(COALESCE(i.original_type,'')) NOT REGEXP 'bug|defect|incident|epic'\n  AND i.resolution_date IS NOT NULL\n  AND $__timeFilter(i.resolution_date) AND ('__all' IN ($developer_id) OR i.assignee_id IN ($developer_id) OR i.assignee_id IN (SELECT a_dev.id FROM accounts a_dev WHERE a_dev.email IN ($developer_id)))",
-          "refId": "A"
-        }
-      ],
-      "title": "Tasks Done",
-      "type": "stat"
-    },
-    {
-      "datasource": "mysql",
-      "description": "Distinct pull request authors, scoped to the selected project(s) and deduplicated by `accounts.full_name` (falling back to the PR author name when no account matches). This narrows but doesn't fully eliminate the overcount from fragmented accounts — see the Distinct-Account Sanity Check table below.",
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "orange",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 8
-      },
-      "id": 5,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "11.0.0",
-      "targets": [
-        {
-          "datasource": "mysql",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT COUNT(DISTINCT COALESCE(NULLIF(a.full_name,''), pr.author_name)) AS \"Contributors\"\nFROM project_pr_metrics ppm\nJOIN pull_requests pr ON pr.id = ppm.id\nLEFT JOIN accounts a ON a.id = pr.author_id\nWHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer_id) OR pr.author_id IN ($developer_id) OR pr.author_id IN (SELECT a_dev.id FROM accounts a_dev WHERE a_dev.email IN ($developer_id)))",
-          "refId": "A"
-        }
-      ],
-      "title": "Contributors",
-      "type": "stat"
-    },
-    {
-      "datasource": "mysql",
-      "description": "PRs Merged ÷ Contributors, both scoped to the selected project(s).",
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 0,
-        "y": 12
-      },
-      "id": 6,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "11.0.0",
-      "targets": [
-        {
-          "datasource": "mysql",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT ROUND(prs.n / NULLIF(c.n,0), 1) AS \"PRs per Contributor\"\nFROM\n  (SELECT COUNT(*) n FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id=ppm.id WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer_id) OR pr.author_id IN ($developer_id) OR pr.author_id IN (SELECT a_dev.id FROM accounts a_dev WHERE a_dev.email IN ($developer_id)))) prs,\n  (SELECT COUNT(DISTINCT COALESCE(NULLIF(a.full_name,''), pr.author_name)) n FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id=ppm.id LEFT JOIN accounts a ON a.id=pr.author_id WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer_id) OR pr.author_id IN ($developer_id) OR pr.author_id IN (SELECT a_dev.id FROM accounts a_dev WHERE a_dev.email IN ($developer_id)))) c",
-          "refId": "A"
-        }
-      ],
-      "title": "PRs per Contributor",
-      "type": "stat"
-    },
-    {
-      "datasource": "mysql",
-      "description": "Resolved non-defect, non-epic issues per distinct PR author: the numerator uses the selected project(s)' board-linked issues and `resolution_date`, while the denominator uses merged-PR contributors. Issues are excluded by normalized `type` and `original_type` text (not labels); NULL `type` rows are excluded by SQL. Since these are different populations, treat the ratio as directional.",
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "purple",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 12
-      },
-      "id": 7,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "11.0.0",
-      "targets": [
-        {
-          "datasource": "mysql",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT ROUND(t.n / NULLIF(c.n,0), 1) AS \"Tasks per Contributor\"\nFROM\n  (SELECT COUNT(*) n FROM issues i JOIN board_issues bi ON bi.issue_id=i.id JOIN project_mapping pm ON pm.row_id=bi.board_id AND pm.`table`='boards' WHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND i.type NOT IN ('BUG','INCIDENT','EPIC') AND LOWER(COALESCE(i.original_type,'')) NOT REGEXP 'bug|defect|incident|epic' AND i.resolution_date IS NOT NULL AND $__timeFilter(i.resolution_date) AND ('__all' IN ($developer_id) OR i.assignee_id IN ($developer_id) OR i.assignee_id IN (SELECT a_dev.id FROM accounts a_dev WHERE a_dev.email IN ($developer_id)))) t,\n  (SELECT COUNT(DISTINCT COALESCE(NULLIF(a.full_name,''), pr.author_name)) n FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id=ppm.id LEFT JOIN accounts a ON a.id=pr.author_id WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer_id) OR pr.author_id IN ($developer_id) OR pr.author_id IN (SELECT a_dev.id FROM accounts a_dev WHERE a_dev.email IN ($developer_id)))) c",
-          "refId": "A"
-        }
-      ],
-      "title": "Tasks per Contributor",
-      "type": "stat"
-    },
-    {
-      "datasource": "mysql",
-      "description": "Counts distinct board-linked issues whose normalized `type` is BUG/INCIDENT or whose `original_type` contains bug/defect/incident, created within 14 days after a successful deployment whose environment contains `prod` for the same project. The count is divided by all PRs merged in the selected time range for the selected project(s), then multiplied by 100; the denominator is not limited to PRs merged during each deployment's 14-day window. Labels are not queried, so label-only defects are not counted.",
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 12,
-        "y": 12
-      },
-      "id": 8,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "11.0.0",
-      "targets": [
-        {
-          "datasource": "mysql",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "WITH prod_deploys AS (\n  SELECT pm.project_name, cdc.finished_date\n  FROM cicd_deployment_commits cdc\n  JOIN project_mapping pm ON pm.row_id = cdc.cicd_scope_id AND pm.`table` = 'cicd_scopes'\n  WHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND LOWER(cdc.environment) LIKE '%prod%' AND cdc.result = 'SUCCESS' AND $__timeFilter(cdc.finished_date)\n),\ndefects AS (\n  SELECT DISTINCT i.id\n  FROM issues i\n  JOIN board_issues bi ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n  JOIN prod_deploys pd ON pd.project_name = pm.project_name\n    AND i.created_date BETWEEN pd.finished_date AND DATE_ADD(pd.finished_date, INTERVAL 14 DAY)\n  WHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (i.type IN ('BUG','INCIDENT') OR LOWER(COALESCE(i.original_type,'')) REGEXP 'bug|defect|incident') AND $__timeFilter(i.created_date)\n),\nprs AS (\n  SELECT pr.id FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(pr.merged_date)\n)\nSELECT ROUND((SELECT COUNT(*) FROM defects) * 100.0 / NULLIF((SELECT COUNT(*) FROM prs), 0), 2) AS \"Escaped Defect Rate (per 100 PRs)\"",
-          "refId": "A"
-        }
-      ],
-      "title": "Escaped Defect Rate",
-      "type": "stat"
-    },
-    {
-      "datasource": "mysql",
-      "description": "AI Spend ÷ PRs Merged, both scoped to the selected project(s)/team(s) — Claude Code OTel spend now carries a real project association, so both sides move together.",
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "currencyUSD"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 12
-      },
-      "id": 9,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "11.0.0",
-      "targets": [
-        {
-          "datasource": "mysql",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT ROUND(spend.cost / NULLIF(prs.n, 0), 2) AS \"Cost per Merged PR\"\nFROM\n  (SELECT SUM(estimated_cost_usd) AS cost FROM ai_model_usages\n   WHERE ('__all' IN ($developer_id) OR user_email IN ($developer_id)) AND source_connection_id IN (\n     SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n     INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n     WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n   )\n   AND $__timeFilter(date)) spend,\n  (SELECT COUNT(*) n FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n   WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer_id) OR pr.author_id IN ($developer_id) OR pr.author_id IN (SELECT a_dev.id FROM accounts a_dev WHERE a_dev.email IN ($developer_id)))) prs",
-          "refId": "A"
-        }
-      ],
-      "title": "Cost per Merged PR",
-      "type": "stat"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 16
-      },
-      "id": 10,
-      "panels": [],
-      "title": "Indexed Trends (Weekly)",
-      "type": "row"
-    },
-    {
-      "datasource": "mysql",
-      "description": "Weekly totals for Claude Code OTel estimated cost, merged PRs, resolved non-defect/non-epic issues, distinct name-deduplicated PR authors, and classified issues opened within 14 days after successful production deployments. Cost uses the selected Project and OTel Teams; delivery metrics use Project only. Issue classification is based on `type`/`original_type`, not labels. Each cell shows the raw weekly value plus its change from the previous available week; an upward change in escaped defects is adverse, while the arrows are not metric-aware. Weeks begin Monday.",
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
+  "spec": {
+    "annotations": [
+      {
+        "kind": "AnnotationQuery",
+        "spec": {
+          "builtIn": true,
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "query": {
+            "datasource": {
+              "name": "grafana"
             },
-            "inspect": false
+            "group": "grafana",
+            "kind": "DataQuery",
+            "spec": {},
+            "version": "v0"
+          }
+        }
+      }
+    ],
+    "cursorSync": "Off",
+    "editable": true,
+    "elements": {
+      "panel-1": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "queryOptions": {},
+              "transformations": []
+            }
           },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "AI Cost"
-            },
-            "properties": [
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
+          "description": "",
+          "id": 1,
+          "links": [],
+          "title": "About this dashboard",
+          "vizConfig": {
+            "group": "text",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
               },
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "options": {
-                      "pattern": "^(.*▲.*)$",
-                      "result": {
+              "options": {
+                "code": {
+                  "language": "plaintext",
+                  "showLineNumbers": false,
+                  "showMiniMap": false
+                },
+                "content": "**How to read this dashboard**\n\n- **Escaped Defect Rate** counts issues whose normalized `type` is `BUG`/`INCIDENT`, or whose `original_type` contains `bug`, `defect`, or `incident`. The SQL does not inspect issue labels, so labels alone do not qualify; projects without matching type data can show zero even when defects exist. Check the \"Defect-Rate Coverage by Project\" table below before interpreting the rate.\n- **Contributors** is deduplicated by `accounts.full_name` (falling back to the PR author name when no account matches), because one engineer can accumulate several `accounts` rows as their git client runs from different machines and IPs. This narrows the overcount but doesn't fully collapse it — see the \"Distinct-Account Sanity Check\" table below for the residual gap.\n- **AI Spend and the AI side of Cost per Merged PR are Claude Code OTel-only** (`ai_model_usages`) and use both the Project and Claude Code OTel Teams filters. The PR denominator uses the Project filter only; the team filter does not narrow PRs.",
+                "mode": "markdown"
+              }
+            },
+            "version": "13.2.2"
+          }
+        }
+      },
+      "panel-11": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "group": "mysql",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "WITH weekly_cost AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week, SUM(estimated_cost_usd) AS v\n  FROM ai_model_usages\n  WHERE ('__all' IN ($developer_id) OR user_email IN ($developer_id) OR account_id IN ($developer_id)) AND source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  )\n  AND $__timeFilter(date)\n  GROUP BY 1\n),\nweekly_prs AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') AS week, COUNT(*) AS v\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id LEFT JOIN accounts a ON a.id = pr.author_id\n  WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer_id) OR a.email IN ($developer_id) OR a.id IN ($developer_id)) GROUP BY 1\n),\nweekly_tasks AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(i.resolution_date), INTERVAL WEEKDAY(i.resolution_date) DAY), '%Y-%m-%d') AS week, COUNT(*) AS v\n  FROM issues i JOIN board_issues bi ON bi.issue_id = i.id LEFT JOIN accounts a1 ON a1.id = i.creator_id LEFT JOIN accounts a2 ON a2.id = i.assignee_id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n  WHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND i.type NOT IN ('BUG','INCIDENT','EPIC') AND LOWER(COALESCE(i.original_type,'')) NOT REGEXP 'bug|defect|incident|epic' AND i.resolution_date IS NOT NULL AND $__timeFilter(i.resolution_date) AND ('__all' IN ($developer_id) OR a1.email IN ($developer_id) OR a1.id IN ($developer_id) OR a2.email IN ($developer_id) OR a2.id IN ($developer_id))\n  GROUP BY 1\n),\nweekly_contrib AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') AS week, COUNT(DISTINCT COALESCE(NULLIF(a.full_name,''), pr.author_name)) AS v\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id LEFT JOIN accounts a ON a.id = pr.author_id\n  WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer_id) OR a.email IN ($developer_id) OR a.id IN ($developer_id)) GROUP BY 1\n),\nprod_deploys AS (\n  SELECT pm.project_name, cdc.finished_date\n  FROM cicd_deployment_commits cdc\n  JOIN project_mapping pm ON pm.row_id = cdc.cicd_scope_id AND pm.`table` = 'cicd_scopes'\n  WHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND LOWER(cdc.environment) LIKE '%prod%' AND cdc.result = 'SUCCESS' AND $__timeFilter(cdc.finished_date)\n),\nweekly_defects AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(i.created_date), INTERVAL WEEKDAY(i.created_date) DAY), '%Y-%m-%d') AS week, COUNT(DISTINCT i.id) AS v\n  FROM issues i\n  JOIN board_issues bi ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n  JOIN prod_deploys pd ON pd.project_name = pm.project_name\n    AND i.created_date BETWEEN pd.finished_date AND DATE_ADD(pd.finished_date, INTERVAL 14 DAY)\n  WHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (i.type IN ('BUG','INCIDENT') OR LOWER(COALESCE(i.original_type,'')) REGEXP 'bug|defect|incident') AND $__timeFilter(i.created_date)\n  GROUP BY 1\n),\nweeks AS (\n  SELECT week FROM weekly_cost UNION SELECT week FROM weekly_prs\n  UNION SELECT week FROM weekly_tasks UNION SELECT week FROM weekly_contrib\n  UNION SELECT week FROM weekly_defects\n),\nfilled AS (\n  SELECT w.week,\n    COALESCE(c.v, 0) AS cost, COALESCE(p.v, 0) AS prs, COALESCE(t.v, 0) AS tasks,\n    COALESCE(ct.v, 0) AS contrib, COALESCE(d.v, 0) AS defects\n  FROM weeks w\n  LEFT JOIN weekly_cost c ON c.week = w.week\n  LEFT JOIN weekly_prs p ON p.week = w.week\n  LEFT JOIN weekly_tasks t ON t.week = w.week\n  LEFT JOIN weekly_contrib ct ON ct.week = w.week\n  LEFT JOIN weekly_defects d ON d.week = w.week\n),\nlagged AS (\n  SELECT week, cost, prs, tasks, contrib, defects,\n    LAG(cost) OVER (ORDER BY week) AS cost_prev,\n    LAG(prs) OVER (ORDER BY week) AS prs_prev,\n    LAG(tasks) OVER (ORDER BY week) AS tasks_prev,\n    LAG(contrib) OVER (ORDER BY week) AS contrib_prev,\n    LAG(defects) OVER (ORDER BY week) AS defects_prev\n  FROM filled\n)\nSELECT week AS \"Week\",\n  CONCAT(CONCAT('$', CASE WHEN ABS(cost) >= 1000000000 THEN CONCAT(FORMAT(cost / 1000000000, 1), 'B') WHEN ABS(cost) >= 1000000 THEN CONCAT(FORMAT(cost / 1000000, 1), 'M') WHEN ABS(cost) >= 1000 THEN CONCAT(FORMAT(cost / 1000, 1), 'K') ELSE FORMAT(cost, 2) END),\n    CASE\n      WHEN cost_prev IS NULL THEN ''\n      WHEN cost_prev = 0 AND cost = 0 THEN '        ▬0.0%'\n      WHEN cost_prev = 0 THEN '        ▲ new'\n      WHEN cost > cost_prev THEN CONCAT('        ▲', ROUND(100.0*(cost-cost_prev)/cost_prev,1), '%')\n      WHEN cost < cost_prev THEN CONCAT('        ▼', ROUND(100.0*(cost_prev-cost)/cost_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"AI Cost\",\n  CONCAT(CASE WHEN ABS(prs) >= 1000000000 THEN CONCAT(FORMAT(prs / 1000000000, 1), 'B') WHEN ABS(prs) >= 1000000 THEN CONCAT(FORMAT(prs / 1000000, 1), 'M') WHEN ABS(prs) >= 1000 THEN CONCAT(FORMAT(prs / 1000, 1), 'K') ELSE FORMAT(prs, 0) END,\n    CASE\n      WHEN prs_prev IS NULL THEN ''\n      WHEN prs_prev = 0 AND prs = 0 THEN '        ▬0.0%'\n      WHEN prs_prev = 0 THEN '        ▲ new'\n      WHEN prs > prs_prev THEN CONCAT('        ▲', ROUND(100.0*(prs-prs_prev)/prs_prev,1), '%')\n      WHEN prs < prs_prev THEN CONCAT('        ▼', ROUND(100.0*(prs_prev-prs)/prs_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"PRs Merged\",\n  CONCAT(CASE WHEN ABS(tasks) >= 1000000000 THEN CONCAT(FORMAT(tasks / 1000000000, 1), 'B') WHEN ABS(tasks) >= 1000000 THEN CONCAT(FORMAT(tasks / 1000000, 1), 'M') WHEN ABS(tasks) >= 1000 THEN CONCAT(FORMAT(tasks / 1000, 1), 'K') ELSE FORMAT(tasks, 0) END,\n    CASE\n      WHEN tasks_prev IS NULL THEN ''\n      WHEN tasks_prev = 0 AND tasks = 0 THEN '        ▬0.0%'\n      WHEN tasks_prev = 0 THEN '        ▲ new'\n      WHEN tasks > tasks_prev THEN CONCAT('        ▲', ROUND(100.0*(tasks-tasks_prev)/tasks_prev,1), '%')\n      WHEN tasks < tasks_prev THEN CONCAT('        ▼', ROUND(100.0*(tasks_prev-tasks)/tasks_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"Tasks Done\",\n  CONCAT(CASE WHEN ABS(contrib) >= 1000000000 THEN CONCAT(FORMAT(contrib / 1000000000, 1), 'B') WHEN ABS(contrib) >= 1000000 THEN CONCAT(FORMAT(contrib / 1000000, 1), 'M') WHEN ABS(contrib) >= 1000 THEN CONCAT(FORMAT(contrib / 1000, 1), 'K') ELSE FORMAT(contrib, 0) END,\n    CASE\n      WHEN contrib_prev IS NULL THEN ''\n      WHEN contrib_prev = 0 AND contrib = 0 THEN '        ▬0.0%'\n      WHEN contrib_prev = 0 THEN '        ▲ new'\n      WHEN contrib > contrib_prev THEN CONCAT('        ▲', ROUND(100.0*(contrib-contrib_prev)/contrib_prev,1), '%')\n      WHEN contrib < contrib_prev THEN CONCAT('        ▼', ROUND(100.0*(contrib_prev-contrib)/contrib_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"Contributors\",\n  CONCAT(CASE WHEN ABS(defects) >= 1000000000 THEN CONCAT(FORMAT(defects / 1000000000, 1), 'B') WHEN ABS(defects) >= 1000000 THEN CONCAT(FORMAT(defects / 1000000, 1), 'M') WHEN ABS(defects) >= 1000 THEN CONCAT(FORMAT(defects / 1000, 1), 'K') ELSE FORMAT(defects, 0) END,\n    CASE\n      WHEN defects_prev IS NULL THEN ''\n      WHEN defects_prev = 0 AND defects = 0 THEN '        ▬0.0%'\n      WHEN defects_prev = 0 THEN '        ▲ new'\n      WHEN defects > defects_prev THEN CONCAT('        ▲', ROUND(100.0*(defects-defects_prev)/defects_prev,1), '%')\n      WHEN defects < defects_prev THEN CONCAT('        ▼', ROUND(100.0*(defects_prev-defects)/defects_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"Escaped Defects\"\nFROM lagged\nORDER BY week DESC"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Weekly totals for Claude Code OTel estimated cost, merged PRs, resolved non-defect/non-epic issues, distinct name-deduplicated PR authors, and classified issues opened within 14 days after successful production deployments. Cost uses the selected Project and OTel Teams; delivery metrics use Project only. Issue classification is based on `type`/`original_type`, not labels. Each cell shows the raw weekly value plus its change from the previous available week; an upward change in escaped defects is adverse, while the arrows are not metric-aware. Weeks begin Monday.",
+          "id": 11,
+          "links": [],
+          "title": "AI Cost / PRs Merged / Tasks Done / Contributors / Escaped Defects — Weekly, with WoW % Change",
+          "vizConfig": {
+            "group": "table",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "align": "auto",
+                    "cellOptions": {
+                      "type": "auto"
+                    },
+                    "footer": {
+                      "reducers": []
+                    },
+                    "inspect": false
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
                         "color": "green",
-                        "index": 0,
-                        "text": "$1"
+                        "value": 0
                       }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "AI Cost"
                     },
-                    "type": "regex"
+                    "properties": [
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-text"
+                        }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "options": {
+                              "pattern": "^(.*▲.*)$",
+                              "result": {
+                                "color": "green",
+                                "index": 0,
+                                "text": "$1"
+                              }
+                            },
+                            "type": "regex"
+                          },
+                          {
+                            "options": {
+                              "pattern": "^(.*▼.*)$",
+                              "result": {
+                                "color": "red",
+                                "index": 1,
+                                "text": "$1"
+                              }
+                            },
+                            "type": "regex"
+                          },
+                          {
+                            "options": {
+                              "pattern": "^(.*▬.*)$",
+                              "result": {
+                                "color": "text",
+                                "index": 2,
+                                "text": "$1"
+                              }
+                            },
+                            "type": "regex"
+                          }
+                        ]
+                      }
+                    ]
                   },
                   {
-                    "options": {
-                      "pattern": "^(.*▼.*)$",
-                      "result": {
-                        "color": "red",
-                        "index": 1,
-                        "text": "$1"
-                      }
+                    "matcher": {
+                      "id": "byName",
+                      "options": "PRs Merged"
                     },
-                    "type": "regex"
+                    "properties": [
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-text"
+                        }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "options": {
+                              "pattern": "^(.*▲.*)$",
+                              "result": {
+                                "color": "green",
+                                "index": 0,
+                                "text": "$1"
+                              }
+                            },
+                            "type": "regex"
+                          },
+                          {
+                            "options": {
+                              "pattern": "^(.*▼.*)$",
+                              "result": {
+                                "color": "red",
+                                "index": 1,
+                                "text": "$1"
+                              }
+                            },
+                            "type": "regex"
+                          },
+                          {
+                            "options": {
+                              "pattern": "^(.*▬.*)$",
+                              "result": {
+                                "color": "text",
+                                "index": 2,
+                                "text": "$1"
+                              }
+                            },
+                            "type": "regex"
+                          }
+                        ]
+                      }
+                    ]
                   },
                   {
-                    "options": {
-                      "pattern": "^(.*▬.*)$",
-                      "result": {
-                        "color": "text",
-                        "index": 2,
-                        "text": "$1"
-                      }
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Tasks Done"
                     },
-                    "type": "regex"
+                    "properties": [
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-text"
+                        }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "options": {
+                              "pattern": "^(.*▲.*)$",
+                              "result": {
+                                "color": "green",
+                                "index": 0,
+                                "text": "$1"
+                              }
+                            },
+                            "type": "regex"
+                          },
+                          {
+                            "options": {
+                              "pattern": "^(.*▼.*)$",
+                              "result": {
+                                "color": "red",
+                                "index": 1,
+                                "text": "$1"
+                              }
+                            },
+                            "type": "regex"
+                          },
+                          {
+                            "options": {
+                              "pattern": "^(.*▬.*)$",
+                              "result": {
+                                "color": "text",
+                                "index": 2,
+                                "text": "$1"
+                              }
+                            },
+                            "type": "regex"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Contributors"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-text"
+                        }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "options": {
+                              "pattern": "^(.*▲.*)$",
+                              "result": {
+                                "color": "green",
+                                "index": 0,
+                                "text": "$1"
+                              }
+                            },
+                            "type": "regex"
+                          },
+                          {
+                            "options": {
+                              "pattern": "^(.*▼.*)$",
+                              "result": {
+                                "color": "red",
+                                "index": 1,
+                                "text": "$1"
+                              }
+                            },
+                            "type": "regex"
+                          },
+                          {
+                            "options": {
+                              "pattern": "^(.*▬.*)$",
+                              "result": {
+                                "color": "text",
+                                "index": 2,
+                                "text": "$1"
+                              }
+                            },
+                            "type": "regex"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Escaped Defects"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-text"
+                        }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "options": {
+                              "pattern": "^(.*▲.*)$",
+                              "result": {
+                                "color": "green",
+                                "index": 0,
+                                "text": "$1"
+                              }
+                            },
+                            "type": "regex"
+                          },
+                          {
+                            "options": {
+                              "pattern": "^(.*▼.*)$",
+                              "result": {
+                                "color": "red",
+                                "index": 1,
+                                "text": "$1"
+                              }
+                            },
+                            "type": "regex"
+                          },
+                          {
+                            "options": {
+                              "pattern": "^(.*▬.*)$",
+                              "result": {
+                                "color": "text",
+                                "index": 2,
+                                "text": "$1"
+                              }
+                            },
+                            "type": "regex"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              "options": {
+                "cellHeight": "sm",
+                "showHeader": true,
+                "sortBy": [
+                  {
+                    "desc": true,
+                    "displayName": "Week"
                   }
                 ]
               }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "PRs Merged"
             },
-            "properties": [
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
+            "version": "13.2.2"
+          }
+        }
+      },
+      "panel-14": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "group": "mysql",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "SELECT\n  COUNT(DISTINCT pr.author_id) AS \"Raw Account Count\",\n  COUNT(DISTINCT COALESCE(NULLIF(a.full_name,''), pr.author_name)) AS \"Name-Deduped Count\",\n  ROUND(100.0 * (COUNT(DISTINCT pr.author_id) - COUNT(DISTINCT COALESCE(NULLIF(a.full_name,''), pr.author_name))) / NULLIF(COUNT(DISTINCT pr.author_id), 0), 1) AS \"Overcount %\"\nFROM project_pr_metrics ppm\nJOIN pull_requests pr ON pr.id = ppm.id\nLEFT JOIN accounts a ON a.id = pr.author_id\nWHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer_id) OR a.email IN ($developer_id) OR a.id IN ($developer_id))"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Compares the raw distinct `accounts.id` count for PR authors against the name-deduplicated count used for the Contributors KPI above, scoped to the selected project(s). The gap between the two is mostly caused by engineers accumulating multiple account rows when their git client reports different emails or hostnames across machines, rather than by genuinely distinct people.",
+          "id": 14,
+          "links": [],
+          "title": "Distinct-Account Sanity Check",
+          "vizConfig": {
+            "group": "table",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "align": "auto",
+                    "cellOptions": {
+                      "type": "auto"
+                    },
+                    "footer": {
+                      "reducers": []
+                    },
+                    "inspect": false
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "cellHeight": "sm",
+                "showHeader": true
+              }
+            },
+            "version": "13.2.2"
+          }
+        }
+      },
+      "panel-15": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "group": "mysql",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "SELECT pm.project_name AS \"Project\",\n  SUM((i.type IN ('BUG','INCIDENT') OR LOWER(COALESCE(i.original_type,'')) REGEXP 'bug|defect|incident')) AS \"Classified Defects\",\n  COUNT(*) AS \"Total Issues\",\n  CASE WHEN SUM((i.type IN ('BUG','INCIDENT') OR LOWER(COALESCE(i.original_type,'')) REGEXP 'bug|defect|incident')) > 0 THEN 'Available' ELSE 'Not classified' END AS \"Defect-Rate Coverage\"\nFROM issues i\nJOIN board_issues bi ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\nWHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n  AND $__timeFilter(i.created_date)\nGROUP BY pm.project_name\nORDER BY 2 DESC"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Count of board-linked issues per selected project created within the selected time range, and how many of them have a normalized `type` of BUG/INCIDENT or an `original_type` containing bug/defect/incident. It reports whether those fields provide any defect classification; it does not inspect labels. `Not classified` means no matching issue was created in the selected range, not that the project has no defects; on short ranges this can happen even for projects that do classify defects.",
+          "id": 15,
+          "links": [],
+          "title": "Defect-Rate Coverage by Project",
+          "vizConfig": {
+            "group": "table",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "align": "auto",
+                    "cellOptions": {
+                      "type": "auto"
+                    },
+                    "footer": {
+                      "reducers": []
+                    },
+                    "inspect": false
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "cellHeight": "sm",
+                "showHeader": true
+              }
+            },
+            "version": "13.2.2"
+          }
+        }
+      },
+      "panel-2": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "group": "mysql",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "SELECT SUM(estimated_cost_usd) AS \"AI Spend\"\nFROM ai_model_usages amu\nWHERE ('__all' IN ($developer_id) OR amu.user_email IN ($developer_id) OR amu.account_id IN ($developer_id))\n  AND source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n)\nAND $__timeFilter(date)",
+                        "sql": {
+                          "columns": [
+                            {
+                              "parameters": [],
+                              "type": "function"
+                            }
+                          ],
+                          "groupBy": [
+                            {
+                              "property": {
+                                "type": "string"
+                              },
+                              "type": "groupBy"
+                            }
+                          ],
+                          "limit": 50
+                        }
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Total estimated AI spend, Claude Code OTel-only, scoped to the selected project(s)/team(s) (`SUM(ai_model_usages.estimated_cost_usd)`).",
+          "id": 2,
+          "links": [],
+          "title": "AI Spend",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "noValue": "0",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "unit": "currencyUSD"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+              }
+            },
+            "version": "13.2.2"
+          }
+        }
+      },
+      "panel-3": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "group": "mysql",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "SELECT COUNT(*) AS \"PRs Merged\"\nFROM project_pr_metrics ppm\nJOIN pull_requests pr ON pr.id = ppm.id\nJOIN accounts a ON a.id = pr.author_id \nWHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(pr.merged_date)\n  AND ('__all' IN ($developer_id) OR a.email IN ($developer_id) OR a.id IN ($developer_id))",
+                        "sql": {
+                          "columns": [
+                            {
+                              "parameters": [],
+                              "type": "function"
+                            }
+                          ],
+                          "groupBy": [
+                            {
+                              "property": {
+                                "type": "string"
+                              },
+                              "type": "groupBy"
+                            }
+                          ],
+                          "limit": 50
+                        }
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Merged pull requests, scoped to the selected project(s).",
+          "id": 3,
+          "links": [],
+          "title": "PRs Merged",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "blue",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+              }
+            },
+            "version": "13.2.2"
+          }
+        }
+      },
+      "panel-4": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "group": "mysql",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "SELECT COUNT(*) AS \"Tasks Done\"\nFROM issues i\nJOIN board_issues bi ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\nLEFT JOIN accounts a1 ON a1.id = i.creator_id\nLEFT JOIN accounts a2 ON a2.id = i.assignee_id\nWHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n  AND i.type NOT IN ('BUG','INCIDENT','EPIC') AND LOWER(COALESCE(i.original_type,'')) NOT REGEXP 'bug|defect|incident|epic'\n  AND i.resolution_date IS NOT NULL\n  AND $__timeFilter(i.resolution_date)\n  AND ('__all' IN ($developer_id) OR a1.email IN ($developer_id) OR a1.id IN ($developer_id) OR a2.email IN ($developer_id) OR a2.id IN ($developer_id))",
+                        "sql": {
+                          "columns": [
+                            {
+                              "parameters": [],
+                              "type": "function"
+                            }
+                          ],
+                          "groupBy": [
+                            {
+                              "property": {
+                                "type": "string"
+                              },
+                              "type": "groupBy"
+                            }
+                          ],
+                          "limit": 50
+                        }
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Counts resolved domain issues linked to boards in the selected project(s), where `type` is not BUG/INCIDENT/EPIC and `original_type` does not contain bug/defect/incident/epic. This query does not inspect labels, and SQL's `type NOT IN` also excludes rows with a NULL type. It uses `resolution_date` as the completion signal rather than tracker-specific status strings; the result therefore includes any remaining issue types, not only Jira Tasks/Sub-tasks.",
+          "id": 4,
+          "links": [],
+          "title": "Tasks Done",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "purple",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+              }
+            },
+            "version": "13.2.2"
+          }
+        }
+      },
+      "panel-5": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "group": "mysql",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "SELECT COUNT(DISTINCT COALESCE(NULLIF(a.full_name,''), pr.author_name)) AS \"Contributors\"\nFROM project_pr_metrics ppm\nJOIN pull_requests pr ON pr.id = ppm.id\nLEFT JOIN accounts a ON a.id = pr.author_id\nWHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(pr.merged_date)\n  AND ('__all' IN ($developer_id) OR a.email IN ($developer_id) OR a.id IN ($developer_id))",
+                        "sql": {
+                          "columns": [
+                            {
+                              "parameters": [],
+                              "type": "function"
+                            }
+                          ],
+                          "groupBy": [
+                            {
+                              "property": {
+                                "type": "string"
+                              },
+                              "type": "groupBy"
+                            }
+                          ],
+                          "limit": 50
+                        }
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Distinct pull request authors, scoped to the selected project(s) and deduplicated by `accounts.full_name` (falling back to the PR author name when no account matches). This narrows but doesn't fully eliminate the overcount from fragmented accounts — see the Distinct-Account Sanity Check table below.",
+          "id": 5,
+          "links": [],
+          "title": "Contributors",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "orange",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+              }
+            },
+            "version": "13.2.2"
+          }
+        }
+      },
+      "panel-6": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "group": "mysql",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "SELECT ROUND(prs.n / NULLIF(c.n,0), 1) AS \"PRs per Contributor\"\nFROM\n  (SELECT COUNT(*) n FROM project_pr_metrics ppm \n  JOIN pull_requests pr ON pr.id=ppm.id \n  LEFT JOIN accounts a ON a.id=pr.author_id\n  WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(pr.merged_date)\n    AND ('__all' IN ($developer_id) OR a.email IN ($developer_id) OR a.id IN ($developer_id))\n  ) prs,\n  (SELECT COUNT(DISTINCT COALESCE(NULLIF(a.full_name,''), pr.author_name)) n FROM project_pr_metrics ppm \n  JOIN pull_requests pr ON pr.id=ppm.id \n  LEFT JOIN accounts a ON a.id=pr.author_id \n  WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g \n                                WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(pr.merged_date)\n    AND ('__all' IN ($developer_id) OR a.email IN ($developer_id) OR a.id IN ($developer_id))\n  ) c",
+                        "sql": {
+                          "columns": [
+                            {
+                              "parameters": [],
+                              "type": "function"
+                            }
+                          ],
+                          "groupBy": [
+                            {
+                              "property": {
+                                "type": "string"
+                              },
+                              "type": "groupBy"
+                            }
+                          ],
+                          "limit": 50
+                        }
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "PRs Merged ÷ Contributors, both scoped to the selected project(s).",
+          "id": 6,
+          "links": [],
+          "title": "PRs per Contributor",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "noValue": "0",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "blue",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+              }
+            },
+            "version": "13.2.2"
+          }
+        }
+      },
+      "panel-7": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "group": "mysql",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "SELECT ROUND(t.n / NULLIF(c.n,0), 1) AS \"Tasks per Contributor\"\nFROM\n  (SELECT COUNT(*) n FROM issues i JOIN board_issues bi ON bi.issue_id=i.id LEFT JOIN accounts a1 ON a1.id = i.creator_id LEFT JOIN accounts a2 ON a2.id = i.assignee_id JOIN project_mapping pm ON pm.row_id=bi.board_id AND pm.`table`='boards' WHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND i.type NOT IN ('BUG','INCIDENT','EPIC') AND LOWER(COALESCE(i.original_type,'')) NOT REGEXP 'bug|defect|incident|epic' AND i.resolution_date IS NOT NULL AND $__timeFilter(i.resolution_date) AND ('__all' IN ($developer_id) OR a1.email IN ($developer_id) OR a1.id IN ($developer_id) OR a2.email IN ($developer_id) OR a2.id IN ($developer_id))) t,\n  (SELECT COUNT(DISTINCT COALESCE(NULLIF(a.full_name,''), pr.author_name)) n FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id=ppm.id LEFT JOIN accounts a ON a.id=pr.author_id WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer_id) OR a.email IN ($developer_id) OR a.id IN ($developer_id))) c"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Resolved non-defect, non-epic issues per distinct PR author: the numerator uses the selected project(s)' board-linked issues and `resolution_date`, while the denominator uses merged-PR contributors. Issues are excluded by normalized `type` and `original_type` text (not labels); NULL `type` rows are excluded by SQL. Since these are different populations, treat the ratio as directional.",
+          "id": 7,
+          "links": [],
+          "title": "Tasks per Contributor",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "purple",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+              }
+            },
+            "version": "13.2.2"
+          }
+        }
+      },
+      "panel-8": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "group": "mysql",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "WITH prod_deploys AS (\n  SELECT pm.project_name, cdc.finished_date\n  FROM cicd_deployment_commits cdc\n  JOIN project_mapping pm ON pm.row_id = cdc.cicd_scope_id AND pm.`table` = 'cicd_scopes'\n  WHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND LOWER(cdc.environment) LIKE '%prod%' AND cdc.result = 'SUCCESS' AND $__timeFilter(cdc.finished_date)\n),\ndefects AS (\n  SELECT DISTINCT i.id\n  FROM issues i\n  JOIN board_issues bi ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n  JOIN prod_deploys pd ON pd.project_name = pm.project_name\n    AND i.created_date BETWEEN pd.finished_date AND DATE_ADD(pd.finished_date, INTERVAL 14 DAY)\n  WHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (i.type IN ('BUG','INCIDENT') OR LOWER(COALESCE(i.original_type,'')) REGEXP 'bug|defect|incident') AND $__timeFilter(i.created_date)\n),\nprs AS (\n  SELECT pr.id FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(pr.merged_date)\n)\nSELECT ROUND((SELECT COUNT(*) FROM defects) * 100.0 / NULLIF((SELECT COUNT(*) FROM prs), 0), 2) AS \"Escaped Defect Rate (per 100 PRs)\""
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Counts distinct board-linked issues whose normalized `type` is BUG/INCIDENT or whose `original_type` contains bug/defect/incident, created within 14 days after a successful deployment whose environment contains `prod` for the same project. The count is divided by all PRs merged in the selected time range for the selected project(s), then multiplied by 100; the denominator is not limited to PRs merged during each deployment's 14-day window. Labels are not queried, so label-only defects are not counted.",
+          "id": 8,
+          "links": [],
+          "title": "Escaped Defect Rate",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "red",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+              }
+            },
+            "version": "13.2.2"
+          }
+        }
+      },
+      "panel-9": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "query": {
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "group": "mysql",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "SELECT ROUND(spend.cost / NULLIF(prs.n, 0), 2) AS \"Cost per Merged PR\"\nFROM\n  (SELECT SUM(estimated_cost_usd) AS cost FROM ai_model_usages\n   WHERE ('__all' IN ($developer_id) OR user_email IN ($developer_id) OR account_id IN ($developer_id)) AND source_connection_id IN (\n     SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n     INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n     WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n   )\n   AND $__timeFilter(date)) spend,\n  (SELECT COUNT(*) n FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id LEFT JOIN accounts a ON a.id = pr.author_id\n   WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer_id) OR a.email IN ($developer_id) OR a.id IN ($developer_id))) prs"
+                      },
+                      "version": "v0"
+                    },
+                    "refId": "A"
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "AI Spend ÷ PRs Merged, both scoped to the selected project(s)/team(s) — Claude Code OTel spend now carries a real project association, so both sides move together.",
+          "id": 9,
+          "links": [],
+          "title": "Cost per Merged PR",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "unit": "currencyUSD"
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+              }
+            },
+            "version": "13.2.2"
+          }
+        }
+      }
+    },
+    "layout": {
+      "kind": "RowsLayout",
+      "spec": {
+        "rows": [
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "collapse": false,
+              "hideHeader": true,
+              "layout": {
+                "kind": "GridLayout",
+                "spec": {
+                  "items": [
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-1"
+                        },
+                        "height": 8,
+                        "width": 24,
+                        "x": 0,
+                        "y": 0
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-2"
+                        },
+                        "height": 4,
+                        "width": 6,
+                        "x": 0,
+                        "y": 8
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-3"
+                        },
+                        "height": 4,
+                        "width": 6,
+                        "x": 6,
+                        "y": 8
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-4"
+                        },
+                        "height": 4,
+                        "width": 6,
+                        "x": 12,
+                        "y": 8
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-5"
+                        },
+                        "height": 4,
+                        "width": 6,
+                        "x": 18,
+                        "y": 8
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-6"
+                        },
+                        "height": 4,
+                        "width": 6,
+                        "x": 0,
+                        "y": 12
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-7"
+                        },
+                        "height": 4,
+                        "width": 6,
+                        "x": 6,
+                        "y": 12
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-8"
+                        },
+                        "height": 4,
+                        "width": 6,
+                        "x": 12,
+                        "y": 12
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-9"
+                        },
+                        "height": 4,
+                        "width": 6,
+                        "x": 18,
+                        "y": 12
+                      }
+                    }
+                  ]
                 }
               },
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "options": {
-                      "pattern": "^(.*▲.*)$",
-                      "result": {
-                        "color": "green",
-                        "index": 0,
-                        "text": "$1"
-                      }
-                    },
-                    "type": "regex"
-                  },
-                  {
-                    "options": {
-                      "pattern": "^(.*▼.*)$",
-                      "result": {
-                        "color": "red",
-                        "index": 1,
-                        "text": "$1"
-                      }
-                    },
-                    "type": "regex"
-                  },
-                  {
-                    "options": {
-                      "pattern": "^(.*▬.*)$",
-                      "result": {
-                        "color": "text",
-                        "index": 2,
-                        "text": "$1"
-                      }
-                    },
-                    "type": "regex"
-                  }
-                ]
-              }
-            ]
+              "title": ""
+            }
           },
           {
-            "matcher": {
-              "id": "byName",
-              "options": "Tasks Done"
-            },
-            "properties": [
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "collapse": false,
+              "layout": {
+                "kind": "GridLayout",
+                "spec": {
+                  "items": [
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-11"
+                        },
+                        "height": 10,
+                        "width": 24,
+                        "x": 0,
+                        "y": 0
+                      }
+                    }
+                  ]
                 }
               },
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "options": {
-                      "pattern": "^(.*▲.*)$",
-                      "result": {
-                        "color": "green",
-                        "index": 0,
-                        "text": "$1"
-                      }
-                    },
-                    "type": "regex"
-                  },
-                  {
-                    "options": {
-                      "pattern": "^(.*▼.*)$",
-                      "result": {
-                        "color": "red",
-                        "index": 1,
-                        "text": "$1"
-                      }
-                    },
-                    "type": "regex"
-                  },
-                  {
-                    "options": {
-                      "pattern": "^(.*▬.*)$",
-                      "result": {
-                        "color": "text",
-                        "index": 2,
-                        "text": "$1"
-                      }
-                    },
-                    "type": "regex"
-                  }
-                ]
-              }
-            ]
+              "title": "Indexed Trends (Weekly)"
+            }
           },
           {
-            "matcher": {
-              "id": "byName",
-              "options": "Contributors"
-            },
-            "properties": [
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "collapse": false,
+              "layout": {
+                "kind": "GridLayout",
+                "spec": {
+                  "items": [
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-14"
+                        },
+                        "height": 6,
+                        "width": 12,
+                        "x": 0,
+                        "y": 0
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-15"
+                        },
+                        "height": 6,
+                        "width": 12,
+                        "x": 12,
+                        "y": 0
+                      }
+                    }
+                  ]
                 }
               },
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "options": {
-                      "pattern": "^(.*▲.*)$",
-                      "result": {
-                        "color": "green",
-                        "index": 0,
-                        "text": "$1"
-                      }
-                    },
-                    "type": "regex"
-                  },
-                  {
-                    "options": {
-                      "pattern": "^(.*▼.*)$",
-                      "result": {
-                        "color": "red",
-                        "index": 1,
-                        "text": "$1"
-                      }
-                    },
-                    "type": "regex"
-                  },
-                  {
-                    "options": {
-                      "pattern": "^(.*▬.*)$",
-                      "result": {
-                        "color": "text",
-                        "index": 2,
-                        "text": "$1"
-                      }
-                    },
-                    "type": "regex"
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Escaped Defects"
-            },
-            "properties": [
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
-              },
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "options": {
-                      "pattern": "^(.*▲.*)$",
-                      "result": {
-                        "color": "green",
-                        "index": 0,
-                        "text": "$1"
-                      }
-                    },
-                    "type": "regex"
-                  },
-                  {
-                    "options": {
-                      "pattern": "^(.*▼.*)$",
-                      "result": {
-                        "color": "red",
-                        "index": 1,
-                        "text": "$1"
-                      }
-                    },
-                    "type": "regex"
-                  },
-                  {
-                    "options": {
-                      "pattern": "^(.*▬.*)$",
-                      "result": {
-                        "color": "text",
-                        "index": 2,
-                        "text": "$1"
-                      }
-                    },
-                    "type": "regex"
-                  }
-                ]
-              }
-            ]
+              "title": "Data Quality"
+            }
           }
         ]
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 24,
-        "x": 0,
-        "y": 17
-      },
-      "id": 11,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "Week"
-          }
-        ]
-      },
-      "pluginVersion": "11.0.0",
-      "targets": [
-        {
-          "datasource": "mysql",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "WITH weekly_cost AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week, SUM(estimated_cost_usd) AS v\n  FROM ai_model_usages\n  WHERE ('__all' IN ($developer_id) OR user_email IN ($developer_id)) AND source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  )\n  AND $__timeFilter(date)\n  GROUP BY 1\n),\nweekly_prs AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') AS week, COUNT(*) AS v\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer_id) OR pr.author_id IN ($developer_id) OR pr.author_id IN (SELECT a_dev.id FROM accounts a_dev WHERE a_dev.email IN ($developer_id))) GROUP BY 1\n),\nweekly_tasks AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(i.resolution_date), INTERVAL WEEKDAY(i.resolution_date) DAY), '%Y-%m-%d') AS week, COUNT(*) AS v\n  FROM issues i JOIN board_issues bi ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n  WHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND i.type NOT IN ('BUG','INCIDENT','EPIC') AND LOWER(COALESCE(i.original_type,'')) NOT REGEXP 'bug|defect|incident|epic' AND i.resolution_date IS NOT NULL AND $__timeFilter(i.resolution_date) AND ('__all' IN ($developer_id) OR i.assignee_id IN ($developer_id) OR i.assignee_id IN (SELECT a_dev.id FROM accounts a_dev WHERE a_dev.email IN ($developer_id)))\n  GROUP BY 1\n),\nweekly_contrib AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') AS week, COUNT(DISTINCT COALESCE(NULLIF(a.full_name,''), pr.author_name)) AS v\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id LEFT JOIN accounts a ON a.id = pr.author_id\n  WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer_id) OR pr.author_id IN ($developer_id) OR pr.author_id IN (SELECT a_dev.id FROM accounts a_dev WHERE a_dev.email IN ($developer_id))) GROUP BY 1\n),\nprod_deploys AS (\n  SELECT pm.project_name, cdc.finished_date\n  FROM cicd_deployment_commits cdc\n  JOIN project_mapping pm ON pm.row_id = cdc.cicd_scope_id AND pm.`table` = 'cicd_scopes'\n  WHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND LOWER(cdc.environment) LIKE '%prod%' AND cdc.result = 'SUCCESS' AND $__timeFilter(cdc.finished_date)\n),\nweekly_defects AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(i.created_date), INTERVAL WEEKDAY(i.created_date) DAY), '%Y-%m-%d') AS week, COUNT(DISTINCT i.id) AS v\n  FROM issues i\n  JOIN board_issues bi ON bi.issue_id = i.id\n  JOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\n  JOIN prod_deploys pd ON pd.project_name = pm.project_name\n    AND i.created_date BETWEEN pd.finished_date AND DATE_ADD(pd.finished_date, INTERVAL 14 DAY)\n  WHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (i.type IN ('BUG','INCIDENT') OR LOWER(COALESCE(i.original_type,'')) REGEXP 'bug|defect|incident') AND $__timeFilter(i.created_date)\n  GROUP BY 1\n),\nweeks AS (\n  SELECT week FROM weekly_cost UNION SELECT week FROM weekly_prs\n  UNION SELECT week FROM weekly_tasks UNION SELECT week FROM weekly_contrib\n  UNION SELECT week FROM weekly_defects\n),\nfilled AS (\n  SELECT w.week,\n    COALESCE(c.v, 0) AS cost, COALESCE(p.v, 0) AS prs, COALESCE(t.v, 0) AS tasks,\n    COALESCE(ct.v, 0) AS contrib, COALESCE(d.v, 0) AS defects\n  FROM weeks w\n  LEFT JOIN weekly_cost c ON c.week = w.week\n  LEFT JOIN weekly_prs p ON p.week = w.week\n  LEFT JOIN weekly_tasks t ON t.week = w.week\n  LEFT JOIN weekly_contrib ct ON ct.week = w.week\n  LEFT JOIN weekly_defects d ON d.week = w.week\n),\nlagged AS (\n  SELECT week, cost, prs, tasks, contrib, defects,\n    LAG(cost) OVER (ORDER BY week) AS cost_prev,\n    LAG(prs) OVER (ORDER BY week) AS prs_prev,\n    LAG(tasks) OVER (ORDER BY week) AS tasks_prev,\n    LAG(contrib) OVER (ORDER BY week) AS contrib_prev,\n    LAG(defects) OVER (ORDER BY week) AS defects_prev\n  FROM filled\n)\nSELECT week AS \"Week\",\n  CONCAT(CONCAT('$', CASE WHEN ABS(cost) >= 1000000000 THEN CONCAT(FORMAT(cost / 1000000000, 1), 'B') WHEN ABS(cost) >= 1000000 THEN CONCAT(FORMAT(cost / 1000000, 1), 'M') WHEN ABS(cost) >= 1000 THEN CONCAT(FORMAT(cost / 1000, 1), 'K') ELSE FORMAT(cost, 2) END),\n    CASE\n      WHEN cost_prev IS NULL THEN ''\n      WHEN cost_prev = 0 AND cost = 0 THEN '        ▬0.0%'\n      WHEN cost_prev = 0 THEN '        ▲ new'\n      WHEN cost > cost_prev THEN CONCAT('        ▲', ROUND(100.0*(cost-cost_prev)/cost_prev,1), '%')\n      WHEN cost < cost_prev THEN CONCAT('        ▼', ROUND(100.0*(cost_prev-cost)/cost_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"AI Cost\",\n  CONCAT(CASE WHEN ABS(prs) >= 1000000000 THEN CONCAT(FORMAT(prs / 1000000000, 1), 'B') WHEN ABS(prs) >= 1000000 THEN CONCAT(FORMAT(prs / 1000000, 1), 'M') WHEN ABS(prs) >= 1000 THEN CONCAT(FORMAT(prs / 1000, 1), 'K') ELSE FORMAT(prs, 0) END,\n    CASE\n      WHEN prs_prev IS NULL THEN ''\n      WHEN prs_prev = 0 AND prs = 0 THEN '        ▬0.0%'\n      WHEN prs_prev = 0 THEN '        ▲ new'\n      WHEN prs > prs_prev THEN CONCAT('        ▲', ROUND(100.0*(prs-prs_prev)/prs_prev,1), '%')\n      WHEN prs < prs_prev THEN CONCAT('        ▼', ROUND(100.0*(prs_prev-prs)/prs_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"PRs Merged\",\n  CONCAT(CASE WHEN ABS(tasks) >= 1000000000 THEN CONCAT(FORMAT(tasks / 1000000000, 1), 'B') WHEN ABS(tasks) >= 1000000 THEN CONCAT(FORMAT(tasks / 1000000, 1), 'M') WHEN ABS(tasks) >= 1000 THEN CONCAT(FORMAT(tasks / 1000, 1), 'K') ELSE FORMAT(tasks, 0) END,\n    CASE\n      WHEN tasks_prev IS NULL THEN ''\n      WHEN tasks_prev = 0 AND tasks = 0 THEN '        ▬0.0%'\n      WHEN tasks_prev = 0 THEN '        ▲ new'\n      WHEN tasks > tasks_prev THEN CONCAT('        ▲', ROUND(100.0*(tasks-tasks_prev)/tasks_prev,1), '%')\n      WHEN tasks < tasks_prev THEN CONCAT('        ▼', ROUND(100.0*(tasks_prev-tasks)/tasks_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"Tasks Done\",\n  CONCAT(CASE WHEN ABS(contrib) >= 1000000000 THEN CONCAT(FORMAT(contrib / 1000000000, 1), 'B') WHEN ABS(contrib) >= 1000000 THEN CONCAT(FORMAT(contrib / 1000000, 1), 'M') WHEN ABS(contrib) >= 1000 THEN CONCAT(FORMAT(contrib / 1000, 1), 'K') ELSE FORMAT(contrib, 0) END,\n    CASE\n      WHEN contrib_prev IS NULL THEN ''\n      WHEN contrib_prev = 0 AND contrib = 0 THEN '        ▬0.0%'\n      WHEN contrib_prev = 0 THEN '        ▲ new'\n      WHEN contrib > contrib_prev THEN CONCAT('        ▲', ROUND(100.0*(contrib-contrib_prev)/contrib_prev,1), '%')\n      WHEN contrib < contrib_prev THEN CONCAT('        ▼', ROUND(100.0*(contrib_prev-contrib)/contrib_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"Contributors\",\n  CONCAT(CASE WHEN ABS(defects) >= 1000000000 THEN CONCAT(FORMAT(defects / 1000000000, 1), 'B') WHEN ABS(defects) >= 1000000 THEN CONCAT(FORMAT(defects / 1000000, 1), 'M') WHEN ABS(defects) >= 1000 THEN CONCAT(FORMAT(defects / 1000, 1), 'K') ELSE FORMAT(defects, 0) END,\n    CASE\n      WHEN defects_prev IS NULL THEN ''\n      WHEN defects_prev = 0 AND defects = 0 THEN '        ▬0.0%'\n      WHEN defects_prev = 0 THEN '        ▲ new'\n      WHEN defects > defects_prev THEN CONCAT('        ▲', ROUND(100.0*(defects-defects_prev)/defects_prev,1), '%')\n      WHEN defects < defects_prev THEN CONCAT('        ▼', ROUND(100.0*(defects_prev-defects)/defects_prev,1), '%')\n      ELSE '        ▬0.0%'\n    END\n  ) AS \"Escaped Defects\"\nFROM lagged\nORDER BY week DESC",
-          "refId": "A"
-        }
+      }
+    },
+    "links": [],
+    "liveNow": false,
+    "preload": false,
+    "tags": [
+      "unified",
+      "devlake",
+      "ai",
+      "throughput",
+      "dashboard"
+    ],
+    "timeSettings": {
+      "autoRefresh": "",
+      "autoRefreshIntervals": [
+        "5s",
+        "10s",
+        "30s",
+        "1m",
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "2h",
+        "1d"
       ],
-      "title": "AI Cost / PRs Merged / Tasks Done / Contributors / Escaped Defects — Weekly, with WoW % Change",
-      "type": "table"
+      "fiscalYearStartMonth": 0,
+      "from": "now-30d",
+      "hideTimepicker": false,
+      "timezone": "utc",
+      "to": "now"
     },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 27
-      },
-      "id": 13,
-      "panels": [],
-      "title": "Data Quality",
-      "type": "row"
-    },
-    {
-      "datasource": "mysql",
-      "description": "Compares the raw distinct `accounts.id` count for PR authors against the name-deduplicated count used for the Contributors KPI above, scoped to the selected project(s). The gap between the two is mostly caused by engineers accumulating multiple account rows when their git client reports different emails or hostnames across machines, rather than by genuinely distinct people.",
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
+    "title": "AI Throughput Overview",
+    "variables": [
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "allowCustomValue": true,
+          "current": {
+            "text": "All",
+            "value": [
+              "$__all"
             ]
           },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 12,
-        "x": 0,
-        "y": 28
-      },
-      "id": 14,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": true
-      },
-      "pluginVersion": "11.0.0",
-      "targets": [
-        {
-          "datasource": "mysql",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  COUNT(DISTINCT pr.author_id) AS \"Raw Account Count\",\n  COUNT(DISTINCT COALESCE(NULLIF(a.full_name,''), pr.author_name)) AS \"Name-Deduped Count\",\n  ROUND(100.0 * (COUNT(DISTINCT pr.author_id) - COUNT(DISTINCT COALESCE(NULLIF(a.full_name,''), pr.author_name))) / NULLIF(COUNT(DISTINCT pr.author_id), 0), 1) AS \"Overcount %\"\nFROM project_pr_metrics ppm\nJOIN pull_requests pr ON pr.id = ppm.id\nLEFT JOIN accounts a ON a.id = pr.author_id\nWHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer_id) OR pr.author_id IN ($developer_id) OR pr.author_id IN (SELECT a_dev.id FROM accounts a_dev WHERE a_dev.email IN ($developer_id)))",
-          "refId": "A"
+          "definition": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nINNER JOIN user_project_mapping upm ON upm.project_name = p.name\nWHERE c.status = 'active'\n  AND upm.user_login = ${__user.login:sqlstring}\nORDER BY p.name;",
+          "hide": "dontHide",
+          "includeAll": true,
+          "label": "Project",
+          "multi": true,
+          "name": "project",
+          "options": [],
+          "query": {
+            "datasource": {
+              "name": "devlake-mysql"
+            },
+            "group": "mysql",
+            "kind": "DataQuery",
+            "spec": {
+              "__legacyStringValue": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nINNER JOIN user_project_mapping upm ON upm.project_name = p.name\nWHERE c.status = 'active'\n  AND upm.user_login = ${__user.login:sqlstring}\nORDER BY p.name;"
+            },
+            "version": "v0"
+          },
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "regexApplyTo": "value",
+          "skipUrlSync": false,
+          "sort": "alphabeticalAsc"
         }
-      ],
-      "title": "Distinct-Account Sanity Check",
-      "type": "table"
-    },
-    {
-      "datasource": "mysql",
-      "description": "Count of board-linked issues per selected project created within the selected time range, and how many of them have a normalized `type` of BUG/INCIDENT or an `original_type` containing bug/defect/incident. It reports whether those fields provide any defect classification; it does not inspect labels. `Not classified` means no matching issue was created in the selected range, not that the project has no defects; on short ranges this can happen even for projects that do classify defects.",
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "allowCustomValue": true,
+          "current": {
+            "text": "All",
+            "value": [
+              "$__all"
             ]
           },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 12,
-        "x": 12,
-        "y": 28
-      },
-      "id": 15,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": true
-      },
-      "pluginVersion": "11.0.0",
-      "targets": [
-        {
-          "datasource": "mysql",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT pm.project_name AS \"Project\",\n  SUM((i.type IN ('BUG','INCIDENT') OR LOWER(COALESCE(i.original_type,'')) REGEXP 'bug|defect|incident')) AS \"Classified Defects\",\n  COUNT(*) AS \"Total Issues\",\n  CASE WHEN SUM((i.type IN ('BUG','INCIDENT') OR LOWER(COALESCE(i.original_type,'')) REGEXP 'bug|defect|incident')) > 0 THEN 'Available' ELSE 'Not classified' END AS \"Defect-Rate Coverage\"\nFROM issues i\nJOIN board_issues bi ON bi.issue_id = i.id\nJOIN project_mapping pm ON pm.row_id = bi.board_id AND pm.`table` = 'boards'\nWHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n  AND $__timeFilter(i.created_date)\nGROUP BY pm.project_name\nORDER BY 2 DESC",
-          "refId": "A"
+          "definition": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND (cp.project_name REGEXP '^(${project:regex})$' AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring}))\nORDER BY c.team_slug;",
+          "hide": "dontHide",
+          "includeAll": true,
+          "label": "Claude Code OTel teams",
+          "multi": true,
+          "name": "otel_teams",
+          "options": [],
+          "query": {
+            "datasource": {
+              "name": "devlake-mysql"
+            },
+            "group": "mysql",
+            "kind": "DataQuery",
+            "spec": {
+              "__legacyStringValue": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND (cp.project_name REGEXP '^(${project:regex})$' AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring}))\nORDER BY c.team_slug;"
+            },
+            "version": "v0"
+          },
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "regexApplyTo": "value",
+          "skipUrlSync": false,
+          "sort": "alphabeticalAsc"
         }
-      ],
-      "title": "Defect-Rate Coverage by Project",
-      "type": "table"
-    }
-  ],
-  "refresh": "",
-  "schemaVersion": 38,
-  "tags": [
-    "unified",
-    "devlake",
-    "ai",
-    "throughput",
-    "dashboard"
-  ],
-  "templating": {
-    "list": [
-      {
-        "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
-        },
-        "datasource": "mysql",
-        "definition": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nINNER JOIN user_project_mapping upm ON upm.project_name = p.name\nWHERE c.status = 'active'\n  AND upm.user_login = ${__user.login:sqlstring}\nORDER BY p.name;",
-        "hide": 0,
-        "includeAll": true,
-        "label": "Project",
-        "multi": true,
-        "name": "project",
-        "options": [],
-        "query": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nINNER JOIN user_project_mapping upm ON upm.project_name = p.name\nWHERE c.status = 'active'\n  AND upm.user_login = ${__user.login:sqlstring}\nORDER BY p.name;",
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
       },
       {
-        "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
-        },
-        "datasource": "mysql",
-        "definition": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND (cp.project_name REGEXP '^(${project:regex})$' AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring}))\nORDER BY c.team_slug;",
-        "hide": 0,
-        "includeAll": true,
-        "label": "Claude Code OTel teams",
-        "multi": true,
-        "name": "otel_teams",
-        "options": [],
-        "query": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND (cp.project_name REGEXP '^(${project:regex})$' AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring}))\nORDER BY c.team_slug;",
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
-      },
-      {
-        "allValue": "'__all'",
-        "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
-        },
-        "datasource": "mysql",
-        "definition": "SELECT COALESCE(MAX(NULLIF(a.full_name, '')), MAX(NULLIF(a.user_name, '')), u.user_email) AS __text, u.user_email AS __value\nFROM (\n  SELECT amu.user_email, amu.account_id, amu.source_connection_id FROM ai_model_usages amu\n  UNION\n  SELECT aa.user_email, aa.account_id, aa.source_connection_id FROM ai_activities aa WHERE aa.record_kind = 'canonical_activity'\n) u\nLEFT JOIN accounts a ON a.id = NULLIF(u.account_id, '')\nWHERE NULLIF(u.user_email, '') IS NOT NULL\n  AND u.source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE c.status = 'active'\n      AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n      AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n  )\nGROUP BY u.user_email\nORDER BY 1",
-        "hide": 0,
-        "includeAll": true,
-        "label": "Developer",
-        "multi": true,
-        "name": "developer_id",
-        "options": [],
-        "query": "SELECT COALESCE(MAX(NULLIF(a.full_name, '')), MAX(NULLIF(a.user_name, '')), u.user_email) AS __text, u.user_email AS __value\nFROM (\n  SELECT amu.user_email, amu.account_id, amu.source_connection_id FROM ai_model_usages amu\n  UNION\n  SELECT aa.user_email, aa.account_id, aa.source_connection_id FROM ai_activities aa WHERE aa.record_kind = 'canonical_activity'\n) u\nLEFT JOIN accounts a ON a.id = NULLIF(u.account_id, '')\nWHERE NULLIF(u.user_email, '') IS NOT NULL\n  AND u.source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE c.status = 'active'\n      AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n      AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n  )\nGROUP BY u.user_email\nORDER BY 1",
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 5,
-        "type": "query"
+        "kind": "QueryVariable",
+        "spec": {
+          "name": "developer_id",
+          "current": {
+            "text": [
+              "All"
+            ],
+            "value": [
+              "$__all"
+            ]
+          },
+          "label": "Developer",
+          "hide": "dontHide",
+          "refresh": "onDashboardLoad",
+          "skipUrlSync": false,
+          "query": {
+            "kind": "DataQuery",
+            "group": "mysql",
+            "version": "v0",
+            "datasource": {
+              "name": "devlake-mysql"
+            },
+            "spec": {
+              "dataset": "devlake",
+              "editorMode": "code",
+              "format": "table",
+              "query": "SELECT COALESCE(MAX(NULLIF(a.full_name, '')), MAX(NULLIF(a.user_name, '')), u.user_email) AS __text, u.user_email AS __value\nFROM (\n  SELECT amu.user_email, amu.account_id, amu.source_connection_id FROM ai_model_usages amu\n  UNION\n  SELECT aa.user_email, aa.account_id, aa.source_connection_id FROM ai_activities aa WHERE aa.record_kind = 'canonical_activity'\n) u\nLEFT JOIN accounts a ON a.id = NULLIF(u.account_id, '')\nWHERE NULLIF(u.user_email, '') IS NOT NULL\n  AND u.source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE c.status = 'active'\n      AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n      AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n  )\nGROUP BY u.user_email\nORDER BY 1",
+              "rawQuery": true,
+              "rawSql": "SELECT COALESCE(MAX(NULLIF(a.full_name, '')), MAX(NULLIF(a.user_name, '')), u.user_email) AS __text, u.user_email AS __value\nFROM (\n  SELECT amu.user_email, amu.account_id, amu.source_connection_id FROM ai_model_usages amu\n  UNION\n  SELECT aa.user_email, aa.account_id, aa.source_connection_id FROM ai_activities aa WHERE aa.record_kind = 'canonical_activity'\n) u\nLEFT JOIN accounts a ON a.id = NULLIF(u.account_id, '')\nWHERE NULLIF(u.user_email, '') IS NOT NULL\n  AND u.source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE c.status = 'active'\n      AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n      AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n  )\nGROUP BY u.user_email\nORDER BY 1",
+              "refId": "SQLVariableQueryEditor-VariableQuery"
+            }
+          },
+          "regex": "",
+          "regexApplyTo": "value",
+          "sort": "alphabeticalCaseInsensitiveAsc",
+          "definition": "SELECT COALESCE(MAX(NULLIF(a.full_name, '')), MAX(NULLIF(a.user_name, '')), u.user_email) AS __text, u.user_email AS __value\nFROM (\n  SELECT amu.user_email, amu.account_id, amu.source_connection_id FROM ai_model_usages amu\n  UNION\n  SELECT aa.user_email, aa.account_id, aa.source_connection_id FROM ai_activities aa WHERE aa.record_kind = 'canonical_activity'\n) u\nLEFT JOIN accounts a ON a.id = NULLIF(u.account_id, '')\nWHERE NULLIF(u.user_email, '') IS NOT NULL\n  AND u.source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE c.status = 'active'\n      AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n      AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n  )\nGROUP BY u.user_email\nORDER BY 1",
+          "options": [],
+          "multi": true,
+          "includeAll": true,
+          "allValue": "'__all'",
+          "allowCustomValue": false
+        }
       }
     ]
-  },
-  "time": {
-    "from": "now-30d",
-    "to": "now"
-  },
-  "timepicker": {},
-  "timezone": "utc",
-  "title": "AI Throughput Overview",
-  "uid": "ai_throughput_overview",
-  "version": 2,
-  "weekStart": ""
+  }
 }
