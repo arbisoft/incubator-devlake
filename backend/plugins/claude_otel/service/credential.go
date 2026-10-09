@@ -110,9 +110,9 @@ func markOtelCredentialRevoked(credential *models.OtelCredential, revokedAt time
 	credential.LastCollectorRestartHint = collectorRestartHint
 }
 
-func updateOtelCredentials(credentials []*models.OtelCredential, message string) errors.Error {
+func updateOtelCredentials(store dal.Dal, credentials []*models.OtelCredential, message string) errors.Error {
 	for _, credential := range credentials {
-		if err := db.Update(credential); err != nil {
+		if err := store.Update(credential); err != nil {
 			return errors.Default.Wrap(err, message)
 		}
 	}

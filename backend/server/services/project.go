@@ -41,7 +41,25 @@ var projectService ProjectService
 // ProjectQuery used to query projects as the api project input
 type ProjectQuery struct {
 	Pagination
+	SortQuery
 	Keyword *string `json:"keyword" form:"keyword"`
+}
+
+const projectLastRunJoin = "LEFT JOIN (SELECT b.project_name, MAX(p.finished_at) last_run_at " +
+	"FROM _devlake_blueprints b JOIN _devlake_pipelines p ON p.blueprint_id = b.id " +
+	"GROUP BY b.project_name) lr ON lr.project_name = projects.name"
+
+const projectSortLastRunAt = "lastRunAt"
+
+var projectSortSpec = sortSpec{
+	columns: map[string]string{
+		"name":               "projects.name",
+		"createdAt":          "projects.created_at",
+		projectSortLastRunAt: "lr.last_run_at",
+	},
+	defaultColumn: "projects.created_at",
+	tieBreaker:    "projects.name",
+	nullsLastKeys: map[string]bool{projectSortLastRunAt: true},
 }
 
 func (query *ProjectQuery) GetKeyword() string {
@@ -57,6 +75,10 @@ func GetProjects(query *ProjectQuery) ([]*models.ApiOutputProject, int64, errors
 	if err := VerifyStruct(query); err != nil {
 		return nil, 0, err
 	}
+	orderBy, err := query.orderBy(projectSortSpec)
+	if err != nil {
+		return nil, 0, err
+	}
 	clauses := []dal.Clause{
 		dal.From(&models.Project{}),
 	}
@@ -69,8 +91,11 @@ func GetProjects(query *ProjectQuery) ([]*models.ApiOutputProject, int64, errors
 		return nil, 0, errors.Default.Wrap(err, "error getting DB count of project")
 	}
 
+	if query.SortBy == projectSortLastRunAt {
+		clauses = append(clauses, dal.Select("projects.*"), dal.Join(projectLastRunJoin))
+	}
 	clauses = append(clauses,
-		dal.Orderby("created_at DESC"),
+		dal.Orderby(orderBy),
 		dal.Offset(query.GetSkip()),
 		dal.Limit(query.GetPageSize()),
 	)
@@ -227,6 +252,11 @@ func PatchProject(name string, body map[string]interface{}) (*models.ApiOutputPr
 
 	// name changed, updates the related entities as well
 	if name != project.Name {
+		// lock order: project row, then plugin rows such as OTel connections (by id), then core tables; hooks never take in-process lifecycle locks
+		err = runProjectRenameHooks(tx, name, project.Name)
+		if err != nil {
+			return nil, err
+		}
 		// ProjectMetric
 		err = tx.UpdateColumn(
 			&models.ProjectMetricSetting{},
@@ -287,6 +317,9 @@ func PatchProject(name string, body map[string]interface{}) (*models.ApiOutputPr
 			"name", project.Name,
 			dal.Where("name = ?", name),
 		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Blueprint
@@ -379,6 +412,10 @@ func DeleteProject(name string) errors.Error {
 			}
 		}
 	}()
+	// lock order: project row, then plugin rows such as OTel connections (by id), then core tables; hooks never take in-process lifecycle locks
+	if _, err = getProjectByName(tx, name, dal.Lock(true, false)); err != nil {
+		return err
+	}
 	if err = runProjectDeleteHooks(tx, name); err != nil {
 		return err
 	}
@@ -424,6 +461,19 @@ func runProjectDeleteHooks(tx dal.Transaction, projectName string) errors.Error 
 			// returned unwrapped: the hook's own message is the reason the
 			// user sees for the rejected delete
 			if err := hook.BeforeDeleteProject(tx, projectName); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func runProjectRenameHooks(tx dal.Transaction, oldName string, newName string) errors.Error {
+	return plugin.TraversalPlugin(func(name string, pluginInst plugin.PluginMeta) errors.Error {
+		if hook, ok := pluginInst.(plugin.ProjectRenameHook); ok {
+			// returned unwrapped: the hook's own message is the reason the
+			// user sees for the rejected rename
+			if err := hook.BeforeRenameProject(tx, oldName, newName); err != nil {
 				return err
 			}
 		}

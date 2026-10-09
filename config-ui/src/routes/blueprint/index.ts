@@ -16,7 +16,6 @@
  *
  */
 
-export * from './types';
 export * from './home';
 export * from './detail';
 export * from './connection-detail';

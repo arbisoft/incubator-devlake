@@ -16,10 +16,10 @@
  *
  */
 
-import { useState, useEffect } from 'react';
-import { uniqWith } from 'lodash';
 import { CaretRightOutlined } from '@ant-design/icons';
 import { theme, Collapse, Tag, Form, Select, Input } from 'antd';
+import { uniqWith } from 'lodash';
+import { useState, useEffect } from 'react';
 
 import API from '@/api';
 import { PageLoading, HelpTooltip, ExternalLink } from '@/components';

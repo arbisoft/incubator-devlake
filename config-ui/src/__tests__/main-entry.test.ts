@@ -18,9 +18,10 @@
 
 /// <reference types="node" />
 
-import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import path from 'path';
+
+import { describe, it, expect } from 'vitest';
 
 /**
  * Regression guard for the React 19 upgrade.

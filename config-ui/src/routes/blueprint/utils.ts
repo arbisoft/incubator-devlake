@@ -18,11 +18,7 @@
 
 export const validRawPlan = (rp: string) => {
   try {
-    const p = JSON.parse(rp);
-    if (p.flat().length === 0) {
-      return true;
-    }
-    return false;
+    return JSON.parse(rp).flat().length === 0;
   } catch {
     return true;
   }

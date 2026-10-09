@@ -16,47 +16,82 @@
  *
  */
 
+import axios from 'axios';
 import { useState, useEffect, useMemo, useRef } from 'react';
 
+type RetryOnError = { delay: number; limit: number };
+
 export const useAutoRefresh = <T>(
-  request: () => Promise<T>,
+  request: (signal: AbortSignal) => Promise<T>,
   deps: React.DependencyList = [],
   option?: {
     cancel?: (data?: T) => boolean;
     interval?: number;
     retryLimit?: number;
+    retryOnError?: RetryOnError;
   },
 ) => {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<T>();
+  const [error, setError] = useState<unknown>();
 
-  const timer = useRef<any>(undefined);
+  const timer = useRef<ReturnType<typeof setInterval>>(undefined);
+  const retryTimer = useRef<number | undefined>(undefined);
   const retryCount = useRef<number>(0);
 
   useEffect(() => {
-    setLoading(true);
-    request()
-      .then((data: T) => {
-        setData(data);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    const controller = new AbortController();
+    let failures = 0;
+
+    const run = () => {
+      setLoading(true);
+      request(controller.signal)
+        .then((data: T) => {
+          setData(data);
+          setError(undefined);
+          failures = 0;
+        })
+        .catch((err: unknown) => {
+          if (axios.isCancel(err)) return;
+          setError(err);
+          if (option?.retryOnError && failures < option.retryOnError.limit) {
+            failures += 1;
+            retryTimer.current = window.setTimeout(run, option.retryOnError.delay);
+          }
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    };
+
+    run();
+    return () => {
+      controller.abort();
+      window.clearTimeout(retryTimer.current);
+    };
   }, [...deps]);
 
   useEffect(() => {
+    const controller = new AbortController();
     timer.current = setInterval(() => {
       setLoading(true);
       retryCount.current += 1;
-      request()
+      request(controller.signal)
         .then((data) => {
           setData(data);
+          setError(undefined);
+        })
+        .catch((err: unknown) => {
+          if (!axios.isCancel(err)) setError(err);
         })
         .finally(() => {
           setLoading(false);
         });
     }, option?.interval ?? 5000);
-    return () => clearInterval(timer.current);
+    return () => {
+      controller.abort();
+      clearInterval(timer.current);
+    };
   }, [...deps]);
 
   useEffect(() => {
@@ -69,7 +104,8 @@ export const useAutoRefresh = <T>(
     () => ({
       loading,
       data,
+      error,
     }),
-    [loading, data],
+    [loading, data, error],
   );
 };

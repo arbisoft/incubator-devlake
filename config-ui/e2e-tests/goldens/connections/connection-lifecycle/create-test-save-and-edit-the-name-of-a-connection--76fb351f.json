@@ -1,0 +1,33 @@
+{
+  "titlePath": ["GitHub connection lifecycle through the UI", "create, test, save, and edit the name of a connection"],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/plugins/github/connections",
+      "body": {
+        "authMethod": "AccessToken",
+        "endpoint": "https://api.github.com/",
+        "name": "e2e-*",
+        "proxy": "",
+        "rateLimitPerHour": 0,
+        "token": "<masked>"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/plugins/github/connections/:id",
+      "body": {
+        "appId": "",
+        "authMethod": "AccessToken",
+        "endpoint": "https://api.github.com/",
+        "installationId": 0,
+        "name": "e2e-*-renamed",
+        "proxy": "",
+        "rateLimitPerHour": 0,
+        "refreshToken": "",
+        "secretKey": "",
+        "token": "<masked>"
+      }
+    }
+  ]
+}

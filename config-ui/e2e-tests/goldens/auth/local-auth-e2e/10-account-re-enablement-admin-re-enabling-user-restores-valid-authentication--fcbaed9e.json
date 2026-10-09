@@ -1,0 +1,40 @@
+{
+  "titlePath": [
+    "Local Password Authentication - Phases 1-4 Full E2E Suite",
+    "10. Account Re-enablement: Admin re-enabling user restores valid authentication"
+  ],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/access/local-users",
+      "body": {
+        "displayName": "Re-enable e2e_*",
+        "loginName": "e2e_*",
+        "role": "member"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/local/change-password",
+      "body": {
+        "password": "<masked>"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/access/users/:id",
+      "body": {
+        "role": "member",
+        "status": "disabled"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/access/users/:id",
+      "body": {
+        "role": "member",
+        "status": "active"
+      }
+    }
+  ]
+}

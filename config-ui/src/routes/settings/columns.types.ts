@@ -1,0 +1,56 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+import type { AccessRole, AccessStatus } from '@/api/access';
+
+export type RoleColumnOptions<T> = {
+  key: string;
+  title: string;
+  getRole: (record: T) => AccessRole;
+  getLabel: (record: T) => string;
+  onChange: (record: T, role: AccessRole) => void;
+};
+
+export type StatusColumnFilter = {
+  value?: AccessStatus;
+  options: { text: string; value: AccessStatus }[];
+};
+
+export type StatusColumnOptions<T> = {
+  key: string;
+  title: string;
+  getStatus: (record: T) => AccessStatus;
+  labels: Record<AccessStatus, string>;
+  filter?: StatusColumnFilter;
+};
+
+export type ActionsColumnOptions<T> = {
+  key: string;
+  title: string;
+  getStatus: (record: T) => AccessStatus;
+  getName: (record: T) => string;
+  labels: {
+    enable: string;
+    disable: string;
+    enableFor: (name: string) => string;
+    disableFor: (name: string) => string;
+    removeFor: (name: string) => string;
+  };
+  onToggle: (record: T, nextStatus: AccessStatus) => void;
+  onRemove: (record: T) => void;
+};

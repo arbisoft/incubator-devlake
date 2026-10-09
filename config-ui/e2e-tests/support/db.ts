@@ -19,7 +19,7 @@ import { execFileSync } from 'child_process';
 
 import { E2E_USER_PREFIX } from './env';
 
-export interface DbCredentials {
+interface DbCredentials {
   user: string;
   password: string;
   database: string;
@@ -28,7 +28,7 @@ export interface DbCredentials {
 }
 
 // Credentials come from E2E_DB_USER/PASSWORD/NAME, falling back to the app DB_URL (not E2E_DB_URL, which targets the Go test database).
-export function dbCredentials(): DbCredentials {
+function dbCredentials(): DbCredentials {
   let parsed: URL | undefined;
   if (process.env.DB_URL) {
     try {
@@ -101,6 +101,15 @@ export function resetLocalAuthState(): void {
   `);
 }
 
+// Removes the e2e- email users that tests add through the API and their audit rows (they have no identities until a first login).
+export function deleteEmailUsersNamedLike(prefix: string): void {
+  const pattern = `${prefix.replace(/'/g, "''")}%`;
+  runSql(`
+    DELETE FROM auth_access_users WHERE email LIKE '${pattern}';
+    DELETE FROM auth_access_audit_events WHERE target_email LIKE '${pattern}';
+  `);
+}
+
 export function countLocalCredentials(loginName: string): number {
   return Number(
     runSql(`SELECT COUNT(*) FROM auth_local_credentials WHERE login_name = '${loginName.replace(/'/g, "''")}';`).trim(),
@@ -111,4 +120,40 @@ export function passwordHashFor(loginName: string): string {
   return runSql(
     `SELECT password_hash FROM auth_local_credentials WHERE login_name = '${loginName.replace(/'/g, "''")}';`,
   ).trim();
+}
+
+// Whether the local credential still forces a password change; undefined when the login has no credential.
+export function mustChangePasswordFor(loginName: string): boolean | undefined {
+  const value = runSql(
+    `SELECT must_change_password FROM auth_local_credentials WHERE login_name = '${loginName.replace(/'/g, "''")}';`,
+  ).trim();
+  return value === '' ? undefined : value === '1';
+}
+
+// Number of hidden (removed from the UI, audit row kept) OTel connections of a team.
+export function hiddenOtelConnectionCount(teamName: string): number {
+  return Number(
+    runSql(
+      `SELECT COUNT(*) FROM _tool_claude_code_otel_connections WHERE team_name = '${teamName.replace(/'/g, "''")}' AND hidden_at IS NOT NULL;`,
+    ).trim(),
+  );
+}
+
+// Removes the connections of a test team with their credentials and project placements, after the API has revoked and hidden them.
+export function deleteOtelConnectionsOfTeam(teamName: string): void {
+  const team = teamName.replace(/'/g, "''");
+  runSql(`
+    DELETE FROM _tool_claude_code_otel_connection_projects WHERE connection_id IN (SELECT id FROM _tool_claude_code_otel_connections WHERE team_name = '${team}');
+    DELETE FROM _tool_claude_code_otel_credentials WHERE connection_id IN (SELECT id FROM _tool_claude_code_otel_connections WHERE team_name = '${team}');
+    DELETE FROM _tool_claude_code_otel_connections WHERE team_name = '${team}';
+  `);
+}
+
+// Pipelines outlive their blueprint and cannot be deleted through the API, so cleanup removes the rows named after test blueprints.
+export function deletePipelinesNamedLike(prefix: string): void {
+  const pattern = `${prefix.replace(/'/g, "''")}%`;
+  runSql(`
+    DELETE FROM _devlake_tasks WHERE pipeline_id IN (SELECT id FROM _devlake_pipelines WHERE name LIKE '${pattern}');
+    DELETE FROM _devlake_pipelines WHERE name LIKE '${pattern}';
+  `);
 }

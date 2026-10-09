@@ -16,8 +16,8 @@
  *
  */
 
-import { useEffect, useMemo, type ChangeEvent } from 'react';
 import { Input } from 'antd';
+import { useEffect, useMemo, type ChangeEvent } from 'react';
 
 import { Block } from '@/components';
 
@@ -59,7 +59,6 @@ export const Token = ({ type, initialValues, values, setValues, setErrors }: Pro
       required={!hasValidCustomHeaders}
     >
       <Input.Password
-        style={{ width: 386 }}
         placeholder={type === 'update' ? '********' : 'Your API Key'}
         value={values.token}
         onChange={(e: ChangeEvent<HTMLInputElement>) => setValues({ token: e.target.value })}

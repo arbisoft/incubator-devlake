@@ -1,0 +1,238 @@
+{
+  "moves": {
+    "auth/access-page.spec.ts": "settings/users.spec.ts"
+  },
+  "specs": {
+    "advanced/blueprint-detail.spec.ts": {
+      "tests": 10,
+      "expects": 57,
+      "backend": 8,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "advanced/blueprints.spec.ts": {
+      "tests": 5,
+      "expects": 24,
+      "backend": 5,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "advanced/pipelines.spec.ts": {
+      "tests": 7,
+      "expects": 26,
+      "backend": 1,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "auth/local-auth-e2e.spec.ts": {
+      "tests": 19,
+      "expects": 120,
+      "backend": 17,
+      "skips": 2,
+      "fixmes": 0
+    },
+    "auth/local-auth-state-a.spec.ts": {
+      "tests": 2,
+      "expects": 7,
+      "backend": 1,
+      "skips": 1,
+      "fixmes": 0
+    },
+    "auth/login-providers.spec.ts": {
+      "tests": 4,
+      "expects": 11,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "auth/rebase-matrix.spec.ts": {
+      "tests": 5,
+      "expects": 51,
+      "backend": 4,
+      "skips": 1,
+      "fixmes": 0
+    },
+    "connections/catalog.spec.ts": {
+      "tests": 8,
+      "expects": 32,
+      "backend": 2,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "connections/connection-detail.spec.ts": {
+      "tests": 3,
+      "expects": 16,
+      "backend": 4,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "connections/connection-lifecycle.spec.ts": {
+      "tests": 5,
+      "expects": 32,
+      "backend": 11,
+      "skips": 1,
+      "fixmes": 0
+    },
+    "connections/data-scope.spec.ts": {
+      "tests": 3,
+      "expects": 18,
+      "backend": 8,
+      "skips": 1,
+      "fixmes": 0
+    },
+    "connections/deprecation-notice.spec.ts": {
+      "tests": 1,
+      "expects": 8,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "connections/health.spec.ts": {
+      "tests": 4,
+      "expects": 17,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "connections/manage-dialog.spec.ts": {
+      "tests": 2,
+      "expects": 4,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "connections/webhooks.spec.ts": {
+      "tests": 1,
+      "expects": 13,
+      "backend": 3,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "keys/api-keys.spec.ts": {
+      "tests": 2,
+      "expects": 25,
+      "backend": 4,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "otel/claude-code-otel.spec.ts": {
+      "tests": 4,
+      "expects": 86,
+      "backend": 9,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "otel/ingestion-health.spec.ts": {
+      "tests": 2,
+      "expects": 9,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "otel/otel-dialogs.spec.ts": {
+      "tests": 3,
+      "expects": 21,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "projects/blueprint-connection.spec.ts": {
+      "tests": 5,
+      "expects": 19,
+      "backend": 2,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "projects/project-blueprint.spec.ts": {
+      "tests": 8,
+      "expects": 63,
+      "backend": 9,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "projects/project-rename.spec.ts": {
+      "tests": 1,
+      "expects": 7,
+      "backend": 4,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "projects/project-tabs.spec.ts": {
+      "tests": 9,
+      "expects": 43,
+      "backend": 6,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "projects/projects-list.spec.ts": {
+      "tests": 2,
+      "expects": 16,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "settings/activity.spec.ts": {
+      "tests": 1,
+      "expects": 4,
+      "backend": 1,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "settings/users.spec.ts": {
+      "tests": 4,
+      "expects": 21,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "shell/db-migrate.spec.ts": {
+      "tests": 1,
+      "expects": 7,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "shell/navigation.spec.ts": {
+      "tests": 5,
+      "expects": 31,
+      "backend": 2,
+      "skips": 1,
+      "fixmes": 0
+    },
+    "shell/redirects.spec.ts": {
+      "tests": 5,
+      "expects": 15,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "shell/sidebar.spec.ts": {
+      "tests": 6,
+      "expects": 39,
+      "backend": 1,
+      "skips": 1,
+      "fixmes": 0
+    },
+    "shell/theme.spec.ts": {
+      "tests": 2,
+      "expects": 23,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "smoke.spec.ts": {
+      "tests": 1,
+      "expects": 3,
+      "backend": 0,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "ui-kit/ui-kit.spec.ts": {
+      "tests": 1,
+      "expects": 4,
+      "backend": 0,
+      "skips": 1,
+      "fixmes": 0
+    }
+  }
+}

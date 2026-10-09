@@ -16,100 +16,42 @@
  *
  */
 
-import { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { Tabs, message } from 'antd';
-import axios from 'axios';
-import API from '@/api';
+import { useNavigate } from 'react-router-dom';
+
 import { PageLoading } from '@/components';
-import { useRefreshData } from '@/hooks';
-import { PATHS } from '@/config';
+import { BLUEPRINT_VIEW } from '@/config';
 
-import { FromEnum } from '../types';
+import { BlueprintConfiguration } from './configuration';
+import { useBlueprintDetail } from './hooks';
+import { BlueprintStatus } from './status';
+import type { BlueprintDetailProps } from './types';
+import { CONTEXT_ROUTES } from './utils';
 
-import { ConfigurationPanel } from './configuration-panel';
-import { StatusPanel } from './status-panel';
-import * as S from './styled';
-
-interface Props {
-  id: ID;
-  from: FromEnum;
-}
-
-export const BlueprintDetail = ({ id, from }: Props) => {
-  const [version, setVersion] = useState(1);
-  const [activeKey, setActiveKey] = useState('status');
-
-  const { state } = useLocation();
+export const BlueprintDetail = ({ blueprintId, context, view }: BlueprintDetailProps) => {
   const navigate = useNavigate();
+  const { detail, version, refresh } = useBlueprintDetail(blueprintId);
 
-  useEffect(() => {
-    setActiveKey(state?.activeKey ?? 'status');
-  }, [state]);
-
-  const { ready, data, error } = useRefreshData(async () => {
-    const [bpRes, pipelineRes] = await Promise.all([API.blueprint.get(id), API.blueprint.pipelines(id)]);
-    return [bpRes, pipelineRes.pipelines[0]];
-  }, [version]);
-  const [cachedData, setCachedData] = useState<{ id: ID; data: typeof data }>();
-
-  useEffect(() => {
-    if (ready && data) {
-      setCachedData({ id, data });
-    }
-  }, [id, ready, data]);
-
-  useEffect(() => {
-    if (axios.isAxiosError(error) && error.response?.status === 404) {
-      message.error(`Blueprint not found with id: ${id}`);
-      navigate(PATHS.BLUEPRINTS(), { replace: true });
-    }
-  }, [error, navigate, id]);
-
-  const handlRefresh = () => {
-    setVersion((v) => v + 1);
-  };
-
-  const handleChangeActiveKey = (activeKey: string) => {
-    setActiveKey(activeKey);
-  };
-
-  const displayData = ready && data ? data : cachedData?.id === id ? cachedData.data : undefined;
-
-  if (!displayData) {
+  if (!detail) {
     return <PageLoading />;
   }
 
-  const [blueprint, lastPipeline] = displayData;
+  const { blueprint, latestPipelineId } = detail;
+  const routes = CONTEXT_ROUTES[context];
 
-  return (
-    <S.Wrapper>
-      <Tabs
-        centered
-        items={[
-          {
-            key: 'status',
-            label: 'Status',
-            children: (
-              <StatusPanel from={from} blueprint={blueprint} pipelineId={lastPipeline?.id} onRefresh={handlRefresh} />
-            ),
-          },
-          {
-            key: 'configuration',
-            label: 'Configuration',
-            children: (
-              <ConfigurationPanel
-                from={from}
-                blueprint={blueprint}
-                onRefresh={handlRefresh}
-                onChangeTab={handleChangeActiveKey}
-              />
-            ),
-          },
-        ]}
-        activeKey={activeKey}
-        onChange={handleChangeActiveKey}
-      />
-    </S.Wrapper>
+  return view === BLUEPRINT_VIEW.STATUS ? (
+    <BlueprintStatus
+      context={context}
+      blueprint={blueprint}
+      pipelineId={latestPipelineId}
+      version={version}
+      onRefresh={refresh}
+    />
+  ) : (
+    <BlueprintConfiguration
+      blueprint={blueprint}
+      connectionPath={(plugin, connectionId) => routes.connection(blueprint, plugin, connectionId)}
+      onRefresh={refresh}
+      onShowStatus={() => navigate(routes.status(blueprint))}
+    />
   );
 };

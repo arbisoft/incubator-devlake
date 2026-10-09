@@ -18,34 +18,15 @@
 
 import styled from 'styled-components';
 
-export const Label = styled.label`
-  font-size: 16px;
-  font-weight: 600;
-`;
-
-export const LabelInfo = styled.i`
-  color: ${({ theme }) => theme.colors.secondary};
-`;
-
-export const LabelDescription = styled.p`
-  margin: 0;
-`;
-
-export const Endpoint = styled.div`
-  p {
-    margin: 10px 0;
-  }
-`;
-
 export const Input = styled.div`
-  margin-bottom: 8px;
+  margin-bottom: ${({ theme }) => theme.space.xs}px;
 
   .input {
     display: flex;
     align-items: center;
 
     .info {
-      margin-left: 4px;
+      margin-left: ${({ theme }) => theme.space.xxs}px;
 
       span.error {
         color: ${({ theme }) => theme.colors.error};
@@ -58,14 +39,14 @@ export const Input = styled.div`
   }
 
   .warning {
-    margin-top: 8px;
+    margin-top: ${({ theme }) => theme.space.xs}px;
   }
 `;
 
 export const Alert = styled.div`
-  margin-top: 8px;
-  padding: 12px 20px;
+  margin-top: ${({ theme }) => theme.space.xs}px;
+  padding: ${({ theme }) => theme.space.sm}px 20px;
   background: ${({ theme }) => theme.colors.bgLayout};
   border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 4px;
+  border-radius: ${({ theme }) => theme.radius.sm}px;
 `;

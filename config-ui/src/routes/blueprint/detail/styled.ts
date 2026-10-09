@@ -18,50 +18,76 @@
 
 import styled from 'styled-components';
 
-export const Wrapper = styled.div`
-  padding-bottom: 24px;
+import { textStyle } from '@/ui/style-helpers';
+
+export const Stack = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.sm}px;
 `;
 
-export const DialogBody = styled.div`
+export const Panel = styled.section`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.lg}px;
+  padding: ${({ theme }) => theme.space.sm}px;
+  background: ${({ theme }) => theme.colors.primarySubtle};
+  border-radius: ${({ theme }) => theme.radius.lg}px;
+`;
+
+export const PanelHead = styled.div`
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.space.md}px;
 `;
 
-export const ConfigurationPanel = styled.div`
-  .block + .block {
-    margin-top: 36px;
-  }
-
-  h3 {
-    margin-bottom: 16px;
-  }
-
-  .btns {
-    margin-top: 16px;
-    text-align: right;
-  }
+export const PanelTitle = styled.h2`
+  ${textStyle('h3')}
+  margin: 0;
+  color: ${({ theme }) => theme.colors.text};
 `;
 
-export const ConnectionList = styled.ul`
+export const PanelBody = styled.div`
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.sm}px;
+  min-width: 0;
+
+  &[hidden] {
+    display: none;
+  }
 `;
 
-export const ConnectionItem = styled.li`
-  margin-right: 24px;
-  padding: 12px 16px;
-  width: 280px;
+export const PanelActions = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: ${({ theme }) => theme.space.xs}px;
+`;
+
+export const ActionNote = styled.span`
+  ${textStyle('caption')}
+  margin-right: ${({ theme }) => theme.space.xs}px;
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
+
+export const EnabledSwitch = styled.label`
+  ${textStyle('body')}
+  display: inline-flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.xs}px;
+  margin-right: ${({ theme }) => theme.space.xs}px;
+  color: ${({ theme }) => theme.colors.text};
+`;
+
+export const EmptyNote = styled.p`
+  ${textStyle('body')}
+  margin: 0;
+  padding: ${({ theme }) => theme.space.md}px;
   background: ${({ theme }) => theme.colors.bgContainer};
-  box-shadow:
-    0px 2.4px 4.8px -0.8px rgba(0, 0, 0, 0.1),
-    0px 1.6px 8px rgba(0, 0, 0, 0.07);
-  border-radius: 4px;
-
-  &:last-child {
-    margin-right: 0;
-  }
-
-  .count {
-    margin: 24px 0;
-  }
+  border: 1px solid ${({ theme }) => theme.colors.borderSubtle};
+  border-radius: ${({ theme }) => theme.radius.lg}px;
+  color: ${({ theme }) => theme.colors.textSecondary};
 `;

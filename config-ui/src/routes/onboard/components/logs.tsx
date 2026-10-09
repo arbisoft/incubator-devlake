@@ -17,131 +17,61 @@
  */
 
 import { LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
-import { theme, Tooltip, Progress } from 'antd';
-import styled from 'styled-components';
+import { Tooltip, Progress } from 'antd';
 
-const Wrapper = styled.div`
-  padding: 10px 20px;
-  font-size: 12px;
-  color: #70727f;
-  background: #f6f6f8;
+import { STATUS_TONE } from '@/ui/constants';
 
-  .title {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+import { COPY, LOG_STATUS } from '../constants';
+import type { SyncLog } from '../types';
+import { getLogStatusText } from '../utils';
 
-    & > span.name {
-      width: 220px;
-      font-weight: 600;
-      white-space: nowrap;
-      text-overflow: ellipsis;
-      overflow: hidden;
-    }
+import {
+  Log,
+  LogName,
+  LogProgress,
+  LogTask,
+  LogTaskIcon,
+  LogTaskName,
+  LogTaskStatus,
+  LogTasks,
+  LogTitle,
+} from './styled';
 
-    & > span.progress {
-      margin-left: 12px;
-      flex: auto;
-    }
-  }
-
-  ul {
-    margin-top: 12px;
-  }
-
-  li {
-    display: flex;
-    margin-top: 6px;
-    position: relative;
-
-    &:first-child {
-      margin-top: 0;
-    }
-  }
-
-  span.name {
-    flex: auto;
-  }
-
-  span.status {
-    flex: 0 0 150px;
-  }
-
-  span.anticon {
-    position: absolute;
-    right: -15px;
-  }
-`;
-
-const getStatus = (task: { step: number; name: string; status: string; finishedRecords: number }) => {
-  if (task.status === 'pending') {
-    return 'Pending';
-  }
-
-  if (task.status === 'running' && task.name === 'Clone Git Repo') {
-    return 'N/A';
-  }
-
-  if (task.status === 'success' && task.name === 'Clone Git Repo') {
-    return 'Completed';
-  }
-
-  if (task.status === 'failed' && task.name === 'Clone Git Repo') {
-    return 'Failed';
-  }
-
-  if (['running', 'success', 'failed'].includes(task.status)) {
-    return `Records collected: ${task.finishedRecords}`;
-  }
+const STATUS_ICON = {
+  [LOG_STATUS.RUNNING]: { icon: <LoadingOutlined />, tone: STATUS_TONE.INFO },
+  [LOG_STATUS.SUCCESS]: { icon: <CheckCircleOutlined />, tone: STATUS_TONE.SUCCESS },
+  [LOG_STATUS.FAILED]: { icon: <CloseCircleOutlined />, tone: STATUS_TONE.ERROR },
 };
 
-interface LogsProps {
-  style?: React.CSSProperties;
-  log: {
-    plugin: string;
-    name: string;
-    percent: number;
-    tasks: Array<{
-      step: number;
-      name: string;
-      status: string;
-      finishedRecords: number;
-    }>;
-  };
-}
+type LogsProps = { log: SyncLog };
 
-export const Logs = ({ style, log: { plugin, name, percent, tasks } }: LogsProps) => {
-  const {
-    token: { green5, red5, colorPrimary },
-  } = theme.useToken();
-
+export const Logs = ({ log: { plugin, name, percent, tasks } }: LogsProps) => {
   if (!plugin) {
     return null;
   }
 
   return (
-    <Wrapper style={style}>
-      <div className="title">
+    <Log>
+      <LogTitle>
         <Tooltip title={name}>
-          <span className="name">{name}</span>
+          <LogName>{name}</LogName>
         </Tooltip>
-        <span className="progress">
+        <LogProgress>
           <Progress size="small" percent={percent} showInfo={false} />
-        </span>
-      </div>
-      <ul>
-        {tasks.map((task) => (
-          <li>
-            <span className="name">
-              Step {task.step} - {task.name}
-            </span>
-            <span className="status">{getStatus(task)}</span>
-            {task.status === 'running' && <LoadingOutlined style={{ color: colorPrimary }} />}
-            {task.status === 'success' && <CheckCircleOutlined style={{ color: green5 }} />}
-            {task.status === 'failed' && <CloseCircleOutlined style={{ color: red5 }} />}
-          </li>
-        ))}
-      </ul>
-    </Wrapper>
+        </LogProgress>
+      </LogTitle>
+      <LogTasks>
+        {tasks.map((task) => {
+          const indicator = task.status === LOG_STATUS.PENDING ? undefined : STATUS_ICON[task.status];
+          return (
+            <LogTask key={`${task.step}-${task.name}`}>
+              <LogTaskName>{COPY.logs.stepLabel(task.step, task.name)}</LogTaskName>
+              <LogTaskStatus>{getLogStatusText(task)}</LogTaskStatus>
+              {indicator && <LogTaskIcon $tone={indicator.tone}>{indicator.icon}</LogTaskIcon>}
+            </LogTask>
+          );
+        })}
+      </LogTasks>
+    </Log>
   );
 };

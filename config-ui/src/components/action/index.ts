@@ -16,6 +16,4 @@
  *
  */
 
-export * from './copy-text';
 export * from './external-link';
-export * from './icon-button';

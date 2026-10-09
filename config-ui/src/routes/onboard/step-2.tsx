@@ -16,41 +16,34 @@
  *
  */
 
-import { useState, useContext, useEffect, useMemo } from 'react';
+import { Button, Tooltip } from 'antd';
+import { useState, useContext, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Flex, Button, Tooltip } from 'antd';
 
 import API from '@/api';
-import { Markdown } from '@/components';
 import { PATHS } from '@/config';
 import { getPluginConfig } from '@/plugins';
 import { ConnectionToken } from '@/plugins/components/connection-form/fields/token';
 import { operator } from '@/utils';
 
+import { STORE_KEY } from './components/constants';
+import { CONNECTION_DEFAULTS, COPY, GUIDE_STEP, ONBOARD_PLUGIN, PLATFORM_NAME, WIZARD_STEP } from './constants';
 import { Context } from './context';
+import { StepActions } from './step-actions';
 import * as S from './styled';
+import type { ConnectionDraft } from './types';
+import { useGuide } from './use-guide';
 
-const paramsMap: Record<string, any> = {
-  github: {
-    authMethod: 'AccessToken',
-    endpoint: 'https://api.github.com/',
-  },
-  gitlab: {
-    endpoint: 'https://gitlab.com/api/v4/',
-  },
-  bitbucket: {
-    endpoint: 'https://api.bitbucket.org/2.0/',
-    usesApiToken: true,
-  },
-  azuredevops: {},
-};
+type TestPayload = Parameters<typeof API.connection.testOld>[1];
+
+const getDefaults = (plugin: string): ConnectionDraft =>
+  plugin in CONNECTION_DEFAULTS ? CONNECTION_DEFAULTS[plugin as keyof typeof CONNECTION_DEFAULTS] : {};
 
 export const Step2 = () => {
-  const [QA, setQA] = useState('');
   const [operating, setOperating] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [testStaus, setTestStatus] = useState(false);
-  const [payload, setPayload] = useState<any>({});
+  const [testStatus, setTestStatus] = useState(false);
+  const [payload, setPayload] = useState<ConnectionDraft>({});
 
   const { step, records, done, projectName, plugin, setStep, setRecords } = useContext(Context);
 
@@ -58,17 +51,13 @@ export const Step2 = () => {
 
   // Get the auth field component for Bitbucket
   const BitbucketAuthField = useMemo(() => {
-    if (plugin === 'bitbucket' && config?.connection?.fields) {
+    if (plugin === ONBOARD_PLUGIN.BITBUCKET && config?.connection?.fields) {
       return config.connection.fields[1];
     }
     return null;
   }, [plugin, config]);
 
-  useEffect(() => {
-    fetch(`/onboard/step-2/${plugin}.md`)
-      .then((res) => res.text())
-      .then((text) => setQA(text));
-  }, [plugin]);
+  const guide = useGuide(GUIDE_STEP.CONNECTION, plugin);
 
   const handleTest = async () => {
     if (!plugin) {
@@ -76,15 +65,11 @@ export const Step2 = () => {
     }
 
     const [success] = await operator(
-      async () =>
-        await API.connection.testOld(plugin, {
-          ...paramsMap[plugin],
-          ...payload,
-        }),
+      async () => await API.connection.testOld(plugin, { ...getDefaults(plugin), ...payload } as TestPayload),
       {
         setOperating: setTesting,
-        formatMessage: () => 'Connection success.',
-        formatReason: () => 'Connection failed. Please check your token or network.',
+        formatMessage: () => COPY.connection.connectSuccess,
+        formatReason: () => COPY.connection.connectFailed,
       },
     );
 
@@ -102,9 +87,9 @@ export const Step2 = () => {
       async () => {
         const connection = await API.connection.create(plugin, {
           name: `${plugin}-${Date.now()}`,
-          ...paramsMap[plugin],
+          ...getDefaults(plugin),
           ...payload,
-        });
+        } as Parameters<typeof API.connection.create>[1]);
 
         const newRecords = [
           ...records,
@@ -113,8 +98,8 @@ export const Step2 = () => {
 
         setRecords(newRecords);
 
-        await API.store.set('onboard', {
-          step: 3,
+        await API.store.set(STORE_KEY, {
+          step: WIZARD_STEP.SCOPE,
           records: newRecords,
           done,
           projectName,
@@ -136,28 +121,32 @@ export const Step2 = () => {
     return null;
   }
 
-  const platformNames: Record<string, string> = {
-    github: 'GitHub',
-    gitlab: 'GitLab',
-    azuredevops: 'Azure DevOps',
-  };
+  const connectButton = (disabled: boolean) => (
+    <S.Connect>
+      <Tooltip title={COPY.connection.testTooltip}>
+        <Button type="primary" disabled={disabled} loading={testing} onClick={handleTest}>
+          {COPY.connection.connect}
+        </Button>
+      </Tooltip>
+    </S.Connect>
+  );
 
   return (
     <>
       <S.StepContent>
-        {platformNames[plugin] && (
-          <div className="content">
+        {PLATFORM_NAME[plugin] && (
+          <S.Form>
             <ConnectionToken
               type="create"
-              label="Personal Access Token"
+              label={COPY.connection.tokenLabel}
               subLabel={
-                <p>
-                  Create a personal access token in {platformNames[plugin]}. For self-managed {config.name}, please skip
-                  the onboarding and configure via <Link to={PATHS.CONNECTIONS()}>Data Connections</Link>.
-                </p>
+                <>
+                  {COPY.connection.tokenDescription(PLATFORM_NAME[plugin], config.name)}{' '}
+                  <Link to={PATHS.CONNECTIONS()}>{COPY.dataConnections}</Link>.
+                </>
               }
               initialValue=""
-              value={payload.token}
+              value={payload.token ?? ''}
               setValue={(token) => {
                 setPayload({ ...payload, token });
                 setTestStatus(false);
@@ -165,60 +154,37 @@ export const Step2 = () => {
               error=""
               setError={() => {}}
             />
-            <Tooltip title="Test Connection">
-              <Button
-                style={{ marginTop: 16 }}
-                type="primary"
-                disabled={!payload.token}
-                loading={testing}
-                onClick={handleTest}
-              >
-                Connect
-              </Button>
-            </Tooltip>
-          </div>
+            {connectButton(!payload.token)}
+          </S.Form>
         )}
-        {['bitbucket'].includes(plugin) && BitbucketAuthField && (
-          <div className="content">
+        {plugin === ONBOARD_PLUGIN.BITBUCKET && BitbucketAuthField && (
+          <S.Form>
             {BitbucketAuthField({
               type: 'create',
               initialValues: {
-                endpoint: 'https://api.bitbucket.org/2.0/',
-                usesApiToken: true,
+                ...CONNECTION_DEFAULTS[ONBOARD_PLUGIN.BITBUCKET],
                 username: '',
                 password: '',
               },
               values: payload,
               errors: {},
-              setValues: (values: any) => {
+              setValues: (values: ConnectionDraft) => {
                 setPayload({ ...payload, ...values });
                 setTestStatus(false);
               },
               setErrors: () => {},
             })}
-            <Tooltip title="Test Connection">
-              <Button
-                style={{ marginTop: 16 }}
-                type="primary"
-                disabled={!payload.username || !payload.password}
-                loading={testing}
-                onClick={handleTest}
-              >
-                Connect
-              </Button>
-            </Tooltip>
-          </div>
+            {connectButton(!payload.username || !payload.password)}
+          </S.Form>
         )}
-        <Markdown className="qa">{QA}</Markdown>
+        <S.Guide>{guide}</S.Guide>
       </S.StepContent>
-      <Flex style={{ marginTop: 36 }} justify="space-between">
-        <Button ghost type="primary" loading={operating} onClick={() => setStep(step - 1)}>
-          Previous Step
-        </Button>
-        <Button type="primary" loading={operating} disabled={!testStaus} onClick={handleSubmit}>
-          Next Step
-        </Button>
-      </Flex>
+      <StepActions
+        loading={operating}
+        nextDisabled={!testStatus}
+        onPrevious={() => setStep(step - 1)}
+        onNext={handleSubmit}
+      />
     </>
   );
 };
