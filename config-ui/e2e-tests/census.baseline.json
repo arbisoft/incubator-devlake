@@ -185,6 +185,13 @@
       "skips": 0,
       "fixmes": 0
     },
+    "settings/grafana-users.spec.ts": {
+      "tests": 15,
+      "expects": 102,
+      "backend": 22,
+      "skips": 0,
+      "fixmes": 0
+    },
     "settings/users.spec.ts": {
       "tests": 4,
       "expects": 21,

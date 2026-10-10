@@ -18,6 +18,7 @@
 import { execFileSync } from 'child_process';
 
 import { E2E_USER_PREFIX } from './env';
+import { assertE2eEmail } from './grafana-safety';
 
 interface DbCredentials {
   user: string;
@@ -114,6 +115,22 @@ export function countLocalCredentials(loginName: string): number {
   return Number(
     runSql(`SELECT COUNT(*) FROM auth_local_credentials WHERE login_name = '${loginName.replace(/'/g, "''")}';`).trim(),
   );
+}
+
+export function readGrafanaProjectMappings(login: string): string[] {
+  if (login !== 'admin') {
+    assertE2eEmail(login);
+  }
+  const escapedLogin = login.replace(/'/g, "''");
+  let output: string;
+  try {
+    output = runSql(
+      `SELECT project_name FROM user_project_mapping WHERE user_login = '${escapedLogin}' ORDER BY project_name;`,
+    );
+  } catch {
+    throw new Error('Grafana project mapping lookup failed.');
+  }
+  return output.split(/\r?\n/).filter(Boolean);
 }
 
 export function passwordHashFor(loginName: string): string {

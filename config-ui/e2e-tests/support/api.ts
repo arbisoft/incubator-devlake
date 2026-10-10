@@ -19,7 +19,22 @@ import { APIRequestContext, APIResponse, PlaywrightWorkerArgs, expect } from '@p
 
 import { getAdminSessionToken } from '../auth-helpers';
 
+import { clearGrafanaOrphan, deleteGrafanaUserByEmail } from './api-grafana';
 import { API_URL } from './env';
+import { setGrafanaAdmin } from './grafana';
+import { createGrafanaCleanupRegistry as createCleanupRegistry } from './grafana-cleanup';
+
+export { createGrafanaUser, listGrafanaUsers } from './api-grafana';
+export { deleteGrafanaAccountByEmail, grafanaPasswordLoginWorks, setGrafanaAdmin } from './grafana';
+
+export function createGrafanaCleanupRegistry(api: APIRequestContext, playwright: PlaywrightWorkerArgs['playwright']) {
+  return createCleanupRegistry({
+    revokeAdmin: (email) => setGrafanaAdmin(playwright, email, false),
+    deleteUser: (email) => deleteGrafanaUserByEmail(api, playwright, email),
+    clearOrphan: (account) => clearGrafanaOrphan(api, account),
+    deleteProject: (name) => deleteProject(api, name),
+  });
+}
 
 const CSRF_TOKEN = 'e2e-csrf-token';
 
