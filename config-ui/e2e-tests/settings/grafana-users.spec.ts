@@ -18,10 +18,10 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { APIRequestContext, Page } from '@playwright/test';
+import { expect, type APIRequestContext, type Page } from '@playwright/test';
 
 import { loginAsAdmin } from '../auth-helpers';
-import { test, expect } from '../fixtures';
+import { test } from '../fixtures';
 import {
   adminApi,
   createEmailUser,
@@ -36,12 +36,10 @@ import {
 } from '../support/api';
 import { GRAFANA_ROLE, GRAFANA_USERS_COPY, USER_MANAGEMENT_COPY, type GrafanaRole } from '../support/app-copy';
 import { deleteEmailUsersNamedLike, readGrafanaProjectMappings } from '../support/db';
+import { passwordMatches } from '../support/grafana-safety';
 import { PATHS } from '../support/pages/paths';
-import {
-  GrafanaOneTimePasswordDialog,
-  GrafanaUserFormDialog,
-  SettingsGrafanaUsersPage,
-} from '../support/pages/settings-grafana-users';
+import { GrafanaOneTimePasswordDialog, GrafanaUserFormDialog } from '../support/pages/settings-grafana-user-dialogs';
+import { SettingsGrafanaUsersPage } from '../support/pages/settings-grafana-users';
 import { SettingsUsersPage } from '../support/pages/settings-users';
 import { ShellPage } from '../support/pages/shell';
 
@@ -53,6 +51,7 @@ test.describe('Grafana user management ordinary flows', () => {
   let accessUserEmail: string | undefined;
   const previousCopyPromptSetting = process.env.PLAYWRIGHT_NO_COPY_PROMPT;
   const inMemoryPasswords = new Set<string>();
+  const { disable, enable } = GRAFANA_USERS_COPY.confirm;
 
   const rememberPassword = (password: string): string => {
     inMemoryPasswords.add(password);
@@ -235,8 +234,8 @@ test.describe('Grafana user management ordinary flows', () => {
     const oneTime = new GrafanaOneTimePasswordDialog(page, normalizedEmail);
     await expect.poll(() => oneTime.isVisible()).toBe(true);
     const shownPassword = rememberPassword(await oneTime.readPassword());
-    expect(shownPassword.length >= 15).toBe(true);
-    expect(shownPassword === password).toBe(true);
+    expect(shownPassword.length).toBeGreaterThanOrEqual(15);
+    expect(passwordMatches(shownPassword, password)).toBe(true);
     expect(await oneTime.copyMatches(shownPassword)).toBe(true);
     expect(await grafanaPasswordLoginWorks(playwright, normalizedEmail, password)).toBe(true);
     await oneTime.close();
@@ -432,14 +431,12 @@ test.describe('Grafana user management ordinary flows', () => {
     await users.open();
     const row = await users.openUser(email);
     await row.requestDisable();
-    const disable = GRAFANA_USERS_COPY.confirm.disable;
     await expect(users.confirmationDialog(disable.title(email))).toBeVisible();
     await users.confirmAction(disable.title(email), disable.confirm);
     await expect.poll(() => visibleUser(email)).toMatchObject({ id: seeded.id, disabled: true });
     expect(await grafanaPasswordLoginWorks(playwright, email, password)).toBe(false);
 
     await (await users.openUser(email)).requestEnable();
-    const enable = GRAFANA_USERS_COPY.confirm.enable;
     await users.confirmAction(enable.title(email), enable.confirm);
     await expect.poll(() => visibleUser(email)).toMatchObject({ id: seeded.id, disabled: false });
     expect(await grafanaPasswordLoginWorks(playwright, email, password)).toBe(true);
@@ -538,8 +535,8 @@ test.describe('Grafana user management ordinary flows', () => {
     const oneTime = new GrafanaOneTimePasswordDialog(page, email);
     await expect.poll(() => oneTime.isVisible()).toBe(true);
     const revealed = rememberPassword(await oneTime.readPassword());
-    expect(revealed.length >= 15).toBe(true);
-    expect(revealed === newPassword).toBe(true);
+    expect(revealed.length).toBeGreaterThanOrEqual(15);
+    expect(passwordMatches(revealed, newPassword)).toBe(true);
     expect(await oneTime.copyMatches(revealed)).toBe(true);
     await oneTime.close();
     await expect.poll(() => visibleUser(email)).toMatchObject({ id: seeded.id });

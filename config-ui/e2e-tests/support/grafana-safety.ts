@@ -20,6 +20,10 @@ import { isIP } from 'node:net';
 const E2E_EMAIL_PATTERN = /^e2e-[a-z0-9][a-z0-9._+-]*@[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/i;
 const E2E_PROJECT_PATTERN = /^e2e-[a-z0-9][a-z0-9._-]*$/i;
 
+export function passwordMatches(actual: string, expected: string): boolean {
+  return actual === expected;
+}
+
 export function assertLoopbackTarget(target: string): void {
   let url: URL;
   try {
