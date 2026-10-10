@@ -16,33 +16,37 @@
  *
  */
 
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { flatten } from 'lodash';
+import { createSlice, createAsyncThunk, type SerializedError } from '@reduxjs/toolkit';
 
 import API from '@/api';
 import { RootState } from '@/app/store';
-import { IConnection, IConnectionStatus, IWebhook, IStatus } from '@/types';
+import { IConnection, IConnectionAPI, IConnectionStatus, IWebhook, IStatus } from '@/types';
 
-import { transformConnection, transformWebhook } from './utils';
+import { HEALTH_PROBE_TIMEOUT_MS, WEBHOOK_PLUGIN } from './constants';
+import { healthFromTestError, healthFromTestResult, readStoredHealth } from './health';
+import type { ConnectionHealthEntry, ConnectionHealthMap } from './types';
+import { getErrorResponse, transformConnection, transformWebhook } from './utils';
 
 const initialState: {
   status: IStatus;
-  error: any;
+  error: SerializedError | null;
   plugins: string[];
   connections: IConnection[];
   webhooks: IWebhook[];
+  health: ConnectionHealthMap;
 } = {
   status: 'idle',
   error: null,
   plugins: [],
   connections: [],
   webhooks: [],
+  health: readStoredHealth(),
 };
 
 export const init = createAsyncThunk('connections/init', async (plugins: string[]) => {
   const connections = await Promise.all(
     plugins
-      .filter((plugin) => plugin !== 'webhook')
+      .filter((plugin) => plugin !== WEBHOOK_PLUGIN)
       .map(async (plugin) => {
         const connections = await API.connection.list(plugin);
         return connections.map((connection) => transformConnection(plugin, connection));
@@ -51,7 +55,7 @@ export const init = createAsyncThunk('connections/init', async (plugins: string[
 
   const webhooks = await Promise.all(
     plugins
-      .filter((plugin) => plugin === 'webhook')
+      .filter((plugin) => plugin === WEBHOOK_PLUGIN)
       .map(async () => {
         const webhooks = await API.plugin.webhook.list();
         return webhooks.map((webhook) => transformWebhook(webhook));
@@ -60,19 +64,24 @@ export const init = createAsyncThunk('connections/init', async (plugins: string[
 
   return {
     plugins,
-    connections: flatten(connections),
-    webhooks: flatten(webhooks),
+    connections: connections.flat(),
+    webhooks: webhooks.flat(),
   };
 });
 
-export const addConnection = createAsyncThunk('connections/addConnection', async ({ plugin, ...payload }: any) => {
-  const connection = await API.connection.create(plugin, payload);
-  return transformConnection(plugin, connection);
-});
+type ConnectionPayload = Omit<IConnectionAPI, 'id'>;
+
+export const addConnection = createAsyncThunk(
+  'connections/addConnection',
+  async ({ plugin, ...payload }: ConnectionPayload & { plugin: string }) => {
+    const connection = await API.connection.create(plugin, payload);
+    return transformConnection(plugin, connection);
+  },
+);
 
 export const updateConnection = createAsyncThunk(
   'connections/updateConnection',
-  async ({ plugin, connectionId, ...payload }: any) => {
+  async ({ plugin, connectionId, ...payload }: ConnectionPayload & { plugin: string; connectionId: ID }) => {
     const connection = await API.connection.update(plugin, connectionId, payload);
     return transformConnection(plugin, connection);
   },
@@ -80,12 +89,14 @@ export const updateConnection = createAsyncThunk(
 
 export const removeConnection = createAsyncThunk(
   'connections/removeConnection',
-  async ({ plugin, connectionId }: any, { rejectWithValue }) => {
+  async ({ plugin, connectionId }: { plugin: string; connectionId: ID }, { rejectWithValue }) => {
     try {
       await API.connection.remove(plugin, connectionId);
       return `${plugin}-${connectionId}`;
-    } catch (err: any) {
-      return rejectWithValue({ ...err.response.data, status: err.response.status });
+    } catch (err: unknown) {
+      const response = getErrorResponse(err);
+      if (!response) throw err;
+      return rejectWithValue({ ...response.data, status: response.status });
     }
   },
 );
@@ -99,14 +110,29 @@ export const testConnection = createAsyncThunk(
       return {
         unique,
         status: res.success ? IConnectionStatus.ONLINE : IConnectionStatus.OFFLINE,
+        health: healthFromTestResult(res, Date.now()),
       };
-    } catch (err: any) {
-      return rejectWithValue({ unique, response: err.response });
+    } catch (err: unknown) {
+      return rejectWithValue({ unique, response: getErrorResponse(err), health: healthFromTestError(err, Date.now()) });
     }
   },
 );
 
-export const addWebhook = createAsyncThunk('connections/addWebhook', async (payload: any) => {
+// Background probe: records health only and leaves `status` to the user-initiated test above.
+// The timeout keeps a hung host from holding one of the few probe slots.
+export const checkConnectionHealth = createAsyncThunk(
+  'connections/checkConnectionHealth',
+  async ({ plugin, id, unique }: IConnection) => {
+    try {
+      const res = await API.connection.test(plugin, id, undefined, HEALTH_PROBE_TIMEOUT_MS);
+      return { unique, health: healthFromTestResult(res, Date.now()) };
+    } catch (err: unknown) {
+      return { unique, health: healthFromTestError(err, Date.now()) };
+    }
+  },
+);
+
+export const addWebhook = createAsyncThunk('connections/addWebhook', async (payload: { name: string }) => {
   const webhook = await API.plugin.webhook.create(payload);
   return {
     webhook: transformWebhook(webhook),
@@ -119,10 +145,13 @@ export const removeWebhook = createAsyncThunk('connections/removeWebhook', async
   return id;
 });
 
-export const updateWebhook = createAsyncThunk('connections/updateWebhook', async ({ id, ...payload }: any) => {
-  const webhook = await API.plugin.webhook.update(id, payload);
-  return webhook;
-});
+export const updateWebhook = createAsyncThunk(
+  'connections/updateWebhook',
+  async ({ id, ...payload }: { id: ID; name: string }) => {
+    const webhook = await API.plugin.webhook.update(id, payload);
+    return webhook;
+  },
+);
 
 export const renewWebhookApiKey = createAsyncThunk('connections/renewWebhookApiKey', async (id: ID, { getState }) => {
   const webhook = (getState() as RootState).connections.webhooks.find((wh) => wh.id === id) as IWebhook;
@@ -149,7 +178,6 @@ export const connectionsSlice = createSlice({
         state.status = 'success';
       })
       .addCase(init.rejected, (state, action) => {
-        console.error(action.error.stack);
         state.status = 'failed';
         state.error = action.error;
       })
@@ -163,9 +191,11 @@ export const connectionsSlice = createSlice({
           }
           return cs;
         });
+        delete state.health[action.payload.unique];
       })
       .addCase(removeConnection.fulfilled, (state, action) => {
         state.connections = state.connections.filter((cs) => cs.unique !== action.payload);
+        delete state.health[action.payload];
       })
       .addCase(testConnection.pending, (state, action) => {
         const existingConnection = state.connections.find((cs) => cs.unique === action.meta.arg.unique);
@@ -178,12 +208,20 @@ export const connectionsSlice = createSlice({
         if (existingConnection) {
           existingConnection.status = action.payload.status;
         }
+        state.health[action.payload.unique] = action.payload.health;
       })
       .addCase(testConnection.rejected, (state, action) => {
         const existingConnection = state.connections.find((cs) => cs.unique === action.meta.arg.unique);
         if (existingConnection) {
           existingConnection.status = IConnectionStatus.OFFLINE;
         }
+        const payload = action.payload as { health?: ConnectionHealthEntry } | undefined;
+        if (payload?.health) {
+          state.health[action.meta.arg.unique] = payload.health;
+        }
+      })
+      .addCase(checkConnectionHealth.fulfilled, (state, action) => {
+        state.health[action.payload.unique] = action.payload.health;
       })
       .addCase(addWebhook.fulfilled, (state, action) => {
         state.webhooks.push(action.payload.webhook);
@@ -199,8 +237,6 @@ export const connectionsSlice = createSlice({
   },
 });
 
-export default connectionsSlice.reducer;
-
 export const selectStatus = (state: RootState) => state.connections.status;
 
 export const selectError = (state: RootState) => state.connections.error;
@@ -209,11 +245,10 @@ export const selectPlugins = (state: RootState) => state.connections.plugins;
 
 export const selectAllConnections = (state: RootState) => state.connections.connections;
 
-export const selectConnections = (state: RootState, plugin: string) =>
-  state.connections.connections.filter((connection) => connection.plugin === plugin);
-
 export const selectConnection = (state: RootState, unique: string) =>
   state.connections.connections.find((cs) => cs.unique === unique);
+
+export const selectHealth = (state: RootState) => state.connections.health;
 
 export const selectWebhooks = (state: RootState) => state.connections.webhooks;
 

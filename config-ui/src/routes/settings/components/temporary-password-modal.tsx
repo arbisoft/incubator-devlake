@@ -1,0 +1,77 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+import { CopyOutlined, LockOutlined } from '@ant-design/icons';
+import { Button, Input, Space, Tooltip } from 'antd';
+import { CopyToClipboard } from 'react-copy-to-clipboard';
+import { useTheme } from 'styled-components';
+
+import { FormField, MODAL_WIDTH } from '@/ui';
+
+import { COPY } from '../constants';
+
+import { Dialog, Hint, TitleRow } from './styled';
+import type { TemporaryPasswordModalProps } from './types';
+
+export const TemporaryPasswordModal = ({
+  open,
+  credential,
+  copy = COPY.modals.temporaryPassword,
+  onClose,
+  onClosed,
+}: TemporaryPasswordModalProps) => {
+  const { layout } = useTheme();
+
+  return (
+    <Dialog
+      open={open}
+      centered
+      destroyOnHidden
+      keyboard={false}
+      closable={false}
+      mask={{ closable: false }}
+      width={layout.modalWidth[MODAL_WIDTH.MD]}
+      title={
+        <TitleRow>
+          <LockOutlined aria-hidden />
+          {copy.title}
+        </TitleRow>
+      }
+      footer={
+        <Button type="primary" onClick={onClose}>
+          {copy.done}
+        </Button>
+      }
+      afterClose={onClosed}
+    >
+      <Hint>{copy.hint}</Hint>
+      <FormField label={copy.passwordFor(credential?.loginName ?? '')}>
+        {(control) => (
+          <Space.Compact block>
+            <Input {...control} readOnly value={credential?.temporaryPassword ?? ''} />
+            <CopyToClipboard text={credential?.temporaryPassword ?? ''}>
+              <Tooltip title={copy.copy}>
+                <Button icon={<CopyOutlined />} aria-label={copy.copy} />
+              </Tooltip>
+            </CopyToClipboard>
+          </Space.Compact>
+        )}
+      </FormField>
+    </Dialog>
+  );
+};

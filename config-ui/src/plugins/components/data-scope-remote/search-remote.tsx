@@ -16,55 +16,53 @@
  *
  */
 
-import { useState, useEffect, useMemo } from 'react';
 import { SearchOutlined } from '@ant-design/icons';
-import { Space, Tag, Input, message } from 'antd';
-import type { McsID, McsItem, McsColumn } from 'miller-columns-select';
-import MillerColumnsSelect from 'miller-columns-select';
 import { useDebounce } from 'ahooks';
+import { Input } from 'antd';
 import { uniqBy } from 'lodash';
+import type { McsItem } from 'miller-columns-select';
+import { useState, useEffect, useEffectEvent, useMemo } from 'react';
 
 import API from '@/api';
-import { Loading, Block } from '@/components';
-import { IPluginConfig } from '@/types';
-import { getPluginScopeName } from '@/plugins';
+import { Block } from '@/components';
+import { getPluginScopeName } from '@/plugins/utils';
 
-import * as T from './types';
-import * as S from './styled';
+import { COPY, ROOT_COLUMN_ID, SCOPE_ITEM_TYPE, SEARCH_DEBOUNCE_MS, SEARCH_PAGE_SIZE } from './constants';
+import { loadChildren } from './load-children';
+import { ScopePanes } from './scope-panes';
+import { SelectedScopes } from './selected-scopes';
+import { Stack } from './styled';
+import type { ResItem, SearchProps } from './types';
+import { toBrowseProps, toSelectionProps } from './utils';
 
-interface Props {
-  mode: 'single' | 'multiple';
-  plugin: string;
-  connectionId: ID;
-  config: IPluginConfig['dataScope'];
-  disabledScope: any[];
-  selectedScope: any[];
-  onChange: (selectedScope: any[]) => void;
-}
+type MillerState = {
+  items: McsItem<ResItem>[];
+  loadedIds: ID[];
+  errorId?: ID | null;
+  nextTokenMap: Record<ID, string>;
+};
 
-export const SearchRemote = ({ mode, plugin, connectionId, config, disabledScope, selectedScope, onChange }: Props) => {
-  const [miller, setMiller] = useState<{
-    items: McsItem<T.ResItem>[];
-    loadedIds: ID[];
-    errorId?: ID | null;
-    nextTokenMap: Record<ID, string>;
-  }>({
-    items: [],
-    loadedIds: [],
-    nextTokenMap: {},
-  });
+type SearchState = {
+  loading: boolean;
+  items: McsItem<ResItem>[];
+  currentItems: McsItem<ResItem>[];
+  query: string;
+  page: number;
+  total: number;
+  hasMore: boolean;
+};
 
-  const PAGE_SIZE = 50;
-
-  const [search, setSearch] = useState<{
-    loading: boolean;
-    items: McsItem<T.ResItem>[];
-    currentItems: McsItem<T.ResItem>[];
-    query: string;
-    page: number;
-    total: number;
-    hasMore: boolean;
-  }>({
+export const SearchRemote = ({
+  mode,
+  plugin,
+  connectionId,
+  config,
+  disabledScope,
+  selectedScope,
+  onChange,
+}: SearchProps) => {
+  const [miller, setMiller] = useState<MillerState>({ items: [], loadedIds: [], nextTokenMap: {} });
+  const [search, setSearch] = useState<SearchState>({
     loading: true,
     items: [],
     currentItems: [],
@@ -74,38 +72,30 @@ export const SearchRemote = ({ mode, plugin, connectionId, config, disabledScope
     hasMore: false,
   });
 
-  const searchDebounce = useDebounce(search.query, { wait: 500 });
+  const searchDebounce = useDebounce(search.query, { wait: SEARCH_DEBOUNCE_MS });
 
   const allItems = useMemo(
     () =>
       uniqBy(
-        [...miller.items, ...search.items].filter((it) => it.type === 'scope'),
+        [...miller.items, ...search.items].filter((it) => it.type === SCOPE_ITEM_TYPE.SCOPE),
         'id',
       ),
     [miller.items, search.items],
   );
 
   const getItems = async (groupId: ID | null, currentPageToken?: string) => {
-    let newItems: McsItem<T.ResItem>[] = [];
-    let nextPageToken = '';
-    let errorId: ID | null;
-
-    try {
-      const res = await API.scope.remote(plugin, connectionId, {
-        groupId,
-        pageToken: currentPageToken,
-      });
-
-      newItems = (res?.children ?? []).map((it) => ({
-        ...it,
-        title: getPluginScopeName(plugin, it) || it.name,
-      }));
-
-      nextPageToken = res.nextPageToken;
-    } catch (err: any) {
-      errorId = groupId;
-      message.error(err.response.data.message);
-    }
+    const {
+      items: newItems,
+      nextPageToken,
+      failed,
+    } = await loadChildren({
+      plugin,
+      connectionId,
+      groupId,
+      pageToken: currentPageToken,
+      toTitle: (it) => getPluginScopeName(plugin, it) || it.name,
+    });
+    const errorId = failed ? groupId : undefined;
 
     if (nextPageToken && newItems.length) {
       setMiller((m) => ({
@@ -113,32 +103,33 @@ export const SearchRemote = ({ mode, plugin, connectionId, config, disabledScope
         items: [...m.items, ...newItems],
         nextTokenMap: {
           ...m.nextTokenMap,
-          [`${groupId ? groupId : 'root'}`]: nextPageToken,
+          [groupId ?? ROOT_COLUMN_ID]: nextPageToken,
         },
       }));
     } else {
       setMiller((m) => ({
         ...m,
         items: [...m.items, ...newItems],
-        loadedIds: [...m.loadedIds, groupId ?? 'root'],
+        loadedIds: [...m.loadedIds, groupId ?? ROOT_COLUMN_ID],
         errorId,
       }));
     }
   };
 
+  const loadRoot = useEffectEvent(() => getItems(null));
+
   useEffect(() => {
-    getItems(null);
+    loadRoot();
   }, []);
 
-  const searchItems = async () => {
-    if (!searchDebounce) return;
-
+  const runSearch = useEffectEvent(async (term: string, page: number, isStale: () => boolean) => {
     try {
       const res = await API.scope.searchRemote(plugin, connectionId, {
-        search: searchDebounce,
-        page: search.page,
-        pageSize: PAGE_SIZE,
+        search: term,
+        page,
+        pageSize: SEARCH_PAGE_SIZE,
       });
+      if (isStale()) return;
 
       const newItems = (res?.children ?? []).map((it) => ({
         ...it,
@@ -146,90 +137,61 @@ export const SearchRemote = ({ mode, plugin, connectionId, config, disabledScope
       }));
 
       const total = res.count ?? 0;
-      // If the backend returns a real total, use it; otherwise fall back to
-      // the heuristic: a full page means there are likely more results.
-      const hasMore = total > 0 ? search.page * PAGE_SIZE < total : newItems.length >= PAGE_SIZE;
+      const hasMore = total > 0 ? page * SEARCH_PAGE_SIZE < total : newItems.length >= SEARCH_PAGE_SIZE;
 
       setSearch((s) => ({
         ...s,
         loading: false,
         items: [...allItems, ...newItems],
-        // Accumulate results across pages so previous pages remain visible
         currentItems: s.page === 1 ? newItems : [...s.currentItems, ...newItems],
         total,
         hasMore,
       }));
     } catch {
-      setSearch((s) => ({ ...s, loading: false, hasMore: false }));
+      if (!isStale()) setSearch((s) => ({ ...s, loading: false, hasMore: false }));
     }
-  };
+  });
 
   useEffect(() => {
-    searchItems();
+    if (!searchDebounce) return undefined;
+    let stale = false;
+    runSearch(searchDebounce, search.page, () => stale);
+
+    return () => {
+      stale = true;
+    };
   }, [searchDebounce, search.page]);
 
+  const searchPlaceholder = config.searchPlaceholder ?? COPY.searchFallback;
+  const browseProps = toBrowseProps(miller, config);
+  const selectionProps = toSelectionProps(disabledScope, selectedScope, allItems, onChange);
+
   return (
-    <>
-      <Block title={config.title} required>
-        {/* Keep selected scopes in a fixed area. */}
-        <S.SelectedScopes>
-          <Space wrap>
-            {selectedScope.length ? (
-              selectedScope.map((sc) => (
-                <Tag
-                  key={sc.id}
-                  color="blue"
-                  closable
-                  onClose={() => onChange(selectedScope.filter((it) => it.id !== sc.id))}
-                >
-                  {getPluginScopeName(plugin, sc) || sc.fullName || sc.name || sc.id}
-                </Tag>
-              ))
-            ) : (
-              <span>Please select scope...</span>
-            )}
-          </Space>
-        </S.SelectedScopes>
-      </Block>
-      <Block>
+    <Block title={config.title} required>
+      <Stack>
         <Input
-          style={{ marginBottom: 12 }}
           prefix={<SearchOutlined />}
-          placeholder={config.searchPlaceholder ?? 'Search'}
+          placeholder={searchPlaceholder}
+          aria-label={searchPlaceholder}
           value={search.query}
           onChange={(e) =>
             setSearch({ ...search, query: e.target.value, loading: true, currentItems: [], page: 1, hasMore: false })
           }
         />
         {!searchDebounce ? (
-          <MillerColumnsSelect
+          <ScopePanes<ResItem>
             mode={mode}
             items={miller.items}
-            columnCount={config.millerColumn?.columnCount ?? 1}
-            columnHeight={300}
-            getCanExpand={(it) => it.type === 'group'}
-            getHasMore={(id) => !miller.loadedIds.includes(id ?? 'root')}
-            getHasError={(id) => id === miller.errorId}
-            onExpand={(id: McsID) => getItems(id, miller.nextTokenMap[id])}
-            onScroll={(id: McsID | null) => getItems(id, miller.nextTokenMap[id ?? 'root'])}
-            renderTitle={(column: McsColumn) =>
-              !column.parentId &&
-              config.millerColumn?.firstColumnTitle && (
-                <S.ColumnTitle>{config.millerColumn.firstColumnTitle}</S.ColumnTitle>
-              )
-            }
-            renderLoading={() => <Loading size={20} style={{ padding: '4px 12px' }} />}
-            renderError={() => <span style={{ color: 'red' }}>Something Error</span>}
-            disabledIds={(disabledScope ?? []).map((it) => it.id)}
-            selectedIds={selectedScope.map((it) => it.id)}
-            onSelectItemIds={(selectedIds: ID[]) => onChange(allItems.filter((it) => selectedIds.includes(it.id)))}
+            {...browseProps}
+            {...selectionProps}
+            onExpand={(id) => getItems(id, miller.nextTokenMap[id])}
+            onScroll={(id) => getItems(id, miller.nextTokenMap[id ?? ROOT_COLUMN_ID])}
           />
         ) : (
-          <MillerColumnsSelect
+          <ScopePanes<ResItem>
             mode={mode}
             items={search.currentItems}
             columnCount={1}
-            columnHeight={300}
             getCanExpand={() => false}
             getHasMore={() => search.hasMore}
             onScroll={() => {
@@ -237,13 +199,11 @@ export const SearchRemote = ({ mode, plugin, connectionId, config, disabledScope
                 setSearch((s) => ({ ...s, loading: true, page: s.page + 1 }));
               }
             }}
-            renderLoading={() => <Loading size={20} style={{ padding: '4px 12px' }} />}
-            disabledIds={(disabledScope ?? []).map((it) => it.id)}
-            selectedIds={selectedScope.map((it) => it.id)}
-            onSelectItemIds={(selectedIds: ID[]) => onChange(allItems.filter((it) => selectedIds.includes(it.id)))}
+            {...selectionProps}
           />
         )}
-      </Block>
-    </>
+        <SelectedScopes plugin={plugin} scopes={selectedScope} onChange={onChange} />
+      </Stack>
+    </Block>
   );
 };

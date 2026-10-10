@@ -1,0 +1,7 @@
+{
+  "titlePath": [
+    "Blueprint detail views and pipeline panel",
+    "each view of an advanced blueprint loads by URL and survives a reload"
+  ],
+  "writes": []
+}

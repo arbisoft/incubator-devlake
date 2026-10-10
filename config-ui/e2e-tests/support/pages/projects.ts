@@ -1,0 +1,291 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+import { Locator, Page } from '@playwright/test';
+
+import { BLUEPRINT_VIEW, COMMON_COPY, PROJECT_DETAIL_COPY, PROJECT_HOME_COPY as COPY, WEBHOOK_COPY } from '../app-copy';
+
+import { BlueprintViews, type BlueprintViewKey } from './blueprint-detail';
+import { BasePage, Screen, urlEndingWith, firstCellTexts, paginationPage, pipelineRowById, tableRow } from './common';
+import { PATHS, PROJECT_TABS, ProjectTabKey } from './paths';
+import { ProjectsReadiness } from './project-readiness';
+import { ProjectOtel, ProjectSettings, ProjectWebhooks } from './project-tab-panels';
+
+const PROJECT_TAB_LABEL = PROJECT_DETAIL_COPY.tabs;
+
+export class ProjectsPage extends BasePage implements Screen {
+  async open(): Promise<void> {
+    await this.visit(PATHS.projects);
+  }
+
+  get urlPattern(): RegExp {
+    return urlEndingWith(PATHS.projects);
+  }
+
+  get ready(): Locator {
+    return this.page.getByRole('button', { name: COPY.newProject });
+  }
+
+  async openWithQuery(query: string): Promise<void> {
+    await this.visit(`${PATHS.projects}?${query}`);
+  }
+
+  async createProject(name: string): Promise<void> {
+    await this.ready.click();
+    const dialog = this.dialog(COPY.create.title);
+    await dialog.getByRole('textbox', { name: COPY.create.name.label }).fill(name);
+    await dialog.getByRole('button', { name: COPY.create.submit }).click();
+  }
+
+  async search(name: string): Promise<void> {
+    const box = this.page.getByRole('textbox', { name: COPY.searchPlaceholder });
+    await box.fill(name);
+    await box.press('Enter');
+  }
+
+  noResults(): Locator {
+    return this.page.getByRole('heading', { name: COPY.noResults.title });
+  }
+
+  async sortByColumn(label: string): Promise<void> {
+    await this.page.getByRole('columnheader', { name: label }).click();
+  }
+
+  async goToListPage(number: number): Promise<void> {
+    await paginationPage(this.page, number).click();
+  }
+
+  projectNames(): Promise<string[]> {
+    return firstCellTexts(this.page);
+  }
+
+  projectRow(name: string): Locator {
+    return this.row(name);
+  }
+
+  get readiness(): ProjectsReadiness {
+    return new ProjectsReadiness(this.page);
+  }
+
+  async openProject(name: string): Promise<void> {
+    await this.projectRow(name).getByRole('link', { name, exact: true }).click();
+  }
+}
+
+export class ProjectPage extends BasePage {
+  constructor(
+    page: Page,
+    private readonly projectName: string,
+  ) {
+    super(page);
+  }
+
+  async open(): Promise<void> {
+    await this.visit(PATHS.project(this.projectName));
+  }
+
+  // The bare project URL redirects to its first tab, and the project list opens its Configurations view.
+  get urlPattern(): RegExp {
+    return new RegExp(`${PATHS.projectTab(this.projectName, 'blueprint')}(/configuration)?$`);
+  }
+
+  private get views(): BlueprintViews {
+    return new BlueprintViews(this.page);
+  }
+
+  async openView(view: BlueprintViewKey): Promise<void> {
+    await this.views.openView(view);
+  }
+
+  viewOption(view: BlueprintViewKey): Locator {
+    return this.views.viewOption(view);
+  }
+
+  selectedViewOption(view: BlueprintViewKey): Locator {
+    return this.views.selectedViewOption(view);
+  }
+
+  viewContent(view: BlueprintViewKey): Locator {
+    return this.views.viewContent(view);
+  }
+
+  get syncPolicyHeading(): Locator {
+    return this.views.syncPolicyHeading;
+  }
+
+  get historicalPipelinesHeading(): Locator {
+    return this.views.historicalPipelinesHeading;
+  }
+
+  viewUrlPattern(view: BlueprintViewKey): RegExp {
+    const base = PATHS.projectTab(this.projectName, 'blueprint');
+    return new RegExp(view === BLUEPRINT_VIEW.STATUS ? `${base}$` : `${base}/${view}$`);
+  }
+
+  async openViewDirect(view: BlueprintViewKey): Promise<void> {
+    const base = PATHS.projectTab(this.projectName, 'blueprint');
+    await this.visit(view === BLUEPRINT_VIEW.STATUS ? base : `${base}/${view}`);
+  }
+
+  get tabs(): readonly ProjectTabKey[] {
+    return PROJECT_TABS;
+  }
+
+  async openAtTab(tab: ProjectTabKey, query = ''): Promise<void> {
+    await this.visit(`${PATHS.projectTab(this.projectName, tab)}${query}`);
+  }
+
+  tabUrlPattern(tab: ProjectTabKey): RegExp {
+    return new RegExp(`${PATHS.projectTab(this.projectName, tab)}$`);
+  }
+
+  tabFor(tab: ProjectTabKey): Locator {
+    return this.tab(PROJECT_TAB_LABEL[tab]);
+  }
+
+  get nameLink(): Locator {
+    return this.page.getByRole('link', { name: this.projectName });
+  }
+
+  get syncPolicy(): Locator {
+    return this.views.syncPolicy;
+  }
+
+  dataScopeCount(count: number): Locator {
+    return this.views.dataScopeCount(count);
+  }
+
+  connectionLabel(connectionName: string): Locator {
+    return this.views.connectionLabel(connectionName);
+  }
+
+  async addConnectionWithScope(connectionName: string, scopeFullName: string): Promise<void> {
+    await this.views.addConnectionWithScope(connectionName, scopeFullName);
+  }
+
+  async openSyncPolicy(): Promise<void> {
+    await this.views.openSyncPolicy();
+  }
+
+  async fillSyncPolicy(minute: string, hour: string): Promise<void> {
+    await this.views.fillSyncPolicy(minute, hour);
+  }
+
+  async saveSyncPolicy(): Promise<void> {
+    await this.views.saveSyncPolicy();
+  }
+
+  async collectData(): Promise<void> {
+    await this.views.collectData();
+  }
+
+  get currentPipelineLabel(): Locator {
+    return this.views.currentPipelineHeading;
+  }
+
+  async openPipelineDetail(id: number): Promise<void> {
+    await this.views.openPipelineDetail(id);
+  }
+
+  pipelineDetailDialog(id: number): Locator {
+    return this.views.pipelineDetailDialog(id);
+  }
+
+  rowMenuButton(id: number): Locator {
+    return this.views.rowMenuButton(id);
+  }
+
+  pipelineRow(id: number): Locator {
+    return pipelineRowById(this.page, id);
+  }
+
+  get webhookDialog(): Locator {
+    return this.dialog(WEBHOOK_COPY.create.title);
+  }
+
+  get webhookCurlNotice(): Locator {
+    return this.webhookDialog.getByText(WEBHOOK_COPY.create.generated);
+  }
+
+  async generateWebhook(name: string): Promise<void> {
+    await this.page.getByRole('button', { name: WEBHOOK_COPY.add }).click();
+    await this.webhookDialog.getByPlaceholder(WEBHOOK_COPY.create.namePlaceholder).fill(name);
+    await this.webhookDialog.getByRole('button', { name: WEBHOOK_COPY.create.submit }).click();
+  }
+
+  async closeWebhookDialog(): Promise<void> {
+    await this.webhookDialog.getByRole('button', { name: COMMON_COPY.close, exact: true }).click();
+  }
+
+  webhookRow(name: string): Locator {
+    return tableRow(this.page, name);
+  }
+
+  // Deletes the webhook through its row and returns the HTTP status of the delete request.
+  async deleteWebhook(name: string, webhookId: number): Promise<number> {
+    await this.webhookRow(name)
+      .getByRole('button', { name: WEBHOOK_COPY.actions.remove(name) })
+      .click();
+    const deleted = this.page.waitForResponse(
+      (res) => res.url().endsWith(`/plugins/webhook/connections/${webhookId}`) && res.request().method() === 'DELETE',
+    );
+    await this.confirmDialog(WEBHOOK_COPY.remove.title(name), WEBHOOK_COPY.remove.confirm);
+    return (await deleted).status();
+  }
+
+  get settings(): ProjectSettings {
+    return new ProjectSettings(this.page, this.projectName);
+  }
+
+  get webhooks(): ProjectWebhooks {
+    return new ProjectWebhooks(this.page);
+  }
+
+  get otel(): ProjectOtel {
+    return new ProjectOtel(this.page);
+  }
+
+  get nameInput(): Locator {
+    return this.settings.nameInput;
+  }
+
+  async renameProject(newName: string): Promise<void> {
+    await this.settings.rename(newName);
+  }
+
+  async deleteProject(): Promise<void> {
+    await this.settings.deleteProject();
+  }
+
+  tabPanel(tab: ProjectTabKey): Locator {
+    const panels: Record<ProjectTabKey, Locator> = {
+      blueprint: this.views.viewContent(BLUEPRINT_VIEW.STATUS),
+      webhooks: this.region(PROJECT_DETAIL_COPY.webhooks.title),
+      'claude-code-otel': this.region(PROJECT_DETAIL_COPY.otel.title),
+      settings: this.region(PROJECT_DETAIL_COPY.settings.details),
+    };
+    return panels[tab];
+  }
+
+  private region(name: string): Locator {
+    return this.page.getByRole('region', { name, exact: true });
+  }
+
+  get noBlueprintHeading(): Locator {
+    return this.page.getByRole('heading', { name: PROJECT_DETAIL_COPY.noBlueprint.title });
+  }
+}

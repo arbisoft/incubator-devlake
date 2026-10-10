@@ -22,6 +22,7 @@ export type Provider = {
   name: string;
   displayName: string;
   loginUrl: string;
+  issuerHost?: string;
 };
 
 export type Methods = {
@@ -54,7 +55,7 @@ export type LocalPasswordChangeInput = {
   password: string;
 };
 
-export const methods = (): Promise<Methods> => request('/auth/methods');
+export const methods = (signal?: AbortSignal): Promise<Methods> => request('/auth/methods', { signal });
 
 export const userinfo = (): Promise<UserInfo> => request('/auth/userinfo');
 

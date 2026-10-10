@@ -1,0 +1,24 @@
+{
+  "titlePath": [
+    "Local Password Authentication - Phases 1-4 Full E2E Suite",
+    "6. Complete Flow: Local creation -> First sign-in -> Forced change redirect -> API Gate -> Change pass -> Direct sign-in"
+  ],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/access/local-users",
+      "body": {
+        "displayName": "Flow e2e_*",
+        "loginName": "e2e_*",
+        "role": "member"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/local/change-password",
+      "body": {
+        "password": "<masked>"
+      }
+    }
+  ]
+}

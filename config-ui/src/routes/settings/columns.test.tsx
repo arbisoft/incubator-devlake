@@ -1,0 +1,182 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+import { fireEvent, screen } from '@testing-library/react';
+import type { TableColumnType } from 'antd';
+import { describe, expect, it, vi } from 'vitest';
+
+import { ACCESS_STATUS, type AccessUser } from '@/api/access';
+import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
+
+import { buildActionsColumn, buildRoleColumn, buildStatusColumn } from './columns';
+import type { ActionsColumnOptions } from './columns.types';
+import { COPY } from './constants';
+
+type Row = { name: string; status: AccessUser['status'] };
+
+const renderCell = <T extends object>(column: TableColumnType<T>, row: T) =>
+  renderWithTheme(<>{column.render?.(undefined, row, 0)}</>);
+
+const actionsColumnOptions = (onToggle = vi.fn(), onRemove = vi.fn()): ActionsColumnOptions<Row> => ({
+  key: 'actions',
+  title: COPY.users.columns.actions,
+  getStatus: (row) => row.status,
+  getName: (row) => row.name,
+  labels: {
+    enable: COPY.actions.enable,
+    disable: COPY.actions.disable,
+    enableFor: COPY.users.enable,
+    disableFor: COPY.users.disable,
+    removeFor: COPY.users.remove,
+  },
+  onToggle,
+  onRemove,
+});
+
+const actionsColumn = (onToggle = vi.fn(), onRemove = vi.fn()) =>
+  buildActionsColumn<Row>(actionsColumnOptions(onToggle, onRemove));
+
+describe('buildStatusColumn', () => {
+  const column = buildStatusColumn<Row>({
+    key: 'status',
+    title: COPY.users.columns.status,
+    getStatus: (row) => row.status,
+    labels: COPY.users.status,
+  });
+
+  it('adds no filter unless asked', () => {
+    expect(column.filters).toBeUndefined();
+    expect(column.filteredValue).toBeUndefined();
+  });
+
+  it('offers a single-choice filter and reports the chosen value as the filtered value', () => {
+    const options = [{ text: COPY.users.status[ACCESS_STATUS.ACTIVE], value: ACCESS_STATUS.ACTIVE }];
+    const filtered = buildStatusColumn<Row>({
+      key: 'status',
+      title: COPY.users.columns.status,
+      getStatus: (row) => row.status,
+      labels: COPY.users.status,
+      filter: { value: ACCESS_STATUS.ACTIVE, options },
+    });
+    expect(filtered.filters).toEqual(options);
+    expect(filtered.filterMultiple).toBe(false);
+    expect(filtered.filteredValue).toEqual([ACCESS_STATUS.ACTIVE]);
+    expect(
+      buildStatusColumn<Row>({
+        ...{ key: 'status', title: 'S', getStatus: (row) => row.status, labels: COPY.users.status },
+        filter: { options },
+      }).filteredValue,
+    ).toBeNull();
+  });
+
+  it('shows the label for the row status as text', () => {
+    renderCell(column, { name: 'Ada', status: ACCESS_STATUS.ACTIVE });
+    expect(screen.getByText(COPY.users.status[ACCESS_STATUS.ACTIVE])).toBeTruthy();
+  });
+
+  it('shows a disabled row with its own label', () => {
+    renderCell(column, { name: 'Ada', status: ACCESS_STATUS.DISABLED });
+    expect(screen.getByText(COPY.users.status[ACCESS_STATUS.DISABLED])).toBeTruthy();
+  });
+});
+
+describe('buildActionsColumn', () => {
+  it('offers Disable for an active row and asks for the disabled status', () => {
+    const onToggle = vi.fn();
+    const row = { name: 'Ada', status: ACCESS_STATUS.ACTIVE };
+    renderCell(actionsColumn(onToggle), row);
+    fireEvent.click(screen.getByRole('button', { name: COPY.users.disable('Ada') }));
+    expect(onToggle).toHaveBeenCalledWith(row, ACCESS_STATUS.DISABLED);
+  });
+
+  it('offers Enable for a disabled row and asks for the active status', () => {
+    const onToggle = vi.fn();
+    const row = { name: 'Ada', status: ACCESS_STATUS.DISABLED };
+    renderCell(actionsColumn(onToggle), row);
+    fireEvent.click(screen.getByRole('button', { name: COPY.users.enable('Ada') }));
+    expect(onToggle).toHaveBeenCalledWith(row, ACCESS_STATUS.ACTIVE);
+  });
+
+  it('names the remove button after the row and reports the row', () => {
+    const onRemove = vi.fn();
+    const row = { name: 'Ada', status: ACCESS_STATUS.ACTIVE };
+    renderCell(actionsColumn(vi.fn(), onRemove), row);
+    fireEvent.click(screen.getByRole('button', { name: COPY.users.remove('Ada') }));
+    expect(onRemove).toHaveBeenCalledWith(row);
+  });
+});
+
+describe('buildActionsColumn options', () => {
+  it('hides Enable/Disable and remove when the row cannot toggle or be removed', () => {
+    const column = buildActionsColumn<Row>({
+      ...actionsColumnOptions(),
+      canToggle: () => false,
+      canRemove: () => false,
+      renderExtra: (row) => <span>{`extra ${row.name}`}</span>,
+    });
+    renderCell(column, { name: 'Ada', status: ACCESS_STATUS.ACTIVE });
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.getByText('extra Ada')).toBeTruthy();
+  });
+});
+
+describe('buildRoleColumn', () => {
+  type RoleRow = { name: string; role: string };
+  const base = {
+    key: 'role',
+    title: 'Role',
+    getRole: (row: RoleRow) => row.role,
+    getLabel: (row: RoleRow) => `Role for ${row.name}`,
+  };
+
+  it('keeps the DevLake roles by default and reports the change', () => {
+    const onChange = vi.fn();
+    const row = { name: 'Ada', role: 'member' };
+    renderCell(buildRoleColumn<RoleRow>({ ...base, onChange }), row);
+    expect(screen.getByRole('combobox', { name: 'Role for Ada' })).toBeTruthy();
+  });
+
+  it('renders a role outside the options as text', () => {
+    renderCell(
+      buildRoleColumn<RoleRow, 'a' | 'b'>({
+        ...base,
+        options: [{ value: 'a', label: 'A' }],
+        onChange: vi.fn(),
+      }),
+      { name: 'Ada', role: 'weird' },
+    );
+    expect(screen.getByText('weird')).toBeTruthy();
+    expect(screen.queryByRole('combobox')).toBeNull();
+  });
+
+  it('disables the select when a locked reason is given', () => {
+    renderCell(
+      buildRoleColumn<RoleRow, 'a' | 'b'>({
+        ...base,
+        options: [
+          { value: 'a', label: 'A' },
+          { value: 'b', label: 'B' },
+        ],
+        getLockedReason: () => 'Locked',
+        onChange: vi.fn(),
+      }),
+      { name: 'Ada', role: 'a' },
+    );
+    expect((screen.getByRole('combobox', { name: 'Role for Ada' }) as HTMLInputElement).disabled).toBe(true);
+  });
+});

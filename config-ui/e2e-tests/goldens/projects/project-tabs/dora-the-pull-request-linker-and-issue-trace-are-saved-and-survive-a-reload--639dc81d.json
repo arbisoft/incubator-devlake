@@ -1,0 +1,32 @@
+{
+  "titlePath": ["project tabs", "DORA, the pull request linker and issue trace are saved and survive a reload"],
+  "writes": [
+    {
+      "method": "PATCH",
+      "path": "/api/projects/e2e-*",
+      "body": {
+        "description": "",
+        "metrics": [
+          {
+            "enable": false,
+            "pluginName": "dora",
+            "pluginOption": {}
+          },
+          {
+            "enable": true,
+            "pluginName": "linker",
+            "pluginOption": {
+              "prToIssueRegexp": "(?mi)(Fixes)\\s+#\\d+"
+            }
+          },
+          {
+            "enable": true,
+            "pluginName": "issue_trace",
+            "pluginOption": {}
+          }
+        ],
+        "name": "e2e-*"
+      }
+    }
+  ]
+}
