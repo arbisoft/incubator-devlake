@@ -51,7 +51,7 @@ func responseWithSettings(connection *models.OtelConnection, credentials []*mode
 			"OTEL_EXPORTER_OTLP_ENDPOINT":       connection.CollectorEndpoint,
 			"OTEL_EXPORTER_OTLP_HEADERS":        fmt.Sprintf("Authorization=Basic %s", header),
 			"OTEL_METRIC_EXPORT_INTERVAL":       "60000",
-			"OTEL_METRICS_INCLUDE_SESSION_ID":   "false",
+			"OTEL_METRICS_INCLUDE_SESSION_ID":   "true",
 			"OTEL_METRICS_INCLUDE_ACCOUNT_UUID": "true",
 		}},
 		RestartRequired: hasPendingCollectorRestart(credentials),

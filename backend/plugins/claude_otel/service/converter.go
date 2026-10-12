@@ -278,6 +278,10 @@ func (c *rawMetricConverter) convert(batch *models.OtelMetricBatch, leaseOwner s
 		c.rollback(tx)
 		return nil, classifyStorageError(fmt.Errorf("write canonical daily Claude Code OTel facts: %w", err))
 	}
+	if err := reconcileOtelSessionHours(tx, sessionHourTargets(prepared.updates)); err != nil {
+		c.rollback(tx)
+		return nil, classifyStorageError(fmt.Errorf("write canonical Claude Code OTel session hours: %w", err))
+	}
 	if err := tx.UpdateColumns(
 		&models.OtelMetricBatch{},
 		[]dal.DalSet{

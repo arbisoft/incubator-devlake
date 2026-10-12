@@ -137,6 +137,49 @@ type AiToolDecision struct {
 
 func (AiToolDecision) TableName() string { return "ai_tool_decisions" }
 
+// AiSessionHour stores one AI coding session's activity, token and decision facts for
+// one UTC hour. SessionId is the provider's own session id; providers that do not report
+// sessions do not write this table. Token, cost and decision counts are summed across
+// model and tool.
+type AiSessionHour struct {
+	domainlayer.DomainEntity
+	Provider     string `gorm:"type:varchar(100);index" json:"provider"`
+	WorkspaceKey string `gorm:"type:varchar(255);index" json:"workspaceKey"`
+	AccountId    string `gorm:"type:varchar(255);index" json:"accountId"`
+	UserKey      string `gorm:"type:varchar(255);index" json:"userKey"`
+	// UserAccountId is absent for valid typed fallback identities (uuid:, email:, install:).
+	UserAccountId *string   `gorm:"type:varchar(255);index" json:"userAccountId,omitempty"`
+	UserEmail     string    `gorm:"type:varchar(255);index" json:"userEmail"`
+	SessionId     string    `gorm:"type:varchar(64);index" json:"sessionId"`
+	HourStart     time.Time `gorm:"index" json:"hourStart"`
+	// TerminalType, ClientVersion and OsType describe the client that ran the session.
+	TerminalType  string `gorm:"type:varchar(64)" json:"terminalType"`
+	ClientVersion string `gorm:"type:varchar(32)" json:"clientVersion"`
+	OsType        string `gorm:"type:varchar(32)" json:"osType"`
+	// SessionCount is the number of session starts the provider reported in this hour.
+	SessionCount        int64     `json:"sessionCount"`
+	ActiveTimeSeconds   string    `gorm:"type:decimal(20,3);not null" json:"activeTimeSeconds"`
+	LinesAdded          int64     `json:"linesAdded"`
+	LinesRemoved        int64     `json:"linesRemoved"`
+	CommitsCreated      int64     `json:"commitsCreated"`
+	PrsCreated          int64     `json:"prsCreated"`
+	InputTokens         int64     `json:"inputTokens"`
+	OutputTokens        int64     `json:"outputTokens"`
+	CacheReadTokens     int64     `json:"cacheReadTokens"`
+	CacheCreationTokens int64     `json:"cacheCreationTokens"`
+	EstimatedCostUsd    string    `gorm:"type:decimal(20,8);not null" json:"estimatedCostUsd"`
+	AcceptedCount       int64     `json:"acceptedCount"`
+	RejectedCount       int64     `json:"rejectedCount"`
+	FirstObservedAt     time.Time `gorm:"type:datetime(3)" json:"firstObservedAt"`
+	LastObservedAt      time.Time `gorm:"type:datetime(3)" json:"lastObservedAt"`
+	SourceType          string    `gorm:"type:varchar(64)" json:"sourceType"`
+	SourceConnectionId  *uint64   `json:"sourceConnectionId,omitempty"`
+	SourceScopeId       *string   `gorm:"type:varchar(255)" json:"sourceScopeId,omitempty"`
+	SourceUpdatedAt     time.Time `gorm:"type:datetime(3)" json:"sourceUpdatedAt"`
+}
+
+func (AiSessionHour) TableName() string { return "ai_session_hours" }
+
 // AiSourcePreference records an explicit per-workspace source policy. API source
 // values are retained for the deferred Enterprise integration but are not selectable
 // until its completeness contract is implemented.

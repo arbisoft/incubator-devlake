@@ -40,6 +40,15 @@ processors:
     limit_percentage: 80
     spike_limit_percentage: 25
 
+  # DevLake stores session.id; Prometheus drops it so per-session series never become labels.
+  attributes/drop_session:
+    actions:
+      - key: session.id
+        action: delete
+  resource/drop_session:
+    attributes:
+      - key: session.id
+        action: delete
   delta_to_cumulative: {}
 
   batch/prometheus:
@@ -122,5 +131,5 @@ service:
       exporters: [otlphttp/claude_raw]
     metrics/prometheus:
       receivers: [forward/prometheus]
-      processors: [delta_to_cumulative, batch/prometheus]
+      processors: [resource/drop_session, attributes/drop_session, delta_to_cumulative, batch/prometheus]
       exporters: [prometheus]

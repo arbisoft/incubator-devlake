@@ -32,6 +32,7 @@ func TestMaintainedCollectorConfigsMatchRawIngestContract(t *testing.T) {
 		"block_on_overflow: false",
 		"directory: /var/lib/otel/compaction",
 		"resource/attribution, attributes/team]",
+		"processors: [resource/drop_session, attributes/drop_session, delta_to_cumulative",
 	}
 	for _, name := range []string{"collector-config.yaml", "collector-config-production.yaml"} {
 		path := filepath.Join("..", "..", "..", "..", "telemetry", "otel-collector", name)

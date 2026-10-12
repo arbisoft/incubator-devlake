@@ -137,17 +137,26 @@ func reconcileOtelDailyTarget(tx dal.Transaction, target dailyTarget) error {
 // exists. A missing account is normal; a lookup failure aborts the conversion.
 func resolveDomainAccount(tx dal.Transaction, activityRows []*models.OtelHourlyActivity, modelRows []*models.OtelHourlyModelUsage, toolRows []*models.OtelHourlyToolUsage) (string, string, error) {
 	email := firstEmail(activityRows, modelRows, toolRows)
+	accountID, err := accountIDForEmail(tx, email)
+	if err != nil {
+		return "", "", err
+	}
+	return accountID, email, nil
+}
+
+// accountIDForEmail returns the DevLake account with this email, or "" when there is none.
+func accountIDForEmail(tx dal.Transaction, email string) (string, error) {
 	if email == "" {
-		return "", "", nil
+		return "", nil
 	}
 	account := &crossdomain.Account{}
 	if err := tx.First(account, dal.Where("email = ?", email), dal.Orderby("id ASC")); err != nil {
 		if tx.IsErrorNotFound(err) {
-			return "", email, nil
+			return "", nil
 		}
-		return "", "", fmt.Errorf("resolve Claude OTel domain account: %w", err)
+		return "", fmt.Errorf("resolve Claude OTel domain account: %w", err)
 	}
-	return account.Id, email, nil
+	return account.Id, nil
 }
 
 func firstEmail(activityRows []*models.OtelHourlyActivity, modelRows []*models.OtelHourlyModelUsage, toolRows []*models.OtelHourlyToolUsage) string {

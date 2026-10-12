@@ -26,5 +26,6 @@ func All() []plugin.MigrationScript {
 		new(addClaudeCodeOtelConnectionProjects),
 		new(addClaudeCodeOtelRawMetricBatches),
 		new(addClaudeCodeOtelHourlyMetrics),
+		new(addClaudeCodeOtelSessionHours),
 	}
 }

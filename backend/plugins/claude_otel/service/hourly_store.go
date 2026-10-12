@@ -47,6 +47,9 @@ func (c *rawMetricConverter) applyHourlyUpdates(tx dal.Transaction, updates []fa
 		if err := upsertHourlyFact(tx, update, value, update.observedAt); err != nil {
 			return classifyStorageError(fmt.Errorf("write hourly Claude Code OTel facts: %w", err))
 		}
+		if err := upsertSessionFact(tx, update, value, update.observedAt); err != nil {
+			return classifyStorageError(fmt.Errorf("write Claude Code OTel session facts: %w", err))
+		}
 	}
 	return nil
 }
@@ -163,6 +166,38 @@ func upsertHourlyFact(tx dal.Transaction, update factUpdate, value metricNumber,
 			"first_observed_at = LEAST(%[1]s.first_observed_at, incoming.first_observed_at), "+
 			"last_observed_at = GREATEST(%[1]s.last_observed_at, incoming.last_observed_at), updated_at = NOW()",
 		table, strings.Join(columns, ", "), placeholders, update.column,
+	)
+	return tx.Exec(query, params...)
+}
+
+// upsertSessionFact adds the same metric value to the update's session-hour row. Datapoints
+// without session.id have no session row. The counter column comes from the allowlisted
+// mapping, and the session table shares the hourly column names.
+func upsertSessionFact(tx dal.Transaction, update factUpdate, value metricNumber, lastObservedAt time.Time) error {
+	if update.session.id == "" {
+		return nil
+	}
+	columns := []string{
+		"connection_id", "team_slug", "organization_id", "user_key", "user_account_id", "user_account_uuid", "user_email",
+		"session_id", "hour_start", "terminal_type", "app_version", "os_type",
+		update.column, "first_observed_at", "last_observed_at", "created_at", "updated_at",
+	}
+	params := []interface{}{
+		update.connection.ID, update.connection.TeamSlug, update.organizationID, update.identity.key,
+		update.identity.accountID, update.identity.accountUUID, update.identity.email,
+		update.session.id, update.hour, update.session.terminalType, update.session.appVersion, update.session.osType,
+		value.sqlString(), update.observedAt, lastObservedAt,
+	}
+	placeholders := strings.TrimSuffix(strings.Repeat("?, ", len(params)), ", ")
+	query := fmt.Sprintf(
+		"INSERT INTO %[1]s (%[2]s) VALUES (%[3]s, NOW(), NOW()) AS incoming "+
+			"ON DUPLICATE KEY UPDATE %[4]s = %[1]s.%[4]s + incoming.%[4]s, "+
+			"terminal_type = IF(incoming.terminal_type = '', %[1]s.terminal_type, incoming.terminal_type), "+
+			"app_version = IF(incoming.app_version = '', %[1]s.app_version, incoming.app_version), "+
+			"os_type = IF(incoming.os_type = '', %[1]s.os_type, incoming.os_type), "+
+			"first_observed_at = LEAST(%[1]s.first_observed_at, incoming.first_observed_at), "+
+			"last_observed_at = GREATEST(%[1]s.last_observed_at, incoming.last_observed_at), updated_at = NOW()",
+		models.OtelSessionHourTable, strings.Join(columns, ", "), placeholders, update.column,
 	)
 	return tx.Exec(query, params...)
 }
