@@ -148,7 +148,7 @@ func SetupApiServer(router *gin.Engine) {
 	router.Use(func(ctx *gin.Context) {
 		serviceStatus := services.CurrentStatus()
 		// The OTLP Collector permanently drops 428 responses; 503 keeps its batch queued.
-		if ctx.Request.URL.Path == auth.PathClaudeOtelMetrics &&
+		if (ctx.Request.URL.Path == auth.PathClaudeOtelMetrics || ctx.Request.URL.Path == auth.PathClaudeOtelLogs) &&
 			(serviceStatus == services.SERVICE_STATUS_WAIT_CONFIRM || serviceStatus == services.SERVICE_STATUS_MIGRATING) {
 			outputOtlpMigrationUnavailable(ctx, DB_MIGRATING)
 			ctx.Abort()

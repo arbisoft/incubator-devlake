@@ -219,6 +219,11 @@ func (c *rawMetricConverter) replay(request *models.OtelReplayRequest, leaseOwne
 		replayed += dayReplayed
 		skipped += daySkipped
 	}
+	logReplayed, err := c.replayLogBatches(request, leaseOwner, &lastRenewal)
+	replayed += logReplayed
+	if err != nil {
+		return replayed, skipped, err
+	}
 	return replayed, skipped, c.finishReplay(request.ID, leaseOwner, models.OtelReplayRequestStatusCompleted, replayed, skipped, diagnostics.message())
 }
 

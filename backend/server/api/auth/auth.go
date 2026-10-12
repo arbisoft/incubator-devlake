@@ -58,9 +58,11 @@ const (
 	PathUserInfo            = "/auth/userinfo"
 	PathLocalLogin          = "/auth/local/login"
 	PathLocalChangePassword = "/auth/local/change-password"
-	// PathClaudeOtelMetrics is authenticated by the Collector-only ingest token,
-	// not an interactive user session. It must remain an exact path match.
+	// PathClaudeOtelMetrics and PathClaudeOtelLogs are authenticated by the
+	// Collector-only ingest token, not an interactive user session. They must remain
+	// exact path matches.
 	PathClaudeOtelMetrics = "/plugins/claude_otel/otlp/v1/metrics"
+	PathClaudeOtelLogs    = "/plugins/claude_otel/otlp/v1/logs"
 )
 
 // RegisterRoutes keeps auth-owned route paths and handlers together so the

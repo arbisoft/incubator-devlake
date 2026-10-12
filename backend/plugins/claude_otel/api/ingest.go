@@ -23,6 +23,7 @@ import (
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/service"
+	collectorlogs "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	collectormetrics "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 	rpccode "google.golang.org/genproto/googleapis/rpc/code"
 	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
@@ -31,6 +32,7 @@ import (
 
 const (
 	OtlpMetricsResourcePath = "otlp/v1/metrics"
+	OtlpLogsResourcePath    = "otlp/v1/logs"
 	otlpProtobufContentType = "application/x-protobuf"
 )
 
@@ -59,6 +61,22 @@ func PostOtlpMetrics(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput,
 	return otlpProtobufOutput(http.StatusOK, &collectormetrics.ExportMetricsServiceResponse{})
 }
 
+// PostOtlpLogs accepts Claude Code events forwarded by the Collector. Only the events
+// DevLake converts are stored, without prompt, response or tool content.
+func PostOtlpLogs(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	ingestService := service.DefaultRawIngestService()
+	if ingestService == nil {
+		return otlpErrorOutput(errors.Unavailable.New("Claude Code OTel ingest service is unavailable"))
+	}
+	if input == nil || input.Request == nil {
+		return otlpErrorOutput(errors.BadInput.New("OTLP logs request is required"))
+	}
+	if _, err := ingestService.IngestLogs(input.Request); err != nil {
+		return otlpErrorOutput(err)
+	}
+	return otlpProtobufOutput(http.StatusOK, &collectorlogs.ExportLogsServiceResponse{})
+}
+
 // otlpErrorOutput returns the OTLP/HTTP protobuf error body. Only the classified top-level
 // message is exposed; wrapped storage causes stay in server logs.
 func otlpErrorOutput(ingestErr errors.Error) (*plugin.ApiResourceOutput, errors.Error) {
@@ -76,7 +94,7 @@ func otlpErrorOutput(ingestErr errors.Error) (*plugin.ApiResourceOutput, errors.
 func otlpProtobufOutput(status int, message proto.Message) (*plugin.ApiResourceOutput, errors.Error) {
 	body, err := proto.Marshal(message)
 	if err != nil {
-		return nil, errors.Default.Wrap(err, "failed to create OTLP metrics response")
+		return nil, errors.Default.Wrap(err, "failed to create OTLP response")
 	}
 	return &plugin.ApiResourceOutput{Body: body, Status: status, ContentType: otlpProtobufContentType}, nil
 }

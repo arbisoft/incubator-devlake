@@ -46,7 +46,8 @@ func responseWithSettings(connection *models.OtelConnection, credentials []*mode
 		ManagedSettings: &models.OtelManagedSettings{Env: map[string]string{
 			"CLAUDE_CODE_ENABLE_TELEMETRY":      "1",
 			"OTEL_METRICS_EXPORTER":             "otlp",
-			"OTEL_LOGS_EXPORTER":                "none",
+			"OTEL_LOGS_EXPORTER":                "otlp",
+			"OTEL_LOGS_EXPORT_INTERVAL":         "5000",
 			"OTEL_EXPORTER_OTLP_PROTOCOL":       connection.Protocol,
 			"OTEL_EXPORTER_OTLP_ENDPOINT":       connection.CollectorEndpoint,
 			"OTEL_EXPORTER_OTLP_HEADERS":        fmt.Sprintf("Authorization=Basic %s", header),

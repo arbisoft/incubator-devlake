@@ -48,17 +48,22 @@ func (c *rawMetricConverter) runRetention() errors.Error {
 	// Schedule before cleanup so a failure does not turn retention into a two-second
 	// retry loop that starves conversion.
 	c.nextRetentionAt = now.Add(retentionInterval)
-	if err := c.deleteExpiredRawBatches(now); err != nil {
+	if err := c.deleteExpiredRawBatches(now, &models.OtelMetricBatch{}); err != nil {
+		return err
+	}
+	if err := c.deleteExpiredRawBatches(now, &models.OtelLogBatch{}); err != nil {
 		return err
 	}
 	return c.deleteExpiredSeriesState(now)
 }
 
-func (c *rawMetricConverter) deleteExpiredRawBatches(now time.Time) errors.Error {
+// deleteExpiredRawBatches deletes expired terminal batches from model's raw table. Prompt
+// events and prompts derived from log batches are kept.
+func (c *rawMetricConverter) deleteExpiredRawBatches(now time.Time, model dal.Tabler) errors.Error {
 	for deletes := 0; deletes < retentionMaxDeleteBatches; deletes++ {
 		batchIDs := make([]uint64, 0, retentionDeleteBatch)
 		if err := c.db.Pluck("id", &batchIDs,
-			dal.From(&models.OtelMetricBatch{}),
+			dal.From(model),
 			dal.Where("received_at < ? AND status IN ?", now.Add(-rawBatchRetention), replayableBatchStatuses),
 			dal.Orderby("id ASC"),
 			dal.Limit(retentionDeleteBatch),
@@ -68,7 +73,7 @@ func (c *rawMetricConverter) deleteExpiredRawBatches(now time.Time) errors.Error
 		if len(batchIDs) == 0 {
 			break
 		}
-		if err := c.db.Delete(&models.OtelMetricBatch{}, dal.Where("id IN ?", batchIDs)); err != nil {
+		if err := c.db.Delete(model, dal.Where("id IN ?", batchIDs)); err != nil {
 			return errors.Default.Wrap(err, "failed to delete expired Claude Code OTel raw batches")
 		}
 		if len(batchIDs) < retentionDeleteBatch {

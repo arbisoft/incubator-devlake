@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/apache/incubator-devlake/core/errors"
@@ -159,5 +160,20 @@ func TestOIDCAuthenticationRejectsUnknownProviderSession(t *testing.T) {
 	}
 	if len(authorizer.identities) != 0 {
 		t.Fatalf("expected no directory lookup for an unknown provider, got %d", len(authorizer.identities))
+	}
+}
+
+// The Collector authenticates the OTLP endpoints with its ingest token, not a user
+// session, so both must be public, and only as exact paths.
+func TestClaudeOtelIngestPathsArePublicOnlyAsExactPaths(t *testing.T) {
+	for _, path := range []string{PathClaudeOtelMetrics, PathClaudeOtelLogs} {
+		if !isPublicPath(path) {
+			t.Errorf("isPublicPath(%q) = false, want true", path)
+		}
+		for _, near := range []string{path + "/", path + "/extra", strings.TrimSuffix(path, "/logs") + "/logs-export"} {
+			if near != path && isPublicPath(near) {
+				t.Errorf("isPublicPath(%q) = true, want only the exact path public", near)
+			}
+		}
 	}
 }

@@ -75,17 +75,7 @@ func NewRawIngestService(db dal.Dal, cfg config.ConfigReader, logger log.Logger)
 }
 
 func (s *RawIngestService) Ingest(request *http.Request) (*RawIngestResult, errors.Error) {
-	if request == nil || request.Body == nil {
-		return nil, errors.BadInput.New("OTLP protobuf request body is required")
-	}
-	if err := validateOtelIngestContentType(request.Header.Get("Content-Type")); err != nil {
-		return nil, err
-	}
-	if err := s.authenticate(request.Header.Get(claudeOtelIngestTokenHeader)); err != nil {
-		return nil, err
-	}
-
-	body, err := readOtelIngestBody(request.Body)
+	body, err := s.readAuthenticatedBody(request)
 	if err != nil {
 		return nil, err
 	}
@@ -116,20 +106,48 @@ func (s *RawIngestService) Ingest(request *http.Request) (*RawIngestResult, erro
 		Status:               models.OtelMetricBatchStatusPending,
 	}
 
+	duplicate, err := s.createRawBatch(batch)
+	if err != nil {
+		return nil, err
+	}
+	if duplicate {
+		return &RawIngestResult{Duplicate: true}, nil
+	}
+	return &RawIngestResult{BatchID: batch.ID}, nil
+}
+
+// readAuthenticatedBody checks the content type and ingest token, then reads the bounded
+// request body shared by the metrics and logs endpoints.
+func (s *RawIngestService) readAuthenticatedBody(request *http.Request) ([]byte, errors.Error) {
+	if request == nil || request.Body == nil {
+		return nil, errors.BadInput.New("OTLP protobuf request body is required")
+	}
+	if err := validateOtelIngestContentType(request.Header.Get("Content-Type")); err != nil {
+		return nil, err
+	}
+	if err := s.authenticate(request.Header.Get(claudeOtelIngestTokenHeader)); err != nil {
+		return nil, err
+	}
+	return readOtelIngestBody(request.Body)
+}
+
+// createRawBatch stores one raw batch. A payload already stored is a duplicate Collector
+// retry, reported as success.
+func (s *RawIngestService) createRawBatch(batch interface{}) (bool, errors.Error) {
 	tx := s.db.Begin()
 	if err := tx.Create(batch); err != nil {
 		if rollbackErr := tx.Rollback(); rollbackErr != nil && s.logger != nil {
 			s.logger.Warn(rollbackErr, "failed to roll back Claude Code OTel raw batch insert")
 		}
 		if s.db.IsDuplicationError(err) {
-			return &RawIngestResult{Duplicate: true}, nil
+			return true, nil
 		}
-		return nil, errors.Unavailable.Wrap(err, "Claude Code OTel raw storage is unavailable")
+		return false, errors.Unavailable.Wrap(err, "Claude Code OTel raw storage is unavailable")
 	}
 	if err := tx.Commit(); err != nil {
-		return nil, errors.Unavailable.Wrap(err, "failed to commit Claude Code OTel raw batch")
+		return false, errors.Unavailable.Wrap(err, "failed to commit Claude Code OTel raw batch")
 	}
-	return &RawIngestResult{BatchID: batch.ID}, nil
+	return false, nil
 }
 
 func (s *RawIngestService) authenticate(providedToken string) errors.Error {
@@ -153,7 +171,7 @@ func (s *RawIngestService) authenticate(providedToken string) errors.Error {
 func validateOtelIngestContentType(value string) errors.Error {
 	mediaType, _, err := mime.ParseMediaType(value)
 	if err != nil || mediaType != otlpProtobufContentType {
-		return errors.HttpStatus(http.StatusUnsupportedMediaType).New("OTLP metrics must use application/x-protobuf")
+		return errors.HttpStatus(http.StatusUnsupportedMediaType).New("OTLP requests must use application/x-protobuf")
 	}
 	return nil
 }
@@ -162,13 +180,13 @@ func readOtelIngestBody(body io.ReadCloser) ([]byte, errors.Error) {
 	defer body.Close()
 	payload, err := io.ReadAll(io.LimitReader(body, maxOtelIngestBodyBytes+1))
 	if err != nil {
-		return nil, errors.BadInput.New("failed to read OTLP metrics request body")
+		return nil, errors.BadInput.New("failed to read OTLP request body")
 	}
 	if len(payload) == 0 {
-		return nil, errors.BadInput.New("OTLP metrics request body is required")
+		return nil, errors.BadInput.New("OTLP request body is required")
 	}
 	if len(payload) > maxOtelIngestBodyBytes {
-		return nil, errors.HttpStatus(http.StatusRequestEntityTooLarge).New("OTLP metrics request body is too large")
+		return nil, errors.HttpStatus(http.StatusRequestEntityTooLarge).New("OTLP request body is too large")
 	}
 	return payload, nil
 }

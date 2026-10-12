@@ -45,6 +45,10 @@ func CanonicalSessionHourID(provider, workspaceKey, userKey, sessionID string, h
 	return canonicalID("session_hour", provider, workspaceKey, userKey, sessionID, hourStart.UTC().Format(time.RFC3339))
 }
 
+func CanonicalPromptID(provider, workspaceKey, userKey, sessionID, promptID string) string {
+	return canonicalID("prompt", provider, workspaceKey, userKey, sessionID, promptID)
+}
+
 func canonicalID(kind string, components ...string) string {
 	encoded := make([]string, 0, len(components)+1)
 	encoded = append(encoded, kind)
