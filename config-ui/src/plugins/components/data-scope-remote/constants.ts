@@ -41,7 +41,9 @@ const ANOTHER_CONNECTION = 'another connection';
 const quote = (name: string) => `"${name}"`;
 
 export const COPY = {
-  forbidden: 'You do not have permission to browse this connection.',
+  authenticationFailed: 'Connection authentication failed. The credentials may be invalid, expired, or revoked.',
+  forbidden: 'Could not access this list. Check repository access, organization policy, or rate limits.',
+  notFound: 'The requested item could not be found or accessed.',
   searchFallback: 'Search',
   submit: 'Save',
   saved: 'Add data scope successful.',
@@ -74,4 +76,8 @@ export const COPY = {
 
 export const SAVE_ERROR_MAP: Record<string, string> = { '400': COPY.saveRejected };
 
-export const LOAD_ERROR_MAP: Record<string, string> = { '403': COPY.forbidden };
+export const LOAD_ERROR_MAP: Record<string, string> = {
+  '401': COPY.authenticationFailed,
+  '403': COPY.forbidden,
+  '404': COPY.notFound,
+};

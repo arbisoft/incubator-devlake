@@ -16,6 +16,7 @@
  *
  */
 
+import { CheckCircleFilled, CloseCircleFilled, WarningFilled } from '@ant-design/icons';
 import styled from 'styled-components';
 
 export const Input = styled.div`
@@ -49,4 +50,20 @@ export const Alert = styled.div`
   background: ${({ theme }) => theme.colors.bgLayout};
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: ${({ theme }) => theme.radius.sm}px;
+`;
+
+export const SuccessPermissionIcon = styled(CheckCircleFilled)`
+  color: ${({ theme }) => theme.colors.success};
+`;
+
+export const WarningPermissionIcon = styled(WarningFilled)`
+  color: ${({ theme }) => theme.colors.warning};
+`;
+
+export const ErrorPermissionIcon = styled(CloseCircleFilled)`
+  color: ${({ theme }) => theme.colors.error};
+`;
+
+export const PermissionTitle = styled.span`
+  margin-left: ${({ theme }) => theme.space.xs}px;
 `;

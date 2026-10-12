@@ -17,6 +17,7 @@
  */
 
 import { selectHealth, testConnection, toHealthView, toTestErrorMessage } from '@/features/connections';
+import { HEALTH_FAILURE_REASON, HTTP_STATUS } from '@/features/connections/constants';
 import { useAppDispatch, useAppSelector } from '@/hooks';
 import { IConnectionStatus, type IConnection } from '@/types';
 import { ConnectionHealth } from '@/ui';
@@ -31,7 +32,23 @@ export const ConnectionStatus = ({ connection }: ConnectionStatusProps) => {
   const entry = useAppSelector(selectHealth)[connection.unique];
 
   const retest = () =>
-    operator(() => dispatch(testConnection(connection)).unwrap(), { formatReason: toTestErrorMessage });
+    operator(
+      async () => {
+        const result = await dispatch(testConnection(connection)).unwrap();
+        if (result.status === IConnectionStatus.OFFLINE) {
+          let status: number = HTTP_STATUS.BAD_REQUEST;
+          if (result.health.reason === HEALTH_FAILURE_REASON.CREDENTIALS) status = HTTP_STATUS.UNAUTHORIZED;
+          else if (result.health.reason === HEALTH_FAILURE_REASON.UNREACHABLE) {
+            status = HTTP_STATUS.SERVICE_UNAVAILABLE;
+          }
+          throw Object.assign(new Error('Connection test failed'), {
+            response: { status, data: { message: result.health.message } },
+          });
+        }
+        return result;
+      },
+      { formatReason: toTestErrorMessage },
+    );
 
   return (
     <ConnectionHealth
