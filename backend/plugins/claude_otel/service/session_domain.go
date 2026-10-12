@@ -88,13 +88,14 @@ func reconcileOtelSessionHours(tx dal.Transaction, targets []sessionHourTarget) 
 				break
 			}
 		}
-		accountID, cached := accounts[email]
+		accountKey := target.workspaceKey + "\x00" + target.userKey
+		accountID, cached := accounts[accountKey]
 		if !cached {
 			var err error
-			if accountID, err = accountIDForEmail(tx, email); err != nil {
+			if accountID, err = ensureClaudeAccount(tx, target.workspaceKey, target.userKey, target.userAccountID, email); err != nil {
 				return err
 			}
-			accounts[email] = accountID
+			accounts[accountKey] = accountID
 		}
 		sessionHour, err := canonicalSessionHour(target, accountID, email, rows)
 		if err != nil {

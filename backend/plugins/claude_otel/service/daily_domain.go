@@ -118,7 +118,7 @@ func reconcileOtelDailyTarget(tx dal.Transaction, target dailyTarget) error {
 		return fmt.Errorf("load hourly Claude OTel tool facts: %w", err)
 	}
 
-	accountID, email, err := resolveDomainAccount(tx, activityRows, modelRows, toolRows)
+	accountID, email, err := resolveDomainAccount(tx, target, activityRows, modelRows, toolRows)
 	if err != nil {
 		return err
 	}
@@ -133,30 +133,90 @@ func reconcileOtelDailyTarget(tx dal.Transaction, target dailyTarget) error {
 	return writeCanonicalToolDecisions(tx, target, accountID, email, toolRows)
 }
 
-// resolveDomainAccount links the canonical row to a DevLake account by email when one
-// exists. A missing account is normal; a lookup failure aborts the conversion.
-func resolveDomainAccount(tx dal.Transaction, activityRows []*models.OtelHourlyActivity, modelRows []*models.OtelHourlyModelUsage, toolRows []*models.OtelHourlyToolUsage) (string, string, error) {
+// resolveDomainAccount links the canonical row to the Claude user's own DevLake account,
+// creating it on first sight. A lookup or write failure aborts the conversion.
+func resolveDomainAccount(tx dal.Transaction, target dailyTarget, activityRows []*models.OtelHourlyActivity, modelRows []*models.OtelHourlyModelUsage, toolRows []*models.OtelHourlyToolUsage) (string, string, error) {
 	email := firstEmail(activityRows, modelRows, toolRows)
-	accountID, err := accountIDForEmail(tx, email)
+	accountID, err := ensureClaudeAccount(tx, target.workspaceKey, target.userKey, target.userAccountID, email)
 	if err != nil {
 		return "", "", err
 	}
 	return accountID, email, nil
 }
 
-// accountIDForEmail returns the DevLake account with this email, or "" when there is none.
-func accountIDForEmail(tx dal.Transaction, email string) (string, error) {
+// claudeAccountID is the DevLake account ID of one Claude user in one organization. Like
+// the canonical ai_* IDs, it has no connection or team component.
+func claudeAccountID(workspaceKey, userKey string) string {
+	return "claude:ClaudeAccount:" + workspaceKey + ":" + userKey
+}
+
+// ensureClaudeAccount writes the Claude user's row in accounts and returns its ID. Telemetry
+// without an email or Claude account ID keeps the values already stored, and an unchanged
+// account is not rewritten. Claude sends no display name, so full_name is copied from
+// another DevLake account with the same email and stays NULL when none has one.
+func ensureClaudeAccount(tx dal.Transaction, workspaceKey, userKey string, userAccountID *string, email string) (string, error) {
+	id := claudeAccountID(workspaceKey, userKey)
+	userName := ""
+	if userAccountID != nil {
+		userName = *userAccountID
+	}
+	stored := &crossdomain.Account{}
+	found := true
+	if err := tx.First(stored, dal.Where("id = ?", id)); err != nil {
+		if !tx.IsErrorNotFound(err) {
+			return "", fmt.Errorf("load Claude OTel domain account: %w", err)
+		}
+		found = false
+	}
+	if email == "" {
+		email = stored.Email
+	}
+	if userName == "" {
+		userName = stored.UserName
+	}
+	fullName := stored.FullName
+	if fullName == "" || email != stored.Email {
+		name, err := fullNameForEmail(tx, email)
+		if err != nil {
+			return "", err
+		}
+		fullName = name
+	}
+	if found && email == stored.Email && userName == stored.UserName && fullName == stored.FullName {
+		return id, nil
+	}
+	// The model's FullName is a plain string, so the row is written directly to store an
+	// unknown name as NULL rather than ''.
+	err := tx.Exec(
+		"INSERT INTO "+(&crossdomain.Account{}).TableName()+" (id, email, user_name, full_name, created_at, updated_at) "+
+			"VALUES (?, ?, ?, NULLIF(?, ''), NOW(), NOW()) AS incoming "+
+			"ON DUPLICATE KEY UPDATE email = incoming.email, user_name = incoming.user_name, full_name = incoming.full_name, updated_at = NOW()",
+		id, email, userName, fullName,
+	)
+	if err != nil {
+		return "", fmt.Errorf("write Claude OTel domain account: %w", err)
+	}
+	return id, nil
+}
+
+// fullNameForEmail returns the name on another DevLake account (Jira, GitHub, git, ...) with
+// this email, or "" when there is none. Lowest ID wins when several sources have a name.
+func fullNameForEmail(tx dal.Transaction, email string) (string, error) {
 	if email == "" {
 		return "", nil
 	}
 	account := &crossdomain.Account{}
-	if err := tx.First(account, dal.Where("email = ?", email), dal.Orderby("id ASC")); err != nil {
+	err := tx.First(account,
+		dal.Where("email = ? AND id NOT LIKE ? AND full_name IS NOT NULL AND full_name <> ''", email, "claude:%"),
+		dal.Orderby("id ASC"),
+	)
+	if err != nil {
 		if tx.IsErrorNotFound(err) {
 			return "", nil
 		}
-		return "", fmt.Errorf("resolve Claude OTel domain account: %w", err)
+		return "", fmt.Errorf("look up Claude OTel account name: %w", err)
 	}
-	return account.Id, nil
+	return account.FullName, nil
 }
 
 func firstEmail(activityRows []*models.OtelHourlyActivity, modelRows []*models.OtelHourlyModelUsage, toolRows []*models.OtelHourlyToolUsage) string {

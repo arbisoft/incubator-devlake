@@ -23,6 +23,7 @@ import (
 
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/ai"
+	"github.com/apache/incubator-devlake/core/models/domainlayer/crossdomain"
 	dalmocks "github.com/apache/incubator-devlake/mocks/core/dal"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
 	"github.com/stretchr/testify/mock"
@@ -77,20 +78,67 @@ func TestCanonicalSessionHourSumsConnections(t *testing.T) {
 func TestReconcileOtelSessionHoursWritesDomainRow(t *testing.T) {
 	hour := time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)
 	email := "dev@example.com"
+	accountID := claudeAccountID(testOrganizationID, "acct:user_1")
 	target := sessionHourTarget{workspaceKey: testOrganizationID, userKey: "acct:user_1", sessionID: "session-a", hour: hour}
 	notFound := errors.NotFound.New("account not found")
 	transaction := dalmocks.NewTransaction(t)
 	transaction.On("All", mock.AnythingOfType("*[]*models.OtelSessionHour"), mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		*args.Get(0).(*[]*models.OtelSessionHour) = []*models.OtelSessionHour{{ConnectionId: 7, UserEmail: &email, LinesAdded: 4, ActiveTimeSeconds: "0", EstimatedCostUSD: "0"}}
 	}).Return(nil).Once()
-	transaction.On("First", mock.Anything, mock.Anything, mock.Anything).Return(notFound).Once()
+	// The Claude account doesn't exist yet; the name comes from another account with the email.
+	transaction.On("First", mock.AnythingOfType("*crossdomain.Account"), mock.Anything).Return(notFound).Once()
 	transaction.On("IsErrorNotFound", notFound).Return(true).Once()
+	transaction.On("First", mock.AnythingOfType("*crossdomain.Account"), mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		args.Get(0).(*crossdomain.Account).FullName = "Dev Name"
+	}).Return(nil).Once()
+	transaction.On("Exec", mock.Anything, accountID, email, "", "Dev Name").Return(nil).Once()
 	transaction.On("CreateOrUpdate", mock.MatchedBy(func(row *ai.AiSessionHour) bool {
-		return row.SessionId == "session-a" && row.UserEmail == email && row.AccountId == "" && row.LinesAdded == 4 &&
+		return row.SessionId == "session-a" && row.UserEmail == email && row.AccountId == accountID && row.LinesAdded == 4 &&
 			row.SourceConnectionId != nil && *row.SourceConnectionId == 7
 	})).Return(nil).Once()
 
 	if err := reconcileOtelSessionHours(transaction, []sessionHourTarget{target}); err != nil {
 		t.Fatalf("reconcileOtelSessionHours() error = %v", err)
+	}
+}
+
+func TestReconcileOtelSessionHoursLoadsAccountOncePerUser(t *testing.T) {
+	hour := time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)
+	email := "dev@example.com"
+	targets := []sessionHourTarget{
+		{workspaceKey: testOrganizationID, userKey: "acct:user_1", sessionID: "session-a", hour: hour},
+		{workspaceKey: testOrganizationID, userKey: "acct:user_1", sessionID: "session-b", hour: hour},
+	}
+	transaction := dalmocks.NewTransaction(t)
+	transaction.On("All", mock.AnythingOfType("*[]*models.OtelSessionHour"), mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		*args.Get(0).(*[]*models.OtelSessionHour) = []*models.OtelSessionHour{{ConnectionId: 7, UserEmail: &email, ActiveTimeSeconds: "0", EstimatedCostUSD: "0"}}
+	}).Return(nil).Twice()
+	// One account load for both sessions; the stored account is current, so nothing is written.
+	transaction.On("First", mock.AnythingOfType("*crossdomain.Account"), mock.Anything).Run(func(args mock.Arguments) {
+		account := args.Get(0).(*crossdomain.Account)
+		account.Email, account.FullName = email, "Dev Name"
+	}).Return(nil).Once()
+	transaction.On("CreateOrUpdate", mock.MatchedBy(func(row *ai.AiSessionHour) bool {
+		return row.AccountId == claudeAccountID(testOrganizationID, "acct:user_1")
+	})).Return(nil).Twice()
+
+	if err := reconcileOtelSessionHours(transaction, targets); err != nil {
+		t.Fatalf("reconcileOtelSessionHours() error = %v", err)
+	}
+}
+
+func TestReconcileOtelSessionHoursStopsOnAccountError(t *testing.T) {
+	hour := time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)
+	failure := errors.Default.New("connection lost")
+	transaction := dalmocks.NewTransaction(t)
+	transaction.On("All", mock.AnythingOfType("*[]*models.OtelSessionHour"), mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		*args.Get(0).(*[]*models.OtelSessionHour) = []*models.OtelSessionHour{{ConnectionId: 7, ActiveTimeSeconds: "0", EstimatedCostUSD: "0"}}
+	}).Return(nil).Once()
+	transaction.On("First", mock.AnythingOfType("*crossdomain.Account"), mock.Anything).Return(failure).Once()
+	transaction.On("IsErrorNotFound", failure).Return(false).Once()
+
+	target := sessionHourTarget{workspaceKey: testOrganizationID, userKey: "acct:user_1", sessionID: "session-a", hour: hour}
+	if err := reconcileOtelSessionHours(transaction, []sessionHourTarget{target}); err == nil {
+		t.Fatal("reconcileOtelSessionHours() error = nil, want the account error and no session row")
 	}
 }
