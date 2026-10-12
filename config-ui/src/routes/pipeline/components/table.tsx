@@ -16,20 +16,20 @@
  *
  */
 
-import { useState } from 'react';
 import { CodeOutlined, FileZipOutlined, RightOutlined } from '@ant-design/icons';
 import { Table, Space, Modal } from 'antd';
-import { pick } from 'lodash';
 import { saveAs } from 'file-saver';
+import { pick } from 'lodash';
+import { useState } from 'react';
 
 import API from '@/api';
-import { DEVLAKE_ENDPOINT } from '@/config';
 import { IconButton, Inspector } from '@/components';
+import { DEVLAKE_ENDPOINT } from '@/config';
 import { IPipeline } from '@/types';
 import { formatTime } from '@/utils';
 
-import { PipelineStatus } from './status';
 import { PipelineDuration } from './duration';
+import { PipelineStatus } from './status';
 import { PipelineTasks } from './tasks';
 
 interface Props {

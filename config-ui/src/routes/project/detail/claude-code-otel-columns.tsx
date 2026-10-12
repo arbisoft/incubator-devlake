@@ -16,9 +16,9 @@
  *
  */
 
-import type { NavigateFunction } from 'react-router-dom';
 import { Button, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import type { NavigateFunction } from 'react-router-dom';
 
 import { type OtelConnectionResponse } from '@/api/otel';
 import { PATHS } from '@/config';

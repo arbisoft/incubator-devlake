@@ -17,10 +17,13 @@
  */
 import { test, expect } from './fixtures';
 import { APP_URL } from './support/env';
+import { PATHS } from './support/pages/paths';
+import { ShellPage } from './support/pages/shell';
 
 test('config UI loads without browser errors', async ({ page, browserErrors }) => {
-  await page.goto('/');
+  const shell = new ShellPage(page);
+  await shell.visit(PATHS.root);
   expect(new URL(page.url()).origin).toBe(new URL(APP_URL).origin);
-  await expect(page.locator('body')).toBeVisible();
+  await expect(shell.body).toBeVisible();
   expect(browserErrors).toEqual([]);
 });

@@ -16,13 +16,14 @@
  *
  */
 
-import type { ComponentType } from 'react';
 import { CopyOutlined } from '@ant-design/icons';
-import { CopyToClipboard } from 'react-copy-to-clipboard';
 import { Alert, Button, Flex, Input, message, Modal, Select, Space, Typography } from 'antd';
+import type { ComponentType } from 'react';
+import { CopyToClipboard } from 'react-copy-to-clipboard';
 
 import type { OtelConnectionResponse, OtelProject } from '@/api/otel';
 import { ExternalLink, Message } from '@/components';
+
 import { OTEL_LIFECYCLE_ACTION, OTEL_ORGANIZATION } from './constants';
 import { ManagedSettings } from './styled';
 

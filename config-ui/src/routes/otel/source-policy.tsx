@@ -19,6 +19,7 @@
 import { Descriptions, Flex, Typography } from 'antd';
 
 import { type AiSourcePreference } from '@/api/otel';
+
 import { OTEL_SOURCE_POLICY } from './constants';
 
 type OtelSourcePolicyProps = {

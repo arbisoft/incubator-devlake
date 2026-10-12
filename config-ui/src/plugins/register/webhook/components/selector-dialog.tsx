@@ -16,13 +16,13 @@
  *
  */
 
-import { useState } from 'react';
 import { Modal } from 'antd';
 import MillerColumnsSelect from 'miller-columns-select';
+import { useState } from 'react';
 
-import { useAppSelector } from '@/hooks';
 import { Block, Loading } from '@/components';
 import { selectWebhooks } from '@/features';
+import { useAppSelector } from '@/hooks';
 import { IWebhook } from '@/types';
 
 import * as S from '../styled';
@@ -34,7 +34,7 @@ interface Props {
   onSubmit: (items: IWebhook[]) => void;
 }
 
-export const SelectorDialog = ({ open, saving, onCancel, onSubmit }: Props) => {
+const SelectorDialog = ({ open, saving, onCancel, onSubmit }: Props) => {
   const [selectedIds, setSelectedIds] = useState<ID[]>([]);
 
   const webhooks = useAppSelector(selectWebhooks);

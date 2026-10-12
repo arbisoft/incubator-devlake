@@ -16,15 +16,15 @@
  *
  */
 
-import { ConnectionName } from './name';
+import { ConnectionAppId } from './app-id';
 import { ConnectionEndpoint } from './endpoint';
-import { ConnectionUsername } from './username';
+import { ConnectionName } from './name';
 import { ConnectionPassword } from './password';
-import { ConnectionToken } from './token';
 import { ConnectionProxy } from './proxy';
 import { ConnectionRateLimit } from './rate-limit';
-import { ConnectionAppId } from './app-id';
 import { ConnectionSecretKey } from './secret-key';
+import { ConnectionToken } from './token';
+import { ConnectionUsername } from './username';
 
 interface Props {
   type: 'create' | 'update';

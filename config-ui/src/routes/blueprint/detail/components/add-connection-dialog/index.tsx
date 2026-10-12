@@ -16,14 +16,14 @@
  *
  */
 
-import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { PlusOutlined } from '@ant-design/icons';
 import { Modal, Select, Space, Button } from 'antd';
+import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 
-import { PATHS } from '@/config';
 import { Block } from '@/components';
+import { PATHS } from '@/config';
 import { selectAllConnections } from '@/features';
 import { useAppSelector } from '@/hooks';
 import { PluginName, DataScopeSelect } from '@/plugins';

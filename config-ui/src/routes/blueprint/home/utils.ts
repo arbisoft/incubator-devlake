@@ -16,8 +16,8 @@
  *
  */
 
-import type { BlueprintConnectionPayload } from '../../../types/blueprint';
 import { IBPMode } from '../../../types';
+import type { BlueprintConnectionPayload } from '../../../types/blueprint';
 
 type BlueprintCreatePayload = {
   name: string;

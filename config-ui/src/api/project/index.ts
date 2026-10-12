@@ -16,8 +16,8 @@
  *
  */
 
-import type { IProject } from '@/types';
 import { encodeName } from '@/routes';
+import type { IProject } from '@/types';
 import { request } from '@/utils';
 
 export const list = (data: Pagination): Promise<{ count: number; projects: IProject[] }> =>

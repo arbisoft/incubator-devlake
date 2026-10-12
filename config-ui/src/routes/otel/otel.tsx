@@ -16,21 +16,22 @@
  *
  */
 
-import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { PlusOutlined } from '@ant-design/icons';
 import { Button, Flex, message, Table } from 'antd';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import API from '@/api';
 import { type OtelConnectionResponse } from '@/api/otel';
 import { Message, PageHeader } from '@/components';
 import { useRefreshData } from '@/hooks';
 import { operator, type OperateConfig } from '@/utils';
+
 import { getOtelColumns } from './columns';
-import { OtelIngestionHealth } from './ingestion-health';
-import { OtelSourcePolicy } from './source-policy';
 import { OTEL_ERROR, OTEL_LIFECYCLE_ACTION, OTEL_REFRESH_INTERVAL_MS } from './constants';
+import { OtelIngestionHealth } from './ingestion-health';
 import { OTEL_MODAL, OtelModals, type OtelLifecycleAction, type OtelModalState } from './modals';
+import { OtelSourcePolicy } from './source-policy';
 import {
   getOtelCreateError,
   getOtelLifecycleError,

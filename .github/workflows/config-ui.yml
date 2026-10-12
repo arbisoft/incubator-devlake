@@ -18,23 +18,29 @@
 name: config-ui
 on:
   pull_request:
-    branches: [ main ]
+    branches: [ main, main-arbisoft, feat/config-ui-reskin ]
     paths:
       - 'config-ui/**'
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Set up Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: '24'
-        cache: 'yarn'
-        cache-dependency-path: config-ui/yarn.lock
+    - name: Enable Corepack
+      run: corepack enable
+    - name: Cache Yarn
+      uses: actions/cache@v4
+      with:
+        path: ~/.yarn/berry/cache
+        key: yarn-${{ runner.os }}-${{ hashFiles('config-ui/yarn.lock') }}
+        restore-keys: yarn-${{ runner.os }}-
     - name: Install with Yarn
-      run: cd config-ui; yarn
+      run: cd config-ui; yarn install --immutable
     - name: Run Lint
-      run: cd config-ui; yarn tsc && yarn lint
+      run: cd config-ui; yarn lint:check
     - name: Run Tests
       run: cd config-ui; yarn test

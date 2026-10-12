@@ -16,12 +16,13 @@
  *
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Button } from 'antd';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import API from '@/api';
 import { PATHS } from '@/config';
+
 import { OTEL_ATTENTION_CHANGED_EVENT, OTEL_REFRESH_INTERVAL_MS, OTEL_VISIBILITY_THROTTLE_MS } from './constants';
 import { getAttentionDescription, getAttentionState, isSameAttentionState, type OtelAttentionState } from './utils';
 

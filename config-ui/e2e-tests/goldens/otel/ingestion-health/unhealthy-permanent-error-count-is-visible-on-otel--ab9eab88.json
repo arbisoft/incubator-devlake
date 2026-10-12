@@ -1,0 +1,7 @@
+{
+  "titlePath": [
+    "Ingestion health panel renders degraded/unhealthy states",
+    "unhealthy permanent-error count is visible on /otel"
+  ],
+  "writes": []
+}

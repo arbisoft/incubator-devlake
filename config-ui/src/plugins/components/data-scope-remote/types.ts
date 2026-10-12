@@ -24,12 +24,3 @@ export type ResItem = {
   fullName: string;
   data: any;
 };
-
-export type GetRemoteScopeParams = {
-  groupId: ID | null;
-  pageToken?: string;
-};
-
-export type SearchRemoteScopeParams = {
-  search?: string;
-} & Pagination;

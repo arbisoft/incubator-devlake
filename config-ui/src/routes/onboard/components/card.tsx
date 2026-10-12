@@ -16,10 +16,10 @@
  *
  */
 
-import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { CloseOutlined, LoadingOutlined, CheckCircleFilled, CloseCircleFilled } from '@ant-design/icons';
 import { theme, Card, Flex, Progress, Space, Button, Modal } from 'antd';
+import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import API from '@/api';
 import { useRefreshData, useAutoRefresh } from '@/hooks';

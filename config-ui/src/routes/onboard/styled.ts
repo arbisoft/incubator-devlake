@@ -18,12 +18,6 @@
 
 import styled from 'styled-components';
 
-export const Wrapper = styled.div`
-  width: 100%;
-  height: 100vh;
-  background-color: ${({ theme }) => theme.colors.bgLayout};
-`;
-
 export const Inner = styled.div`
   margin: 0 auto;
   padding: 36px 0;

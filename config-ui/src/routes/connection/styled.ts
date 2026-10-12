@@ -16,8 +16,8 @@
  *
  */
 
-import styled from 'styled-components';
 import { Alert } from 'antd';
+import styled from 'styled-components';
 
 export const Wrapper = styled.div`
   h2 {

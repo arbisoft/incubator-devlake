@@ -20,6 +20,7 @@ import { Button, Popconfirm, Space, Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 
 import { GRAFANA_PROVIDER_KIND, OIDC_PROVIDER_SYNC_STATUS, type OIDCProvider } from '@/api/access';
+
 import { GRAFANA_PROVIDER_LABEL, OIDC_PROVIDER_STATUS_COLOR } from './constants';
 import { canActivateOIDCProvider, canSelectGenericOIDCProvider, getOIDCProviderStatus } from './utils';
 

@@ -16,13 +16,12 @@
  *
  */
 
-import { useEffect, useMemo, useState } from 'react';
 import { Select, Input } from 'antd';
+import { useEffect, useMemo, useState } from 'react';
 
 import API from '@/api';
 import { Block, ExternalLink } from '@/components';
 
-import * as S from './styled';
 import {
   buildGithubInstallationOptions,
   GithubAppSettings,
@@ -30,6 +29,7 @@ import {
   isMaskedGithubAppSecret,
   shouldValidateGithubAppConfig,
 } from './githubapp-utils';
+import * as S from './styled';
 
 interface Props {
   connectionId?: ID;

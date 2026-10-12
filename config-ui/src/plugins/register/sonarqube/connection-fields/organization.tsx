@@ -17,9 +17,9 @@
  */
 
 import { Input } from 'antd';
+import { useEffect } from 'react';
 
 import { Block, ExternalLink } from '@/components';
-import { useEffect } from 'react';
 
 interface Props {
   type: 'create' | 'update';

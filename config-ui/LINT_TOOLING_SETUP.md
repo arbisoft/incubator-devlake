@@ -475,3 +475,29 @@ Baseline at setup time (2026-10-06), so you can tell whether your numbers look r
 - **The pre-commit hook will block commits.** It runs `eslint --fix` on staged files, so any touched file with errors that can't be auto-fixed (e.g. `no-explicit-any`) blocks the commit. Until the backlog is cleaned up, either fix the files you touch or temporarily downgrade the noisy rules to `'warn'` locally.
 - **Knip and jscpd exit with an error code** when they find issues. That's expected; don't wire them into CI as blocking until the baseline is cleared.
 - **Prettier settings are unchanged** (devlake keeps `printWidth: 120` and Prettier 2). Adopting ornge's Prettier config would reformat the whole codebase.
+
+---
+
+## After the upstream sync (#83)
+
+The steps above were written for the pre-sync stack. This branch is now on ESLint 10 flat config, so several steps no longer work as written. Each change below says what happened, what it breaks in the steps above, and the workaround that is implemented in this repo.
+
+- **Flat config replaced `.eslintrc.js` and `.eslintignore`.** After the sync, ESLint 10 only reads `eslint.config.mjs`, so step 4 (`.eslintrc.js`) and step 5 (`.eslintignore`) no longer apply. The main config is `eslint.config.mjs` and its `ignores` array. The guide's rules live in a separate `eslint.quality.config.mjs`, which spreads the main config and adds the presets and rules on top, so ignores and parser settings are not duplicated.
+- **The quality config is report-only.** `yarn lint` and the husky hook run `eslint --fix` with the main config, so putting the guide's rules there would fail commits and rewrite about 140 files (step 9). Nothing loads `eslint.quality.config.mjs` except `yarn lint:quality` (`eslint -c eslint.quality.config.mjs . -f ./eslint-summary.cjs`), so `lint:check`, `yarn lint` and the hook behave as before. To adopt the rules later, merge the config into `eslint.config.mjs`.
+- **`eslint-plugin-import` does not support ESLint 10.** Step 1 and the step 4 rules (`import/order`, `import/no-unresolved`, `import/no-extraneous-dependencies`, `plugin:import/typescript`) cannot be installed or loaded. We use `eslint-plugin-import-x`, its flat-config fork, so the rules are named `import-x/*`. The TypeScript resolver is `eslint-import-resolver-typescript` through `import-x/resolver-next` in `eslint.quality.config.mjs`.
+- **`settings.react.version: 'detect'` crashes `eslint-plugin-react` 7.37 on ESLint 10** (`getFilename is not a function`), so the step 4 `settings` block cannot be used. The version is pinned in `eslint.quality.config.mjs` (`react: { version: '19.3' }`). Bump it when React is bumped.
+- **`eslint-plugin-headers` replaced `.file-headerrc`.** Step 4's `header/header` rule and `.file-headerrc` do not exist after the sync. The licence header is enforced by `headers/header-format` in `eslint.config.mjs`, which the quality config inherits. `eslint.config.mjs` also applies it to the `.cjs` scripts.
+- **Package versions differ from step 1.** `@typescript-eslint/*` 7 is replaced by `typescript-eslint` 8, `eslint-plugin-react-hooks` 4 by 7 and `eslint-config-prettier` 9 by 10, all already in `package.json`. Do not install step 1's versions. `eslint-plugin-react-hooks` 7 `recommended` also includes the React Compiler rules (`set-state-in-effect`, `refs`, `immutability`, `globals` and others), which the guide's 4.x did not have. `eslint.quality.config.mjs` sets the ones that fire to `warn`.
+- **Prettier is 3, not 2.** Step 9 says Prettier 2. The repo config (`.prettierrc.js`, `printWidth: 120`) is unchanged and the quality config keeps `prettier/prettier`. Check files with `corepack yarn exec prettier --check <files>`; do not run `yarn prettier`, which rewrites the repo.
+- **Formatters are `.cjs` and scripts use Yarn.** Steps 2, 6 and 7 name `format-jscpd.js` and call `npm run`. The scripts are `eslint-summary.cjs` and `format-jscpd.cjs`, and `format-jscpd.cjs` calls `corepack yarn jscpd:run`. They carry the licence header and are linted by the main config.
+- **`tsconfig.eslint.json` is still needed.** Step 3 holds on this branch: without it `import-x/no-unresolved` cannot resolve the `@/` alias through the `references` entry in `tsconfig.json`. The file is in this repo and is passed as the resolver `project`.
+- **Scripts as they exist.** Run these from `config-ui/`; none rewrites files, and the old `dup` script is gone (superseded by `find:duplicates`).
+  - `yarn lint:quality`: the quality ESLint report.
+  - `yarn find:dead-code`: `knip`.
+  - `yarn jscpd:run`: raw jscpd on `./src`.
+  - `yarn jscpd:format`: `node format-jscpd.cjs`.
+  - `yarn find:duplicates`: runs `jscpd:format`.
+  - `yarn quality:baseline`: see below.
+- **`quality:baseline` stops the counts growing.** The report-only tools have no gate of their own. `tools/quality-baseline.mjs` runs the quality ESLint config, knip and jscpd, and compares per-rule ESLint totals, the knip findings and the jscpd totals with `quality.baseline.json`. It exits 1 if any of them grows. `yarn quality:baseline --write` rewrites the baseline, and should only be used when counts went down or an addition is explained.
+- **Rule tuning.** Some guide rules are noisy for this repo, so `eslint.quality.config.mjs` changes them, each with a one-line reason in the file. For `e2e-tests/**` it turns off `sonarjs/no-skipped-tests`, `super-linear-regex`, `pseudo-random`, `no-clear-text-protocols` and `no-duplicate-string`. Repo-wide it sets `sonarjs/no-nested-conditional`, `prefer-destructuring` and the React Compiler hook rules to `warn`. Everything else stays at the guide's severity.
+- **Knip needs almost no config.** It infers the Vite entry, the `@/` alias, Vitest, Playwright and the ESLint configs. `knip.jsonc` only ignores the three empty reskin barrels (`src/ui/index.ts`, `src/ui/hooks/index.ts`, `src/routes/ui-kit/index.ts`), each with its reason; do not add ignores to hide real findings.

@@ -16,8 +16,8 @@
  *
  */
 
-import { useEffect, useState } from 'react';
 import { Alert, Button, Form, Input, Typography } from 'antd';
+import { useEffect, useState } from 'react';
 
 import API from '@/api';
 import { TipLayout } from '@/components';

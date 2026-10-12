@@ -15,9 +15,12 @@
  * limitations under the License.
  *
  */
-import { test, expect } from '../fixtures';
 import { loginAsAdmin } from '../auth-helpers';
+import { test, expect } from '../fixtures';
 import { fetchAuthMethods } from '../support/auth-state';
+import { countLocalCredentials } from '../support/db';
+import { LoginPage } from '../support/pages/login';
+import { SettingsUsersPage } from '../support/pages/settings-users';
 
 test.describe('Phase 1-3 Verification: State A (Local Auth Disabled / Default)', () => {
   test.beforeEach(async ({ request }) => {
@@ -32,30 +35,23 @@ test.describe('Phase 1-3 Verification: State A (Local Auth Disabled / Default)',
     expect(data.providers?.length ?? 0).toBeGreaterThan(0);
 
     // Check UI login page
-    await page.goto('/login');
-    await expect(page.getByRole('button', { name: /Sign in with Google/i })).toBeVisible();
-    await expect(page.getByRole('textbox', { name: /Username/i })).not.toBeVisible();
-    await expect(page.getByRole('button', { name: /^Sign in$/i })).not.toBeVisible();
+    const loginPage = new LoginPage(page);
+    await loginPage.open();
+    await expect(loginPage.providerButton('Google')).toBeVisible();
+    await expect(loginPage.usernameTextbox).not.toBeVisible();
+    await expect(loginPage.signInButton).not.toBeVisible();
   });
 
   test('2. Attempting to create a local user via API when disabled returns 503', async ({ page, context }) => {
     await loginAsAdmin(context);
-    await page.goto('/access');
-    const res = await page.evaluate(async () => {
-      const resp = await fetch('/api/access/local-users', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': document.cookie.match(/devlake_csrf=([^;]+)/)?.[1] || '',
-        },
-        body: JSON.stringify({
-          loginName: 'testadmin',
-          displayName: 'Test Admin',
-          role: 'member',
-        }),
-      });
-      return { status: resp.status, body: await resp.json() };
+    const usersPage = new SettingsUsersPage(page);
+    await usersPage.open();
+    const credentialsBefore = countLocalCredentials('testadmin');
+    const res = await usersPage.sessionFetch('/api/access/local-users', {
+      method: 'POST',
+      body: { loginName: 'testadmin', displayName: 'Test Admin', role: 'member' },
     });
     expect(res.status).toBe(503);
+    expect(countLocalCredentials('testadmin')).toBe(credentialsBefore);
   });
 });

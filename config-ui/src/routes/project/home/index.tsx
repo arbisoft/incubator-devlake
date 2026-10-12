@@ -16,10 +16,10 @@
  *
  */
 
-import { useState, useMemo, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
 import { PlusOutlined, SettingOutlined } from '@ant-design/icons';
 import { Flex, Table, Button, Modal, Input, Space, Tooltip } from 'antd';
+import { useState, useMemo, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
 import API from '@/api';
 import { type OtelConnectionResponse } from '@/api/otel';
@@ -27,12 +27,11 @@ import { PageHeader, Block, IconButton } from '@/components';
 import { getCron, PATHS } from '@/config';
 import { ConnectionName } from '@/features';
 import { useRefreshData } from '@/hooks';
+import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?react';
 import { OnboardTour } from '@/routes/onboard/components';
-import { formatTime, operator } from '@/utils';
 import { PipelineStatus } from '@/routes/pipeline';
 import { IBlueprint } from '@/types';
-
-import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?react';
+import { formatTime, operator } from '@/utils';
 
 type ClaudeCodeOtelConnectionNameProps = {
   connection: OtelConnectionResponse;

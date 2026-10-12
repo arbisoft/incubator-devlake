@@ -16,8 +16,8 @@
  *
  */
 
-import { useState, useEffect } from 'react';
 import { Modal, Input } from 'antd';
+import { useState, useEffect } from 'react';
 
 interface Props {
   name: string;

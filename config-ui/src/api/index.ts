@@ -18,8 +18,8 @@
 
 import { request } from '@/utils';
 
-import * as apiKey from './api-key';
 import * as access from './access';
+import * as apiKey from './api-key';
 import * as auth from './auth';
 import * as blueprint from './blueprint';
 import * as connection from './connection';
@@ -36,7 +36,7 @@ const migrate = () => request('/proceed-db-migration');
 const ping = () => request('/ping');
 const version = (signal?: AbortSignal): Promise<{ version: string }> => request('/version', { signal });
 
-export const API = {
+const API = {
   access,
   apiKey,
   auth,

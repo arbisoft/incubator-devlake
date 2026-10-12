@@ -16,12 +16,12 @@
  *
  */
 
-import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { ConfigProvider } from 'antd';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { ThemeProvider as StyledThemeProvider } from 'styled-components';
 
-import { useAppSelector } from '@/hooks';
 import { selectThemeMode, resolveThemeMode } from '@/features/theme/slice';
+import { useAppSelector } from '@/hooks';
 
 import { getTheme, ResolvedTheme } from './tokens';
 

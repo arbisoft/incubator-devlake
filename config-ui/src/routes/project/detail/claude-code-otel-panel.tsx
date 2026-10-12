@@ -16,14 +16,13 @@
  *
  */
 
-import { useNavigate } from 'react-router-dom';
 import { Button, Card, Space, Table, Typography } from 'antd';
+import { useNavigate } from 'react-router-dom';
 
 import API from '@/api';
 import { type OtelConnectionResponse } from '@/api/otel';
 import { PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
-
 import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?react';
 
 import { getClaudeCodeOtelProjectColumns } from './claude-code-otel-columns';

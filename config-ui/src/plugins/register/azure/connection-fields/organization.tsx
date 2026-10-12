@@ -16,8 +16,8 @@
  *
  */
 
-import React, { useEffect, useState } from 'react';
 import { Input, Radio, type RadioChangeEvent } from 'antd';
+import React, { useEffect, useState } from 'react';
 
 import { Block, ExternalLink } from '@/components';
 import { DOC_URL } from '@/release';

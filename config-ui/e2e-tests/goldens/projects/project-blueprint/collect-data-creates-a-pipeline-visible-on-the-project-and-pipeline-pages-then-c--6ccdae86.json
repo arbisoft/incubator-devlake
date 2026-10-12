@@ -1,0 +1,16 @@
+{
+  "titlePath": [
+    "Project, blueprint, pipeline and webhook flows",
+    "collect data creates a pipeline visible on the project and pipeline pages, then cancel it"
+  ],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/blueprints/:id/trigger",
+      "body": {
+        "fullSync": false,
+        "skipCollectors": false
+      }
+    }
+  ]
+}

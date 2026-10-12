@@ -26,6 +26,7 @@ import {
   type OIDCProvider,
   type OIDCProviderInput,
 } from '../../api/access';
+
 import { AUTHENTICATION_STATE, OIDC_PROVIDER_STATUS } from './constants';
 
 export const ACCESS_ERROR = {
@@ -45,7 +46,7 @@ export const ACCESS_ERROR = {
     'OIDC provider was saved, but Grafana OAuth synchronization failed. Use Retry Grafana to complete synchronization.',
 } as const;
 
-export const LOCAL_CREDENTIAL_ERROR = {
+const LOCAL_CREDENTIAL_ERROR = {
   DUPLICATE_USER: 'This username already has a DevLake local password.',
   INVALID_USER: 'Enter a valid username, then try again.',
 } as const;
@@ -198,8 +199,6 @@ export const getOIDCProviderError = (error: unknown) => {
   if (code === ACCESS_ERROR_CODE.GRAFANA_SYNC_FAILED) return ACCESS_ERROR.GRAFANA_SYNC_FAILED;
   return ACCESS_ERROR.OIDC_PROVIDER_FAILED;
 };
-
-export const getOIDCProviderErrorCode = (error: unknown) => extractOIDCProviderErrorCode(error);
 
 export const getOIDCProviderStatus = (provider?: OIDCProvider) => {
   if (!provider) return OIDC_PROVIDER_STATUS.CONFIGURED;

@@ -15,7 +15,9 @@
  * limitations under the License.
  *
  */
-import { test as base, expect } from '@playwright/test';
+import { expect } from '@playwright/test';
+
+import { test as base } from './support/write-recorder';
 
 export const test = base.extend<{
   browserErrors: string[];

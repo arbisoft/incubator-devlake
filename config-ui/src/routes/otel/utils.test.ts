@@ -16,8 +16,8 @@
  *
  */
 
-import { describe, expect, it } from 'vitest';
 import { AxiosError, AxiosHeaders, HttpStatusCode } from 'axios';
+import { describe, expect, it } from 'vitest';
 
 import { OTEL_CONNECTION_STATUS } from '../../api/otel/types';
 

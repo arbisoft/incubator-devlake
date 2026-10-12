@@ -16,9 +16,9 @@
  *
  */
 
-import { CopyToClipboard } from 'react-copy-to-clipboard';
 import { CopyOutlined } from '@ant-design/icons';
 import { Button, message } from 'antd';
+import { CopyToClipboard } from 'react-copy-to-clipboard';
 import styled from 'styled-components';
 
 import { TextTooltip } from '@/components';

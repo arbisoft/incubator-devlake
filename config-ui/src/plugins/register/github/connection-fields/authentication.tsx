@@ -16,8 +16,8 @@
  *
  */
 
-import { useEffect } from 'react';
 import { Radio } from 'antd';
+import { useEffect } from 'react';
 
 import { Block } from '@/components';
 

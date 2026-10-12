@@ -16,8 +16,8 @@
  *
  */
 
-import { redirect } from 'react-router-dom';
 import { intersection } from 'lodash';
+import { redirect } from 'react-router-dom';
 
 import API from '@/api';
 import { PATHS } from '@/config';

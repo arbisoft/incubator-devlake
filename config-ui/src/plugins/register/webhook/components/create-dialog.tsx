@@ -16,18 +16,18 @@
  *
  */
 
-import { useState, useMemo } from 'react';
 import { CheckCircleOutlined } from '@ant-design/icons';
 import { Modal, Input } from 'antd';
+import { useState, useMemo } from 'react';
 
-import { useAppDispatch } from '@/hooks';
 import { Block, CopyText, ExternalLink } from '@/components';
 import { addWebhook } from '@/features';
+import { useAppDispatch } from '@/hooks';
 import { operator } from '@/utils';
 
-import { transformURI } from './utils';
-
 import * as S from '../styled';
+
+import { transformURI } from './utils';
 
 interface Props {
   open: boolean;
@@ -175,5 +175,3 @@ export const CreateDialog = ({ open, onCancel, onSubmitAfter }: Props) => {
     </Modal>
   );
 };
-
-export default CreateDialog;

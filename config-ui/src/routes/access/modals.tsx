@@ -16,8 +16,8 @@
  *
  */
 
-import { Button, Input, Modal, Select, Space } from 'antd';
 import { CopyOutlined } from '@ant-design/icons';
+import { Button, Input, Modal, Select, Space } from 'antd';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
 
 import type { AccessRole } from '@/api/access';

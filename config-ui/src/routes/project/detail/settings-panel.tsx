@@ -16,19 +16,18 @@
  *
  */
 
+import { Flex, Space, Card, Modal, Input, Checkbox, Button, message } from 'antd';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Flex, Space, Card, Modal, Input, Checkbox, Button, message } from 'antd';
 
 import API from '@/api';
 import { OTEL_CONNECTION_STATUS } from '@/api/otel';
 import { Block, HelpTooltip, Message } from '@/components';
 import { PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
+import { getOtelProjectError } from '@/routes/otel/utils';
 import { IProject } from '@/types';
 import { operator } from '@/utils';
-
-import { getOtelProjectError } from '@/routes/otel/utils';
 
 const RegexPrIssueDefaultValue = '(?mi)(Closes)[\\s]*.*(((and )?#\\d+[ ]*)+)';
 

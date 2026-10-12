@@ -16,9 +16,9 @@
  *
  */
 
-import { useNavigate } from 'react-router-dom';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
 import { Card, Space, Flex, Button } from 'antd';
+import { useNavigate } from 'react-router-dom';
 
 import { TipLayout } from '@/components';
 

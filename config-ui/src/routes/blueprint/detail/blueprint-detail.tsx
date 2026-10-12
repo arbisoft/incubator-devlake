@@ -16,14 +16,15 @@
  *
  */
 
-import { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, message } from 'antd';
 import axios from 'axios';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+
 import API from '@/api';
 import { PageLoading } from '@/components';
-import { useRefreshData } from '@/hooks';
 import { PATHS } from '@/config';
+import { useRefreshData } from '@/hooks';
 
 import { FromEnum } from '../types';
 

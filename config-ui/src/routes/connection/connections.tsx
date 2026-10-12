@@ -16,20 +16,20 @@
  *
  */
 
+import { WarningOutlined } from '@ant-design/icons';
+import { theme, Badge, Modal } from 'antd';
 import { Fragment, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { theme, Badge, Modal } from 'antd';
-import { WarningOutlined } from '@ant-design/icons';
 
-import { selectPlugins, selectAllConnections, selectWebhooks } from '@/features/connections';
 import API from '@/api';
 import { OTEL_CREDENTIAL_STATUS } from '@/api/otel';
 import { PATHS } from '@/config';
+import { selectPlugins, selectAllConnections, selectWebhooks } from '@/features/connections';
 import { useAppSelector, useRefreshData } from '@/hooks';
 import { getPluginConfig, ConnectionList, ConnectionForm } from '@/plugins';
+import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?react';
 import { formatPlural } from '@/utils';
 
-import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?react';
 import * as S from './styled';
 
 const SORT_START_WITH = ['o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'];

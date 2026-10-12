@@ -16,8 +16,8 @@
  *
  */
 
-import { useState, useEffect, useMemo } from 'react';
 import { Flex, Button, Alert } from 'antd';
+import { useState, useEffect, useMemo } from 'react';
 
 import API from '@/api';
 import type { ScopeDuplicateGroup } from '@/api/scope';

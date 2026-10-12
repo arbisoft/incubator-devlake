@@ -22,9 +22,10 @@ import type { ColumnsType } from 'antd/es/table';
 
 import { OTEL_CONNECTION_STATUS, OTEL_CREDENTIAL_STATUS, type OtelConnectionResponse } from '@/api/otel';
 import { formatTime } from '@/utils';
+
+import { OTEL_CONNECTION_DISPLAY_STATUS, OTEL_ORGANIZATION, OTEL_PROJECT_PLACEMENT } from './constants';
 import { OTEL_MODAL, type OtelModalState } from './modals';
 import { getOtelConnectionStatus } from './utils';
-import { OTEL_CONNECTION_DISPLAY_STATUS, OTEL_ORGANIZATION, OTEL_PROJECT_PLACEMENT } from './constants';
 
 export const getOtelColumns = (
   setCurrent: (connection: OtelConnectionResponse) => void,

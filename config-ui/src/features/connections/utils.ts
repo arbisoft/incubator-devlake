@@ -17,7 +17,6 @@
  */
 
 import { getPluginConfig } from '@/plugins';
-
 import { IConnectionAPI, IConnection, IConnectionStatus, IWebhookAPI, IWebhook } from '@/types';
 
 export const transformConnection = (plugin: string, connection: IConnectionAPI): IConnection => {

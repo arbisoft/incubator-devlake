@@ -16,9 +16,9 @@
  *
  */
 
-import { forwardRef, Ref } from 'react';
 import type { ButtonProps } from 'antd';
 import { Tooltip, Button } from 'antd';
+import { forwardRef, Ref } from 'react';
 
 interface Props extends Pick<
   ButtonProps,

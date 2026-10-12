@@ -16,17 +16,17 @@
  *
  */
 
-import { useState, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
 import { DeleteOutlined, PlusOutlined, LinkOutlined, ClearOutlined } from '@ant-design/icons';
 import { theme, Space, Table, Button, Modal, message } from 'antd';
+import { useState, useMemo } from 'react';
+import { Helmet } from 'react-helmet';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 
 import API from '@/api';
 import { PageHeader, Message, IconButton } from '@/components';
 import { PATHS } from '@/config';
-import { useAppDispatch, useAppSelector } from '@/hooks';
 import { selectConnection, removeConnection } from '@/features';
+import { useAppDispatch, useAppSelector } from '@/hooks';
 import { useRefreshData } from '@/hooks';
 import {
   ConnectionStatus,
@@ -36,11 +36,11 @@ import {
   ScopeConfig,
   ScopeConfigSelect,
 } from '@/plugins';
+import { getPluginScopeName } from '@/plugins';
 import { IConnection } from '@/types';
 import { operator } from '@/utils';
 
 import * as S from './styled';
-import { getPluginScopeName } from '@/plugins';
 
 const brandName = import.meta.env.DEVLAKE_BRAND_NAME ?? 'DevLake';
 

@@ -18,8 +18,8 @@
 
 import styled from 'styled-components';
 
-import LogoImg from '@/images/logo.svg';
 import LogoHorizontalImg from '@/images/logo-horizontal.svg';
+import LogoImg from '@/images/logo.svg';
 
 const Wrapper = styled.div`
   display: flex;
