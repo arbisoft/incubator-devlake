@@ -31,4 +31,5 @@ export const PATHS = {
   access: '/access',
   otel: '/otel',
   onboard: '/onboard',
+  uiKit: '/ui-kit',
 };

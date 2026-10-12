@@ -1,9 +1,5 @@
 {
   "eslint": {
-    "@typescript-eslint/no-empty-object-type": {
-      "errors": 0,
-      "warnings": 1
-    },
     "@typescript-eslint/no-explicit-any": {
       "errors": 324,
       "warnings": 0

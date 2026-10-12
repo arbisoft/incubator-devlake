@@ -16,16 +16,55 @@
  *
  */
 
-/* Initial-paint fallbacks; ThemeProvider overrides these from theme tokens. */
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/figtree-latin-400-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./fonts/figtree-latin-500-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./fonts/figtree-latin-600-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./fonts/figtree-latin-700-normal.woff2') format('woff2');
+}
+
+/* Initial-paint fallbacks follow the OS scheme via system colours; ThemeProvider overrides them from theme tokens. */
 :root {
-  --devlake-color-text: #292b3f;
-  --devlake-color-text-muted: #94959f;
-  --devlake-color-bg: #ffffff;
+  color-scheme: light dark;
+  --devlake-color-text: CanvasText;
+  --devlake-color-text-secondary: GrayText;
+  --devlake-color-text-muted: GrayText;
+  --devlake-color-bg: Canvas;
 }
 
 body {
   color: var(--devlake-color-text);
   background-color: var(--devlake-color-bg);
+  font-family:
+    'Figtree',
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
   margin: 0;
 }
 
@@ -72,9 +111,20 @@ ul {
 p {
   margin: 8px 0;
   font-size: 12px;
-  color: var(--devlake-color-text-muted);
+  color: var(--devlake-color-text-secondary);
 }
 
 #root {
   height: 100vh;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

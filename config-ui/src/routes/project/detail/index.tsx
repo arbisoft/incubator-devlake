@@ -24,7 +24,7 @@ import { useParams, useLocation, useNavigate } from 'react-router-dom';
 
 import API from '@/api';
 import { PageHeader, PageLoading } from '@/components';
-import { PATHS } from '@/config';
+import { BRAND_NAME, PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
 import { BlueprintDetail, FromEnum } from '@/routes';
 
@@ -32,8 +32,6 @@ import { ClaudeCodeOtelPanel } from './claude-code-otel-panel';
 import { SettingsPanel } from './settings-panel';
 import * as S from './styled';
 import { WebhooksPanel } from './webhooks-panel';
-
-const brandName = import.meta.env.DEVLAKE_BRAND_NAME ?? 'DevLake';
 
 export const ProjectDetailPage = () => {
   const [version, setVersion] = useState(1);
@@ -86,7 +84,7 @@ export const ProjectDetailPage = () => {
     >
       <Helmet>
         <title>
-          {project.name} - {brandName}
+          {project.name} - {BRAND_NAME}
         </title>
       </Helmet>
       <S.Wrapper>

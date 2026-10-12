@@ -15,8 +15,10 @@
  * limitations under the License.
  *
  */
+import { PALETTE } from '../../src/theme/palette';
 import { loginAsAdmin } from '../auth-helpers';
 import { test, expect } from '../fixtures';
+import { hexToRgb } from '../support/colour';
 import { PATHS } from '../support/pages/paths';
 import { ProjectsPage } from '../support/pages/projects';
 import { ShellPage } from '../support/pages/shell';
@@ -24,11 +26,13 @@ import { ShellPage } from '../support/pages/shell';
 const expectDark = async (shell: ShellPage) => {
   await expect.poll(() => shell.backgroundBrightness()).toBeLessThan(80);
   await expect(shell.html).toHaveAttribute('data-theme', 'dark');
+  await expect.poll(() => shell.backgroundColour()).toBe(hexToRgb(PALETTE.dark.colors.bgContainer));
 };
 
 const expectLight = async (shell: ShellPage) => {
   await expect.poll(() => shell.backgroundBrightness()).toBeGreaterThan(180);
   await expect(shell.html).toHaveAttribute('data-theme', 'light');
+  await expect.poll(() => shell.backgroundColour()).toBe(hexToRgb(PALETTE.light.colors.bgContainer));
 };
 
 test.describe('theme toggle', () => {

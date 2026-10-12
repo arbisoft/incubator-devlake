@@ -24,15 +24,13 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 import API from '@/api';
 import { PageLoading, PageHeader, ExternalLink } from '@/components';
-import { PATHS } from '@/config';
+import { BRAND_NAME, PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
 import { DataScopeSelect } from '@/plugins';
 import { operator } from '@/utils';
 
 import * as S from './styled';
 import { BlueprintConnectionDetailTable } from './table';
-
-const brandName = import.meta.env.DEVLAKE_BRAND_NAME ?? 'DevLake';
 
 export const BlueprintConnectionDetailPage = () => {
   const [version, setVersion] = useState(1);
@@ -196,7 +194,7 @@ export const BlueprintConnectionDetailPage = () => {
     >
       <Helmet>
         <title>
-          {pname ? pname : blueprint.name} - {connection.name} - {brandName}
+          {pname ? pname : blueprint.name} - {connection.name} - {BRAND_NAME}
         </title>
       </Helmet>
       <S.Top>

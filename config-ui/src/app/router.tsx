@@ -16,8 +16,10 @@
  *
  */
 
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate, type RouteObject } from 'react-router-dom';
 
+import { PageLoading } from '@/components';
+import { PATHS } from '@/config';
 import {
   DBMigrate,
   Onboard,
@@ -43,6 +45,16 @@ import {
 } from '@/routes';
 
 const PATH_PREFIX = import.meta.env.DEVLAKE_PATH_PREFIX ?? '';
+
+const devRoutes: RouteObject[] = import.meta.env.DEV
+  ? [
+      {
+        path: `${PATHS.UI_KIT()}/*`,
+        hydrateFallbackElement: <PageLoading />,
+        lazy: async () => ({ Component: (await import('@/routes/ui-kit')).UiKit }),
+      },
+    ]
+  : [];
 
 export const router = createBrowserRouter([
   {
@@ -135,6 +147,7 @@ export const router = createBrowserRouter([
       },
     ],
   },
+  ...devRoutes,
   {
     path: '*',
     element: <NotFound />,
