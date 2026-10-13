@@ -62,7 +62,8 @@ func PostOtlpMetrics(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput,
 }
 
 // PostOtlpLogs accepts Claude Code events forwarded by the Collector. Only the events
-// DevLake converts are stored, without prompt, response or tool content.
+// DevLake converts are stored, without response, tool or error content. Prompt text is
+// stored for developers who set OTEL_LOG_USER_PROMPTS=1; see service.IngestLogs.
 func PostOtlpLogs(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
 	ingestService := service.DefaultRawIngestService()
 	if ingestService == nil {

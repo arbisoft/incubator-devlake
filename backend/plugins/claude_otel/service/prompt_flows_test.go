@@ -43,6 +43,12 @@ func replaceAttribute(attributes []*commonv1.KeyValue, key, value string) []*com
 	return append(removeAttribute(attributes, key), stringAttribute(key, value))
 }
 
+// claimsStatus reports whether a log batch claim condition selects the given status.
+func claimsStatus(argument interface{}, status string) bool {
+	params := whereParams(argument)
+	return len(params) > 0 && params[0] == status
+}
+
 // whereParams returns a where clause's parameters, or nil for any other argument.
 func whereParams(argument interface{}) []interface{} {
 	clause, ok := argument.(dal.Clause)
@@ -566,9 +572,9 @@ func TestConvertLogBatchCompletesABatchWithOnlySkippedEvents(t *testing.T) {
 }
 
 // expectCandidate makes the claim query for one condition find a batch, or nothing when id is 0.
-func expectCandidate(database *dalmocks.Dal, condition string, id uint64, status string) {
+func expectCandidate(database *dalmocks.Dal, claimed string, id uint64, status string) {
 	call := database.On("First", mock.AnythingOfType("*models.OtelLogBatch"), mock.Anything, mock.MatchedBy(func(clause interface{}) bool {
-		return strings.Contains(clauseExpr(clause), condition)
+		return claimsStatus(clause, claimed)
 	}), mock.Anything)
 	if id == 0 {
 		call.Return(errors.NotFound.New("none")).Once()
@@ -583,10 +589,10 @@ func expectCandidate(database *dalmocks.Dal, condition string, id uint64, status
 func TestClaimNextLogBatchClaimsTheOldestClaimableBatch(t *testing.T) {
 	database := dalmocks.NewDal(t)
 	database.On("IsErrorNotFound", mock.Anything).Return(true)
-	expectCandidate(database, "'pending'", 12, models.OtelMetricBatchStatusPending)
-	expectCandidate(database, "'retryable_error'", 0, "")
+	expectCandidate(database, models.OtelMetricBatchStatusPending, 12, models.OtelMetricBatchStatusPending)
+	expectCandidate(database, models.OtelMetricBatchStatusRetryableError, 0, "")
 	// Batch 4's lease expired while processing, so it is older and claimed first.
-	expectCandidate(database, "'processing'", 4, models.OtelMetricBatchStatusProcessing)
+	expectCandidate(database, models.OtelMetricBatchStatusProcessing, 4, models.OtelMetricBatchStatusProcessing)
 	var claimParams []interface{}
 	database.On("UpdateColumns", mock.AnythingOfType("*models.OtelLogBatch"), mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		claimParams = whereParams(args.Get(2))
@@ -607,9 +613,9 @@ func TestClaimNextLogBatchClaimsTheOldestClaimableBatch(t *testing.T) {
 func TestClaimNextLogBatchYieldsWhenAnotherWorkerClaimedFirst(t *testing.T) {
 	database := dalmocks.NewDal(t)
 	database.On("IsErrorNotFound", mock.Anything).Return(true)
-	expectCandidate(database, "'pending'", 12, models.OtelMetricBatchStatusPending)
-	expectCandidate(database, "'retryable_error'", 0, "")
-	expectCandidate(database, "'processing'", 0, "")
+	expectCandidate(database, models.OtelMetricBatchStatusPending, 12, models.OtelMetricBatchStatusPending)
+	expectCandidate(database, models.OtelMetricBatchStatusRetryableError, 0, "")
+	expectCandidate(database, models.OtelMetricBatchStatusProcessing, 0, "")
 	database.On("UpdateColumns", mock.AnythingOfType("*models.OtelLogBatch"), mock.Anything, mock.Anything).Return(nil).Once()
 	// The guarded update matched nothing, so the batch is not loaded under this lease.
 	database.On("First", mock.AnythingOfType("*models.OtelLogBatch"), mock.Anything).Return(errors.NotFound.New("none")).Once()
@@ -623,9 +629,9 @@ func TestClaimNextLogBatchYieldsWhenAnotherWorkerClaimedFirst(t *testing.T) {
 func TestClaimNextLogBatchReturnsClaimWriteError(t *testing.T) {
 	database := dalmocks.NewDal(t)
 	database.On("IsErrorNotFound", mock.Anything).Return(true)
-	expectCandidate(database, "'pending'", 12, models.OtelMetricBatchStatusPending)
-	expectCandidate(database, "'retryable_error'", 0, "")
-	expectCandidate(database, "'processing'", 0, "")
+	expectCandidate(database, models.OtelMetricBatchStatusPending, 12, models.OtelMetricBatchStatusPending)
+	expectCandidate(database, models.OtelMetricBatchStatusRetryableError, 0, "")
+	expectCandidate(database, models.OtelMetricBatchStatusProcessing, 0, "")
 	database.On("UpdateColumns", mock.AnythingOfType("*models.OtelLogBatch"), mock.Anything, mock.Anything).Return(errors.Default.New("deadlock")).Once()
 
 	if batch, _, err := newRawMetricConverter(database, nil).claimNextLogBatch(); err == nil || batch != nil {
@@ -687,9 +693,9 @@ func TestReplayLogBatchesPagesPastAFullPage(t *testing.T) {
 	}).Return(nil).Twice()
 
 	lastRenewal := converter.now()
-	replayed, err := converter.replayLogBatches(replayRequest(converter), "owner", &lastRenewal)
-	if err != nil || replayed != 0 {
-		t.Fatalf("replayLogBatches() = %d, %v, want undecodable batches skipped", replayed, err)
+	replayed, skipped, err := converter.replayLogBatches(replayRequest(converter), "owner", &lastRenewal, &replayDiagnostics{})
+	if err != nil || replayed != 0 || skipped != replayLogPageSize {
+		t.Fatalf("replayLogBatches() = %d, %d, %v, want undecodable batches skipped", replayed, skipped, err)
 	}
 	if len(afterIDs) != 2 || afterIDs[0] != uint64(0) || afterIDs[1] != uint64(replayLogPageSize) {
 		t.Fatalf("pages started after ids %v, want 0 then %d", afterIDs, replayLogPageSize)
@@ -703,7 +709,7 @@ func TestReplayLogBatchesReturnsPreparationError(t *testing.T) {
 	database.On("All", mock.AnythingOfType("*[]*models.OtelConnection"), mock.Anything).Return(errors.Default.New("connection lost")).Once()
 
 	lastRenewal := converter.now()
-	if replayed, err := converter.replayLogBatches(replayRequest(converter), "owner", &lastRenewal); err == nil || replayed != 0 {
+	if replayed, _, err := converter.replayLogBatches(replayRequest(converter), "owner", &lastRenewal, &replayDiagnostics{}); err == nil || replayed != 0 {
 		t.Fatalf("replayLogBatches() = %d, %v, want the connection lookup failure", replayed, err)
 	}
 }
@@ -714,12 +720,29 @@ func TestReplayLogBatchesRollsBackWhenEventsCannotBeStored(t *testing.T) {
 	transaction := dalmocks.NewTransaction(t)
 	database.On("Begin").Return(transaction).Once()
 	expectConverterLease(converter, transaction, converter.workerID)
+	transaction.On("Delete", mock.AnythingOfType("*models.OtelPromptEvent"), mock.Anything).Return(nil).Once()
 	transaction.On("CreateIfNotExist", mock.Anything).Return(errors.Default.New("disk full")).Once()
 	transaction.On("Rollback").Return(nil).Once()
 
 	lastRenewal := converter.now()
-	if replayed, err := converter.replayLogBatches(replayRequest(converter), "owner", &lastRenewal); err == nil || replayed != 0 {
+	if replayed, _, err := converter.replayLogBatches(replayRequest(converter), "owner", &lastRenewal, &replayDiagnostics{}); err == nil || replayed != 0 {
 		t.Fatalf("replayLogBatches() = %d, %v, want the write failure", replayed, err)
+	}
+}
+
+func TestReplayLogBatchesRollsBackWhenStoredEventsCannotBeDeleted(t *testing.T) {
+	converter, database := boundConverter(t)
+	expectReplayPage(database, logBatch(t, 5, attributedRecord("api_request")))
+	transaction := dalmocks.NewTransaction(t)
+	database.On("Begin").Return(transaction).Once()
+	expectConverterLease(converter, transaction, converter.workerID)
+	transaction.On("Delete", mock.AnythingOfType("*models.OtelPromptEvent"), mock.Anything).Return(errors.Default.New("lock wait timeout")).Once()
+	transaction.On("Rollback").Return(nil).Once()
+
+	lastRenewal := converter.now()
+	replayed, _, err := converter.replayLogBatches(replayRequest(converter), "owner", &lastRenewal, &replayDiagnostics{})
+	if err == nil || replayed != 0 || !strings.Contains(err.Error(), "delete replayed") {
+		t.Fatalf("replayLogBatches() = %d, %v, want the delete failure", replayed, err)
 	}
 }
 
@@ -729,12 +752,13 @@ func TestReplayLogBatchesReturnsCommitFailure(t *testing.T) {
 	transaction := dalmocks.NewTransaction(t)
 	database.On("Begin").Return(transaction).Once()
 	expectConverterLease(converter, transaction, converter.workerID)
+	transaction.On("Delete", mock.AnythingOfType("*models.OtelPromptEvent"), mock.Anything).Return(nil).Once()
 	transaction.On("CreateIfNotExist", mock.Anything).Return(nil).Once()
 	transaction.On("All", mock.AnythingOfType("*[]*models.OtelPromptEvent"), mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	transaction.On("Commit").Return(errors.Default.New("deadlock")).Once()
 
 	lastRenewal := converter.now()
-	replayed, err := converter.replayLogBatches(replayRequest(converter), "owner", &lastRenewal)
+	replayed, _, err := converter.replayLogBatches(replayRequest(converter), "owner", &lastRenewal, &replayDiagnostics{})
 	if err == nil || replayed != 0 || !strings.Contains(err.Error(), "log batch 5 replay") {
 		t.Fatalf("replayLogBatches() = %d, %v, want the commit failure", replayed, err)
 	}
@@ -747,7 +771,7 @@ func TestReplayLogBatchesStopsWhenTheReplayLeaseCannotBeRenewed(t *testing.T) {
 
 	// A zero last renewal makes the renewal due before the first batch.
 	var lastRenewal time.Time
-	if replayed, err := converter.replayLogBatches(replayRequest(converter), "owner", &lastRenewal); err == nil || replayed != 0 {
+	if replayed, _, err := converter.replayLogBatches(replayRequest(converter), "owner", &lastRenewal, &replayDiagnostics{}); err == nil || replayed != 0 {
 		t.Fatalf("replayLogBatches() = %d, %v, want the renewal failure before any batch", replayed, err)
 	}
 }

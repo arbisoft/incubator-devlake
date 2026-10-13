@@ -279,16 +279,16 @@ func TestClaimNextLogBatchDoesNotWaitBehindARetry(t *testing.T) {
 	database.On("IsErrorNotFound", notFound).Return(true)
 	// No pending batch; batch 9 is a retry that is due; nothing is stuck in processing.
 	database.On("First", mock.AnythingOfType("*models.OtelLogBatch"), mock.Anything, mock.MatchedBy(func(clause interface{}) bool {
-		return strings.Contains(clauseExpr(clause), "'pending'")
+		return claimsStatus(clause, models.OtelMetricBatchStatusPending)
 	}), mock.Anything).Return(notFound).Once()
 	database.On("First", mock.AnythingOfType("*models.OtelLogBatch"), mock.Anything, mock.MatchedBy(func(clause interface{}) bool {
-		return strings.Contains(clauseExpr(clause), "'retryable_error'")
+		return claimsStatus(clause, models.OtelMetricBatchStatusRetryableError)
 	}), mock.Anything).Run(func(args mock.Arguments) {
 		batch := args.Get(0).(*models.OtelLogBatch)
 		batch.ID, batch.Status, batch.AttemptCount = 9, models.OtelMetricBatchStatusRetryableError, 2
 	}).Return(nil).Once()
 	database.On("First", mock.AnythingOfType("*models.OtelLogBatch"), mock.Anything, mock.MatchedBy(func(clause interface{}) bool {
-		return strings.Contains(clauseExpr(clause), "'processing'")
+		return claimsStatus(clause, models.OtelMetricBatchStatusProcessing)
 	}), mock.Anything).Return(notFound).Once()
 	database.On("UpdateColumns", mock.AnythingOfType("*models.OtelLogBatch"), mock.Anything, mock.Anything).Return(nil).Once()
 	database.On("First", mock.AnythingOfType("*models.OtelLogBatch"), mock.Anything).Run(func(args mock.Arguments) {
@@ -347,7 +347,7 @@ func TestReplayLogBatchesWithNothingInRange(t *testing.T) {
 	request := &models.OtelReplayRequest{RangeStart: time.Date(2026, 10, 10, 0, 0, 0, 0, time.UTC), RangeEnd: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)}
 
 	var lastRenewal time.Time
-	replayed, err := newRawMetricConverter(database, nil).replayLogBatches(request, "owner", &lastRenewal)
+	replayed, _, err := newRawMetricConverter(database, nil).replayLogBatches(request, "owner", &lastRenewal, &replayDiagnostics{})
 	if err != nil || replayed != 0 {
 		t.Fatalf("replayLogBatches() = %d, %v", replayed, err)
 	}
@@ -499,7 +499,7 @@ func expectClaimOf(database *dalmocks.Dal, batch *models.OtelLogBatch) {
 	notFound := errors.NotFound.New("none")
 	database.On("IsErrorNotFound", notFound).Return(true).Maybe()
 	database.On("First", mock.AnythingOfType("*models.OtelLogBatch"), mock.Anything, mock.MatchedBy(func(clause interface{}) bool {
-		return strings.Contains(clauseExpr(clause), "'pending'")
+		return claimsStatus(clause, models.OtelMetricBatchStatusPending)
 	}), mock.Anything).Run(func(args mock.Arguments) {
 		candidate := args.Get(0).(*models.OtelLogBatch)
 		candidate.ID, candidate.Status, candidate.AttemptCount = batch.ID, models.OtelMetricBatchStatusPending, 0
@@ -599,16 +599,33 @@ func TestReplayLogBatchesRebuildsPromptsOfEachDecodableBatch(t *testing.T) {
 	transaction := dalmocks.NewTransaction(t)
 	database.On("Begin").Return(transaction).Once()
 	expectConverterLease(converter, transaction, converter.workerID)
-	transaction.On("CreateIfNotExist", mock.MatchedBy(func(event *models.OtelPromptEvent) bool { return event.LogBatchId == 5 })).Return(nil).Once()
+	var stored *models.OtelPromptEvent
+	transaction.On("CreateIfNotExist", mock.MatchedBy(func(event *models.OtelPromptEvent) bool { return event.LogBatchId == 5 })).Run(func(args mock.Arguments) {
+		stored = args.Get(0).(*models.OtelPromptEvent)
+	}).Return(nil).Once()
+	// The stored copy is deleted first, so the re-derived event replaces it.
+	var deleted []string
+	transaction.On("Delete", mock.AnythingOfType("*models.OtelPromptEvent"), mock.MatchedBy(func(clause dal.Clause) bool {
+		return clauseExpr(clause) == "id IN ?"
+	})).Run(func(args mock.Arguments) {
+		deleted = whereParams(args.Get(1))[0].([]string)
+	}).Return(nil).Once()
 	transaction.On("All", mock.AnythingOfType("*[]*models.OtelPromptEvent"), mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	transaction.On("Commit").Return(nil).Once()
 	request := &models.OtelReplayRequest{RangeStart: converter.now().Add(-time.Hour), RangeEnd: converter.now()}
 
 	// A renewal just happened, so the replay lease is not renewed again.
 	lastRenewal := converter.now()
-	replayed, err := converter.replayLogBatches(request, "owner", &lastRenewal)
-	if err != nil || replayed != 1 {
-		t.Fatalf("replayLogBatches() = %d, %v, want only the decodable batch replayed", replayed, err)
+	diagnostics := &replayDiagnostics{}
+	replayed, skipped, err := converter.replayLogBatches(request, "owner", &lastRenewal, diagnostics)
+	if err != nil || replayed != 1 || skipped != 1 {
+		t.Fatalf("replayLogBatches() = %d, %d, %v, want the decodable batch replayed and the other skipped", replayed, skipped, err)
+	}
+	if len(deleted) != 1 || stored == nil || deleted[0] != stored.Id {
+		t.Fatalf("deleted event ids %v, want the re-derived event's id", deleted)
+	}
+	if message := diagnostics.message(); message == nil || !strings.Contains(*message, "batch=4 code="+string(errorInvalidPayload)) {
+		t.Fatalf("diagnostics = %v, want the undecodable batch 4 recorded", message)
 	}
 }
 
@@ -622,7 +639,7 @@ func TestReplayLogBatchesStopsWhenTheConverterLeaseIsLost(t *testing.T) {
 	request := &models.OtelReplayRequest{RangeStart: converter.now().Add(-time.Hour), RangeEnd: converter.now()}
 
 	lastRenewal := converter.now()
-	replayed, err := converter.replayLogBatches(request, "owner", &lastRenewal)
+	replayed, _, err := converter.replayLogBatches(request, "owner", &lastRenewal, &replayDiagnostics{})
 	if err == nil || replayed != 0 {
 		t.Fatalf("replayLogBatches() = %d, %v, want the lease loss and nothing replayed", replayed, err)
 	}
@@ -634,7 +651,7 @@ func TestReplayLogBatchesReturnsLoadError(t *testing.T) {
 	request := &models.OtelReplayRequest{RangeStart: time.Unix(0, 0), RangeEnd: time.Unix(3600, 0)}
 
 	var lastRenewal time.Time
-	if _, err := newRawMetricConverter(database, nil).replayLogBatches(request, "owner", &lastRenewal); err == nil {
+	if _, _, err := newRawMetricConverter(database, nil).replayLogBatches(request, "owner", &lastRenewal, &replayDiagnostics{}); err == nil {
 		t.Fatal("replayLogBatches() error = nil, want the load error")
 	}
 }

@@ -51,10 +51,14 @@ const (
 // claimableLogBatchConditions select log batches ready to convert. Events are converted
 // independently of each other, so unlike metric batches a waiting retry does not hold
 // back later batches.
-var claimableLogBatchConditions = []string{
-	"status = 'pending'",
-	"status = 'retryable_error' AND (next_attempt_at IS NULL OR next_attempt_at <= ?)",
-	"status = 'processing' AND (lease_until IS NULL OR lease_until < ?)",
+// A condition with a second placeholder compares against the current time.
+var claimableLogBatchConditions = []struct {
+	where  string
+	status string
+}{
+	{"status = ?", models.OtelMetricBatchStatusPending},
+	{"status = ? AND (next_attempt_at IS NULL OR next_attempt_at <= ?)", models.OtelMetricBatchStatusRetryableError},
+	{"status = ? AND (lease_until IS NULL OR lease_until < ?)", models.OtelMetricBatchStatusProcessing},
 }
 
 // promptEventUpdate is one converted event plus the connection binding it depends on.
@@ -107,14 +111,14 @@ func (c *rawMetricConverter) claimNextLogBatch() (*models.OtelLogBatch, string, 
 	now := c.now().UTC()
 	var head *models.OtelLogBatch
 	for _, condition := range claimableLogBatchConditions {
-		params := []interface{}{}
-		if strings.Contains(condition, "?") {
+		params := []interface{}{condition.status}
+		if strings.Count(condition.where, "?") > 1 {
 			params = append(params, now)
 		}
 		candidate := &models.OtelLogBatch{}
 		err := c.db.First(candidate,
 			dal.Select("id, status, attempt_count"),
-			dal.Where(condition, params...),
+			dal.Where(condition.where, params...),
 			dal.Orderby("id ASC"),
 		)
 		if err != nil {
@@ -470,11 +474,14 @@ func promptTargets(updates []promptEventUpdate) []promptTarget {
 }
 
 // replayLogBatches re-derives prompt events from the retained log batches observed in the
-// replay range and rebuilds their prompts, one batch per transaction. Stored events are
-// kept, so a replay adds events a fixed converter now extracts and never double counts.
-func (c *rawMetricConverter) replayLogBatches(request *models.OtelReplayRequest, leaseOwner string, lastRenewal *time.Time) (int, error) {
+// replay range and rebuilds their prompts, one batch per transaction. Each re-derived event
+// replaces its stored copy, so a fixed converter corrects stored values without double
+// counting. A stored event the converter no longer extracts is left in place. A batch whose
+// payload cannot be decoded is skipped and recorded in diagnostics. It returns the number
+// of log batches replayed and skipped.
+func (c *rawMetricConverter) replayLogBatches(request *models.OtelReplayRequest, leaseOwner string, lastRenewal *time.Time, diagnostics *replayDiagnostics) (int, int, error) {
 	start, end := request.RangeStart.UTC(), request.RangeEnd.UTC()
-	replayed := 0
+	replayed, skipped := 0, 0
 	afterID := uint64(0)
 	for {
 		batches := make([]*models.OtelLogBatch, 0, replayLogPageSize)
@@ -483,37 +490,59 @@ func (c *rawMetricConverter) replayLogBatches(request *models.OtelReplayRequest,
 			dal.Orderby("id ASC"),
 			dal.Limit(replayLogPageSize),
 		); err != nil {
-			return replayed, fmt.Errorf("load Claude Code OTel log batches to replay: %w", err)
+			return replayed, skipped, fmt.Errorf("load Claude Code OTel log batches to replay: %w", err)
 		}
 		for _, batch := range batches {
 			afterID = batch.ID
 			if err := c.renewReplayLeaseIfDue(request.ID, leaseOwner, lastRenewal, false); err != nil {
-				return replayed, err
+				return replayed, skipped, err
 			}
 			payload := &collectorlogs.ExportLogsServiceRequest{}
 			if err := proto.Unmarshal(batch.PayloadProto, payload); err != nil {
+				diagnostics.add(batch.ID, permanentMetricError(errorInvalidPayload, "decode replay log batch %d: %v", batch.ID, err))
+				skipped++
 				continue
 			}
 			prepared, err := c.prepareLogEvents(batch.ID, payload)
 			if err != nil {
-				return replayed, err
+				return replayed, skipped, err
 			}
 			tx := c.db.Begin()
 			if err := c.verifyConverterLease(tx); err != nil {
 				c.rollback(tx)
-				return replayed, err
+				return replayed, skipped, err
+			}
+			if err := deletePromptEvents(tx, prepared.updates); err != nil {
+				c.rollback(tx)
+				return replayed, skipped, err
 			}
 			if err := applyPromptEvents(tx, prepared.updates); err != nil {
 				c.rollback(tx)
-				return replayed, err
+				return replayed, skipped, err
 			}
 			if err := tx.Commit(); err != nil {
-				return replayed, fmt.Errorf("commit Claude Code OTel log batch %d replay: %w", batch.ID, err)
+				return replayed, skipped, fmt.Errorf("commit Claude Code OTel log batch %d replay: %w", batch.ID, err)
 			}
 			replayed++
 		}
 		if len(batches) < replayLogPageSize {
-			return replayed, nil
+			return replayed, skipped, nil
 		}
 	}
+}
+
+// deletePromptEvents removes the stored copies of the given events so replay can write
+// them again with the current converter's values.
+func deletePromptEvents(tx dal.Transaction, updates []promptEventUpdate) error {
+	if len(updates) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(updates))
+	for _, update := range updates {
+		ids = append(ids, update.event.Id)
+	}
+	if err := tx.Delete(&models.OtelPromptEvent{}, dal.Where("id IN ?", ids)); err != nil {
+		return classifyStorageError(fmt.Errorf("delete replayed Claude Code OTel prompt events: %w", err))
+	}
+	return nil
 }

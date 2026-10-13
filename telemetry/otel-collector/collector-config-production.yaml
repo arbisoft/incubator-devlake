@@ -141,6 +141,9 @@ service:
       receivers: [otlp]
       processors: [memory_limiter, resource/attribution, attributes/team]
       exporters: [forward/claude_raw, forward/prometheus]
+    # No batch processor: otlphttp/claude_raw batches in its persistent sending_queue, so
+    # client exports are merged before DevLake sees them, and an in-memory batch here
+    # would lose data the queue would otherwise keep across a restart.
     logs:
       receivers: [otlp]
       processors: [memory_limiter, resource/attribution, attributes/team, attributes/drop_content]

@@ -66,7 +66,9 @@ var logContentAttributes = map[string]struct{}{
 }
 
 // IngestLogs stores the supported Claude Code events of one authenticated OTLP Logs
-// request, without response, tool or error content. A request with no supported event is accepted without storing a batch.
+// request, without response, tool or error content. Prompt text is kept for developers
+// with OTEL_LOG_USER_PROMPTS=1. A request with no supported event is accepted without
+// storing a batch.
 func (s *RawIngestService) IngestLogs(request *http.Request) (*RawIngestResult, errors.Error) {
 	body, err := s.readAuthenticatedBody(request)
 	if err != nil {
@@ -146,9 +148,9 @@ func sanitizeOtelLogsRequest(request *collectorlogs.ExportLogsServiceRequest) (i
 }
 
 // sanitizeLogRecord reports whether the record is a supported event and, if so, strips it
-// in place: content attributes, the body, and fields this schema version does not know,
-// which could carry content a newer client adds. The event name is kept as an attribute,
-// and an opted-in prompt's text is kept once, as the prompt attribute.
+// in place: the content attributes in logContentAttributes, the body, and unknown protobuf
+// fields. Other attributes are kept as sent. The event name is kept as an attribute, and
+// an opted-in prompt's text is kept once, as the prompt attribute.
 func sanitizeLogRecord(record *logsv1.LogRecord) bool {
 	eventName := logEventName(record)
 	if _, supported := supportedLogEvents[eventName]; !supported {

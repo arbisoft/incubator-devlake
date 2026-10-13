@@ -116,6 +116,9 @@ func (c *rawMetricConverter) pollOnce() (bool, errors.Error) {
 	if processed, err := c.processNext(); err != nil || processed {
 		return processed, err
 	}
+	// Log batches convert only once no metric batch is waiting. Metrics arrive once a
+	// minute per client and convert quickly, so the backlog drains between exports; a
+	// sustained metric backlog would delay prompt events but never lose them.
 	return c.processNextLogBatch()
 }
 
