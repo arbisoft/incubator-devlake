@@ -47,9 +47,6 @@ const (
 	devlakeProjectAttribute     = "devlake_project"
 	organizationIDAttribute     = "organization.id"
 	sessionIDAttribute          = "session.id"
-	terminalTypeAttribute       = "terminal.type"
-	serviceVersionAttribute     = "service.version"
-	osTypeAttribute             = "os.type"
 )
 
 type RawIngestResult struct {

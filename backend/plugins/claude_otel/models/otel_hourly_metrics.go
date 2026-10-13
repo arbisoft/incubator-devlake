@@ -24,7 +24,6 @@ const (
 	OtelHourlyModelUsageTable  = "_tool_claude_code_otel_hourly_model_usage"
 	OtelHourlyToolUsageTable   = "_tool_claude_code_otel_hourly_tool_usage"
 	OtelMetricSeriesStateTable = "_tool_claude_code_otel_series_state"
-	OtelSessionHourTable       = "_tool_claude_code_otel_session_hours"
 )
 
 // OtelHourlyActivity stores Claude Code metrics whose grain is a connection,
@@ -100,43 +99,6 @@ type OtelHourlyToolUsage struct {
 func (OtelHourlyToolUsage) TableName() string { return OtelHourlyToolUsageTable }
 
 // OtelMetricSeriesState is the durable state required to convert cumulative OTLP sums.
-// OtelSessionHour holds one Claude Code session's metrics for one hour. Counter columns
-// reuse the hourly fact column names so the allowlisted metric mapping addresses both;
-// token, cost and decision counters are summed across model, query source and tool.
-type OtelSessionHour struct {
-	ConnectionId        uint64    `gorm:"primaryKey;index;index:idx_otel_session_hours_session,priority:1"`
-	TeamSlug            string    `gorm:"type:varchar(63);index"`
-	OrganizationId      *string   `gorm:"type:char(36);index"`
-	UserKey             string    `gorm:"type:varchar(255);primaryKey;index:idx_otel_session_hours_user,priority:1"`
-	UserAccountId       *string   `gorm:"type:varchar(255);index"`
-	UserAccountUUID     *string   `gorm:"type:varchar(255);index"`
-	UserEmail           *string   `gorm:"type:varchar(255);index"`
-	SessionId           string    `gorm:"type:varchar(64);primaryKey;index:idx_otel_session_hours_session,priority:2"`
-	HourStart           time.Time `gorm:"primaryKey;index;index:idx_otel_session_hours_user,priority:2"`
-	TerminalType        string    `gorm:"type:varchar(64);not null;default:''"`
-	AppVersion          string    `gorm:"type:varchar(32);not null;default:''"`
-	OsType              string    `gorm:"type:varchar(32);not null;default:''"`
-	SessionCount        int64     `gorm:"not null;default:0"`
-	ActiveTimeSeconds   string    `gorm:"type:decimal(20,3);not null;default:0"`
-	LinesAdded          int64     `gorm:"not null;default:0"`
-	LinesRemoved        int64     `gorm:"not null;default:0"`
-	CommitsCreated      int64     `gorm:"not null;default:0"`
-	PrsCreated          int64     `gorm:"not null;default:0"`
-	InputTokens         int64     `gorm:"not null;default:0"`
-	OutputTokens        int64     `gorm:"not null;default:0"`
-	CacheReadTokens     int64     `gorm:"not null;default:0"`
-	CacheCreationTokens int64     `gorm:"not null;default:0"`
-	EstimatedCostUSD    string    `gorm:"type:decimal(20,8);not null;default:0"`
-	AcceptedCount       int64     `gorm:"not null;default:0"`
-	RejectedCount       int64     `gorm:"not null;default:0"`
-	FirstObservedAt     time.Time `gorm:"type:datetime(3)"`
-	LastObservedAt      time.Time `gorm:"type:datetime(3)"`
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
-}
-
-func (OtelSessionHour) TableName() string { return OtelSessionHourTable }
-
 type OtelMetricSeriesState struct {
 	SeriesHash        []byte `gorm:"type:binary(32);primaryKey"`
 	ConnectionId      uint64 `gorm:"index"`

@@ -109,21 +109,11 @@ type factUpdate struct {
 	query          string
 	tool           string
 	language       string
-	session        sessionAttributes
 	value          metricNumber
 	temporality    metricsv1.AggregationTemporality
 	startNanos     uint64
 	timeNanos      uint64
 	seriesHash     []byte
-}
-
-// sessionAttributes are the per-session dimensions of one datapoint. An empty id means
-// the client does not export session.id, so the datapoint updates no session-hour row.
-type sessionAttributes struct {
-	id           string
-	terminalType string
-	appVersion   string
-	osType       string
 }
 
 type developerIdentity struct {

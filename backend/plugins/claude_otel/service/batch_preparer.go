@@ -36,11 +36,6 @@ const (
 	maxResourceSkipDiagnostics = 5
 	maxUnknownMetricNames      = 10
 	maxDiagnosticNameLength    = 128
-	// Session dimension widths match the session-hour columns.
-	maxSessionIDLength    = 64
-	maxTerminalTypeLength = 64
-	maxAppVersionLength   = 32
-	maxOsTypeLength       = 32
 )
 
 // preparedBatch holds a batch's fact updates plus bounded, operator-safe diagnostics.
@@ -207,7 +202,6 @@ func (p *batchPreparer) prepareDatapoint(
 		query:          defaultDimension(attributeString(pointAttrs, "query_source")),
 		tool:           defaultDimension(attributeString(pointAttrs, "tool_name")),
 		language:       defaultDimension(attributeString(pointAttrs, "language")),
-		session:        sessionFromAttributes(resourceAttrs, pointAttrs),
 		value:          value,
 		temporality:    temporality,
 		startNanos:     point.GetStartTimeUnixNano(),
@@ -223,28 +217,6 @@ func (p *batchPreparer) prepareDatapoint(
 // validateResourceAttribution ensures a Collector resource group contains only its
 // derived team attribution. It runs during conversion so an invalid group is retained
 // for diagnosis but cannot suppress other valid groups from the same OTLP request.
-// sessionFromAttributes reads the session dimensions, preferring datapoint attributes over
-// resource attributes. An id that does not fit its column is dropped rather than truncated,
-// because a truncated id could merge two sessions.
-func sessionFromAttributes(resourceAttrs, pointAttrs []*commonv1.KeyValue) sessionAttributes {
-	lookup := func(key string) string {
-		if value := attributeString(pointAttrs, key); value != "" {
-			return value
-		}
-		return attributeString(resourceAttrs, key)
-	}
-	sessionID := lookup(sessionIDAttribute)
-	if len([]rune(sessionID)) > maxSessionIDLength {
-		sessionID = ""
-	}
-	return sessionAttributes{
-		id:           sessionID,
-		terminalType: truncate(lookup(terminalTypeAttribute), maxTerminalTypeLength),
-		appVersion:   truncate(lookup(serviceVersionAttribute), maxAppVersionLength),
-		osType:       truncate(lookup(osTypeAttribute), maxOsTypeLength),
-	}
-}
-
 func validateResourceAttribution(resourceMetrics *metricsv1.ResourceMetrics) error {
 	resourceAttributes := resourceMetrics.GetResource().GetAttributes()
 	if hasAttribute(resourceAttributes, devlakeTeamAttribute) || hasAttribute(resourceAttributes, devlakeProjectAttribute) {

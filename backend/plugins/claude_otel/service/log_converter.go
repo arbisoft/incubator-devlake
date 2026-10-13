@@ -40,8 +40,10 @@ import (
 
 const (
 	promptIDAttribute = "prompt.id"
-	// maxPromptIDLength matches the prompt_id columns; a longer id is skipped, not truncated.
+	// maxPromptIDLength and maxSessionIDLength match the prompt_id and session_id columns;
+	// a longer prompt id is skipped and a longer session id dropped, never truncated.
 	maxPromptIDLength   = 64
+	maxSessionIDLength  = 64
 	maxEventFieldLength = 255
 	replayLogPageSize   = 100
 )
@@ -298,7 +300,7 @@ func (p *batchPreparer) preparePromptEvent(batchID uint64, resourceAttrs, attrs 
 		UserKey:        identity.key,
 		UserAccountId:  identity.accountID,
 		UserEmail:      identity.email,
-		SessionId:      sessionFromAttributes(resourceAttrs, attrs).id,
+		SessionId:      sessionIDFromAttributes(resourceAttrs, attrs),
 		PromptId:       promptID,
 		EventName:      eventName,
 		EventTime:      eventTime,
@@ -307,6 +309,20 @@ func (p *batchPreparer) preparePromptEvent(batchID uint64, resourceAttrs, attrs 
 	fillPromptEventFacts(event, attrs)
 	event.Id = promptEventID(event, attrs)
 	return promptEventUpdate{event: event, connection: connection, organizationID: organizationID}, nil
+}
+
+// sessionIDFromAttributes reads session.id from the record, else from its resource. An id
+// that does not fit its column is dropped rather than truncated, because a truncated id
+// could merge two sessions.
+func sessionIDFromAttributes(resourceAttrs, attrs []*commonv1.KeyValue) string {
+	sessionID := attributeString(attrs, sessionIDAttribute)
+	if sessionID == "" {
+		sessionID = attributeString(resourceAttrs, sessionIDAttribute)
+	}
+	if len([]rune(sessionID)) > maxSessionIDLength {
+		return ""
+	}
+	return sessionID
 }
 
 // fillPromptEventFacts copies the attributes each event kind carries.

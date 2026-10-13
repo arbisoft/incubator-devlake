@@ -50,7 +50,7 @@ func newOtelLogsRequest(resources ...[]*logsv1.LogRecord) *collectorlogs.ExportL
 	request := &collectorlogs.ExportLogsServiceRequest{}
 	for _, records := range resources {
 		request.ResourceLogs = append(request.ResourceLogs, &logsv1.ResourceLogs{
-			Resource:  &resourcev1.Resource{Attributes: []*commonv1.KeyValue{stringAttribute(serviceVersionAttribute, "2.1.0")}},
+			Resource:  &resourcev1.Resource{Attributes: []*commonv1.KeyValue{stringAttribute("service.version", "2.1.0")}},
 			ScopeLogs: []*logsv1.ScopeLogs{{LogRecords: records}},
 		})
 	}

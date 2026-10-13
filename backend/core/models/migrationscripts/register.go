@@ -155,7 +155,7 @@ func All() []plugin.MigrationScript {
 		new(addAuthLocalLoginReservations),
 		new(addCanonicalAiDomain),
 		new(retireClaudePlatformPlugin),
-		new(addAiSessionHours),
 		new(addAiPrompts),
+		new(dropAiSessionHours),
 	}
 }

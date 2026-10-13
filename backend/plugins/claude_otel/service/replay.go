@@ -368,11 +368,9 @@ func (c *rawMetricConverter) replayBatchFailure(batch *models.OtelMetricBatch, e
 	return false, nil, fmt.Errorf("cannot safely replay processed batch %d: %w", batch.ID, err)
 }
 
-// hourlyAggregateKey includes the session id so a replay rebuilds each session-hour row
-// separately; hourly rows still sum correctly because their upsert adds every aggregate.
 func hourlyAggregateKey(update factUpdate) string {
-	return fmt.Sprintf("%d\x00%d\x00%s\x00%d\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s",
-		update.fact, update.connection.ID, update.identity.key, update.hour.Unix(), update.model, update.query, update.tool, update.language, update.column, update.session.id)
+	return fmt.Sprintf("%d\x00%d\x00%s\x00%d\x00%s\x00%s\x00%s\x00%s\x00%s",
+		update.fact, update.connection.ID, update.identity.key, update.hour.Unix(), update.model, update.query, update.tool, update.language, update.column)
 }
 
 // commitReplayDay fences both leases and replaces one completed UTC day atomically. The
@@ -415,7 +413,7 @@ func (c *rawMetricConverter) commitReplayDay(requestID uint64, leaseOwner string
 
 func (c *rawMetricConverter) replaceReplayRange(tx dal.Transaction, rangeStart, rangeEnd time.Time, aggregates map[string]*hourlyAggregate) error {
 	hourRange := dal.Where("hour_start >= ? AND hour_start < ?", rangeStart, rangeEnd)
-	for _, fact := range []interface{}{&models.OtelHourlyActivity{}, &models.OtelHourlyModelUsage{}, &models.OtelHourlyToolUsage{}, &models.OtelSessionHour{}} {
+	for _, fact := range []interface{}{&models.OtelHourlyActivity{}, &models.OtelHourlyModelUsage{}, &models.OtelHourlyToolUsage{}} {
 		if err := tx.Delete(fact, hourRange); err != nil {
 			return fmt.Errorf("delete hourly facts for replay: %w", err)
 		}
@@ -429,10 +427,6 @@ func (c *rawMetricConverter) replaceReplayRange(tx dal.Transaction, rangeStart, 
 			return fmt.Errorf("delete canonical facts for replay: %w", err)
 		}
 	}
-	sessionHourRange := dal.Where("provider = ? AND source_type = ? AND hour_start >= ? AND hour_start < ?", aiProviderClaude, aiSourceOtel, rangeStart, rangeEnd)
-	if err := tx.Delete(&ai.AiSessionHour{}, sessionHourRange); err != nil {
-		return fmt.Errorf("delete canonical session hours for replay: %w", err)
-	}
 	updates := make([]factUpdate, 0, len(aggregates))
 	for _, aggregate := range aggregates {
 		if err := bindConnectionOrganization(tx, aggregate.update.connection, aggregate.update.organizationID); err != nil {
@@ -441,16 +435,10 @@ func (c *rawMetricConverter) replaceReplayRange(tx dal.Transaction, rangeStart, 
 		if err := upsertHourlyFact(tx, aggregate.update, metricNumber{value: aggregate.value}, aggregate.lastObservedAt); err != nil {
 			return fmt.Errorf("write replayed hourly facts: %w", err)
 		}
-		if err := upsertSessionFact(tx, aggregate.update, metricNumber{value: aggregate.value}, aggregate.lastObservedAt); err != nil {
-			return fmt.Errorf("write replayed session facts: %w", err)
-		}
 		updates = append(updates, aggregate.update)
 	}
 	if err := reconcileOtelDaily(tx, dailyTargets(updates)); err != nil {
 		return fmt.Errorf("write replayed canonical daily facts: %w", err)
-	}
-	if err := reconcileOtelSessionHours(tx, sessionHourTargets(updates)); err != nil {
-		return fmt.Errorf("write replayed canonical session hours: %w", err)
 	}
 	return nil
 }

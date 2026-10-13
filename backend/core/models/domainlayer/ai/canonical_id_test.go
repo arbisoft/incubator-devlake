@@ -37,23 +37,6 @@ func TestCanonicalIDsAreSourceIndependentAndGrainSpecific(t *testing.T) {
 	}
 }
 
-func TestCanonicalSessionHourIDSeparatesSessionsAndHours(t *testing.T) {
-	hour := time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)
-	id := CanonicalSessionHourID("claude", "org", "acct:user_1", "session-a", hour)
-	if id != CanonicalSessionHourID("claude", "org", "acct:user_1", "session-a", hour.In(time.FixedZone("PKT", 5*3600))) {
-		t.Fatal("session hour ID must not depend on the hour's time zone")
-	}
-	if id == CanonicalSessionHourID("claude", "org", "acct:user_1", "session-b", hour) {
-		t.Fatal("different sessions must not share a session hour ID")
-	}
-	if id == CanonicalSessionHourID("claude", "org", "acct:user_1", "session-a", hour.Add(time.Hour)) {
-		t.Fatal("different hours of one session must not share a session hour ID")
-	}
-	if id == CanonicalSessionHourID("cursor", "org", "acct:user_1", "session-a", hour) {
-		t.Fatal("different providers must not share a session hour ID")
-	}
-}
-
 func TestCanonicalPromptIDSeparatesPromptsSessionsAndProviders(t *testing.T) {
 	id := CanonicalPromptID("claude", "org", "acct:user_1", "session-a", "prompt-1")
 	if id != CanonicalPromptID("claude", "org", "acct:user_1", "session-a", "prompt-1") || !strings.HasPrefix(id, "ai:prompt:") {
