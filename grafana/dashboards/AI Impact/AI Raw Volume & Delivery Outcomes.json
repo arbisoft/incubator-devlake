@@ -539,7 +539,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Distinct commits without recorded PR associations in a qualifying base repository, scoped to the selected project(s), using commit dates. Missing collection or synchronization data can inflate counts; this does not establish direct pushes to main or bypassed review.",
+      "description": "Distinct commits without recorded PR associations or merged-PR result SHAs in the same base repository, scoped to the selected project(s), using commit dates. Incomplete associations or rebased SHAs can inflate counts; this does not prove direct pushes to main.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -583,7 +583,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(DISTINCT c.sha) AS \"Commits Without PRs\"\nFROM commits c\nJOIN repo_commits rc ON rc.commit_sha = c.sha\nJOIN project_mapping pm ON pm.row_id = rc.repo_id AND pm.`table` = 'repos'\nWHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(c.committed_date)\nAND NOT EXISTS (\n  SELECT 1\n  FROM pull_request_commits prc\n  JOIN pull_requests pr ON pr.id = prc.pull_request_id\n  WHERE prc.commit_sha = c.sha AND pr.base_repo_id = rc.repo_id\n)",
+          "rawSql": "SELECT COUNT(DISTINCT c.sha) AS \"Commits Without PRs\"\nFROM commits c\nJOIN repo_commits rc ON rc.commit_sha = c.sha\nJOIN project_mapping pm ON pm.row_id = rc.repo_id AND pm.`table` = 'repos'\nWHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(c.committed_date)\nAND NOT EXISTS (\n  SELECT 1\n  FROM pull_request_commits prc\n  JOIN pull_requests pr ON pr.id = prc.pull_request_id\n  WHERE prc.commit_sha = c.sha AND pr.base_repo_id = rc.repo_id\n)\nAND NOT EXISTS (\n  SELECT 1\n  FROM pull_requests mpr\n  WHERE mpr.merge_commit_sha = c.sha\n    AND mpr.base_repo_id = rc.repo_id\n    AND mpr.status = 'MERGED'\n)",
           "refId": "A"
         }
       ],
@@ -592,7 +592,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Total code churn in lines (additions + deletions), counted once per commit without recorded PR associations in a qualifying base repository, scoped to the selected project(s), using commit dates. Collection gaps can inflate counts; churn is not unique abandoned code or evidence of direct pushes to main.",
+      "description": "Total code churn in lines (additions + deletions), counted once per commit without recorded PR associations or merged-PR result SHAs in the same base repository, using commit dates. Incomplete associations or rebased SHAs can inflate totals; churn is not unique abandoned code.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -636,7 +636,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(SUM(sz), 0) AS \"Code Churn Without Recorded PRs\" FROM (\n  SELECT DISTINCT c.sha, (COALESCE(c.additions, 0) + COALESCE(c.deletions, 0)) AS sz\n  FROM commits c\n  JOIN repo_commits rc ON rc.commit_sha = c.sha\n  JOIN project_mapping pm ON pm.row_id = rc.repo_id AND pm.`table` = 'repos'\n  WHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(c.committed_date)\n  AND NOT EXISTS (\n    SELECT 1\n    FROM pull_request_commits prc\n    JOIN pull_requests pr ON pr.id = prc.pull_request_id\n    WHERE prc.commit_sha = c.sha AND pr.base_repo_id = rc.repo_id\n  )\n) x",
+          "rawSql": "SELECT COALESCE(SUM(sz), 0) AS \"Code Churn Without Recorded PRs\" FROM (\n  SELECT DISTINCT c.sha, (COALESCE(c.additions, 0) + COALESCE(c.deletions, 0)) AS sz\n  FROM commits c\n  JOIN repo_commits rc ON rc.commit_sha = c.sha\n  JOIN project_mapping pm ON pm.row_id = rc.repo_id AND pm.`table` = 'repos'\n  WHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(c.committed_date)\n  AND NOT EXISTS (\n    SELECT 1\n    FROM pull_request_commits prc\n    JOIN pull_requests pr ON pr.id = prc.pull_request_id\n    WHERE prc.commit_sha = c.sha AND pr.base_repo_id = rc.repo_id\n  )\n  AND NOT EXISTS (\n    SELECT 1\n    FROM pull_requests mpr\n    WHERE mpr.merge_commit_sha = c.sha\n      AND mpr.base_repo_id = rc.repo_id\n      AND mpr.status = 'MERGED'\n  )\n) x",
           "refId": "A"
         }
       ],
