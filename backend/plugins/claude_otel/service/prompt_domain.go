@@ -96,9 +96,6 @@ func canonicalPrompt(target promptTarget, events []*models.OtelPromptEvent) *ai.
 				prompt.PromptLength = event.PromptLength
 			}
 			prompt.CommandName = firstNonEmpty(prompt.CommandName, event.CommandName)
-			if prompt.PromptText == nil && event.PromptText != nil {
-				prompt.PromptText = event.PromptText
-			}
 		case eventAPIRequest:
 			prompt.ApiRequests++
 			prompt.ApiDurationMs += event.DurationMs

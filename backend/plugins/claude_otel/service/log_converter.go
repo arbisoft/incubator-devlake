@@ -336,9 +336,6 @@ func fillPromptEventFacts(event *models.OtelPromptEvent, attrs []*commonv1.KeyVa
 	case eventUserPrompt:
 		event.PromptLength = attributeInt64(attrs, "prompt_length")
 		event.CommandName = text("command_name")
-		if prompt := attributeString(attrs, promptAttribute); prompt != "" {
-			event.PromptText = &prompt
-		}
 	case eventAPIRequest:
 		event.Model = text("model")
 		event.DurationMs = attributeInt64(attrs, "duration_ms")

@@ -43,10 +43,9 @@ func boolPointer(value bool) *bool { return &value }
 
 func TestCanonicalPromptSumsAPromptsEvents(t *testing.T) {
 	email := "dev@example.com"
-	text := "fix the login bug"
 	events := []*models.OtelPromptEvent{
 		promptEvent("user_prompt", 0, func(e *models.OtelPromptEvent) {
-			e.PromptLength, e.CommandName, e.PromptText, e.UserEmail = 17, "review", &text, &email
+			e.PromptLength, e.CommandName, e.UserEmail = 17, "review", &email
 		}),
 		promptEvent("tool_decision", 2*time.Second, func(e *models.OtelPromptEvent) { e.ToolName, e.Decision = "Write", "accept" }),
 		promptEvent("tool_decision", 3*time.Second, func(e *models.OtelPromptEvent) { e.ToolName, e.Decision = "Edit", "reject" }),
@@ -71,8 +70,8 @@ func TestCanonicalPromptSumsAPromptsEvents(t *testing.T) {
 	if got.Id != ai.CanonicalPromptID(aiProviderClaude, testOrganizationID, "acct:user_1", "session-a", "prompt-1") || got.Provider != aiProviderClaude || got.SourceType != aiSourceOtel {
 		t.Fatalf("identity = %q %q %q", got.Id, got.Provider, got.SourceType)
 	}
-	if got.UserEmail != email || got.PromptLength != 17 || got.CommandName != "review" || got.PromptText == nil || *got.PromptText != text {
-		t.Fatalf("prompt = %q %d %q %v", got.UserEmail, got.PromptLength, got.CommandName, got.PromptText)
+	if got.UserEmail != email || got.PromptLength != 17 || got.CommandName != "review" {
+		t.Fatalf("prompt = %q %d %q", got.UserEmail, got.PromptLength, got.CommandName)
 	}
 	if got.WallDurationMs != 9000 || got.ApiDurationMs != 3753+1836+100 || got.ToolDurationMs != 121 || !got.SourceUpdatedAt.Equal(got.EndedAt) {
 		t.Fatalf("durations = wall %d, api %d, tool %d", got.WallDurationMs, got.ApiDurationMs, got.ToolDurationMs)
@@ -92,9 +91,9 @@ func TestCanonicalPromptSumsAPromptsEvents(t *testing.T) {
 	}
 }
 
-func TestCanonicalPromptWithoutOptInHasNoText(t *testing.T) {
+func TestCanonicalPromptWithOnlyAPromptEvent(t *testing.T) {
 	got := canonicalPrompt(testPromptTarget, []*models.OtelPromptEvent{promptEvent("user_prompt", 0, func(e *models.OtelPromptEvent) { e.PromptLength = 40 })})
-	if got.PromptText != nil || got.PromptLength != 40 || got.EstimatedCostUsd != "0.00000000" || got.WallDurationMs != 0 {
+	if got.PromptLength != 40 || got.EstimatedCostUsd != "0.00000000" || got.WallDurationMs != 0 {
 		t.Fatalf("prompt = %+v, want length only, zero cost and wall time", got)
 	}
 }

@@ -29,5 +29,6 @@ func All() []plugin.MigrationScript {
 		new(addClaudeCodeOtelLogTables),
 		new(dropClaudeCodeOtelSessionHours),
 		new(addClaudeCodeOtelReplayLogCounts),
+		new(dropClaudeCodeOtelPromptText),
 	}
 }

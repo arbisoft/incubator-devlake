@@ -50,25 +50,16 @@ var supportedLogEvents = map[string]struct{}{
 	eventAPIRefusal: {}, eventToolResult: {}, eventToolDecision: {},
 }
 
-const (
-	promptAttribute     = "prompt"
-	promptTextAttribute = "prompt_text"
-	// redactedPrompt is what Claude Code sends in place of the text when the developer has
-	// not opted in with OTEL_LOG_USER_PROMPTS=1.
-	redactedPrompt = "<REDACTED>"
-)
-
-// logContentAttributes carry model responses, tool inputs or error text. They are removed
-// before storage even when a developer turns on OTEL_LOG_TOOL_DETAILS; the Collector
-// removes them too. Prompt text is kept for developers who opted in; see promptText.
+// logContentAttributes carry prompt text, model responses, tool inputs or error text. They
+// are removed before storage even when a developer turns on OTEL_LOG_USER_PROMPTS or
+// OTEL_LOG_TOOL_DETAILS; the Collector removes them too.
 var logContentAttributes = map[string]struct{}{
-	"response": {}, "body": {}, "tool_input": {}, "tool_parameters": {}, "error": {},
+	"prompt": {}, "prompt_text": {}, "response": {}, "body": {}, "tool_input": {}, "tool_parameters": {}, "error": {},
 }
 
 // IngestLogs stores the supported Claude Code events of one authenticated OTLP Logs
-// request, without response, tool or error content. Prompt text is kept for developers
-// with OTEL_LOG_USER_PROMPTS=1. A request with no supported event is accepted without
-// storing a batch.
+// request, without prompt text or response, tool or error content. A request with no
+// supported event is accepted without storing a batch.
 func (s *RawIngestService) IngestLogs(request *http.Request) (*RawIngestResult, errors.Error) {
 	body, err := s.readAuthenticatedBody(request)
 	if err != nil {
@@ -149,21 +140,15 @@ func sanitizeOtelLogsRequest(request *collectorlogs.ExportLogsServiceRequest) (i
 
 // sanitizeLogRecord reports whether the record is a supported event and, if so, strips it
 // in place: the content attributes in logContentAttributes, the body, and unknown protobuf
-// fields. Other attributes are kept as sent. The event name is kept as an attribute, and
-// an opted-in prompt's text is kept once, as the prompt attribute.
+// fields. Other attributes are kept as sent, and the event name is kept as an attribute.
 func sanitizeLogRecord(record *logsv1.LogRecord) bool {
 	eventName := logEventName(record)
 	if _, supported := supportedLogEvents[eventName]; !supported {
 		return false
 	}
-	text := ""
-	if eventName == eventUserPrompt {
-		text = promptText(record.GetAttributes())
-	}
-	attributes := make([]*commonv1.KeyValue, 0, len(record.GetAttributes())+2)
+	attributes := make([]*commonv1.KeyValue, 0, len(record.GetAttributes())+1)
 	for _, attribute := range record.GetAttributes() {
-		switch attribute.GetKey() {
-		case eventNameAttribute, promptAttribute, promptTextAttribute:
+		if attribute.GetKey() == eventNameAttribute {
 			continue
 		}
 		if _, content := logContentAttributes[attribute.GetKey()]; content {
@@ -172,29 +157,10 @@ func sanitizeLogRecord(record *logsv1.LogRecord) bool {
 		attributes = append(attributes, attribute)
 	}
 	attributes = append(attributes, stringKeyValue(eventNameAttribute, eventName))
-	if text != "" {
-		attributes = append(attributes, stringKeyValue(promptAttribute, text))
-	}
 	record.Attributes = attributes
 	record.Body = nil
 	record.ProtoReflect().SetUnknown(nil)
 	return true
-}
-
-// promptText returns the prompt as typed, from prompt or else prompt_text, or "" when the
-// developer has not opted in and Claude Code sent the redaction placeholder.
-func promptText(attributes []*commonv1.KeyValue) string {
-	for _, key := range []string{promptAttribute, promptTextAttribute} {
-		for _, attribute := range attributes {
-			if attribute.GetKey() != key {
-				continue
-			}
-			if text := attribute.GetValue().GetStringValue(); strings.TrimSpace(text) != "" && text != redactedPrompt {
-				return text
-			}
-		}
-	}
-	return ""
 }
 
 func stringKeyValue(key, value string) *commonv1.KeyValue {

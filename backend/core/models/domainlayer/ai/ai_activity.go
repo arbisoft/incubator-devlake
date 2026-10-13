@@ -139,8 +139,8 @@ func (AiToolDecision) TableName() string { return "ai_tool_decisions" }
 
 // AiPrompt stores what one developer prompt cost and how it went: wall time, API and tool
 // time, tokens and cost, and the effectiveness signals (tool success, edit decisions, API
-// errors and refusals). PromptId is the provider's own prompt id. PromptText is the prompt
-// as the developer typed it, set only when they opted in to sending it.
+// errors and refusals). PromptId is the provider's own prompt id. The prompt's text is not
+// stored.
 type AiPrompt struct {
 	domainlayer.DomainEntity
 	Provider     string `gorm:"type:varchar(100);index" json:"provider"`
@@ -153,9 +153,8 @@ type AiPrompt struct {
 	SessionId     string  `gorm:"type:varchar(64);index" json:"sessionId"`
 	PromptId      string  `gorm:"type:varchar(64);index" json:"promptId"`
 	// CommandName is the slash command the prompt ran, empty for typed prompts.
-	CommandName  string  `gorm:"type:varchar(255)" json:"commandName"`
-	PromptLength int64   `json:"promptLength"`
-	PromptText   *string `json:"promptText,omitempty"`
+	CommandName  string `gorm:"type:varchar(255)" json:"commandName"`
+	PromptLength int64  `json:"promptLength"`
 	// StartedAt to EndedAt spans the prompt's first and last event; the API and tool
 	// durations are the summed time of its API requests and tool runs.
 	StartedAt      time.Time `gorm:"type:datetime(3);index" json:"startedAt"`

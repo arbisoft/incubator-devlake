@@ -108,7 +108,7 @@ func storedRecords(request *collectorlogs.ExportLogsServiceRequest) []*logsv1.Lo
 	return records
 }
 
-func TestLogIngestKeepsPromptTextAndDropsOtherContent(t *testing.T) {
+func TestLogIngestDropsPromptTextAndOtherContent(t *testing.T) {
 	prompt := newLogRecord(eventUserPrompt,
 		stringAttribute("prompt.id", "prompt-1"),
 		stringAttribute("prompt", "deploy with password hunter2"),
@@ -141,12 +141,12 @@ func TestLogIngestKeepsPromptTextAndDropsOtherContent(t *testing.T) {
 			}
 		}
 	}
-	// The opted-in prompt is kept once and unmasked; the body copy and prompt_text are not.
-	if got := bytes.Count(batch.PayloadProto, []byte("deploy with password hunter2")); got != 1 {
-		t.Fatalf("stored payload has the prompt text %d times, want once", got)
+	// Prompt text is not stored, even from a developer who opted in to sending it.
+	if bytes.Contains(batch.PayloadProto, []byte("deploy with password hunter2")) {
+		t.Fatal("stored payload still contains the prompt text")
 	}
-	if attributeString(records[0].GetAttributes(), promptAttribute) != "deploy with password hunter2" || hasAttribute(records[0].GetAttributes(), promptTextAttribute) {
-		t.Fatalf("user_prompt attributes = %v, want the text as prompt only", records[0].GetAttributes())
+	if attributeInt64(records[0].GetAttributes(), "prompt_length") != 28 {
+		t.Fatalf("user_prompt attributes = %v, want prompt_length kept", records[0].GetAttributes())
 	}
 	if bytes.Contains(batch.PayloadProto, []byte(".env")) || bytes.Contains(batch.PayloadProto, []byte("Here is the password")) {
 		t.Fatal("stored payload still contains tool or response content")
@@ -186,33 +186,8 @@ func TestLogIngestAcceptsClaudeCodeEventShape(t *testing.T) {
 	if batch.RecordCount != 1 || attributeString(records[0].GetAttributes(), eventNameAttribute) != eventUserPrompt {
 		t.Fatalf("records = %v, want only user_prompt, stored as %s", records, eventUserPrompt)
 	}
-	// Not opted in: the redaction placeholder is not stored as prompt text.
-	if hasAttribute(records[0].GetAttributes(), promptAttribute) || hasAttribute(records[0].GetAttributes(), promptTextAttribute) || records[0].GetBody() != nil {
+	if hasAttribute(records[0].GetAttributes(), "prompt") || hasAttribute(records[0].GetAttributes(), "prompt_text") || records[0].GetBody() != nil {
 		t.Fatalf("user_prompt kept the placeholder or body: %v", records[0])
-	}
-}
-
-func TestLogIngestKeepsPromptTextSentOnlyAsPromptText(t *testing.T) {
-	request := newOtelLogsRequest([]*logsv1.LogRecord{newLogRecord(eventUserPrompt,
-		stringAttribute("prompt.id", "prompt-1"), stringAttribute(promptAttribute, redactedPrompt),
-		stringAttribute(promptTextAttribute, "refactor the auth middleware"),
-	)})
-
-	_, stored := ingestAndCapture(t, request)
-
-	attributes := storedRecords(stored)[0].GetAttributes()
-	if attributeString(attributes, promptAttribute) != "refactor the auth middleware" || hasAttribute(attributes, promptTextAttribute) {
-		t.Fatalf("attributes = %v, want the prompt_text value stored as prompt", attributes)
-	}
-}
-
-func TestLogIngestStoresPromptTextOnlyOnUserPrompt(t *testing.T) {
-	request := newOtelLogsRequest([]*logsv1.LogRecord{newLogRecord(eventAPIRequest, stringAttribute(promptAttribute, "not a prompt event"))})
-
-	_, stored := ingestAndCapture(t, request)
-
-	if hasAttribute(storedRecords(stored)[0].GetAttributes(), promptAttribute) {
-		t.Fatal("a prompt attribute on a non-prompt event was kept")
 	}
 }
 

@@ -132,9 +132,9 @@ func TestFillPromptEventFactsByEventKind(t *testing.T) {
 		attrs []*commonv1.KeyValue
 		check func(*models.OtelPromptEvent) bool
 	}{
-		{"user_prompt", []*commonv1.KeyValue{stringAttribute("prompt_length", "63"), stringAttribute("command_name", "review"), stringAttribute(promptAttribute, "fix the login bug")},
+		{"user_prompt", []*commonv1.KeyValue{stringAttribute("prompt_length", "63"), stringAttribute("command_name", "review")},
 			func(e *models.OtelPromptEvent) bool {
-				return e.PromptLength == 63 && e.CommandName == "review" && e.PromptText != nil && *e.PromptText == "fix the login bug"
+				return e.PromptLength == 63 && e.CommandName == "review"
 			}},
 		{"api_request", []*commonv1.KeyValue{stringAttribute("model", "claude-opus-5-5"), intAttribute("duration_ms", 3753), intAttribute("input_tokens", 2),
 			intAttribute("output_tokens", 74), intAttribute("cache_read_tokens", 19134), intAttribute("cache_creation_tokens", 7), intAttribute("cost_usd_micros", 5315)},

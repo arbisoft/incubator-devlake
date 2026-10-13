@@ -76,7 +76,7 @@ func TestPromptFlowFromIngestToCanonicalPrompt(t *testing.T) {
 		}
 		return newLogRecord(eventName, append(attributes, extra...)...)
 	}
-	userPrompt := common("user_prompt", stringAttribute(promptAttribute, redactedPrompt), intAttribute("prompt_length", 42))
+	userPrompt := common("user_prompt", stringAttribute("prompt", "<REDACTED>"), intAttribute("prompt_length", 42))
 	apiRequest := common("api_request", stringAttribute("model", "claude-opus-5-5"), doubleAttribute("cost_usd", 0.25),
 		intAttribute("input_tokens", 10), intAttribute("output_tokens", 20), intAttribute("duration_ms", 900),
 		stringAttribute("response", "model output"))
@@ -106,9 +106,6 @@ func TestPromptFlowFromIngestToCanonicalPrompt(t *testing.T) {
 
 	got := canonicalPrompt(targets[0], events)
 
-	if got.PromptText != nil {
-		t.Fatalf("PromptText = %q, want nil for a redacted prompt", *got.PromptText)
-	}
 	if got.WorkspaceKey != testOrganizationID || got.UserKey != "acct:user_1" || got.UserAccountId == nil || *got.UserAccountId != "user_1" ||
 		got.UserEmail != "dev@example.com" || got.SessionId != "session-a" || got.PromptId != "prompt-1" {
 		t.Fatalf("identity = %+v", got)
@@ -122,24 +119,6 @@ func TestPromptFlowFromIngestToCanonicalPrompt(t *testing.T) {
 	}
 	if got.SourceConnectionId == nil || *got.SourceConnectionId != 3 {
 		t.Fatalf("SourceConnectionId = %v, want 3", got.SourceConnectionId)
-	}
-}
-
-func TestPromptFlowKeepsOptedInPromptText(t *testing.T) {
-	record := newLogRecord("user_prompt",
-		stringAttribute(devlakeTeamAttribute, "platform"), stringAttribute(organizationIDAttribute, testOrganizationID),
-		stringAttribute("user.account_id", "user_1"), stringAttribute(promptIDAttribute, "prompt-1"),
-		stringAttribute(promptAttribute, "fix the login bug"))
-	_, stored := ingestAndCapture(t, newOtelLogsRequest([]*logsv1.LogRecord{record}))
-	converter, _ := boundConverter(t)
-	prepared, err := converter.prepareLogEvents(7, stored)
-	if err != nil || len(prepared.updates) != 1 {
-		t.Fatalf("prepareLogEvents() = %+v, %v", prepared, err)
-	}
-
-	got := canonicalPrompt(promptTargets(prepared.updates)[0], []*models.OtelPromptEvent{prepared.updates[0].event})
-	if got.PromptText == nil || *got.PromptText != "fix the login bug" {
-		t.Fatalf("PromptText = %v, want the opted-in text", got.PromptText)
 	}
 }
 
@@ -157,22 +136,21 @@ func TestCanonicalPromptSpansEventsReceivedOutOfOrder(t *testing.T) {
 	}
 }
 
-func TestCanonicalPromptKeepsTheFirstTextAndLongestLength(t *testing.T) {
-	first, second := "fix the login bug", "a resent prompt"
+func TestCanonicalPromptKeepsTheFirstEmailAndLongestLength(t *testing.T) {
 	email := "dev@example.com"
 	events := []*models.OtelPromptEvent{
-		// An event without email or text leaves them to later events.
+		// An event without email leaves it to later events.
 		promptEvent("api_request", 0, nil),
 		promptEvent("user_prompt", time.Second, func(e *models.OtelPromptEvent) {
-			e.PromptLength, e.PromptText, e.UserEmail = 17, &first, &email
+			e.PromptLength, e.UserEmail = 17, &email
 		}),
 		promptEvent("user_prompt", 2*time.Second, func(e *models.OtelPromptEvent) {
-			e.PromptLength, e.PromptText, e.CommandName = 40, &second, "review"
+			e.PromptLength, e.CommandName = 40, "review"
 		}),
 	}
 	got := canonicalPrompt(testPromptTarget, events)
-	if got.PromptText == nil || *got.PromptText != first || got.PromptLength != 40 || got.CommandName != "review" || got.UserEmail != email {
-		t.Fatalf("prompt = text %v, length %d, command %q, email %q", got.PromptText, got.PromptLength, got.CommandName, got.UserEmail)
+	if got.PromptLength != 40 || got.CommandName != "review" || got.UserEmail != email {
+		t.Fatalf("prompt = length %d, command %q, email %q", got.PromptLength, got.CommandName, got.UserEmail)
 	}
 }
 
@@ -517,8 +495,8 @@ func TestFillPromptEventFactsKeepsOnlyTheEventKindsFacts(t *testing.T) {
 	}
 	prompt := &models.OtelPromptEvent{EventName: "user_prompt"}
 	fillPromptEventFacts(prompt, []*commonv1.KeyValue{intAttribute("prompt_length", 12)})
-	if prompt.PromptText != nil || prompt.PromptLength != 12 {
-		t.Errorf("user_prompt facts = %+v, want a length and no text", prompt)
+	if prompt.PromptLength != 12 {
+		t.Errorf("user_prompt facts = %+v, want a length", prompt)
 	}
 }
 
