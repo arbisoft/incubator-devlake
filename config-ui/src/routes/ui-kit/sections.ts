@@ -49,6 +49,7 @@ import { SearchInputDemo } from './search-input.demo';
 import { SectionCardDemo } from './section-card.demo';
 import { SidebarNavDemo } from './sidebar-nav.demo';
 import { SortSelectDemo } from './sort-select.demo';
+import { StandalonePageDemo } from './standalone-page.demo';
 import { StatusBadgeDemo } from './status-badge.demo';
 import { ToolbarDemo } from './toolbar.demo';
 import type { SectionDefinition } from './types';
@@ -78,6 +79,7 @@ export const SECTIONS: SectionDefinition[] = [
   { id: SECTION.SEARCH_INPUT, Demo: SearchInputDemo },
   { id: SECTION.FILTER_TABS, Demo: FilterTabsDemo },
   { id: SECTION.SORT_SELECT, Demo: SortSelectDemo },
+  { id: SECTION.STANDALONE_PAGE, Demo: StandalonePageDemo },
   { id: SECTION.TOOLBAR, Demo: ToolbarDemo },
   { id: SECTION.ACCOUNT_BLOCK, Demo: AccountBlockDemo },
   { id: SECTION.APP_SHELL, Demo: AppShellDemo },

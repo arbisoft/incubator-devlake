@@ -24,7 +24,7 @@ import {
   DBMigrate,
   Onboard,
   Otel,
-  Error,
+  ErrorPage,
   Layout,
   layoutLoader,
   Login,
@@ -99,7 +99,7 @@ export const routes: RouteObject[] = [
     path: `${PATH_PREFIX}`,
     element: <Layout />,
     loader: layoutLoader,
-    errorElement: <Error />,
+    errorElement: <ErrorPage />,
     children: [
       {
         index: true,

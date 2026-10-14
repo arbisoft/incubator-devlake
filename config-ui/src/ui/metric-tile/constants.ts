@@ -16,38 +16,4 @@
  *
  */
 
-import styled from 'styled-components';
-
-export const Container = styled.div``;
-
-export const Title = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-`;
-
-export const Description = styled.p`
-  margin-top: 12px;
-  margin-bottom: 16px;
-`;
-
-export const Content = styled.div``;
-
-export const Breadcrumbs = styled.ul`
-  display: flex;
-  align-items: center;
-`;
-
-export const Breadcrumb = styled.li`
-  display: flex;
-  align-items: center;
-  font-size: 24px;
-  font-weight: 600;
-
-  a {
-    display: flex;
-    align-items: center;
-    color: ${({ theme }) => theme.colors.text};
-  }
-`;
-export const Extra = styled.div``;
+export const METRIC_TILE_TONE = { DEFAULT: 'default', ON_BRAND: 'onBrand' } as const;

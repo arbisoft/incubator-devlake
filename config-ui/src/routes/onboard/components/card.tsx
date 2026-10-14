@@ -25,7 +25,7 @@ import { useRefreshData, useAutoRefresh } from '@/hooks';
 import { ConfirmModal, CONFIRM_TONE, ProgressBanner } from '@/ui';
 import { operator } from '@/utils';
 
-import { DashboardURLMap } from '../step-4';
+import { DASHBOARD_URL } from '../dashboard-url';
 
 import { BANNER_ACTION, COPY, FINAL_TASK_STATUSES, STORE_KEY } from './constants';
 import type { BannerAction, OnboardStore } from './types';
@@ -75,7 +75,7 @@ export const OnboardCard = () => {
   const handlers: Record<BannerAction, () => void> = {
     [BANNER_ACTION.CONTINUE]: () => navigate(PATHS.ONBOARD()),
     [BANNER_ACTION.DETAILS]: () => navigate(PATHS.ONBOARD()),
-    [BANNER_ACTION.DASHBOARD]: () => window.open(DashboardURLMap[data.plugin]),
+    [BANNER_ACTION.DASHBOARD]: () => window.open(DASHBOARD_URL[data.plugin]),
     [BANNER_ACTION.FINISH]: () => setConfirmOpen(true),
   };
 

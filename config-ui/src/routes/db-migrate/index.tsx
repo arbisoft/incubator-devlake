@@ -16,18 +16,18 @@
  *
  */
 
-import { ExclamationCircleOutlined } from '@ant-design/icons';
-import { Card, Space, Flex, Button } from 'antd';
+import { Button } from 'antd';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import API from '@/api';
-import { TipLayout } from '@/components';
 import { PATHS } from '@/config';
+import { EMPTY_ILLUSTRATION, EMPTY_STATE_SIZE, EmptyState, StandalonePage } from '@/ui';
 import { useDocumentTitle } from '@/ui/hooks';
 import { operator } from '@/utils';
 
 import { COPY } from './constants';
+import { Actions, Warning } from './styled';
 
 export const DBMigrate = () => {
   useDocumentTitle(COPY.title);
@@ -38,7 +38,7 @@ export const DBMigrate = () => {
 
   const handleSubmit = async () => {
     const [success] = await operator(() => API.migrate(), {
-      setOperating: setOperating,
+      setOperating,
     });
 
     if (success) {
@@ -47,27 +47,21 @@ export const DBMigrate = () => {
   };
 
   return (
-    <TipLayout>
-      <Card>
-        <h2>
-          <Space>
-            <ExclamationCircleOutlined style={{ fontSize: 20, color: 'var(--devlake-color-warning-alt)' }} />
-            <span>New Migration Scripts Detected</span>
-          </Space>
-        </h2>
-        <p>
-          If you have already started, please wait for database migrations to complete, do <strong>NOT</strong> close
-          your browser at this time.
-        </p>
-        <p className="warning">
-          Warning: Performing migration may wipe collected data for consistency and re-collecting data may be required.
-        </p>
-        <Flex justify="center">
-          <Button type="primary" loading={operating} onClick={handleSubmit}>
-            Proceed to Database Migration
-          </Button>
-        </Flex>
-      </Card>
-    </TipLayout>
+    <StandalonePage>
+      <EmptyState
+        illustration={EMPTY_ILLUSTRATION.EMPTY}
+        title={COPY.heading}
+        description={COPY.description}
+        size={EMPTY_STATE_SIZE.PAGE}
+        action={
+          <Actions>
+            <Warning>{COPY.warning}</Warning>
+            <Button type="primary" loading={operating} onClick={handleSubmit}>
+              {COPY.proceed}
+            </Button>
+          </Actions>
+        }
+      />
+    </StandalonePage>
   );
 };

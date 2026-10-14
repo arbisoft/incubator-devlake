@@ -18,7 +18,9 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { normalizeLoginReturnPath } from './utils';
+import { PROVIDER_ID } from './constants';
+import { PROVIDER_LOGOS } from './logos';
+import { matchProviderLogo, normalizeLoginReturnPath } from './utils';
 
 describe('routes/login/utils', () => {
   it('keeps a relative return path under the configured application prefix', () => {
@@ -32,5 +34,34 @@ describe('routes/login/utils', () => {
     expect(normalizeLoginReturnPath('//example.com', '/devlake/')).toBe('/devlake/');
     expect(normalizeLoginReturnPath('connections', '/devlake/')).toBe('/devlake/');
     expect(normalizeLoginReturnPath('/\\example.com', '/devlake/')).toBe('/devlake/');
+  });
+
+  it.each([
+    ['accounts.google.com', PROVIDER_ID.GOOGLE],
+    ['login.microsoftonline.com', PROVIDER_ID.MICROSOFT],
+    ['dev-123456.okta.com', PROVIDER_ID.OKTA],
+    ['github.com', PROVIDER_ID.GITHUB],
+    ['gitlab.com', PROVIDER_ID.GITLAB],
+    ['tenant.eu.auth0.com', PROVIDER_ID.AUTH0],
+    ['keycloak.example.com', PROVIDER_ID.KEYCLOAK],
+  ])('matches %s to its provider logo', (host, id) => {
+    expect(matchProviderLogo(host)).toBe(PROVIDER_LOGOS[id]);
+  });
+
+  it('ignores the port, the letter case and a trailing dot of the host', () => {
+    expect(matchProviderLogo('Accounts.Google.com:443')).toBe(PROVIDER_LOGOS[PROVIDER_ID.GOOGLE]);
+    expect(matchProviderLogo('acme.okta.com.')).toBe(PROVIDER_LOGOS[PROVIDER_ID.OKTA]);
+  });
+
+  it('does not match look-alike hosts', () => {
+    expect(matchProviderLogo('okta.com')).toBeUndefined();
+    expect(matchProviderLogo('notgithub.com')).toBeUndefined();
+    expect(matchProviderLogo('accounts.google.com.evil.example')).toBeUndefined();
+  });
+
+  it('returns nothing for an unknown or missing host', () => {
+    expect(matchProviderLogo('sso.example.com')).toBeUndefined();
+    expect(matchProviderLogo('')).toBeUndefined();
+    expect(matchProviderLogo(undefined)).toBeUndefined();
   });
 });

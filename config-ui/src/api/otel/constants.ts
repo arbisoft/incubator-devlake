@@ -16,34 +16,36 @@
  *
  */
 
-import { createContext } from 'react';
+export const OTEL_STATUS = {
+  ACTIVE: 'active',
+  RETIRING: 'retiring',
+  REVOKED: 'revoked',
+} as const;
 
-export type Record = {
-  plugin: string;
-  connectionId: ID;
-  blueprintId: ID;
-  pipelineId: ID;
-  scopeName: string;
-};
+export const AI_METRIC_FAMILY = {
+  CORE_ACTIVITY: 'core_activity',
+  MODEL_USAGE: 'model_usage',
+  TOOL_USAGE: 'tool_usage',
+} as const;
 
-const initialValue: {
-  step: number;
-  records: Record[];
-  done: boolean;
-  projectName?: string;
-  plugin?: string;
-  setStep: (value: number) => void;
-  setRecords: (value: Record[]) => void;
-  setProjectName: (value: string) => void;
-  setPlugin: (value: string) => void;
-} = {
-  step: 0,
-  records: [],
-  done: false,
-  setStep: () => {},
-  setRecords: () => {},
-  setProjectName: () => {},
-  setPlugin: () => {},
-};
+export const OTEL_INGESTION_STATE = {
+  HEALTHY: 'healthy',
+  DEGRADED: 'degraded',
+  UNHEALTHY: 'unhealthy',
+} as const;
 
-export const Context = createContext(initialValue);
+export const OTEL_BATCH_STATUS = {
+  PENDING: 'pending',
+  PROCESSING: 'processing',
+  PROCESSED: 'processed',
+  RETRYABLE_ERROR: 'retryable_error',
+  PERMANENT_ERROR: 'permanent_error',
+} as const;
+
+export const OTEL_ACTION_PATH = {
+  ROTATE: 'rotate',
+  REVOKE: 'revoke',
+  HIDE: 'hide',
+  FINALIZE_ROTATION: 'finalize-rotation',
+  APPLY: 'apply',
+} as const;

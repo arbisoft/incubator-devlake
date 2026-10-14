@@ -110,8 +110,8 @@ export class PipelinesPage extends BasePage implements Screen {
     await this.visit(PATHS.pipeline(id));
   }
 
-  detailIdLink(id: number): Locator {
-    return this.page.getByRole('link', { name: String(id), exact: true });
+  detailHeading(id: number): Locator {
+    return this.page.getByRole('heading', { level: 1, name: COPY.detailTitle(String(id)), exact: true });
   }
 
   get tasksCompletedLabel(): Locator {

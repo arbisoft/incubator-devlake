@@ -16,33 +16,23 @@
  *
  */
 
-import styled from 'styled-components';
+import { screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 
-export const Wrapper = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding-top: 100px;
-  height: 100vh;
-  background-color: ${({ theme }) => theme.colors.bgLayout};
-  box-sizing: border-box;
-`;
+import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
-export const Inner = styled.div`
-  margin: 32px auto 0;
-  width: 820px;
+import { StandalonePage } from './standalone-page';
 
-  h2 {
-    display: flex;
-    align-items: center;
-    margin: 0;
-  }
+describe('StandalonePage', () => {
+  it('renders its children inside the main landmark', () => {
+    renderWithTheme(<StandalonePage>Body</StandalonePage>);
+    expect(screen.getByRole('main').textContent).toBe('Body');
+    expect(screen.queryByRole('complementary')).toBeNull();
+  });
 
-  p {
-    margin: 16px 0;
-
-    &.warning {
-      color: ${({ theme }) => theme.colors.warningAlt};
-    }
-  }
-`;
+  it('renders the aside beside the content when one is given', () => {
+    renderWithTheme(<StandalonePage aside="Brand">Body</StandalonePage>);
+    expect(screen.getByRole('complementary').textContent).toBe('Brand');
+    expect(screen.getByRole('main').textContent).toContain('Body');
+  });
+});

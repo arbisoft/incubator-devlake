@@ -18,8 +18,6 @@
 
 import { PROJECT_TAB } from '@/config/route-keys';
 import type { ProjectTab } from '@/config/types';
-import { OTEL_CONNECTION_DISPLAY_STATUS } from '@/routes/otel/constants';
-import { STATUS_TONE } from '@/ui/constants';
 
 export const COPY = {
   breadcrumbProjects: 'Projects',
@@ -141,9 +139,3 @@ export const DELETE_ERROR_MAP: Record<string, string> = {
 };
 
 export const OTEL_COLUMN = { TEAM: 'team', PLACEMENT: 'placement', STATUS: 'status', ACTIONS: 'actions' } as const;
-
-export const OTEL_STATUS_TONE = {
-  [OTEL_CONNECTION_DISPLAY_STATUS.READY]: STATUS_TONE.SUCCESS,
-  [OTEL_CONNECTION_DISPLAY_STATUS.ACTION_REQUIRED]: STATUS_TONE.WARNING,
-  [OTEL_CONNECTION_DISPLAY_STATUS.REVOKED]: STATUS_TONE.NEUTRAL,
-} as const;

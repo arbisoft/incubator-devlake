@@ -17,8 +17,17 @@
  */
 import { Locator } from '@playwright/test';
 
+import { LOGIN_COPY } from '../app-copy';
+
 import { BasePage } from './common';
 import { PATHS } from './paths';
+
+export interface StubProvider {
+  name: string;
+  displayName: string;
+  loginUrl: string;
+  issuerHost?: string;
+}
 
 export class LoginPage extends BasePage {
   async open(): Promise<void> {
@@ -26,35 +35,62 @@ export class LoginPage extends BasePage {
   }
 
   providerButton(providerName: string): Locator {
-    return this.page.getByRole('button', { name: new RegExp(`Sign in with ${providerName}`, 'i') });
+    return this.page.getByRole('button', { name: LOGIN_COPY.continueWith(providerName) });
+  }
+
+  // Serves /auth/methods with the given providers only, so a spec does not depend on the stack's own providers.
+  async stubProviders(providers: StubProvider[]): Promise<void> {
+    await this.page.route('**/auth/methods', (route) =>
+      route.fulfill({ json: { providers, apiKey: { enabled: true } } }),
+    );
+  }
+
+  get heading(): Locator {
+    return this.page.getByRole('heading', { name: LOGIN_COPY.title });
+  }
+
+  get providerButtons(): Locator {
+    return this.page.getByRole('button', { name: LOGIN_COPY.continueWith('') });
+  }
+
+  providerLogo(providerName: string, alt: string): Locator {
+    return this.providerButton(providerName).getByRole('img', { name: alt, exact: true });
+  }
+
+  anyProviderLogo(providerName: string): Locator {
+    return this.providerButton(providerName).getByRole('img', { name: /logo$/i });
+  }
+
+  providerFallbackIcon(providerName: string): Locator {
+    return this.providerButton(providerName).locator('.anticon-key');
   }
 
   get usernameInput(): Locator {
-    return this.page.getByLabel(/username/i);
+    return this.page.getByLabel(LOGIN_COPY.usernameLabel);
   }
 
   get passwordInput(): Locator {
-    return this.page.getByLabel(/password/i);
+    return this.page.getByLabel(LOGIN_COPY.passwordLabel, { exact: true });
   }
 
   get usernameTextbox(): Locator {
-    return this.page.getByRole('textbox', { name: /Username/i });
+    return this.page.getByRole('textbox', { name: LOGIN_COPY.usernameLabel });
   }
 
   get signInButton(): Locator {
-    return this.page.getByRole('button', { name: /^Sign in$/i });
+    return this.page.getByRole('button', { name: LOGIN_COPY.submit, exact: true });
   }
 
   get usernameRequiredError(): Locator {
-    return this.page.getByText('Enter your username.');
+    return this.page.getByText(LOGIN_COPY.usernameRequired);
   }
 
   get passwordRequiredError(): Locator {
-    return this.page.getByText('Enter your password.');
+    return this.page.getByText(LOGIN_COPY.passwordRequired);
   }
 
   get invalidCredentialsError(): Locator {
-    return this.page.getByText('Invalid username or password.');
+    return this.page.getByText(LOGIN_COPY.invalidCredentials);
   }
 
   async submit(): Promise<void> {
@@ -78,7 +114,7 @@ export class LoginPage extends BasePage {
     await this.page.route(`**${loginUrl}**`, (route) =>
       route.fulfill({ status: 200, contentType: 'text/html', body: 'stub identity provider' }),
     );
-    await this.page.getByRole('button', { name: new RegExp(providerName, 'i') }).click();
+    await this.providerButton(providerName).click();
     return new URL((await providerRequest).url());
   }
 }

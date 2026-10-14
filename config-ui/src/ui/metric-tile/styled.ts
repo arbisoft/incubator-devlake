@@ -20,31 +20,41 @@ import styled from 'styled-components';
 
 import { textStyle } from '@/ui/style-helpers';
 
-export const Tile = styled.dl`
+import { METRIC_TILE_TONE } from './constants';
+import type { MetricTileTone } from './types';
+
+type ToneProps = { $tone: MetricTileTone };
+
+const onBrand = ({ $tone }: ToneProps) => $tone === METRIC_TILE_TONE.ON_BRAND;
+
+export const Tile = styled.dl<ToneProps>`
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.space.xs}px;
+  gap: ${({ theme, $tone }) => (onBrand({ $tone }) ? 0 : theme.space.xs)}px;
   min-width: 0;
   margin: 0;
-  padding: ${({ theme }) => theme.space.md}px;
+  padding: ${({ theme, $tone }) => (onBrand({ $tone }) ? 0 : theme.space.md)}px;
 `;
 
-export const Label = styled.dt`
+export const Label = styled.dt<ToneProps>`
   ${textStyle('caption')}
-  color: ${({ theme }) => theme.colors.textSecondary};
+  order: ${(props) => (onBrand(props) ? 2 : 0)};
+  color: ${({ theme, $tone }) => (onBrand({ $tone }) ? theme.sidebar.textMuted : theme.colors.textSecondary)};
 `;
 
-export const Value = styled.dd`
-  ${textStyle('display')}
+export const Value = styled.dd<ToneProps>`
+  ${(props) => textStyle(onBrand(props) ? 'h1' : 'display')(props)}
+  order: ${(props) => (onBrand(props) ? 1 : 0)};
   margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: ${({ theme }) => theme.colors.text};
+  color: ${({ theme, $tone }) => (onBrand({ $tone }) ? theme.sidebar.text : theme.colors.text)};
 `;
 
-export const Hint = styled.dd`
+export const Hint = styled.dd<ToneProps>`
   ${textStyle('caption')}
+  order: 3;
   margin: 0;
-  color: ${({ theme }) => theme.colors.textSecondary};
+  color: ${({ theme, $tone }) => (onBrand({ $tone }) ? theme.sidebar.textMuted : theme.colors.textSecondary)};
 `;

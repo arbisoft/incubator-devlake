@@ -16,17 +16,15 @@
  *
  */
 
-import { saveAs } from 'file-saver';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import API from '@/api';
-import { DEVLAKE_ENDPOINT } from '@/config';
 import type { IPipeline } from '@/types';
 import { DataTable, EMPTY_STATE_SIZE } from '@/ui';
 
 import { getPipelineColumns } from '../columns';
-import { COPY, LOGS_FILE_NAME, PIPELINE_ROW_ACTION } from '../constants';
+import { COPY, PIPELINE_ROW_ACTION } from '../constants';
 import type { PipelineSortKey } from '../types';
+import { downloadPipelineLogs } from '../use-pipeline-actions';
 import { pickConfig } from '../utils';
 
 import { PipelineConfigDrawer } from './config-drawer';
@@ -62,8 +60,8 @@ export const PipelineTable = ({
       } else if (action === PIPELINE_ROW_ACTION.DETAIL) {
         setDetailId(pipeline.id);
         setDetailOpen(true);
-      } else if (await API.pipeline.log(pipeline.id)) {
-        saveAs(`${DEVLAKE_ENDPOINT}/pipelines/${pipeline.id}/${LOGS_FILE_NAME}`, LOGS_FILE_NAME);
+      } else {
+        await downloadPipelineLogs(pipeline.id);
       }
     },
     [],

@@ -16,36 +16,42 @@
  *
  */
 
-import { Descriptions, Flex, Typography } from 'antd';
+import { Alert, Button, type TableColumnsType } from 'antd';
 
-import { type AiSourcePreference } from '@/api/otel';
+import type { AiSourcePreference } from '@/api/otel';
+import { DataTable, EMPTY_STATE_SIZE, SectionCard } from '@/ui';
 
-import { OTEL_SOURCE_POLICY } from './constants';
+import { COPY, POLICY_COLUMN, PREFERRED_SOURCE } from './constants';
+import type { OtelSourcePolicyProps } from './types';
 
-type OtelSourcePolicyProps = {
-  preferences?: AiSourcePreference[];
-};
+const COLUMNS: TableColumnsType<AiSourcePreference> = [
+  { key: POLICY_COLUMN.WORKSPACE, title: COPY.policy.columns.workspace, dataIndex: 'workspaceKey', ellipsis: true },
+  { key: POLICY_COLUMN.FAMILY, title: COPY.policy.columns.family, dataIndex: 'metricFamily' },
+  { key: POLICY_COLUMN.SOURCE, title: COPY.policy.columns.source, dataIndex: 'preferredSource' },
+];
 
-export const OtelSourcePolicy = ({ preferences }: OtelSourcePolicyProps) => {
-  const active = preferences?.filter((preference) => preference.preferredSource === 'otel') ?? [];
+export const OtelSourcePolicy = ({ loading, failed, preferences, onRetry }: OtelSourcePolicyProps) => {
+  const active = (preferences ?? []).filter(({ preferredSource }) => preferredSource === PREFERRED_SOURCE);
 
   return (
-    <Flex vertical gap={8} style={{ marginBottom: 16 }}>
-      <Typography.Title level={5} style={{ margin: 0 }}>
-        {OTEL_SOURCE_POLICY.TITLE}
-      </Typography.Title>
-      {active.length > 0 && (
-        <Descriptions bordered size="small" column={{ xs: 1, sm: 3 }}>
-          {active.map((preference) => (
-            <Descriptions.Item
-              key={`${preference.workspaceKey}-${preference.metricFamily}`}
-              label={preference.metricFamily}
-            >
-              {preference.preferredSource}
-            </Descriptions.Item>
-          ))}
-        </Descriptions>
+    <SectionCard title={COPY.policy.title} description={COPY.policy.description}>
+      {failed && (
+        <Alert
+          type="error"
+          showIcon
+          title={COPY.policy.unavailable}
+          action={<Button onClick={onRetry}>{COPY.health.retry}</Button>}
+        />
       )}
-    </Flex>
+      <DataTable
+        rowKey={({ workspaceKey, metricFamily }) => `${workspaceKey}-${metricFamily}`}
+        ariaLabel={COPY.policy.tableLabel}
+        loading={loading}
+        columns={COLUMNS}
+        dataSource={active}
+        pagination={false}
+        empty={{ ...COPY.policy.empty, size: EMPTY_STATE_SIZE.SECTION }}
+      />
+    </SectionCard>
   );
 };

@@ -36,7 +36,8 @@ export type SidebarTokens = {
 };
 
 type TypographyStyle = { fontSize: number; lineHeight: number; fontWeight: number; letterSpacing: number };
-type TypographyKey = 'display' | 'h1' | 'h2' | 'h3' | 'body' | 'bodyMedium' | 'bodyLarge' | 'caption' | 'captionStrong';
+type TypographyKey =
+  'hero' | 'display' | 'h1' | 'h2' | 'h3' | 'body' | 'bodyMedium' | 'bodyLarge' | 'caption' | 'captionStrong';
 export type TypographyTokens = {
   fontFamily: string;
   monoFamily: string;
@@ -62,6 +63,17 @@ export type LayoutTokens = {
   focusRingWidth: number;
   keyValueLabelWidth: number;
   emptyStateTextWidth: number;
+  standalonePanelWidth: number;
+  authAsideWidth: number;
+  authFormWidth: number;
+  authActionHeight: number;
+  authWordmarkWidth: number;
+  authProviderLogoSize: number;
+  authGlowSize: number;
+  authGlowBlur: number;
+  authGlowOpacity: number;
+  authGlowInsetX: number;
+  authGlowInsetBottom: number;
   searchMaxWidth: number;
   connectionNameWidth: number;
   sortSelectWidth: number;
@@ -80,6 +92,14 @@ export type LayoutTokens = {
   pipelineTaskDurationWidth: number;
   pipelineProgressWidth: number;
   catalogCardMinWidth: number;
+  otelTeamColumnWidth: number;
+  otelProjectsColumnWidth: number;
+  otelOrganizationColumnWidth: number;
+  otelEndpointColumnWidth: number;
+  otelStatusColumnWidth: number;
+  otelCredentialsColumnWidth: number;
+  otelUpdatedColumnWidth: number;
+  otelActionsColumnWidth: number;
   segmentInset: number;
   segmentPaddingBlock: number;
   segmentPaddingInline: number;
@@ -90,6 +110,17 @@ export type LayoutTokens = {
   scopeRowHeight: number;
   scopeCheckboxSize: number;
   fieldMaxWidth: number;
+  wizardWidth: number;
+  wizardContentWidth: number;
+  wizardPanelHeight: number;
+  wizardFormWidth: number;
+  wizardStepMarkSize: number;
+  wizardConnectorWidth: number;
+  wizardSectionGap: number;
+  wizardResultSize: number;
+  wizardLogNameWidth: number;
+  wizardLogStatusWidth: number;
+  wizardActionWidth: number;
 };
 export type ZIndexTokens = { sidebar: number; flyout: number; drawer: number; modal: number };
 export type MotionTokens = { fast: number; base: number; easing: string };
@@ -103,6 +134,7 @@ export const TYPOGRAPHY: TypographyTokens = {
   fontFamily: FONT_FAMILY,
   monoFamily: MONO_FAMILY,
   scale: {
+    hero: { fontSize: 34, lineHeight: 40, fontWeight: WEIGHT.bold, letterSpacing: -0.8 },
     display: { fontSize: 30, lineHeight: 36, fontWeight: WEIGHT.semibold, letterSpacing: -0.6 },
     h1: { fontSize: 24, lineHeight: 32, fontWeight: WEIGHT.bold, letterSpacing: -0.4 },
     h2: { fontSize: 20, lineHeight: 28, fontWeight: WEIGHT.semibold, letterSpacing: -0.2 },
@@ -129,6 +161,17 @@ export const LAYOUT: LayoutTokens = {
   focusRingWidth: 2,
   keyValueLabelWidth: 112,
   emptyStateTextWidth: 452,
+  standalonePanelWidth: 600,
+  authAsideWidth: 620,
+  authFormWidth: 360,
+  authActionHeight: 44,
+  authWordmarkWidth: 108,
+  authProviderLogoSize: 18,
+  authGlowSize: 560,
+  authGlowBlur: 90,
+  authGlowOpacity: 0.45,
+  authGlowInsetX: -180,
+  authGlowInsetBottom: -130,
   searchMaxWidth: 400,
   connectionNameWidth: 200,
   sortSelectWidth: 168,
@@ -147,6 +190,14 @@ export const LAYOUT: LayoutTokens = {
   pipelineTaskDurationWidth: 64,
   pipelineProgressWidth: 250,
   catalogCardMinWidth: 272,
+  otelTeamColumnWidth: 120,
+  otelProjectsColumnWidth: 120,
+  otelOrganizationColumnWidth: 120,
+  otelEndpointColumnWidth: 140,
+  otelStatusColumnWidth: 110,
+  otelCredentialsColumnWidth: 110,
+  otelUpdatedColumnWidth: 90,
+  otelActionsColumnWidth: 250,
   segmentInset: 2,
   segmentPaddingBlock: 3,
   segmentPaddingInline: 11,
@@ -157,6 +208,17 @@ export const LAYOUT: LayoutTokens = {
   scopeRowHeight: 40,
   scopeCheckboxSize: 16,
   fieldMaxWidth: 600,
+  wizardWidth: 1200,
+  wizardContentWidth: 860,
+  wizardPanelHeight: 450,
+  wizardFormWidth: 540,
+  wizardStepMarkSize: 32,
+  wizardConnectorWidth: 100,
+  wizardSectionGap: 144,
+  wizardResultSize: 120,
+  wizardLogNameWidth: 220,
+  wizardLogStatusWidth: 150,
+  wizardActionWidth: 280,
 };
 
 // antd's popup layer is 1000 (modal, drawer); dropdowns 1050; the sidebar sits below them.

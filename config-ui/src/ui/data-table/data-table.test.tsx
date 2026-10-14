@@ -26,6 +26,7 @@ import { EMPTY_STATE_SIZE } from '@/ui/empty-state';
 
 import { DataTable } from './data-table';
 import type { DataTableProps } from './types';
+import { getHorizontalScroll } from './utils';
 
 type Row = { id: number; name: string };
 
@@ -54,6 +55,19 @@ const setup = (props: Partial<DataTableProps<Row>> = {}) =>
   );
 
 describe('DataTable', () => {
+  it('sets a numeric scroll width when every leaf column has a fixed width', () => {
+    expect(
+      getHorizontalScroll<Row>([
+        { key: 'name', title: 'Name', width: 120 },
+        { title: 'Details', children: [{ key: 'id', title: 'Identifier', width: 80 }] },
+      ]),
+    ).toBe(200);
+  });
+
+  it('keeps intrinsic scrolling when a leaf column has no numeric width', () => {
+    expect(getHorizontalScroll<Row>([{ key: 'name', title: 'Name', width: 120 }, COLUMNS[1]])).toBe('max-content');
+  });
+
   it('exposes the table through its accessible name and renders the rows', () => {
     setup();
     const table = screen.getByRole('table', { name: ARIA_LABEL });

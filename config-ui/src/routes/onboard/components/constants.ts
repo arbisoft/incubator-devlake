@@ -16,6 +16,8 @@
  *
  */
 
+import { WIZARD_STEP } from '../constants';
+
 export const ONBOARD_STATUS = {
   PREPARE: 'prepare',
   RUNNING: 'running',
@@ -42,7 +44,7 @@ export const FINAL_TASK_STATUSES: string[] = [TASK_STATUS.COMPLETED, TASK_STATUS
 
 export const STORE_KEY = 'onboard';
 export const TOTAL_STEPS = 3;
-export const ONBOARD_DONE_STEP = 4;
+export const ONBOARD_DONE_STEP = WIZARD_STEP.RESULT;
 
 export const COPY = {
   title: 'Onboarding Session',

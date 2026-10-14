@@ -18,56 +18,51 @@
 
 import { request } from '@/utils';
 
+import { OTEL_ACTION_PATH } from './constants';
 import type { AiSourcePreference, OtelConnectionResponse, OtelIngestionStatus, OtelProject } from './types';
+import { CONNECTIONS_PATH, OTEL_BASE_PATH, otelAction } from './utils';
 
+export * from './constants';
 export * from './types';
 
-const basePath = '/plugins/claude_otel/connections';
-const sourcePreferencesPath = '/plugins/claude_otel/source-preferences';
+const sourcePreferencesPath = `${OTEL_BASE_PATH}/source-preferences`;
 
-export const list = (signal?: AbortSignal): Promise<OtelConnectionResponse[]> => request(basePath, { signal });
+export const list = (signal?: AbortSignal): Promise<OtelConnectionResponse[]> => request(CONNECTIONS_PATH, { signal });
 
 export const listSourcePreferences = (signal?: AbortSignal): Promise<AiSourcePreference[]> =>
   request(sourcePreferencesPath, { signal });
 
 export const ingestionStatus = (signal?: AbortSignal): Promise<OtelIngestionStatus> =>
-  request('/plugins/claude_otel/ingestion-status', { signal });
+  request(`${OTEL_BASE_PATH}/ingestion-status`, { signal });
 
-export const metricBatchPayload = (id: ID): Promise<unknown> =>
-  request(`/plugins/claude_otel/metric-batches/${id}/payload`);
+export const metricBatchPayload = (id: ID, signal?: AbortSignal): Promise<unknown> =>
+  request(`${OTEL_BASE_PATH}/metric-batches/${id}/payload`, { signal });
 
 export const create = (data: { teamName: string; projectNames: string[] }) =>
-  request(basePath, {
+  request(CONNECTIONS_PATH, {
     method: 'POST',
     data,
   }) as Promise<OtelConnectionResponse>;
 
-// Keep credential lifecycle requests consistent across the management actions.
-const otelAction =
-  (action: string) =>
-  (id: ID): Promise<OtelConnectionResponse> =>
-    request(`${basePath}/${id}/${action}`, {
-      method: 'POST',
-    });
+export const rotate = otelAction(OTEL_ACTION_PATH.ROTATE);
+export const revoke = otelAction(OTEL_ACTION_PATH.REVOKE);
+export const hide = otelAction(OTEL_ACTION_PATH.HIDE);
+export const finalizeRotation = otelAction(OTEL_ACTION_PATH.FINALIZE_ROTATION);
+export const apply = otelAction(OTEL_ACTION_PATH.APPLY);
 
-export const rotate = otelAction('rotate');
-export const revoke = otelAction('revoke');
-export const hide = otelAction('hide');
-export const finalizeRotation = otelAction('finalize-rotation');
-export const apply = otelAction('apply');
-
-export const listProjects = (): Promise<OtelProject[]> => request('/plugins/claude_otel/projects');
+export const listProjects = (signal?: AbortSignal): Promise<OtelProject[]> =>
+  request(`${OTEL_BASE_PATH}/projects`, { signal });
 
 export const listForProject = (projectName: string, signal?: AbortSignal): Promise<OtelConnectionResponse[]> =>
-  request(`/plugins/claude_otel/projects/${encodeURIComponent(projectName)}/connections`, { signal });
+  request(`${OTEL_BASE_PATH}/projects/${encodeURIComponent(projectName)}/connections`, { signal });
 
 export const updateProjects = (id: ID, projectNames: string[]): Promise<OtelProject[]> =>
-  request(`${basePath}/${id}/projects`, {
+  request(`${CONNECTIONS_PATH}/${id}/projects`, {
     method: 'PUT',
     data: { projectNames },
   });
 
 export const validateProjectRemoval = (projectName: string): Promise<void> =>
-  request(`/plugins/claude_otel/projects/${encodeURIComponent(projectName)}/removal-preflight`, {
+  request(`${OTEL_BASE_PATH}/projects/${encodeURIComponent(projectName)}/removal-preflight`, {
     method: 'POST',
   });

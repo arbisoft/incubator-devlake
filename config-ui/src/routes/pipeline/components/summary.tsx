@@ -16,16 +16,18 @@
  *
  */
 
-import { ReloadOutlined, StopOutlined } from '@ant-design/icons';
+import { CodeOutlined, FileZipOutlined, ReloadOutlined, StopOutlined } from '@ant-design/icons';
+import { useState } from 'react';
 
 import { IPipelineStatus } from '@/types';
 import { IconButton } from '@/ui';
 import { formatTime } from '@/utils';
 
 import { COPY } from '../constants';
-import { usePipelineActions } from '../use-pipeline-actions';
-import { getPipelineActions } from '../utils';
+import { downloadPipelineLogs, usePipelineActions } from '../use-pipeline-actions';
+import { getPipelineActions, pickConfig } from '../utils';
 
+import { PipelineConfigDrawer } from './config-drawer';
 import { PipelineDuration } from './duration';
 import { PipelineStatusBadge } from './status-badge';
 import { FailedNote, Summary, SummaryActions, SummaryCell, SummaryLabel, SummaryValue } from './styled';
@@ -35,6 +37,7 @@ export const PipelineSummary = ({ pipeline, onChanged }: PipelineSummaryProps) =
   const { id, status, beganAt, finishedAt, stage, finishedTasks, totalTasks } = pipeline;
   const { operating, cancel, rerun } = usePipelineActions(id, onChanged);
   const actions = getPipelineActions(status);
+  const [configOpen, setConfigOpen] = useState(false);
 
   const cells = [
     { label: COPY.summary.status, value: <PipelineStatusBadge status={status} /> },
@@ -56,17 +59,31 @@ export const PipelineSummary = ({ pipeline, onChanged }: PipelineSummaryProps) =
             <SummaryValue>{value}</SummaryValue>
           </SummaryCell>
         ))}
-        {(actions.cancel || actions.rerun) && (
-          <SummaryActions>
-            {actions.cancel && (
-              <IconButton icon={<StopOutlined />} label={COPY.summary.cancel} loading={operating} onClick={cancel} />
-            )}
-            {actions.rerun && (
-              <IconButton icon={<ReloadOutlined />} label={COPY.summary.rerun} loading={operating} onClick={rerun} />
-            )}
-          </SummaryActions>
-        )}
+        <SummaryActions>
+          <IconButton
+            icon={<CodeOutlined />}
+            label={COPY.rowActions.configuration}
+            onClick={() => setConfigOpen(true)}
+          />
+          <IconButton
+            icon={<FileZipOutlined />}
+            label={COPY.rowActions.downloadLogs}
+            onClick={() => downloadPipelineLogs(id)}
+          />
+          {actions.cancel && (
+            <IconButton icon={<StopOutlined />} label={COPY.summary.cancel} loading={operating} onClick={cancel} />
+          )}
+          {actions.rerun && (
+            <IconButton icon={<ReloadOutlined />} label={COPY.summary.rerun} loading={operating} onClick={rerun} />
+          )}
+        </SummaryActions>
       </Summary>
+      <PipelineConfigDrawer
+        open={configOpen}
+        id={id}
+        config={pickConfig(pipeline)}
+        onClose={() => setConfigOpen(false)}
+      />
       {status === IPipelineStatus.FAILED && <FailedNote>{COPY.summary.failed}</FailedNote>}
     </>
   );

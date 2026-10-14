@@ -37,6 +37,8 @@ import { Mono, Narrow } from './styled';
 import type { UserRow } from './types';
 
 const { dataTable: text } = COPY;
+const COLUMN_WIDTH = 180;
+const LONG_COLUMN_WIDTH = 320;
 
 const columns: TableColumnsType<UserRow> = [
   {
@@ -66,6 +68,11 @@ const columns: TableColumnsType<UserRow> = [
     render: (hasNote: boolean) => (hasNote ? text.longNote : null),
   },
 ];
+
+const fixedWidthColumns: TableColumnsType<UserRow> = columns.map((column) => ({
+  ...column,
+  width: column.key === 'note' ? LONG_COLUMN_WIDTH : COLUMN_WIDTH,
+}));
 
 const compare = (a: UserRow, b: UserRow, key: string) =>
   String(a[key as keyof UserRow]).localeCompare(String(b[key as keyof UserRow]));
@@ -121,6 +128,16 @@ export const DataTableDemo = () => (
   <DemoSection id={SECTION.DATA_TABLE} title={COPY.sections.dataTable}>
     <DemoCase label={COPY.cases.sortAndPaginate}>
       <ServerTable />
+    </DemoCase>
+    <DemoCase label={COPY.cases.fixedWidthTable}>
+      <DataTable<UserRow>
+        columns={fixedWidthColumns}
+        dataSource={TABLE_ROWS.slice(0, 2)}
+        rowKey="id"
+        loading={false}
+        ariaLabel={text.ariaLabel}
+        empty={empty}
+      />
     </DemoCase>
     <DemoCase label={COPY.cases.selectable}>
       <SelectableTable />

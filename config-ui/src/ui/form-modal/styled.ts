@@ -50,8 +50,10 @@ export const Footer = styled.div`
 `;
 
 export const SubmitButton = styled(Button)`
-  &[aria-disabled='true'],
-  &[aria-disabled='true']:hover {
+  &&&[aria-disabled='true'],
+  &&&[aria-disabled='true']:hover,
+  &&&[aria-disabled='true']:focus,
+  &&&[aria-disabled='true']:active {
     color: ${({ theme }) => theme.colors.textDisabled};
     background: ${({ theme }) => theme.colors.bgTableHeader};
     border-color: ${({ theme }) => theme.colors.border};

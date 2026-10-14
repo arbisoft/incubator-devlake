@@ -16,7 +16,7 @@
  *
  */
 
-import { OTEL_CONNECTION_STATUS, type OtelConnectionResponse } from '@/api/otel';
+import { OTEL_STATUS, type OtelConnectionResponse } from '@/api/otel';
 import { PATHS, PROJECT_TAB, type ProjectTab } from '@/config';
 import { WEBHOOK_PLUGIN } from '@/features';
 import type { IBlueprint, IProject } from '@/types';
@@ -82,9 +82,7 @@ export const buildProjectPayload = (form: SettingsForm): ProjectPayload => ({
 export const getOtelPlacementState = (connections?: OtelConnectionResponse[]): OtelPlacementState => ({
   hasPlacements: Boolean(connections?.length),
   hasActiveFinal: Boolean(
-    connections?.some(
-      ({ connection, projects }) => connection.status === OTEL_CONNECTION_STATUS.ACTIVE && projects.length === 1,
-    ),
+    connections?.some(({ connection, projects }) => connection.status === OTEL_STATUS.ACTIVE && projects.length === 1),
   ),
 });
 

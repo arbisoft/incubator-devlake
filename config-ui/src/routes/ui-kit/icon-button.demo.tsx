@@ -17,6 +17,8 @@
  */
 
 import { DeleteOutlined, EditOutlined } from '@ant-design/icons';
+import { Button } from 'antd';
+import { useRef } from 'react';
 
 import { ICON_BUTTON_TONE, IconButton } from '@/ui';
 
@@ -25,27 +27,39 @@ import { DemoCase, DemoSection } from './demo-section';
 
 const noop = () => undefined;
 
-export const IconButtonDemo = () => (
-  <DemoSection id={SECTION.ICON_BUTTON} title={COPY.sections.iconButton}>
-    <DemoCase label={COPY.cases.default}>
-      <IconButton icon={<EditOutlined />} label={COPY.iconButton.edit} onClick={noop} />
-    </DemoCase>
-    <DemoCase label={COPY.cases.primary}>
-      <IconButton icon={<EditOutlined />} label={COPY.iconButton.edit} tone={ICON_BUTTON_TONE.PRIMARY} onClick={noop} />
-    </DemoCase>
-    <DemoCase label={COPY.cases.danger}>
-      <IconButton
-        icon={<DeleteOutlined />}
-        label={COPY.iconButton.remove}
-        tone={ICON_BUTTON_TONE.DANGER}
-        onClick={noop}
-      />
-    </DemoCase>
-    <DemoCase label={COPY.cases.disabled}>
-      <IconButton icon={<EditOutlined />} label={COPY.iconButton.edit} disabled onClick={noop} />
-    </DemoCase>
-    <DemoCase label={COPY.cases.loading}>
-      <IconButton icon={<EditOutlined />} label={COPY.iconButton.edit} loading onClick={noop} />
-    </DemoCase>
-  </DemoSection>
-);
+export const IconButtonDemo = () => {
+  const focusTarget = useRef<HTMLButtonElement>(null);
+  return (
+    <DemoSection id={SECTION.ICON_BUTTON} title={COPY.sections.iconButton}>
+      <DemoCase label={COPY.cases.default}>
+        <IconButton icon={<EditOutlined />} label={COPY.iconButton.edit} onClick={noop} />
+      </DemoCase>
+      <DemoCase label={COPY.cases.primary}>
+        <IconButton
+          icon={<EditOutlined />}
+          label={COPY.iconButton.edit}
+          tone={ICON_BUTTON_TONE.PRIMARY}
+          onClick={noop}
+        />
+      </DemoCase>
+      <DemoCase label={COPY.cases.danger}>
+        <IconButton
+          icon={<DeleteOutlined />}
+          label={COPY.iconButton.remove}
+          tone={ICON_BUTTON_TONE.DANGER}
+          onClick={noop}
+        />
+      </DemoCase>
+      <DemoCase label={COPY.cases.disabled}>
+        <IconButton icon={<EditOutlined />} label={COPY.iconButton.edit} disabled onClick={noop} />
+      </DemoCase>
+      <DemoCase label={COPY.cases.loading}>
+        <IconButton icon={<EditOutlined />} label={COPY.iconButton.edit} loading onClick={noop} />
+      </DemoCase>
+      <DemoCase label={COPY.cases.focusRestoration}>
+        <Button onClick={() => focusTarget.current?.focus()}>{COPY.iconButton.restoreFocus}</Button>
+        <IconButton icon={<EditOutlined />} label={COPY.iconButton.edit} buttonRef={focusTarget} onClick={noop} />
+      </DemoCase>
+    </DemoSection>
+  );
+};

@@ -16,10 +16,20 @@
  *
  */
 
-import { Card } from 'antd';
-import styled from 'styled-components';
+import { createContext } from 'react';
 
-export const ChangePasswordCard = styled(Card)`
-  max-width: 480px;
-  margin: 0 auto;
-`;
+import type { OnboardContextValue } from './types';
+
+const noop = () => {};
+
+const initialValue: OnboardContextValue = {
+  step: 0,
+  records: [],
+  done: false,
+  setStep: noop,
+  setRecords: noop,
+  setProjectName: noop,
+  setPlugin: noop,
+};
+
+export const Context = createContext(initialValue);

@@ -22,6 +22,4 @@ export * from './loading';
 export * from './logo';
 export * from './markdown';
 export * from './message';
-export * from './page-header';
-export * from './tip-layout';
 export * from './tooltip';

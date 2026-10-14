@@ -23,7 +23,7 @@ import { EmptyState } from '@/ui/empty-state';
 
 import { Table } from './styled';
 import type { DataTableProps } from './types';
-import { toSortState, withSortOrder } from './utils';
+import { getHorizontalScroll, toSortState, withSortOrder } from './utils';
 
 const SIZE_OPTIONS = [...PAGE_SIZE_OPTIONS];
 
@@ -64,7 +64,7 @@ export const DataTable = <T extends object, S extends string = string>({
       loading={firstLoad}
       rowSelection={rowSelection}
       onRow={onRow}
-      scroll={{ x: 'max-content' }}
+      scroll={{ x: getHorizontalScroll(columns) }}
       locale={{ emptyText: firstLoad ? null : <EmptyState {...empty} /> }}
       pagination={
         pagination && {

@@ -27,6 +27,7 @@ import {
   createProject,
   deleteProject,
   findOtelConnection,
+  waitForOtelRestartCooldown,
   otelCredentialStatuses,
   uniqueName,
 } from '../support/api';
@@ -92,6 +93,7 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     page,
   }) => {
     test.setTimeout(120_000);
+    await waitForOtelRestartCooldown();
     // 1. Navigate to /connections
     const connectionsPage = new ConnectionsPage(page);
     const otel = new OtelPage(page);
@@ -122,7 +124,8 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
 
     // 8. Click "Generate"
     await expect(createDialog.submitButton).toBeEnabled();
-    await createDialog.submit();
+    const createResponse = await createDialog.submit();
+    expect(createResponse.status, `connection create completed in ${createResponse.durationMs}ms`).toBe(201);
 
     // 9. Confirm SnippetModal appears with one-time credentials (allow up to 15s for helper/htpasswd restart)
     const snippet = otel.snippetDialog;
@@ -155,16 +158,12 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     expect(created?.connection.status).toBe('active');
     expect(otelCredentialStatuses(created)).toEqual(['active']);
     expect(created?.projects.map((p) => p.name)).toEqual([projectName]);
-    // A recent collector restart puts the endpoint in cooldown, so retry Apply until the row is Ready
     await expect(async () => {
       await otel.reload();
       await expect(row.root).toBeVisible({ timeout: 5000 });
-      if (!(await row.ready.isVisible())) {
-        await row.applyChanges(5000);
-      }
       await expect(row.ready).toBeVisible({ timeout: 3000 });
     }).toPass({ timeout: 70_000, intervals: [3000] });
-    await expect(row.active).toBeVisible();
+    await expect(await row.active()).toBeVisible();
   });
 
   test('2. Organization binding from first telemetry and canonical source policy', async ({ page }) => {
@@ -276,7 +275,12 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     await expect(row.rotateButton).toBeEnabled();
     await row.rotate();
 
-    const rotateModal = otel.rotateDialog;
+    const rotateModal = otel.rotateDialog(testTeamName);
+    await expect(rotateModal.dialog).toBeVisible();
+    await rotateModal.cancel();
+    await expect(rotateModal.dialog).not.toBeVisible();
+    await expect(row.rotateButton).toBeFocused();
+    await row.rotate();
     await expect(rotateModal.dialog).toBeVisible();
     await rotateModal.confirm();
 
@@ -285,38 +289,49 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     await expect(snippet.dialog).toBeVisible({ timeout: 15000 });
     await snippet.close();
     await expect(snippet.dialog).not.toBeVisible();
+    await expect(row.finalizeButton).toBeFocused();
 
     // Row should now show retiring and active tags
-    await expect(row.retiring).toBeVisible({ timeout: 15000 });
-    await expect(row.active).toBeVisible();
+    await expect(await row.retiring()).toBeVisible({ timeout: 15000 });
+    await expect(await row.active()).toBeVisible();
     expect(otelCredentialStatuses(await findOtelConnection(api, testTeamName))).toEqual(['active', 'retiring']);
 
     // 2. FINALIZE
     await expect(row.finalizeButton).toBeEnabled();
     await row.finalize();
 
-    const finalizeModal = otel.finalizeDialog;
+    const finalizeModal = otel.finalizeDialog(testTeamName);
+    await expect(finalizeModal.dialog).toBeVisible();
+    await finalizeModal.cancel();
+    await expect(finalizeModal.dialog).not.toBeVisible();
+    await expect(row.finalizeButton).toBeFocused();
+    await row.finalize();
     await expect(finalizeModal.dialog).toBeVisible();
     await finalizeModal.confirm();
     await expect(finalizeModal.dialog).not.toBeVisible({ timeout: 15000 });
 
     // Retiring credential should disappear, leaving one active credential
-    await expect(row.retiring).toHaveCount(0, { timeout: 15000 });
-    await expect(row.active).toBeVisible();
+    await expect(await row.retiring()).toHaveCount(0, { timeout: 15000 });
+    await expect(await row.active()).toBeVisible();
     expect(otelCredentialStatuses(await findOtelConnection(api, testTeamName))).toEqual(['active', 'revoked']);
 
     // 3. REVOKE
     await expect(row.revokeButton).toBeEnabled();
     await row.revoke();
 
-    const revokeModal = otel.revokeDialog;
+    const revokeModal = otel.revokeDialog(testTeamName);
+    await expect(revokeModal.dialog).toBeVisible();
+    await revokeModal.cancel();
+    await expect(revokeModal.dialog).not.toBeVisible();
+    await expect(row.revokeButton).toBeFocused();
+    await row.revoke();
     await expect(revokeModal.dialog).toBeVisible();
     await revokeModal.confirm();
     await expect(revokeModal.dialog).not.toBeVisible({ timeout: 15000 });
 
     // Status should update to Revoked
-    await expect(row.revokedStatus).toBeVisible({ timeout: 15000 });
-    await expect(row.revokedTag).toBeVisible();
+    await expect(await row.revokedStatus()).toBeVisible({ timeout: 15000 });
+    await expect(await row.revokedTag()).toBeVisible();
     const revoked = await findOtelConnection(api, testTeamName);
     expect(revoked?.connection.status).toBe('revoked');
     expect(otelCredentialStatuses(revoked)).toEqual(['revoked', 'revoked']);
@@ -325,7 +340,12 @@ test.describe.serial('Claude Code OTel UI & Lifecycle E2E', () => {
     await expect(row.removeButton).toBeEnabled();
     await row.remove();
 
-    const removeModal = otel.removeDialog;
+    const removeModal = otel.removeDialog(testTeamName);
+    await expect(removeModal.dialog).toBeVisible();
+    await removeModal.cancel();
+    await expect(removeModal.dialog).not.toBeVisible();
+    await expect(row.removeButton).toBeFocused();
+    await row.remove();
     await expect(removeModal.dialog).toBeVisible();
     await removeModal.confirm();
     await expect(removeModal.dialog).not.toBeVisible({ timeout: 15000 });

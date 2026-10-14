@@ -41,6 +41,7 @@ import {
   getLocalCredentialError,
   getOIDCProviderError,
   getOIDCProviderStatus,
+  getUpdateAccessError,
   isValidDomain,
   isValidEmail,
   isValidLocalLoginName,
@@ -112,6 +113,29 @@ describe('routes/settings/utils', () => {
     expect(getCreateUserError(serverErr)).toBe(ACCESS_ERROR.REQUEST_FAILED);
 
     expect(getCreateUserError(new Error('network error'))).toBe(ACCESS_ERROR.REQUEST_FAILED);
+  });
+
+  it('maps role and status update errors to safe UI copy', () => {
+    const invalid = createAxiosError(HttpStatusCode.BadRequest, { code: ACCESS_ERROR_CODE.INVALID_USER });
+    const invalidDomain = createAxiosError(HttpStatusCode.BadRequest, { code: ACCESS_ERROR_CODE.INVALID_DOMAIN });
+    const lastAdmin = createAxiosError(HttpStatusCode.BadRequest, {
+      message: 'keep at least one active customer administrator',
+    });
+    const missing = createAxiosError(HttpStatusCode.NotFound, { message: 'access user not found' });
+
+    expect(getUpdateAccessError(invalid)).toBe(ACCESS_ERROR.INVALID_UPDATE);
+    expect(getUpdateAccessError(invalidDomain)).toBe(ACCESS_ERROR.INVALID_UPDATE);
+    expect(getUpdateAccessError(lastAdmin)).toBe(ACCESS_ERROR.LAST_ADMIN);
+    expect(getUpdateAccessError(missing)).toBe(ACCESS_ERROR.ENTRY_NOT_FOUND);
+  });
+
+  it('keeps an unmapped bad-request message, and hides every other failure behind the generic copy', () => {
+    const unmapped = createAxiosError(HttpStatusCode.BadRequest, { message: 'provide something else' });
+    const server = createAxiosError(HttpStatusCode.InternalServerError, { message: 'error saving access user: sql' });
+
+    expect(getUpdateAccessError(unmapped)).toBe('provide something else');
+    expect(getUpdateAccessError(server)).toBe(ACCESS_ERROR.REQUEST_FAILED);
+    expect(getUpdateAccessError(new Error('network error'))).toBe(ACCESS_ERROR.REQUEST_FAILED);
   });
 
   it('maps local credential lifecycle errors to safe UI copy', () => {

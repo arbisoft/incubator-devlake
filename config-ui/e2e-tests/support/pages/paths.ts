@@ -25,6 +25,7 @@ export const PROJECT_TABS: readonly ProjectTabKey[] = Object.values(PROJECT_TAB)
 export const PATHS = {
   root: '/',
   login: '/login',
+  dbMigrate: '/db-migrate',
   projects: '/projects',
   project: (name: string) => `/projects/${encodeURIComponent(name)}`,
   projectTab: (name: string, tab: ProjectTabKey) => `/projects/${encodeURIComponent(name)}/${tab}`,

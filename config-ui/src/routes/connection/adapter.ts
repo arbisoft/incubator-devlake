@@ -17,7 +17,7 @@
  */
 import { createElement } from 'react';
 
-import { OTEL_CONNECTION_STATUS, OTEL_CREDENTIAL_STATUS, type OtelConnectionResponse } from '@/api/otel';
+import { OTEL_STATUS, type OtelConnectionResponse } from '@/api/otel';
 import { PATHS } from '@/config';
 import { countFailed, WEBHOOK_PLUGIN, type ConnectionHealthMap } from '@/features/connections';
 import { INTEGRATION_CATEGORY, PLUGIN_CATALOG, getCatalogEntry } from '@/plugins/catalog';
@@ -44,7 +44,7 @@ export const summarizeOtelCredentials = (connections: OtelConnectionResponse[] =
       if (recoveryRequired) summary.recoveryRequired += 1;
       if (restartRequired) summary.restartRequired += 1;
       if (!restartRequired && !recoveryRequired) {
-        summary.active += credentials.filter(({ status }) => status === OTEL_CREDENTIAL_STATUS.ACTIVE).length;
+        summary.active += credentials.filter(({ status }) => status === OTEL_STATUS.ACTIVE).length;
       }
       return summary;
     },
@@ -81,8 +81,7 @@ const toOtelSummary = (otelConnections: OtelConnectionResponse[] | undefined): I
   weight: PLUGIN_CATALOG.claude_code.weight + OTEL_WEIGHT_OFFSET,
   beta: false,
   deprecated: false,
-  connections: (otelConnections ?? []).filter(({ connection }) => connection.status === OTEL_CONNECTION_STATUS.ACTIVE)
-    .length,
+  connections: (otelConnections ?? []).filter(({ connection }) => connection.status === OTEL_STATUS.ACTIVE).length,
   failed: 0,
   href: PATHS.OTEL(),
   otel: summarizeOtelCredentials(otelConnections),

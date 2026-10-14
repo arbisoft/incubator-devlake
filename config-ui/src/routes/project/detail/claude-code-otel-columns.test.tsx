@@ -20,13 +20,13 @@ import { fireEvent, screen } from '@testing-library/react';
 import type { TableColumnsType } from 'antd';
 import { describe, expect, it, vi } from 'vitest';
 
-import { OTEL_CONNECTION_STATUS, type OtelConnectionResponse } from '@/api/otel';
+import { OTEL_STATUS, type OtelConnectionResponse } from '@/api/otel';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
 import { getClaudeCodeOtelProjectColumns } from './claude-code-otel-columns';
 import { COPY, OTEL_COLUMN } from './constants';
 
-const record = (overrides: Partial<OtelConnectionResponse> = {}, status = OTEL_CONNECTION_STATUS.ACTIVE) =>
+const record = (overrides: Partial<OtelConnectionResponse> = {}, status = OTEL_STATUS.ACTIVE) =>
   ({
     connection: { id: 1, teamName: 'Platform', status },
     credentials: [],

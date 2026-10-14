@@ -28,6 +28,7 @@ export const IconButton = ({
   tone = ICON_BUTTON_TONE.DEFAULT,
   disabled,
   loading,
+  buttonRef,
   onClick,
 }: IconButtonProps) => (
   <Tooltip title={label}>
@@ -37,6 +38,7 @@ export const IconButton = ({
       $brand={tone === ICON_BUTTON_TONE.PRIMARY}
       icon={icon}
       aria-label={label}
+      ref={buttonRef}
       disabled={disabled}
       loading={loading}
       onClick={onClick}

@@ -18,4 +18,10 @@
 
 export const COPY = {
   title: 'Database migration',
+  heading: 'New Migration Scripts Detected',
+  description:
+    'If you have already started, please wait for database migrations to complete, do NOT close your browser at this time.',
+  warning:
+    'Warning: Performing migration may wipe collected data for consistency and re-collecting data may be required.',
+  proceed: 'Proceed to Database Migration',
 };

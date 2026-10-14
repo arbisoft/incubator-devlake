@@ -16,5 +16,6 @@
  *
  */
 
+export { METRIC_TILE_TONE } from './constants';
 export * from './metric-tile';
 export type * from './types';

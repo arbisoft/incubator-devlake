@@ -16,13 +16,16 @@
  *
  */
 
+import { METRIC_TILE_TONE } from './constants';
 import { Hint, Label, Tile, Value } from './styled';
 import type { MetricTileProps } from './types';
 
-export const MetricTile = ({ label, value, hint }: MetricTileProps) => (
-  <Tile>
-    <Label>{label}</Label>
-    <Value title={String(value)}>{value}</Value>
-    {hint && <Hint>{hint}</Hint>}
+export const MetricTile = ({ label, value, hint, tone = METRIC_TILE_TONE.DEFAULT }: MetricTileProps) => (
+  <Tile $tone={tone}>
+    <Label $tone={tone}>{label}</Label>
+    <Value $tone={tone} title={String(value)}>
+      {value}
+    </Value>
+    {hint && <Hint $tone={tone}>{hint}</Hint>}
   </Tile>
 );

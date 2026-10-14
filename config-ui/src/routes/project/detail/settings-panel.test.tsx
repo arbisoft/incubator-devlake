@@ -21,7 +21,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import API from '@/api';
-import { OTEL_CONNECTION_STATUS, type OtelConnectionResponse } from '@/api/otel';
+import { OTEL_STATUS, type OtelConnectionResponse } from '@/api/otel';
 import { IBPMode, type IProject } from '@/types';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 import { COMMON_COPY } from '@/ui/constants';
@@ -71,7 +71,7 @@ const PROJECT: IProject = {
 
 const placement = (projects: number) =>
   ({
-    connection: { id: 1, teamName: 'Platform', status: OTEL_CONNECTION_STATUS.ACTIVE },
+    connection: { id: 1, teamName: 'Platform', status: OTEL_STATUS.ACTIVE },
     projects: Array.from({ length: projects }, (_, index) => ({ name: `p${index}` })),
   }) as OtelConnectionResponse;
 
