@@ -1,11 +1,11 @@
 {
   "eslint": {
     "@typescript-eslint/no-explicit-any": {
-      "errors": 237,
+      "errors": 234,
       "warnings": 0
     },
     "@typescript-eslint/no-unused-vars": {
-      "errors": 12,
+      "errors": 10,
       "warnings": 0
     },
     "eqeqeq": {
@@ -25,7 +25,7 @@
       "warnings": 0
     },
     "no-duplicate-imports": {
-      "errors": 5,
+      "errors": 4,
       "warnings": 0
     },
     "no-empty": {
@@ -34,11 +34,11 @@
     },
     "prefer-destructuring": {
       "errors": 0,
-      "warnings": 12
+      "warnings": 9
     },
     "react-hooks/exhaustive-deps": {
       "errors": 0,
-      "warnings": 64
+      "warnings": 61
     },
     "react-hooks/globals": {
       "errors": 0,
@@ -53,7 +53,7 @@
       "warnings": 23
     },
     "react/no-array-index-key": {
-      "errors": 3,
+      "errors": 2,
       "warnings": 0
     },
     "react/no-unescaped-entities": {
@@ -70,7 +70,7 @@
     },
     "sonarjs/no-duplicate-string": {
       "errors": 0,
-      "warnings": 19
+      "warnings": 18
     },
     "sonarjs/no-ignored-exceptions": {
       "errors": 1,
@@ -78,13 +78,9 @@
     },
     "sonarjs/no-nested-conditional": {
       "errors": 0,
-      "warnings": 8
+      "warnings": 6
     },
     "sonarjs/no-nested-template-literals": {
-      "errors": 1,
-      "warnings": 0
-    },
-    "sonarjs/prefer-native-axios-alternative": {
       "errors": 1,
       "warnings": 0
     },
@@ -93,7 +89,7 @@
       "warnings": 0
     },
     "sonarjs/super-linear-regex": {
-      "errors": 4,
+      "errors": 3,
       "warnings": 0
     },
     "sonarjs/unused-import": {
@@ -103,7 +99,7 @@
   },
   "knip": [],
   "jscpd": {
-    "clones": 101,
-    "duplicatedLines": 1842
+    "clones": 99,
+    "duplicatedLines": 1828
   }
 }

@@ -4,9 +4,9 @@
   },
   "specs": {
     "advanced/blueprint-detail.spec.ts": {
-      "tests": 10,
-      "expects": 57,
-      "backend": 8,
+      "tests": 11,
+      "expects": 69,
+      "backend": 9,
       "skips": 0,
       "fixmes": 0
     },
@@ -18,15 +18,15 @@
       "fixmes": 0
     },
     "advanced/pipelines.spec.ts": {
-      "tests": 7,
-      "expects": 26,
+      "tests": 8,
+      "expects": 31,
       "backend": 1,
       "skips": 0,
       "fixmes": 0
     },
     "auth/local-auth-e2e.spec.ts": {
-      "tests": 19,
-      "expects": 120,
+      "tests": 20,
+      "expects": 125,
       "backend": 17,
       "skips": 2,
       "fixmes": 0
@@ -75,7 +75,7 @@
     },
     "connections/data-scope.spec.ts": {
       "tests": 3,
-      "expects": 18,
+      "expects": 21,
       "backend": 8,
       "skips": 1,
       "fixmes": 0
@@ -110,7 +110,7 @@
     },
     "keys/api-keys.spec.ts": {
       "tests": 2,
-      "expects": 25,
+      "expects": 29,
       "backend": 4,
       "skips": 0,
       "fixmes": 0
@@ -158,9 +158,9 @@
       "fixmes": 0
     },
     "projects/project-rename.spec.ts": {
-      "tests": 1,
-      "expects": 7,
-      "backend": 4,
+      "tests": 2,
+      "expects": 16,
+      "backend": 9,
       "skips": 0,
       "fixmes": 0
     },
@@ -186,8 +186,8 @@
       "fixmes": 0
     },
     "settings/grafana-users.spec.ts": {
-      "tests": 15,
-      "expects": 102,
+      "tests": 16,
+      "expects": 114,
       "backend": 22,
       "skips": 0,
       "fixmes": 0
@@ -207,9 +207,9 @@
       "fixmes": 0
     },
     "shell/navigation.spec.ts": {
-      "tests": 5,
-      "expects": 31,
-      "backend": 2,
+      "tests": 6,
+      "expects": 41,
+      "backend": 6,
       "skips": 1,
       "fixmes": 0
     },
