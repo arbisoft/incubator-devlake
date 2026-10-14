@@ -50,3 +50,15 @@ func canonicalID(kind string, components ...string) string {
 	digest := sha256.Sum256([]byte(strings.Join(encoded, "|")))
 	return "ai:" + kind + ":" + hex.EncodeToString(digest[:])
 }
+
+func PromptID(provider, workspaceKey, promptID string) string {
+	return canonicalID("prompt", provider, workspaceKey, promptID)
+}
+
+func PromptSkillID(provider, workspaceKey, promptID, skillName string) string {
+	return canonicalID("prompt_skill", provider, workspaceKey, promptID, skillName)
+}
+
+func PermissionModeChangeID(provider, workspaceKey, sessionID string, changedAt time.Time, fromMode, toMode string) string {
+	return canonicalID("permission_mode_change", provider, workspaceKey, sessionID, changedAt.UTC().Format(time.RFC3339Nano), fromMode, toMode)
+}

@@ -113,7 +113,13 @@ func (c *rawMetricConverter) pollOnce() (bool, errors.Error) {
 	if replayed, err := c.processNextReplay(); err != nil || replayed {
 		return replayed, err
 	}
-	return c.processNext()
+	// Metrics and logs advance one batch each per round so neither backlog starves the other.
+	processedMetrics, err := c.processNext()
+	if err != nil {
+		return processedMetrics, err
+	}
+	processedLogs, err := c.processNextLogBatch()
+	return processedMetrics || processedLogs, err
 }
 
 // acquireLease takes or renews the singleton converter lease. The conditional update
@@ -177,7 +183,7 @@ func (c *rawMetricConverter) claimNext() (*models.OtelMetricBatch, string, error
 	if head == nil {
 		return nil, "", nil
 	}
-	if !isBatchClaimable(head, now) {
+	if !isBatchClaimable(head.Status, head.LeaseUntil, head.NextAttemptAt, now) {
 		return nil, "", nil
 	}
 	leaseOwner := uuid.NewString()
@@ -237,12 +243,13 @@ func (c *rawMetricConverter) findClaimHead() (*models.OtelMetricBatch, errors.Er
 	return head, nil
 }
 
-func isBatchClaimable(batch *models.OtelMetricBatch, now time.Time) bool {
-	switch batch.Status {
+// isBatchClaimable applies to metric and log batches, which share the status lifecycle.
+func isBatchClaimable(status string, leaseUntil, nextAttemptAt *time.Time, now time.Time) bool {
+	switch status {
 	case models.OtelMetricBatchStatusProcessing:
-		return batch.LeaseUntil == nil || batch.LeaseUntil.Before(now)
+		return leaseUntil == nil || leaseUntil.Before(now)
 	case models.OtelMetricBatchStatusRetryableError:
-		return batch.NextAttemptAt == nil || !batch.NextAttemptAt.After(now)
+		return nextAttemptAt == nil || !nextAttemptAt.After(now)
 	default:
 		return true
 	}

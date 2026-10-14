@@ -13,7 +13,7 @@ receivers:
 processors:
   resource/attribution:
     attributes:
-      # The attributes processor below edits datapoints only. Remove spoofable resource-level
+      # The attributes processor below edits datapoints and log records only. Remove spoofable resource-level
       # attribution so it cannot reach Prometheus labels or DevLake raw storage.
       - key: devlake_team
         action: delete
@@ -34,6 +34,22 @@ processors:
         pattern: "^otel_(?P<devlake_team>[a-z0-9]+(?:-[a-z0-9]+)*)_[a-z0-9]+$"
         action: extract
       - key: devlake_auth_username
+        action: delete
+  transform/strip_content:
+    error_mode: ignore
+    log_statements:
+      # Response, tool input and raw API body content is never forwarded. DevLake strips the
+      # same attributes again at ingest. Prompt text is forwarded and kept out of ai_* tables.
+      - delete_matching_keys(log.attributes, "^(response|tool_input|body|body_ref)$")
+      - delete_matching_keys(resource.attributes, "^(response|tool_input|body|body_ref)$")
+      # A tool_result error message can echo file contents; api_error messages are kept.
+      - delete_key(log.attributes, "error") where log.attributes["event.name"] == "tool_result"
+  attributes/drop_session:
+    actions:
+      # Session ids are needed on events, but would make every session a Prometheus series.
+      - key: session.id
+        action: delete
+      - key: ccr.session.id
         action: delete
   memory_limiter:
     check_interval: 1s
@@ -120,7 +136,12 @@ service:
     metrics/claude_raw:
       receivers: [forward/claude_raw]
       exporters: [otlphttp/claude_raw]
+    # Claude Code events go only to DevLake, at /plugins/claude_otel/otlp/v1/logs.
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource/attribution, attributes/team, transform/strip_content]
+      exporters: [otlphttp/claude_raw]
     metrics/prometheus:
       receivers: [forward/prometheus]
-      processors: [delta_to_cumulative, batch/prometheus]
+      processors: [attributes/drop_session, delta_to_cumulative, batch/prometheus]
       exporters: [prometheus]

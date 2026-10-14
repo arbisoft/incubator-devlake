@@ -44,15 +44,27 @@ func responseWithSettings(connection *models.OtelConnection, credentials []*mode
 		Connection:  connection,
 		Credentials: credentials,
 		ManagedSettings: &models.OtelManagedSettings{Env: map[string]string{
-			"CLAUDE_CODE_ENABLE_TELEMETRY":      "1",
-			"OTEL_METRICS_EXPORTER":             "otlp",
-			"OTEL_LOGS_EXPORTER":                "none",
-			"OTEL_EXPORTER_OTLP_PROTOCOL":       connection.Protocol,
-			"OTEL_EXPORTER_OTLP_ENDPOINT":       connection.CollectorEndpoint,
-			"OTEL_EXPORTER_OTLP_HEADERS":        fmt.Sprintf("Authorization=Basic %s", header),
-			"OTEL_METRIC_EXPORT_INTERVAL":       "60000",
-			"OTEL_METRICS_INCLUDE_SESSION_ID":   "false",
+			"CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+			"OTEL_METRICS_EXPORTER":        "otlp",
+			"OTEL_LOGS_EXPORTER":           "otlp",
+			"OTEL_EXPORTER_OTLP_PROTOCOL":  connection.Protocol,
+			"OTEL_EXPORTER_OTLP_ENDPOINT":  connection.CollectorEndpoint,
+			"OTEL_EXPORTER_OTLP_HEADERS":   fmt.Sprintf("Authorization=Basic %s", header),
+			"OTEL_METRIC_EXPORT_INTERVAL":  "60000",
+			// Events carry session.id under this flag; per-prompt permission mode is
+			// derived per session. The Collector keeps it out of Prometheus labels.
+			"OTEL_METRICS_INCLUDE_SESSION_ID":   "true",
 			"OTEL_METRICS_INCLUDE_ACCOUNT_UUID": "true",
+			// Skill, MCP, plugin and command names, and tool parameters.
+			"OTEL_LOG_TOOL_DETAILS": "1",
+			// Prompt text is stored in the raw and _tool tables only, never in ai_* tables.
+			"OTEL_LOG_USER_PROMPTS": "1",
+			// Other content stays off. Managed settings take precedence, so developers
+			// cannot turn it on; the Collector and ingest also strip it. Responses must be
+			// off explicitly: unset, they follow OTEL_LOG_USER_PROMPTS.
+			"OTEL_LOG_ASSISTANT_RESPONSES": "0",
+			"OTEL_LOG_TOOL_CONTENT":        "0",
+			"OTEL_LOG_RAW_API_BODIES":      "0",
 		}},
 		RestartRequired: hasPendingCollectorRestart(credentials),
 		RestartHint:     restartHint(credentials),

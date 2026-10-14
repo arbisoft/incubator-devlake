@@ -1,0 +1,1311 @@
+{
+ "resourceLogs": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "claude-code"
+      }
+     },
+     {
+      "key": "service.version",
+      "value": {
+       "stringValue": "2.1.300"
+      }
+     }
+    ]
+   },
+   "scopeLogs": [
+    {
+     "scope": {
+      "name": "com.anthropic.claude_code.events",
+      "version": "2.1.300"
+     },
+     "logRecords": [
+      {
+       "body": {
+        "stringValue": "claude_code.user_prompt"
+       },
+       "attributes": [
+        {
+         "key": "devlake_team",
+         "value": {
+          "stringValue": "platform"
+         }
+        },
+        {
+         "key": "event.name",
+         "value": {
+          "stringValue": "user_prompt"
+         }
+        },
+        {
+         "key": "event.timestamp",
+         "value": {
+          "stringValue": "2026-10-14T10:00:00.000Z"
+         }
+        },
+        {
+         "key": "event.sequence",
+         "value": {
+          "intValue": "1"
+         }
+        },
+        {
+         "key": "session.id",
+         "value": {
+          "stringValue": "sess-1"
+         }
+        },
+        {
+         "key": "organization.id",
+         "value": {
+          "stringValue": "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e"
+         }
+        },
+        {
+         "key": "user.account_uuid",
+         "value": {
+          "stringValue": "aaaa1111-1111-4111-8111-111111111111"
+         }
+        },
+        {
+         "key": "user.email",
+         "value": {
+          "stringValue": "developer@example.com"
+         }
+        },
+        {
+         "key": "user.id",
+         "value": {
+          "stringValue": "install-1"
+         }
+        },
+        {
+         "key": "terminal.type",
+         "value": {
+          "stringValue": "iTerm.app"
+         }
+        },
+        {
+         "key": "prompt.id",
+         "value": {
+          "stringValue": "p1"
+         }
+        },
+        {
+         "key": "prompt_length",
+         "value": {
+          "intValue": "42"
+         }
+        },
+        {
+         "key": "prompt",
+         "value": {
+          "stringValue": "Summarize the failing tests"
+         }
+        },
+        {
+         "key": "prompt_text",
+         "value": {
+          "stringValue": "Summarize the failing tests"
+         }
+        }
+       ]
+      },
+      {
+       "body": {
+        "stringValue": "claude_code.api_request"
+       },
+       "attributes": [
+        {
+         "key": "devlake_team",
+         "value": {
+          "stringValue": "platform"
+         }
+        },
+        {
+         "key": "event.name",
+         "value": {
+          "stringValue": "api_request"
+         }
+        },
+        {
+         "key": "event.timestamp",
+         "value": {
+          "stringValue": "2026-10-14T10:00:02.000Z"
+         }
+        },
+        {
+         "key": "event.sequence",
+         "value": {
+          "intValue": "2"
+         }
+        },
+        {
+         "key": "session.id",
+         "value": {
+          "stringValue": "sess-1"
+         }
+        },
+        {
+         "key": "organization.id",
+         "value": {
+          "stringValue": "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e"
+         }
+        },
+        {
+         "key": "user.account_uuid",
+         "value": {
+          "stringValue": "aaaa1111-1111-4111-8111-111111111111"
+         }
+        },
+        {
+         "key": "user.email",
+         "value": {
+          "stringValue": "developer@example.com"
+         }
+        },
+        {
+         "key": "user.id",
+         "value": {
+          "stringValue": "install-1"
+         }
+        },
+        {
+         "key": "terminal.type",
+         "value": {
+          "stringValue": "iTerm.app"
+         }
+        },
+        {
+         "key": "prompt.id",
+         "value": {
+          "stringValue": "p1"
+         }
+        },
+        {
+         "key": "model",
+         "value": {
+          "stringValue": "claude-opus-5-5"
+         }
+        },
+        {
+         "key": "input_tokens",
+         "value": {
+          "intValue": "1200"
+         }
+        },
+        {
+         "key": "output_tokens",
+         "value": {
+          "intValue": "300"
+         }
+        },
+        {
+         "key": "cache_read_tokens",
+         "value": {
+          "intValue": "5000"
+         }
+        },
+        {
+         "key": "cache_creation_tokens",
+         "value": {
+          "intValue": "100"
+         }
+        },
+        {
+         "key": "cost_usd",
+         "value": {
+          "doubleValue": 0.0425
+         }
+        },
+        {
+         "key": "duration_ms",
+         "value": {
+          "intValue": "1800"
+         }
+        },
+        {
+         "key": "query_source",
+         "value": {
+          "stringValue": "repl_main_thread"
+         }
+        },
+        {
+         "key": "request_id",
+         "value": {
+          "stringValue": "req-1"
+         }
+        }
+       ]
+      },
+      {
+       "body": {
+        "stringValue": "claude_code.permission_mode_changed"
+       },
+       "attributes": [
+        {
+         "key": "devlake_team",
+         "value": {
+          "stringValue": "platform"
+         }
+        },
+        {
+         "key": "event.name",
+         "value": {
+          "stringValue": "permission_mode_changed"
+         }
+        },
+        {
+         "key": "event.timestamp",
+         "value": {
+          "stringValue": "2026-10-14T10:01:00.000Z"
+         }
+        },
+        {
+         "key": "event.sequence",
+         "value": {
+          "intValue": "3"
+         }
+        },
+        {
+         "key": "session.id",
+         "value": {
+          "stringValue": "sess-1"
+         }
+        },
+        {
+         "key": "organization.id",
+         "value": {
+          "stringValue": "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e"
+         }
+        },
+        {
+         "key": "user.account_uuid",
+         "value": {
+          "stringValue": "aaaa1111-1111-4111-8111-111111111111"
+         }
+        },
+        {
+         "key": "user.email",
+         "value": {
+          "stringValue": "developer@example.com"
+         }
+        },
+        {
+         "key": "user.id",
+         "value": {
+          "stringValue": "install-1"
+         }
+        },
+        {
+         "key": "terminal.type",
+         "value": {
+          "stringValue": "iTerm.app"
+         }
+        },
+        {
+         "key": "from_mode",
+         "value": {
+          "stringValue": "default"
+         }
+        },
+        {
+         "key": "to_mode",
+         "value": {
+          "stringValue": "plan"
+         }
+        },
+        {
+         "key": "trigger",
+         "value": {
+          "stringValue": "shift_tab"
+         }
+        }
+       ]
+      },
+      {
+       "body": {
+        "stringValue": "claude_code.user_prompt"
+       },
+       "attributes": [
+        {
+         "key": "devlake_team",
+         "value": {
+          "stringValue": "platform"
+         }
+        },
+        {
+         "key": "event.name",
+         "value": {
+          "stringValue": "user_prompt"
+         }
+        },
+        {
+         "key": "event.timestamp",
+         "value": {
+          "stringValue": "2026-10-14T10:02:00.000Z"
+         }
+        },
+        {
+         "key": "event.sequence",
+         "value": {
+          "intValue": "4"
+         }
+        },
+        {
+         "key": "session.id",
+         "value": {
+          "stringValue": "sess-1"
+         }
+        },
+        {
+         "key": "organization.id",
+         "value": {
+          "stringValue": "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e"
+         }
+        },
+        {
+         "key": "user.account_uuid",
+         "value": {
+          "stringValue": "aaaa1111-1111-4111-8111-111111111111"
+         }
+        },
+        {
+         "key": "user.email",
+         "value": {
+          "stringValue": "developer@example.com"
+         }
+        },
+        {
+         "key": "user.id",
+         "value": {
+          "stringValue": "install-1"
+         }
+        },
+        {
+         "key": "terminal.type",
+         "value": {
+          "stringValue": "iTerm.app"
+         }
+        },
+        {
+         "key": "prompt.id",
+         "value": {
+          "stringValue": "p2"
+         }
+        },
+        {
+         "key": "prompt_length",
+         "value": {
+          "intValue": "120"
+         }
+        },
+        {
+         "key": "prompt",
+         "value": {
+          "stringValue": "  Review the auth change\n"
+         }
+        }
+       ]
+      },
+      {
+       "body": {
+        "stringValue": "claude_code.skill_activated"
+       },
+       "attributes": [
+        {
+         "key": "devlake_team",
+         "value": {
+          "stringValue": "platform"
+         }
+        },
+        {
+         "key": "event.name",
+         "value": {
+          "stringValue": "skill_activated"
+         }
+        },
+        {
+         "key": "event.timestamp",
+         "value": {
+          "stringValue": "2026-10-14T10:02:01.000Z"
+         }
+        },
+        {
+         "key": "event.sequence",
+         "value": {
+          "intValue": "5"
+         }
+        },
+        {
+         "key": "session.id",
+         "value": {
+          "stringValue": "sess-1"
+         }
+        },
+        {
+         "key": "organization.id",
+         "value": {
+          "stringValue": "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e"
+         }
+        },
+        {
+         "key": "user.account_uuid",
+         "value": {
+          "stringValue": "aaaa1111-1111-4111-8111-111111111111"
+         }
+        },
+        {
+         "key": "user.email",
+         "value": {
+          "stringValue": "developer@example.com"
+         }
+        },
+        {
+         "key": "user.id",
+         "value": {
+          "stringValue": "install-1"
+         }
+        },
+        {
+         "key": "terminal.type",
+         "value": {
+          "stringValue": "iTerm.app"
+         }
+        },
+        {
+         "key": "prompt.id",
+         "value": {
+          "stringValue": "p2"
+         }
+        },
+        {
+         "key": "skill.name",
+         "value": {
+          "stringValue": "code-review"
+         }
+        },
+        {
+         "key": "invocation_trigger",
+         "value": {
+          "stringValue": "claude-proactive"
+         }
+        },
+        {
+         "key": "skill.source",
+         "value": {
+          "stringValue": "userSettings"
+         }
+        }
+       ]
+      },
+      {
+       "body": {
+        "stringValue": "claude_code.tool_result"
+       },
+       "attributes": [
+        {
+         "key": "devlake_team",
+         "value": {
+          "stringValue": "platform"
+         }
+        },
+        {
+         "key": "event.name",
+         "value": {
+          "stringValue": "tool_result"
+         }
+        },
+        {
+         "key": "event.timestamp",
+         "value": {
+          "stringValue": "2026-10-14T10:02:03.000Z"
+         }
+        },
+        {
+         "key": "event.sequence",
+         "value": {
+          "intValue": "6"
+         }
+        },
+        {
+         "key": "session.id",
+         "value": {
+          "stringValue": "sess-1"
+         }
+        },
+        {
+         "key": "organization.id",
+         "value": {
+          "stringValue": "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e"
+         }
+        },
+        {
+         "key": "user.account_uuid",
+         "value": {
+          "stringValue": "aaaa1111-1111-4111-8111-111111111111"
+         }
+        },
+        {
+         "key": "user.email",
+         "value": {
+          "stringValue": "developer@example.com"
+         }
+        },
+        {
+         "key": "user.id",
+         "value": {
+          "stringValue": "install-1"
+         }
+        },
+        {
+         "key": "terminal.type",
+         "value": {
+          "stringValue": "iTerm.app"
+         }
+        },
+        {
+         "key": "prompt.id",
+         "value": {
+          "stringValue": "p2"
+         }
+        },
+        {
+         "key": "tool_name",
+         "value": {
+          "stringValue": "Skill"
+         }
+        },
+        {
+         "key": "tool_use_id",
+         "value": {
+          "stringValue": "tu-1"
+         }
+        },
+        {
+         "key": "success",
+         "value": {
+          "stringValue": "true"
+         }
+        },
+        {
+         "key": "duration_ms",
+         "value": {
+          "intValue": "12"
+         }
+        },
+        {
+         "key": "tool_parameters",
+         "value": {
+          "stringValue": "{\"skill_name\": \"code-review\"}"
+         }
+        },
+        {
+         "key": "tool_input",
+         "value": {
+          "stringValue": "{\"skill\":\"code-review\"}"
+         }
+        }
+       ]
+      },
+      {
+       "body": {
+        "stringValue": "claude_code.api_request"
+       },
+       "attributes": [
+        {
+         "key": "devlake_team",
+         "value": {
+          "stringValue": "platform"
+         }
+        },
+        {
+         "key": "event.name",
+         "value": {
+          "stringValue": "api_request"
+         }
+        },
+        {
+         "key": "event.timestamp",
+         "value": {
+          "stringValue": "2026-10-14T10:02:05.000Z"
+         }
+        },
+        {
+         "key": "event.sequence",
+         "value": {
+          "intValue": "7"
+         }
+        },
+        {
+         "key": "session.id",
+         "value": {
+          "stringValue": "sess-1"
+         }
+        },
+        {
+         "key": "organization.id",
+         "value": {
+          "stringValue": "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e"
+         }
+        },
+        {
+         "key": "user.account_uuid",
+         "value": {
+          "stringValue": "aaaa1111-1111-4111-8111-111111111111"
+         }
+        },
+        {
+         "key": "user.email",
+         "value": {
+          "stringValue": "developer@example.com"
+         }
+        },
+        {
+         "key": "user.id",
+         "value": {
+          "stringValue": "install-1"
+         }
+        },
+        {
+         "key": "terminal.type",
+         "value": {
+          "stringValue": "iTerm.app"
+         }
+        },
+        {
+         "key": "prompt.id",
+         "value": {
+          "stringValue": "p2"
+         }
+        },
+        {
+         "key": "model",
+         "value": {
+          "stringValue": "claude-opus-5-5"
+         }
+        },
+        {
+         "key": "input_tokens",
+         "value": {
+          "intValue": "2000"
+         }
+        },
+        {
+         "key": "output_tokens",
+         "value": {
+          "intValue": "500"
+         }
+        },
+        {
+         "key": "cost_usd",
+         "value": {
+          "doubleValue": 0.06
+         }
+        },
+        {
+         "key": "skill.name",
+         "value": {
+          "stringValue": "code-review"
+         }
+        },
+        {
+         "key": "request_id",
+         "value": {
+          "stringValue": "req-2"
+         }
+        }
+       ]
+      },
+      {
+       "body": {
+        "stringValue": "claude_code.tool_result"
+       },
+       "attributes": [
+        {
+         "key": "devlake_team",
+         "value": {
+          "stringValue": "platform"
+         }
+        },
+        {
+         "key": "event.name",
+         "value": {
+          "stringValue": "tool_result"
+         }
+        },
+        {
+         "key": "event.timestamp",
+         "value": {
+          "stringValue": "2026-10-14T10:02:06.000Z"
+         }
+        },
+        {
+         "key": "event.sequence",
+         "value": {
+          "intValue": "8"
+         }
+        },
+        {
+         "key": "session.id",
+         "value": {
+          "stringValue": "sess-1"
+         }
+        },
+        {
+         "key": "organization.id",
+         "value": {
+          "stringValue": "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e"
+         }
+        },
+        {
+         "key": "user.account_uuid",
+         "value": {
+          "stringValue": "aaaa1111-1111-4111-8111-111111111111"
+         }
+        },
+        {
+         "key": "user.email",
+         "value": {
+          "stringValue": "developer@example.com"
+         }
+        },
+        {
+         "key": "user.id",
+         "value": {
+          "stringValue": "install-1"
+         }
+        },
+        {
+         "key": "terminal.type",
+         "value": {
+          "stringValue": "iTerm.app"
+         }
+        },
+        {
+         "key": "prompt.id",
+         "value": {
+          "stringValue": "p2"
+         }
+        },
+        {
+         "key": "tool_name",
+         "value": {
+          "stringValue": "Bash"
+         }
+        },
+        {
+         "key": "tool_use_id",
+         "value": {
+          "stringValue": "tu-2"
+         }
+        },
+        {
+         "key": "success",
+         "value": {
+          "stringValue": "false"
+         }
+        },
+        {
+         "key": "error_type",
+         "value": {
+          "stringValue": "ShellError"
+         }
+        },
+        {
+         "key": "error",
+         "value": {
+          "stringValue": "cat: secret.txt: contents..."
+         }
+        },
+        {
+         "key": "tool_parameters",
+         "value": {
+          "stringValue": "{\"bash_command\": \"cat\", \"full_command\": \"cat secret.txt\"}"
+         }
+        }
+       ]
+      },
+      {
+       "body": {
+        "stringValue": "claude_code.tool_decision"
+       },
+       "attributes": [
+        {
+         "key": "devlake_team",
+         "value": {
+          "stringValue": "platform"
+         }
+        },
+        {
+         "key": "event.name",
+         "value": {
+          "stringValue": "tool_decision"
+         }
+        },
+        {
+         "key": "event.timestamp",
+         "value": {
+          "stringValue": "2026-10-14T10:02:07.000Z"
+         }
+        },
+        {
+         "key": "event.sequence",
+         "value": {
+          "intValue": "9"
+         }
+        },
+        {
+         "key": "session.id",
+         "value": {
+          "stringValue": "sess-1"
+         }
+        },
+        {
+         "key": "organization.id",
+         "value": {
+          "stringValue": "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e"
+         }
+        },
+        {
+         "key": "user.account_uuid",
+         "value": {
+          "stringValue": "aaaa1111-1111-4111-8111-111111111111"
+         }
+        },
+        {
+         "key": "user.email",
+         "value": {
+          "stringValue": "developer@example.com"
+         }
+        },
+        {
+         "key": "user.id",
+         "value": {
+          "stringValue": "install-1"
+         }
+        },
+        {
+         "key": "terminal.type",
+         "value": {
+          "stringValue": "iTerm.app"
+         }
+        },
+        {
+         "key": "prompt.id",
+         "value": {
+          "stringValue": "p2"
+         }
+        },
+        {
+         "key": "tool_name",
+         "value": {
+          "stringValue": "Edit"
+         }
+        },
+        {
+         "key": "tool_use_id",
+         "value": {
+          "stringValue": "tu-3"
+         }
+        },
+        {
+         "key": "decision",
+         "value": {
+          "stringValue": "reject"
+         }
+        },
+        {
+         "key": "source",
+         "value": {
+          "stringValue": "user_reject"
+         }
+        }
+       ]
+      },
+      {
+       "body": {
+        "stringValue": "claude_code.api_error"
+       },
+       "attributes": [
+        {
+         "key": "devlake_team",
+         "value": {
+          "stringValue": "platform"
+         }
+        },
+        {
+         "key": "event.name",
+         "value": {
+          "stringValue": "api_error"
+         }
+        },
+        {
+         "key": "event.timestamp",
+         "value": {
+          "stringValue": "2026-10-14T10:02:08.000Z"
+         }
+        },
+        {
+         "key": "event.sequence",
+         "value": {
+          "intValue": "10"
+         }
+        },
+        {
+         "key": "session.id",
+         "value": {
+          "stringValue": "sess-1"
+         }
+        },
+        {
+         "key": "organization.id",
+         "value": {
+          "stringValue": "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e"
+         }
+        },
+        {
+         "key": "user.account_uuid",
+         "value": {
+          "stringValue": "aaaa1111-1111-4111-8111-111111111111"
+         }
+        },
+        {
+         "key": "user.email",
+         "value": {
+          "stringValue": "developer@example.com"
+         }
+        },
+        {
+         "key": "user.id",
+         "value": {
+          "stringValue": "install-1"
+         }
+        },
+        {
+         "key": "terminal.type",
+         "value": {
+          "stringValue": "iTerm.app"
+         }
+        },
+        {
+         "key": "prompt.id",
+         "value": {
+          "stringValue": "p2"
+         }
+        },
+        {
+         "key": "model",
+         "value": {
+          "stringValue": "claude-opus-5-5"
+         }
+        },
+        {
+         "key": "error",
+         "value": {
+          "stringValue": "overloaded"
+         }
+        },
+        {
+         "key": "status_code",
+         "value": {
+          "intValue": "529"
+         }
+        },
+        {
+         "key": "attempt",
+         "value": {
+          "intValue": "1"
+         }
+        }
+       ]
+      },
+      {
+       "body": {
+        "stringValue": "claude_code.permission_mode_changed"
+       },
+       "attributes": [
+        {
+         "key": "devlake_team",
+         "value": {
+          "stringValue": "platform"
+         }
+        },
+        {
+         "key": "event.name",
+         "value": {
+          "stringValue": "permission_mode_changed"
+         }
+        },
+        {
+         "key": "event.timestamp",
+         "value": {
+          "stringValue": "2026-10-14T10:03:00.000Z"
+         }
+        },
+        {
+         "key": "event.sequence",
+         "value": {
+          "intValue": "11"
+         }
+        },
+        {
+         "key": "session.id",
+         "value": {
+          "stringValue": "sess-1"
+         }
+        },
+        {
+         "key": "organization.id",
+         "value": {
+          "stringValue": "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e"
+         }
+        },
+        {
+         "key": "user.account_uuid",
+         "value": {
+          "stringValue": "aaaa1111-1111-4111-8111-111111111111"
+         }
+        },
+        {
+         "key": "user.email",
+         "value": {
+          "stringValue": "developer@example.com"
+         }
+        },
+        {
+         "key": "user.id",
+         "value": {
+          "stringValue": "install-1"
+         }
+        },
+        {
+         "key": "terminal.type",
+         "value": {
+          "stringValue": "iTerm.app"
+         }
+        },
+        {
+         "key": "from_mode",
+         "value": {
+          "stringValue": "plan"
+         }
+        },
+        {
+         "key": "to_mode",
+         "value": {
+          "stringValue": "default"
+         }
+        },
+        {
+         "key": "trigger",
+         "value": {
+          "stringValue": "exit_plan_mode"
+         }
+        }
+       ]
+      },
+      {
+       "body": {
+        "stringValue": "claude_code.user_prompt"
+       },
+       "attributes": [
+        {
+         "key": "devlake_team",
+         "value": {
+          "stringValue": "platform"
+         }
+        },
+        {
+         "key": "event.name",
+         "value": {
+          "stringValue": "user_prompt"
+         }
+        },
+        {
+         "key": "event.timestamp",
+         "value": {
+          "stringValue": "2026-10-14T10:04:00.000Z"
+         }
+        },
+        {
+         "key": "event.sequence",
+         "value": {
+          "intValue": "12"
+         }
+        },
+        {
+         "key": "session.id",
+         "value": {
+          "stringValue": "sess-1"
+         }
+        },
+        {
+         "key": "organization.id",
+         "value": {
+          "stringValue": "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e"
+         }
+        },
+        {
+         "key": "user.account_uuid",
+         "value": {
+          "stringValue": "aaaa1111-1111-4111-8111-111111111111"
+         }
+        },
+        {
+         "key": "user.email",
+         "value": {
+          "stringValue": "developer@example.com"
+         }
+        },
+        {
+         "key": "user.id",
+         "value": {
+          "stringValue": "install-1"
+         }
+        },
+        {
+         "key": "terminal.type",
+         "value": {
+          "stringValue": "iTerm.app"
+         }
+        },
+        {
+         "key": "prompt.id",
+         "value": {
+          "stringValue": "p3"
+         }
+        },
+        {
+         "key": "prompt_length",
+         "value": {
+          "intValue": "8"
+         }
+        },
+        {
+         "key": "command_name",
+         "value": {
+          "stringValue": "review"
+         }
+        },
+        {
+         "key": "command_source",
+         "value": {
+          "stringValue": "builtin"
+         }
+        },
+        {
+         "key": "prompt",
+         "value": {
+          "stringValue": "<REDACTED>"
+         }
+        },
+        {
+         "key": "prompt_text",
+         "value": {
+          "stringValue": "<REDACTED>"
+         }
+        }
+       ]
+      },
+      {
+       "body": {
+        "stringValue": "claude_code.assistant_response"
+       },
+       "attributes": [
+        {
+         "key": "devlake_team",
+         "value": {
+          "stringValue": "platform"
+         }
+        },
+        {
+         "key": "event.name",
+         "value": {
+          "stringValue": "assistant_response"
+         }
+        },
+        {
+         "key": "event.timestamp",
+         "value": {
+          "stringValue": "2026-10-14T10:04:09.000Z"
+         }
+        },
+        {
+         "key": "event.sequence",
+         "value": {
+          "intValue": "13"
+         }
+        },
+        {
+         "key": "session.id",
+         "value": {
+          "stringValue": "sess-1"
+         }
+        },
+        {
+         "key": "organization.id",
+         "value": {
+          "stringValue": "0d0e7a3b-52f1-4c7e-9a51-3f6f2f7c1b9e"
+         }
+        },
+        {
+         "key": "user.account_uuid",
+         "value": {
+          "stringValue": "aaaa1111-1111-4111-8111-111111111111"
+         }
+        },
+        {
+         "key": "user.email",
+         "value": {
+          "stringValue": "developer@example.com"
+         }
+        },
+        {
+         "key": "user.id",
+         "value": {
+          "stringValue": "install-1"
+         }
+        },
+        {
+         "key": "terminal.type",
+         "value": {
+          "stringValue": "iTerm.app"
+         }
+        },
+        {
+         "key": "prompt.id",
+         "value": {
+          "stringValue": "p3"
+         }
+        },
+        {
+         "key": "response_length",
+         "value": {
+          "intValue": "900"
+         }
+        },
+        {
+         "key": "response",
+         "value": {
+          "stringValue": "<REDACTED>"
+         }
+        },
+        {
+         "key": "model",
+         "value": {
+          "stringValue": "claude-opus-5-5"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

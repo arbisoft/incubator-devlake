@@ -89,11 +89,8 @@ func (c *rawMetricConverter) prepareUpdates(request *collectormetrics.ExportMetr
 			}
 			continue
 		}
-		var conversionErr *conversionError
-		if !stderrors.As(err, &conversionErr) {
-			return nil, err
-		}
-		if _, attribution := attributionErrorCodes[conversionErr.code]; !attribution {
+		conversionErr, attribution := attributionError(err)
+		if !attribution {
 			return nil, err
 		}
 		preparer.recordSkip(conversionErr)
@@ -102,6 +99,17 @@ func (c *rawMetricConverter) prepareUpdates(request *collectormetrics.ExportMetr
 		return lessSeriesSample(preparer.result.updates[i], preparer.result.updates[j])
 	})
 	return &preparer.result, nil
+}
+
+// attributionError reports whether err is one resource group's attribution failure, which
+// skips that group instead of failing the batch.
+func attributionError(err error) (*conversionError, bool) {
+	var conversionErr *conversionError
+	if !stderrors.As(err, &conversionErr) {
+		return nil, false
+	}
+	_, attribution := attributionErrorCodes[conversionErr.code]
+	return conversionErr, attribution
 }
 
 func (p *batchPreparer) recordSkip(err *conversionError) {

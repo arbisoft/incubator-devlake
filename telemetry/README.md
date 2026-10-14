@@ -79,16 +79,27 @@ Create a Claude Code OTel connection through the DevLake Config UI. The one-time
   "env": {
     "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
     "OTEL_METRICS_EXPORTER": "otlp",
-    "OTEL_LOGS_EXPORTER": "none",
+    "OTEL_LOGS_EXPORTER": "otlp",
     "OTEL_EXPORTER_OTLP_PROTOCOL": "grpc",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "https://otel.customer.example.com:4317",
     "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Basic <base64(username:password)>",
     "OTEL_METRIC_EXPORT_INTERVAL": "60000",
-    "OTEL_METRICS_INCLUDE_SESSION_ID": "false",
-    "OTEL_METRICS_INCLUDE_ACCOUNT_UUID": "true"
+    "OTEL_METRICS_INCLUDE_SESSION_ID": "true",
+    "OTEL_METRICS_INCLUDE_ACCOUNT_UUID": "true",
+    "OTEL_LOG_TOOL_DETAILS": "1",
+    "OTEL_LOG_USER_PROMPTS": "1",
+    "OTEL_LOG_ASSISTANT_RESPONSES": "0",
+    "OTEL_LOG_TOOL_CONTENT": "0",
+    "OTEL_LOG_RAW_API_BODIES": "0"
   }
 }
 ```
+
+Claude Code sends metrics and log events. Events (prompts, API requests, tool results, skill activations, permission mode changes and others) are stored per event in `_tool_claude_code_otel_events` and rolled up into `ai_prompts`, `ai_prompt_skills` and `ai_permission_mode_changes`. `OTEL_LOG_TOOL_DETAILS=1` makes Claude Code send skill, MCP, plugin and command names and tool parameters.
+
+Prompt text is stored only in the raw log batches and in `_tool_claude_code_otel_events.prompt_text`, and is cleared from events after 90 days, when the raw batches are deleted. It is never written to `ai_*` tables. Responses, tool input and raw API bodies are never stored: managed settings keep those gates off, the Collector deletes the attributes, and DevLake deletes them again at ingest. Session ids are stored on events but removed from Prometheus labels.
+
+Claude Code reports only permission mode changes, not the mode a session starts in. A prompt before a session's first change takes that change's `from_mode`. Prompts in a session with no change are recorded as `default` with `permission_mode_inferred` set.
 
 The generated endpoint must be HTTPS in a real deployment. Basic Auth only encodes credentials; TLS provides transport confidentiality. Do not send customer credentials to an `http://` endpoint.
 
