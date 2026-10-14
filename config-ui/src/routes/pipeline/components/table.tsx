@@ -24,7 +24,7 @@ import { DataTable, EMPTY_STATE_SIZE } from '@/ui';
 import { getPipelineColumns } from '../columns';
 import { COPY, PIPELINE_ROW_ACTION } from '../constants';
 import type { PipelineSortKey } from '../types';
-import { downloadPipelineLogs } from '../use-pipeline-actions';
+import { useLogDownload } from '../use-log-download';
 import { pickConfig } from '../utils';
 
 import { PipelineConfigDrawer } from './config-drawer';
@@ -46,6 +46,7 @@ export const PipelineTable = ({
   const [detailId, setDetailId] = useState<ID>();
   const [detailOpen, setDetailOpen] = useState(false);
   const [opener, setOpener] = useState<HTMLElement | null>(null);
+  const { download, isDownloading } = useLogDownload();
 
   useEffect(() => {
     if (!configOpen && !detailOpen) opener?.focus();
@@ -60,17 +61,17 @@ export const PipelineTable = ({
       } else if (action === PIPELINE_ROW_ACTION.DETAIL) {
         setDetailId(pipeline.id);
         setDetailOpen(true);
-      } else {
-        await downloadPipelineLogs(pipeline.id);
+      } else if (action === PIPELINE_ROW_ACTION.DOWNLOAD_LOGS) {
+        await download(pipeline.id);
       }
     },
-    [],
+    [download],
   );
 
   const sortable = list !== undefined;
   const columns = useMemo(
-    () => getPipelineColumns({ sortable, onRowAction: handleRowAction }),
-    [sortable, handleRowAction],
+    () => getPipelineColumns({ sortable, onRowAction: handleRowAction, isDownloading }),
+    [sortable, handleRowAction, isDownloading],
   );
 
   return (

@@ -24,15 +24,14 @@ import { formatTime } from '@/utils';
 import { PipelineDuration } from './components/duration';
 import { PipelineRowActions } from './components/row-actions';
 import { PipelineStatusCell } from './components/status-cell';
-import type { PipelineRowAction } from './components/types';
 import { COPY, PIPELINE_COLUMN } from './constants';
+import type { PipelineColumnOptions } from './types';
 
-type ColumnOptions = {
-  sortable: boolean;
-  onRowAction: (action: PipelineRowAction, pipeline: IPipeline, trigger: HTMLElement | null) => void;
-};
-
-export const getPipelineColumns = ({ sortable, onRowAction }: ColumnOptions): TableColumnsType<IPipeline> => [
+export const getPipelineColumns = ({
+  sortable,
+  onRowAction,
+  isDownloading = () => false,
+}: PipelineColumnOptions): TableColumnsType<IPipeline> => [
   { key: PIPELINE_COLUMN.ID, title: COPY.columns.id, dataIndex: 'id' },
   { key: PIPELINE_COLUMN.BLUEPRINT, title: COPY.columns.blueprint, dataIndex: 'name' },
   {
@@ -68,7 +67,11 @@ export const getPipelineColumns = ({ sortable, onRowAction }: ColumnOptions): Ta
     title: COPY.columns.action,
     align: 'center',
     render: (_, pipeline) => (
-      <PipelineRowActions id={pipeline.id} onSelect={(action, trigger) => onRowAction(action, pipeline, trigger)} />
+      <PipelineRowActions
+        id={pipeline.id}
+        downloading={isDownloading(pipeline.id)}
+        onSelect={(action, trigger) => onRowAction(action, pipeline, trigger)}
+      />
     ),
   },
 ];

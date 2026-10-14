@@ -28,6 +28,7 @@ export type PipelineStatusCellProps = { status: IPipelineStatus; finished: numbe
 
 export type PipelineRowActionsProps = {
   id: ID;
+  downloading?: boolean;
   onSelect: (action: PipelineRowAction, trigger: HTMLElement | null) => void;
 };
 

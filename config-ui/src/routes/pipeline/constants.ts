@@ -45,6 +45,7 @@ export const BLUEPRINT_OPTIONS_LIMIT = 100;
 export const BLUEPRINT_SEARCH_DEBOUNCE_MS = 300;
 export const BLUEPRINT_TYPE_ALL = 'ALL';
 export const LOGS_FILE_NAME = 'logging.tar.gz';
+const HTTP_NOT_FOUND = '404' as const;
 export const PICKED_CONFIG_FIELDS = ['id', 'name', 'plan', 'skipOnFail'] as const;
 
 export const COPY = {
@@ -125,17 +126,21 @@ export const COPY = {
     cancelFailed: 'The pipeline could not be cancelled. Try again in a moment.',
     rerunStarted: 'Rerun started.',
     rerunFailed: 'The rerun could not be started. Try again in a moment.',
+    downloadFailed: 'Pipeline logs could not be downloaded. Try again.',
+    logsNotFound: 'No log archive is available for this pipeline.',
     rerunBusy: 'This pipeline has nothing to rerun right now. Wait for running tasks to finish and try again.',
     taskRerunStarted: 'Task rerun started.',
     taskRerunFailed: 'The task could not be rerun. Try again in a moment.',
   },
 };
 
-const HTTP_BAD_REQUEST = '400';
+const HTTP_BAD_REQUEST = '400' as const;
 
 export const LOAD_RETRY = { delay: 1000, limit: 3 } as const;
 
 export const RERUN_ERROR_MAP: Record<string, string> = { [HTTP_BAD_REQUEST]: COPY.actions.rerunBusy };
+
+export const LOG_DOWNLOAD_ERROR_MAP: Record<string, string> = { [HTTP_NOT_FOUND]: COPY.actions.logsNotFound };
 
 export const TASK_CELL = {
   PENDING: 'pending',
