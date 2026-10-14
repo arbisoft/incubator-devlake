@@ -35,6 +35,7 @@ import (
 	compliancescorecard "github.com/apache/incubator-devlake/server/api/compliance_scorecard"
 	"github.com/apache/incubator-devlake/server/api/domainlayer"
 	"github.com/apache/incubator-devlake/server/api/grafanarole"
+	"github.com/apache/incubator-devlake/server/api/grafanausers"
 	"github.com/apache/incubator-devlake/server/api/pipelines"
 	"github.com/apache/incubator-devlake/server/api/plugininfo"
 	"github.com/apache/incubator-devlake/server/api/project"
@@ -99,6 +100,7 @@ func RegisterRouter(r *gin.Engine, basicRes context.BasicRes) {
 
 	// fork-owned native OIDC access directory
 	access.RegisterRoutes(r)
+	grafanausers.RegisterRoutes(r)
 
 	// user project mapping api
 	//

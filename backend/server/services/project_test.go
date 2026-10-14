@@ -18,6 +18,7 @@ limitations under the License.
 package services
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/apache/incubator-devlake/core/dal"
@@ -97,6 +98,59 @@ func TestDeleteProjectRemovesOnlyItsUserProjectMappings(t *testing.T) {
 	}
 	if where.Expr != "project_name = ?" || len(where.Params) != 1 || where.Params[0] != "project-to-delete" {
 		t.Fatalf("mapping delete filter = (%q, %#v), want project_name = ? with project-to-delete", where.Expr, where.Params)
+	}
+}
+
+func TestPatchProjectRenameMovesOnlyItsUserProjectMappings(t *testing.T) {
+	dataDal := dalmocks.NewDal(t)
+	projectTx := dalmocks.NewTransaction(t)
+
+	previousDAL, previousBlueprintManager := db, bpManager
+	db = dataDal
+	bpManager = services.NewBlueprintManager(dataDal)
+	t.Cleanup(func() {
+		db = previousDAL
+		bpManager = previousBlueprintManager
+	})
+
+	dataDal.On("Begin").Return(projectTx).Once()
+	dataDal.On("All", mock.Anything, mock.Anything).Return(nil)
+	dataDal.On("First", mock.Anything, mock.Anything).Return(errors.NotFound.New("no blueprint"))
+	dataDal.On("IsErrorNotFound", mock.Anything).Return(true)
+
+	projectTx.On("First", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		args.Get(0).(*models.Project).Name = "old-name"
+	}).Return(nil).Once()
+
+	type update struct {
+		column  string
+		value   interface{}
+		clauses []dal.Clause
+	}
+	updates := map[string]update{}
+	projectTx.On("UpdateColumn", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		updates[fmt.Sprintf("%T", args.Get(0))] = update{column: args.String(1), value: args.Get(2), clauses: args.Get(3).([]dal.Clause)}
+	}).Return(nil)
+	projectTx.On("Update", mock.Anything).Return(nil)
+	projectTx.On("Commit").Return(nil).Once()
+
+	if _, err := PatchProject("old-name", map[string]interface{}{"name": "new-name"}); err != nil {
+		t.Fatalf("PatchProject() error = %v", err)
+	}
+
+	got, ok := updates[fmt.Sprintf("%T", &models.UserProjectMapping{})]
+	if !ok {
+		t.Fatalf("no user_project_mapping update issued; updates = %v", updates)
+	}
+	if got.column != "project_name" || got.value != "new-name" {
+		t.Fatalf("mapping update = (%q, %v), want project_name = new-name", got.column, got.value)
+	}
+	if len(got.clauses) != 1 || got.clauses[0].Type != dal.WhereClause {
+		t.Fatalf("mapping update clauses = %#v, want one WHERE clause", got.clauses)
+	}
+	where, ok := got.clauses[0].Data.(dal.DalClause)
+	if !ok || where.Expr != "project_name = ?" || len(where.Params) != 1 || where.Params[0] != "old-name" {
+		t.Fatalf("mapping update filter = %#v, want project_name = ? with old-name", got.clauses[0].Data)
 	}
 }
 
