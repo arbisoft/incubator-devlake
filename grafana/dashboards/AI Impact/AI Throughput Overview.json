@@ -40,7 +40,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "**How to read this dashboard**\n\n- **Escaped Defect Rate** counts issues whose normalized `type` is `BUG`/`INCIDENT`, or whose `original_type` contains `bug`, `defect`, or `incident`. The SQL does not inspect issue labels, so labels alone do not qualify; projects without matching type data can show zero even when defects exist. Check the \"Defect-Rate Coverage by Project\" table below before interpreting the rate.\n- **Contributors** is deduplicated by `accounts.full_name` (falling back to the PR author name when no account matches), because one engineer can accumulate several `accounts` rows as their git client runs from different machines and IPs. This narrows the overcount but doesn't fully collapse it — see the \"Distinct-Account Sanity Check\" table below for the residual gap.\n- **AI Spend and the AI side of Cost per Merged PR are Claude Code OTel-only** (`ai_model_usages`) and use both the Project and Claude Code OTel Teams filters. The PR denominator uses the Project filter only; the team filter does not narrow PRs.",
+        "content": "**How to read this dashboard**\n\n- **Escaped Defect Rate** counts issues whose normalized `type` is `BUG`/`INCIDENT`, or whose `original_type` contains `bug`, `defect`, or `incident`. The SQL does not inspect issue labels, so labels alone do not qualify; projects without matching type data can show zero even when defects exist. Check the \"Defect-Rate Coverage by Project\" table below before interpreting the rate.\n- **Contributors** is deduplicated by `accounts.full_name` (falling back to the PR author name when no account matches), because one engineer can accumulate several `accounts` rows as their git client runs from different machines and IPs. This narrows the overcount but doesn't fully collapse it — see the \"Distinct-Account Sanity Check\" table below for the residual gap.\n- **AI Spend and the AI side of Cost per Merged PR are Claude Code OTel-only** (`ai_model_usages`) and use both the Project and Claude Code OTel Teams filters. The PR denominator uses the Project filter only; the team filter does not narrow PRs.\n- **Developer filter:** AI Spend matches the developer's OTel email; PR and contributor figures match the PR author's GitHub account, using the account GitHub links to that email through the developer's commits. Developers marked *no GitHub link* have no PR figures. Tasks Done, Tasks per Contributor, Escaped Defect Rate, Defect-Rate Coverage and the weekly Tasks Done and Escaped Defects columns are project-wide and ignore the Developer filter.",
         "mode": "markdown"
       },
       "pluginVersion": "11.0.0",
@@ -157,7 +157,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Counts resolved domain issues linked to boards in the selected project(s), where `type` is not BUG/INCIDENT/EPIC and `original_type` does not contain bug/defect/incident/epic. This query does not inspect labels, and SQL's `type NOT IN` also excludes rows with a NULL type. It uses `resolution_date` as the completion signal rather than tracker-specific status strings; the result therefore includes any remaining issue types, not only Jira Tasks/Sub-tasks.",
+      "description": "Counts resolved domain issues linked to boards in the selected project(s), where `type` is not BUG/INCIDENT/EPIC and `original_type` does not contain bug/defect/incident/epic. This query does not inspect labels, and SQL's `type NOT IN` also excludes rows with a NULL type. It uses `resolution_date` as the completion signal rather than tracker-specific status strings; the result therefore includes any remaining issue types, not only Jira Tasks/Sub-tasks. Ignores the Developer filter: most tasks come from Jira, whose assignees rarely expose an email that can be matched to a developer.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -205,7 +205,7 @@
           "refId": "A"
         }
       ],
-      "title": "Tasks Done",
+      "title": "Tasks Done (project-wide)",
       "type": "stat"
     },
     {
@@ -318,7 +318,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Resolved non-defect, non-epic issues per distinct PR author: the numerator uses the selected project(s)' board-linked issues and `resolution_date`, while the denominator uses merged-PR contributors. Issues are excluded by normalized `type` and `original_type` text (not labels); NULL `type` rows are excluded by SQL. Since these are different populations, treat the ratio as directional.",
+      "description": "Resolved non-defect, non-epic issues per distinct PR author: the numerator uses the selected project(s)' board-linked issues and `resolution_date`, while the denominator uses merged-PR contributors. Issues are excluded by normalized `type` and `original_type` text (not labels); NULL `type` rows are excluded by SQL. Since these are different populations, treat the ratio as directional. Ignores the Developer filter on both sides, because tasks cannot be attributed to a developer.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -366,12 +366,12 @@
           "refId": "A"
         }
       ],
-      "title": "Tasks per Contributor",
+      "title": "Tasks per Contributor (project-wide)",
       "type": "stat"
     },
     {
       "datasource": "mysql",
-      "description": "Counts distinct board-linked issues whose normalized `type` is BUG/INCIDENT or whose `original_type` contains bug/defect/incident, created within 14 days after a successful deployment whose environment contains `prod` for the same project. The count is divided by all PRs merged in the selected time range for the selected project(s), then multiplied by 100; the denominator is not limited to PRs merged during each deployment's 14-day window. Labels are not queried, so label-only defects are not counted.",
+      "description": "Counts distinct board-linked issues whose normalized `type` is BUG/INCIDENT or whose `original_type` contains bug/defect/incident, created within 14 days after a successful deployment whose environment contains `prod` for the same project. The count is divided by all PRs merged in the selected time range for the selected project(s), then multiplied by 100; the denominator is not limited to PRs merged during each deployment's 14-day window. Labels are not queried, so label-only defects are not counted. Ignores the Developer filter on both sides, because escaped defects cannot be attributed to a single developer.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -419,7 +419,7 @@
           "refId": "A"
         }
       ],
-      "title": "Escaped Defect Rate",
+      "title": "Escaped Defect Rate (project-wide)",
       "type": "stat"
     },
     {
@@ -491,7 +491,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Weekly totals for Claude Code OTel estimated cost, merged PRs, resolved non-defect/non-epic issues, distinct name-deduplicated PR authors, and classified issues opened within 14 days after successful production deployments. Cost uses the selected Project and OTel Teams; delivery metrics use Project only. Issue classification is based on `type`/`original_type`, not labels. Each cell shows the raw weekly value plus its change from the previous available week; an upward change in escaped defects is adverse, while the arrows are not metric-aware. Weeks begin Monday.",
+      "description": "Weekly totals for Claude Code OTel estimated cost, merged PRs, resolved non-defect/non-epic issues, distinct name-deduplicated PR authors, and classified issues opened within 14 days after successful production deployments. Cost uses the selected Project and OTel Teams; delivery metrics use Project only. Issue classification is based on `type`/`original_type`, not labels. Each cell shows the raw weekly value plus its change from the previous available week; an upward change in escaped defects is adverse, while the arrows are not metric-aware. Weeks begin Monday. The Developer filter applies to the AI Cost, PRs Merged and Contributors columns; Tasks Done and Escaped Defects stay project-wide.",
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -878,7 +878,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Count of board-linked issues per selected project created within the selected time range, and how many of them have a normalized `type` of BUG/INCIDENT or an `original_type` containing bug/defect/incident. It reports whether those fields provide any defect classification; it does not inspect labels. `Not classified` means no matching issue was created in the selected range, not that the project has no defects; on short ranges this can happen even for projects that do classify defects.",
+      "description": "Count of board-linked issues per selected project created within the selected time range, and how many of them have a normalized `type` of BUG/INCIDENT or an `original_type` containing bug/defect/incident. It reports whether those fields provide any defect classification; it does not inspect labels. `Not classified` means no matching issue was created in the selected range, not that the project has no defects; on short ranges this can happen even for projects that do classify defects. Ignores the Developer filter.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -923,7 +923,7 @@
           "refId": "A"
         }
       ],
-      "title": "Defect-Rate Coverage by Project",
+      "title": "Defect-Rate Coverage by Project (project-wide)",
       "type": "table"
     }
   ],
