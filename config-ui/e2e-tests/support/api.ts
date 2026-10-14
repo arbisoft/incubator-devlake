@@ -246,6 +246,54 @@ export async function deleteProject(api: APIRequestContext, name: string): Promi
   expect(res.ok(), `delete project ${name} failed with ${res.status()}`).toBe(true);
 }
 
+export async function createBlueprint(
+  api: APIRequestContext,
+  name: string,
+  options: { enable?: boolean } = {},
+): Promise<ApiBlueprint> {
+  return json(
+    await api.post('/blueprints', {
+      data: {
+        name,
+        mode: 'NORMAL',
+        enable: options.enable ?? true,
+        cronConfig: '0 0 * * *',
+        isManual: false,
+        skipOnFail: true,
+        connections: [],
+      },
+    }),
+    `create blueprint ${name}`,
+  );
+}
+
+// A blueprint with no connections answers 400 yet still records a pipeline that completes at once.
+export async function triggerBlueprint(api: APIRequestContext, blueprintId: number): Promise<void> {
+  await api.post(`/blueprints/${blueprintId}/trigger`, { data: { skipCollectors: false, fullSync: false } });
+  await expect.poll(async () => (await listBlueprintPipelines(api, blueprintId)).length).toBeGreaterThan(0);
+}
+
+async function deleteBlueprint(api: APIRequestContext, blueprintId: number): Promise<void> {
+  await cancelPipelinesOfBlueprint(api, blueprintId);
+  await api.delete(`/blueprints/${blueprintId}`);
+}
+
+export async function listBlueprintsByKeyword(api: APIRequestContext, keyword: string): Promise<ApiBlueprint[]> {
+  const res = await json<{ blueprints: ApiBlueprint[] }>(
+    await api.get('/blueprints', { params: { type: 'ALL', keyword, pageSize: 100 } }),
+    'list blueprints',
+  );
+  return res.blueprints ?? [];
+}
+
+export async function deleteBlueprintsByPrefix(api: APIRequestContext, prefix: string): Promise<void> {
+  for (const blueprint of await listBlueprintsByKeyword(api, prefix)) {
+    if (blueprint.name.startsWith(prefix)) {
+      await deleteBlueprint(api, blueprint.id);
+    }
+  }
+}
+
 export interface ApiPipeline {
   id: number;
   name: string;
@@ -310,6 +358,13 @@ export async function listApiKeys(api: APIRequestContext): Promise<ApiKey[]> {
   return res.apikeys ?? [];
 }
 
+export async function createApiKey(api: APIRequestContext, name: string, expiredAt?: string): Promise<ApiKey> {
+  return json(
+    await api.post('/api-keys', { data: { name, expiredAt, allowedPath: '.*', type: 'devlake' } }),
+    `create api key ${name}`,
+  );
+}
+
 export async function deleteApiKeysByPrefix(api: APIRequestContext): Promise<void> {
   for (const key of await listApiKeys(api)) {
     if (key.name.startsWith(E2E_PREFIX)) {
@@ -343,11 +398,32 @@ export async function listAccessUsers(api: APIRequestContext): Promise<ApiAccess
   }
 }
 
+// Creates an email (SSO) user that signs in later; it works with or without local auth.
+export async function createEmailUser(api: APIRequestContext, email: string): Promise<ApiAccessUser> {
+  return json<ApiAccessUser>(await api.post('/access/users', { data: { email, role: 'member' } }), 'create email user');
+}
+
 export async function findAccessUserByLogin(
   api: APIRequestContext,
   loginName: string,
 ): Promise<ApiAccessUser | undefined> {
   return (await listAccessUsers(api)).find((u) => u.localLoginName === loginName);
+}
+
+export interface ApiAuditEvent {
+  id: number;
+  action: string;
+  actorEmail: string;
+  targetEmail: string;
+  detail: string;
+}
+
+export async function findAuditEventByTarget(
+  api: APIRequestContext,
+  targetEmail: string,
+): Promise<ApiAuditEvent | undefined> {
+  const events = await json<ApiAuditEvent[]>(await api.get('/access/audit-events'), 'list audit events');
+  return events.find((event) => event.targetEmail === targetEmail);
 }
 
 export interface ApiOidcProvider {

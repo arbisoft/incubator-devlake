@@ -17,7 +17,6 @@
  */
 
 export const COPY = {
-  title: 'Blueprints',
   detailTitle: (id: string) => `Blueprints:${id}`,
   connectionDetailTitle: (parent: string, connection: string) => `${parent} - ${connection}`,
 };

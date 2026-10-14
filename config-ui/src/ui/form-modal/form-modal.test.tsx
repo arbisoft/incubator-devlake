@@ -82,6 +82,12 @@ describe('FormModal', () => {
     expect(modal?.style.width).toBe(`${getTheme('light').layout.modalWidth.lg}px`);
   });
 
+  it('defaults to the medium width', () => {
+    setup({ width: undefined });
+    const modal = screen.getByRole('dialog', { name: TITLE }).closest<HTMLElement>('.ant-modal');
+    expect(modal?.style.width).toBe(`${getTheme('light').layout.modalWidth.md}px`);
+  });
+
   it('shows the busy state on submit', () => {
     setup({ loading: true });
     expect(screen.getByRole('button', { name: new RegExp(SUBMIT) }).className).toContain('ant-btn-loading');

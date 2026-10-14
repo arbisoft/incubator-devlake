@@ -19,7 +19,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { ACCESS_ROLE } from '@/api/access';
-import { ROLE_OPTIONS } from '@/routes/access/constants';
+import { ROLE_OPTIONS } from '@/routes/settings/constants';
 
 import { COPY } from './constants';
 import type { LayoutUser } from './types';

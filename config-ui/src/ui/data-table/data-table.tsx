@@ -27,18 +27,31 @@ import { toSortState, withSortOrder } from './utils';
 
 const SIZE_OPTIONS = [...PAGE_SIZE_OPTIONS];
 
-export const DataTable = <T extends object>({
+export const DataTable = <T extends object, S extends string = string>({
   columns,
   dataSource,
   rowKey,
   loading,
   ariaLabel,
-  pagination,
-  sort,
+  pagination: paginationProp,
+  list,
+  total = 0,
+  sort: sortProp,
   empty,
   rowSelection,
   onRow,
-}: DataTableProps<T>) => {
+}: DataTableProps<T, S>) => {
+  const sort = sortProp ?? (list && { value: list.sort, onChange: list.setSort });
+  const pagination =
+    paginationProp ??
+    (list && {
+      page: list.page,
+      pageSize: list.pageSize,
+      total,
+      pageSizeOptions: list.pageSizeOptions,
+      onPageChange: list.setPage,
+      onPageSizeChange: list.setPageSize,
+    });
   const sortedColumns = useMemo(() => withSortOrder(columns, sort?.value), [columns, sort?.value]);
   const firstLoad = loading && dataSource.length === 0;
 
@@ -58,13 +71,13 @@ export const DataTable = <T extends object>({
           current: pagination.page,
           pageSize: pagination.pageSize,
           total: pagination.total,
-          pageSizeOptions: SIZE_OPTIONS,
+          pageSizeOptions: [...(pagination.pageSizeOptions ?? SIZE_OPTIONS)],
           placement: ['bottomCenter'],
           onChange: (page, pageSize) =>
             pageSize === pagination.pageSize ? pagination.onPageChange(page) : pagination.onPageSizeChange(pageSize),
         }
       }
-      onChange={(_, __, sorter, { action }) => action === 'sort' && sort?.onChange(toSortState(sorter))}
+      onChange={(_, __, sorter, { action }) => action === 'sort' && sort?.onChange(toSortState<T, S>(sorter))}
     />
   );
 };

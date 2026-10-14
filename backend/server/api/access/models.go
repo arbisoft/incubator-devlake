@@ -334,6 +334,18 @@ func (query PageQuery) Normalize() (PageQuery, bool) {
 
 func (query PageQuery) Offset() int { return (query.Page - 1) * query.PageSize }
 
+// UserListQuery is PageQuery plus an optional case-insensitive email or display name filter.
+type UserListQuery struct {
+	PageQuery
+	Keyword string `form:"keyword"`
+}
+
+func (query UserListQuery) Normalize() (UserListQuery, bool) {
+	page, valid := query.PageQuery.Normalize()
+	query.PageQuery = page
+	return query, valid
+}
+
 type PaginatedUsers struct {
 	Users    []AccessUser `json:"users"`
 	Count    int64        `json:"count"`

@@ -19,9 +19,16 @@
 import { Table as AntTable } from 'antd';
 import styled from 'styled-components';
 
+import { focusRingStyle } from '@/ui/style-helpers';
+
 export const Table = styled(AntTable)`
   .ant-table-container {
     border-radius: ${({ theme }) => theme.radius.lg}px;
+  }
+
+  .ant-table-column-has-sorters:focus-visible {
+    ${focusRingStyle}
+    outline-offset: -${({ theme }) => theme.layout.focusRingWidth}px;
   }
 
   .ant-table-tbody > tr.ant-table-placeholder:hover > td {

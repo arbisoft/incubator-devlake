@@ -29,7 +29,7 @@ const columnKey = <T extends object>(column: TableColumnsType<T>[number]): strin
   return 'dataIndex' in column && column.dataIndex !== undefined ? String(column.dataIndex) : undefined;
 };
 
-export const withSortOrder = <T extends object>(columns: TableColumnsType<T>, sort?: SortState) =>
+export const withSortOrder = <T extends object>(columns: TableColumnsType<T>, sort?: SortState<string>) =>
   columns.map((column) => {
     if (!('sorter' in column) || !column.sorter) return column;
     const active = sort !== undefined && columnKey(column) === sort.sortBy;
@@ -37,11 +37,13 @@ export const withSortOrder = <T extends object>(columns: TableColumnsType<T>, so
     return { ...column, sortOrder: active ? sortOrder : null };
   });
 
-export const toSortState = <T extends object>(sorter: SorterResult<T> | SorterResult<T>[]): SortState | undefined => {
+export const toSortState = <T extends object, S extends string = string>(
+  sorter: SorterResult<T> | SorterResult<T>[],
+): SortState<S> | undefined => {
   const [first] = Array.isArray(sorter) ? sorter : [sorter];
   if (!first?.order || first.columnKey === undefined) return undefined;
   return {
-    sortBy: String(first.columnKey),
+    sortBy: String(first.columnKey) as S,
     sortOrder: first.order === ANTD_SORT_ORDER.ASC ? SORT_ORDER.ASC : SORT_ORDER.DESC,
   };
 };

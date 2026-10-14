@@ -23,7 +23,9 @@ import {
   BuildOutlined,
   ExperimentOutlined,
   GithubOutlined,
+  HistoryOutlined,
   KeyOutlined,
+  LockOutlined,
   PartitionOutlined,
   ProjectOutlined,
   SettingOutlined,
@@ -33,14 +35,14 @@ import {
 import { createElement } from 'react';
 
 import { LINKS, PATHS } from '@/config';
-import { canManageAccess } from '@/routes/access/guard';
+import { canManageAccess } from '@/routes/settings/guard';
 import { NAV_ITEM_KIND, type NavItem } from '@/ui';
 
-import { COPY, COPYRIGHT_HIDDEN_NAV_KEYS, NAV_KEY } from './constants';
+import { ACCESS_NAV_KEYS, COPY, COPYRIGHT_HIDDEN_NAV_KEYS, NAV_KEY } from './constants';
 import type { NavVisibility } from './types';
 
 const isNavKeyVisible = (key: string, { access, copyrightHide }: NavVisibility) => {
-  if (key === NAV_KEY.SETTINGS || key === NAV_KEY.USERS) return canManageAccess(access);
+  if (ACCESS_NAV_KEYS.includes(key)) return canManageAccess(access);
   return !(copyrightHide && COPYRIGHT_HIDDEN_NAV_KEYS.includes(key));
 };
 
@@ -109,6 +111,22 @@ export const getNavItems = (visibility: NavVisibility): NavItem[] => {
           icon: createElement(TeamOutlined),
           path: PATHS.SETTINGS_USERS(),
           visible: visible(NAV_KEY.USERS),
+        },
+        {
+          kind: NAV_ITEM_KIND.ROUTE,
+          key: NAV_KEY.AUTHENTICATION,
+          label: COPY.nav.authentication,
+          icon: createElement(LockOutlined),
+          path: PATHS.SETTINGS_AUTHENTICATION(),
+          visible: visible(NAV_KEY.AUTHENTICATION),
+        },
+        {
+          kind: NAV_ITEM_KIND.ROUTE,
+          key: NAV_KEY.ACTIVITY,
+          label: COPY.nav.activity,
+          icon: createElement(HistoryOutlined),
+          path: PATHS.SETTINGS_ACTIVITY(),
+          visible: visible(NAV_KEY.ACTIVITY),
         },
       ],
     },

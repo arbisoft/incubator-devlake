@@ -25,6 +25,14 @@ export const Dialog = styled(Modal)`
   .ant-modal-title {
     ${textStyle('h3')}
   }
+
+  .ant-modal-header {
+    margin-bottom: ${({ theme }) => theme.space.lg}px;
+  }
+
+  .ant-modal-footer {
+    margin-top: ${({ theme }) => theme.space.lg}px;
+  }
 `;
 
 export const TitleRow = styled.span`

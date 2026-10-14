@@ -329,7 +329,9 @@ function main() {
   args.reports.forEach(printReport);
   if (args.json) fs.writeFileSync(args.json, `${JSON.stringify(snapshot, null, 2)}\n`);
   if (args.mode === 'write') {
-    fs.writeFileSync(args.baseline, `${JSON.stringify({ moves: {}, ...snapshot }, null, 2)}\n`);
+    // Keep the recorded spec moves; a rewrite only refreshes the counts.
+    const moves = fs.existsSync(args.baseline) ? (JSON.parse(fs.readFileSync(args.baseline, 'utf8')).moves ?? {}) : {};
+    fs.writeFileSync(args.baseline, `${JSON.stringify({ moves, ...snapshot }, null, 2)}\n`);
     out(`Wrote ${path.relative(CONFIG_UI_ROOT, args.baseline)}`);
     return;
   }

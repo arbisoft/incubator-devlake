@@ -21,7 +21,7 @@ import { matchRoutes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 
 import { PATHS, PROJECT_TAB } from '@/config';
-import { accessLoader, Access, ParamRedirect } from '@/routes';
+import { accessLoader, ParamRedirect, SettingsActivity, SettingsAuthentication, SettingsUsers } from '@/routes';
 
 import { routes } from './router';
 
@@ -68,9 +68,13 @@ describe('legacy redirects', () => {
     expect(pages.has(undefined)).toBe(false);
   });
 
-  it('guards the settings pages with the access loader and renders Access at users', () => {
-    const matches = matchRoutes(routes, PATHS.SETTINGS_USERS()) ?? [];
+  it.each([
+    [PATHS.SETTINGS_USERS(), SettingsUsers],
+    [PATHS.SETTINGS_AUTHENTICATION(), SettingsAuthentication],
+    [PATHS.SETTINGS_ACTIVITY(), SettingsActivity],
+  ])('guards %s with the access loader and renders its page', (path, page) => {
+    const matches = matchRoutes(routes, path) ?? [];
     expect(matches.some((match) => match.route.loader === accessLoader)).toBe(true);
-    expect(renderedBy(PATHS.SETTINGS_USERS())).toBe(Access);
+    expect(renderedBy(path)).toBe(page);
   });
 });

@@ -19,7 +19,7 @@
 import { Button, Tooltip } from 'antd';
 import { useTheme } from 'styled-components';
 
-import { COMMON_COPY } from '@/ui/constants';
+import { COMMON_COPY, MODAL_WIDTH } from '@/ui/constants';
 
 import { Dialog, Footer, SubmitButton, TitleRow } from './styled';
 import type { FormModalProps } from './types';
@@ -30,7 +30,7 @@ export const FormModal = ({
   icon,
   submitLabel,
   cancelLabel = COMMON_COPY.cancel,
-  width,
+  width = MODAL_WIDTH.MD,
   loading,
   submitDisabled,
   disabledReason,

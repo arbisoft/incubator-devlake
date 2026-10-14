@@ -18,11 +18,6 @@
 
 // Src files that fail the strict reskin rules today; remove a file from here when it is cleaned.
 export const RESKIN_LINT_PENDING = [
-  'src/routes/access/authentication-columns.tsx',
-  'src/routes/access/authentication-editor.tsx',
-  'src/routes/access/authentication.tsx',
-  'src/routes/access/modals.tsx',
-  'src/routes/api-keys/api-keys.tsx',
   'src/routes/blueprint/connection-detail/index.tsx',
   'src/routes/blueprint/detail/components/add-connection-dialog/index.tsx',
   'src/routes/blueprint/detail/components/sync-policy/index.tsx',
@@ -30,7 +25,6 @@ export const RESKIN_LINT_PENDING = [
   'src/routes/blueprint/detail/configuration-panel.tsx',
   'src/routes/blueprint/detail/status-panel.tsx',
   'src/routes/blueprint/detail/styled.ts',
-  'src/routes/blueprint/home/index.tsx',
   'src/routes/change-password.tsx',
   'src/routes/connection/connection.tsx',
   'src/routes/connection/connections.tsx',
@@ -53,10 +47,6 @@ export const RESKIN_LINT_PENDING = [
   'src/routes/otel/otel.tsx',
   'src/routes/otel/source-policy.tsx',
   'src/routes/otel/styled.ts',
-  'src/routes/pipeline/components/table.tsx',
-  'src/routes/pipeline/components/task.tsx',
-  'src/routes/pipeline/components/tasks.tsx',
   'src/routes/project/detail/settings-panel.tsx',
   'src/routes/project/detail/webhooks-panel.tsx',
-  'src/routes/project/home/index.tsx',
 ];

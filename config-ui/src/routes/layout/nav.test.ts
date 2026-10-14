@@ -32,6 +32,8 @@ import { getNavItems } from './nav';
 const ADMIN: AccessCurrent = { enabled: true, role: ACCESS_ROLE.CUSTOMER_ADMIN };
 const MEMBER: AccessCurrent = { enabled: true, role: ACCESS_ROLE.MEMBER };
 
+const SETTINGS_CHILD_KEYS: string[] = [NAV_KEY.USERS, NAV_KEY.AUTHENTICATION, NAV_KEY.ACTIVITY];
+
 const flatten = (items: NavItem[]): NavItem[] =>
   items.flatMap((item) =>
     item.kind === NAV_ITEM_KIND.ROUTE && item.children ? [item, ...flatten(item.children)] : [item],
@@ -76,6 +78,36 @@ describe('getNavItems', () => {
       expect(keys).not.toContain(NAV_KEY.USERS);
       expect(keys).toContain(NAV_KEY.PROJECTS);
     });
+  });
+
+  it('lists Users, Authentication and Recent Activities under Settings, in that order', () => {
+    const items = getNavItems({ access: ADMIN, copyrightHide: false });
+    const settings = items.find((item) => item.key === NAV_KEY.SETTINGS);
+    expect(settings?.kind === NAV_ITEM_KIND.ROUTE && settings.children?.map((child) => child.key)).toEqual([
+      NAV_KEY.USERS,
+      NAV_KEY.AUTHENTICATION,
+      NAV_KEY.ACTIVITY,
+    ]);
+    const children = flatten(items).filter((item) => SETTINGS_CHILD_KEYS.includes(item.key));
+    expect(children.map((item) => (item.kind === NAV_ITEM_KIND.ROUTE ? item.label : ''))).toEqual([
+      COPY.nav.users,
+      COPY.nav.authentication,
+      COPY.nav.activity,
+    ]);
+  });
+
+  it('shows Authentication and Recent Activities only to a customer administrator', () => {
+    expect(visibleKeys(ADMIN)).toEqual(expect.arrayContaining([NAV_KEY.AUTHENTICATION, NAV_KEY.ACTIVITY]));
+    [MEMBER, { enabled: false }, null].forEach((access) => {
+      const keys = visibleKeys(access);
+      expect(keys).not.toContain(NAV_KEY.AUTHENTICATION);
+      expect(keys).not.toContain(NAV_KEY.ACTIVITY);
+    });
+  });
+
+  it('opens the new Settings pages from their paths', () => {
+    expect(activeKey(PATHS.SETTINGS_AUTHENTICATION())).toBe(NAV_KEY.AUTHENTICATION);
+    expect(activeKey(PATHS.SETTINGS_ACTIVITY())).toBe(NAV_KEY.ACTIVITY);
   });
 
   it('hides Dashboards, GitHub and Slack, and the divider before them, when the copyright is hidden', () => {

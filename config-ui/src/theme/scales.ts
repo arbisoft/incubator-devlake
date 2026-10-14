@@ -57,6 +57,7 @@ export type LayoutTokens = {
   keyValueLabelWidth: number;
   emptyStateTextWidth: number;
   searchMaxWidth: number;
+  connectionNameWidth: number;
   sortSelectWidth: number;
   statusDotSize: number;
   sidebarHeaderHeight: number;
@@ -68,6 +69,8 @@ export type LayoutTokens = {
   markTileSize: number;
   wordmarkWidth: number;
   confirmModalWidth: number;
+  pipelineTaskHeight: number;
+  pipelineTaskDurationWidth: number;
   modalWidth: { sm: number; md: number; lg: number };
 };
 export type ZIndexTokens = { sidebar: number; flyout: number; drawer: number; modal: number };
@@ -109,6 +112,7 @@ export const LAYOUT: LayoutTokens = {
   keyValueLabelWidth: 112,
   emptyStateTextWidth: 452,
   searchMaxWidth: 400,
+  connectionNameWidth: 200,
   sortSelectWidth: 168,
   statusDotSize: 6,
   sidebarHeaderHeight: 70,
@@ -120,6 +124,8 @@ export const LAYOUT: LayoutTokens = {
   markTileSize: 32,
   wordmarkWidth: 120,
   confirmModalWidth: 416,
+  pipelineTaskHeight: 80,
+  pipelineTaskDurationWidth: 80,
   modalWidth: { sm: 520, md: 600, lg: 800 },
 };
 

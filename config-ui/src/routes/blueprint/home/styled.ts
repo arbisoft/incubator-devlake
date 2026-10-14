@@ -16,6 +16,9 @@
  *
  */
 
+import { Select } from 'antd';
 import styled from 'styled-components';
 
-export const DialogWrapper = styled.div``;
+export const TypeSelect = styled(Select)`
+  width: ${({ theme }) => theme.layout.sortSelectWidth}px;
+`;

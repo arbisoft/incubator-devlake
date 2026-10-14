@@ -27,6 +27,7 @@ type ListFilters = Record<string, string>;
 
 export type ListDefaults<S extends string, F extends ListFilters> = {
   pageSize?: number;
+  pageSizeOptions?: readonly number[];
   keyword?: string;
   sort?: ListSort<S>;
   filters: F;
@@ -38,6 +39,14 @@ type ListValues<S extends string, F extends ListFilters> = {
   keyword: string;
   sort?: ListSort<S>;
   filters: F;
+};
+
+export type ListQuery<S extends string> = {
+  page: number;
+  pageSize: number;
+  keyword?: string;
+  sortBy?: S;
+  sortOrder?: SortOrder;
 };
 
 const isSortOrder = (value: string | null): value is SortOrder => value === SORT_ORDER.ASC || value === SORT_ORDER.DESC;
@@ -55,7 +64,7 @@ const readList = <S extends string, F extends ListFilters>(
   ) as F;
   return {
     page: Number.isInteger(page) && page > 0 ? page : DEFAULT_PAGE,
-    pageSize: (PAGE_SIZE_OPTIONS as readonly number[]).includes(pageSize)
+    pageSize: (defaults.pageSizeOptions ?? PAGE_SIZE_OPTIONS).includes(pageSize)
       ? pageSize
       : (defaults.pageSize ?? DEFAULT_PAGE_SIZE),
     keyword: params.get(LIST_PARAMS.KEYWORD) ?? defaults.keyword ?? '',
@@ -129,6 +138,17 @@ export const useListState = <S extends string, F extends ListFilters>(inlineDefa
     [defaults, setParams],
   );
 
+  const query = useMemo<ListQuery<S>>(
+    () => ({
+      page: values.page,
+      pageSize: values.pageSize,
+      keyword: values.keyword || undefined,
+      sortBy: values.sort?.sortBy,
+      sortOrder: values.sort?.sortOrder,
+    }),
+    [values],
+  );
+
   const toQuery = useCallback(() => {
     const { page, pageSize, keyword, sort, filters } = values;
     const entries: [string, string | number | undefined][] = [
@@ -145,5 +165,16 @@ export const useListState = <S extends string, F extends ListFilters>(inlineDefa
     >;
   }, [values]);
 
-  return { ...values, setPage, setPageSize, setKeyword, setSort, setFilter, reset, toQuery };
+  return {
+    ...values,
+    pageSizeOptions: defaults.pageSizeOptions,
+    query,
+    setPage,
+    setPageSize,
+    setKeyword,
+    setSort,
+    setFilter,
+    reset,
+    toQuery,
+  };
 };

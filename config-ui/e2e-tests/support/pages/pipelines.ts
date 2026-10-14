@@ -17,7 +17,17 @@
  */
 import { Locator } from '@playwright/test';
 
-import { BasePage, Screen, urlEndingWith, pipelineRowById } from './common';
+import { PIPELINE_COPY as COPY } from '../app-copy';
+
+import {
+  BasePage,
+  Screen,
+  firstCellTexts,
+  paginationPage,
+  pipelineRowById,
+  selectOption,
+  urlEndingWith,
+} from './common';
 import { PATHS } from './paths';
 
 export class PipelinesPage extends BasePage implements Screen {
@@ -30,7 +40,43 @@ export class PipelinesPage extends BasePage implements Screen {
   }
 
   get ready(): Locator {
-    return this.page.getByRole('columnheader', { name: 'Blueprint Name' });
+    return this.page.getByRole('columnheader', { name: COPY.columns.blueprint });
+  }
+
+  async openWithQuery(query: string): Promise<void> {
+    await this.visit(`${PATHS.pipelines}?${query}`);
+  }
+
+  async filterByBlueprint(name: string): Promise<void> {
+    await this.page.getByRole('combobox', { name: COPY.blueprintFilter.label }).click();
+    await selectOption(this.page, name).click();
+  }
+
+  async sortByColumn(label: string): Promise<void> {
+    await this.page.getByRole('columnheader', { name: label }).click();
+  }
+
+  async goToListPage(number: number): Promise<void> {
+    await paginationPage(this.page, number).click();
+  }
+
+  async pipelineIds(): Promise<number[]> {
+    return (await firstCellTexts(this.page)).map(Number);
+  }
+
+  async openConfiguration(id: number): Promise<void> {
+    await this.pipelineRow(id)
+      .getByRole('button', { name: COPY.rowActions.label(id) })
+      .click();
+    await this.page.getByRole('menuitem', { name: COPY.rowActions.configuration }).click();
+  }
+
+  rowActionsButton(id: number): Locator {
+    return this.pipelineRow(id).getByRole('button', { name: COPY.rowActions.label(id) });
+  }
+
+  configurationDrawer(id: number): Locator {
+    return this.dialog(COPY.drawer.title(id));
   }
 
   pipelineRow(id: number): Locator {
@@ -46,6 +92,6 @@ export class PipelinesPage extends BasePage implements Screen {
   }
 
   get tasksCompletedLabel(): Locator {
-    return this.page.getByText('Tasks Completed', { exact: true });
+    return this.page.getByText(COPY.info.tasksCompleted, { exact: true });
   }
 }

@@ -101,6 +101,15 @@ export function resetLocalAuthState(): void {
   `);
 }
 
+// Removes the e2e- email users that tests add through the API and their audit rows (they have no identities until a first login).
+export function deleteEmailUsersNamedLike(prefix: string): void {
+  const pattern = `${prefix.replace(/'/g, "''")}%`;
+  runSql(`
+    DELETE FROM auth_access_users WHERE email LIKE '${pattern}';
+    DELETE FROM auth_access_audit_events WHERE target_email LIKE '${pattern}';
+  `);
+}
+
 export function countLocalCredentials(loginName: string): number {
   return Number(
     runSql(`SELECT COUNT(*) FROM auth_local_credentials WHERE login_name = '${loginName.replace(/'/g, "''")}';`).trim(),
@@ -128,4 +137,13 @@ export function hiddenOtelConnectionCount(teamName: string): number {
       `SELECT COUNT(*) FROM _tool_claude_code_otel_connections WHERE team_name = '${teamName.replace(/'/g, "''")}' AND hidden_at IS NOT NULL;`,
     ).trim(),
   );
+}
+
+// Pipelines outlive their blueprint and cannot be deleted through the API, so cleanup removes the rows named after test blueprints.
+export function deletePipelinesNamedLike(prefix: string): void {
+  const pattern = `${prefix.replace(/'/g, "''")}%`;
+  runSql(`
+    DELETE FROM _devlake_tasks WHERE pipeline_id IN (SELECT id FROM _devlake_pipelines WHERE name LIKE '${pattern}');
+    DELETE FROM _devlake_pipelines WHERE name LIKE '${pattern}';
+  `);
 }

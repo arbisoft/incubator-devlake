@@ -17,12 +17,16 @@
  */
 import { Locator, Page } from '@playwright/test';
 
+import { PROJECT_HOME_COPY as COPY } from '../app-copy';
+
 import {
   BasePage,
   Screen,
   urlEndingWith,
   cronFieldInputs,
+  firstCellTexts,
   iconButton,
+  paginationPage,
   pipelineRowById,
   sectionHeaderButton,
   selectOption,
@@ -48,18 +52,40 @@ export class ProjectsPage extends BasePage implements Screen {
   }
 
   get ready(): Locator {
-    return this.page.getByRole('button', { name: 'New Project' });
+    return this.page.getByRole('button', { name: COPY.newProject });
+  }
+
+  async openWithQuery(query: string): Promise<void> {
+    await this.visit(`${PATHS.projects}?${query}`);
   }
 
   async createProject(name: string): Promise<void> {
     await this.ready.click();
-    const dialog = this.dialog('Create a New Project');
-    await dialog.getByPlaceholder('Your Project Name').fill(name);
-    await dialog.getByRole('button', { name: 'Save' }).click();
+    const dialog = this.dialog(COPY.create.title);
+    await dialog.getByRole('textbox', { name: COPY.create.name.label }).fill(name);
+    await dialog.getByRole('button', { name: COPY.create.submit }).click();
   }
 
   async search(name: string): Promise<void> {
-    await this.page.getByPlaceholder('Search project ...').fill(name);
+    const box = this.page.getByRole('textbox', { name: COPY.searchPlaceholder });
+    await box.fill(name);
+    await box.press('Enter');
+  }
+
+  noResults(): Locator {
+    return this.page.getByRole('heading', { name: COPY.noResults.title });
+  }
+
+  async sortByColumn(label: string): Promise<void> {
+    await this.page.getByRole('columnheader', { name: label }).click();
+  }
+
+  async goToListPage(number: number): Promise<void> {
+    await paginationPage(this.page, number).click();
+  }
+
+  projectNames(): Promise<string[]> {
+    return firstCellTexts(this.page);
   }
 
   projectRow(name: string): Locator {

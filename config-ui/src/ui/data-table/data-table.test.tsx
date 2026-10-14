@@ -93,4 +93,37 @@ describe('DataTable', () => {
     fireEvent.click(screen.getByTitle('2'));
     expect(onPageChange).toHaveBeenCalledExactlyOnceWith(2);
   });
+
+  it('offers the page sizes the caller passes', () => {
+    setup({
+      pagination: {
+        page: 1,
+        pageSize: 10,
+        total: 100,
+        pageSizeOptions: [10, 25],
+        onPageChange: vi.fn(),
+        onPageSizeChange: vi.fn(),
+      },
+    });
+    fireEvent.mouseDown(screen.getByRole('combobox'));
+    expect(screen.getByText('25 / page')).toBeTruthy();
+    expect(screen.queryByText('100 / page')).toBeNull();
+  });
+
+  it('takes sort and pagination straight from the list state', () => {
+    const list = {
+      page: 1,
+      pageSize: 1,
+      sort: { sortBy: 'name', sortOrder: SORT_ORDER.ASC },
+      setPage: vi.fn(),
+      setPageSize: vi.fn(),
+      setSort: vi.fn(),
+    };
+    setup({ list, total: 2 });
+    expect(screen.getByRole('columnheader', { name: 'Name' }).getAttribute('aria-sort')).toBe('ascending');
+    fireEvent.click(screen.getByRole('columnheader', { name: 'Name' }));
+    expect(list.setSort).toHaveBeenCalledExactlyOnceWith({ sortBy: 'name', sortOrder: SORT_ORDER.DESC });
+    fireEvent.click(screen.getByTitle('2'));
+    expect(list.setPage).toHaveBeenCalledExactlyOnceWith(2);
+  });
 });

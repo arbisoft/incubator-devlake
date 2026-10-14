@@ -19,6 +19,7 @@ package services
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
@@ -39,6 +40,9 @@ type GetBlueprintQuery struct {
 	PageSize    int
 	Mode        string
 	Type        string
+	Keyword     string
+	// OrderBy must be a trusted expression; it is interpolated, never user input. Empty means "id DESC".
+	OrderBy string
 }
 
 type BlueprintProjectPairs struct {
@@ -156,10 +160,19 @@ func (b *BlueprintManager) GetDbBlueprints(query *GetBlueprintQuery) ([]*models.
 		clauses = append(clauses, dal.Where("mode = ?", query.Mode))
 	}
 
+	if keyword := strings.ToLower(query.Keyword); keyword != "" {
+		pattern := "%" + keyword + "%"
+		clauses = append(clauses, dal.Where("(LOWER(_devlake_blueprints.name) LIKE ? OR LOWER(_devlake_blueprints.project_name) LIKE ?)", pattern, pattern))
+	}
+
 	// count total records
 	// var count int64
 	count := errors.Must1(b.db.Count(clauses...))
-	clauses = append(clauses, dal.Orderby("id DESC"))
+	orderBy := query.OrderBy
+	if orderBy == "" {
+		orderBy = "id DESC"
+	}
+	clauses = append(clauses, dal.Orderby(orderBy))
 	// load paginated blueprints from database
 	if query.SkipRecords != 0 {
 		clauses = append(clauses, dal.Offset(query.SkipRecords))
