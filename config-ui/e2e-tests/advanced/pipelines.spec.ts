@@ -119,4 +119,17 @@ test.describe.serial('Pipelines list blueprint filter, sort and configuration dr
     await expect(pipelines.configurationDrawer(pipelineId)).toBeHidden();
     await expect(pipelines.rowActionsButton(pipelineId)).toBeFocused();
   });
+
+  test('Detail opens the pipeline panel in a modal and returns focus to the row menu button', async ({ page }) => {
+    const [pipelineId] = pipelineIdsA;
+    const pipelines = new PipelinesPage(page);
+    await pipelines.openWithQuery(`blueprintId=${blueprintA.id}`);
+    await pipelines.openDetailModal(pipelineId);
+    await expect(pipelines.detailDialog(pipelineId)).toBeVisible();
+    await expect(pipelines.detailTasksLabel(pipelineId)).toBeVisible();
+    await expect(pipelines.detailOpened(pipelineId)).toBeVisible();
+    await pipelines.pressEscape();
+    await expect(pipelines.detailDialog(pipelineId)).toBeHidden();
+    await expect(pipelines.rowActionsButton(pipelineId)).toBeFocused();
+  });
 });

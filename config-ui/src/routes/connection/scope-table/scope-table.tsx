@@ -33,13 +33,14 @@ export const ScopeTable = ({
   list,
   empty,
   selection,
+  showProjects,
   onScopeConfigChange,
   onClear,
   onDelete,
 }: ScopeTableProps) => {
   const columns = useMemo(
-    () => getScopeColumns({ plugin, connectionId, onScopeConfigChange, onClear, onDelete }),
-    [plugin, connectionId, onScopeConfigChange, onClear, onDelete],
+    () => getScopeColumns({ plugin, connectionId, showProjects, onScopeConfigChange, onClear, onDelete }),
+    [plugin, connectionId, showProjects, onScopeConfigChange, onClear, onDelete],
   );
 
   return (
@@ -52,10 +53,12 @@ export const ScopeTable = ({
       empty={empty}
       list={list}
       total={total}
-      rowSelection={{
-        selectedRowKeys: selection.selectedIds,
-        onChange: (keys) => selection.onChange(keys as ID[]),
-      }}
+      rowSelection={
+        selection && {
+          selectedRowKeys: selection.selectedIds,
+          onChange: (keys) => selection.onChange(keys as ID[]),
+        }
+      }
     />
   );
 };

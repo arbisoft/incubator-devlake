@@ -25,10 +25,17 @@ import {
   firstCellTexts,
   paginationPage,
   pipelineRowById,
-  selectOption,
+  chooseOption,
   urlEndingWith,
 } from './common';
 import { PATHS } from './paths';
+import {
+  openPipelineRowDetail,
+  pipelineDetailDialog,
+  pipelineDetailOpened,
+  pipelineRowMenuButton,
+  pipelineTasksLabel,
+} from './pipeline-table';
 
 export class PipelinesPage extends BasePage implements Screen {
   async open(): Promise<void> {
@@ -49,7 +56,7 @@ export class PipelinesPage extends BasePage implements Screen {
 
   async filterByBlueprint(name: string): Promise<void> {
     await this.page.getByRole('combobox', { name: COPY.blueprintFilter.label }).click();
-    await selectOption(this.page, name).click();
+    await chooseOption(this.page, name);
   }
 
   async sortByColumn(label: string): Promise<void> {
@@ -72,7 +79,23 @@ export class PipelinesPage extends BasePage implements Screen {
   }
 
   rowActionsButton(id: number): Locator {
-    return this.pipelineRow(id).getByRole('button', { name: COPY.rowActions.label(id) });
+    return pipelineRowMenuButton(this.page, id);
+  }
+
+  async openDetailModal(id: number): Promise<void> {
+    await openPipelineRowDetail(this.page, id);
+  }
+
+  detailDialog(id: number): Locator {
+    return pipelineDetailDialog(this.page, id);
+  }
+
+  detailOpened(id: number): Locator {
+    return pipelineDetailOpened(this.page, id);
+  }
+
+  detailTasksLabel(id: number): Locator {
+    return pipelineTasksLabel(this.detailDialog(id));
   }
 
   configurationDrawer(id: number): Locator {
@@ -92,6 +115,6 @@ export class PipelinesPage extends BasePage implements Screen {
   }
 
   get tasksCompletedLabel(): Locator {
-    return this.page.getByText(COPY.info.tasksCompleted, { exact: true });
+    return pipelineTasksLabel(this.page);
   }
 }

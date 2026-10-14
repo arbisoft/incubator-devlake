@@ -43,6 +43,12 @@ export const Icon = styled.span<{ $tone: ConfirmModalProps['tone'] }>`
   color: ${({ theme, $tone }) => ($tone === CONFIRM_TONE.DANGER ? theme.colors.error : theme.colors.warningText)};
 `;
 
+export const Body = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.md}px;
+`;
+
 export const Description = styled.p`
   ${textStyle('body')}
   margin: 0;

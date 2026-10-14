@@ -24,7 +24,7 @@ import { useTheme } from 'styled-components';
 import { COMMON_COPY } from '@/ui/constants';
 
 import { CONFIRM_TONE } from './constants';
-import { Description, Dialog, Footer, Icon, TitleRow } from './styled';
+import { Body, Description, Dialog, Footer, Icon, TitleRow } from './styled';
 import type { ConfirmModalProps } from './types';
 
 const focusOnMount = (node: HTMLElement | null) => node?.focus();
@@ -37,6 +37,8 @@ export const ConfirmModal = ({
   confirmLabel,
   cancelLabel = COMMON_COPY.cancel,
   loading,
+  confirmDisabled,
+  children,
   onConfirm,
   onCancel,
   afterClose,
@@ -69,19 +71,22 @@ export const ConfirmModal = ({
           <Button ref={focusOnMount} disabled={loading} onClick={onCancel}>
             {cancelLabel}
           </Button>
-          <Button type="primary" danger={danger} loading={loading} onClick={onConfirm}>
+          <Button type="primary" danger={danger} loading={loading} disabled={confirmDisabled} onClick={onConfirm}>
             {confirmLabel}
           </Button>
         </Footer>
       }
     >
-      <Description
-        id={descriptionId}
-        // antd's dialog has no describedby prop, so the description links itself to its dialog.
-        ref={(node) => node?.closest('[role="dialog"]')?.setAttribute('aria-describedby', descriptionId)}
-      >
-        {description}
-      </Description>
+      <Body>
+        <Description
+          id={descriptionId}
+          // antd's dialog has no describedby prop, so the description links itself to its dialog.
+          ref={(node) => node?.closest('[role="dialog"]')?.setAttribute('aria-describedby', descriptionId)}
+        >
+          {description}
+        </Description>
+        {children}
+      </Body>
     </Dialog>
   );
 };

@@ -16,7 +16,7 @@
  *
  */
 
-import { Button, Space } from 'antd';
+import { Alert, Button, Space } from 'antd';
 import { useState } from 'react';
 
 import { CONFIRM_TONE, ConfirmModal } from '@/ui';
@@ -27,7 +27,7 @@ import { HEALTH_RETEST_MS } from './fixtures';
 
 const { confirmModal: text } = COPY;
 
-const CASE = { DEFAULT: 'default', DANGER: 'danger', LOADING: 'loading', LONG: 'long' } as const;
+const CASE = { DEFAULT: 'default', DANGER: 'danger', LOADING: 'loading', LONG: 'long', NOTES: 'notes' } as const;
 type OpenCase = (typeof CASE)[keyof typeof CASE];
 
 const TITLES: Record<OpenCase, string> = {
@@ -35,6 +35,7 @@ const TITLES: Record<OpenCase, string> = {
   [CASE.DANGER]: text.title,
   [CASE.LOADING]: text.title,
   [CASE.LONG]: text.longTitle,
+  [CASE.NOTES]: text.title,
 };
 
 export const ConfirmModalDemo = () => {
@@ -59,6 +60,7 @@ export const ConfirmModalDemo = () => {
           <Button danger onClick={() => setOpen(CASE.DANGER)}>{`${COPY.cases.danger}: ${text.open}`}</Button>
           <Button onClick={() => setOpen(CASE.LOADING)}>{`${COPY.cases.loading}: ${text.open}`}</Button>
           <Button onClick={() => setOpen(CASE.LONG)}>{`${COPY.cases.longText}: ${text.open}`}</Button>
+          <Button onClick={() => setOpen(CASE.NOTES)}>{`${COPY.cases.notes}: ${text.open}`}</Button>
         </Space>
       </DemoCase>
       <ConfirmModal
@@ -69,9 +71,17 @@ export const ConfirmModalDemo = () => {
         confirmLabel={open === CASE.DEFAULT ? text.defaultConfirm : text.confirm}
         cancelLabel={open === CASE.DEFAULT ? text.keep : undefined}
         loading={loading}
+        confirmDisabled={open === CASE.NOTES}
         onConfirm={confirm}
         onCancel={close}
-      />
+      >
+        {open === CASE.NOTES && (
+          <>
+            <Alert type="warning" showIcon title={text.note} />
+            <Alert type="error" showIcon title={text.blocked} />
+          </>
+        )}
+      </ConfirmModal>
     </DemoSection>
   );
 };

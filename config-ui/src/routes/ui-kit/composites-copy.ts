@@ -65,6 +65,8 @@ export const COMPOSITES_COPY = {
     defaultDescription: 'Everyone signed in sees the new look on their next page load.',
     defaultConfirm: 'Apply branding',
     keep: 'Keep my branding',
+    note: 'Shared credentials stay active for their other projects.',
+    blocked: 'Revoke the connection first, then delete.',
     longTitle: 'Delete the project with an extraordinarily long name that goes past the width of the dialog?',
   },
   formField: {
@@ -82,6 +84,13 @@ export const COMPOSITES_COPY = {
     reset: 'Reset',
     toggleSaving: 'Toggle saving',
     state: (name: string, saving: boolean) => `Name: "${name}", saving: ${saving}`,
+  },
+  useLastLoaded: {
+    next: 'Load next value',
+    refetch: 'Start a refetch',
+    switchScope: 'Switch scope',
+    state: (value: string, shown: string) => `Loaded: ${value}, shown: ${shown}`,
+    pending: 'pending',
   },
   useRefreshVersion: { refresh: 'Refresh', version: (count: number) => `Refresh count: ${count}` },
   overflowList: {

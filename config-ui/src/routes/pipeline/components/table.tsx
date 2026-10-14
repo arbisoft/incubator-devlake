@@ -16,10 +16,8 @@
  *
  */
 
-import { Modal } from 'antd';
 import { saveAs } from 'file-saver';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useTheme } from 'styled-components';
 
 import API from '@/api';
 import { DEVLAKE_ENDPOINT } from '@/config';
@@ -29,10 +27,10 @@ import { DataTable, EMPTY_STATE_SIZE } from '@/ui';
 import { getPipelineColumns } from '../columns';
 import { COPY, LOGS_FILE_NAME, PIPELINE_ROW_ACTION } from '../constants';
 import type { PipelineSortKey } from '../types';
-import { pickConfig, toTablePagination } from '../utils';
+import { pickConfig } from '../utils';
 
 import { PipelineConfigDrawer } from './config-drawer';
-import { PipelineTasks } from './tasks';
+import { PipelineDetailModal } from './detail-modal';
 import type { PipelineRowAction, PipelineTableProps } from './types';
 
 const DEFAULT_EMPTY = { ...COPY.empty, size: EMPTY_STATE_SIZE.SECTION };
@@ -45,7 +43,6 @@ export const PipelineTable = ({
   total,
   empty = DEFAULT_EMPTY,
 }: PipelineTableProps) => {
-  const { layout } = useTheme();
   const [configTarget, setConfigTarget] = useState<IPipeline>();
   const [configOpen, setConfigOpen] = useState(false);
   const [detailId, setDetailId] = useState<ID>();
@@ -89,7 +86,7 @@ export const PipelineTable = ({
         empty={empty}
         list={list}
         total={total}
-        pagination={pagination && toTablePagination(pagination)}
+        pagination={pagination}
       />
       {configTarget && (
         <PipelineConfigDrawer
@@ -100,17 +97,12 @@ export const PipelineTable = ({
         />
       )}
       {detailId !== undefined && (
-        <Modal
+        <PipelineDetailModal
           open={detailOpen}
-          centered
-          destroyOnHidden
-          footer={null}
-          width={layout.modalWidth.lg}
-          title={COPY.drawer.title(detailId)}
-          onCancel={() => setDetailOpen(false)}
-        >
-          <PipelineTasks id={detailId} />
-        </Modal>
+          id={detailId}
+          onClose={() => setDetailOpen(false)}
+          afterClose={() => opener?.focus()}
+        />
       )}
     </>
   );

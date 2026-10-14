@@ -44,18 +44,25 @@ export const tableWithRow = (page: Page, text: string | RegExp): Locator =>
 const toast = (page: Page, text: string | RegExp): Locator =>
   page.locator('.ant-message-notice').filter({ hasText: text });
 
-export const selectOption = (page: Page, label: string | RegExp): Locator =>
+const selectOption = (page: Page, label: string | RegExp): Locator =>
   page.locator('.ant-select-item-option').filter({ hasText: label });
 
-// The dropdown list is virtual, so an option past the first screen is not in the DOM until the list is scrolled to it.
+// The list is virtual and antd scrolls a reopened one to its selected value, so start from the top and page down until the option renders.
 export async function chooseOption(page: Page, label: string | RegExp): Promise<void> {
   const option = selectOption(page, label);
   const holder = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) [class$="-holder"]');
+  let atTop = false;
   await expect
     .poll(
       async () => {
         if (await option.count()) return true;
-        await holder.evaluate((el) => el.scrollBy(0, el.clientHeight));
+        if (!(await holder.count())) return false;
+        if (atTop) {
+          await holder.evaluate((el) => el.scrollBy(0, el.clientHeight));
+        } else {
+          await holder.evaluate((el) => el.scrollTo(0, 0));
+          atTop = true;
+        }
         return false;
       },
       { intervals: [50] },
@@ -70,9 +77,6 @@ export const iconButton = (scope: Page | Locator, iconName: string): Locator =>
 
 const tabByName = (page: Page, name: string): Locator => page.getByRole('tab', { name, exact: true });
 
-// The five cron inputs (minute, hour, day, month, week) of the Custom sync frequency.
-export const cronFieldInputs = (dialog: Locator): Locator => dialog.locator('input.ant-input');
-
 export const pipelineRowById = (page: Page, id: number): Locator =>
   page.locator('tbody tr.ant-table-row').filter({ has: page.getByRole('cell', { name: String(id), exact: true }) });
 
@@ -84,9 +88,6 @@ export const selectBox = (scope: Page | Locator): Locator => scope.locator('.ant
 
 export const tagWithText = (scope: Page | Locator, text: string | RegExp): Locator =>
   scope.locator('.ant-tag').filter({ hasText: text });
-
-export const sectionHeaderButton = (page: Page, heading: string): Locator =>
-  page.locator('h3', { hasText: heading }).getByRole('button');
 
 // AntD 6 Empty renders both an SVG title and a description with the same text; target the description.
 const emptyState = (page: Page, text: string): Locator =>

@@ -46,7 +46,8 @@ export type ScopeTableProps = {
   loading: boolean;
   list: NonNullable<DataTableProps<ScopeRow>['list']>;
   empty: EmptyStateProps;
-  selection: ScopeSelection;
+  selection?: ScopeSelection;
+  showProjects?: boolean;
   onScopeConfigChange: () => void;
   onClear?: (row: ScopeRow) => void;
   onDelete?: (row: ScopeRow) => void;
@@ -54,5 +55,5 @@ export type ScopeTableProps = {
 
 export type ScopeColumnOptions = Pick<
   ScopeTableProps,
-  'plugin' | 'connectionId' | 'onScopeConfigChange' | 'onClear' | 'onDelete'
+  'plugin' | 'connectionId' | 'onScopeConfigChange' | 'onClear' | 'onDelete' | 'showProjects'
 >;

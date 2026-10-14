@@ -55,6 +55,7 @@ export const SelectorDialog = ({ open, saving, onCancel, onSubmit }: SelectorDia
       submitDisabled={!selectedIds.length}
       onSubmit={handleSubmit}
       onCancel={onCancel}
+      afterClose={() => setSelectedIds([])}
     >
       <Block title={COPY.select.label} description={COPY.select.description}>
         <MillerColumnsSelect

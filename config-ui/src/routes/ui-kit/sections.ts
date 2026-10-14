@@ -56,6 +56,7 @@ import { UseConcurrencyQueueDemo } from './use-concurrency-queue.demo';
 import { UseConfirmFlowDemo } from './use-confirm-flow.demo';
 import { UseDocumentTitleDemo } from './use-document-title.demo';
 import { UseInViewDemo } from './use-in-view.demo';
+import { UseLastLoadedDemo } from './use-last-loaded.demo';
 import { UseListStateDemo } from './use-list-state.demo';
 import { UseModalFormDemo } from './use-modal-form.demo';
 import { UseRefreshVersionDemo } from './use-refresh-version.demo';
@@ -101,6 +102,7 @@ export const SECTIONS: SectionDefinition[] = [
   { id: SECTION.USE_LIST_STATE, Demo: UseListStateDemo },
   { id: SECTION.USE_ROUTE_TAB, Demo: UseRouteTabDemo },
   { id: SECTION.USE_REFRESH_VERSION, Demo: UseRefreshVersionDemo },
+  { id: SECTION.USE_LAST_LOADED, Demo: UseLastLoadedDemo },
   { id: SECTION.USE_MODAL_FORM, Demo: UseModalFormDemo },
   { id: SECTION.USE_DOCUMENT_TITLE, Demo: UseDocumentTitleDemo },
   { id: SECTION.USE_IN_VIEW, Demo: UseInViewDemo },

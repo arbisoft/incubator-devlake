@@ -30,6 +30,7 @@ import type { ScopeColumnOptions, ScopeRow } from './types';
 export const getScopeColumns = ({
   plugin,
   connectionId,
+  showProjects = true,
   onScopeConfigChange,
   onClear,
   onDelete,
@@ -103,5 +104,5 @@ export const getScopeColumns = ({
     });
   }
 
-  return columns;
+  return showProjects ? columns : columns.filter(({ key }) => key !== SCOPE_COLUMN.PROJECTS);
 };

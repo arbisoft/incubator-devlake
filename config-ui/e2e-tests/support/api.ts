@@ -194,7 +194,8 @@ export async function putGithubScope(
 export interface ApiProject {
   name: string;
   description?: string;
-  blueprint?: ApiBlueprint;
+  blueprint?: ApiBlueprint | null;
+  metrics?: { pluginName: string; pluginOption: { prToIssueRegexp?: string }; enable: boolean }[];
   [key: string]: unknown;
 }
 
@@ -267,13 +268,28 @@ export async function createBlueprint(
   );
 }
 
+export async function getBlueprint(api: APIRequestContext, blueprintId: number): Promise<ApiBlueprint> {
+  return json(await api.get(`/blueprints/${blueprintId}`), `get blueprint ${blueprintId}`);
+}
+
+export async function setBlueprintConnections(
+  api: APIRequestContext,
+  blueprint: ApiBlueprint,
+  connections: ApiBlueprint['connections'],
+): Promise<ApiBlueprint> {
+  return json(
+    await api.patch(`/blueprints/${blueprint.id}`, { data: { ...blueprint, connections } }),
+    `update blueprint ${blueprint.id}`,
+  );
+}
+
 // A blueprint with no connections answers 400 yet still records a pipeline that completes at once.
 export async function triggerBlueprint(api: APIRequestContext, blueprintId: number): Promise<void> {
   await api.post(`/blueprints/${blueprintId}/trigger`, { data: { skipCollectors: false, fullSync: false } });
   await expect.poll(async () => (await listBlueprintPipelines(api, blueprintId)).length).toBeGreaterThan(0);
 }
 
-async function deleteBlueprint(api: APIRequestContext, blueprintId: number): Promise<void> {
+export async function deleteBlueprint(api: APIRequestContext, blueprintId: number): Promise<void> {
   await cancelPipelinesOfBlueprint(api, blueprintId);
   await api.delete(`/blueprints/${blueprintId}`);
 }
@@ -332,6 +348,10 @@ export const isTerminalPipelineStatus = (status: string) => !ACTIVE_PIPELINE_STA
 
 export async function listWebhooks(api: APIRequestContext): Promise<{ id: number; name: string }[]> {
   return json(await api.get('/plugins/webhook/connections'), 'list webhooks');
+}
+
+export async function createWebhook(api: APIRequestContext, name: string): Promise<{ id: number; name: string }> {
+  return json(await api.post('/plugins/webhook/connections', { data: { name } }), `create webhook ${name}`);
 }
 
 export async function deleteWebhooksByPrefix(api: APIRequestContext): Promise<void> {
@@ -458,6 +478,29 @@ export async function findOtelConnection(
   teamName: string,
 ): Promise<ApiOtelConnection | undefined> {
   return (await listOtelConnections(api)).find((it) => it.connection.teamName === teamName);
+}
+
+// Creates a Claude Code OTel connection placed under the given projects; its one-time credential is not returned.
+export async function createOtelConnection(
+  api: APIRequestContext,
+  teamName: string,
+  projectNames: string[],
+): Promise<ApiOtelConnection> {
+  return json(
+    await api.post('/plugins/claude_otel/connections', { data: { teamName, projectNames } }),
+    'create otel connection',
+  );
+}
+
+// Revokes (when still active) and hides every connection of a team, so its projects can be deleted.
+export async function retireOtelConnections(api: APIRequestContext, teamName: string): Promise<void> {
+  const entries = (await listOtelConnections(api)).filter((it) => it.connection.teamName === teamName);
+  for (const { connection } of entries) {
+    if (connection.status === 'active') {
+      await api.post(`/plugins/claude_otel/connections/${connection.id}/revoke`);
+    }
+    await api.post(`/plugins/claude_otel/connections/${connection.id}/hide`);
+  }
 }
 
 // Credential statuses of a connection, sorted so a spec can compare them with toEqual.

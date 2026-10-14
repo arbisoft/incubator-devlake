@@ -16,6 +16,8 @@
  *
  */
 
+import type { ReactNode } from 'react';
+
 import type { IWebhook } from '@/types';
 
 import type { COMMAND_KEY, WEBHOOK_DIALOG } from './constants';
@@ -44,6 +46,8 @@ export type WebhookDialogKind = (typeof WEBHOOK_DIALOG)[keyof typeof WEBHOOK_DIA
 
 export type WebHookConnectionProps = {
   filterIds?: ID[];
+  extraActions?: ReactNode;
+  addDisabledReason?: string;
   onCreateAfter?: (id: ID) => void;
   onDeleteAfter?: (id: ID) => void;
 };

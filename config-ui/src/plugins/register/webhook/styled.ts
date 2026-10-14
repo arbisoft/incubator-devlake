@@ -25,6 +25,12 @@ export const Stack = styled.div`
   gap: ${({ theme }) => theme.space.lg}px;
 `;
 
+export const Actions = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${({ theme }) => theme.space.sm}px;
+`;
+
 export const Intro = styled.p`
   ${textStyle('body')}
   margin: 0;

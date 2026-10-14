@@ -17,7 +17,7 @@
  */
 
 import { PlusOutlined } from '@ant-design/icons';
-import { Button } from 'antd';
+import { Button, Tooltip } from 'antd';
 import { useMemo, useState } from 'react';
 
 import { selectWebhooks } from '@/features/connections';
@@ -28,10 +28,16 @@ import { DataTable, EMPTY_STATE_SIZE } from '@/ui';
 import { getColumns } from './columns';
 import { CreateDialog, DeleteDialog, EditDialog, ViewDialog } from './components';
 import { COPY, WEBHOOK_DIALOG } from './constants';
-import { Stack } from './styled';
+import { Actions, Stack } from './styled';
 import type { WebHookConnectionProps, WebhookDialogKind } from './types';
 
-export const WebHookConnection = ({ filterIds, onCreateAfter, onDeleteAfter }: WebHookConnectionProps) => {
+export const WebHookConnection = ({
+  filterIds,
+  extraActions,
+  addDisabledReason,
+  onCreateAfter,
+  onDeleteAfter,
+}: WebHookConnectionProps) => {
   const [kind, setKind] = useState<WebhookDialogKind>();
   const [target, setTarget] = useState<IWebhook>();
 
@@ -65,11 +71,19 @@ export const WebHookConnection = ({ filterIds, onCreateAfter, onDeleteAfter }: W
         pagination={false}
         empty={{ ...COPY.empty, size: EMPTY_STATE_SIZE.SECTION }}
       />
-      <div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setKind(WEBHOOK_DIALOG.ADD)}>
-          {COPY.add}
-        </Button>
-      </div>
+      <Actions>
+        <Tooltip title={addDisabledReason}>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            disabled={addDisabledReason !== undefined}
+            onClick={() => setKind(WEBHOOK_DIALOG.ADD)}
+          >
+            {COPY.add}
+          </Button>
+        </Tooltip>
+        {extraActions}
+      </Actions>
       <CreateDialog open={kind === WEBHOOK_DIALOG.ADD} onCancel={hide} onSubmitAfter={onCreateAfter} />
       {target && (
         <>

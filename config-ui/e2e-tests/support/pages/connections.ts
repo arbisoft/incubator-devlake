@@ -29,7 +29,7 @@ import {
   SORT_SELECT_COPY,
 } from '../app-copy';
 
-import { BasePage, Screen, segmentedOption, selectOption, urlEndingWith, tableRow } from './common';
+import { BasePage, Screen, segmentedOption, chooseOption, urlEndingWith, tableRow } from './common';
 import { ConnectionForm } from './connection-form';
 import { PATHS } from './paths';
 
@@ -149,7 +149,7 @@ export class ConnectionsPage extends BasePage implements Screen {
 
   async sortBy(label: string): Promise<void> {
     await this.sortSelect.click();
-    await selectOption(this.page, label).click();
+    await chooseOption(this.page, label);
   }
 
   async clearFilters(): Promise<void> {

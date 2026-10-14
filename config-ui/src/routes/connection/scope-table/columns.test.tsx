@@ -45,6 +45,11 @@ describe('scope columns', () => {
     expect(keys).toEqual([SCOPE_COLUMN.NAME, SCOPE_COLUMN.PROJECTS, SCOPE_COLUMN.SCOPE_CONFIG]);
   });
 
+  it('leaves the projects column out when asked to', () => {
+    const keys = getScopeColumns({ ...OPTIONS, showProjects: false }).map((column) => column.key);
+    expect(keys).toEqual([SCOPE_COLUMN.NAME, SCOPE_COLUMN.SCOPE_CONFIG]);
+  });
+
   it('names each row action after its scope and reports the row', () => {
     const onClear = vi.fn();
     const onDelete = vi.fn();

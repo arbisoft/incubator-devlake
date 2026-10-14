@@ -15,14 +15,13 @@
  * limitations under the License.
  *
  */
-import { Card } from 'antd';
 import { useParams } from 'react-router-dom';
 
 import { PageHeader } from '@/components';
 import { PATHS } from '@/config';
 import { useDocumentTitle } from '@/ui/hooks';
 
-import { PipelineInfo, PipelineTasks } from './components';
+import { PipelinePanel } from './components';
 import { COPY } from './constants';
 
 export const Pipeline = () => {
@@ -41,12 +40,7 @@ export const Pipeline = () => {
         },
       ]}
     >
-      <Card>
-        <PipelineInfo id={id as string} />
-      </Card>
-      <Card>
-        <PipelineTasks id={id as string} />
-      </Card>
+      <PipelinePanel id={id as string} />
     </PageHeader>
   );
 };

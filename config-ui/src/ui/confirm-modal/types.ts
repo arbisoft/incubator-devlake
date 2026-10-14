@@ -16,6 +16,8 @@
  *
  */
 
+import type { ReactNode } from 'react';
+
 import type { CONFIRM_TONE } from './constants';
 
 type ConfirmTone = (typeof CONFIRM_TONE)[keyof typeof CONFIRM_TONE];
@@ -28,6 +30,8 @@ export type ConfirmModalProps = {
   confirmLabel: string;
   cancelLabel?: string;
   loading?: boolean;
+  confirmDisabled?: boolean;
+  children?: ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
   afterClose?: () => void;

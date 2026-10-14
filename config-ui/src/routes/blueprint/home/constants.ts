@@ -38,7 +38,6 @@ export const BLUEPRINT_STATUS_TONE = {
 } as const;
 
 export const MAX_VISIBLE_CONNECTIONS = 2;
-export const CONFIGURATION_TAB_STATE = { activeKey: 'configuration' } as const;
 
 export const COPY = {
   title: 'Blueprints',

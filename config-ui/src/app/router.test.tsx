@@ -20,8 +20,16 @@ import { isValidElement } from 'react';
 import { matchRoutes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 
-import { PATHS, PROJECT_TAB } from '@/config';
-import { accessLoader, ParamRedirect, SettingsActivity, SettingsAuthentication, SettingsUsers } from '@/routes';
+import { BLUEPRINT_VIEW, PATHS, PROJECT_TAB } from '@/config';
+import {
+  accessLoader,
+  BlueprintDetailPage,
+  ParamRedirect,
+  ProjectDetailPage,
+  SettingsActivity,
+  SettingsAuthentication,
+  SettingsUsers,
+} from '@/routes';
 
 import { routes } from './router';
 
@@ -66,6 +74,15 @@ describe('legacy redirects', () => {
     const pages = new Set(Object.values(PROJECT_TAB).map((tab) => renderedBy(PATHS.PROJECT_TAB('demo', tab))));
     expect(pages.size).toBe(1);
     expect(pages.has(undefined)).toBe(false);
+  });
+
+  it('serves the configuration views from their pages, not the :unique redirects', () => {
+    const project = PATHS.PROJECT_BLUEPRINT_VIEW('demo', BLUEPRINT_VIEW.CONFIGURATION);
+    const advanced = PATHS.BLUEPRINT_VIEW(7, BLUEPRINT_VIEW.CONFIGURATION);
+    expect(redirectTarget(project)).toBeUndefined();
+    expect(redirectTarget(advanced)).toBeUndefined();
+    expect(renderedBy(project)).toBe(ProjectDetailPage);
+    expect(renderedBy(advanced)).toBe(BlueprintDetailPage);
   });
 
   it.each([

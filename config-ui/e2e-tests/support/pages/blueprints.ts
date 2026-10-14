@@ -19,6 +19,7 @@ import { Locator } from '@playwright/test';
 
 import { BLUEPRINT_HOME_COPY as COPY } from '../app-copy';
 
+import { BlueprintViews, type BlueprintViewKey } from './blueprint-detail';
 import { BasePage, Screen, firstCellTexts, segmentedOption, urlEndingWith } from './common';
 import { PATHS } from './paths';
 
@@ -72,7 +73,11 @@ export class BlueprintPage extends BasePage implements Screen {
   }
 
   detailUrlPattern(id: number): RegExp {
-    return new RegExp(`${PATHS.blueprint(id)}$`);
+    return new RegExp(`${PATHS.blueprint(id)}(/configuration)?$`);
+  }
+
+  async openView(view: BlueprintViewKey): Promise<void> {
+    await this.views.openView(view);
   }
 
   blueprintRow(name: string): Locator {
@@ -87,11 +92,19 @@ export class BlueprintPage extends BasePage implements Screen {
     await this.blueprintRow(name).getByRole('link', { name }).click();
   }
 
+  private get views(): BlueprintViews {
+    return new BlueprintViews(this.page);
+  }
+
+  get syncPolicy(): Locator {
+    return this.views.syncPolicy;
+  }
+
   dataScopeCount(count: number): Locator {
-    return this.page.getByText(`${count} data scope`);
+    return this.views.dataScopeCount(count);
   }
 
   connectionLabel(connectionName: string): Locator {
-    return this.page.getByText(connectionName);
+    return this.views.connectionLabel(connectionName);
   }
 }

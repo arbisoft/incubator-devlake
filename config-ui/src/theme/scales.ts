@@ -65,6 +65,7 @@ export type LayoutTokens = {
   searchMaxWidth: number;
   connectionNameWidth: number;
   sortSelectWidth: number;
+  datePickerWidth: number;
   statusDotSize: number;
   sidebarHeaderHeight: number;
   sidebarControlSize: number;
@@ -75,8 +76,9 @@ export type LayoutTokens = {
   markTileSize: number;
   wordmarkWidth: number;
   confirmModalWidth: number;
-  pipelineTaskHeight: number;
+  pipelineTaskIdWidth: number;
   pipelineTaskDurationWidth: number;
+  pipelineProgressWidth: number;
   catalogCardMinWidth: number;
   segmentInset: number;
   segmentPaddingBlock: number;
@@ -87,6 +89,7 @@ export type LayoutTokens = {
   scopePaneHeightCompact: number;
   scopeRowHeight: number;
   scopeCheckboxSize: number;
+  fieldMaxWidth: number;
 };
 export type ZIndexTokens = { sidebar: number; flyout: number; drawer: number; modal: number };
 export type MotionTokens = { fast: number; base: number; easing: string };
@@ -129,6 +132,7 @@ export const LAYOUT: LayoutTokens = {
   searchMaxWidth: 400,
   connectionNameWidth: 200,
   sortSelectWidth: 168,
+  datePickerWidth: 224,
   statusDotSize: 6,
   sidebarHeaderHeight: 70,
   sidebarControlSize: 28,
@@ -139,8 +143,9 @@ export const LAYOUT: LayoutTokens = {
   markTileSize: 32,
   wordmarkWidth: 120,
   confirmModalWidth: 416,
-  pipelineTaskHeight: 80,
-  pipelineTaskDurationWidth: 80,
+  pipelineTaskIdWidth: 84,
+  pipelineTaskDurationWidth: 64,
+  pipelineProgressWidth: 250,
   catalogCardMinWidth: 272,
   segmentInset: 2,
   segmentPaddingBlock: 3,
@@ -151,6 +156,7 @@ export const LAYOUT: LayoutTokens = {
   scopePaneHeightCompact: 200,
   scopeRowHeight: 40,
   scopeCheckboxSize: 16,
+  fieldMaxWidth: 600,
 };
 
 // antd's popup layer is 1000 (modal, drawer); dropdowns 1050; the sidebar sits below them.

@@ -29,5 +29,9 @@ export const LINKS = {
     DEPLOYMENT: 'https://devlake.apache.org/docs/Plugins/webhook#deployment',
     PULL_REQUEST: 'https://devlake.apache.org/docs/Plugins/webhook#pull_requests',
   },
+  CRON: {
+    HELP: 'https://crontab.cronhub.io/',
+    AI: 'https://cron-ai.vercel.app/',
+  },
   SLACK: 'https://join.slack.com/t/devlake-io/shared_invite/zt-26ulybksw-IDrJYuqY1FrdjlMMJhs53Q',
 } as const;
