@@ -95,7 +95,7 @@ Create a Claude Code OTel connection through the DevLake Config UI. The one-time
 }
 ```
 
-Claude Code sends metrics and log events. Events (prompts, API requests, tool results, skill activations, permission mode changes and others) are stored per event in `_tool_claude_code_otel_events` and rolled up into `ai_prompts`, `ai_prompt_skills` and `ai_permission_mode_changes`. `OTEL_LOG_TOOL_DETAILS=1` makes Claude Code send skill, MCP, plugin and command names and tool parameters.
+Claude Code sends metrics and log events. Events (prompts, API requests, tool results, skill activations, permission mode changes and others) are stored per event in `_tool_claude_code_otel_events` and rolled up into `ai_prompts`, `ai_prompt_skills` and `ai_permission_mode_changes`. `OTEL_LOG_TOOL_DETAILS=1` makes Claude Code send skill, MCP, plugin and command names and tool parameters. DevLake keeps only `skill_name`, `mcp_server_name` and `mcp_tool_name` from `tool_parameters` and drops the rest at ingest, including Bash command lines and file paths.
 
 Prompt text is stored only in the raw log batches and in `_tool_claude_code_otel_events.prompt_text`, and is cleared from events after 90 days, when the raw batches are deleted. It is never written to `ai_*` tables. Responses, tool input and raw API bodies are never stored: managed settings keep those gates off, the Collector deletes the attributes, and DevLake deletes them again at ingest. Session ids are stored on events but removed from Prometheus labels.
 

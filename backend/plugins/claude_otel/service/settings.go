@@ -55,7 +55,8 @@ func responseWithSettings(connection *models.OtelConnection, credentials []*mode
 			// derived per session. The Collector keeps it out of Prometheus labels.
 			"OTEL_METRICS_INCLUDE_SESSION_ID":   "true",
 			"OTEL_METRICS_INCLUDE_ACCOUNT_UUID": "true",
-			// Skill, MCP, plugin and command names, and tool parameters.
+			// Skill, MCP, plugin and command names, and tool parameters. Ingest keeps only the
+			// skill and MCP names from tool parameters; command lines and paths are dropped.
 			"OTEL_LOG_TOOL_DETAILS": "1",
 			// Prompt text is stored in the raw and _tool tables only, never in ai_* tables.
 			"OTEL_LOG_USER_PROMPTS": "1",

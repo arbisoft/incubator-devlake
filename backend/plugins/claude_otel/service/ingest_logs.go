@@ -19,6 +19,7 @@ package service
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
@@ -34,6 +35,8 @@ import (
 const (
 	promptAttribute     = "prompt"
 	promptTextAttribute = "prompt_text"
+	// toolParametersAttribute is a JSON object string sent under OTEL_LOG_TOOL_DETAILS.
+	toolParametersAttribute = "tool_parameters"
 	// redactedContent is what Claude Code sends in place of content whose gate is off.
 	redactedContent = "<REDACTED>"
 )
@@ -53,6 +56,14 @@ var contentAttributes = map[string]struct{}{
 // error message can echo file contents. On api_error the error is a service message.
 var toolResultContentAttributes = map[string]struct{}{
 	"error": {},
+}
+
+// toolParameterKeys are the tool_parameters fields kept. The others, such as full_command,
+// bash_command and file paths, can carry secrets and are dropped.
+var toolParameterKeys = map[string]struct{}{
+	"skill_name":      {},
+	"mcp_server_name": {},
+	"mcp_tool_name":   {},
 }
 
 // IngestLogs stores one authenticated OTLP Logs request as a raw batch. Events are derived
@@ -126,15 +137,15 @@ func resourceLogRecords(resourceLogs *logsv1.ResourceLogs) []*logsv1.LogRecord {
 	return records
 }
 
-// stripContentAttributes removes content attributes from every resource and record, and
-// keeps each prompt's text once, as prompt_text.
+// stripContentAttributes removes content attributes from every resource and record, keeps
+// each prompt's text once, as prompt_text, and keeps only allowlisted tool parameters.
 func stripContentAttributes(request *collectorlogs.ExportLogsServiceRequest) {
 	for _, resourceLogs := range request.GetResourceLogs() {
 		if resource := resourceLogs.GetResource(); resource != nil {
 			resource.Attributes = withoutAttributes(resource.GetAttributes(), contentAttributes)
 		}
 		for _, record := range resourceLogRecords(resourceLogs) {
-			record.Attributes = normalizePromptText(withoutAttributes(record.GetAttributes(), contentAttributes))
+			record.Attributes = filterToolParameters(normalizePromptText(withoutAttributes(record.GetAttributes(), contentAttributes)))
 			if logEventName(record) == "tool_result" {
 				record.Attributes = withoutAttributes(record.GetAttributes(), toolResultContentAttributes)
 			}
@@ -157,6 +168,34 @@ func normalizePromptText(attributes []*commonv1.KeyValue) []*commonv1.KeyValue {
 	return append(attributes, &commonv1.KeyValue{
 		Key:   promptTextAttribute,
 		Value: &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: text}},
+	})
+}
+
+// filterToolParameters keeps only the allowlisted tool_parameters fields. A value that is
+// not a JSON object string, or has no allowlisted field, is dropped.
+func filterToolParameters(attributes []*commonv1.KeyValue) []*commonv1.KeyValue {
+	raw := untrimmedStringAttribute(attributes, toolParametersAttribute)
+	attributes = withoutAttributes(attributes, map[string]struct{}{toolParametersAttribute: {}})
+	var parameters map[string]interface{}
+	if raw == "" || json.Unmarshal([]byte(raw), &parameters) != nil {
+		return attributes
+	}
+	kept := make(map[string]interface{}, len(toolParameterKeys))
+	for key := range toolParameterKeys {
+		if value, ok := parameters[key]; ok {
+			kept[key] = value
+		}
+	}
+	if len(kept) == 0 {
+		return attributes
+	}
+	encoded, err := json.Marshal(kept)
+	if err != nil {
+		return attributes
+	}
+	return append(attributes, &commonv1.KeyValue{
+		Key:   toolParametersAttribute,
+		Value: &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: string(encoded)}},
 	})
 }
 

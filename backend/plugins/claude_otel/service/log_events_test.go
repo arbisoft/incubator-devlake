@@ -33,6 +33,7 @@ import (
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
 	"github.com/stretchr/testify/mock"
 	collectorlogs "go.opentelemetry.io/proto/otlp/collector/logs/v1"
+	commonv1 "go.opentelemetry.io/proto/otlp/common/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -68,6 +69,17 @@ func TestIngestLogsStripsContentBeforeStorage(t *testing.T) {
 				t.Fatalf("%s event kept content attribute %q", logEventName(record), key)
 			}
 		}
+		if parameters := untrimmedStringAttribute(record.GetAttributes(), toolParametersAttribute); parameters != "" {
+			var fields map[string]interface{}
+			if err := json.Unmarshal([]byte(parameters), &fields); err != nil {
+				t.Fatalf("%s tool_parameters is not a JSON object: %q", logEventName(record), parameters)
+			}
+			for key := range fields {
+				if _, allowed := toolParameterKeys[key]; !allowed {
+					t.Fatalf("%s tool_parameters kept %q", logEventName(record), key)
+				}
+			}
+		}
 		copies := 0
 		for _, attribute := range record.GetAttributes() {
 			if attribute.GetKey() == promptTextAttribute {
@@ -94,6 +106,45 @@ func TestIngestLogsStripsContentBeforeStorage(t *testing.T) {
 	want := map[string]string{"p1": "Summarize the failing tests", "p2": "  Review the auth change\n"}
 	if len(promptTexts) != len(want) || promptTexts["p1"] != want["p1"] || promptTexts["p2"] != want["p2"] {
 		t.Fatalf("stored prompt texts = %q, want %q", promptTexts, want)
+	}
+}
+
+func TestFilterToolParametersKeepsOnlyAllowlistedKeys(t *testing.T) {
+	stringParameters := func(value string) *commonv1.KeyValue {
+		return &commonv1.KeyValue{Key: toolParametersAttribute, Value: &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: value}}}
+	}
+	tests := []struct {
+		name      string
+		parameter *commonv1.KeyValue
+		want      string
+	}{
+		{"mixed keys", stringParameters(`{"skill_name":"code-review","full_command":"curl -H 'Authorization: Bearer x'"}`), `{"skill_name":"code-review"}`},
+		{"mcp keys", stringParameters(`{"mcp_server_name":"github","mcp_tool_name":"create_issue","file_path":"/etc/passwd"}`), `{"mcp_server_name":"github","mcp_tool_name":"create_issue"}`},
+		{"only disallowed keys", stringParameters(`{"bash_command":"cat","full_command":"cat secret.txt"}`), ""},
+		{"invalid JSON", stringParameters(`full_command=cat secret.txt`), ""},
+		{"not an object", stringParameters(`["skill_name"]`), ""},
+		{"not a string", &commonv1.KeyValue{Key: toolParametersAttribute, Value: &commonv1.AnyValue{Value: &commonv1.AnyValue_KvlistValue{KvlistValue: &commonv1.KeyValueList{Values: []*commonv1.KeyValue{
+			{Key: "full_command", Value: &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "cat secret.txt"}}},
+		}}}}}, ""},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			event := &commonv1.KeyValue{Key: "event.name", Value: &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "tool_result"}}}
+			filtered := filterToolParameters([]*commonv1.KeyValue{event, test.parameter})
+			if !hasAttribute(filtered, "event.name") {
+				t.Fatal("filterToolParameters() dropped an unrelated attribute")
+			}
+			got := untrimmedStringAttribute(filtered, toolParametersAttribute)
+			if test.want == "" {
+				if hasAttribute(filtered, toolParametersAttribute) {
+					t.Fatalf("tool_parameters = %v, want dropped", filtered)
+				}
+				return
+			}
+			if got != test.want {
+				t.Fatalf("tool_parameters = %s, want %s", got, test.want)
+			}
+		})
 	}
 }
 
@@ -156,6 +207,9 @@ func TestPrepareEventsMapsTypedColumnsAndKeepsAttributes(t *testing.T) {
 		event := item.event
 		if bytes.Contains(event.Attributes, []byte(promptTextAttribute)) {
 			t.Fatalf("%s attributes kept the prompt text: %s", event.EventName, event.Attributes)
+		}
+		if bytes.Contains(event.Attributes, []byte("full_command")) || bytes.Contains(event.Attributes, []byte("secret.txt")) {
+			t.Fatalf("%s attributes kept a command line: %s", event.EventName, event.Attributes)
 		}
 		wantText := map[string]string{"p1": "Summarize the failing tests", "p2": "  Review the auth change\n"}[event.PromptId]
 		if event.EventName != eventUserPrompt {
