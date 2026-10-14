@@ -90,7 +90,15 @@ export const Connection = () => {
 
   // The store drops the connection on delete before navigation completes.
   if (!connection) {
-    return null;
+    return (
+      <ListPage>
+        <PageHeader
+          title={DETAIL_COPY.missing.title}
+          description={DETAIL_COPY.missing.description}
+          actions={<Button onClick={() => navigate(PATHS.CONNECTIONS())}>{DETAIL_COPY.missing.back}</Button>}
+        />
+      </ListPage>
+    );
   }
 
   const { name, pluginName } = connection;
@@ -171,7 +179,6 @@ export const Connection = () => {
         plugin={plugin}
         connectionId={connectionId}
         connectionName={name}
-        scopes={rows}
         onClose={() => setAddOpen(false)}
         onAdded={() => {
           setAddOpen(false);

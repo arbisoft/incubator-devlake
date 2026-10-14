@@ -18,15 +18,17 @@
 
 import { Alert, Button, message } from 'antd';
 import { pick } from 'lodash';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import API from '@/api';
 import { addConnection, updateConnection } from '@/features';
-import { selectConnection, toTestErrorMessage } from '@/features/connections';
-import { useAppDispatch, useAppSelector } from '@/hooks';
+import { selectConnection, toConnectionActionErrorMessage } from '@/features/connections';
+import { COPY as CONNECTION_COPY, HTTP_STATUS as CONNECTION_HTTP_STATUS } from '@/features/connections/constants';
+import { getErrorResponse } from '@/features/connections/utils';
+import { useAppDispatch, useAppSelector, useRefreshData } from '@/hooks';
 import { getPluginConfig } from '@/plugins/utils';
 import type { IConnectionAPI } from '@/types';
-import { ExternalLink, toUserMessage } from '@/ui';
+import { COMMON_COPY, ExternalLink, toUserMessage, useRefreshVersion } from '@/ui';
 import { operator } from '@/utils';
 
 import { CONNECTION_FORM_TYPE, COPY, SAVE_ERROR_MAP } from './constants';
@@ -39,10 +41,13 @@ import {
   sanitizeCustomHeaders,
 } from './payload';
 import { Actions, Root } from './styled';
-import type { ConnectionFormProps, ConnectionFormType, ConnectionFormValues } from './types';
-
-type TestPayload = NonNullable<Parameters<typeof API.connection.test>[2]>;
-type OldTestPayload = Parameters<typeof API.connection.testOld>[1];
+import type {
+  ConnectionFormProps,
+  ConnectionFormType,
+  ConnectionFormValues,
+  OldTestPayload,
+  TestPayload,
+} from './types';
 
 export const ConnectionForm = ({ plugin, connectionId, onSuccess }: ConnectionFormProps) => {
   const [type, setType] = useState<ConnectionFormType>(CONNECTION_FORM_TYPE.CREATE);
@@ -55,9 +60,23 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: ConnectionFo
   const dispatch = useAppDispatch();
   const connection = useAppSelector((state) => selectConnection(state, `${plugin}-${connectionId}`));
   const selectedConnection = connectionDetail ?? connection;
+  const { version, refresh } = useRefreshVersion();
+  const { ready: detailReady, error: detailError } = useRefreshData(
+    (signal) =>
+      connectionId === undefined
+        ? Promise.resolve(undefined)
+        : API.connection.get(plugin, connectionId, signal).then((res) => {
+            if (!signal.aborted) {
+              setConnectionDetail(res);
+              setValues(pick(res, CONNECTION_FORM_FIELDS));
+              setErrors({});
+            }
+            return res;
+          }),
+    [plugin, connectionId, version],
+  );
 
-  // Reset during render, not in an effect: an effect-based reset ran after
-  // field components' own mount effects and silently wiped their defaults.
+  // Reset during render so it runs before the fields apply defaults.
   const resetKey = `${plugin}:${connectionId ?? ''}`;
   const [lastResetKey, setLastResetKey] = useState<string | null>(null);
   if (lastResetKey !== resetKey) {
@@ -67,29 +86,6 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: ConnectionFo
     setErrors({});
     setValues(connectionId && connection ? pick(connection, CONNECTION_FORM_FIELDS) : {});
   }
-
-  // Async refetch stays in an effect; it only adds real saved values on top
-  // of the already-reset state above, so it can't reintroduce the race.
-  useEffect(() => {
-    if (!connectionId) {
-      return;
-    }
-    let canceled = false;
-    API.connection
-      .get(plugin, connectionId)
-      .then((res) => {
-        if (canceled) {
-          return;
-        }
-        setConnectionDetail(res);
-        setValues(pick(res, CONNECTION_FORM_FIELDS));
-        setErrors({});
-      })
-      .catch(() => undefined);
-    return () => {
-      canceled = true;
-    };
-  }, [plugin, connectionId]);
 
   const pluginConfig = getPluginConfig(plugin);
   const name = pluginConfig?.name;
@@ -103,40 +99,54 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: ConnectionFo
     () => sanitizeCustomHeaders(values.customHeaders as Parameters<typeof sanitizeCustomHeaders>[0]),
     [values.customHeaders],
   );
+  const detailsBlocked =
+    connectionId !== undefined && (!detailReady || detailError !== undefined || connectionDetail === undefined);
 
   if (!plugin || !name) {
     return null;
   }
 
   const handleTest = async () => {
+    if (detailsBlocked) return;
+
     const [success, res] = await operator(
-      () =>
-        type === CONNECTION_FORM_TYPE.UPDATE && connectionId
-          ? API.connection.test(
-              plugin,
-              connectionId,
-              buildChangedTestPayload(selectedConnection, values, customHeaders) as TestPayload,
-            )
-          : API.connection.testOld(plugin, buildNewTestPayload(initialValues, values, customHeaders) as OldTestPayload),
+      async () => {
+        const result =
+          type === CONNECTION_FORM_TYPE.UPDATE && connectionId
+            ? await API.connection.test(
+                plugin,
+                connectionId,
+                buildChangedTestPayload(selectedConnection, values, customHeaders) as TestPayload,
+              )
+            : await API.connection.testOld(
+                plugin,
+                buildNewTestPayload(initialValues, values, customHeaders) as OldTestPayload,
+              );
+        if (result.success === false) {
+          throw Object.assign(new Error(CONNECTION_COPY.testFailed.fallback), {
+            response: { status: CONNECTION_HTTP_STATUS.BAD_REQUEST, data: { message: result.message } },
+          });
+        }
+        return result;
+      },
       {
         setOperating: setTesting,
         formatMessage: () => COPY.test.success,
-        formatReason: toTestErrorMessage,
+        formatReason: toConnectionActionErrorMessage,
         hideToast: !!showTestResultMessage,
       },
     );
 
-    if (success && showTestResultMessage) {
-      message.success(res?.message || COPY.test.success);
+    if (showTestResultMessage) {
+      if (success) message.success(res?.message || COPY.test.success);
+      else message.error(toConnectionActionErrorMessage(res));
     }
   };
 
   const handleSave = async () => {
-    // Save and Test diverge on the update path: handleTest sends only fields
-    // that changed vs `selectedConnection`, while handleSave sends the merged
-    // (plugin defaults + form values), whitelisted payload. Don't unify these
-    // without first confirming the save and test endpoints accept the same
-    // shape.
+    if (detailsBlocked) return;
+
+    // Save uses the merged whitelist; Test sends only changed fields.
     const payload = buildConnectionSavePayload(
       type === CONNECTION_FORM_TYPE.UPDATE ? { ...initialValues, ...selectedConnection } : initialValues,
       { ...values, customHeaders },
@@ -151,7 +161,12 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: ConnectionFo
       {
         setOperating: setSaving,
         formatMessage: () => (!connectionId ? COPY.save.created : COPY.save.updated),
-        formatReason: (error) => toUserMessage(error, SAVE_ERROR_MAP, COPY.save.failed),
+        formatReason: (error) =>
+          getErrorResponse(error)?.status === CONNECTION_HTTP_STATUS.CONFLICT
+            ? COPY.save.duplicate
+            : toConnectionActionErrorMessage(error, (source) =>
+                toUserMessage(source, SAVE_ERROR_MAP, COPY.save.failed),
+              ),
       },
     );
 
@@ -169,6 +184,19 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: ConnectionFo
           </>
         }
       />
+      {connectionId !== undefined && !detailReady && detailError === undefined && (
+        <Alert title={COPY.details.loading} />
+      )}
+      {connectionId !== undefined && detailError !== undefined && (
+        <Alert
+          title={COPY.details.failed}
+          action={
+            <Button type="link" onClick={refresh}>
+              {COMMON_COPY.retry}
+            </Button>
+          }
+        />
+      )}
       <div>
         <Form
           type={type}
@@ -183,10 +211,21 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: ConnectionFo
         />
       </div>
       <Actions>
-        <Button htmlType="button" type="primary" loading={saving} disabled={disabled || testing} onClick={handleSave}>
+        <Button
+          htmlType="button"
+          type="primary"
+          loading={saving}
+          disabled={disabled || testing || detailsBlocked}
+          onClick={handleSave}
+        >
           {COPY.save.label}
         </Button>
-        <Button htmlType="button" loading={testing} disabled={disabled || saving} onClick={handleTest}>
+        <Button
+          htmlType="button"
+          loading={testing}
+          disabled={disabled || saving || detailsBlocked}
+          onClick={handleTest}
+        >
           {COPY.test.label}
         </Button>
       </Actions>

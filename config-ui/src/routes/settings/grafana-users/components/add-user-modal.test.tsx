@@ -37,7 +37,12 @@ import {
   setup,
   submit,
 } from './__tests__/add-user-modal-helpers';
-import { captureLoggedRequestBody, expectPasswordErrorSafe, makePasswordError } from './__tests__/password-error';
+import {
+  captureLoggedRequestBody,
+  expectPasswordErrorSafe,
+  makePasswordError,
+  waitForPasswordFormReady,
+} from './__tests__/password-error';
 
 import './__tests__/add-user-modal-basic-cases';
 import './__tests__/add-user-modal-picker-cases';
@@ -77,6 +82,7 @@ describe('AddUserModal initial form', () => {
     expectPasswordErrorSafe(error, loggedRequestBody, password, PASSWORD);
     expect(email.value === EMAIL).toBeTruthy();
     expect(props.onClose).not.toHaveBeenCalled();
+    await waitForPasswordFormReady(submit(COPY.add.submit));
 
     fireEvent.click(submit(COPY.add.submit));
     await waitFor(() => expect(props.onPassword).toHaveBeenCalledOnce());

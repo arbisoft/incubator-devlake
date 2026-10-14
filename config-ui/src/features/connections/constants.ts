@@ -45,6 +45,7 @@ export const COPY = {
 export const HTTP_STATUS = {
   OK: 200,
   BAD_REQUEST: 400,
+  CONFLICT: 409,
   UNAUTHORIZED: 401,
   FORBIDDEN: 403,
   REQUEST_TIMEOUT: 408,

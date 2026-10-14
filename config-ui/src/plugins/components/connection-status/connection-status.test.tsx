@@ -19,18 +19,26 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { COPY } from '@/features/connections/constants';
+import type { ConnectionHealthEntry } from '@/features/connections';
+import { COPY, HEALTH_FAILURE_REASON } from '@/features/connections/constants';
 import { IConnectionStatus, type IConnection } from '@/types';
 import { messageMock } from '@/ui/__tests__/mock-message';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
+import { COPY as HEALTH_VIEW_COPY } from '@/ui/connection-health/constants';
 
 import { ConnectionStatus } from './connection-status';
 
-const mocks = vi.hoisted(() => ({ dispatch: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  dispatch: vi.fn(),
+  selector: undefined as ((state: unknown) => unknown) | undefined,
+}));
 
 vi.mock('@/hooks', () => ({
   useAppDispatch: () => mocks.dispatch,
-  useAppSelector: (selector: (state: unknown) => unknown) => selector({ connections: { health: {} } }),
+  useAppSelector: (selector: (state: unknown) => unknown) => {
+    mocks.selector = selector;
+    return selector({ connections: { health: {} } });
+  },
 }));
 
 vi.mock('antd', async (importOriginal) =>
@@ -46,47 +54,78 @@ const connection = {
   status: IConnectionStatus.IDLE,
 } as IConnection;
 
+const mockRetestResult = (status: IConnectionStatus, health: ConnectionHealthEntry) => {
+  mocks.dispatch.mockReturnValue({
+    unwrap: () => Promise.resolve({ unique: connection.unique, status, health }),
+  });
+};
+
+const performRetest = () => {
+  renderWithTheme(<ConnectionStatus connection={connection} />);
+  fireEvent.click(screen.getByRole('button', { name: HEALTH_VIEW_COPY.retest }));
+};
+
 describe('ConnectionStatus retest feedback', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('shows a failure toast when the fulfilled test result is offline', async () => {
-    mocks.dispatch.mockReturnValue({
-      unwrap: () =>
-        Promise.resolve({
-          unique: connection.unique,
-          status: IConnectionStatus.OFFLINE,
-          health: {
-            status: IConnectionStatus.OFFLINE,
-            reason: 'credentials',
-            message: 'authentication failed',
-            testedAt: Date.now(),
-          },
-        }),
+    mockRetestResult(IConnectionStatus.OFFLINE, {
+      status: IConnectionStatus.OFFLINE,
+      reason: HEALTH_FAILURE_REASON.CREDENTIALS,
+      message: 'authentication failed',
+      testedAt: Date.now(),
     });
-    renderWithTheme(<ConnectionStatus connection={connection} />);
+    performRetest();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Retest connection' }));
+    await waitFor(() => expect(messageMock.error).toHaveBeenCalledWith('authentication failed'));
+    expect(messageMock.success).not.toHaveBeenCalled();
+  });
 
-    await waitFor(() => expect(messageMock.error).toHaveBeenCalledWith(COPY.testFailed.credentials));
+  it('uses the generic fallback when an offline result has no message', async () => {
+    mockRetestResult(IConnectionStatus.OFFLINE, {
+      status: IConnectionStatus.OFFLINE,
+      reason: HEALTH_FAILURE_REASON.FAILED,
+      testedAt: Date.now(),
+    });
+    performRetest();
+
+    await waitFor(() => expect(messageMock.error).toHaveBeenCalledWith(COPY.testFailed.fallback));
+    expect(messageMock.success).not.toHaveBeenCalled();
+  });
+
+  it('reduces a multiline offline reason to its readable summary', async () => {
+    mockRetestResult(IConnectionStatus.OFFLINE, {
+      status: IConnectionStatus.OFFLINE,
+      reason: HEALTH_FAILURE_REASON.FAILED,
+      message: 'attached stack trace\nWraps: (2) Repository was not found\nWraps: (3) ignored detail',
+      testedAt: Date.now(),
+    });
+    performRetest();
+
+    await waitFor(() => expect(messageMock.error).toHaveBeenCalledWith('Repository was not found'));
     expect(messageMock.success).not.toHaveBeenCalled();
   });
 
   it('shows a success toast when the fulfilled test result is online', async () => {
-    mocks.dispatch.mockReturnValue({
-      unwrap: () =>
-        Promise.resolve({
-          unique: connection.unique,
-          status: IConnectionStatus.ONLINE,
-          health: { status: IConnectionStatus.ONLINE, testedAt: Date.now() },
-        }),
+    mockRetestResult(IConnectionStatus.ONLINE, {
+      status: IConnectionStatus.ONLINE,
+      testedAt: Date.now(),
     });
-    renderWithTheme(<ConnectionStatus connection={connection} />);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Retest connection' }));
+    performRetest();
 
     await waitFor(() => expect(messageMock.success).toHaveBeenCalledWith('Operation successfully completed'));
     expect(messageMock.error).not.toHaveBeenCalled();
+  });
+
+  it('selects only this connection health entry', () => {
+    renderWithTheme(<ConnectionStatus connection={connection} />);
+    const entry = { status: IConnectionStatus.ONLINE, testedAt: Date.now() };
+    const { selector } = mocks;
+    if (!selector) throw new Error('Health selector was not captured.');
+
+    expect(selector({ connections: { health: { [connection.unique]: entry, other: { testedAt: 1 } } } })).toBe(entry);
+    expect(selector({ connections: { health: { [connection.unique]: entry, other: { testedAt: 2 } } } })).toBe(entry);
   });
 });

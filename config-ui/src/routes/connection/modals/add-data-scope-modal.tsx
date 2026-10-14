@@ -16,37 +16,41 @@
  *
  */
 
+import { useRefreshData } from '@/hooks';
 import { DataScopeRemoteModal } from '@/plugins';
+import { useRefreshVersion } from '@/ui';
 
 import { DETAIL_COPY } from '../constants';
-import type { ScopeRow } from '../scope-table';
 
-type AddDataScopeModalProps = {
-  open: boolean;
-  plugin: string;
-  connectionId: ID;
-  connectionName: string;
-  scopes: ScopeRow[];
-  onClose: () => void;
-  onAdded: () => void;
-};
+import { loadScopeMembership } from './scope-membership';
+import type { AddDataScopeModalProps } from './types';
 
 export const AddDataScopeModal = ({
   open,
   plugin,
   connectionId,
   connectionName,
-  scopes,
   onClose,
   onAdded,
-}: AddDataScopeModalProps) => (
-  <DataScopeRemoteModal
-    open={open}
-    plugin={plugin}
-    connectionId={connectionId}
-    title={DETAIL_COPY.addScopeTitle(connectionName)}
-    disabledScope={scopes}
-    onCancel={onClose}
-    onSubmit={onAdded}
-  />
-);
+}: AddDataScopeModalProps) => {
+  const { version, refresh } = useRefreshVersion();
+  const { data, ready, error } = useRefreshData(
+    (signal) => (open ? loadScopeMembership(plugin, connectionId, signal) : Promise.resolve([])),
+    [plugin, connectionId, version, open],
+  );
+
+  return (
+    <DataScopeRemoteModal
+      open={open}
+      plugin={plugin}
+      connectionId={connectionId}
+      title={DETAIL_COPY.addScopeTitle(connectionName)}
+      disabledScope={data ?? []}
+      loadingScopes={open && !ready && error === undefined}
+      scopesLoadFailed={open && error !== undefined}
+      onRetryScopes={refresh}
+      onCancel={onClose}
+      onSubmit={onAdded}
+    />
+  );
+};

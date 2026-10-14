@@ -51,6 +51,7 @@ export const COPY = {
   saveRejected: 'The selected data scope was rejected. Check the selection and try again.',
   disabledReason: 'Select at least one data scope.',
   loadFailed: 'Could not load the list. Try again.',
+  membershipLoadFailed: 'Existing data scopes could not be loaded. Retry before adding scopes.',
   selected: (count: number) => `${count} selected`,
   noneSelected: 'Please select scope...',
   clearAll: 'Clear all',

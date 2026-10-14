@@ -16,7 +16,12 @@
  *
  */
 
+import type API from '@/api';
+
 import type { CONNECTION_FORM_TYPE } from './constants';
+
+export type TestPayload = NonNullable<Parameters<typeof API.connection.test>[2]>;
+export type OldTestPayload = Parameters<typeof API.connection.testOld>[1];
 
 export type ConnectionFormType = (typeof CONNECTION_FORM_TYPE)[keyof typeof CONNECTION_FORM_TYPE];
 

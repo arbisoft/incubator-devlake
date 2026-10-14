@@ -71,10 +71,17 @@ export const HTTP_STATUS = { FORBIDDEN: 403, NOT_FOUND: 404, CONFLICT: 409 } as 
 
 export const BULK_DELETE_CONCURRENCY = 3;
 export const MAX_LISTED_SCOPES = 5;
+export const SCOPE_MEMBERSHIP_PAGE_SIZE = 100;
 export const NO_SCOPE_CONFIG = 'None';
 export const SCOPE_CONFIG_UNSUPPORTED_PLUGIN = 'tapd';
 
 export const DETAIL_COPY = {
+  missing: {
+    title: 'Connection not found',
+    description: 'This connection may have been removed.',
+    back: 'Back to connections',
+  },
+  membershipLoadFailed: 'Existing data scopes could not be loaded.',
   breadcrumbRoot: 'Connections',
   description: "To view DORA metrics, you'll need to add Scope Configs.",
   deleteConnection: 'Delete connection',

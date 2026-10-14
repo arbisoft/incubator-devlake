@@ -28,7 +28,12 @@ import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 import { COPY } from '../../constants';
 import { SetPasswordModal } from '../set-password-modal';
 
-import { captureLoggedRequestBody, expectPasswordErrorSafe, makePasswordError } from './password-error';
+import {
+  captureLoggedRequestBody,
+  expectPasswordErrorSafe,
+  makePasswordError,
+  waitForPasswordFormReady,
+} from './password-error';
 
 const EMAIL = 'ann@example.com';
 const PASSWORD = 'a-long-enough-password';
@@ -100,6 +105,7 @@ describe('SetPasswordModal', () => {
     expect(props.onClose).not.toHaveBeenCalled();
 
     await waitFor(() => expect(submit().getAttribute('aria-disabled')).not.toBe(ARIA_TRUE));
+    await waitForPasswordFormReady(submit());
     fireEvent.click(submit());
     await waitFor(() => expect(props.onPassword).toHaveBeenCalledOnce());
     expect(grafana.setPassword).toHaveBeenCalledTimes(2);

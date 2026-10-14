@@ -16,6 +16,7 @@
  *
  */
 
+import { waitFor } from '@testing-library/react';
 import { AxiosError, AxiosHeaders, isAxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { expect, vi } from 'vitest';
 
@@ -57,4 +58,10 @@ export const expectPasswordErrorSafe = (
   expect(loggedBodyReader()).toBeFalsy();
   expect(error.config?.data === undefined).toBeTruthy();
   expect(input.value === expectedPassword).toBeTruthy();
+};
+
+export const waitForPasswordFormReady = async (button: HTMLElement) => {
+  await waitFor(() => expect(button.classList.contains('ant-btn-loading')).toBeFalsy(), {
+    onTimeout: () => new Error('The password form was not ready to retry.'),
+  });
 };
