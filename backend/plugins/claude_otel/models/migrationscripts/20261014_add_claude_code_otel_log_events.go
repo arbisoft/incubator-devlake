@@ -79,6 +79,7 @@ type otelEvent20261014 struct {
 	PluginName          string    `gorm:"type:varchar(255)"`
 	McpServerName       string    `gorm:"type:varchar(255)"`
 	QuerySource         string    `gorm:"type:varchar(100)"`
+	CommandName         string    `gorm:"type:varchar(255)"`
 	Success             *bool
 	DurationMs          *int64
 	CostUsd             *string         `gorm:"type:decimal(20,8)"`

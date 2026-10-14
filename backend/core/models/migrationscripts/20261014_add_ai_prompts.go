@@ -42,8 +42,8 @@ type aiPrompt20261014 struct {
 	UserAccountId          *string   `gorm:"type:varchar(255);index"`
 	UserEmail              string    `gorm:"type:varchar(255);index"`
 	SourceConnectionId     uint64    `gorm:"index"`
-	SessionId              string    `gorm:"type:varchar(64);index"`
-	PromptId               string    `gorm:"type:varchar(64);index"`
+	SessionId              string    `gorm:"type:varchar(128);index"`
+	PromptId               string    `gorm:"type:varchar(128);index"`
 	StartedAt              time.Time `gorm:"type:datetime(3);index"`
 	EndedAt                time.Time `gorm:"type:datetime(3)"`
 	PromptLength           int64
@@ -75,8 +75,8 @@ type aiPromptSkill20261014 struct {
 	Provider          string    `gorm:"type:varchar(100);index"`
 	WorkspaceKey      string    `gorm:"type:varchar(255);index"`
 	UserKey           string    `gorm:"type:varchar(255);index"`
-	SessionId         string    `gorm:"type:varchar(64);index"`
-	PromptId          string    `gorm:"type:varchar(64);index"`
+	SessionId         string    `gorm:"type:varchar(128);index"`
+	PromptId          string    `gorm:"type:varchar(128);index"`
 	SkillName         string    `gorm:"type:varchar(255);index"`
 	InvocationTrigger string    `gorm:"type:varchar(64)"`
 	SkillSource       string    `gorm:"type:varchar(64)"`
@@ -93,7 +93,7 @@ type aiPermissionModeChange20261014 struct {
 	WorkspaceKey string    `gorm:"type:varchar(255);index"`
 	UserKey      string    `gorm:"type:varchar(255);index"`
 	UserEmail    string    `gorm:"type:varchar(255);index"`
-	SessionId    string    `gorm:"type:varchar(64);index"`
+	SessionId    string    `gorm:"type:varchar(128);index"`
 	ChangedAt    time.Time `gorm:"type:datetime(3);index"`
 	FromMode     string    `gorm:"type:varchar(64)"`
 	ToMode       string    `gorm:"type:varchar(64);index"`
