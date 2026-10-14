@@ -40,7 +40,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "**Scope & caveats:**\n\n- **AI usage/activity figures on this dashboard come from Claude Code OTel** and are scoped through the connection-to-project mapping and the Project/Claude Code OTel Teams filters above. Activity totals use `canonical_activity` rows; model-usage totals come from `ai_model_usages`. Legacy Claude Admin-API and Cursor activity are excluded — neither carries a reliable per-project mapping, so mixing them in made the “Company-wide” figures uncomparable to the project-scoped delivery panels below.\n- **Active Hours** is queried directly from Claude Code's OTel telemetry, not the shared `ai_activities` table — session duration isn't rolled up into the domain layer for any provider.\n- **Commits/lines never merged are inflated by squash-merge workflows.** A squash-merged PR keeps only its final squashed commit in the ingested history — the original branch commits never show up as “merged” even though the code did ship. Read this row as an upper bound on abandoned work, not an exact measurement.\n- **PR Abandonment Rate** is the delivery-outcome view of the same problem: no field links an AI session to the branch or PR it produced, so a dollar/token cost can't be attached to abandoned work directly. This table measures it a different way instead — PR-level: (PRs authored that closed without merging) ÷ (all PRs authored) — as an outcome-based proxy for wasted effort, not an AI-cost-denominated one.",
+        "content": "**Scope & caveats:**\n\n- **AI usage/activity figures on this dashboard come from Claude Code OTel** and are scoped through the connection-to-project mapping and the Project/Claude Code OTel Teams filters above. Activity totals use `canonical_activity` rows; model-usage totals come from `ai_model_usages`. Legacy Claude Admin-API and Cursor activity are excluded — neither carries a reliable per-project mapping, so mixing them in made the “Company-wide” figures uncomparable to the project-scoped delivery panels below.\n- **Active Hours** is queried directly from Claude Code's OTel telemetry, not the shared `ai_activities` table — session duration isn't rolled up into the domain layer for any provider.\n- **Commits/code churn in closed, unmerged PRs** require at least one closed PR and no merged or open PR association for the same commit SHA in the same base repository. All commit/PR checks use the PR base repository; PRs in another repository do not affect qualification. Closed-PR commit counts come directly from recorded PR associations without requiring repository history or commit metadata; closed-PR churn requires commit metadata, so it can cover fewer commits. Each SHA is counted once per panel if any selected accessible repository qualifies. A SHA shared across repositories can therefore qualify in both categories; these totals should not be added as disjoint sets.\n- **Commits/code churn without recorded PRs** have no recorded PR association of any status in a qualifying repository, and are not a merged PR's merge commit there. This includes branches without PRs and direct-to-default-branch commits; it does not prove the commits never reached main or bypassed review. Counts depend on complete commit/PR ingestion, and historical associations may remain after branch history changes. Equivalent code can ship under another SHA (for example, through squashing or cherry-picking). Known overcounts: rebase-merged PRs (every rewritten commit except the merge result), GitLab MRs that are squashed and also get a merge commit (DevLake stores only the merge commit, so the squash commit looks unassociated; a backend fix is tracked separately), and merges of PRs that DevLake never collected.\n- **Reporting periods and line counts:** PRs Closed, Never Merged and the closed-PR commit/churn panels use PR closure dates; commits may have been created before the selected period. The merged-PR exclusion checks all dates. Panels without recorded PRs use commit dates and check PR associations across all dates, so their reporting periods differ from the closed-PR panels. Code churn is shown in lines (additions + deletions), counted once per SHA, and only covers commits with additions/deletions metadata; it shows no data when none of the qualifying commits have it. Repeated edits are counted; this is not unique abandoned code.\n- **PR Abandonment Rate** is the delivery-outcome view of the same problem: no field links an AI session to the branch or PR it produced, so a dollar/token cost can't be attached to abandoned work directly. This table measures it a different way instead — PR-level: (PRs authored that closed without merging) ÷ (all PRs authored) — as an outcome-based proxy for wasted effort, not an AI-cost-denominated one.",
         "mode": "markdown"
       },
       "pluginVersion": "11.0.0",
@@ -380,7 +380,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Pull requests closed without ever merging, scoped to the selected project(s).",
+      "description": "Distinct pull requests closed without merging, scoped to the selected project(s), using PR closure dates. Closed-PR commit/churn panels use the same date field; panels without recorded PRs use commit dates.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -424,7 +424,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) AS \"PRs Closed, Never Merged\"\nFROM pull_requests pr\nJOIN project_mapping pm ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\nWHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status = 'CLOSED' AND $__timeFilter(pr.closed_date)",
+          "rawSql": "SELECT COUNT(DISTINCT pr.id) AS \"PRs Closed, Never Merged\"\nFROM pull_requests pr\nJOIN project_mapping pm ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\nWHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status = 'CLOSED' AND $__timeFilter(pr.closed_date)",
           "refId": "A"
         }
       ],
@@ -433,7 +433,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Commits with no record of ever landing in a merged pull request, scoped to the selected project(s). Inflated by squash-merge workflows — see the caveat above; read as an upper bound, not an exact count.",
+      "description": "Distinct recorded commit SHAs in PRs closed during the selected period, scoped by PR base repository to the selected project(s), excluding SHAs that are also in a merged or open PR in the same base repository, across any date. Includes associations without commit metadata; recorded associations do not prove code was abandoned.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -477,16 +477,31 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(DISTINCT c.sha) AS \"Commits Never Merged\"\nFROM commits c\nJOIN repo_commits rc ON rc.commit_sha = c.sha\nJOIN project_mapping pm ON pm.row_id = rc.repo_id AND pm.`table` = 'repos'\nLEFT JOIN pull_request_commits prc ON prc.commit_sha = c.sha\nLEFT JOIN pull_requests pr ON pr.id = prc.pull_request_id AND pr.status = 'MERGED'\nWHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.id IS NULL AND $__timeFilter(c.committed_date)",
+          "rawSql": "WITH scoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nactive_shas AS (\n  SELECT DISTINCT pr.base_repo_id AS repo_id, prc.commit_sha AS sha\n  FROM pull_requests pr\n  JOIN pull_request_commits prc ON prc.pull_request_id = pr.id\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND pr.status IN ('MERGED', 'OPEN')\n),\nclosed_shas AS (\n  SELECT DISTINCT prc.commit_sha AS sha\n  FROM pull_requests pr\n  JOIN pull_request_commits prc ON prc.pull_request_id = pr.id\n  LEFT JOIN active_shas act ON act.repo_id = pr.base_repo_id AND act.sha = prc.commit_sha\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND pr.status = 'CLOSED'\n    AND $__timeFilter(pr.closed_date)\n    AND act.sha IS NULL\n)\nSELECT\n  COUNT(*) AS \"Commits in Closed, Unmerged PRs\",\n  CASE WHEN COUNT(*) > 0 AND COUNT(c.additions) = 0 THEN NULL\n    ELSE COALESCE(SUM(COALESCE(c.additions, 0) + COALESCE(c.deletions, 0)), 0)\n  END AS \"Code Churn in Closed, Unmerged PRs\"\nFROM closed_shas s\nLEFT JOIN commits c ON c.sha = s.sha",
           "refId": "A"
         }
       ],
-      "title": "Commits Never Merged",
-      "type": "stat"
+      "title": "Commits in Closed, Unmerged PRs",
+      "type": "stat",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Commits in Closed, Unmerged PRs"
+              ]
+            }
+          }
+        }
+      ]
     },
     {
-      "datasource": "mysql",
-      "description": "Additions + deletions summed over the same never-merged commit set above. Inflated by squash-merge workflows for the same reason — read as an upper bound, not a precise figure.",
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "description": "Total code churn in lines (additions + deletions), counted once per commit from Commits in Closed, Unmerged PRs. Only commits with additions/deletions metadata in the commits table contribute, so churn is undercounted when metadata is missing; it shows no data when none of the qualifying commits have metadata. Repeated edits and changes shipped elsewhere are included.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -499,7 +514,7 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "suffix:lines"
         },
         "overrides": []
       },
@@ -527,15 +542,162 @@
       "pluginVersion": "11.0.0",
       "targets": [
         {
-          "datasource": "mysql",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT SUM(sz) AS \"Lines Never Merged\" FROM (\n  SELECT DISTINCT c.sha, (c.additions + c.deletions) AS sz\n  FROM commits c\n  JOIN repo_commits rc ON rc.commit_sha = c.sha\n  JOIN project_mapping pm ON pm.row_id = rc.repo_id AND pm.`table` = 'repos'\n  LEFT JOIN pull_request_commits prc ON prc.commit_sha = c.sha\n  LEFT JOIN pull_requests pr ON pr.id = prc.pull_request_id AND pr.status = 'MERGED'\n  WHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.id IS NULL AND $__timeFilter(c.committed_date)\n) x",
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 10,
           "refId": "A"
         }
       ],
-      "title": "Lines Never Merged",
-      "type": "stat"
+      "title": "Code Churn in Closed, Unmerged PRs",
+      "type": "stat",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Code Churn in Closed, Unmerged PRs"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "datasource": "mysql",
+      "description": "Distinct commits in the selected project(s)' repositories, by commit date, that have no recorded PR association of any status and are not a merged PR's merge commit in the same base repository. Rebase-merged PR commits, squash commits from GitLab MRs that also have a merge commit, and merges of PRs that were never collected can inflate the count; this does not prove direct pushes to main.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 0,
+        "y": 21
+      },
+      "id": 14,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH scoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\npr_shas AS (\n  SELECT pr.base_repo_id AS repo_id, prc.commit_sha AS sha\n  FROM pull_requests pr\n  JOIN pull_request_commits prc ON prc.pull_request_id = pr.id\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n  UNION\n  SELECT mpr.base_repo_id, mpr.merge_commit_sha\n  FROM pull_requests mpr\n  WHERE mpr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND mpr.status = 'MERGED' AND mpr.merge_commit_sha <> ''\n),\nno_pr AS (\n  SELECT DISTINCT c.sha, c.additions, c.deletions\n  FROM commits c\n  JOIN repo_commits rc ON rc.commit_sha = c.sha\n  JOIN scoped_repos s ON s.repo_id = rc.repo_id\n  LEFT JOIN pr_shas p ON p.repo_id = rc.repo_id AND p.sha = c.sha\n  WHERE p.sha IS NULL AND $__timeFilter(c.committed_date)\n)\nSELECT\n  COUNT(*) AS \"Commits Without PRs\",\n  CASE WHEN COUNT(*) > 0 AND COUNT(additions) = 0 THEN NULL\n    ELSE COALESCE(SUM(COALESCE(additions, 0) + COALESCE(deletions, 0)), 0)\n  END AS \"Code Churn Without Recorded PRs\"\nFROM no_pr",
+          "refId": "A"
+        }
+      ],
+      "title": "Commits Without PRs",
+      "type": "stat",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Commits Without PRs"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "description": "Total code churn in lines (additions + deletions), counted once per commit from Commits Without PRs. Only commits with additions/deletions metadata contribute; it shows no data when none of the qualifying commits have metadata. Churn is not unique abandoned code.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              }
+            ]
+          },
+          "unit": "suffix:lines"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 12,
+        "y": 21
+      },
+      "id": 15,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 14,
+          "refId": "A"
+        }
+      ],
+      "title": "Code Churn Without Recorded PRs",
+      "type": "stat",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Code Churn Without Recorded PRs"
+              ]
+            }
+          }
+        }
+      ]
     },
     {
       "collapsed": false,
@@ -543,7 +705,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 21
+        "y": 25
       },
       "id": 12,
       "panels": [],
@@ -552,7 +714,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "PR-level, not commit/branch-level: (PRs authored that closed without merging) ÷ (all PRs authored), scoped to the selected project(s), minimum 5 PRs authored in range to avoid noisy small-sample rates. Measures delivery outcome, not AI-specific cost.",
+      "description": "PR-level, not commit/branch-level: (PRs authored that closed without merging) ÷ (all PRs authored), scoped to the selected project(s), minimum 5 PRs authored in range to avoid noisy small-sample rates. Measures delivery outcome, not AI-specific cost. Each PR is counted once even when its repository maps to several selected projects.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -573,7 +735,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 22
+        "y": 26
       },
       "id": 13,
       "options": {
@@ -593,7 +755,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(NULLIF(a.full_name,''), pr.author_name) AS \"Contributor\",\n  COUNT(*) AS \"Total PRs\",\n  SUM(pr.status = 'CLOSED') AS \"Abandoned (Closed, Never Merged)\",\n  ROUND(100.0 * SUM(pr.status = 'CLOSED') / COUNT(*), 1) AS \"Abandonment Rate %\"\nFROM pull_requests pr\nLEFT JOIN accounts a ON a.id = pr.author_id\nJOIN project_mapping pm ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\nWHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status IN ('CLOSED', 'MERGED') AND COALESCE(pr.merged_date, pr.closed_date) BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY COALESCE(NULLIF(a.full_name,''), pr.author_name)\nHAVING COUNT(*) >= 5\nORDER BY 4 DESC\nLIMIT 25",
+          "rawSql": "SELECT COALESCE(NULLIF(a.full_name,''), pr.author_name) AS \"Contributor\",\n  COUNT(*) AS \"Total PRs\",\n  SUM(pr.status = 'CLOSED') AS \"Abandoned (Closed, Never Merged)\",\n  ROUND(100.0 * SUM(pr.status = 'CLOSED') / COUNT(*), 1) AS \"Abandonment Rate %\"\nFROM pull_requests pr\nLEFT JOIN accounts a ON a.id = pr.author_id\nWHERE pr.base_repo_id IN (SELECT pm.row_id FROM project_mapping pm WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))) AND pr.status IN ('CLOSED', 'MERGED') AND COALESCE(pr.merged_date, pr.closed_date) BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY COALESCE(NULLIF(a.full_name,''), pr.author_name)\nHAVING COUNT(*) >= 5\nORDER BY 4 DESC\nLIMIT 25",
           "refId": "A"
         }
       ],
