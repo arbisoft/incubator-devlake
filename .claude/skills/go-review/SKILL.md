@@ -1,6 +1,6 @@
 ---
 name: go-review
-description: Review Go changes on the current branch against strict standards — Go idioms (Effective Go, Go Code Review Comments, Google Go Style Guide), SOLID, constructor dependency injection, GoF design patterns, OpenAPI/REST API design and spec accuracy, and good practices (security, observability, config and reliability, code hygiene). Use when asked to review the branch, review my changes, do a code review, or check this diff for Go code.
+description: Review Go changes on the current branch against strict standards — Go idioms (Effective Go, Go Code Review Comments, Google Go Style Guide), SOLID, constructor dependency injection, GoF design patterns, OpenAPI/REST API design and spec accuracy, and good practices (security, observability, config and reliability, code hygiene). Use when the user runs /go-review, or asks to review Go or backend changes against these standards (e.g. "go-review this branch", "check my Go diff for SOLID/DI"). Not for generic "review my changes" or "code review" requests that don't mention Go or these standards (use the built-in /code-review), and not for non-Go code (e.g. config-ui uses react-review).
 argument-hint: "[base-branch] [detailed]"
 ---
 <!--
@@ -103,7 +103,8 @@ If nothing is left to review, say so and stop.
 7. **Each finding appears exactly once.** See Step 5.
 8. **Label every finding** **[blocking]** or **[non-blocking]**:
    - Blocking: anything in "Always Request Changes" below, any correctness, concurrency, error-handling or security defect, any API contract break, any DI or DIP violation in new code (but framework init globals read at the composition root, such as `basicRes` in a handler, are not violations: DI-B4), and LSP-1/LSP-2 (they change behavior). SRP, OCP, ISP and GoF findings are blocking **only** per the Severity rules in `design-patterns.md`: when the diff duplicates or grows the anti-pattern, or a pattern is broken (GOF-X2). Otherwise they're non-blocking.
-   - Non-blocking: naming, doc comments, small idiom issues, HYG-4 split suggestions, and missing examples in the spec (API-D6).
+   - Non-blocking: naming, doc comments, small idiom issues, mixed error styles (GO-X2), HYG-4 split suggestions, and missing examples in the spec (API-D6).
+   - GO-X has both severities. GO-X2 (style mismatch) is non-blocking, under API & naming. GO-X5 (typed nil through `errors.Error`) is blocking, under Correctness.
 9. **Assume a competent author.** Explain only what's not obvious. Don't lecture about what SOLID or REST is.
 
 ## Workflow
@@ -161,7 +162,7 @@ Re-read the code for each merged finding and mark it **valid**, **invalid** or *
 
 ### Using sub-agents
 - **Small diffs** (under ~400 changed Go lines, or 1–2 packages): do everything inline, with no sub-agents.
-- **Larger diffs:** spawn up to **3** Explore agents in parallel for Steps 2–4, split by package, with API routes going to whichever agent owns the handler package. Give each one the paths of the six standards files and its package list. Then use **1** agent for the Step 6 fact-check of the merged list.
+- **Larger diffs:** spawn up to **3** `general-purpose` agents in parallel for Steps 2–4, split by package, with API routes going to whichever agent owns the handler package. Give each one the paths of the six standards files, its package list, the base branch, the conventions found in Step 1, and the finding format. Ask for candidate findings only (`file:line`, rule ID, claim, fix, severity case), not a written review. Then use **1** `general-purpose` agent for the Step 6 fact-check of the merged list. Don't use `Explore` for review or fact-checking: it only locates code and reads excerpts, so it can't judge findings. Use it only for a quick search, such as finding a route's registration or a helper's callers.
 - Never spawn agents for Step 5. Merging is done by you.
 
 ## Output format
@@ -169,16 +170,16 @@ Re-read the code for each merged finding and mark it **valid**, **invalid** or *
 Leave out any finding section with no findings. Assign each finding to **exactly one** section: the **first** one in this order that matches its consequence.
 
 1. **Security**: `SEC-*`, `API-A*`, plus any other finding with a security consequence (e.g. a secret leaked through an API-B2 model).
-2. **Correctness**: wrong results, nil dereferences, broken logic, data loss.
+2. **Correctness**: wrong results, nil dereferences, broken logic, data loss, typed nil returned through an error interface (`GO-X5`).
 3. **Concurrency**: races, leaks, deadlocks, missing cancellation (`GO-G*`, `GO-C4`).
-4. **Error handling**: `GO-E*`, `GO-X*`.
+4. **Error handling**: `GO-E*`. (`GO-X2` goes to API & naming, and `GO-X5` to Correctness.)
 5. **API contract**: `API-R*`, `API-M*`, `API-S*`, `API-E*`, `API-B*`, `API-P*`, `API-V*`, `API-H*`.
 6. **Dependency injection**: `DI-*`.
 7. **SOLID**: `SRP-*`, `OCP-*`, `LSP-*`, `ISP-*`, `DIP-*`.
 8. **Design patterns**: `GOF-*`.
 9. **Reliability**: `REL-*`.
 10. **API spec**: `API-D*`.
-11. **API & naming**: `GO-N*`, `GO-P*`, `GO-I*`, `GO-C1`–`C3`, `GO-C5`, `GO-R*`.
+11. **API & naming**: `GO-N*`, `GO-P*`, `GO-I*`, `GO-C1`–`C3`, `GO-C5`, `GO-R*`, `GO-X2`.
 12. **Observability**: `OBS-*`.
 13. **Testing**: `GO-T*`, `DI-T*`, but only when the defect is purely missing or inadequate tests.
 14. **Performance**: `GO-F*`.

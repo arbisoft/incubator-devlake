@@ -28,7 +28,7 @@ The following are always dependencies. Business logic never creates, looks up or
 | HTTP / RPC clients, vendor SDKs | an interface over the calls used, implemented by an adapter (GOF-S1) | `http.DefaultClient`, `http.Get`, `&http.Client{}`, `sdk.New()` |
 | Clock | `now func() time.Time` or a `Clock` interface | `time.Now()`, `time.Since()`, `time.After()` for business decisions |
 | Randomness / ID generation | `IDGenerator` interface or `func() string` | `uuid.New()`, `rand.*` |
-| Logger | a logger interface or `*slog.Logger` (Go 1.21+) passed in | global `log.Printf`, package-level loggers |
+| Logger | the project's logger interface, passed in (in this repo: `log.Logger` from `core/log`, obtained via `GetLogger()`; `*slog.Logger` only on Go 1.21+ modules without their own logger) | global `log.Printf`, package-level loggers |
 | Config / environment | a typed config struct passed to the constructor | `os.Getenv`, `viper.Get` inside logic |
 | Filesystem | `fs.FS` or a small interface | `os.ReadFile` deep in logic |
 | Metrics / tracing | an interface or provider passed in | global registries used directly |
@@ -127,7 +127,7 @@ func WithClock(now func() time.Time) Option { return func(s *CostService) { s.no
 func run(ctx context.Context, cfg Config) error {
 	httpc := &http.Client{Timeout: cfg.Timeout}
 	prices := pricing.NewHTTPAdapter(httpc, cfg.PricingURL) // Adapter
-	svc, err := NewCostService(retry.Wrap(prices, 3), slogLogger(cfg)) // Decorator
+	svc, err := NewCostService(retry.Wrap(prices, 3), logger) // Decorator; logger is the project's Logger (e.g. basicRes.GetLogger())
 	…
 }
 ```

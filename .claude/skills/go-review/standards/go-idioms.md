@@ -24,6 +24,8 @@ Each rule has an ID (`GO-…`). Reviews cite it; implementations follow it.
 
 ## GO-X — Project conventions
 
+**Severity:** GO-X2 (mixed styles) is **non-blocking** and goes under **API & naming**. GO-X5 (typed nil through an error interface) is **blocking** and goes under **Correctness**. GO-X1, X3 and X4 are guidance on how to read other rules and produce no findings of their own.
+
 The rules below give Go's default *form* for some things (`fmt.Errorf`, `error`, the stdlib `testing` package). A module often has its own established form for the same job. Find it before applying those rules.
 
 - **GO-X1 The project's error package takes precedence.** If the module has its own error package or type that most of the code uses, use it. To detect it, compare counts in the packages being changed, e.g. `grep -rhoE 'errors\.[A-Za-z]+\.(Wrap|New)\(' <pkgs>` against `grep -r 'fmt.Errorf' <pkgs>`. Then:
@@ -31,11 +33,11 @@ The rules below give Go's default *form* for some things (`fmt.Errorf`, `error`,
   - Its type or kind checks meet GO-E3 and GO-E4. If its type implements `Unwrap() error`, std `errors.Is`/`errors.As` also work through the chain, and either is fine.
   - Returning its error interface type is correct wherever this standard says `error` (DI-C1, GO-E9).
   - GO-E7's message style applies to its messages.
-  - *Example (this repo):* `core/errors` is used about 1,900 times, against about 80 uses of `fmt.Errorf`. New code writes `return nil, errors.Default.Wrap(err, "load connection")` or `errors.BadInput.New("connectionId is required")` and returns `errors.Error`.
-- **GO-X2 Following the convention is never a finding. Mixing styles is.** A new `fmt.Errorf` in a package that uses the custom type, or a plain `error` returned where the package returns the custom type, is a **non-blocking** finding, and so is the reverse. Existing mixed code that the change doesn't touch isn't a finding.
+  - *Example (this repo):* `core/errors` is used ~2,000 times, against about 80 uses of `fmt.Errorf`. New code writes `return nil, errors.Default.Wrap(err, "load connection")` or `errors.BadInput.New("connectionId is required")` and returns `errors.Error`.
+- **GO-X2 Following the convention is never a finding. Mixing styles is.** A new `fmt.Errorf` in a package that uses the custom type, or a plain `error` returned where the package returns the custom type, is a **non-blocking** finding, filed under **API & naming** (it's a style mismatch, not an error-handling defect). The reverse is treated the same way. Existing mixed code that the change doesn't touch isn't a finding.
 - **GO-X3 The same precedence applies to other conventions of form:** the logger interface (OBS-L1), the test assertion library (GO-T8), the mock generator (DI-T2) and the constructor return type (DI-C1). Match the package first, then the module.
 - **GO-X4 Conventions never override principles.** GO-X covers *form* only. A project habit that breaks a DI, SOLID, GoF, SEC, REL or API rule is still a finding under that rule. DI-B says how to handle existing code without spreading the problem.
-- **GO-X5 Typed-nil interfaces.** When the error type is an interface (like `errors.Error`), never return a typed nil pointer through it (`var e *myErr; return e`). The result is a non-nil interface, so `err != nil` is true. Return a literal `nil`.
+- **GO-X5 Typed-nil interfaces.** When the error type is an interface (like `errors.Error`), never return a typed nil pointer through it (`var e *myErr; return e`). The result is a non-nil interface, so `err != nil` is true. Return a literal `nil`. This is a **blocking** finding, filed under **Correctness**: callers treat success as failure, or dereference a nil pointer.
 
 ## Naming
 
@@ -83,13 +85,13 @@ The rules below give Go's default *form* for some things (`fmt.Errorf`, `error`,
 
 - **GO-I1 Accept interfaces, return concrete types.** Constructors return `*T`, not an interface, unless there are several implementations to hide behind a factory (see GOF-C1).
 - **GO-I2 Define interfaces where they are used.** The consuming package declares the small interface it needs. The producing package exports the concrete type. Don't add an interface "for mocking" in the producer package.
-- **GO-I3 Keep interfaces small.** One to three methods. Combine by embedding (`ReadWriter`). See SOLID-ISP.
+- **GO-I3 Keep interfaces small.** One to three methods. Combine by embedding (`ReadWriter`). See ISP-1 and ISP-2.
 - **GO-I4 Compile-time assertions.** Each concrete implementation of an interface it's meant to satisfy has `var _ Fetcher = (*HTTPFetcher)(nil)`.
 - **GO-I5 No pointers to interfaces.** `*io.Reader` is almost always a mistake.
 
 ## Package and API design
 
-- **GO-P1 Packages have one purpose** and no import cycles. Shared types go in the lower-level package. A cycle means there's a missing abstraction (see SOLID-DIP).
+- **GO-P1 Packages have one purpose** and no import cycles. Shared types go in the lower-level package. A cycle means there's a missing abstraction (see DIP-2).
 - **GO-P2 `internal/`** holds code that other modules must not import.
 - **GO-P3 Every exported identifier has a doc comment** that starts with its name (`// Client fetches …`). Comments explain why and the contract (nil handling, errors, concurrency safety), not what the code obviously does.
 - **GO-P4 Make the zero value useful** where it's cheap (`sync.Mutex`, `bytes.Buffer`). If it can't be, export a constructor and make sure misuse fails loudly.

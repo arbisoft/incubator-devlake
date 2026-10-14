@@ -18,7 +18,7 @@ limitations under the License.
 
 Go has no classes or inheritance, so each principle is stated in Go terms: types, packages, interfaces and composition. Apply them **strictly** to new and changed code. Each section lists what counts as a violation; a review finding cites the rule ID.
 
-## SOLID-SRP — Single Responsibility
+## SRP — Single Responsibility (`SRP-*`)
 
 A type, function or package has **one reason to change**.
 
@@ -47,7 +47,7 @@ func (s *Importer) Import(ctx context.Context, r io.Reader) error {
 }
 ```
 
-## SOLID-OCP — Open/Closed
+## OCP — Open/Closed (`OCP-*`)
 
 Add behavior by **adding code**, such as a new implementation of an interface, a new strategy or a new registered handler, not by editing a central conditional.
 
@@ -59,7 +59,7 @@ Violations:
 
 A closed `switch` over a fixed, small domain (days of the week, a protocol's three message types) isn't a violation. The finding needs a reason the set will grow or the switch is repeated.
 
-## SOLID-LSP — Liskov Substitution
+## LSP — Liskov Substitution (`LSP-*`)
 
 Every implementation of an interface can **replace any other** without callers noticing.
 
@@ -69,7 +69,7 @@ Violations:
 - **LSP-3 Callers type-asserting to the concrete type** to work around differences (`if f, ok := x.(*SlowFetcher); ok { … }`). The abstraction is leaking.
 - **LSP-4 Undocumented contracts.** An interface with several implementations but no doc comment on each method about errors, nil handling and concurrency. Without a written contract, substitutability can't be checked. Treat the missing contract as the finding.
 
-## SOLID-ISP — Interface Segregation
+## ISP — Interface Segregation (`ISP-*`)
 
 Clients depend only on **the methods they use**.
 
@@ -89,7 +89,7 @@ type userLister interface {
 func NewReporter(users userLister) *Reporter
 ```
 
-## SOLID-DIP — Dependency Inversion
+## DIP — Dependency Inversion (`DIP-*`)
 
 High-level policy depends on **abstractions it owns**. Infrastructure (DB, HTTP, SDKs, files, clock) depends on, or adapts to, those abstractions, never the other way round.
 

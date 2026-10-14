@@ -58,7 +58,10 @@ Four areas: **Security (`SEC-*`)**, **Observability (`OBS-*`)**, **Config and re
 ## Observability (OBS)
 
 ### OBS-L — Logging
-- **OBS-L1 Structured logs** with key/value fields (`"connectionId", id, "op", "collect"`), using the repo's logger interface, injected (DI-M). Use `log/slog` only on Go 1.21+ and only where the repo hasn't standardized on another logger.
+- **OBS-L1 Structured logs**, using the repo's logger interface, injected (DI-M), in that logger's style.
+  - With a key/value logger (`slog`, zap), pass fields: `"connectionId", id, "op", "collect"`.
+  - With a printf-style logger, such as this repo's `log.Logger` (`core/log`), put the context in the message as labeled values (`logger.Info("collect done connectionId=%d rows=%d", id, n)`). Use `Nested("<scope>")` for a component prefix, and pass errors as the `err` argument of `Warn`/`Error`, not formatted into the message.
+  - Use `log/slog` only on Go 1.21+ and only where the repo hasn't standardized on another logger.
 - **OBS-L2 Correct levels:**
   - **Error**: needs action, and is logged once where it's handled (GO-E6).
   - **Warn**: degraded but recovered.
