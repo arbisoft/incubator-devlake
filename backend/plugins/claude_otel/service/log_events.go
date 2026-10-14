@@ -124,6 +124,10 @@ func (p *batchPreparer) prepareLogResource(resourceLogs *logsv1.ResourceLogs, re
 
 func (p *batchPreparer) prepareLogRecord(teamSlug string, resourceAttrs []*commonv1.KeyValue, record *logsv1.LogRecord, resourceBindings map[uint64]string) (*models.OtelEvent, *models.OtelConnection, error) {
 	recordAttrs := record.GetAttributes()
+	eventName := logEventName(record)
+	if eventName == "" {
+		return nil, nil, permanentMetricError(errorInvalidDimension, "OTLP log record has no event name")
+	}
 	observedAt, err := logRecordTime(record)
 	if err != nil {
 		return nil, nil, permanentMetricError(errorInvalidTimestamp, "OTLP log record has an invalid timestamp")
@@ -161,7 +165,7 @@ func (p *batchPreparer) prepareLogRecord(teamSlug string, resourceAttrs []*commo
 		UserEmail:           identity.email,
 		SessionId:           attributeString(recordAttrs, "session.id"),
 		PromptId:            attributeString(recordAttrs, "prompt.id"),
-		EventName:           logEventName(record),
+		EventName:           eventName,
 		EventSequence:       attributeInt(recordAttrs, "event.sequence"),
 		EventTimestamp:      observedAt,
 		AppVersion:          firstNonEmpty(attributeString(recordAttrs, "app.version"), attributeString(resourceAttrs, "service.version")),
@@ -185,9 +189,6 @@ func (p *batchPreparer) prepareLogRecord(teamSlug string, resourceAttrs []*commo
 	}
 	if event.EventName == eventUserPrompt && promptText != "" {
 		event.PromptText = &promptText
-	}
-	if event.EventName == "" {
-		return nil, nil, permanentMetricError(errorInvalidDimension, "OTLP log record has no event name")
 	}
 	event.EventKey = otelEventKey(event, attributeString(recordAttrs, "tool_use_id"), attributeString(recordAttrs, "request_id"))
 	return event, connection, nil
