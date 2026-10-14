@@ -136,6 +136,8 @@ service:
       receivers: [forward/claude_raw]
       exporters: [otlphttp/claude_raw]
     # Claude Code events go only to DevLake, at /plugins/claude_otel/otlp/v1/logs.
+    # The otlphttp/claude_raw sending_queue batches them (256 KiB to 1 MiB, 10s flush), so no
+    # batch processor is needed.
     logs:
       receivers: [otlp]
       processors: [resource/attribution, attributes/team, transform/strip_content]
