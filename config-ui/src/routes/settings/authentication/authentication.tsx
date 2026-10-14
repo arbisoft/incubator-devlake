@@ -37,6 +37,8 @@ import {
   buildListEmpty,
   useRefreshVersion,
 } from '@/ui';
+import { STATUS_TONE } from '@/ui/constants';
+import type { StatusTone } from '@/ui/types';
 
 import { getAuthenticationState } from '../utils';
 
@@ -53,7 +55,11 @@ export const SettingsAuthentication = () => {
     onDone: refresh,
   });
 
-  const { data, ready } = useRefreshData(async () => {
+  const {
+    data,
+    ready,
+    error: loadError,
+  } = useRefreshData(async () => {
     const [providerResult, callbacks] = await Promise.all([
       API.access
         .listOIDCProviders()
@@ -65,8 +71,17 @@ export const SettingsAuthentication = () => {
   }, [version]);
 
   const providers = useMemo(() => data?.providerResult.providers ?? [], [data]);
-  const loadFailed = data?.providerResult.loadFailed ?? false;
-  const authenticationState = getAuthenticationState(providers);
+  const loadFailed = data?.providerResult.loadFailed === true || loadError !== undefined;
+  let authenticationStateLabel = COPY.stateLoading;
+  let authenticationStateTone: StatusTone = STATUS_TONE.NEUTRAL;
+  if (loadFailed) {
+    authenticationStateLabel = COPY.stateUnavailable;
+    authenticationStateTone = STATUS_TONE.ERROR;
+  } else if (ready) {
+    const authenticationState = getAuthenticationState(providers);
+    authenticationStateLabel = authenticationState;
+    authenticationStateTone = AUTHENTICATION_STATE_TONE[authenticationState];
+  }
   const enabledProviderCount = useMemo(() => providers.filter((provider) => provider.enabled).length, [providers]);
 
   const openEditor = useCallback(
@@ -112,8 +127,8 @@ export const SettingsAuthentication = () => {
             <Tooltip title={COPY.stateTooltip}>
               <span>
                 <StatusBadge
-                  tone={AUTHENTICATION_STATE_TONE[authenticationState]}
-                  label={authenticationState}
+                  tone={authenticationStateTone}
+                  label={authenticationStateLabel}
                   variant={STATUS_BADGE_VARIANT.DOT}
                 />
               </span>
@@ -127,7 +142,7 @@ export const SettingsAuthentication = () => {
         <DataTable
           rowKey="providerKey"
           ariaLabel={COPY.tableLabel}
-          loading={!ready}
+          loading={!ready && !loadFailed}
           columns={columns}
           dataSource={providers}
           empty={loadFailed ? { ...empty, title: COPY.loadFailed, size: EMPTY_STATE_SIZE.SECTION } : empty}

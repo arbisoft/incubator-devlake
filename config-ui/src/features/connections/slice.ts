@@ -239,8 +239,6 @@ export const connectionsSlice = createSlice({
 
 export const selectStatus = (state: RootState) => state.connections.status;
 
-export const selectError = (state: RootState) => state.connections.error;
-
 export const selectPlugins = (state: RootState) => state.connections.plugins;
 
 export const selectAllConnections = (state: RootState) => state.connections.connections;

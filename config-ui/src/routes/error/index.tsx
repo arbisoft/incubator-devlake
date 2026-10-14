@@ -24,6 +24,7 @@ import { EMPTY_ILLUSTRATION, EMPTY_STATE_SIZE, EmptyState, StandalonePage } from
 import { useDocumentTitle } from '@/ui/hooks';
 
 import { COPY } from './constants';
+import { getRouteErrorTitle } from './utils';
 
 export const ErrorPage = () => {
   useDocumentTitle(COPY.title);
@@ -36,7 +37,7 @@ export const ErrorPage = () => {
     <StandalonePage>
       <EmptyState
         illustration={EMPTY_ILLUSTRATION.ERROR}
-        title={String(error ?? '') || COPY.unknown}
+        title={getRouteErrorTitle(error)}
         description={COPY.description}
         size={EMPTY_STATE_SIZE.PAGE}
         action={

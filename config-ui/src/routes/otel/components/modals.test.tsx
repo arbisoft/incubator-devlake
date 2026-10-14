@@ -16,7 +16,7 @@
  *
  */
 
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { message } from 'antd';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -76,9 +76,10 @@ describe('OTel modals', () => {
     const onCreated = vi.fn();
     const createError = { response: { status: 400, data: { message: '/private/create-internal' } } };
     let rejectCreate!: (reason: unknown) => void;
-    otel.create.mockImplementationOnce(
-      () => new Promise<OtelConnectionResponse>((_resolve, reject) => (rejectCreate = reject)),
-    );
+    const pendingCreate = new Promise<OtelConnectionResponse>((_resolve, reject) => {
+      rejectCreate = reject;
+    });
+    otel.create.mockReturnValueOnce(pendingCreate);
     otel.create.mockResolvedValueOnce(created);
     renderWithTheme(
       <CreateModal
@@ -90,32 +91,42 @@ describe('OTel modals', () => {
       />,
     );
 
-    const teamName = await screen.findByRole('textbox', { name: COPY.create.teamName.label });
-    fireEvent.change(teamName, { target: { value: 'Platform' } });
-    await waitFor(() => expect(screen.getByText(PROJECT_ALPHA)).toBeTruthy());
-    const submit = screen.getByRole('button', { name: COPY.create.submit });
+    try {
+      const teamName = await screen.findByRole('textbox', { name: COPY.create.teamName.label });
+      fireEvent.change(teamName, { target: { value: '  Platform  ' } });
+      await waitFor(() => expect(screen.getByText(PROJECT_ALPHA)).toBeTruthy());
+      const submit = screen.getByRole('button', { name: COPY.create.submit });
 
-    fireEvent.click(submit);
-    await waitFor(() => expect(submit.classList.contains(LOADING_CLASS)).toBe(true));
-    rejectCreate(createError);
-    await waitFor(() => expect(message.error).toHaveBeenCalledWith(OTEL_COPY.errors.createValidation));
-    expect(screen.getByRole('dialog', { name: COPY.create.title })).toBeTruthy();
-    expect(teamName).toHaveProperty('value', 'Platform');
-    expect(screen.getByText(PROJECT_ALPHA)).toBeTruthy();
-    await waitFor(() => expect(submit.classList.contains(LOADING_CLASS)).toBe(false));
+      fireEvent.click(submit);
+      await waitFor(() => expect(submit.classList.contains(LOADING_CLASS)).toBe(true));
+      rejectCreate(createError);
+      await waitFor(() => expect(message.error).toHaveBeenCalledWith(OTEL_COPY.errors.createValidation));
+      expect(screen.getByRole('dialog', { name: COPY.create.title })).toBeTruthy();
+      expect(teamName).toHaveProperty('value', '  Platform  ');
+      expect(screen.getByText(PROJECT_ALPHA)).toBeTruthy();
+      expect(otel.create).toHaveBeenNthCalledWith(1, { teamName: 'Platform', projectNames: [PROJECT_ALPHA] });
+      await waitFor(() => expect(submit.classList.contains(LOADING_CLASS)).toBe(false));
 
-    fireEvent.click(submit);
-    await waitFor(() => expect(onCreated).toHaveBeenCalledWith(created));
-    expect(otel.create).toHaveBeenCalledTimes(2);
+      fireEvent.click(submit);
+      await waitFor(() => expect(onCreated).toHaveBeenCalledWith(created));
+      expect(otel.create).toHaveBeenNthCalledWith(2, { teamName: 'Platform', projectNames: [PROJECT_ALPHA] });
+      expect(otel.create).toHaveBeenCalledTimes(2);
+    } finally {
+      await act(async () => {
+        rejectCreate(createError);
+        await pendingCreate.catch(() => undefined);
+      });
+    }
   });
 
   it('keeps project placement open and selected after failure so Save can be retried', async () => {
     const saved = vi.fn();
     const projectError = { response: { status: 409, data: { message: '/private/projects-internal' } } };
     let rejectProjects!: (reason: unknown) => void;
-    otel.updateProjects.mockImplementationOnce(
-      () => new Promise<{ name: string }[]>((_resolve, reject) => (rejectProjects = reject)),
-    );
+    const pendingProjects = new Promise<{ name: string }[]>((_resolve, reject) => {
+      rejectProjects = reject;
+    });
+    otel.updateProjects.mockReturnValueOnce(pendingProjects);
     otel.updateProjects.mockResolvedValueOnce(projectOptions);
     renderWithTheme(
       <ProjectsModal
@@ -127,18 +138,25 @@ describe('OTel modals', () => {
       />,
     );
 
-    const save = await screen.findByRole('button', { name: COPY.projectsModal.submit });
-    await waitFor(() => expect(screen.getByText(PROJECT_ALPHA)).toBeTruthy());
-    fireEvent.click(save);
-    await waitFor(() => expect(save.classList.contains(LOADING_CLASS)).toBe(true));
-    rejectProjects(projectError);
-    await waitFor(() => expect(message.error).toHaveBeenCalledWith(OTEL_COPY.errors.projects));
-    expect(screen.getByRole('dialog', { name: COPY.projectsModal.title })).toBeTruthy();
-    expect(screen.getByText(PROJECT_ALPHA)).toBeTruthy();
-    await waitFor(() => expect(save.classList.contains(LOADING_CLASS)).toBe(false));
+    try {
+      const save = await screen.findByRole('button', { name: COPY.projectsModal.submit });
+      await waitFor(() => expect(screen.getByText(PROJECT_ALPHA)).toBeTruthy());
+      fireEvent.click(save);
+      await waitFor(() => expect(save.classList.contains(LOADING_CLASS)).toBe(true));
+      rejectProjects(projectError);
+      await waitFor(() => expect(message.error).toHaveBeenCalledWith(OTEL_COPY.errors.projects));
+      expect(screen.getByRole('dialog', { name: COPY.projectsModal.title })).toBeTruthy();
+      expect(screen.getByText(PROJECT_ALPHA)).toBeTruthy();
+      await waitFor(() => expect(save.classList.contains(LOADING_CLASS)).toBe(false));
 
-    fireEvent.click(save);
-    await waitFor(() => expect(saved).toHaveBeenCalledOnce());
-    expect(otel.updateProjects).toHaveBeenCalledTimes(2);
+      fireEvent.click(save);
+      await waitFor(() => expect(saved).toHaveBeenCalledOnce());
+      expect(otel.updateProjects).toHaveBeenCalledTimes(2);
+    } finally {
+      await act(async () => {
+        rejectProjects(projectError);
+        await pendingProjects.catch(() => undefined);
+      });
+    }
   });
 });

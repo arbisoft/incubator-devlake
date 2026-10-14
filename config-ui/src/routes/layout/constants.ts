@@ -59,6 +59,8 @@ export const ACCOUNT_MENU_KEY = {
 
 export const FAILURE_COOLDOWN_MS = 10_000;
 
+export const INIT_STATUS = { IDLE: 'idle', LOADING: 'loading', FAILED: 'failed' } as const;
+
 export const LINK_IDENTITY = {
   PATH: '/auth/link-identity',
   PROVIDER_PARAM: 'provider',
@@ -68,6 +70,7 @@ export const LINK_IDENTITY = {
 } as const;
 
 export const COPY = {
+  initializationFailed: 'The application could not be initialized. Reload and try again.',
   nav: {
     projects: 'Projects',
     connections: 'Connections',

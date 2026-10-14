@@ -33,6 +33,17 @@ export type LayoutData = {
   access: AccessCurrent | null;
 };
 
+export type UseAccountMenuOptions = {
+  version: string;
+  user: LayoutUser | null;
+  access: AccessCurrent | null;
+  themeMode: ThemeMode;
+  onSelectTheme: (mode: ThemeMode) => void;
+  handleLogout: () => void;
+};
+
+export type IdentityLinkLocation = { key: string; search: string };
+
 export type NavVisibility = {
   access: AccessCurrent | null;
   copyrightHide: boolean;

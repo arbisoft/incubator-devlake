@@ -18,24 +18,15 @@
 
 import { message } from 'antd';
 import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import API from '@/api';
-import type { AccessCurrent, LinkableOIDCProvider } from '@/api/access';
+import type { LinkableOIDCProvider } from '@/api/access';
 import { DEVLAKE_ENDPOINT, PATHS } from '@/config';
-import type { ThemeMode } from '@/theme/tokens';
 
 import { getAccountMenuItems } from './account-menu-items';
 import { COPY, FAILURE_COOLDOWN_MS, LINK_IDENTITY } from './constants';
-import type { LayoutUser } from './types';
-
-type UseAccountMenuOptions = {
-  version: string;
-  user: LayoutUser | null;
-  access: AccessCurrent | null;
-  themeMode: ThemeMode;
-  onSelectTheme: (mode: ThemeMode) => void;
-  handleLogout: () => void;
-};
+import type { IdentityLinkLocation, UseAccountMenuOptions } from './types';
 
 export const useAccountMenu = ({
   version,
@@ -91,10 +82,19 @@ export const useAccountMenu = ({
 };
 
 export const useIdentityLinkNotification = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const processedLocationRef = useRef<IdentityLinkLocation | null>(null);
+
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const processedLocation = processedLocationRef.current;
+    if (processedLocation?.key === location.key && processedLocation.search === location.search) return;
+
+    const params = new URLSearchParams(location.search);
     const identityLinkResult = params.get(LINK_IDENTITY.RESULT_PARAM);
     if (!identityLinkResult) return;
+    processedLocationRef.current = { key: location.key, search: location.search };
+
     if (identityLinkResult === LINK_IDENTITY.RESULT_LINKED) {
       message.success(COPY.identityLink.linked);
     } else {
@@ -103,6 +103,6 @@ export const useIdentityLinkNotification = () => {
     params.delete(LINK_IDENTITY.RESULT_PARAM);
     const query = params.toString();
     const search = query ? `?${query}` : '';
-    window.history.replaceState(null, '', `${window.location.pathname}${search}`);
-  }, []);
+    navigate({ pathname: location.pathname, search, hash: location.hash }, { replace: true, state: location.state });
+  }, [location, navigate]);
 };
