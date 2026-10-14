@@ -80,7 +80,10 @@ Strict applies to **new and changed code**, not to rewriting the whole codebase:
     	if err := api.Decode(input.Body, &req, vld); err != nil {
     		return nil, errors.BadInput.Wrap(err, "invalid request body")
     	}
-    	svc := newThingService(basicRes.GetDal(), basicRes.GetLogger()) // wiring only
+    	svc, err := newThingService(basicRes.GetDal(), basicRes.GetLogger()) // wiring only
+    	if err != nil {
+    		return nil, errors.Default.Wrap(err, "build thing service") // missing dependency: server fault, 500 is right
+    	}
     	out, err := svc.Create(req)
     	if err != nil {
     		return nil, err
