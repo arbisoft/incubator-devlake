@@ -53,7 +53,7 @@ export const ApiKeys = () => {
   const [revokeOpen, setRevokeOpen] = useState(false);
   const [revoking, setRevoking] = useState(false);
 
-  const { data, ready, error } = useRefreshData(() => API.apiKey.list(list.query), [version, list.query]);
+  const { data, ready, error } = useRefreshData((signal) => API.apiKey.list(list.query, signal), [version, list.query]);
 
   const pathPrefix = useMemo(() => getPathPrefix(window.location.origin), []);
   const columns = useMemo(

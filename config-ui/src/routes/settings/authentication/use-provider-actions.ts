@@ -21,9 +21,9 @@ import { useCallback, useState } from 'react';
 
 import API from '@/api';
 import type { OIDCProvider } from '@/api/access';
+import { useConfirmFlow } from '@/ui/hooks';
 import { operator } from '@/utils';
 
-import { useConfirmFlow } from '../use-confirm-flow';
 import { getOIDCProviderError } from '../utils';
 
 import { COPY, OIDC_PROVIDER_MESSAGE, PROVIDER_ACTION, PROVIDER_CONFIRM } from './constants';

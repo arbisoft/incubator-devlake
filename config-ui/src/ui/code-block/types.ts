@@ -25,4 +25,5 @@ export type CodeBlockProps = {
   language: CodeLanguage;
   copyLabel: string;
   maxHeight?: number;
+  singleLine?: boolean;
 };

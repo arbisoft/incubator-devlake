@@ -26,11 +26,13 @@ export type FormModalProps = {
   icon?: ReactNode;
   submitLabel: string;
   cancelLabel?: string;
+  showCancel?: boolean;
   width?: ModalWidth;
   loading?: boolean;
   submitDisabled?: boolean;
   disabledReason?: string;
   onSubmit: () => void;
   onCancel: () => void;
+  afterClose?: () => void;
   children: ReactNode;
 };

@@ -28,9 +28,10 @@ type ListRes = {
 
 export type ListParams = Pagination & KeywordParams & SortParams<'name' | 'expiredAt' | 'createdAt'>;
 
-export const list = (data?: ListParams): Promise<ListRes> =>
+export const list = (data?: ListParams, signal?: AbortSignal): Promise<ListRes> =>
   request('/api-keys', {
     data,
+    signal,
   });
 
 type CreateForm = Pick<IApiKey, 'name' | 'expiredAt' | 'allowedPath'>;

@@ -22,6 +22,7 @@ import { describe, expect, it } from 'vitest';
 
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
+import { ROW_LINK_VARIANT } from './constants';
 import { RowLink } from './row-link';
 
 describe('RowLink', () => {
@@ -32,5 +33,18 @@ describe('RowLink', () => {
       </MemoryRouter>,
     );
     expect(screen.getByRole('link', { name: 'alpha' }).getAttribute('href')).toBe('/projects/alpha');
+  });
+
+  it('colours the link variant differently from the default text colour', () => {
+    renderWithTheme(
+      <MemoryRouter>
+        <RowLink to="/a">plain</RowLink>
+        <RowLink to="/b" variant={ROW_LINK_VARIANT.LINK}>
+          linked
+        </RowLink>
+      </MemoryRouter>,
+    );
+    const colour = (name: string) => getComputedStyle(screen.getByRole('link', { name })).color;
+    expect(colour('linked')).not.toBe(colour('plain'));
   });
 });

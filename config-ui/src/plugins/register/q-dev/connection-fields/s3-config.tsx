@@ -64,7 +64,6 @@ export const S3Config = ({ initialValues, values, setValues, setErrors }: Props)
   return (
     <Block title="S3 Bucket" description="Name of the bucket that stores the Q Developer CSV files." required>
       <Input
-        style={{ width: 386 }}
         placeholder="my-q-dev-data"
         value={bucket}
         onChange={handleBucketChange}

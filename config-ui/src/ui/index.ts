@@ -30,6 +30,7 @@ export * from './filter-tabs';
 export * from './form-field';
 export * from './form-modal';
 export * from './hooks';
+export * from './icon-button';
 export * from './identity-cell';
 export * from './integration-card';
 export * from './key-value-list';

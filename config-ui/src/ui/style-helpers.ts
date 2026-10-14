@@ -70,3 +70,18 @@ export const toneColors = ({ colors }: DefaultTheme): Record<StatusTone, ToneCol
   [STATUS_TONE.INFO]: { text: colors.infoText, bg: colors.infoTintBg, dot: colors.infoText },
   [STATUS_TONE.NEUTRAL]: { text: colors.textSecondary, bg: colors.bgTableHeader, dot: colors.textSecondary },
 });
+
+// Keeps a modal inside the viewport: the header and footer stay put and the body scrolls.
+export const scrollableModal = ({ theme }: { theme: DefaultTheme }) => css`
+  .ant-modal-container {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - ${theme.layout.modalViewportMargin * 2}px);
+  }
+
+  .ant-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+`;

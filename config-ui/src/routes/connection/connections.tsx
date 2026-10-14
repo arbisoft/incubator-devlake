@@ -15,278 +15,202 @@
  * limitations under the License.
  *
  */
-
 import { WarningOutlined } from '@ant-design/icons';
-import { theme, Badge, Modal } from 'antd';
-import { Fragment, useState, useMemo } from 'react';
+import { Button, Switch } from 'antd';
+import { useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import API from '@/api';
-import { OTEL_CREDENTIAL_STATUS } from '@/api/otel';
 import { PATHS } from '@/config';
-import { selectPlugins, selectAllConnections, selectWebhooks } from '@/features/connections';
+import {
+  selectAllConnections,
+  selectHealth,
+  selectPlugins,
+  selectWebhooks,
+  useHealthChecks,
+  WEBHOOK_PLUGIN,
+} from '@/features/connections';
 import { useAppSelector, useRefreshData } from '@/hooks';
-import { getPluginConfig, ConnectionList, ConnectionForm } from '@/plugins';
-import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?react';
-import { useDocumentTitle } from '@/ui/hooks';
-import { formatPlural } from '@/utils';
+import { getPluginConfig } from '@/plugins';
+import type { IConnection } from '@/types';
+import {
+  EMPTY_ILLUSTRATION,
+  EMPTY_STATE_SIZE,
+  EmptyState,
+  FilterTabs,
+  FILTER_TABS_VARIANT,
+  ListPage,
+  ListToolbar,
+  PageHeader,
+  SORT_ORDER,
+  SortSelect,
+  useListState,
+} from '@/ui';
 
-import { COPY } from './constants';
+import { toIntegrationSummaries } from './adapter';
+import { CatalogCard } from './catalog-card';
+import {
+  buildCategoryTabs,
+  filterByCategory,
+  filterIntegrations,
+  isCatalogSortKey,
+  resolveCategory,
+  sortIntegrations,
+} from './catalog-utils';
+import { CATALOG_FILTER, CATALOG_SORT, CATEGORY_ALL, CONNECTED_ONLY, COPY } from './constants';
+import { ManageModal } from './manage-modal';
 import * as S from './styled';
+import type { CatalogSortKey, IntegrationSummary } from './types';
 import { useDeprecationNotice } from './use-deprecation-notice';
+import { useManageDialog } from './use-manage-dialog';
 
-const SORT_START_WITH = ['o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'];
-const CLAUDE_PLUGIN = 'claude_code';
+const NO_CONNECTIONS: IConnection[] = [];
 
-interface StatusBadgeProps {
-  count: number;
-  color: string;
-  text: string;
-}
+const SORT_OPTIONS = [
+  { key: CATALOG_SORT.ACTIVE, label: COPY.sort.active },
+  { key: CATALOG_SORT.NAME, label: COPY.sort.name },
+];
 
-const StatusBadge = ({ count, color, text }: StatusBadgeProps) => {
-  if (count <= 0) return null;
-  return <Badge color={color} text={text} />;
-};
-
-// Group by the displayed name's first letter. The headings used to be produced
-// by cutting the list at the first plugin id starting with o-z, which only
-// agrees with the headings while `sort` happens to run alphabetically — it
-// stopped doing so as plugins were appended in the order they were added, so
-// Asana, Kiro, Linear and incident.io all showed up under O-Z.
-export const splitPluginsByInitial = (plugins: string[], nameOf: (plugin: string) => string) => {
-  const isOZ = (plugin: string) => SORT_START_WITH.includes((nameOf(plugin)[0] ?? '').toLowerCase());
-  return [plugins.filter((plugin) => !isOZ(plugin)), plugins.filter(isOZ)];
-};
+type CatalogFilters = { [CATALOG_FILTER.CATEGORY]: string; [CATALOG_FILTER.CONNECTED]: string };
 
 export const Connections = () => {
-  useDocumentTitle(COPY.title);
-
-  const [type, setType] = useState<'list' | 'form'>();
-  const [plugin, setPlugin] = useState('');
-
-  const {
-    token: { colorPrimary },
-  } = theme.useToken();
-
-  const pluginConfig = useMemo(() => getPluginConfig(plugin), [plugin]);
-
   const navigate = useNavigate();
+  const dialog = useManageDialog();
+  const { check } = useHealthChecks();
 
   const plugins = useAppSelector(selectPlugins);
   const connections = useAppSelector(selectAllConnections);
   const webhooks = useAppSelector(selectWebhooks);
-  // Separate ready credentials from connections that need auth-file recovery or application.
+  const health = useAppSelector(selectHealth);
   const { data: otelConnections } = useRefreshData(() => API.otel.list(), []);
-  const otelCredentialSummary = useMemo(
-    () =>
-      otelConnections?.reduce(
-        (summary, connection) => {
-          if (connection.recoveryRequired) summary.recoveryRequired += 1;
-          if (connection.restartRequired) summary.restartRequired += 1;
-          if (!connection.restartRequired && !connection.recoveryRequired) {
-            summary.active += connection.credentials.filter(
-              (credential) => credential.status === OTEL_CREDENTIAL_STATUS.ACTIVE,
-            ).length;
-          }
-          return summary;
-        },
-        { active: 0, restartRequired: 0, recoveryRequired: 0 },
-      ) ?? { active: 0, restartRequired: 0, recoveryRequired: 0 },
-    [otelConnections],
-  );
 
-  const filterWebhookPlugins = plugins.filter((p) => p !== 'webhook');
+  const list = useListState<CatalogSortKey, CatalogFilters>({
+    sort: { sortBy: CATALOG_SORT.ACTIVE, sortOrder: SORT_ORDER.DESC },
+    filters: { [CATALOG_FILTER.CATEGORY]: CATEGORY_ALL, [CATALOG_FILTER.CONNECTED]: CONNECTED_ONLY.OFF },
+  });
+  const sortKey = list.sort && isCatalogSortKey(list.sort.sortBy) ? list.sort.sortBy : CATALOG_SORT.ACTIVE;
+  const category = resolveCategory(list.filters.category);
+  const connectedOnly = list.filters.connected === CONNECTED_ONLY.ON;
+
   const { notice: deprecatedPlugin, dismiss: dismissDeprecation } = useDeprecationNotice(
-    filterWebhookPlugins,
+    plugins.filter((plugin) => plugin !== WEBHOOK_PLUGIN),
     connections,
   );
 
-  const [firstPlugins, secondPlugins] = useMemo(
-    () => splitPluginsByInitial(filterWebhookPlugins, (plugin) => getPluginConfig(plugin)?.name ?? plugin),
-    [filterWebhookPlugins],
+  const connectionsByPlugin = useMemo(() => {
+    const groups = new Map<string, IConnection[]>();
+    for (const connection of connections) {
+      groups.set(connection.plugin, [...(groups.get(connection.plugin) ?? []), connection]);
+    }
+    return groups;
+  }, [connections]);
+
+  const summaries = useMemo(
+    () =>
+      toIntegrationSummaries({ plugins, connections, webhooks, health, otelConnections, getConfig: getPluginConfig }),
+    [plugins, connections, webhooks, health, otelConnections],
   );
 
-  const handleShowListDialog = (plugin: string) => {
-    setType('list');
-    setPlugin(plugin);
-  };
-
-  const handleShowFormDialog = (pluginName?: string) => {
-    setType('form');
-    if (pluginName) setPlugin(pluginName);
-  };
-
-  const handleHideDialog = () => {
-    setType(undefined);
-    setPlugin('');
-  };
-
-  const handleSuccessAfter = async (plugin: string, id: ID) => {
-    navigate(PATHS.CONNECTION(plugin, id));
-  };
-
-  const renderOtelConnection = () => (
-    <li key="claude-code-otel" onClick={() => navigate(PATHS.OTEL())}>
-      <span className="logo">
-        <ClaudeCodeOtelIcon />
-      </span>
-      <span className="name">Claude Code OTel</span>
-      <span className="count">
-        {otelCredentialSummary.active ||
-        otelCredentialSummary.restartRequired ||
-        otelCredentialSummary.recoveryRequired ? (
-          <span className="otel-credential-summary">
-            <StatusBadge
-              count={otelCredentialSummary.active}
-              color={colorPrimary}
-              text={formatPlural(otelCredentialSummary.active, 'active credential')}
-            />
-            <StatusBadge
-              count={otelCredentialSummary.recoveryRequired}
-              color="#ff4d4f"
-              text={`${formatPlural(otelCredentialSummary.recoveryRequired, 'connection')} needing storage recovery`}
-            />
-            <StatusBadge
-              count={otelCredentialSummary.restartRequired}
-              color="#faad14"
-              text={`${formatPlural(otelCredentialSummary.restartRequired, 'connection')} requiring action`}
-            />
-          </span>
-        ) : (
-          'No connection'
-        )}
-      </span>
-    </li>
+  const matching = useMemo(
+    () => filterIntegrations(summaries, { keyword: list.keyword, category, connectedOnly }),
+    [summaries, list.keyword, category, connectedOnly],
   );
+  const tabs = useMemo(() => buildCategoryTabs(matching), [matching]);
+  const visible = useMemo(
+    () => sortIntegrations(filterByCategory(matching, category), sortKey),
+    [matching, category, sortKey],
+  );
+
+  const handleManage = (item: IntegrationSummary) => (item.href ? navigate(item.href) : dialog.showList(item.key));
+  const handleAdd = (item: IntegrationSummary) => {
+    if (item.href) navigate(item.href);
+    else if (item.key === WEBHOOK_PLUGIN) dialog.showList(item.key);
+    else dialog.showForm(item.key);
+  };
+  const handleCreated = useCallback((plugin: string, id: ID) => navigate(PATHS.CONNECTION(plugin, id)), [navigate]);
+
+  const isFiltered = list.keyword !== '' || category !== CATEGORY_ALL;
+  const empty = isFiltered
+    ? { ...COPY.noResults, action: <Button onClick={list.reset}>{COPY.clearFilters}</Button> }
+    : {
+        ...COPY.empty,
+        illustration: EMPTY_ILLUSTRATION.NO_CONNECTION,
+        action: (
+          <Button type="primary" onClick={() => list.setFilter(CATALOG_FILTER.CONNECTED, CONNECTED_ONLY.OFF)}>
+            {COPY.showAll}
+          </Button>
+        ),
+      };
 
   return (
-    <S.Wrapper>
-      <h1>Connections</h1>
-      <h5>
-        Create and manage data connections from the following data sources or Webhooks to be used in syncing data in
-        your Projects.
-      </h5>
-      <h2>Data Connections</h2>
-      <h5>You can create and manage data connections for the following data sources and use them in your Projects.</h5>
+    <ListPage>
+      <PageHeader title={COPY.title} description={COPY.description} />
       {deprecatedPlugin?.deprecationMessage && (
         <S.DeprecationAlert
           closable={{ onClose: dismissDeprecation }}
           showIcon
           type="warning"
           icon={<WarningOutlined />}
-          message={COPY.deprecationTitle}
+          title={COPY.deprecationTitle}
           description={deprecatedPlugin.deprecationMessage}
         />
       )}
-      <h4>A-N</h4>
-      <ul>
-        {firstPlugins.map((plugin) => {
-          const pluginConfig = getPluginConfig(plugin);
-          const connectionCount = connections.filter((cs) => cs.plugin === plugin).length;
-          return (
-            <Fragment key={plugin}>
-              <li onClick={() => handleShowListDialog(plugin)}>
-                {pluginConfig.isBeta && <span className="beta">Beta</span>}
-                {pluginConfig.isDeprecated && <span className="deprecated">Deprecated</span>}
-                <span className="logo">{pluginConfig.icon({ color: colorPrimary })}</span>
-                <span className="name">{pluginConfig.name}</span>
-                <span className="count">
-                  {connectionCount ? (
-                    <Badge color={colorPrimary} text={`${connectionCount} connections`} />
-                  ) : (
-                    'No connection'
-                  )}
-                </span>
-              </li>
-              {plugin === CLAUDE_PLUGIN && renderOtelConnection()}
-            </Fragment>
-          );
-        })}
-        {!firstPlugins.includes(CLAUDE_PLUGIN) && renderOtelConnection()}
-      </ul>
-      <h4>O-Z</h4>
-      <ul>
-        {secondPlugins.map((plugin) => {
-          const pluginConfig = getPluginConfig(plugin);
-          const connectionCount = connections.filter((cs) => cs.plugin === plugin).length;
-          return (
-            <li key={plugin} onClick={() => handleShowListDialog(plugin)}>
-              {pluginConfig.isBeta && <span className="beta">Beta</span>}
-              {pluginConfig.isDeprecated && <span className="deprecated">Deprecated</span>}
-              <span className="logo">{pluginConfig.icon({ color: colorPrimary })}</span>
-              <span className="name">{pluginConfig.name}</span>
-              <span className="count">
-                {connectionCount ? (
-                  <Badge color={colorPrimary} text={`${connectionCount} connections`} />
-                ) : (
-                  'No connection'
-                )}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-      <h2>Webhooks</h2>
-      <h5>
-        You can use webhooks to import deployments and incidents from the unsupported data integrations to calculate
-        DORA metrics, etc.
-      </h5>
-      <ul>
-        {plugins
-          .filter((plugin) => plugin === 'webhook')
-          .map((plugin) => {
-            const pluginConfig = getPluginConfig(plugin);
-            const connectionCount = webhooks.length;
-            return (
-              <li key={plugin} onClick={() => handleShowListDialog(plugin)}>
-                <span className="logo">{pluginConfig.icon({ color: colorPrimary })}</span>
-                <span className="name">{pluginConfig.name}</span>
-                <span className="count">
-                  {connectionCount ? (
-                    <Badge color={colorPrimary} text={`${connectionCount} connections`} />
-                  ) : (
-                    'No connection'
-                  )}
-                </span>
-              </li>
-            );
-          })}
-      </ul>
-      {type === 'list' && pluginConfig && (
-        <Modal
-          open
-          width={820}
-          centered
-          title={
-            <S.ModalTitle>
-              <span className="icon">{pluginConfig.icon({ color: colorPrimary })}</span>
-              <span className="name">Manage Connections: {pluginConfig.name}</span>
-            </S.ModalTitle>
-          }
-          footer={null}
-          onCancel={handleHideDialog}
-        >
-          <ConnectionList plugin={plugin} onCreate={handleShowFormDialog} />
-        </Modal>
+      <ListToolbar
+        list={list}
+        searchPlaceholder={COPY.searchPlaceholder}
+        filters={
+          <SortSelect
+            options={SORT_OPTIONS}
+            value={sortKey}
+            onChange={(key) =>
+              isCatalogSortKey(key) &&
+              list.setSort({ sortBy: key, sortOrder: key === CATALOG_SORT.NAME ? SORT_ORDER.ASC : SORT_ORDER.DESC })
+            }
+          />
+        }
+        end={
+          <S.SwitchField>
+            {COPY.connectedOnly}
+            <Switch
+              checked={connectedOnly}
+              onChange={(checked) =>
+                list.setFilter(CATALOG_FILTER.CONNECTED, checked ? CONNECTED_ONLY.ON : CONNECTED_ONLY.OFF)
+              }
+            />
+          </S.SwitchField>
+        }
+      />
+      <FilterTabs
+        variant={FILTER_TABS_VARIANT.FLAT}
+        items={tabs}
+        value={category}
+        onChange={(key) => list.setFilter(CATALOG_FILTER.CATEGORY, key)}
+      />
+      {visible.length === 0 ? (
+        <EmptyState size={EMPTY_STATE_SIZE.SECTION} {...empty} />
+      ) : (
+        <S.Grid onFocus={dialog.rememberOpener}>
+          {visible.map((item) => (
+            <CatalogCard
+              key={item.key}
+              item={item}
+              connections={connectionsByPlugin.get(item.key) ?? NO_CONNECTIONS}
+              onCheck={check}
+              onManage={handleManage}
+              onAdd={handleAdd}
+            />
+          ))}
+        </S.Grid>
       )}
-      {type === 'form' && plugin && pluginConfig && (
-        <Modal
-          open
-          width={820}
-          centered
-          title={
-            <S.ModalTitle>
-              <span className="icon">{pluginConfig.icon({ color: colorPrimary })}</span>
-              <span className="name">Manage Connections: {pluginConfig.name}</span>
-            </S.ModalTitle>
-          }
-          footer={null}
-          onCancel={handleHideDialog}
-        >
-          <ConnectionForm plugin={plugin} onSuccess={(id) => handleSuccessAfter(plugin, id)} />
-        </Modal>
-      )}
-    </S.Wrapper>
+      <ManageModal
+        open={dialog.open}
+        plugin={dialog.plugin}
+        isForm={dialog.isForm}
+        onClose={dialog.hide}
+        onAfterClose={dialog.reset}
+        onCreate={() => dialog.showForm(dialog.plugin)}
+        onCreated={handleCreated}
+      />
+    </ListPage>
   );
 };

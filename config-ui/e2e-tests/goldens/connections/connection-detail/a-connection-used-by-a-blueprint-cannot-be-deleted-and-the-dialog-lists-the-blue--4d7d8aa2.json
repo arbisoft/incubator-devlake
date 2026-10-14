@@ -1,0 +1,10 @@
+{
+  "titlePath": ["a connection used by a blueprint cannot be deleted and the dialog lists the blueprint"],
+  "writes": [
+    {
+      "method": "DELETE",
+      "path": "/api/plugins/github/connections/:id",
+      "body": null
+    }
+  ]
+}

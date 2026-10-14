@@ -76,13 +76,7 @@ export const ConnectionOrganization = ({ label, initialValue, value, setValue }:
         </Radio.Group>
       </Block>
       <Block>
-        <Input
-          style={{ width: 386 }}
-          placeholder="Your organization"
-          value={value}
-          onChange={handleChangeValue}
-          disabled={!settings.scoped}
-        />
+        <Input placeholder="Your organization" value={value} onChange={handleChangeValue} disabled={!settings.scoped} />
       </Block>
     </>
   );

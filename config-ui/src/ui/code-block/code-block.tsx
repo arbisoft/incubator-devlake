@@ -21,11 +21,11 @@ import { Button, Tooltip } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { COPIED_RESET_MS, COPY } from './constants';
-import { CopyButtonSlot, Pre, Wrapper } from './styled';
+import { CopyButtonSlot, FullText, Pre, Wrapper } from './styled';
 import type { CodeBlockProps } from './types';
 import { formatCode } from './utils';
 
-export const CodeBlock = ({ value, copyLabel, maxHeight }: CodeBlockProps) => {
+export const CodeBlock = ({ value, copyLabel, maxHeight, singleLine }: CodeBlockProps) => {
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const text = useMemo(() => formatCode(value), [value]);
@@ -45,9 +45,11 @@ export const CodeBlock = ({ value, copyLabel, maxHeight }: CodeBlockProps) => {
 
   return (
     <Wrapper>
-      <Pre tabIndex={0} aria-label={COPY.region} $maxHeight={maxHeight}>
-        <code>{text}</code>
-      </Pre>
+      <Tooltip title={singleLine ? <FullText>{text}</FullText> : undefined}>
+        <Pre tabIndex={0} aria-label={COPY.region} $maxHeight={maxHeight} $singleLine={singleLine}>
+          <code>{text}</code>
+        </Pre>
+      </Tooltip>
       <CopyButtonSlot>
         <Tooltip title={copyLabel}>
           <Button aria-label={copyLabel} icon={copied ? <CheckOutlined /> : <CopyOutlined />} onClick={copy} />

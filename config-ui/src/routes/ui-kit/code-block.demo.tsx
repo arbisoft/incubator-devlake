@@ -20,7 +20,7 @@ import { CODE_LANGUAGE, CodeBlock } from '@/ui';
 
 import { COPY, SECTION } from './constants';
 import { DemoCase, DemoSection } from './demo-section';
-import { JSON_LONG_SAMPLE, JSON_SAMPLE } from './fixtures';
+import { JSON_LONG_SAMPLE, JSON_SAMPLE, SHELL_SAMPLE } from './fixtures';
 
 const MAX_HEIGHT = 160;
 
@@ -39,6 +39,17 @@ export const CodeBlockDemo = () => (
     </DemoCase>
     <DemoCase label={COPY.cases.notJson}>
       <CodeBlock value={COPY.codeBlock.plain} language={CODE_LANGUAGE.JSON} copyLabel={COPY.codeBlock.copy} />
+    </DemoCase>
+    <DemoCase label={COPY.cases.shell}>
+      <CodeBlock value={SHELL_SAMPLE} language={CODE_LANGUAGE.SHELL} copyLabel={COPY.codeBlock.copyCommand} />
+    </DemoCase>
+    <DemoCase label={COPY.cases.singleLine}>
+      <CodeBlock
+        value={SHELL_SAMPLE}
+        language={CODE_LANGUAGE.SHELL}
+        copyLabel={COPY.codeBlock.copyCommand}
+        singleLine
+      />
     </DemoCase>
     <DemoCase label={COPY.cases.empty}>
       <CodeBlock value={undefined} language={CODE_LANGUAGE.JSON} copyLabel={COPY.codeBlock.copy} />

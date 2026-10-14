@@ -58,7 +58,7 @@ export const BlueprintHomePage = () => {
   const [creating, setCreating] = useState(false);
 
   const { data, ready, error } = useRefreshData(
-    () => API.blueprint.list(buildBlueprintQuery(list.query, filters)),
+    (signal) => API.blueprint.list(buildBlueprintQuery(list.query, filters), signal),
     [version, list.query, filters.type, filters.status],
   );
 

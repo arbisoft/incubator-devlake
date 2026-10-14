@@ -57,7 +57,6 @@ export const Organization = ({ type, initialValues, values, setValues, setErrors
       description="Enter the GitHub organization name for org-level metrics and seat data. At least one of Organization or Enterprise Slug is required."
     >
       <Input
-        style={{ width: 386 }}
         placeholder="e.g. github"
         status={error ? 'error' : ''}
         value={values.organization ?? ''}

@@ -41,7 +41,10 @@ export const ProjectHomePage = () => {
 
   const navigate = useNavigate();
 
-  const { data, ready, error } = useRefreshData(() => API.project.list(list.query), [version, list.query]);
+  const { data, ready, error } = useRefreshData(
+    (signal) => API.project.list(list.query, signal),
+    [version, list.query],
+  );
   const { data: otelConnections } = useRefreshData(() => API.otel.list(), []);
 
   const rows = useMemo(

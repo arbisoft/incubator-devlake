@@ -19,7 +19,7 @@
 import { useState } from 'react';
 
 import { getPluginConfig } from '@/plugins';
-import { IntegrationCard } from '@/ui';
+import { IntegrationCard, STATUS_BADGE_VARIANT, STATUS_TONE, StatusBadge } from '@/ui';
 
 import { COPY, SECTION } from './constants';
 import { DemoCase, DemoSection } from './demo-section';
@@ -63,6 +63,49 @@ export const IntegrationCardDemo = () => {
           />
         </Grid>
         <span role="status">{last}</span>
+      </DemoCase>
+      <DemoCase label={COPY.cases.withActions}>
+        <NarrowCard>
+          <IntegrationCard
+            icon={github}
+            name={text.github}
+            category={text.category.scm}
+            connected={2}
+            details={
+              <>
+                <StatusBadge
+                  tone={STATUS_TONE.SUCCESS}
+                  label={text.activeCredentials}
+                  variant={STATUS_BADGE_VARIANT.DOT}
+                />
+                <StatusBadge
+                  tone={STATUS_TONE.WARNING}
+                  label={text.requiresAction}
+                  variant={STATUS_BADGE_VARIANT.DOT}
+                />
+              </>
+            }
+            docsHref={text.docsUrl}
+            menu={[
+              { key: 'manage', label: text.manageAction, onClick: () => setLast(text.managed(text.github)) },
+              { key: 'add', label: text.addAction, onClick: () => setLast(text.added(text.github)) },
+            ]}
+            onManage={() => setLast(text.managed(text.github))}
+            onAdd={() => setLast(text.added(text.github))}
+          />
+        </NarrowCard>
+      </DemoCase>
+      <DemoCase label={COPY.cases.deprecated}>
+        <NarrowCard>
+          <IntegrationCard
+            icon={jira}
+            name={text.jira}
+            category={text.category.issues}
+            deprecated
+            connected={0}
+            onAdd={() => undefined}
+          />
+        </NarrowCard>
       </DemoCase>
       <DemoCase label={COPY.cases.beta}>
         <NarrowCard>

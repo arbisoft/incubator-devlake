@@ -16,17 +16,8 @@
  *
  */
 
-import type { CONFIRM_TONE } from '@/ui/confirm-modal/constants';
-
 import type { ACCESS_MODAL, LIFECYCLE_ACTION, LIFECYCLE_SUBJECT } from './constants';
 
 export type AccessModal = (typeof ACCESS_MODAL)[keyof typeof ACCESS_MODAL];
 export type LifecycleSubject = (typeof LIFECYCLE_SUBJECT)[keyof typeof LIFECYCLE_SUBJECT];
 export type LifecycleAction = (typeof LIFECYCLE_ACTION)[keyof typeof LIFECYCLE_ACTION];
-
-export type ConfirmConfig = {
-  tone: (typeof CONFIRM_TONE)[keyof typeof CONFIRM_TONE];
-  title: (name: string) => string;
-  description: (name: string) => string;
-  confirm: string;
-};

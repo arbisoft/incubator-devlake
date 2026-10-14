@@ -18,37 +18,64 @@
 
 import styled from 'styled-components';
 
-export const Wrapper = styled.div`
-  h2 {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0;
-    margin-bottom: 16px;
-    padding: 0;
-    font-weight: 600;
-    color: ${({ theme }) => theme.colors.success};
-  }
+import { textStyle } from '@/ui/style-helpers';
 
-  h5 {
-    margin: 16px 0 8px;
-  }
-
-  p {
-    color: ${({ theme }) => theme.colors.text};
-  }
+export const Stack = styled.div`
+  display: grid;
+  gap: ${({ theme }) => theme.space.lg}px;
 `;
 
-export const ApiKey = styled.div`
+export const Intro = styled.p`
+  ${textStyle('body')}
+  margin: 0;
+  color: ${({ theme }) => theme.colors.text};
+`;
+
+export const Success = styled.h2`
+  ${textStyle('h3')}
   display: flex;
   align-items: center;
-
-  & > div {
-    max-width: 50%;
-    margin-right: 8px;
-  }
+  justify-content: center;
+  gap: ${({ theme }) => theme.space.xs}px;
+  margin: 0;
+  color: ${({ theme }) => theme.colors.success};
 `;
 
-export const Tips = styled.div`
-  margin-top: 8px;
+export const Group = styled.section`
+  display: grid;
+  gap: ${({ theme }) => theme.space.sm}px;
+`;
+
+export const GroupTitle = styled.h3`
+  ${textStyle('h3')}
+  margin: 0;
+`;
+
+export const Command = styled.div`
+  display: grid;
+  gap: ${({ theme }) => theme.space.xxs}px;
+`;
+
+export const CommandLabel = styled.span`
+  ${textStyle('bodyMedium')}
+`;
+
+export const Hint = styled.p`
+  ${textStyle('body')}
+  margin: 0;
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
+
+export const KeyRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.xs}px;
+`;
+
+export const Notice = styled.strong`
+  ${textStyle('bodyMedium')}
+`;
+
+export const LoadingRow = styled.div`
+  padding: ${({ theme }) => theme.space.xxs}px ${({ theme }) => theme.space.sm}px;
 `;

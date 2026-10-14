@@ -20,8 +20,39 @@ import { Segmented, Tabs } from 'antd';
 import styled from 'styled-components';
 
 export const FlatTabs = styled(Tabs)`
-  .ant-tabs-nav {
+  && .ant-tabs-nav {
     margin: 0;
+    padding: ${({ theme }) => theme.layout.segmentInset}px;
+    background: ${({ theme }) => theme.colors.primarySubtle};
+    border-radius: ${({ theme }) => theme.radius.md}px;
+
+    &::before {
+      display: none;
+    }
+  }
+
+  && .ant-tabs-nav-list {
+    gap: ${({ theme }) => theme.layout.segmentInset}px;
+  }
+
+  && .ant-tabs-tab {
+    margin: 0;
+    padding: ${({ theme }) => theme.layout.segmentPaddingBlock}px ${({ theme }) => theme.layout.segmentPaddingInline}px;
+    border-radius: ${({ theme }) => theme.radius.sm}px;
+    color: ${({ theme }) => theme.colors.textSecondary};
+  }
+
+  && .ant-tabs-tab-active {
+    background: ${({ theme }) => theme.colors.bgContainer};
+    box-shadow: ${({ theme }) => theme.shadow.segmentSelected};
+
+    .ant-tabs-tab-btn {
+      color: ${({ theme }) => theme.colors.text};
+    }
+  }
+
+  .ant-tabs-ink-bar {
+    display: none;
   }
 `;
 

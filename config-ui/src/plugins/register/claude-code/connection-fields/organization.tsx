@@ -55,7 +55,6 @@ export const Organization = ({ type, initialValues, values, setValues, setErrors
       required
     >
       <Input
-        style={{ width: 386 }}
         placeholder="e.g. org_123456789"
         status={error ? 'error' : ''}
         value={values.organization ?? ''}

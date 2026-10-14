@@ -16,16 +16,16 @@
  *
  */
 
-import { PlusOutlined } from '@ant-design/icons';
-import { Button } from 'antd';
+import { EllipsisOutlined, PlusOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+import { Button, Dropdown, Tooltip } from 'antd';
 import { useId } from 'react';
 
-import { STATUS_TONE } from '@/ui/constants';
+import { COMMON_COPY, STATUS_TONE } from '@/ui/constants';
 import { PluginIcon } from '@/ui/plugin-icon';
 import { STATUS_BADGE_VARIANT, StatusBadge } from '@/ui/status-badge';
 
 import { COPY } from './constants';
-import { Actions, Category, Counts, Name, Root } from './styled';
+import { Actions, Category, CategoryRow, Counts, Details, Header, HeaderActions, Name, Root } from './styled';
 import type { IntegrationCardProps } from './types';
 
 export const IntegrationCard = ({
@@ -33,8 +33,12 @@ export const IntegrationCard = ({
   name,
   category,
   beta,
+  deprecated,
   connected,
   failed,
+  details,
+  menu,
+  docsHref,
   onManage,
   onAdd,
 }: IntegrationCardProps) => {
@@ -43,10 +47,39 @@ export const IntegrationCard = ({
 
   return (
     <Root $connected={isConnected} aria-labelledby={nameId}>
-      <PluginIcon icon={icon} size="lg" />
+      <Header>
+        <PluginIcon icon={icon} size="lg" />
+        {(docsHref || menu) && (
+          <HeaderActions>
+            {docsHref && (
+              <Tooltip title={COPY.docs(name)}>
+                <Button
+                  type="text"
+                  size="small"
+                  href={docsHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  icon={<QuestionCircleOutlined />}
+                  aria-label={`${COPY.docs(name)} ${COMMON_COPY.opensInNewTab}`}
+                />
+              </Tooltip>
+            )}
+            {menu && (
+              <Dropdown menu={{ items: menu }} trigger={['click']} placement="bottomRight">
+                <Button type="text" size="small" icon={<EllipsisOutlined />} aria-label={COPY.actionsFor(name)} />
+              </Dropdown>
+            )}
+          </HeaderActions>
+        )}
+      </Header>
       <div>
         <Name id={nameId}>{name}</Name>
-        <Category>{beta ? COPY.categoryBeta(category) : category}</Category>
+        <CategoryRow>
+          <Category>{beta ? COPY.categoryBeta(category) : category}</Category>
+          {deprecated && (
+            <StatusBadge tone={STATUS_TONE.ERROR} label={COPY.deprecated} variant={STATUS_BADGE_VARIANT.TEXT} />
+          )}
+        </CategoryRow>
       </div>
       {connected > 0 && (
         <Counts>
@@ -56,16 +89,12 @@ export const IntegrationCard = ({
           )}
         </Counts>
       )}
+      {details && <Details>{details}</Details>}
       <Actions>
         {isConnected ? (
-          <>
-            <Button block type="primary" aria-describedby={nameId} onClick={onManage}>
-              {COPY.manage(connected)}
-            </Button>
-            <Button block type="text" icon={<PlusOutlined aria-hidden />} aria-describedby={nameId} onClick={onAdd}>
-              {COPY.add}
-            </Button>
-          </>
+          <Button block type="primary" aria-describedby={nameId} onClick={onManage}>
+            {COPY.manage(connected)}
+          </Button>
         ) : (
           <Button block icon={<PlusOutlined aria-hidden />} aria-describedby={nameId} onClick={onAdd}>
             {COPY.add}

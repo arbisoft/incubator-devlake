@@ -18,6 +18,7 @@
 
 import type { ReactNode } from 'react';
 
+import type { CONFIRM_TONE } from './confirm-modal/constants';
 import type { ICON_SIZE_PX, MODAL_WIDTH, NAV_ITEM_KIND, SORT_ORDER, STATUS_TONE } from './constants';
 
 export type StatusTone = (typeof STATUS_TONE)[keyof typeof STATUS_TONE];
@@ -50,3 +51,10 @@ export type NavItem =
       visible?: boolean;
     }
   | { kind: typeof NAV_ITEM_KIND.DIVIDER; key: string };
+
+export type ConfirmConfig = {
+  tone: (typeof CONFIRM_TONE)[keyof typeof CONFIRM_TONE];
+  title: (name: string) => string;
+  description: (name: string) => string;
+  confirm: string;
+};

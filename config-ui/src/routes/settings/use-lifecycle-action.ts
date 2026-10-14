@@ -26,11 +26,11 @@ import {
   type AccessUser,
   type LocalCredentialResponse,
 } from '@/api/access';
+import { useConfirmFlow } from '@/ui/hooks';
 import { operator } from '@/utils';
 
 import { LIFECYCLE_ACTION, LIFECYCLE_CONFIRM, LIFECYCLE_SUBJECT } from './constants';
 import type { LifecycleAction, LifecycleSubject } from './types';
-import { useConfirmFlow } from './use-confirm-flow';
 import { getDomainLabel, getLocalCredentialError, getUserLabel } from './utils';
 
 export type LifecycleTarget =

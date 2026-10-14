@@ -61,7 +61,7 @@ export const ConnectionTenantType = ({ initialValue, value, setValue, setError }
 
   return (
     <Block title="Tenant type" description="" required>
-      <Input style={{ width: 386 }} placeholder="Tenant type" value={value} onChange={handleChange} />
+      <Input placeholder="Tenant type" value={value} onChange={handleChange} />
     </Block>
   );
 };

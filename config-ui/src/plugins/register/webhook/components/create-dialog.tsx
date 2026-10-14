@@ -17,161 +17,92 @@
  */
 
 import { CheckCircleOutlined } from '@ant-design/icons';
-import { Modal, Input } from 'antd';
-import { useState, useMemo } from 'react';
+import { Input } from 'antd';
+import { useMemo, useState } from 'react';
 
-import { Block, CopyText, ExternalLink } from '@/components';
 import { addWebhook } from '@/features';
 import { useAppDispatch } from '@/hooks';
+import { FormField, FormModal, MODAL_WIDTH, toUserMessage, useModalForm } from '@/ui';
 import { operator } from '@/utils';
 
-import * as S from '../styled';
+import { COPY, ERROR_MAP, FALLBACK_ERROR } from '../constants';
+import { Intro, Stack, Success } from '../styled';
+import type { CreateDialogProps, WebhookCommands as Commands } from '../types';
+import { buildCommands, getApiPrefix } from '../utils';
 
-import { transformURI } from './utils';
+import { WebhookCommands } from './webhook-commands';
+import { WebhookIcon } from './webhook-icon';
 
-interface Props {
-  open: boolean;
-  onCancel: () => void;
-  onSubmitAfter?: (id: ID) => void;
-}
+const INITIAL_FORM = { name: '' };
 
-export const CreateDialog = ({ open, onCancel, onSubmitAfter }: Props) => {
-  const [operating, setOperating] = useState(false);
-  const [step, setStep] = useState(1);
-  const [name, setName] = useState('');
-  const [record, setRecord] = useState({
-    id: 0,
-    postIssuesEndpoint: '',
-    closeIssuesEndpoint: '',
-    postDeploymentsCurl: '',
-    postPullRequestsEndpoint: '',
-    apiKey: '',
-  });
-
+export const CreateDialog = ({ open, onCancel, onSubmitAfter }: CreateDialogProps) => {
+  const [commands, setCommands] = useState<Commands>();
   const dispatch = useAppDispatch();
-
-  const prefix = useMemo(() => `${window.location.origin}/api`, []);
+  const prefix = useMemo(() => getApiPrefix(window.location.origin), []);
+  const { values, setField, reset, setSaving, modalProps } = useModalForm(INITIAL_FORM, {
+    onClose: onCancel,
+    required: ['name'],
+    disabledReason: COPY.create.disabledReason,
+  });
 
   const handleSubmit = async () => {
     const [success, res] = await operator(
       async () => {
-        const {
-          webhook: {
-            id,
-            postIssuesEndpoint,
-            closeIssuesEndpoint,
-            postPipelineDeployTaskEndpoint,
-            postPullRequestsEndpoint,
-          },
-          apiKey,
-        } = await dispatch(addWebhook({ name })).unwrap();
-
-        return {
-          id,
-          apiKey,
-          postIssuesEndpoint,
-          closeIssuesEndpoint,
-          postPipelineDeployTaskEndpoint,
-          postPullRequestsEndpoint,
-        };
+        const { webhook, apiKey } = await dispatch(addWebhook({ name: values.name })).unwrap();
+        return { id: webhook.id, commands: buildCommands(prefix, webhook, apiKey) };
       },
       {
-        setOperating,
-        hideToast: true,
+        setOperating: setSaving,
+        formatMessage: () => COPY.create.success,
+        formatReason: (error) => toUserMessage(error, ERROR_MAP, FALLBACK_ERROR.create),
       },
     );
 
     if (success) {
-      setStep(2);
-      setRecord({
-        id: res.id,
-        apiKey: res.apiKey,
-        ...transformURI(prefix, res, res.apiKey),
-      });
+      setCommands(res.commands);
       onSubmitAfter?.(res.id);
     }
   };
 
+  const handleClosed = () => {
+    setCommands(undefined);
+    reset();
+  };
+
   return (
-    <Modal
+    <FormModal
       open={open}
-      width={820}
-      centered
-      title="Add a New Webhook"
-      footer={step === 2 ? null : undefined}
-      okText={step === 1 ? 'Generate POST URL' : 'Done'}
-      okButtonProps={{
-        disabled: step === 1 && !name,
-        loading: operating,
-      }}
-      onCancel={onCancel}
-      onOk={handleSubmit}
+      icon={<WebhookIcon />}
+      title={COPY.create.title}
+      submitLabel={commands ? COPY.create.done : COPY.create.submit}
+      showCancel={!commands}
+      width={commands ? MODAL_WIDTH.LG : MODAL_WIDTH.SM}
+      afterClose={handleClosed}
+      onSubmit={commands ? onCancel : handleSubmit}
+      {...modalProps}
+      submitDisabled={!commands && modalProps.submitDisabled}
     >
-      {step === 1 && (
-        <S.Wrapper>
-          <Block
-            title="Webhook Name"
-            description="Give your Webhook a unique name to help you identify it in the future."
-            required
-          >
-            <Input placeholder="Webhook Name" value={name} onChange={(e) => setName(e.target.value)} />
-          </Block>
-        </S.Wrapper>
+      {commands ? (
+        <Stack>
+          <Success>
+            <CheckCircleOutlined aria-hidden />
+            {COPY.create.generated}
+          </Success>
+          <Intro>{COPY.create.keyNotice}</Intro>
+          <WebhookCommands commands={commands} />
+        </Stack>
+      ) : (
+        <FormField label={COPY.create.nameLabel} description={COPY.create.nameDescription} required>
+          {(control) => (
+            <Input
+              {...control}
+              placeholder={COPY.create.namePlaceholder}
+              value={values.name}
+              onChange={(event) => setField('name', event.target.value)}
+            />
+          )}
+        </FormField>
       )}
-      {step === 2 && (
-        <S.Wrapper>
-          <h2>
-            <CheckCircleOutlined size={30} />
-            <span>CURL commands generated. Please copy them now.</span>
-          </h2>
-          <p>
-            A non-expired API key is automatically generated for the authentication of the webhook. This key will only
-            show now. You can revoke it in the webhook page at any time.
-          </p>
-          <Block title="Incident">
-            <h5>Post to register/update an incident</h5>
-            <CopyText content={record.postIssuesEndpoint} />
-            <p>
-              See the{' '}
-              <ExternalLink link="https://devlake.apache.org/docs/Plugins/webhook#register-issues---update-or-create-issues">
-                full payload schema
-              </ExternalLink>
-              .
-            </p>
-            <h5>Post to close a registered incident</h5>
-            <CopyText content={record.closeIssuesEndpoint} />
-            <p>
-              See the{' '}
-              <ExternalLink link="https://devlake.apache.org/docs/Plugins/webhook#register-issues---close-issues-optional">
-                full payload schema
-              </ExternalLink>
-              .
-            </p>
-          </Block>
-          <Block title="Deployments">
-            <h5>Post to register a deployment</h5>
-            <CopyText content={record.postDeploymentsCurl} />
-            <p>
-              See the{' '}
-              <ExternalLink link="https://devlake.apache.org/docs/Plugins/webhook#deployment">
-                full payload schema
-              </ExternalLink>
-              .
-            </p>
-          </Block>
-          <Block title="Pull Requests">
-            <h5>Post to register a pull request</h5>
-            <CopyText content={record.postPullRequestsEndpoint} />
-            <p>
-              See the{' '}
-              <ExternalLink link="https://devlake.apache.org/docs/Plugins/webhook#pull_requests">
-                full payload schema
-              </ExternalLink>
-              .
-            </p>
-          </Block>
-        </S.Wrapper>
-      )}
-    </Modal>
+    </FormModal>
   );
 };

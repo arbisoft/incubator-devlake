@@ -27,11 +27,11 @@ import { COPY, STATE_LABEL, STATE_TONE } from './constants';
 import { Root, TestedAt } from './styled';
 import type { ConnectionHealthProps } from './types';
 
-export const ConnectionHealth = ({ state, testedAt, message, testing, onRetest }: ConnectionHealthProps) => {
+export const ConnectionHealth = ({ state, testedAt, label, message, testing, onRetest }: ConnectionHealthProps) => {
   const badge = testing ? (
     <StatusBadge tone={STATUS_TONE.INFO} label={COPY.testing} variant={STATUS_BADGE_VARIANT.TEXT} />
   ) : (
-    <StatusBadge tone={STATE_TONE[state]} label={STATE_LABEL[state]} variant={STATUS_BADGE_VARIANT.TEXT} />
+    <StatusBadge tone={STATE_TONE[state]} label={label ?? STATE_LABEL[state]} variant={STATUS_BADGE_VARIANT.TEXT} />
   );
 
   return (

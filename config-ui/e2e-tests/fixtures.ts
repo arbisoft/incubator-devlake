@@ -17,6 +17,7 @@
  */
 import { expect } from '@playwright/test';
 
+import { CONNECTION_TEST_URL } from './support/constants';
 import { test as base } from './support/write-recorder';
 
 export const test = base.extend<{
@@ -29,6 +30,9 @@ export const test = base.extend<{
         const text = msg.text();
         // Ignore expected 401 when checking unauthenticated session on initial load
         if (text.includes('status of 401 (Unauthorized)')) {
+          return;
+        }
+        if (text.includes('Failed to load resource') && CONNECTION_TEST_URL.test(msg.location().url)) {
           return;
         }
         errors.push(`[console.error] ${text}`);

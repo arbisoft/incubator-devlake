@@ -16,48 +16,48 @@
  *
  */
 
-import { Modal } from 'antd';
 import { useState } from 'react';
 
-import { Message } from '@/components';
 import { removeWebhook } from '@/features';
 import { useAppDispatch } from '@/hooks';
+import { CONFIRM_TONE, ConfirmModal, toUserMessage } from '@/ui';
 import { operator } from '@/utils';
 
-interface Props {
-  initialId: ID;
-  onCancel: () => void;
+import { COPY, ERROR_MAP, FALLBACK_ERROR } from '../constants';
+import type { WebhookDialogProps } from '../types';
+
+type DeleteDialogProps = WebhookDialogProps & {
   onSubmitAfter?: (id: ID) => void;
-}
+};
 
-export const DeleteDialog = ({ initialId, onCancel, onSubmitAfter }: Props) => {
+export const DeleteDialog = ({ open, webhook, onCancel, afterClose, onSubmitAfter }: DeleteDialogProps) => {
   const [operating, setOperating] = useState(false);
-
   const dispatch = useAppDispatch();
 
   const handleSubmit = async () => {
-    const [success] = await operator(() => dispatch(removeWebhook(initialId)), {
+    const [success] = await operator(() => dispatch(removeWebhook(webhook.id)).unwrap(), {
       setOperating,
+      formatMessage: () => COPY.remove.success,
+      formatReason: (error) => toUserMessage(error, ERROR_MAP, FALLBACK_ERROR.remove),
     });
 
     if (success) {
-      onSubmitAfter?.(initialId);
+      onSubmitAfter?.(webhook.id);
       onCancel();
     }
   };
 
   return (
-    <Modal
-      open
-      title="Delete this Webhook?"
-      okText="Confirm"
-      okButtonProps={{
-        loading: operating,
-      }}
+    <ConfirmModal
+      open={open}
+      tone={CONFIRM_TONE.DANGER}
+      title={COPY.remove.title(webhook.name)}
+      description={COPY.remove.description}
+      confirmLabel={COPY.remove.confirm}
+      loading={operating}
+      afterClose={afterClose}
+      onConfirm={handleSubmit}
       onCancel={onCancel}
-      onOk={handleSubmit}
-    >
-      <Message content="This Webhook cannot be recovered once it’s deleted." />
-    </Modal>
+    />
   );
 };

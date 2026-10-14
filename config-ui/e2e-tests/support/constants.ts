@@ -46,6 +46,9 @@ export const GOLDEN_MASKED_KEYS: readonly string[] = [
 // Arrays of objects carrying this key are sorted by it: the backend returns a blueprint plan stage's tasks in map order.
 export const GOLDEN_UNORDERED_BY_KEY = 'plugin';
 
+// The catalog tests each connection lazily, so a rejected stored credential logs a failed-resource error in the browser.
+export const CONNECTION_TEST_URL = /\/plugins\/[^/]+\/connections\/\d+\/test$/;
+
 export interface IgnoredWrite {
   method: string;
   // Matched against the normalised path without its query string.

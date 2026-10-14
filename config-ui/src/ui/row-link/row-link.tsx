@@ -16,7 +16,10 @@
  *
  */
 
+import { ROW_LINK_VARIANT } from './constants';
 import { Anchor } from './styled';
 import type { RowLinkProps } from './types';
 
-export const RowLink = (props: RowLinkProps) => <Anchor {...props} />;
+export const RowLink = ({ variant = ROW_LINK_VARIANT.TEXT, ...props }: RowLinkProps) => (
+  <Anchor {...props} $link={variant === ROW_LINK_VARIANT.LINK} />
+);

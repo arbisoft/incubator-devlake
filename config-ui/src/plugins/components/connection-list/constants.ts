@@ -16,14 +16,38 @@
  *
  */
 
+import { PAGE_SIZE_OPTIONS } from '@/ui/constants';
+
+export const CONNECTION_FILTER = { ALL: 'all', CONNECTED: 'connected', FAILED: 'failed' } as const;
+
+export const CONNECTION_SORT_KEY = { NAME: 'name' } as const;
+
+export const COLUMN_KEY = { NAME: 'name', STATUS: 'status', REPOS: 'repos', ACTIONS: 'actions' } as const;
+
+export const REPO_COUNT_CONCURRENCY = 3;
+
+export const REPO_COUNT_QUERY = { page: 1, pageSize: 1 } as const;
+
+export const PAGE_SIZES = PAGE_SIZE_OPTIONS;
+export const [DEFAULT_PAGE_SIZE] = PAGE_SIZE_OPTIONS;
+export const FIRST_PAGE = 1;
+
 export const COPY = {
-  connectionName: 'Connection Name',
-  status: 'Status',
+  tableLabel: (name: string) => `${name} connections`,
+  add: 'Add a Connection',
+  columns: { name: 'Connection Name', status: 'Status', repos: 'Repo Count', actions: 'Action' },
+  filters: { all: 'All', connected: 'Connected', failed: 'Failed' },
   details: 'Details',
   edit: 'Edit',
-  create: 'Create a New Connection',
-  manage: (name: string) => `Manage Connections: ${name}`,
+  detailsFor: (name: string) => `Details: ${name}`,
+  editFor: (name: string) => `Edit: ${name}`,
+  noRepoCount: '—',
+  empty: {
+    title: 'No connections yet',
+    description: 'Add a connection to start collecting data from this integration.',
+  },
+  noResults: {
+    title: 'No connections in this view',
+    description: 'Switch to another tab to see the rest.',
+  },
 };
-
-export const COLUMN_WIDTH = 200;
-export const MODAL_WIDTH = 820;

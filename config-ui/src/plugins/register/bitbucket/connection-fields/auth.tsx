@@ -84,7 +84,6 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
         required
       >
         <Input
-          style={{ width: 386 }}
           placeholder="https://api.bitbucket.org/2.0/"
           value={values.endpoint}
           onChange={handleChangeEndpoint}
@@ -109,7 +108,6 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
         required
       >
         <Input
-          style={{ width: 386 }}
           placeholder={values.usesApiToken ? 'user@example.com' : 'Your Bitbucket Username'}
           value={values.username}
           onChange={handleChangeUsername}
@@ -130,7 +128,6 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
         required
       >
         <Input.Password
-          style={{ width: 386 }}
           placeholder={type === 'update' ? '********' : `Your ${values.usesApiToken ? 'API Token' : 'App Password'}`}
           value={values.password}
           onChange={handleChangePassword}

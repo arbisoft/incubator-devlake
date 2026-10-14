@@ -198,6 +198,8 @@ type ForkThemeColors = {
   iconBrand: string;
   focusRing: string;
   primarySubtle: string;
+  primarySubtleEnd: string;
+  primarySubtleBorder: string;
   selectedBg: string;
   onSelected: string;
   bgTableHeader: string;

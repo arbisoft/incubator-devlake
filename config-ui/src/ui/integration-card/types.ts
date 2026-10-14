@@ -16,6 +16,9 @@
  *
  */
 
+import type { MenuProps } from 'antd';
+import type { ReactNode } from 'react';
+
 import type { PluginIconProps } from '@/ui/plugin-icon';
 
 export type IntegrationCardProps = {
@@ -23,8 +26,12 @@ export type IntegrationCardProps = {
   name: string;
   category: string;
   beta?: boolean;
+  deprecated?: boolean;
   connected: number;
   failed?: number;
+  details?: ReactNode;
+  menu?: MenuProps['items'];
+  docsHref?: string;
   onManage?: () => void;
   onAdd: () => void;
 };

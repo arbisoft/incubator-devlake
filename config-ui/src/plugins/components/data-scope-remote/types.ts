@@ -16,11 +16,72 @@
  *
  */
 
+import type { McsItem, MillerColumnsSelectProps } from 'miller-columns-select';
+
+import type { IPluginConfig } from '@/types';
+
+import type { LOAD_STATUS, SCOPE_ITEM_TYPE, SCOPE_MODE } from './constants';
+
+type ScopeItemType = (typeof SCOPE_ITEM_TYPE)[keyof typeof SCOPE_ITEM_TYPE];
+type ScopeMode = (typeof SCOPE_MODE)[keyof typeof SCOPE_MODE];
+export type LoadStatus = (typeof LOAD_STATUS)[keyof typeof LOAD_STATUS];
+
+type ScopeData = Record<string, unknown>;
+
 export type ResItem = {
-  type: 'group' | 'scope';
+  type: ScopeItemType;
   parentId: ID | null;
   id: ID;
   name: string;
   fullName: string;
-  data: any;
+  data: ScopeData;
+};
+
+export type ScopeItem = McsItem<ResItem>;
+
+type DisabledScope = { id: ID };
+
+export type DataScopeConfig = IPluginConfig['dataScope'];
+
+export type SearchProps = {
+  mode: ScopeMode;
+  plugin: string;
+  connectionId: ID;
+  config: DataScopeConfig;
+  disabledScope: DisabledScope[];
+  selectedScope: ScopeItem[];
+  onChange: (selectedScope: ScopeItem[]) => void;
+};
+
+export type DataScopeRemoteProps = {
+  mode?: ScopeMode;
+  plugin: string;
+  connectionId: ID;
+  selectedScope: ScopeItem[];
+  disabledScope?: DisabledScope[];
+  onChangeSelectedScope: (scope: ScopeItem[]) => void;
+};
+
+export type DataScopeRemoteModalProps = {
+  open: boolean;
+  plugin: string;
+  connectionId: ID;
+  title: string;
+  disabledScope?: DisabledScope[];
+  onCancel: () => void;
+  onSubmit: () => void;
+};
+
+export type ScopePanesProps<T> = Omit<
+  MillerColumnsSelectProps<T>,
+  'columnHeight' | 'renderTitle' | 'renderLoading' | 'renderError'
+> & {
+  firstColumnTitle?: string;
+  compact?: boolean;
+};
+
+export type SelectedScopesProps = {
+  plugin: string;
+  scopes: ScopeItem[];
+  onChange: (scopes: ScopeItem[]) => void;
 };

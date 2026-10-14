@@ -135,8 +135,8 @@ const basePath = '/access';
 export const current = (): Promise<AccessCurrent> => request(`${basePath}/me`);
 export type AccessUserListParams = AccessPagination & KeywordParams;
 
-export const listUsers = (params: AccessUserListParams): Promise<PaginatedAccessUsers> =>
-  request(`${basePath}/users`, { data: params });
+export const listUsers = (params: AccessUserListParams, signal?: AbortSignal): Promise<PaginatedAccessUsers> =>
+  request(`${basePath}/users`, { data: params, signal });
 export const createUser = (data: { email: string; role: AccessRole }): Promise<AccessUser> =>
   request(`${basePath}/users`, { method: 'POST', data });
 export const updateUser = (id: ID, data: { role: AccessRole; status: AccessStatus }): Promise<AccessUser> =>
@@ -153,15 +153,16 @@ export const resetLocalCredential = (id: ID): Promise<LocalCredentialResponse> =
   request(`${basePath}/users/${id}/local-credential/reset`, { method: 'POST' });
 export const removeLocalCredential = (id: ID): Promise<AccessUser> =>
   request(`${basePath}/users/${id}/local-credential`, { method: 'DELETE' });
-export const listDomains = (params: AccessPagination): Promise<PaginatedAccessDomains> =>
-  request(`${basePath}/domains`, { data: params });
+export const listDomains = (params: AccessPagination, signal?: AbortSignal): Promise<PaginatedAccessDomains> =>
+  request(`${basePath}/domains`, { data: params, signal });
 export const createDomain = (data: { domain: string; defaultRole: AccessRole }): Promise<AccessDomain> =>
   request(`${basePath}/domains`, { method: 'POST', data });
 export const updateDomain = (id: ID, data: { defaultRole: AccessRole; status: AccessStatus }): Promise<AccessDomain> =>
   request(`${basePath}/domains/${id}`, { method: 'PATCH', data });
 export const hideDomain = (id: ID): Promise<AccessDomain> =>
   request(`${basePath}/domains/${id}/hide`, { method: 'POST' });
-export const listAuditEvents = (): Promise<AccessAuditEvent[]> => request(`${basePath}/audit-events`);
+export const listAuditEvents = (signal?: AbortSignal): Promise<AccessAuditEvent[]> =>
+  request(`${basePath}/audit-events`, { signal });
 export const getOIDCCallbacks = (): Promise<OIDCCallbacks> => request(`${basePath}/oidc-providers/callbacks`);
 export const listOIDCProviders = (): Promise<OIDCProvider[]> => request(`${basePath}/oidc-providers`);
 export const listLinkableOIDCProviders = (): Promise<LinkableOIDCProvider[]> =>

@@ -44,21 +44,24 @@ export const Pipelines = () => {
   const { version, refresh } = useRefreshVersion();
 
   const { ready, data, error } = useRefreshData(
-    () => API.pipeline.list(buildPipelineQuery(list.query, filters)),
+    (signal) => API.pipeline.list(buildPipelineQuery(list.query, filters), signal),
     [version, list.query, filters.blueprintId],
   );
   const [searchInput, setSearch] = useState('');
   const search = useDebounce(searchInput, { wait: BLUEPRINT_SEARCH_DEBOUNCE_MS });
   const { data: blueprints } = useRefreshData(
-    () =>
-      API.blueprint.list({
-        page: 1,
-        pageSize: BLUEPRINT_OPTIONS_LIMIT,
-        type: BLUEPRINT_TYPE_ALL,
-        keyword: search || undefined,
-        sortBy: 'name',
-        sortOrder: SORT_ORDER.ASC,
-      }),
+    (signal) =>
+      API.blueprint.list(
+        {
+          page: 1,
+          pageSize: BLUEPRINT_OPTIONS_LIMIT,
+          type: BLUEPRINT_TYPE_ALL,
+          keyword: search || undefined,
+          sortBy: 'name',
+          sortOrder: SORT_ORDER.ASC,
+        },
+        signal,
+      ),
     [search],
   );
   const { data: selected } = useRefreshData(

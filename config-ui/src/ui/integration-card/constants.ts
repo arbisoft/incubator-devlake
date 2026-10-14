@@ -18,6 +18,9 @@
 
 export const COPY = {
   categoryBeta: (category: string) => `${category} · Beta`,
+  deprecated: 'Deprecated',
+  actionsFor: (name: string) => `${name} actions`,
+  docs: (name: string) => `View ${name} documentation`,
   connected: (count: number) => `${count} connected`,
   failed: (count: number) => `${count} failed`,
   manage: (count: number) => `Manage (${count})`,

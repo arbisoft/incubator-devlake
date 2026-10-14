@@ -51,7 +51,7 @@ export type DataTableProps<T extends object, S extends string = string> = {
   rowKey: TableProps<T>['rowKey'];
   loading: boolean;
   ariaLabel: string;
-  pagination?: DataTablePagination;
+  pagination?: DataTablePagination | false;
   list?: DataTableList<S>;
   total?: number;
   sort?: DataTableSort<S>;

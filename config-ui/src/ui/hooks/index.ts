@@ -17,6 +17,7 @@
  */
 
 export * from './use-concurrency-queue';
+export * from './use-confirm-flow';
 export * from './use-document-title';
 export * from './use-in-view';
 export * from './use-list-state';

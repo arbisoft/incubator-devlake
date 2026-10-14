@@ -16,57 +16,51 @@
  *
  */
 
-import { Modal, Input } from 'antd';
-import { useState, useEffect } from 'react';
+import { Input } from 'antd';
 
-import { Block } from '@/components';
-import { updateWebhook, selectWebhook } from '@/features';
-import { useAppDispatch, useAppSelector } from '@/hooks';
+import { updateWebhook } from '@/features';
+import { useAppDispatch } from '@/hooks';
+import { FormField, FormModal, MODAL_WIDTH, toUserMessage, useModalForm } from '@/ui';
 import { operator } from '@/utils';
 
-interface Props {
-  initialId: ID;
-  onCancel: () => void;
-}
+import { COPY, ERROR_MAP, FALLBACK_ERROR } from '../constants';
+import type { WebhookDialogProps } from '../types';
 
-export const EditDialog = ({ initialId, onCancel }: Props) => {
-  const [name, setName] = useState('');
-  const [operating, setOperating] = useState(false);
+import { WebhookIcon } from './webhook-icon';
 
+export const EditDialog = ({ open, webhook, onCancel, afterClose }: WebhookDialogProps) => {
   const dispatch = useAppDispatch();
-  const webhook = useAppSelector((state) => selectWebhook(state, initialId));
-
-  useEffect(() => {
-    setName(webhook?.name ?? '');
-  }, [webhook]);
+  const { values, setField, setSaving, modalProps } = useModalForm(
+    { name: webhook.name },
+    { onClose: onCancel, required: ['name'], disabledReason: COPY.create.disabledReason },
+  );
 
   const handleSubmit = async () => {
-    const [success] = await operator(() => dispatch(updateWebhook({ id: initialId, name })), {
-      setOperating,
+    const [success] = await operator(() => dispatch(updateWebhook({ id: webhook.id, name: values.name })).unwrap(), {
+      setOperating: setSaving,
+      formatMessage: () => COPY.edit.success,
+      formatReason: (error) => toUserMessage(error, ERROR_MAP, FALLBACK_ERROR.edit),
     });
 
-    if (success) {
-      onCancel();
-    }
+    if (success) onCancel();
   };
 
   return (
-    <Modal
-      open
-      width={820}
-      centered
-      title="Edit Webhook Name"
-      okText="Save"
-      okButtonProps={{
-        disabled: !name,
-        loading: operating,
-      }}
-      onCancel={onCancel}
-      onOk={handleSubmit}
+    <FormModal
+      open={open}
+      icon={<WebhookIcon />}
+      title={COPY.edit.title}
+      submitLabel={COPY.edit.submit}
+      width={MODAL_WIDTH.SM}
+      afterClose={afterClose}
+      onSubmit={handleSubmit}
+      {...modalProps}
     >
-      <Block title="Name" required>
-        <Input value={name} onChange={(e) => setName(e.target.value)} />
-      </Block>
-    </Modal>
+      <FormField label={COPY.create.nameLabel} required>
+        {(control) => (
+          <Input {...control} value={values.name} onChange={(event) => setField('name', event.target.value)} />
+        )}
+      </FormField>
+    </FormModal>
   );
 };

@@ -25,8 +25,7 @@ import {
 } from '@/api/access/constants';
 import { CONFIRM_TONE } from '@/ui/confirm-modal/constants';
 import { STATUS_TONE } from '@/ui/constants';
-
-import type { ConfirmConfig } from './types';
+import type { ConfirmConfig } from '@/ui/types';
 
 export const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
 export const [DEFAULT_PAGE_SIZE] = PAGE_SIZE_OPTIONS;

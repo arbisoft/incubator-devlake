@@ -19,9 +19,9 @@
 import { ACCESS_ERROR_CODE, GRAFANA_PROVIDER_KIND, type GrafanaProviderKind } from '@/api/access/constants';
 import { CONFIRM_TONE } from '@/ui/confirm-modal/constants';
 import { STATUS_TONE } from '@/ui/constants';
+import type { ConfirmConfig } from '@/ui/types';
 
 import { ACCESS_ERROR } from '../constants';
-import type { ConfirmConfig } from '../types';
 
 export const OIDC_PROVIDER_ERROR_MAP: Record<string, string> = {
   [ACCESS_ERROR_CODE.INVALID_OIDC_PROVIDER]: ACCESS_ERROR.INVALID_OIDC_PROVIDER,

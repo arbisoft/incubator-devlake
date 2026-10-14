@@ -61,7 +61,7 @@ export const ConnectionTenantId = ({ initialValue, value, setValue, setError }: 
 
   return (
     <Block title="Tenant Id" description="" required>
-      <Input style={{ width: 386 }} placeholder="Tenant Id" value={value} onChange={handleChange} />
+      <Input placeholder="Tenant Id" value={value} onChange={handleChange} />
     </Block>
   );
 };

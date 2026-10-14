@@ -25,8 +25,8 @@ import { SubTasksRes } from './types';
 
 export type ListParams = Pagination & SortParams<'id' | 'beganAt' | 'finishedAt'> & { blueprint_id?: ID };
 
-export const list = (params: ListParams): Promise<{ count: number; pipelines: IPipeline[] }> =>
-  request('/pipelines', { data: params });
+export const list = (params: ListParams, signal?: AbortSignal): Promise<{ count: number; pipelines: IPipeline[] }> =>
+  request('/pipelines', { data: params, signal });
 
 export const get = (id: ID) => request(`/pipelines/${id}`);
 

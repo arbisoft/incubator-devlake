@@ -15,7 +15,7 @@
  * limitations under the License.
  *
  */
-import { Locator, Page } from '@playwright/test';
+import { expect, Locator, Page } from '@playwright/test';
 
 import { PageResponse } from '../api';
 import { TEST_ACTION_HEADER } from '../constants';
@@ -46,6 +46,23 @@ const toast = (page: Page, text: string | RegExp): Locator =>
 
 export const selectOption = (page: Page, label: string | RegExp): Locator =>
   page.locator('.ant-select-item-option').filter({ hasText: label });
+
+// The dropdown list is virtual, so an option past the first screen is not in the DOM until the list is scrolled to it.
+export async function chooseOption(page: Page, label: string | RegExp): Promise<void> {
+  const option = selectOption(page, label);
+  const holder = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) [class$="-holder"]');
+  await expect
+    .poll(
+      async () => {
+        if (await option.count()) return true;
+        await holder.evaluate((el) => el.scrollBy(0, el.clientHeight));
+        return false;
+      },
+      { intervals: [50] },
+    )
+    .toBe(true);
+  await option.click();
+}
 
 // AntD icons render role="img" with aria-label set to the icon name (for example "delete", "link").
 export const iconButton = (scope: Page | Locator, iconName: string): Locator =>

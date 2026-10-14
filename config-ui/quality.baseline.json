@@ -1,7 +1,7 @@
 {
   "eslint": {
     "@typescript-eslint/no-explicit-any": {
-      "errors": 320,
+      "errors": 259,
       "warnings": 0
     },
     "@typescript-eslint/no-unused-vars": {
@@ -16,49 +16,37 @@
       "errors": 2,
       "warnings": 0
     },
-    "jsx-a11y/click-events-have-key-events": {
-      "errors": 5,
-      "warnings": 0
-    },
     "jsx-a11y/no-autofocus": {
-      "errors": 1,
-      "warnings": 0
-    },
-    "jsx-a11y/no-noninteractive-element-interactions": {
-      "errors": 4,
-      "warnings": 0
-    },
-    "jsx-a11y/no-static-element-interactions": {
       "errors": 1,
       "warnings": 0
     },
     "max-lines": {
       "errors": 0,
-      "warnings": 18
+      "warnings": 15
     },
     "no-console": {
-      "errors": 3,
+      "errors": 2,
       "warnings": 0
     },
     "no-duplicate-imports": {
-      "errors": 15,
+      "errors": 8,
       "warnings": 0
     },
     "no-empty": {
       "errors": 0,
-      "warnings": 3
+      "warnings": 2
     },
     "prefer-destructuring": {
       "errors": 0,
-      "warnings": 17
+      "warnings": 14
     },
     "react-hooks/exhaustive-deps": {
       "errors": 0,
-      "warnings": 74
+      "warnings": 67
     },
     "react-hooks/globals": {
       "errors": 0,
-      "warnings": 2
+      "warnings": 1
     },
     "react-hooks/immutability": {
       "errors": 0,
@@ -70,11 +58,7 @@
     },
     "react-hooks/set-state-in-effect": {
       "errors": 0,
-      "warnings": 40
-    },
-    "react/display-name": {
-      "errors": 1,
-      "warnings": 0
+      "warnings": 31
     },
     "react/jsx-key": {
       "errors": 1,
@@ -89,7 +73,7 @@
       "warnings": 0
     },
     "sonarjs/cognitive-complexity": {
-      "errors": 4,
+      "errors": 3,
       "warnings": 0
     },
     "sonarjs/no-clear-text-protocols": {
@@ -110,18 +94,14 @@
     },
     "sonarjs/no-nested-conditional": {
       "errors": 0,
-      "warnings": 17
+      "warnings": 13
     },
     "sonarjs/no-nested-template-literals": {
-      "errors": 2,
+      "errors": 1,
       "warnings": 0
     },
     "sonarjs/prefer-native-axios-alternative": {
       "errors": 1,
-      "warnings": 0
-    },
-    "sonarjs/prefer-native-lodash-alternative": {
-      "errors": 2,
       "warnings": 0
     },
     "sonarjs/prefer-single-boolean-return": {
@@ -143,7 +123,7 @@
   },
   "knip": [],
   "jscpd": {
-    "clones": 112,
-    "duplicatedLines": 1985
+    "clones": 105,
+    "duplicatedLines": 1890
   }
 }

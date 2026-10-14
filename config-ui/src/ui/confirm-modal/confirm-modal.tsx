@@ -39,6 +39,7 @@ export const ConfirmModal = ({
   loading,
   onConfirm,
   onCancel,
+  afterClose,
 }: ConfirmModalProps) => {
   const descriptionId = useId();
   const { layout } = useTheme();
@@ -62,6 +63,7 @@ export const ConfirmModal = ({
         </TitleRow>
       }
       onCancel={onCancel}
+      afterClose={afterClose}
       footer={
         <Footer>
           <Button ref={focusOnMount} disabled={loading} onClick={onCancel}>
