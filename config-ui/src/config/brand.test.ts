@@ -49,6 +49,17 @@ describe('brand', () => {
     ).toEqual({ brandName: 'Acme Lake', titleCustom: 'Acme', primaryOverride: 'brand-override', copyrightHide: true });
   });
 
+  it.each([true, 'true', ' TRUE ', 'TrUe'])('hides the copyright for a supported true value', (value) => {
+    expect(resolveBrand({ DEVLAKE_COPYRIGHT_HIDE: value }).copyrightHide === true).toBeTruthy();
+  });
+
+  it.each([false, undefined, '', 'false', '1', 'yes', ' trueish '])(
+    'keeps the copyright for an unsupported value',
+    (value) => {
+      expect(resolveBrand({ DEVLAKE_COPYRIGHT_HIDE: value }).copyrightHide === false).toBeTruthy();
+    },
+  );
+
   it('treats empty env values as unset', () => {
     const brand = resolveBrand({ DEVLAKE_BRAND_NAME: '', DEVLAKE_TITLE_CUSTOM: '', DEVLAKE_COLOR_CUSTOM: '' });
     expect(brand.brandName).toBe(DEFAULT_BRAND_NAME);

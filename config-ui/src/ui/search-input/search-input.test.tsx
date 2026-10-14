@@ -73,4 +73,10 @@ describe('SearchInput', () => {
     fireEvent.click(screen.getByRole('button', { name: COMMON_COPY.clear }));
     expect(onSearch).toHaveBeenCalledExactlyOnceWith('');
   });
+
+  it('does not search when a user deletes the text manually', () => {
+    const { input, onSearch } = setup({ value: 'abc', allowClear: true });
+    fireEvent.change(input, { target: { value: '' } });
+    expect(onSearch).not.toHaveBeenCalled();
+  });
 });

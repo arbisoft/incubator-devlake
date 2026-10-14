@@ -27,6 +27,7 @@ export type FormModalProps = {
   submitLabel: string;
   cancelLabel?: string;
   showCancel?: boolean;
+  dismissible?: boolean;
   width?: ModalWidth;
   loading?: boolean;
   submitDisabled?: boolean;

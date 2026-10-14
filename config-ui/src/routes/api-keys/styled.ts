@@ -16,7 +16,6 @@
  *
  */
 
-import { Modal } from 'antd';
 import styled from 'styled-components';
 
 import { textStyle } from '@/ui/style-helpers';
@@ -59,22 +58,6 @@ export const PathPrefix = styled.span`
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-right: 0;
   border-radius: ${({ theme }) => theme.radius.sm}px 0 0 ${({ theme }) => theme.radius.sm}px;
-`;
-
-export const Dialog = styled(Modal)`
-  .ant-modal-title {
-    ${textStyle('h3')}
-  }
-
-  .ant-modal-header {
-    margin-bottom: ${({ theme }) => theme.space.lg}px;
-  }
-`;
-
-export const DialogTitle = styled.span`
-  display: flex;
-  align-items: center;
-  gap: ${({ theme }) => theme.space.xs}px;
 `;
 
 export const GeneratedBody = styled.div`

@@ -34,7 +34,7 @@ export const SearchInputDemo = () => {
         <span role="status">{status}</span>
       </DemoCase>
       <DemoCase label={`${COPY.cases.withValue}, ${COPY.cases.clearable}`}>
-        <SearchInput value="jira" placeholder={COPY.searchInput.placeholder} onSearch={setKeyword} allowClear />
+        <ClearableSearchCase />
       </DemoCase>
       <DemoCase label={COPY.cases.longText}>
         <Narrow>
@@ -42,5 +42,26 @@ export const SearchInputDemo = () => {
         </Narrow>
       </DemoCase>
     </DemoSection>
+  );
+};
+
+const ClearableSearchCase = () => {
+  const [keyword, setKeyword] = useState('jira');
+  const [submitted, setSubmitted] = useState<string>();
+  const status = submitted === undefined ? COPY.searchInput.none : COPY.searchInput.submitted(submitted);
+
+  return (
+    <>
+      <SearchInput
+        value={keyword}
+        placeholder={COPY.searchInput.placeholder}
+        onSearch={(next) => {
+          setKeyword(next);
+          setSubmitted(next);
+        }}
+        allowClear
+      />
+      <span role="status">{status}</span>
+    </>
   );
 };

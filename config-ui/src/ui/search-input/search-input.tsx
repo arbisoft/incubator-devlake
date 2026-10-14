@@ -43,10 +43,15 @@ export const SearchInput = ({ value, placeholder, onSearch, allowClear }: Search
         placeholder={placeholder}
         aria-label={placeholder}
         allowClear={allowClear && { clearIcon: <CloseCircleFilled aria-label={COMMON_COPY.clear} /> }}
-        onChange={(event) => {
-          setDraft(event.target.value);
-          if (!event.target.value && allowClear && event.type === 'click') onSearch('');
-        }}
+        onChange={(event) => setDraft(event.target.value)}
+        onClear={
+          allowClear
+            ? () => {
+                setDraft('');
+                onSearch('');
+              }
+            : undefined
+        }
         onPressEnter={submit}
       />
       <Button type="primary" icon={<SearchOutlined />} aria-label={COMMON_COPY.search} onClick={submit} />

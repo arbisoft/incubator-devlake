@@ -96,6 +96,9 @@ export const COPY = {
     title: 'Your API key is ready',
     description: "Copy it now — you won't be able to see it again.",
     copy: 'Copy API key',
+    copied: 'API key copied.',
+    keyLabel: 'API key',
+    done: 'Done',
     close: 'Close',
   },
   confirm: {

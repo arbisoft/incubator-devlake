@@ -23,8 +23,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/routes';
 
 import { ACCESS_ROLE } from '@/api/access';
+import { THEME_MODE } from '@/theme/constants';
 
-import { ACCOUNT_MENU_KEY, COPY, FAILURE_COOLDOWN_MS, LINK_IDENTITY, THEME_MODE } from './constants';
+import { ACCOUNT_MENU_KEY, COPY, FAILURE_COOLDOWN_MS, LINK_IDENTITY } from './constants';
 import type { LayoutUser } from './types';
 import { useAccountMenu, useIdentityLinkNotification } from './use-account-menu';
 

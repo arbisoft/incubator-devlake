@@ -76,7 +76,6 @@ export type LayoutTokens = {
   authGlowInsetBottom: number;
   searchMaxWidth: number;
   searchMinWidth: number;
-  connectionNameWidth: number;
   connectionLabelMaxWidth: number;
   sortSelectWidth: number;
   datePickerWidth: number;
@@ -186,7 +185,6 @@ export const LAYOUT: LayoutTokens = {
   authGlowInsetBottom: -130,
   searchMaxWidth: 400,
   searchMinWidth: 140,
-  connectionNameWidth: 200,
   connectionLabelMaxWidth: 240,
   sortSelectWidth: 168,
   datePickerWidth: 224,

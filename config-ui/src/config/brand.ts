@@ -16,18 +16,18 @@
  *
  */
 
+import type { BrandEnv } from './types';
+
 export const DEFAULT_BRAND_NAME = 'Arbisoft DevLake';
 export const POWERED_BY = 'Powered by Apache DevLake';
-
-type BrandEnv = Partial<
-  Pick<ImportMetaEnv, 'DEVLAKE_BRAND_NAME' | 'DEVLAKE_TITLE_CUSTOM' | 'DEVLAKE_COLOR_CUSTOM' | 'DEVLAKE_COPYRIGHT_HIDE'>
->;
 
 export const resolveBrand = (env: BrandEnv) => ({
   brandName: env.DEVLAKE_BRAND_NAME || DEFAULT_BRAND_NAME,
   titleCustom: env.DEVLAKE_TITLE_CUSTOM || undefined,
   primaryOverride: env.DEVLAKE_COLOR_CUSTOM || undefined,
-  copyrightHide: Boolean(env.DEVLAKE_COPYRIGHT_HIDE),
+  copyrightHide:
+    env.DEVLAKE_COPYRIGHT_HIDE === true ||
+    (typeof env.DEVLAKE_COPYRIGHT_HIDE === 'string' && env.DEVLAKE_COPYRIGHT_HIDE.trim().toLowerCase() === 'true'),
 });
 
 const brand = resolveBrand(import.meta.env);

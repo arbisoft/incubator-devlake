@@ -27,6 +27,7 @@ import {
   SORT_ORDER,
   STATUS_TONE,
   StatusBadge,
+  type SortState,
   useListState,
 } from '@/ui';
 
@@ -39,6 +40,7 @@ import type { UserRow } from './types';
 const { dataTable: text } = COPY;
 const COLUMN_WIDTH = 180;
 const LONG_COLUMN_WIDTH = 320;
+const KEYLESS_PREVIEW_ROW_COUNT = 12;
 
 const columns: TableColumnsType<UserRow> = [
   {
@@ -73,6 +75,7 @@ const fixedWidthColumns: TableColumnsType<UserRow> = columns.map((column) => ({
   ...column,
   width: column.key === 'note' ? LONG_COLUMN_WIDTH : COLUMN_WIDTH,
 }));
+const keylessColumns: TableColumnsType<UserRow> = columns.map(({ key: _key, ...column }) => column);
 
 const compare = (a: UserRow, b: UserRow, key: string) =>
   String(a[key as keyof UserRow]).localeCompare(String(b[key as keyof UserRow]));
@@ -146,6 +149,28 @@ const SelectableTable = () => {
   );
 };
 
+const KeylessSortTable = () => {
+  const [sort, setSort] = useState<SortState<string> | undefined>({ sortBy: 'name', sortOrder: SORT_ORDER.ASC });
+  const sorted = sort
+    ? [...TABLE_ROWS].sort((a, b) => {
+        const factor = sort.sortOrder === SORT_ORDER.ASC ? 1 : -1;
+        return factor * compare(a, b, sort.sortBy);
+      })
+    : TABLE_ROWS;
+
+  return (
+    <DataTable<UserRow>
+      columns={keylessColumns}
+      dataSource={sorted.slice(0, KEYLESS_PREVIEW_ROW_COUNT)}
+      rowKey="id"
+      loading={false}
+      ariaLabel={text.sortName}
+      empty={empty}
+      sort={{ value: sort, onChange: setSort }}
+    />
+  );
+};
+
 export const DataTableDemo = () => (
   <DemoSection id={SECTION.DATA_TABLE} title={COPY.sections.dataTable}>
     <DemoCase label={COPY.cases.sortAndPaginate}>
@@ -160,6 +185,19 @@ export const DataTableDemo = () => (
         ariaLabel={text.ariaLabel}
         empty={empty}
       />
+    </DemoCase>
+    <DemoCase label={COPY.cases.unpaginated}>
+      <DataTable<UserRow>
+        columns={columns}
+        dataSource={TABLE_ROWS.slice(0, KEYLESS_PREVIEW_ROW_COUNT)}
+        rowKey="id"
+        loading={false}
+        ariaLabel={text.ariaLabel}
+        empty={empty}
+      />
+    </DemoCase>
+    <DemoCase label={COPY.cases.keylessSort}>
+      <KeylessSortTable />
     </DemoCase>
     <DemoCase label={COPY.cases.selectable}>
       <SelectableTable />

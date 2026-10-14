@@ -31,6 +31,7 @@ export const FormModal = ({
   submitLabel,
   cancelLabel = COMMON_COPY.cancel,
   showCancel = true,
+  dismissible = true,
   width = MODAL_WIDTH.MD,
   loading,
   submitDisabled,
@@ -42,12 +43,22 @@ export const FormModal = ({
 }: FormModalProps) => {
   const { layout } = useTheme();
   const reason = submitDisabled ? disabledReason : undefined;
+  const canDismiss = dismissible && !loading;
+  const cancel = () => {
+    if (canDismiss) onCancel();
+  };
+  const submit = () => {
+    if (!loading && !submitDisabled) onSubmit();
+  };
 
   return (
     <Dialog
       open={open}
       centered
       destroyOnHidden
+      closable={canDismiss}
+      keyboard={canDismiss}
+      mask={{ closable: canDismiss }}
       width={layout.modalWidth[width]}
       title={
         <TitleRow>
@@ -55,7 +66,7 @@ export const FormModal = ({
           {title}
         </TitleRow>
       }
-      onCancel={onCancel}
+      onCancel={cancel}
       afterClose={afterClose}
       footer={
         <Footer>
@@ -64,12 +75,16 @@ export const FormModal = ({
               type="primary"
               loading={loading}
               aria-disabled={submitDisabled}
-              onClick={submitDisabled ? undefined : onSubmit}
+              onClick={loading || submitDisabled ? undefined : submit}
             >
               {submitLabel}
             </SubmitButton>
           </Tooltip>
-          {showCancel && <Button onClick={onCancel}>{cancelLabel}</Button>}
+          {showCancel && (
+            <Button disabled={!canDismiss} onClick={cancel}>
+              {cancelLabel}
+            </Button>
+          )}
         </Footer>
       }
     >

@@ -54,6 +54,7 @@ export const COMPOSITES_COPY = {
     longNote:
       'A very long note that does not fit in the cell and has to be handled by the table without breaking the layout of its neighbours.',
     selected: (count: number) => `Selected rows: ${count}`,
+    sortName: 'Sort by name',
   },
   confirmModal: {
     open: 'Open',
@@ -104,12 +105,17 @@ export const COMPOSITES_COPY = {
     open: 'Open',
     openSingle: 'Open without cancel',
     openTall: 'Open with a tall body',
+    openAcknowledgement: 'Open acknowledgement dialog',
+    acknowledgementTitle: 'Review complete',
+    acknowledgementBody: 'This dialog stays open until you acknowledge the completed action.',
+    acknowledgementDone: 'Acknowledge',
     tallLine: (index: number) => `Line ${index} of a body taller than the viewport`,
     title: 'Add a new webhook',
     field: 'Webhook name',
     hint: 'Give your webhook a unique name to help you identify it later.',
     submit: 'Save',
     reason: 'Enter a name to continue.',
+    pending: 'Saving is in progress. Dismissal and repeated submissions are paused until it finishes.',
     longTitle: 'Add a webhook with an extraordinarily long title that has to wrap inside the dialog header',
   },
   detailDrawer: {

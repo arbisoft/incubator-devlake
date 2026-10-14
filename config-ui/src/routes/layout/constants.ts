@@ -16,6 +16,7 @@
  *
  */
 
+import { THEME_MODE } from '@/theme/constants';
 import type { ThemeMode } from '@/theme/tokens';
 
 export const NAV_KEY = {
@@ -41,13 +42,6 @@ export const NAV_KEY = {
 export const ACCESS_NAV_KEYS: string[] = [NAV_KEY.SETTINGS, NAV_KEY.USERS, NAV_KEY.AUTHENTICATION, NAV_KEY.ACTIVITY];
 
 export const COPYRIGHT_HIDDEN_NAV_KEYS: string[] = [NAV_KEY.DASHBOARDS, NAV_KEY.GITHUB, NAV_KEY.SLACK];
-
-export const THEME_MODE = { LIGHT: 'light', DARK: 'dark', SYSTEM: 'system' } as const satisfies Record<
-  string,
-  ThemeMode
->;
-
-export const THEME_MODES: ThemeMode[] = [THEME_MODE.LIGHT, THEME_MODE.DARK, THEME_MODE.SYSTEM];
 
 export const ACCOUNT_MENU_KEY = {
   VERSION: 'version',

@@ -31,6 +31,7 @@ import { getHorizontalScroll } from './utils';
 type Row = { id: number; name: string };
 
 const ARIA_LABEL = 'Connections table';
+const PAGINATION_SELECTOR = '.ant-pagination';
 const EMPTY = { title: 'No connections yet', size: EMPTY_STATE_SIZE.SECTION };
 const ROWS: Row[] = [
   { id: 1, name: 'Alpha' },
@@ -77,7 +78,16 @@ describe('DataTable', () => {
 
   it('shows no pager when pagination is turned off', () => {
     const { container } = setup({ pagination: false });
-    expect(container.querySelector('.ant-pagination')).toBeNull();
+    expect(container.querySelector(PAGINATION_SELECTOR)).toBeNull();
+  });
+
+  it('shows every row without a pager when neither pagination nor list state is supplied', () => {
+    const dataSource = Array.from({ length: 12 }, (_, id) => ({ id, name: `Row ${id}` }));
+    const { container } = setup({ dataSource });
+    expect(within(screen.getByRole('table', { name: ARIA_LABEL })).getAllByRole('row')).toHaveLength(
+      dataSource.length + 1,
+    );
+    expect(container.querySelector(PAGINATION_SELECTOR)).toBeNull();
   });
 
   it('renders the empty state when there is no data', () => {
@@ -162,5 +172,32 @@ describe('DataTable', () => {
     expect(list.setSort).toHaveBeenCalledExactlyOnceWith({ sortBy: 'name', sortOrder: SORT_ORDER.DESC });
     fireEvent.click(screen.getByTitle('2'));
     expect(list.setPage).toHaveBeenCalledExactlyOnceWith(2);
+  });
+
+  it('keeps an explicit false pagination prop ahead of list pagination', () => {
+    const { container } = setup({
+      list: {
+        page: 1,
+        pageSize: 1,
+        setPage: vi.fn(),
+        setPageSize: vi.fn(),
+        setSort: vi.fn(),
+      },
+      pagination: false,
+    });
+    expect(container.querySelector(PAGINATION_SELECTOR)).toBeNull();
+  });
+
+  it('uses a keyless column dataIndex for controlled sorting and emitted sort state', () => {
+    const setSort = vi.fn();
+    const columns: TableColumnsType<Row> = [{ title: 'Name', dataIndex: 'name', sorter: true }];
+    setup({
+      columns,
+      sort: { value: { sortBy: 'name', sortOrder: SORT_ORDER.ASC }, onChange: setSort },
+    });
+    const header = screen.getByRole('columnheader', { name: /Name/ });
+    expect(header.getAttribute('aria-sort')).toBe('ascending');
+    fireEvent.click(header);
+    expect(setSort).toHaveBeenCalledExactlyOnceWith({ sortBy: 'name', sortOrder: SORT_ORDER.DESC });
   });
 });

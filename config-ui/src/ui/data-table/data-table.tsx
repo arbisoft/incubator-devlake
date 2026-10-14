@@ -68,15 +68,19 @@ export const DataTable = <T extends object, S extends string = string>({
       scroll={{ x: getHorizontalScroll(columns) }}
       locale={{ emptyText: firstLoad ? null : <EmptyState {...empty} /> }}
       pagination={
-        pagination && {
-          current: pagination.page,
-          pageSize: pagination.pageSize,
-          total: pagination.total,
-          pageSizeOptions: [...(pagination.pageSizeOptions ?? SIZE_OPTIONS)],
-          placement: ['bottomCenter'],
-          onChange: (page, pageSize) =>
-            pageSize === pagination.pageSize ? pagination.onPageChange(page) : pagination.onPageSizeChange(pageSize),
-        }
+        pagination
+          ? {
+              current: pagination.page,
+              pageSize: pagination.pageSize,
+              total: pagination.total,
+              pageSizeOptions: [...(pagination.pageSizeOptions ?? SIZE_OPTIONS)],
+              placement: ['bottomCenter'],
+              onChange: (page, pageSize) =>
+                pageSize === pagination.pageSize
+                  ? pagination.onPageChange(page)
+                  : pagination.onPageSizeChange(pageSize),
+            }
+          : false
       }
       onChange={(_, filters, sorter, { action }) => {
         if (action === 'sort') sort?.onChange(toSortState<T, S>(sorter));

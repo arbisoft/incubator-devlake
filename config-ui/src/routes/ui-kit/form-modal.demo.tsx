@@ -18,7 +18,7 @@
 
 import { ApiOutlined } from '@ant-design/icons';
 import { Button, Input, Space } from 'antd';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { FormModal, MODAL_WIDTH, type ModalWidth } from '@/ui';
 
@@ -37,6 +37,11 @@ export const FormModalDemo = () => {
   const [tall, setTall] = useState(false);
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [acknowledgementOpen, setAcknowledgementOpen] = useState(false);
+  const timer = useRef<number | undefined>(undefined);
+
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
   const close = () => {
     setWidth(undefined);
     setLong(false);
@@ -46,11 +51,13 @@ export const FormModalDemo = () => {
   };
   const submit = () => {
     setLoading(true);
-    window.setTimeout(() => {
+    timer.current = window.setTimeout(() => {
+      timer.current = undefined;
       setLoading(false);
       close();
     }, HEALTH_RETEST_MS);
   };
+  const closeAcknowledgement = () => setAcknowledgementOpen(false);
 
   return (
     <DemoSection id={SECTION.FORM_MODAL} title={COPY.sections.formModal}>
@@ -63,6 +70,9 @@ export const FormModalDemo = () => {
           <Button onClick={() => setSingle(true)}>{text.openSingle}</Button>
           <Button onClick={() => setTall(true)}>{text.openTall}</Button>
         </Space>
+      </DemoCase>
+      <DemoCase label={COPY.cases.acknowledgementOnly}>
+        <Button onClick={() => setAcknowledgementOpen(true)}>{text.openAcknowledgement}</Button>
       </DemoCase>
       <FormModal
         open={width !== undefined || long || single || tall}
@@ -77,6 +87,7 @@ export const FormModalDemo = () => {
         onSubmit={submit}
         onCancel={close}
       >
+        {loading && <p role="status">{text.pending}</p>}
         {tall && Array.from({ length: TALL_LINES }, (_, index) => <p key={index}>{text.tallLine(index + 1)}</p>)}
         <Space orientation="vertical" size="small">
           <label htmlFor="ui-kit-webhook-name">{text.field}</label>
@@ -87,6 +98,17 @@ export const FormModalDemo = () => {
             onChange={(event) => setName(event.target.value)}
           />
         </Space>
+      </FormModal>
+      <FormModal
+        open={acknowledgementOpen}
+        title={text.acknowledgementTitle}
+        submitLabel={text.acknowledgementDone}
+        showCancel={false}
+        dismissible={false}
+        onSubmit={closeAcknowledgement}
+        onCancel={closeAcknowledgement}
+      >
+        <p>{text.acknowledgementBody}</p>
       </FormModal>
     </DemoSection>
   );
