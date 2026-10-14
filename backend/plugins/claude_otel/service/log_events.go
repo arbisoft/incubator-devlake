@@ -86,7 +86,8 @@ func (c *rawMetricConverter) prepareEvents(request *collectorlogs.ExportLogsServ
 }
 
 // prepareLogResource converts one resource group. As for metrics, any attribution failure
-// discards the whole group.
+// discards the whole group. A record with bad data, such as no user identity or event name,
+// is skipped on its own.
 func (p *batchPreparer) prepareLogResource(resourceLogs *logsv1.ResourceLogs, resourceBindings map[uint64]string, batchID uint64) ([]preparedEvent, error) {
 	resourceAttrs := resourceLogs.GetResource().GetAttributes()
 	if hasAttribute(resourceAttrs, devlakeTeamAttribute) || hasAttribute(resourceAttrs, devlakeProjectAttribute) {
@@ -109,6 +110,10 @@ func (p *batchPreparer) prepareLogResource(resourceLogs *logsv1.ResourceLogs, re
 		teamSlug = team
 		event, connection, err := p.prepareLogRecord(team, resourceAttrs, record, resourceBindings)
 		if err != nil {
+			if conversionErr, skip := conversionErrorIn(err, logRecordErrorCodes); skip {
+				p.recordRecordSkip(conversionErr)
+				continue
+			}
 			return nil, err
 		}
 		event.RawBatchId = batchID

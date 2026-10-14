@@ -40,25 +40,38 @@ const (
 
 // preparedBatch holds a batch's fact updates plus bounded, operator-safe diagnostics.
 type preparedBatch struct {
-	updates        []factUpdate
-	skippedCount   int
-	skipMessages   []string
-	unknownMetrics []string
+	updates            []factUpdate
+	skippedCount       int
+	skippedRecordCount int
+	skipMessages       []string
+	unknownMetrics     []string
 }
 
 func (p *preparedBatch) diagnosticCode() *string {
-	if p.skippedCount == 0 {
+	var code string
+	switch {
+	case p.skippedCount > 0:
+		code = string(diagnosticResourcesSkipped)
+	case p.skippedRecordCount > 0:
+		code = string(diagnosticRecordsSkipped)
+	default:
 		return nil
 	}
-	code := string(diagnosticResourcesSkipped)
 	return &code
 }
 
 func (p *preparedBatch) diagnostic() *string {
-	if p.skippedCount == 0 {
+	parts := make([]string, 0, 2)
+	if p.skippedCount > 0 {
+		parts = append(parts, fmt.Sprintf("%d resource group(s)", p.skippedCount))
+	}
+	if p.skippedRecordCount > 0 {
+		parts = append(parts, fmt.Sprintf("%d log record(s)", p.skippedRecordCount))
+	}
+	if len(parts) == 0 {
 		return nil
 	}
-	message := fmt.Sprintf("skipped %d resource group(s): %s", p.skippedCount, strings.Join(p.skipMessages, "; "))
+	message := fmt.Sprintf("skipped %s: %s", strings.Join(parts, " and "), strings.Join(p.skipMessages, "; "))
 	return &message
 }
 
@@ -104,16 +117,31 @@ func (c *rawMetricConverter) prepareUpdates(request *collectormetrics.ExportMetr
 // attributionError reports whether err is one resource group's attribution failure, which
 // skips that group instead of failing the batch.
 func attributionError(err error) (*conversionError, bool) {
+	return conversionErrorIn(err, attributionErrorCodes)
+}
+
+// conversionErrorIn reports whether err is a conversion error with one of codes.
+func conversionErrorIn(err error, codes map[conversionErrorCode]struct{}) (*conversionError, bool) {
 	var conversionErr *conversionError
 	if !stderrors.As(err, &conversionErr) {
 		return nil, false
 	}
-	_, attribution := attributionErrorCodes[conversionErr.code]
-	return conversionErr, attribution
+	_, found := codes[conversionErr.code]
+	return conversionErr, found
 }
 
 func (p *batchPreparer) recordSkip(err *conversionError) {
 	p.result.skippedCount++
+	p.addSkipMessage(err)
+}
+
+// recordRecordSkip notes one log record skipped for bad data.
+func (p *batchPreparer) recordRecordSkip(err *conversionError) {
+	p.result.skippedRecordCount++
+	p.addSkipMessage(err)
+}
+
+func (p *batchPreparer) addSkipMessage(err *conversionError) {
 	if len(p.result.skipMessages) < maxResourceSkipDiagnostics {
 		p.result.skipMessages = append(p.result.skipMessages, fmt.Sprintf("%s: %s", err.code, err.Error()))
 	}

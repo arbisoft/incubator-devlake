@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/apache/incubator-devlake/core/dal"
+	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/ai"
 	dalmocks "github.com/apache/incubator-devlake/mocks/core/dal"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
@@ -226,6 +227,50 @@ func TestPrepareEventsMapsTypedColumnsAndKeepsAttributes(t *testing.T) {
 	}
 	if !apiRequest.EventTimestamp.Equal(time.Date(2026, 10, 14, 10, 2, 5, 0, time.UTC)) {
 		t.Fatalf("api_request timestamp = %s", apiRequest.EventTimestamp)
+	}
+}
+
+func TestPrepareEventsSkipsOnlyInvalidRecords(t *testing.T) {
+	request := loadLogEventsFixture(t)
+	stripContentAttributes(request)
+	records := resourceLogRecords(request.GetResourceLogs()[0])
+	kept := records[0].GetAttributes()[:0]
+	for _, attribute := range records[0].GetAttributes() {
+		if !strings.HasPrefix(attribute.GetKey(), "user.") {
+			kept = append(kept, attribute)
+		}
+	}
+	records[0].Attributes = kept
+	records[1].Attributes = withoutAttributes(records[1].GetAttributes(), map[string]struct{}{"event.name": {}})
+	records[1].Body = nil
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
+
+	prepared, err := newRawMetricConverter(database, nil).prepareEvents(request, 9)
+	if err != nil {
+		t.Fatalf("prepareEvents() error = %v", err)
+	}
+	if len(prepared.events) != 11 || prepared.skippedCount != 0 || prepared.skippedRecordCount != 2 {
+		t.Fatalf("prepareEvents() events=%d skipped groups=%d records=%d, want 11, 0 and 2", len(prepared.events), prepared.skippedCount, prepared.skippedRecordCount)
+	}
+	if code := prepared.diagnosticCode(); code == nil || *code != string(diagnosticRecordsSkipped) {
+		t.Fatalf("diagnosticCode() = %v, want %s", code, diagnosticRecordsSkipped)
+	}
+	message := prepared.diagnostic()
+	if message == nil || !strings.Contains(*message, "2 log record(s)") ||
+		!strings.Contains(*message, string(errorMissingUserIdentity)) || !strings.Contains(*message, string(errorInvalidDimension)) {
+		t.Fatalf("diagnostic() = %v, want both skipped records", message)
+	}
+}
+
+func TestPrepareEventsFailsBatchOnConnectionLookupError(t *testing.T) {
+	request := loadLogEventsFixture(t)
+	stripContentAttributes(request)
+	database := dalmocks.NewDal(t)
+	database.EXPECT().All(mock.AnythingOfType("*[]*models.OtelConnection"), mock.Anything).Return(errors.Default.New("database unavailable"))
+
+	_, err := newRawMetricConverter(database, nil).prepareEvents(request, 9)
+	if code, permanent, _ := classifyConversionError(err); err == nil || code != errorConnectionLookup || permanent {
+		t.Fatalf("prepareEvents() error = %v, want retryable %s", err, errorConnectionLookup)
 	}
 }
 

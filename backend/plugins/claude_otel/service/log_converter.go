@@ -39,8 +39,8 @@ func (c *rawMetricConverter) processNextLogBatch() (bool, errors.Error) {
 	if conversionErr != nil {
 		return true, c.recordLogBatchFailure(batch, leaseOwner, conversionErr)
 	}
-	if prepared.skippedCount > 0 {
-		c.logWarn(nil, fmt.Sprintf("Claude Code OTel raw log batch %d skipped %d resource group(s)", batch.ID, prepared.skippedCount))
+	if message := prepared.diagnostic(); message != nil {
+		c.logWarn(nil, fmt.Sprintf("Claude Code OTel raw log batch %d %s", batch.ID, *message))
 	}
 	return true, nil
 }

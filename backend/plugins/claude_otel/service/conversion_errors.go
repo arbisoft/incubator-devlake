@@ -51,6 +51,7 @@ const (
 	errorRetryExhausted         conversionErrorCode = "retry_exhausted"
 	errorConversionFailure      conversionErrorCode = "conversion_failure"
 	diagnosticResourcesSkipped  conversionErrorCode = "resources_skipped"
+	diagnosticRecordsSkipped    conversionErrorCode = "records_skipped"
 )
 
 // attributionErrorCodes identify one resource group's trusted-attribution failure. They
@@ -64,6 +65,15 @@ var attributionErrorCodes = map[conversionErrorCode]struct{}{
 	errorOrganizationMismatch: {},
 	errorConnectionNotFound:   {},
 	errorAmbiguousConnection:  {},
+}
+
+// logRecordErrorCodes identify one log record's bad data. They skip only that record:
+// unlike cumulative metrics, events have no ordering that a missing record breaks.
+var logRecordErrorCodes = map[conversionErrorCode]struct{}{
+	errorInvalidTimestamp:    {},
+	errorMissingUserIdentity: {},
+	errorInvalidDimension:    {},
+	errorInvalidValue:        {},
 }
 
 type conversionError struct {
