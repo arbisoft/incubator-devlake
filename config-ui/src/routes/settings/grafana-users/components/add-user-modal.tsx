@@ -121,15 +121,12 @@ export const AddUserModal = ({ open, onClose, onChanged, onPassword }: AddUserMo
       },
       { setOperating: setSaving, formatReason: getFlowError(GRAFANA_FLOW_ERRORS.CREATE) },
     );
+    onChanged();
     if (!success) {
       const userId = getPartialUserId(result);
-      if (userId !== undefined) {
-        setPartialId(userId);
-        onChanged();
-      }
+      if (userId !== undefined) setPartialId(userId);
       return;
     }
-    onChanged();
     onPassword({ email: normalizeEmail(values.email), password: values.password });
     reset();
     close();

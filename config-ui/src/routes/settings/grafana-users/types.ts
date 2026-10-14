@@ -31,8 +31,13 @@ export type DevlakeUserOption = { value: AccessUser['id']; label: string; email:
 
 export type OneTimePassword = { email: string; password: string };
 
+export type GrafanaPending = { action: GrafanaRowAction; user: GrafanaUser };
+
+export type GrafanaDialogState = { kind?: GrafanaDialog; user?: GrafanaUser; session: number };
+
 export type GrafanaColumnActions = {
   onRoleChange: (user: GrafanaUser, role: GrafanaRole) => void;
+  isRolePending?: (user: GrafanaUser) => boolean;
   onToggle: (action: GrafanaRowAction, user: GrafanaUser) => void;
   onRemove: (user: GrafanaUser) => void;
   onEditProjects: (user: GrafanaUser) => void;

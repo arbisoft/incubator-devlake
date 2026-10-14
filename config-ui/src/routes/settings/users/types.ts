@@ -22,6 +22,7 @@ import type { StatusColumnFilter } from '../columns.types';
 
 export type UserColumnActions = {
   onRoleChange: (user: AccessUser, role: AccessRole) => void;
+  isRolePending?: (user: AccessUser) => boolean;
   onStatusChange: (user: AccessUser, status: AccessStatus) => void;
   onRemove: (user: AccessUser) => void;
   onAddLocalCredential: (user: AccessUser) => void;
@@ -33,6 +34,7 @@ export type UserColumnActions = {
 
 export type DomainColumnActions = {
   onRoleChange: (domain: AccessDomain, role: AccessRole) => void;
+  isRolePending?: (domain: AccessDomain) => boolean;
   onStatusChange: (domain: AccessDomain, status: AccessStatus) => void;
   onRemove: (domain: AccessDomain) => void;
 };

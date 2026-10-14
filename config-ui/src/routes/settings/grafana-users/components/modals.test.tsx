@@ -22,8 +22,6 @@ import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import API from '@/api';
-import { GRAFANA_ERROR_CODE, GRAFANA_ROLE } from '@/api/grafana-users/constants';
-import type { GrafanaUser } from '@/api/grafana-users/types';
 import type { IProject } from '@/types';
 import { COMMON_COPY } from '@/ui';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
@@ -33,10 +31,13 @@ import type { TemporaryCredential } from '../../components/types';
 import { COPY as SETTINGS_COPY } from '../../constants';
 import { COPY } from '../constants';
 
+import { callbacks, EMAIL, submit, type, user } from './__tests__/dialog-helpers';
 import { EditDetailsModal } from './edit-details-modal';
 import { OrphansModal } from './orphans-modal';
 import { ProjectsModal } from './projects-modal';
 
+import './__tests__/failure-refresh-cases';
+import './__tests__/orphans-modal-cases';
 import './__tests__/set-password-modal-cases';
 
 vi.mock('antd', async (importOriginal) => {
@@ -51,29 +52,10 @@ vi.mock('@/api', async () => {
 
 const grafana = vi.mocked(API.grafanaUsers);
 const projectList = vi.mocked(API.project.list);
-const EMAIL = 'ann@example.com';
 const ORPHAN_EMAIL = 'gone@example.com';
 const MODAL_SELECTOR = '.ant-modal';
 const project = (name: string): IProject => ({ name, description: '', blueprint: null, metrics: [] });
 const PASSWORD = 'a-long-enough-password';
-
-const user = (patch: Partial<GrafanaUser> = {}): GrafanaUser => ({
-  id: 5,
-  email: EMAIL,
-  name: 'Ann Lee',
-  role: GRAFANA_ROLE.VIEWER,
-  disabled: false,
-  sso: false,
-  protected: false,
-  projects: [],
-  ...patch,
-});
-
-const callbacks = () => ({ onClose: vi.fn(), onChanged: vi.fn(), onPassword: vi.fn() });
-
-const submit = (name: string) => screen.getByRole('button', { name: new RegExp(`${name}$`) });
-const type = (label: string, value: string) =>
-  fireEvent.change(screen.getByLabelText(new RegExp(`^${label}`)), { target: { value } });
 
 const TemporaryPasswordHarness = () => {
   const [open, setOpen] = useState(true);
@@ -168,19 +150,6 @@ describe('EditDetailsModal', () => {
     expect(props.onClose).toHaveBeenCalled();
     expect(grafana.updateUser).not.toHaveBeenCalled();
   });
-
-  it('keeps the dialog and values when the save fails', async () => {
-    grafana.updateUser.mockRejectedValueOnce({
-      response: { status: 403, data: { code: GRAFANA_ERROR_CODE.USER_SSO_MANAGED } },
-    });
-    const props = callbacks();
-    renderWithTheme(<EditDetailsModal open user={user()} {...props} />);
-    type(COPY.add.name.label, 'Anna');
-    fireEvent.click(submit(COPY.details.submit));
-    await waitFor(() => expect(message.error).toHaveBeenCalled());
-    expect(props.onClose).not.toHaveBeenCalled();
-    expect((screen.getByLabelText(new RegExp(`^${COPY.add.name.label}`)) as HTMLInputElement).value).toBe('Anna');
-  });
 });
 
 describe('ProjectsModal', () => {
@@ -208,14 +177,15 @@ describe('ProjectsModal', () => {
     await waitFor(() => expect(grafana.setProjects).toHaveBeenCalledWith(5, []));
   });
 
-  it('keeps the dialog open when the save fails', async () => {
+  it('keeps the dialog and selection open and refreshes the list once when the save fails', async () => {
     grafana.setProjects.mockRejectedValueOnce(new Error('boom'));
     const props = callbacks();
-    renderWithTheme(<ProjectsModal open user={user()} {...props} />);
+    renderWithTheme(<ProjectsModal open user={user({ projects: ['alpha'] })} {...props} />);
     fireEvent.click(submit(COPY.projects.submit));
     await waitFor(() => expect(message.error).toHaveBeenCalled());
     expect(props.onClose).not.toHaveBeenCalled();
-    expect(props.onChanged).not.toHaveBeenCalled();
+    expect(props.onChanged).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('alpha')).toBeTruthy();
   });
 });
 
@@ -258,10 +228,5 @@ describe('OrphansModal', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: COPY.orphansDialog.confirm.confirm }));
     await waitFor(() => expect(props.onChanged).toHaveBeenCalled());
     expect(grafana.clearOrphan).toHaveBeenCalledWith(ORPHAN_EMAIL);
-  });
-
-  it('stays closed when no orphan is left', () => {
-    renderWithTheme(<OrphansModal open orphans={[]} onClose={vi.fn()} onChanged={vi.fn()} />);
-    expect(screen.queryByText(COPY.orphansDialog.title)).toBeNull();
   });
 });

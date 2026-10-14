@@ -19,30 +19,24 @@
 import { useCallback } from 'react';
 
 import API from '@/api';
-import {
-  ACCESS_STATUS,
-  type AccessDomain,
-  type AccessRole,
-  type AccessUser,
-  type LocalCredentialResponse,
-} from '@/api/access';
+import { ACCESS_STATUS, type AccessRole } from '@/api/access';
 import { useConfirmFlow } from '@/ui/hooks';
 import { operator } from '@/utils';
 
 import { LIFECYCLE_ACTION, LIFECYCLE_CONFIRM, LIFECYCLE_SUBJECT } from './constants';
-import type { LifecycleAction, LifecycleSubject } from './types';
+import type {
+  LifecycleAction,
+  LifecycleActionOptions,
+  LifecycleSubject,
+  LifecyclePending,
+  LifecycleTarget,
+} from './types';
+import { usePendingRoles } from './use-pending-roles';
 import { getDomainLabel, getLocalCredentialError, getUpdateAccessError, getUserLabel } from './utils';
 
-export type LifecycleTarget =
-  | { subject: Extract<LifecycleSubject, 'user'>; item: AccessUser }
-  | { subject: Extract<LifecycleSubject, 'domain'>; item: AccessDomain };
+export type { LifecycleTarget } from './types';
 
-type Options = {
-  onDone: () => void;
-  onCredential?: (credential: LocalCredentialResponse) => void;
-};
-
-type Pending = { action: LifecycleAction; target: LifecycleTarget };
+const toRoleKey = (subject: LifecycleSubject, id: ID) => `${subject}:${id}`;
 
 const CREDENTIAL_ACTIONS: LifecycleAction[] = [LIFECYCLE_ACTION.RESET_PASSWORD, LIFECYCLE_ACTION.REMOVE_PASSWORD];
 
@@ -52,7 +46,7 @@ const getName = (target: LifecycleTarget) =>
 const statusFor = (action: LifecycleAction) =>
   action === LIFECYCLE_ACTION.ENABLE ? ACCESS_STATUS.ACTIVE : ACCESS_STATUS.DISABLED;
 
-const toRequest = ({ action, target }: Pending): (() => Promise<unknown>) | undefined => {
+const toRequest = ({ action, target }: LifecyclePending): (() => Promise<unknown>) | undefined => {
   if (target.subject === LIFECYCLE_SUBJECT.DOMAIN) {
     const { id, defaultRole } = target.item;
     if (action === LIFECYCLE_ACTION.HIDE) return () => API.access.hideDomain(id);
@@ -77,14 +71,14 @@ const toRequest = ({ action, target }: Pending): (() => Promise<unknown>) | unde
   }
 };
 
-const resolve = ({ action, target }: Pending) => ({
+const resolve = ({ action, target }: LifecyclePending) => ({
   config: LIFECYCLE_CONFIRM[target.subject][action],
   name: getName(target),
 });
 
-export const useLifecycleAction = ({ onDone, onCredential }: Options) => {
+export const useLifecycleAction = ({ onDone, onCredential }: LifecycleActionOptions) => {
   const run = useCallback(
-    async (next: Pending, setLoading: (loading: boolean) => void) => {
+    async (next: LifecyclePending, setLoading: (loading: boolean) => void) => {
       const request = toRequest(next);
       if (!request) return false;
       const [success, response] = await operator(request, {
@@ -107,22 +101,39 @@ export const useLifecycleAction = ({ onDone, onCredential }: Options) => {
     [request],
   );
 
+  const { beginRoleChange, endRoleChange, isRolePending } = usePendingRoles();
+
   const changeRole = useCallback(
     async (target: LifecycleTarget, role: AccessRole) => {
-      const [success] = await operator(
-        async () => {
-          if (target.subject === LIFECYCLE_SUBJECT.USER) {
-            await API.access.updateUser(target.item.id, { role, status: target.item.status });
-          } else {
-            await API.access.updateDomain(target.item.id, { defaultRole: role, status: target.item.status });
-          }
-        },
-        { formatReason: getUpdateAccessError },
-      );
-      if (success) onDone();
+      const key = toRoleKey(target.subject, target.item.id);
+      if (!beginRoleChange(key)) return;
+      try {
+        const [success] = await operator(
+          async () => {
+            if (target.subject === LIFECYCLE_SUBJECT.USER) {
+              await API.access.updateUser(target.item.id, { role, status: target.item.status });
+            } else {
+              await API.access.updateDomain(target.item.id, { defaultRole: role, status: target.item.status });
+            }
+          },
+          { formatReason: getUpdateAccessError },
+        );
+        if (success) onDone();
+      } finally {
+        endRoleChange(key);
+      }
     },
-    [onDone],
+    [beginRoleChange, endRoleChange, onDone],
   );
 
-  return { start, changeRole, confirmProps };
+  const isUserRolePending = useCallback(
+    (id: ID) => isRolePending(toRoleKey(LIFECYCLE_SUBJECT.USER, id)),
+    [isRolePending],
+  );
+  const isDomainRolePending = useCallback(
+    (id: ID) => isRolePending(toRoleKey(LIFECYCLE_SUBJECT.DOMAIN, id)),
+    [isRolePending],
+  );
+
+  return { start, changeRole, isUserRolePending, isDomainRolePending, confirmProps };
 };

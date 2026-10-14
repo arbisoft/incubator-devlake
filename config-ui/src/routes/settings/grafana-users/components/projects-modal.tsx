@@ -43,8 +43,8 @@ export const ProjectsModal = ({ open, user, onClose, onChanged }: UserDialogProp
       setOperating: setSaving,
       formatReason: getFlowError(GRAFANA_FLOW_ERRORS.PROJECTS),
     });
-    if (!success) return;
     onChanged();
+    if (!success) return;
     reset();
     onClose();
   };

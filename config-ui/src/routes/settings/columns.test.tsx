@@ -179,4 +179,46 @@ describe('buildRoleColumn', () => {
     );
     expect((screen.getByRole('combobox', { name: 'Role for Ada' }) as HTMLInputElement).disabled).toBe(true);
   });
+
+  describe('pending rows', () => {
+    const ada = { name: 'Ada', role: 'a' };
+    const bob = { name: 'Bob', role: 'a' };
+    const selectFor = (row: RoleRow) =>
+      screen.getByRole('combobox', { name: `Role for ${row.name}` }) as HTMLInputElement;
+    const isLoading = (row: RoleRow) => selectFor(row).closest('.ant-select')?.classList.contains('ant-select-loading');
+    const column = buildRoleColumn<RoleRow, 'a' | 'b'>({
+      ...base,
+      options: [
+        { value: 'a', label: 'A' },
+        { value: 'b', label: 'B' },
+      ],
+      getLockedReason: (row) => (row.name === 'Locked' ? 'Locked' : undefined),
+      isPending: (row) => row.name === 'Ada' || row.name === 'Locked',
+      onChange: vi.fn(),
+    });
+
+    it('disables and marks as loading only the pending row', () => {
+      renderWithTheme(
+        <>
+          {column.render?.(undefined, ada, 0)}
+          {column.render?.(undefined, bob, 1)}
+        </>,
+      );
+      expect(selectFor(ada).disabled).toBe(true);
+      expect(isLoading(ada)).toBe(true);
+      expect(selectFor(bob).disabled).toBe(false);
+      expect(isLoading(bob)).toBe(false);
+    });
+
+    it('keeps a locked row disabled while it is pending', () => {
+      renderCell(column, { name: 'Locked', role: 'a' });
+      expect(selectFor({ name: 'Locked', role: 'a' }).disabled).toBe(true);
+    });
+
+    it('is not pending unless asked', () => {
+      renderCell(buildRoleColumn<RoleRow>({ ...base, onChange: vi.fn() }), { ...ada, role: 'member' });
+      expect(selectFor(ada).disabled).toBe(false);
+      expect(isLoading(ada)).toBe(false);
+    });
+  });
 });

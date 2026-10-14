@@ -85,14 +85,6 @@ describe('SetPasswordModal', () => {
     expect((screen.getByLabelText(new RegExp(`^${COPY.password.label}`)) as HTMLInputElement).value).toHaveLength(24);
   });
 
-  it('keeps the password and shows no one-time dialog when the request fails', async () => {
-    grafana.setPassword.mockRejectedValueOnce(new Error('boom'));
-    const props = submitPassword(PASSWORD);
-    await waitFor(() => expect(message.error).toHaveBeenCalled());
-    expect(props.onPassword).not.toHaveBeenCalled();
-    expect((screen.getByLabelText(new RegExp(`^${COPY.password.label}`)) as HTMLInputElement).value).toBe(PASSWORD);
-  });
-
   it('keeps a failed password update ready for retry without reporting its request body', async () => {
     const error = makePasswordError(PASSWORD, 403, GRAFANA_ERROR_CODE.PASSWORD_REJECTED);
     grafana.setPassword.mockRejectedValueOnce(error).mockResolvedValueOnce(undefined);

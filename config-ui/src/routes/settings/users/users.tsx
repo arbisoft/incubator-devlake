@@ -32,6 +32,7 @@ import {
   ListToolbar,
   SectionCard,
   buildListEmpty,
+  useLastLoaded,
   useListState,
   useRefreshVersion,
 } from '@/ui';
@@ -80,6 +81,7 @@ export const DevlakeUsers = () => {
     (signal) => API.access.listDomains(toAccessPagination({ page: domainPage, pageSize: domainPageSize }), signal),
     [version, domainPage, domainPageSize],
   );
+  const usersCount = useLastLoaded(users.data?.count, LIFECYCLE_SUBJECT.USER);
   const methods = useRefreshData(() => API.auth.methods().catch(() => undefined), []);
   const localAuthEnabled = methods.data?.localPassword?.enabled === true;
 
@@ -109,12 +111,16 @@ export const DevlakeUsers = () => {
     refresh();
   }, [refresh]);
 
-  const { start, changeRole, confirmProps } = useLifecycleAction({ onDone: refresh, onCredential: showCredential });
+  const { start, changeRole, isUserRolePending, isDomainRolePending, confirmProps } = useLifecycleAction({
+    onDone: refresh,
+    onCredential: showCredential,
+  });
 
   const userColumns = useMemo(
     () =>
       getUserColumns({
         onRoleChange: (user, role) => changeRole({ subject: LIFECYCLE_SUBJECT.USER, item: user }, role),
+        isRolePending: (user) => isUserRolePending(user.id),
         onStatusChange: (user, status) =>
           start(status === ACCESS_STATUS.ACTIVE ? LIFECYCLE_ACTION.ENABLE : LIFECYCLE_ACTION.DISABLE, {
             subject: LIFECYCLE_SUBJECT.USER,
@@ -132,13 +138,14 @@ export const DevlakeUsers = () => {
         localAuthEnabled,
         statusFilter: { value: status, options: USER_STATUS_FILTER_OPTIONS },
       }),
-    [changeRole, localAuthEnabled, start, status],
+    [changeRole, isUserRolePending, localAuthEnabled, start, status],
   );
 
   const domainColumns = useMemo(
     () =>
       getDomainColumns({
         onRoleChange: (domain, role) => changeRole({ subject: LIFECYCLE_SUBJECT.DOMAIN, item: domain }, role),
+        isRolePending: (domain) => isDomainRolePending(domain.id),
         onStatusChange: (domain, status) =>
           start(status === ACCESS_STATUS.ACTIVE ? LIFECYCLE_ACTION.ENABLE : LIFECYCLE_ACTION.DISABLE, {
             subject: LIFECYCLE_SUBJECT.DOMAIN,
@@ -146,7 +153,7 @@ export const DevlakeUsers = () => {
           }),
         onRemove: (domain) => start(LIFECYCLE_ACTION.HIDE, { subject: LIFECYCLE_SUBJECT.DOMAIN, item: domain }),
       }),
-    [changeRole, start],
+    [changeRole, isDomainRolePending, start],
   );
 
   const addUserButton = (
@@ -175,7 +182,7 @@ export const DevlakeUsers = () => {
     <>
       <SectionCard
         title={COPY.users.title}
-        count={users.data?.count}
+        count={usersCount}
         actions={
           <ListToolbar
             list={list}

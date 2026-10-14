@@ -50,8 +50,8 @@ export const EditDetailsModal = ({ open, user, onClose, onChanged }: UserDialogP
       formatReason: getFlowError(GRAFANA_FLOW_ERRORS.DETAILS),
     });
     setConfirmOpen(false);
-    if (!success) return;
     onChanged();
+    if (!success) return;
     reset();
     onClose();
   };

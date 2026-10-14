@@ -44,3 +44,15 @@ export const mockGrafanaUsersApi = () => ({
     access: { listUsers: vi.fn() },
   },
 });
+
+export const createDeferred = <T = void>() => {
+  let state: { resolve: (value: T) => void; reject: (reason: unknown) => void } | undefined;
+  const promise = new Promise<T>((resolve, reject) => {
+    state = { resolve, reject };
+  });
+  return {
+    promise,
+    resolve: (value: T) => state?.resolve(value),
+    reject: (reason: unknown) => state?.reject(reason),
+  };
+};

@@ -24,6 +24,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import API from '@/api';
 import { ACCESS_ROLE, ACCESS_STATUS, type AccessDomain, type AccessUser } from '@/api/access';
 
+import { ACCESS_DOMAIN as DOMAIN, ACCESS_USER as USER } from './__tests__/access-fixtures';
+import { createDeferred } from './__tests__/test-utils';
 import { ACCESS_ERROR, COPY, LIFECYCLE_ACTION, LIFECYCLE_SUBJECT } from './constants';
 import type { LifecycleAction } from './types';
 import { useLifecycleAction, type LifecycleTarget } from './use-lifecycle-action';
@@ -48,22 +50,7 @@ vi.mock('@/api', () => ({
 
 const access = vi.mocked(API.access);
 
-const USER: AccessUser = {
-  id: 7,
-  issuer: 'issuer',
-  subject: 'subject',
-  email: 'ada@example.com',
-  displayName: 'Ada',
-  role: ACCESS_ROLE.MEMBER,
-  status: ACCESS_STATUS.ACTIVE,
-  hasLocalCredential: true,
-};
-const DOMAIN: AccessDomain = {
-  id: 3,
-  domain: 'example.com',
-  defaultRole: ACCESS_ROLE.CUSTOMER_ADMIN,
-  status: ACCESS_STATUS.ACTIVE,
-};
+const OTHER_USER_ID = 8;
 const USER_TARGET: LifecycleTarget = { subject: LIFECYCLE_SUBJECT.USER, item: USER };
 const DOMAIN_TARGET: LifecycleTarget = { subject: LIFECYCLE_SUBJECT.DOMAIN, item: DOMAIN };
 
@@ -73,6 +60,8 @@ const setup = () => {
   const hook = renderHook(() => useLifecycleAction({ onDone, onCredential }));
   return { ...hook, onDone, onCredential };
 };
+
+type Hook = ReturnType<typeof setup>['result']['current'];
 
 describe('useLifecycleAction', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -185,6 +174,91 @@ describe('useLifecycleAction', () => {
       status: ACCESS_STATUS.ACTIVE,
     });
     expect(onDone).toHaveBeenCalledTimes(2);
+  });
+
+  describe('role change guard', () => {
+    it.each([
+      {
+        name: 'user',
+        target: USER_TARGET,
+        arm: () => {
+          const deferred = createDeferred<AccessUser>();
+          access.updateUser.mockReturnValueOnce(deferred.promise);
+          return () => deferred.resolve(USER);
+        },
+        writes: () => access.updateUser,
+        isPending: (hook: Hook) => hook.isUserRolePending(USER.id),
+      },
+      {
+        name: 'domain',
+        target: DOMAIN_TARGET,
+        arm: () => {
+          const deferred = createDeferred<AccessDomain>();
+          access.updateDomain.mockReturnValueOnce(deferred.promise);
+          return () => deferred.resolve(DOMAIN);
+        },
+        writes: () => access.updateDomain,
+        isPending: (hook: Hook) => hook.isDomainRolePending(DOMAIN.id),
+      },
+    ])(
+      'writes once for two same-tick changes of a $name and marks it pending until it settles',
+      async ({ target, arm, writes, isPending }) => {
+        const settle = arm();
+        const { result, onDone } = setup();
+        const { changeRole } = result.current;
+        let calls: Promise<void>[] = [];
+        act(() => {
+          calls = [changeRole(target, ACCESS_ROLE.CUSTOMER_ADMIN), changeRole(target, ACCESS_ROLE.MEMBER)];
+        });
+        expect(writes()).toHaveBeenCalledTimes(1);
+        expect(isPending(result.current)).toBe(true);
+
+        await act(async () => {
+          settle();
+          await Promise.all(calls);
+        });
+        expect(isPending(result.current)).toBe(false);
+        expect(onDone).toHaveBeenCalledOnce();
+      },
+    );
+
+    it('keeps another user, and a domain sharing the same id, independent', async () => {
+      const deferred = createDeferred<AccessUser>();
+      access.updateUser.mockReturnValueOnce(deferred.promise).mockResolvedValue(USER);
+      access.updateDomain.mockResolvedValue(DOMAIN);
+      const { result } = setup();
+      const { changeRole } = result.current;
+      const other: LifecycleTarget = { subject: LIFECYCLE_SUBJECT.USER, item: { ...USER, id: OTHER_USER_ID } };
+      const sameId: LifecycleTarget = { subject: LIFECYCLE_SUBJECT.DOMAIN, item: { ...DOMAIN, id: USER.id } };
+      let calls: Promise<void>[] = [];
+      act(() => {
+        calls = [
+          changeRole(USER_TARGET, ACCESS_ROLE.MEMBER),
+          changeRole(other, ACCESS_ROLE.MEMBER),
+          changeRole(sameId, ACCESS_ROLE.MEMBER),
+        ];
+      });
+      expect(access.updateUser).toHaveBeenCalledTimes(2);
+      expect(access.updateDomain).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        deferred.resolve(USER);
+        await Promise.all(calls);
+      });
+      expect(result.current.isUserRolePending(USER.id)).toBe(false);
+    });
+
+    it('clears pending after a failure and lets the change be retried', async () => {
+      access.updateUser.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce(USER);
+      const { result, onDone } = setup();
+      await act(async () => result.current.changeRole(USER_TARGET, ACCESS_ROLE.CUSTOMER_ADMIN));
+      expect(result.current.isUserRolePending(USER.id)).toBe(false);
+      expect(onDone).not.toHaveBeenCalled();
+
+      await act(async () => result.current.changeRole(USER_TARGET, ACCESS_ROLE.CUSTOMER_ADMIN));
+      expect(access.updateUser).toHaveBeenCalledTimes(2);
+      expect(onDone).toHaveBeenCalledOnce();
+    });
   });
 
   describe('failure toasts', () => {

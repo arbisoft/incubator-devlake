@@ -91,6 +91,7 @@ export const getGrafanaUserColumns = (actions: GrafanaColumnActions): TableColum
     getRole: (user) => user.role,
     getLabel: (user) => COPY.actions.roleFor(user.email),
     getLockedReason: (user) => (user.protected ? COPY.actions.roleLocked : undefined),
+    isPending: actions.isRolePending,
     onChange: actions.onRoleChange,
   }),
   {

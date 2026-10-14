@@ -29,6 +29,7 @@ export type RoleColumnOptions<T, R extends string = AccessRole> = {
   getRole: (record: T) => string;
   getLabel: (record: T) => string;
   getLockedReason?: (record: T) => string | undefined;
+  isPending?: (record: T) => boolean;
   onChange: (record: T, role: R) => void;
 };
 

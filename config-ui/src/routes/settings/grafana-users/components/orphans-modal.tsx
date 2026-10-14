@@ -17,6 +17,7 @@
  */
 
 import { Button } from 'antd';
+import { useEffect, useRef, useState } from 'react';
 import { useTheme } from 'styled-components';
 
 import API from '@/api';
@@ -35,22 +36,49 @@ const copy = COPY.orphansDialog;
 
 export const OrphansModal = ({ open, orphans, onClose, onChanged }: OrphansModalProps) => {
   const { layout } = useTheme();
+  const clearing = useRef<string | undefined>(undefined);
+  const [clearingAccount, setClearingAccount] = useState<string>();
+  const [cleared, setCleared] = useState<ReadonlySet<string>>(new Set());
+
+  const listed = new Set(orphans.map(({ account }) => account));
+  if ([...cleared].some((account) => !listed.has(account))) {
+    setCleared(new Set([...cleared].filter((account) => listed.has(account))));
+  }
+  const visibleOrphans = orphans.filter(({ account }) => !cleared.has(account));
+
   const { request, confirmProps } = useConfirmFlow<string>({
     resolve: (account) => ({ config: copy.confirm, name: account }),
     run: async (account, setLoading) => {
-      const [success] = await operator(() => API.grafanaUsers.clearOrphan(account), {
-        setOperating: setLoading,
-        formatReason: getFlowError(GRAFANA_FLOW_ERRORS.ORPHAN),
-      });
-      onChanged();
-      return success;
+      if (clearing.current !== undefined) return false;
+      clearing.current = account;
+      setClearingAccount(account);
+      try {
+        const [success] = await operator(() => API.grafanaUsers.clearOrphan(account), {
+          setOperating: setLoading,
+          formatReason: getFlowError(GRAFANA_FLOW_ERRORS.ORPHAN),
+        });
+        onChanged();
+        if (success) setCleared((current) => new Set(current).add(account));
+        return success;
+      } finally {
+        clearing.current = undefined;
+        setClearingAccount(undefined);
+      }
     },
   });
+
+  const requestClear = (account: string) => {
+    if (clearing.current === undefined) request(account);
+  };
+
+  useEffect(() => {
+    if (open && visibleOrphans.length === 0) onClose();
+  }, [open, visibleOrphans.length, onClose]);
 
   return (
     <>
       <Dialog
-        open={open && orphans.length > 0}
+        open={open && visibleOrphans.length > 0}
         centered
         destroyOnHidden
         width={layout.modalWidth[MODAL_WIDTH.MD]}
@@ -60,7 +88,7 @@ export const OrphansModal = ({ open, orphans, onClose, onChanged }: OrphansModal
       >
         <Hint>{copy.description}</Hint>
         <OrphanList>
-          {orphans.map(({ account, projects }) => (
+          {visibleOrphans.map(({ account, projects }) => (
             <OrphanRow key={account}>
               <OrphanAccount>{account}</OrphanAccount>
               <OrphanProjects>
@@ -73,7 +101,11 @@ export const OrphansModal = ({ open, orphans, onClose, onChanged }: OrphansModal
                   />
                 ))}
               </OrphanProjects>
-              <Button aria-label={copy.clearFor(account)} onClick={() => request(account)}>
+              <Button
+                aria-label={copy.clearFor(account)}
+                disabled={clearingAccount === account}
+                onClick={() => requestClear(account)}
+              >
                 {copy.clear}
               </Button>
             </OrphanRow>

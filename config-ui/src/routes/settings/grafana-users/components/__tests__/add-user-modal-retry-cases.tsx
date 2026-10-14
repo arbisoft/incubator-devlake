@@ -39,6 +39,8 @@ import {
   submit,
   USER_NAME,
 } from './add-user-modal-helpers';
+import { expectRejectedAndKept, USER_NOT_FOUND_ERROR } from './dialog-helpers';
+import { waitForPasswordFormReady } from './password-error';
 
 const selectRole = async (role: GrafanaRole) => {
   fireEvent.mouseDown(screen.getByRole('combobox', { name: new RegExp(COPY.add.role.label) }));
@@ -80,6 +82,13 @@ const retrySuccessfully = async (props: ReturnType<typeof setup>) => {
 describe('AddUserModal partial retry', () => {
   beforeEach(resetAddUserMocks);
   afterEach(cleanupAddUserMocks);
+
+  it('refreshes the list once when the create is partial', async () => {
+    const props = await createPartial();
+    expect(props.onChanged).toHaveBeenCalledTimes(1);
+    await retrySuccessfully(props);
+    expect(props.onChanged).toHaveBeenCalledTimes(2);
+  });
 
   it.each([GRAFANA_ROLE.EDITOR, GRAFANA_ROLE.VIEWER])(
     'writes both desired values when the user is not in the org (%s)',
@@ -228,5 +237,26 @@ describe('AddUserModal partial retry', () => {
     expect(grafana.createUser).toHaveBeenCalledTimes(1);
     expect(props.onPassword).not.toHaveBeenCalled();
     expect(props.onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe('AddUserModal rejected create', () => {
+  beforeEach(resetAddUserMocks);
+  afterEach(cleanupAddUserMocks);
+
+  it('refreshes the list once, keeps the form open, and refreshes and closes only on a successful retry', async () => {
+    grafana.createUser.mockRejectedValueOnce(USER_NOT_FOUND_ERROR);
+    const props = setup();
+    fillAdd();
+    fireEvent.click(submit(COPY.add.submit));
+    await expectRejectedAndKept(props);
+    expect((screen.getByLabelText(new RegExp(`^${COPY.add.email.label}`)) as HTMLInputElement).value).toBe(EMAIL);
+
+    await waitForPasswordFormReady(submit(COPY.add.submit));
+    fireEvent.click(submit(COPY.add.submit));
+    await waitFor(() => expect(props.onPassword).toHaveBeenCalledTimes(1));
+    expect(props.onChanged).toHaveBeenCalledTimes(2);
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+    expect(grafana.createUser).toHaveBeenCalledTimes(2);
   });
 });

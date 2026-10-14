@@ -29,6 +29,8 @@ import { COPY, GRAFANA_ROW_ACTION, GRAFANA_USER_COLUMN } from './constants';
 import type { GrafanaColumnActions } from './types';
 
 const EMAIL = 'ann@example.com';
+const BOB_EMAIL = 'bob@example.com';
+const ROOT_EMAIL = 'root@example.com';
 
 const user = (patch: Partial<GrafanaUser> = {}): GrafanaUser => ({
   id: 1,
@@ -112,5 +114,29 @@ describe('Grafana user columns', () => {
     setup(user({ role: 'None' }));
     expect(screen.getByText('None')).toBeTruthy();
     expect(screen.queryByRole('combobox', { name: COPY.actions.roleFor(EMAIL) })).toBeNull();
+  });
+
+  it('disables only the role select of an account whose role change is pending', () => {
+    const rows = [
+      user({ id: 1, email: EMAIL }),
+      user({ id: 2, email: BOB_EMAIL }),
+      user({ id: 3, email: ROOT_EMAIL, protected: true }),
+    ];
+    const columns = getGrafanaUserColumns({ ...makeActions(), isRolePending: (row) => row.id !== 2 });
+    renderWithTheme(<Table rowKey="id" pagination={false} columns={columns} dataSource={rows} />);
+    const select = (email: string) =>
+      screen.getByRole('combobox', { name: COPY.actions.roleFor(email) }) as HTMLInputElement;
+    expect(select(EMAIL).disabled).toBe(true);
+    expect(select(EMAIL).closest('.ant-select')?.classList.contains('ant-select-loading')).toBe(true);
+    expect(select(BOB_EMAIL).disabled).toBe(false);
+    expect(select(BOB_EMAIL).closest('.ant-select')?.classList.contains('ant-select-loading')).toBe(false);
+    expect(select(ROOT_EMAIL).disabled).toBe(true);
+  });
+
+  it('leaves the role select enabled when no pending check is given', () => {
+    setup(user());
+    expect((screen.getByRole('combobox', { name: COPY.actions.roleFor(EMAIL) }) as HTMLInputElement).disabled).toBe(
+      false,
+    );
   });
 });

@@ -73,6 +73,7 @@ export const getUserColumns = (actions: UserColumnActions): TableColumnsType<Acc
     title: COPY.users.columns.role,
     getRole: (user) => user.role,
     getLabel: (user) => COPY.users.roleFor(getUserLabel(user)),
+    isPending: actions.isRolePending,
     onChange: actions.onRoleChange,
   }),
   buildStatusColumn<AccessUser>({
@@ -111,6 +112,7 @@ export const getDomainColumns = (actions: DomainColumnActions): TableColumnsType
     title: COPY.domains.columns.defaultRole,
     getRole: (domain) => domain.defaultRole,
     getLabel: (domain) => COPY.domains.roleFor(domain.domain),
+    isPending: actions.isRolePending,
     onChange: actions.onRoleChange,
   }),
   buildStatusColumn<AccessDomain>({

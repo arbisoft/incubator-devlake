@@ -46,8 +46,8 @@ export const SetPasswordModal = ({ open, user, onClose, onChanged, onPassword }:
         formatReason: getFlowError(GRAFANA_FLOW_ERRORS.PASSWORD),
       },
     );
-    if (!success) return;
     onChanged();
+    if (!success) return;
     onPassword({ email: user.email, password: values.password });
     reset();
     onClose();
