@@ -19,8 +19,10 @@ import { Locator } from '@playwright/test';
 
 import { ONBOARD_COPY } from '../app-copy';
 
-import { BasePage } from './common';
+import { BasePage, chooseOption, selectBox } from './common';
 import { PATHS } from './paths';
+
+const GITHUB_LABEL = 'GitHub';
 
 export class OnboardPage extends BasePage {
   async open(): Promise<void> {
@@ -45,5 +47,30 @@ export class OnboardPage extends BasePage {
 
   get nextStepButton(): Locator {
     return this.page.getByRole('button', { name: ONBOARD_COPY.next });
+  }
+
+  async fillProjectName(name: string): Promise<void> {
+    await this.projectNameInput.fill(name);
+  }
+
+  async clickNext(): Promise<void> {
+    await this.nextStepButton.click();
+  }
+
+  async chooseGithub(): Promise<void> {
+    await selectBox(this.page).click();
+    await chooseOption(this.page, GITHUB_LABEL);
+  }
+
+  get githubSelection(): Locator {
+    return selectBox(this.page).filter({ hasText: GITHUB_LABEL });
+  }
+
+  get projectCheckFailed(): Locator {
+    return this.toast(ONBOARD_COPY.project.checkFailed);
+  }
+
+  get connectionTokenLabel(): Locator {
+    return this.page.getByText(ONBOARD_COPY.connection.tokenLabel).first();
   }
 }

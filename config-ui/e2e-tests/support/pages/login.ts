@@ -34,6 +34,10 @@ export class LoginPage extends BasePage {
     await this.visit(PATHS.login);
   }
 
+  async openWithReturnPath(returnPath: string): Promise<void> {
+    await this.visit(`${PATHS.login}?${LOGIN_PARAMS.RETURN_URL}=${encodeURIComponent(returnPath)}`);
+  }
+
   async openWithError(error: string): Promise<void> {
     await this.visit(`${PATHS.login}?${LOGIN_PARAMS.ERROR}=${error}`);
   }
@@ -109,6 +113,38 @@ export class LoginPage extends BasePage {
     await this.usernameInput.fill(username);
     await this.passwordInput.fill(password);
     await this.submit();
+  }
+
+  // Stubs only the local login POST and records the returnUrl it carries; the body is never exposed.
+  async captureLocalLoginReturnUrl(): Promise<{ current: () => unknown; reset: () => void }> {
+    let captured: unknown;
+    await this.page.route('**/auth/local/login', async (route) => {
+      captured = route.request().postDataJSON()?.returnUrl;
+      await route.fulfill({ status: 200, json: {} });
+    });
+    return {
+      current: () => captured,
+      reset: () => {
+        captured = undefined;
+      },
+    };
+  }
+
+  async releaseLocalLogin(): Promise<void> {
+    await this.page.unroute('**/auth/local/login');
+  }
+
+  async waitForPathname(pathname: string): Promise<void> {
+    await this.page.waitForURL((url) => url.pathname === pathname);
+  }
+
+  // Signs in without letting a failure echo the entered values.
+  async signInSafely(username: string, password: string): Promise<void> {
+    try {
+      await this.signIn(username, password);
+    } catch {
+      throw new Error('The local sign-in form could not be submitted.');
+    }
   }
 
   // Matches /login carrying the given app path as its return_url.

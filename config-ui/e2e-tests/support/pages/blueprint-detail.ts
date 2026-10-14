@@ -101,6 +101,43 @@ export class BlueprintViews extends BasePage {
     await this.syncPolicyDialog.getByRole('button', { name: SYNC_POLICY_COPY.modal.submit, exact: true }).click();
   }
 
+  get planEditor(): Locator {
+    return this.page.getByRole('textbox', { name: CONFIG_COPY.json.editor.label, exact: true });
+  }
+
+  get planSaveButton(): Locator {
+    return this.page
+      .getByRole('region', { name: CONFIG_COPY.json.title, exact: true })
+      .getByRole('button', { name: CONFIG_COPY.json.save, exact: true });
+  }
+
+  get invalidPlanNotice(): Locator {
+    return this.page.getByText(CONFIG_COPY.json.invalidPlan, { exact: true });
+  }
+
+  async fillPlan(text: string): Promise<void> {
+    await this.planEditor.fill(text);
+  }
+
+  async planText(): Promise<string> {
+    return this.planEditor.inputValue();
+  }
+
+  async savePlan(): Promise<void> {
+    await this.planSaveButton.click();
+  }
+
+  // Starts counting PATCH requests to this blueprint; the returned function reads the count.
+  countBlueprintPatches(blueprintId: number): () => number {
+    let count = 0;
+    this.page.on('request', (req) => {
+      if (req.method() === 'PATCH' && new RegExp(`/blueprints/${blueprintId}$`).test(new URL(req.url()).pathname)) {
+        count += 1;
+      }
+    });
+    return () => count;
+  }
+
   get addConnectionButton(): Locator {
     return this.page.getByRole('button', { name: CONFIG_COPY.connections.add });
   }

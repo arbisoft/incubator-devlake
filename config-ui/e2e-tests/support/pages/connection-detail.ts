@@ -115,6 +115,14 @@ export class ConnectionDetailPage extends BasePage {
     return this.scopeRow(fullName).getByText(configName);
   }
 
+  scopeAssociateButton(fullName: string): Locator {
+    return this.scopeRow(fullName).getByRole('button', { name: SCOPE_CONFIG_COPY.associate, exact: true });
+  }
+
+  scopeEditButton(fullName: string): Locator {
+    return this.scopeRow(fullName).getByRole('button', { name: SCOPE_CONFIG_COPY.edit, exact: true });
+  }
+
   get addScopeDialog(): Locator {
     return this.dialog('Add Data Scope');
   }

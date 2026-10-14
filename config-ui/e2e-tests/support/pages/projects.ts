@@ -263,6 +263,10 @@ export class ProjectPage extends BasePage {
     return this.settings.nameInput;
   }
 
+  async saveSettings(): Promise<void> {
+    await this.settings.save();
+  }
+
   async renameProject(newName: string): Promise<void> {
     await this.settings.rename(newName);
   }

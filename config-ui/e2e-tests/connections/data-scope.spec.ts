@@ -72,11 +72,13 @@ test.describe.serial('GitHub data scope and scope config on a connection', () =>
   test('create a scope config from the UI and associate it with the scope', async ({ page }) => {
     const detail = new ConnectionDetailPage(page, PLUGINS.github);
     await detail.open(connectionId);
+    await expect(detail.scopeAssociateButton(repo)).toBeVisible();
     await detail.openAssociateScopeConfig(repo);
     await detail.createScopeConfig(scopeConfigName);
     await expect(detail.associateScopeConfigRow(scopeConfigName)).toBeVisible();
     await detail.saveAssociateScopeConfig();
     await expect(detail.scopeConfigCell(repo, scopeConfigName)).toBeVisible();
+    await expect(detail.scopeEditButton(repo)).toBeVisible();
 
     const configsRes = await api.get(`/plugins/github/connections/${connectionId}/scope-configs`);
     const configs: { id: number; name: string; entities: string[] }[] = await configsRes.json();
@@ -89,6 +91,7 @@ test.describe.serial('GitHub data scope and scope config on a connection', () =>
     expect(scopes[0].scopeConfig?.name).toBe(scopeConfigName);
     await detail.reload();
     await expect(detail.scopeConfigCell(repo, scopeConfigName)).toBeVisible();
+    await expect(detail.scopeEditButton(repo)).toBeVisible();
   });
 
   test('remove the data scope from the UI', async ({ page }) => {

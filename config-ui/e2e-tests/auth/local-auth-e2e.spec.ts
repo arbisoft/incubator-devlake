@@ -24,8 +24,11 @@ import { fetchAuthMethods } from '../support/auth-state';
 import { countLocalCredentials, mustChangePasswordFor, passwordHashFor, resetLocalAuthState } from '../support/db';
 import { API_URL, APP_URL, E2E_USER_PREFIX } from '../support/env';
 import { LoginPage } from '../support/pages/login';
+import { PATHS } from '../support/pages/paths';
 import { SettingsUsersPage } from '../support/pages/settings-users';
 import { ShellPage } from '../support/pages/shell';
+
+test.use({ trace: 'off', video: 'off', screenshot: 'off' });
 
 test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () => {
   let api: APIRequestContext;
@@ -65,8 +68,7 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     await expect(loginPage.providerButton('Google')).toBeVisible();
 
     // Local authentication form should be visible with proper labels
-    const usernameInput = loginPage.usernameInput;
-    const passwordInput = loginPage.passwordInput;
+    const { usernameInput, passwordInput } = loginPage;
     const signInBtn = loginPage.signInButton;
 
     await expect(usernameInput).toBeVisible();
@@ -647,7 +649,7 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     });
     // DevLake returns 302 Found redirecting to Grafana's independent public login
     expect(grafanaRedirect.status()).toBe(302);
-    const location = grafanaRedirect.headers()['location'];
+    const { location } = grafanaRedirect.headers();
     expect(location).toMatch(/(:3002\/login|\/grafana\/)/);
 
     await userContext.close();
@@ -862,5 +864,43 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
 
     // Verify session remains intact
     expect(page.url()).not.toContain('/login');
+  });
+
+  test('local login keeps hostile return paths on the application origin', async ({ page, context }) => {
+    await loginAsAdmin(context);
+    const dummyUser = 'e2e-user';
+    const dummyPassword = 'not-a-real-secret';
+    const loginPage = new LoginPage(page);
+    const captured = await loginPage.captureLocalLoginReturnUrl();
+    const appOrigin = new URL(APP_URL).origin;
+    const hostile = [
+      '/\t/example.com',
+      '/\n/example.com',
+      '/\r/example.com',
+      '/\\example.com',
+      '/%5Cexample.com',
+      '//example.com',
+    ];
+
+    for (const [index, returnPath] of hostile.entries()) {
+      captured.reset();
+      await loginPage.openWithReturnPath(returnPath);
+      await loginPage.signInSafely(dummyUser, dummyPassword);
+      await loginPage.waitForPathname(PATHS.projects);
+      expect(captured.current(), `return path variant ${index}`).toBe(PATHS.root);
+      expect(new URL(page.url()).origin, `return path variant ${index}`).toBe(appOrigin);
+    }
+
+    const benign = '/projects?tab=e2e#section';
+    captured.reset();
+    await loginPage.openWithReturnPath(benign);
+    await loginPage.signInSafely(dummyUser, dummyPassword);
+    await loginPage.waitForPathname(PATHS.projects);
+    const landed = new URL(page.url());
+    expect(captured.current(), 'benign return path').toBe(benign);
+    expect(landed.origin, 'benign return path').toBe(appOrigin);
+    expect(`${landed.pathname}${landed.search}${landed.hash}`, 'benign return path').toBe(benign);
+
+    await loginPage.releaseLocalLogin();
   });
 });

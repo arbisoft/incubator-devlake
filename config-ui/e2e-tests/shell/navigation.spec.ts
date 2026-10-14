@@ -19,7 +19,7 @@ import { APIRequestContext, Page } from '@playwright/test';
 
 import { loginAsAdmin } from '../auth-helpers';
 import { test, expect } from '../fixtures';
-import { adminApi } from '../support/api';
+import { adminApi, getOnboardStore, setOnboardStore, uniqueName } from '../support/api';
 import { fetchAuthMethods } from '../support/auth-state';
 import { ApiKeysPage } from '../support/pages/api-keys';
 import { BlueprintPage } from '../support/pages/blueprints';
@@ -141,6 +141,39 @@ test.describe('authenticated shell', () => {
       await expect(onboard.nextStepButton).toBeDisabled();
       expect(((await (await api.get('/store/onboard')).json()) as { step: number }).step).toBe(1);
       expect(browserErrors).toEqual([]);
+    });
+
+    test('a failed project name check stays on the same onboarding step and retries', async ({ page }) => {
+      await setOnboardStore(api, { step: 1, records: [], done: false });
+      const projectName = uniqueName('e2e-onboard');
+      const checkPath = `/projects/${encodeURIComponent(projectName)}/check`;
+      const isCheck = (url: URL) => url.pathname.endsWith(checkPath);
+      await page.route(isCheck, (route) => route.fulfill({ status: 500, json: { success: false } }), { times: 1 });
+      let storeWrites = 0;
+      page.on('request', (req) => {
+        if (req.method() === 'PUT' && new URL(req.url()).pathname.endsWith('/store/onboard')) storeWrites += 1;
+      });
+
+      const onboard = new OnboardPage(page);
+      await onboard.open();
+      await onboard.fillProjectName(projectName);
+      await onboard.chooseGithub();
+      await onboard.clickNext();
+
+      await expect(onboard.projectCheckFailed).toBeVisible();
+      await expect(onboard.projectNameInput).toHaveValue(projectName);
+      await expect(onboard.githubSelection).toBeVisible();
+      await expect(onboard.nextStepButton).toBeEnabled();
+      expect(storeWrites).toBe(0);
+      expect((await getOnboardStore(api)).step).toBe(1);
+
+      await page.unroute(isCheck);
+      await onboard.clickNext();
+      await expect(onboard.connectionTokenLabel).toBeVisible();
+      const stored = await getOnboardStore(api);
+      expect(stored.step).toBe(2);
+      expect(stored.projectName).toBe(projectName);
+      expect(stored.plugin).toBe('github');
     });
   });
 });

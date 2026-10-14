@@ -63,7 +63,23 @@ export class ApiKeysPage extends BasePage implements Screen {
   }
 
   async closeGeneratedKeyDialog(): Promise<void> {
-    await this.generatedKeyDialog.getByRole('button', { name: COPY.generated.close }).click();
+    await this.generatedKeyDialog.getByRole('button', { name: COPY.generated.done }).click();
+  }
+
+  get generatedKeyText(): Locator {
+    return this.generatedKeyDialog.getByLabel(COPY.generated.keyLabel, { exact: true });
+  }
+
+  get generatedKeyCloseIcon(): Locator {
+    return this.generatedKeyModalWrap.locator('.ant-modal-close');
+  }
+
+  private get generatedKeyModalWrap(): Locator {
+    return this.page.locator('.ant-modal-wrap').filter({ has: this.generatedKeyDialog });
+  }
+
+  async clickGeneratedKeyMask(): Promise<void> {
+    await this.generatedKeyModalWrap.click({ position: { x: 5, y: 5 } });
   }
 
   async revokeKey(name: string): Promise<void> {

@@ -23,6 +23,8 @@ import { adminApi, createApiKey, deleteApiKeysByPrefix, listApiKeys, uniqueName 
 import { API_URL } from '../support/env';
 import { ApiKeysPage } from '../support/pages/api-keys';
 
+test.use({ trace: 'off', video: 'off', screenshot: 'off' });
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 let api: APIRequestContext;
@@ -58,12 +60,20 @@ test('an API key created in the UI authenticates REST calls until it is revoked'
   const shown = keys.generatedKeyDialog;
   await expect(shown).toBeVisible();
   expect((await shown.innerText()).includes(apiKey), 'the one-time key is displayed').toBe(true);
+  const shownKey = await keys.generatedKeyText.innerText();
+  await keys.clickGeneratedKeyMask();
+  await expect(shown).toBeVisible();
+  expect((await keys.generatedKeyText.innerText()) === shownKey, 'the shown key is unchanged after a mask click').toBe(
+    true,
+  );
+  await expect(keys.generatedKeyCloseIcon).toHaveCount(0);
   await keys.closeGeneratedKeyDialog();
+  await expect(shown).toBeHidden();
 
   const stored = (await listApiKeys(api)).find((k) => k.name === keyName);
   expect(stored).toMatchObject({ name: keyName, allowedPath });
   expect(Math.abs(new Date(stored?.expiredAt as string).getTime() - (before + 7 * DAY_MS))).toBeLessThan(DAY_MS);
-  expect(JSON.stringify(stored)).not.toContain(apiKey);
+  expect(JSON.stringify(stored).includes(apiKey)).toBe(false);
   await expect(keys.keyRow(keyName)).toBeVisible();
 
   const bare = await playwright.request.newContext({ extraHTTPHeaders: { Authorization: `Bearer ${apiKey}` } });

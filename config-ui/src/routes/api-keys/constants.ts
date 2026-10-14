@@ -99,7 +99,6 @@ export const COPY = {
     copied: 'API key copied.',
     keyLabel: 'API key',
     done: 'Done',
-    close: 'Close',
   },
   confirm: {
     title: (name: string) => `Revoke “${name}”?`,
