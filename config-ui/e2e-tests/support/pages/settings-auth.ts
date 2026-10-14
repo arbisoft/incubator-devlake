@@ -22,14 +22,14 @@ import { ApiMessage, PageResponse } from '../api';
 import { BasePage, Screen, tableWithRow, urlEndingWith } from './common';
 import { PATHS } from './paths';
 
-// The sign-in providers section of the /access page.
+// The sign-in providers section of the /settings/users page.
 export class SettingsAuthPage extends BasePage implements Screen {
   async open(): Promise<void> {
-    await this.visit(PATHS.access);
+    await this.visit(PATHS.settingsUsers);
   }
 
   get urlPattern(): RegExp {
-    return urlEndingWith(PATHS.access);
+    return urlEndingWith(PATHS.settingsUsers);
   }
 
   get ready(): Locator {

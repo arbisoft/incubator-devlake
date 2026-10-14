@@ -94,7 +94,7 @@ export class LocalUserDialog {
   }
 }
 
-// A row of the people table on /access, with its local-password actions.
+// A row of the people table on /settings/users, with its local-password actions.
 export class AccessUserRow {
   constructor(
     private readonly page: Page,
@@ -136,14 +136,18 @@ export class AccessUserRow {
   }
 }
 
-// The /access page (user management).
+// The /settings/users page (user management).
 export class SettingsUsersPage extends BasePage implements Screen {
   async open(): Promise<void> {
-    await this.visit(PATHS.access);
+    await this.visit(PATHS.settingsUsers);
   }
 
   get urlPattern(): RegExp {
-    return urlEndingWith(PATHS.access);
+    return urlEndingWith(PATHS.settingsUsers);
+  }
+
+  get pathSegment(): string {
+    return PATHS.settingsUsers;
   }
 
   get ready(): Locator {

@@ -24,8 +24,13 @@ import { Avatar, Copy, Expanded, Name, Rail, Secondary } from './styled';
 import type { AccountBlockProps } from './types';
 import { getInitials } from './utils';
 
-export const AccountBlock = ({ name, secondary, collapsed, menu }: AccountBlockProps) => (
-  <Dropdown menu={{ items: menu }} trigger={collapsed ? ['hover', 'click'] : ['click']} placement="topLeft">
+export const AccountBlock = ({ name, secondary, collapsed, menu, onOpenChange }: AccountBlockProps) => (
+  <Dropdown
+    menu={{ items: menu }}
+    trigger={collapsed ? ['hover', 'click'] : ['click']}
+    placement="topLeft"
+    onOpenChange={onOpenChange}
+  >
     {collapsed ? (
       <Rail type="button" aria-label={COPY.menu(name)}>
         <Avatar aria-hidden>{getInitials(name)}</Avatar>

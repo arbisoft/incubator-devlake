@@ -21,10 +21,14 @@ import API from '@/api';
 import { PageHeader } from '@/components';
 import { PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
+import { useDocumentTitle } from '@/ui/hooks';
 
 import { PipelineTable } from './components';
+import { COPY } from './constants';
 
 export const Pipelines = () => {
+  useDocumentTitle(COPY.title);
+
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 

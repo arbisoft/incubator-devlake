@@ -28,7 +28,15 @@ import {
   selectOption,
   tableRow,
 } from './common';
-import { PATHS } from './paths';
+import { PATHS, PROJECT_TABS, ProjectTabKey } from './paths';
+
+// Outer project tab labels, keyed by their URL segment.
+const PROJECT_TAB_LABEL: Record<ProjectTabKey, string> = {
+  blueprint: 'Blueprint',
+  webhooks: 'Webhooks',
+  'claude-code-otel': 'Claude Code OTel',
+  settings: 'Settings',
+};
 
 export class ProjectsPage extends BasePage implements Screen {
   async open(): Promise<void> {
@@ -75,8 +83,25 @@ export class ProjectPage extends BasePage {
     await this.visit(PATHS.project(this.projectName));
   }
 
+  // The bare project URL redirects to its first tab.
   get urlPattern(): RegExp {
-    return new RegExp(`/projects/${encodeURIComponent(this.projectName)}$`);
+    return this.tabUrlPattern('blueprint');
+  }
+
+  get tabs(): readonly ProjectTabKey[] {
+    return PROJECT_TABS;
+  }
+
+  async openAtTab(tab: ProjectTabKey, query = ''): Promise<void> {
+    await this.visit(`${PATHS.projectTab(this.projectName, tab)}${query}`);
+  }
+
+  tabUrlPattern(tab: ProjectTabKey): RegExp {
+    return new RegExp(`${PATHS.projectTab(this.projectName, tab)}$`);
+  }
+
+  tabFor(tab: ProjectTabKey): Locator {
+    return this.tab(PROJECT_TAB_LABEL[tab]);
   }
 
   get nameLink(): Locator {

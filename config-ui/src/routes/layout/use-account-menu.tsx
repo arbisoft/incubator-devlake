@@ -16,24 +16,35 @@
  *
  */
 
-import { KeyOutlined, LogoutOutlined } from '@ant-design/icons';
-import type { MenuProps } from 'antd';
 import { message } from 'antd';
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import API from '@/api';
 import type { AccessCurrent, LinkableOIDCProvider } from '@/api/access';
 import { DEVLAKE_ENDPOINT, PATHS } from '@/config';
+import type { ThemeMode } from '@/theme/tokens';
 
-const FAILURE_COOLDOWN_MS = 10_000;
+import { getAccountMenuItems } from './account-menu-items';
+import { COPY, FAILURE_COOLDOWN_MS, LINK_IDENTITY } from './constants';
+import type { LayoutUser } from './types';
 
 type UseAccountMenuOptions = {
-  user?: { authenticated: boolean; authenticationMethod: 'local' | 'oidc' | '' };
-  access?: AccessCurrent | null;
+  version: string;
+  user: LayoutUser | null;
+  access: AccessCurrent | null;
+  themeMode: ThemeMode;
+  onSelectTheme: (mode: ThemeMode) => void;
   handleLogout: () => void;
 };
 
-export const useAccountMenu = ({ user, access, handleLogout }: UseAccountMenuOptions) => {
+export const useAccountMenu = ({
+  version,
+  user,
+  access,
+  themeMode,
+  onSelectTheme,
+  handleLogout,
+}: UseAccountMenuOptions) => {
   const [linkableProviders, setLinkableProviders] = useState<LinkableOIDCProvider[]>();
   const [linkProvidersFailed, setLinkProvidersFailed] = useState(false);
   const lastFailedAtRef = useRef<number>(0);
@@ -58,38 +69,20 @@ export const useAccountMenu = ({ user, access, handleLogout }: UseAccountMenuOpt
 
   const startIdentityLink = (providerKey: string) => {
     const returnURL = `${window.location.pathname}${window.location.search}`;
-    window.location.assign(
-      `${DEVLAKE_ENDPOINT}/auth/link-identity?provider=${encodeURIComponent(
-        providerKey,
-      )}&return_url=${encodeURIComponent(returnURL)}`,
-    );
+    const provider = `${LINK_IDENTITY.PROVIDER_PARAM}=${encodeURIComponent(providerKey)}`;
+    const returnTo = `${LINK_IDENTITY.RETURN_URL_PARAM}=${encodeURIComponent(returnURL)}`;
+    window.location.assign(`${DEVLAKE_ENDPOINT}${LINK_IDENTITY.PATH}?${provider}&${returnTo}`);
   };
 
-  const accountMenuItems: MenuProps['items'] = [
-    ...(user?.authenticationMethod === 'local'
-      ? [
-          {
-            key: 'change-password',
-            icon: React.createElement(KeyOutlined),
-            label: 'Change password',
-            onClick: () => window.location.assign(PATHS.CHANGE_PASSWORD()),
-          },
-        ]
-      : []),
-    ...(linkableProviders?.map((provider) => ({
-      key: `link-identity-${provider.providerKey}`,
-      label: `Add ${provider.displayName} sign-in`,
-      onClick: () => startIdentityLink(provider.providerKey),
-    })) ?? []),
-    ...(linkableProviders?.length === 0
-      ? [{ key: 'no-linkable-providers', disabled: true, label: 'No additional sign-in providers' }]
-      : []),
-    ...(linkProvidersFailed
-      ? [{ key: 'linkable-providers-failed', disabled: true, label: 'Additional sign-in methods are unavailable' }]
-      : []),
-    { type: 'divider' },
-    { key: 'logout', icon: React.createElement(LogoutOutlined), label: 'Sign out', onClick: handleLogout },
-  ];
+  const accountMenuItems = getAccountMenuItems(
+    { version, user, linkableProviders, linkProvidersFailed, themeMode },
+    {
+      onSelectTheme,
+      onChangePassword: () => window.location.assign(PATHS.CHANGE_PASSWORD()),
+      onLinkIdentity: startIdentityLink,
+      onSignOut: handleLogout,
+    },
+  );
 
   return {
     accountMenuItems,
@@ -100,15 +93,16 @@ export const useAccountMenu = ({ user, access, handleLogout }: UseAccountMenuOpt
 export const useIdentityLinkNotification = () => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const identityLinkResult = params.get('identity_link');
+    const identityLinkResult = params.get(LINK_IDENTITY.RESULT_PARAM);
     if (!identityLinkResult) return;
-    if (identityLinkResult === 'linked') {
-      message.success('Additional sign-in method added.');
+    if (identityLinkResult === LINK_IDENTITY.RESULT_LINKED) {
+      message.success(COPY.identityLink.linked);
     } else {
-      message.error('The additional sign-in method could not be added. Please try again.');
+      message.error(COPY.identityLink.failed);
     }
-    params.delete('identity_link');
+    params.delete(LINK_IDENTITY.RESULT_PARAM);
     const query = params.toString();
-    window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
+    const search = query ? `?${query}` : '';
+    window.history.replaceState(null, '', `${window.location.pathname}${search}`);
   }, []);
 };

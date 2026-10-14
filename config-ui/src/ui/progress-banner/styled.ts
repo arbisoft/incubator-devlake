@@ -18,7 +18,8 @@
 
 import styled from 'styled-components';
 
-import { textStyle } from '@/ui/style-helpers';
+import { textStyle, toneColors } from '@/ui/style-helpers';
+import type { StatusTone } from '@/ui/types';
 
 export const Root = styled.div`
   display: flex;
@@ -36,9 +37,26 @@ export const Progress = styled.span`
   color: ${({ theme }) => theme.colors.onSelected};
 `;
 
+export const Indicator = styled.span<{ $tone: StatusTone }>`
+  display: inline-flex;
+  color: ${(p) => toneColors(p.theme)[p.$tone].dot};
+`;
+
+export const Copy = styled.div`
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+`;
+
+export const Title = styled.p`
+  ${textStyle('bodyMedium')}
+  margin: 0;
+  color: ${({ theme }) => theme.colors.text};
+`;
+
 export const Message = styled.p`
   ${textStyle('body')}
-  flex: 1 1 ${({ theme }) => theme.layout.sortSelectWidth}px;
   margin: 0;
   min-width: 0;
   color: ${({ theme }) => theme.colors.text};

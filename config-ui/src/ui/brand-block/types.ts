@@ -18,4 +18,5 @@
 
 export type BrandBlockProps = {
   collapsed: boolean;
+  title?: string;
 };

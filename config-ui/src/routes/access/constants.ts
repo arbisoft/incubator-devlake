@@ -17,9 +17,9 @@
  */
 
 import { ACCESS_ROLE, GRAFANA_PROVIDER_KIND, type AccessRole, type GrafanaProviderKind } from '@/api/access';
+import { PATHS } from '@/config';
 
-export const PATH_PREFIX = import.meta.env.DEVLAKE_PATH_PREFIX ?? '';
-export const ACCESS_PATH = `${PATH_PREFIX}/access`;
+const ACCESS_PATH = PATHS.SETTINGS_USERS();
 export const BREADCRUMBS = [{ name: 'User Management', path: ACCESS_PATH }];
 export const PAGE_DESCRIPTION =
   'Manage who can access DevLake. Grafana access remains independently managed in Grafana.';
@@ -91,3 +91,7 @@ export const ROLE_OPTIONS: Array<{ value: AccessRole; label: string }> = [
   { value: ACCESS_ROLE.MEMBER, label: 'Member' },
   { value: ACCESS_ROLE.CUSTOMER_ADMIN, label: 'Customer administrator' },
 ];
+
+export const COPY = {
+  title: 'Users',
+};

@@ -74,7 +74,7 @@ export const themeSlice = createSlice({
   },
 });
 
-export const { cycleMode } = themeSlice.actions;
+export const { setMode } = themeSlice.actions;
 
 export const selectThemeMode = (state: RootState): ThemeMode => state.theme.mode;
 

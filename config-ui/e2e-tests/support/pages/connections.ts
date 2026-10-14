@@ -17,6 +17,8 @@
  */
 import { Locator, Page } from '@playwright/test';
 
+import { CONNECTIONS_COPY } from '../app-copy';
+
 import { BasePage, Screen, urlEndingWith, iconButton, tableRow, tagWithText } from './common';
 import { PATHS } from './paths';
 
@@ -32,6 +34,7 @@ export interface PluginRef {
 export const PLUGINS = {
   github: { name: 'GitHub', key: 'github' },
   claudeCode: { name: 'Claude Code', key: 'claude_code' },
+  azureDevops: { name: 'Azure DevOps', key: 'azuredevops' },
 } satisfies Record<string, PluginRef>;
 
 const manageTitle = (plugin: PluginRef) => `Manage Connections: ${plugin.name}`;
@@ -111,6 +114,14 @@ export class ConnectionsPage extends BasePage implements Screen {
 
   get webhooksHeading(): Locator {
     return this.page.getByRole('heading', { name: 'Webhooks', exact: true });
+  }
+
+  get deprecationNotice(): Locator {
+    return this.page.getByRole('alert').filter({ hasText: CONNECTIONS_COPY.deprecationTitle });
+  }
+
+  async closeDeprecationNotice(): Promise<void> {
+    await this.deprecationNotice.getByRole('button', { name: 'Close' }).click();
   }
 
   card(name: string): Locator {

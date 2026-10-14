@@ -19,14 +19,15 @@
 import { CloseOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { theme, Layout, Modal } from 'antd';
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
 import { useNavigate } from 'react-router-dom';
 
 import API from '@/api';
 import { PageLoading } from '@/components';
-import { BRAND_NAME, PATHS } from '@/config';
+import { PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
+import { useDocumentTitle } from '@/ui/hooks';
 
+import { COPY } from './constants';
 import type { Record } from './context';
 import { Context } from './context';
 import { Step0 } from './step-0';
@@ -57,6 +58,8 @@ interface Props {
 }
 
 export const Onboard = ({ logo, title }: Props) => {
+  useDocumentTitle(COPY.title);
+
   const [step, setStep] = useState(0);
   const [records, setRecords] = useState<Record[]>([]);
   const [projectName, setProjectName] = useState<string>();
@@ -110,9 +113,6 @@ export const Onboard = ({ logo, title }: Props) => {
         setPlugin: setPlugin,
       }}
     >
-      <Helmet>
-        <title>Onboard - {BRAND_NAME}</title>
-      </Helmet>
       <Layout style={{ minHeight: '100vh' }}>
         <S.Inner>
           {step === 0 ? (

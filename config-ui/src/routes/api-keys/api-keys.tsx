@@ -25,12 +25,16 @@ import API from '@/api';
 import { PageHeader, Block, ExternalLink, CopyText, Message } from '@/components';
 import { PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
+import { useDocumentTitle } from '@/ui/hooks';
 import { operator, formatTime } from '@/utils';
 
 import * as C from './constant';
+import { COPY } from './constants';
 import * as S from './styled';
 
 export const ApiKeys = () => {
+  useDocumentTitle(COPY.title);
+
   const [version, setVersion] = useState(1);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);

@@ -54,3 +54,17 @@ export const MarkTile = styled.span`
   background: ${({ theme }) => theme.sidebar.markBg};
   border-radius: ${({ theme }) => theme.radius.md}px;
 `;
+
+export const CustomTitle = styled.h2`
+  ${textStyle('h3')}
+  margin: 0;
+  overflow: hidden;
+  color: ${({ theme }) => theme.sidebar.text};
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+export const CustomInitial = styled.span`
+  ${textStyle('bodyMedium')}
+  color: ${({ theme }) => theme.sidebar.text};
+`;

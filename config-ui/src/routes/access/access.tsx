@@ -31,11 +31,12 @@ import {
 } from '@/api/access';
 import { PageHeader } from '@/components';
 import { useRefreshData } from '@/hooks';
+import { useDocumentTitle } from '@/ui/hooks';
 import { operator } from '@/utils';
 
 import { Authentication } from './authentication';
 import { getAuditColumns, getDomainColumns, getUserColumns } from './columns';
-import { BREADCRUMBS, DEFAULT_PAGE_SIZE, PAGE_DESCRIPTION, PAGE_SIZE_OPTIONS } from './constants';
+import { BREADCRUMBS, COPY, DEFAULT_PAGE_SIZE, PAGE_DESCRIPTION, PAGE_SIZE_OPTIONS } from './constants';
 import {
   AddLocalCredentialModal,
   CreateDomainModal,
@@ -62,6 +63,8 @@ type TemporaryCredential = Pick<LocalCredentialResponse, 'loginName' | 'temporar
 const AUDIT_COLUMNS = getAuditColumns();
 
 export const Access = () => {
+  useDocumentTitle(COPY.title);
+
   const [version, setVersion] = useState(0);
   const [userPage, setUserPage] = useState(1);
   const [userPageSize, setUserPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(DEFAULT_PAGE_SIZE);

@@ -24,6 +24,7 @@ import styled from 'styled-components';
 
 import API from '@/api';
 import { ExternalLink } from '@/components';
+import { PATHS } from '@/config';
 import { useAutoRefresh } from '@/hooks';
 import { operator } from '@/utils';
 
@@ -193,7 +194,7 @@ export const Step4 = () => {
     );
 
     if (success) {
-      navigate('/');
+      navigate(PATHS.ROOT());
     }
   };
 

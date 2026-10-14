@@ -16,16 +16,32 @@
  *
  */
 
-import { POWERED_BY } from '@/config/brand';
+import { POWERED_BY, TITLE_CUSTOM } from '@/config/brand';
 import wordmark from '@/images/brand/arbisoft-wordmark.png';
 import Mark from '@/images/brand/devlake-mark.svg?react';
 
 import { COPY } from './constants';
-import { MarkTile, PoweredBy, Root, Wordmark } from './styled';
+import { CustomInitial, CustomTitle, MarkTile, PoweredBy, Root, Wordmark } from './styled';
 import type { BrandBlockProps } from './types';
 
-export const BrandBlock = ({ collapsed }: BrandBlockProps) =>
-  collapsed ? (
+export const BrandBlock = ({ collapsed, title = TITLE_CUSTOM }: BrandBlockProps) => {
+  if (title) {
+    return collapsed ? (
+      <Root $collapsed>
+        <MarkTile>
+          <CustomInitial role="img" aria-label={title}>
+            {title.charAt(0).toUpperCase()}
+          </CustomInitial>
+        </MarkTile>
+      </Root>
+    ) : (
+      <Root $collapsed={false}>
+        <CustomTitle>{title}</CustomTitle>
+      </Root>
+    );
+  }
+
+  return collapsed ? (
     <Root $collapsed>
       <MarkTile>
         <Mark role="img" aria-label={COPY.markAlt} />
@@ -37,3 +53,4 @@ export const BrandBlock = ({ collapsed }: BrandBlockProps) =>
       <PoweredBy>{POWERED_BY}</PoweredBy>
     </Root>
   );
+};

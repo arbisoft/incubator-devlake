@@ -18,6 +18,9 @@
 
 import { css, type DefaultTheme } from 'styled-components';
 
+import { STATUS_TONE } from './constants';
+import type { StatusTone } from './types';
+
 type TextStyleKey = keyof DefaultTheme['typography']['scale'];
 
 export const textStyle =
@@ -57,3 +60,13 @@ export const motionTransition =
       transition: none;
     }
   `;
+
+type ToneColors = { text: string; bg: string; dot: string };
+
+export const toneColors = ({ colors }: DefaultTheme): Record<StatusTone, ToneColors> => ({
+  [STATUS_TONE.SUCCESS]: { text: colors.successText, bg: colors.successBg, dot: colors.success },
+  [STATUS_TONE.WARNING]: { text: colors.warningText, bg: colors.warningBg, dot: colors.warning },
+  [STATUS_TONE.ERROR]: { text: colors.errorActive, bg: colors.errorBg, dot: colors.error },
+  [STATUS_TONE.INFO]: { text: colors.infoText, bg: colors.infoTintBg, dot: colors.infoText },
+  [STATUS_TONE.NEUTRAL]: { text: colors.textSecondary, bg: colors.bgTableHeader, dot: colors.textSecondary },
+});

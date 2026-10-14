@@ -18,3 +18,9 @@
 
 // App copy that page objects reuse; this depth keeps the relative path short.
 export { COPY as UI_KIT_COPY } from '../../src/routes/ui-kit/constants';
+export { COPY as LAYOUT_COPY, THEME_LABEL } from '../../src/routes/layout/constants';
+export { COPY as SIDEBAR_COPY } from '../../src/ui/sidebar-nav/constants';
+export { COPY as ACCOUNT_BLOCK_COPY } from '../../src/ui/account-block/constants';
+export { COMMON_COPY } from '../../src/ui/constants';
+export { PROJECT_TAB } from '../../src/config/route-keys';
+export { COPY as CONNECTIONS_COPY } from '../../src/routes/connection/constants';

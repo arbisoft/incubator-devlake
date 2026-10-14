@@ -60,30 +60,42 @@ test.describe('theme toggle', () => {
     // Start from a known mode, then reload so the app picks it up.
     await shell.writeStoredTheme('light');
     await shell.reload();
-    await expect(shell.themeButton('Light theme')).toBeVisible();
+    await shell.openThemeMenu();
+    await expect(shell.themeCheck('light')).toBeVisible();
+    await shell.closeAccountMenu();
     await expectLight(shell);
 
-    await shell.switchTheme('Light theme');
-    await expect(shell.themeButton('Dark theme')).toBeVisible();
+    await shell.switchTheme('dark');
+    await shell.openThemeMenu();
+    await expect(shell.themeCheck('dark')).toBeVisible();
+    await shell.closeAccountMenu();
     expect(await shell.readStoredTheme()).toBe('dark');
     await expectDark(shell);
 
     await shell.reload();
-    await expect(shell.themeButton('Dark theme')).toBeVisible();
+    await shell.openThemeMenu();
+    await expect(shell.themeCheck('dark')).toBeVisible();
+    await shell.closeAccountMenu();
     expect(await shell.readStoredTheme()).toBe('dark');
     await expectDark(shell);
 
-    await shell.switchTheme('Dark theme');
-    await expect(shell.themeButton('Follow system')).toBeVisible();
+    await shell.switchTheme('system');
+    await shell.openThemeMenu();
+    await expect(shell.themeCheck('system')).toBeVisible();
+    await shell.closeAccountMenu();
     expect(await shell.readStoredTheme()).toBe('system');
 
-    await shell.switchTheme('Follow system');
-    await expect(shell.themeButton('Light theme')).toBeVisible();
+    await shell.switchTheme('light');
+    await shell.openThemeMenu();
+    await expect(shell.themeCheck('light')).toBeVisible();
+    await shell.closeAccountMenu();
     expect(await shell.readStoredTheme()).toBe('light');
     await expectLight(shell);
 
     await shell.reload();
-    await expect(shell.themeButton('Light theme')).toBeVisible();
+    await shell.openThemeMenu();
+    await expect(shell.themeCheck('light')).toBeVisible();
+    await shell.closeAccountMenu();
     expect(await shell.readStoredTheme()).toBe('light');
     await expectLight(shell);
     expect(browserErrors).toEqual([]);
@@ -96,14 +108,18 @@ test.describe('theme toggle', () => {
     originalMode = await shell.readStoredTheme();
     await shell.writeStoredTheme('system');
     await shell.reload();
-    await expect(shell.themeButton('Follow system')).toBeVisible();
+    await shell.openThemeMenu();
+    await expect(shell.themeCheck('system')).toBeVisible();
+    await shell.closeAccountMenu();
     await expectDark(shell);
 
     await shell.emulateColorScheme('light');
     await expectLight(shell);
 
     await shell.reload();
-    await expect(shell.themeButton('Follow system')).toBeVisible();
+    await shell.openThemeMenu();
+    await expect(shell.themeCheck('system')).toBeVisible();
+    await shell.closeAccountMenu();
     expect(await shell.readStoredTheme()).toBe('system');
     await expectLight(shell);
 

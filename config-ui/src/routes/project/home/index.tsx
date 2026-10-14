@@ -24,14 +24,17 @@ import { Link, useNavigate } from 'react-router-dom';
 import API from '@/api';
 import { type OtelConnectionResponse } from '@/api/otel';
 import { PageHeader, Block, IconButton } from '@/components';
-import { getCron, PATHS } from '@/config';
+import { getCron, PATHS, PROJECT_TAB } from '@/config';
 import { ConnectionName } from '@/features';
 import { useRefreshData } from '@/hooks';
 import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?react';
 import { OnboardTour } from '@/routes/onboard/components';
 import { PipelineStatus } from '@/routes/pipeline';
 import { IBlueprint } from '@/types';
+import { useDocumentTitle } from '@/ui/hooks';
 import { formatTime, operator } from '@/utils';
+
+import { COPY } from './constants';
 
 type ClaudeCodeOtelConnectionNameProps = {
   connection: OtelConnectionResponse;
@@ -47,6 +50,8 @@ const ClaudeCodeOtelConnectionName = ({ connection }: ClaudeCodeOtelConnectionNa
 );
 
 export const ProjectHomePage = () => {
+  useDocumentTitle(COPY.title);
+
   const [version, setVersion] = useState(1);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -237,7 +242,7 @@ export const ProjectHomePage = () => {
                 icon={<SettingOutlined />}
                 helptip="Project Configuration"
                 onClick={() =>
-                  navigate(PATHS.PROJECT(name), {
+                  navigate(PATHS.PROJECT_TAB(name, PROJECT_TAB.BLUEPRINT), {
                     state: { activeKey: 'configuration' },
                   })
                 }

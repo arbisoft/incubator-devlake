@@ -24,11 +24,13 @@ import { useSearchParams } from 'react-router-dom';
 import API from '@/api';
 import { type OtelConnectionResponse } from '@/api/otel';
 import { Message, PageHeader } from '@/components';
+import { PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
+import { useDocumentTitle } from '@/ui/hooks';
 import { operator, type OperateConfig } from '@/utils';
 
 import { getOtelColumns } from './columns';
-import { OTEL_ERROR, OTEL_LIFECYCLE_ACTION, OTEL_REFRESH_INTERVAL_MS } from './constants';
+import { COPY, OTEL_ERROR, OTEL_LIFECYCLE_ACTION, OTEL_REFRESH_INTERVAL_MS } from './constants';
 import { OtelIngestionHealth } from './ingestion-health';
 import { OTEL_MODAL, OtelModals, type OtelLifecycleAction, type OtelModalState } from './modals';
 import { OtelSourcePolicy } from './source-policy';
@@ -41,9 +43,7 @@ import {
   notifyOtelAttentionChanged,
 } from './utils';
 
-// Avoid importing PATHS here: config/paths imports the routes barrel, which also exports this module.
-const OTEL_PATH = `${import.meta.env.DEVLAKE_PATH_PREFIX ?? ''}/otel`;
-const BREADCRUMBS = [{ name: 'Claude Code OTel', path: OTEL_PATH }];
+const BREADCRUMBS = [{ name: 'Claude Code OTel', path: PATHS.OTEL() }];
 
 type OtelOperationResult<T> = { success: true; data: T } | { success: false; error: unknown };
 
@@ -54,6 +54,8 @@ const operateOtel = async <T,>(request: () => Promise<T>, config?: OperateConfig
 };
 
 export const Otel = () => {
+  useDocumentTitle(COPY.title);
+
   const [version, setVersion] = useState(1);
   const [operating, setOperating] = useState(false);
   const [modal, setModal] = useState<OtelModalState>();

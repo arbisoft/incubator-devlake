@@ -27,10 +27,10 @@ test.describe('Access Management & Authentication', () => {
 
     const usersPage = new SettingsUsersPage(page);
     await usersPage.open();
-    await expect(page).toHaveURL(/.*\/access/);
+    await expect(page).toHaveURL(usersPage.urlPattern);
 
     // Verify navigation and core access sections are visible
-    await expect(new ShellPage(page).menuText('User Management')).toBeVisible();
+    await expect(new ShellPage(page).usersMenuItem).toBeVisible();
     await expect(usersPage.ready).toBeVisible();
     await expect(new ActivityPage(page).recentActivityHeading).toBeVisible();
 

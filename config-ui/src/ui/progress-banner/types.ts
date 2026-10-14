@@ -16,10 +16,18 @@
  *
  */
 
+import type { StatusTone } from '@/ui/types';
+
+type ProgressBannerAction = { label: string; onClick: () => void };
+
 export type ProgressBannerProps = {
-  progress: { done: number; total: number };
+  progress?: { done: number; total: number };
+  tone?: StatusTone;
+  loading?: boolean;
+  title?: string;
   message: string;
   actionLabel: string;
   onAction: () => void;
+  secondaryAction?: ProgressBannerAction;
   onDismiss: () => void;
 };

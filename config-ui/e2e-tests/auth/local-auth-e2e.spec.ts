@@ -121,7 +121,7 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     await loginAsAdmin(context);
     const usersPage = new SettingsUsersPage(page);
     await usersPage.open();
-    await expect(page).toHaveURL(/.*\/access/);
+    await expect(page).toHaveURL(usersPage.urlPattern);
 
     // Click Add local user button
     await expect(usersPage.addLocalUserButton).toBeVisible();
@@ -558,10 +558,11 @@ test.describe('Local Password Authentication - Phases 1-4 Full E2E Suite', () =>
     await memberShell.waitUntilPathLeaves('/change-password');
 
     // Member attempts to navigate to /access directly in browser
-    await new SettingsUsersPage(memberPage).open();
-    // Client router accessLoader redirects member away from /access
-    await memberShell.waitUntilPathLeaves('/access', 5000);
-    expect(memberPage.url()).not.toContain('/access');
+    const memberUsersPage = new SettingsUsersPage(memberPage);
+    await memberUsersPage.open();
+    // The users route loader sends a member away from the page
+    await memberShell.waitUntilPathLeaves(memberUsersPage.pathSegment, 5000);
+    expect(memberPage.url()).not.toContain(memberUsersPage.pathSegment);
 
     // Member attempts to call admin API POST /api/access/local-users directly
     const apiAttempt = await memberShell.sessionFetch<ApiMessage>('/api/access/local-users', {

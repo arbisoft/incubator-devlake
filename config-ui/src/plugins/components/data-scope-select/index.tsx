@@ -355,12 +355,12 @@ export const DataScopeSelect = ({
           <>
             Select the data scope in this Connection that you wish to associate with this Project. If you wish to add
             more Data Scope to this Connection, please{' '}
-            <ExternalLink link={`/connections/${plugin}/${connectionId}`}>go to the Connection page</ExternalLink>.
+            <ExternalLink link={PATHS.CONNECTION(plugin, connectionId)}>go to the Connection page</ExternalLink>.
           </>
         ) : (
           <>
             There is no Data Scope in this connection yet, please{' '}
-            <ExternalLink link={`/connections/${plugin}/${connectionId}`}>
+            <ExternalLink link={PATHS.CONNECTION(plugin, connectionId)}>
               add Data Scope and manage their Scope Configs
             </ExternalLink>{' '}
             first.
@@ -380,8 +380,7 @@ export const DataScopeSelect = ({
                 <>
                   Unchecking Data Scope below will only remove it from the current Project and will not delete the
                   historical data. If you would like to delete the data of Data Scope, please{' '}
-                  <ExternalLink link={`/connections/${plugin}/${connectionId}`}>go to the Connection page</ExternalLink>
-                  .
+                  <ExternalLink link={PATHS.CONNECTION(plugin, connectionId)}>go to the Connection page</ExternalLink>.
                 </>
               }
             />

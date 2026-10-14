@@ -38,8 +38,6 @@ export const tableWithRow = (page: Page, text: string | RegExp): Locator =>
 const toast = (page: Page, text: string | RegExp): Locator =>
   page.locator('.ant-message-notice').filter({ hasText: text });
 
-export const sidebarMenu = (page: Page): Locator => page.getByRole('menu').first();
-
 export const selectOption = (page: Page, label: string | RegExp): Locator =>
   page.locator('.ant-select-item-option').filter({ hasText: label });
 

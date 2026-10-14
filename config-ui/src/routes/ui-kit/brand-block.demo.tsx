@@ -36,5 +36,15 @@ export const BrandBlockDemo = () => (
         </DarkBox>
       </Row>
     </DemoCase>
+    <DemoCase label={COPY.cases.customTitle}>
+      <Row>
+        <DarkBox $wide>
+          <BrandBlock collapsed={false} title={COPY.brandBlock.customTitle} />
+        </DarkBox>
+        <DarkBox>
+          <BrandBlock collapsed title={COPY.brandBlock.customTitle} />
+        </DarkBox>
+      </Row>
+    </DemoCase>
   </DemoSection>
 );

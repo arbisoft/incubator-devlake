@@ -37,7 +37,7 @@ export const layoutLoader = async ({ request }: Props) => {
   const onboard = await API.store.get('onboard');
 
   if (!onboard) {
-    return redirect('/onboard');
+    return redirect(PATHS.ONBOARD());
   }
 
   let fePlugins = getRegisterPlugins();
