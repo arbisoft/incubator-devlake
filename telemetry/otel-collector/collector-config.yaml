@@ -44,7 +44,8 @@ processors:
       - delete_matching_keys(log.attributes, "^(response|tool_input|body|body_ref)$")
       - delete_matching_keys(resource.attributes, "^(response|tool_input|body|body_ref)$")
       # A tool_result error message can echo file contents; api_error messages are kept.
-      - delete_key(log.attributes, "error") where log.attributes["event.name"] == "tool_result"
+      # Claude Code may send the name with or without the claude_code. prefix.
+      - delete_key(log.attributes, "error") where log.attributes["event.name"] == "tool_result" or log.attributes["event.name"] == "claude_code.tool_result"
   attributes/drop_session:
     actions:
       # Session ids are needed on events, but would make every session a Prometheus series.
