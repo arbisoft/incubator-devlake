@@ -24,6 +24,7 @@ import API from '@/api';
 import { PATHS } from '@/config';
 import { getPluginConfig } from '@/plugins';
 import { ConnectionToken } from '@/plugins/components/connection-form/fields/token';
+import { Auth as BitbucketAuthField } from '@/plugins/register/bitbucket/connection-fields';
 import { operator } from '@/utils';
 
 import { STORE_KEY } from './components/constants';
@@ -31,10 +32,8 @@ import { CONNECTION_DEFAULTS, COPY, GUIDE_STEP, ONBOARD_PLUGIN, PLATFORM_NAME, W
 import { Context } from './context';
 import { StepActions } from './step-actions';
 import * as S from './styled';
-import type { ConnectionDraft } from './types';
+import type { ConnectionDraft, ConnectionTestPayload } from './types';
 import { useGuide } from './use-guide';
-
-type TestPayload = Parameters<typeof API.connection.testOld>[1];
 
 const getDefaults = (plugin: string): ConnectionDraft =>
   plugin in CONNECTION_DEFAULTS ? CONNECTION_DEFAULTS[plugin as keyof typeof CONNECTION_DEFAULTS] : {};
@@ -49,14 +48,6 @@ export const Step2 = () => {
 
   const config = useMemo(() => getPluginConfig(plugin as string), [plugin]);
 
-  // Get the auth field component for Bitbucket
-  const BitbucketAuthField = useMemo(() => {
-    if (plugin === ONBOARD_PLUGIN.BITBUCKET && config?.connection?.fields) {
-      return config.connection.fields[1];
-    }
-    return null;
-  }, [plugin, config]);
-
   const guide = useGuide(GUIDE_STEP.CONNECTION, plugin);
 
   const handleTest = async () => {
@@ -64,8 +55,18 @@ export const Step2 = () => {
       return;
     }
 
+    setTestStatus(false);
     const [success] = await operator(
-      async () => await API.connection.testOld(plugin, { ...getDefaults(plugin), ...payload } as TestPayload),
+      async () => {
+        const result = await API.connection.testOld(plugin, {
+          ...getDefaults(plugin),
+          ...payload,
+        } as ConnectionTestPayload);
+        if (result.success === false) {
+          throw new Error(COPY.connection.connectFailed);
+        }
+        return result;
+      },
       {
         setOperating: setTesting,
         formatMessage: () => COPY.connection.connectSuccess,
@@ -73,13 +74,11 @@ export const Step2 = () => {
       },
     );
 
-    if (success) {
-      setTestStatus(true);
-    }
+    setTestStatus(success);
   };
 
   const handleSubmit = async () => {
-    if (!plugin) {
+    if (!plugin || !testStatus || testing || operating) {
       return;
     }
 
@@ -148,7 +147,7 @@ export const Step2 = () => {
               initialValue=""
               value={payload.token ?? ''}
               setValue={(token) => {
-                setPayload({ ...payload, token });
+                setPayload((current) => ({ ...current, token }));
                 setTestStatus(false);
               }}
               error=""
@@ -157,23 +156,23 @@ export const Step2 = () => {
             {connectButton(!payload.token)}
           </S.Form>
         )}
-        {plugin === ONBOARD_PLUGIN.BITBUCKET && BitbucketAuthField && (
+        {plugin === ONBOARD_PLUGIN.BITBUCKET && (
           <S.Form>
-            {BitbucketAuthField({
-              type: 'create',
-              initialValues: {
+            <BitbucketAuthField
+              type="create"
+              initialValues={{
                 ...CONNECTION_DEFAULTS[ONBOARD_PLUGIN.BITBUCKET],
                 username: '',
                 password: '',
-              },
-              values: payload,
-              errors: {},
-              setValues: (values: ConnectionDraft) => {
-                setPayload({ ...payload, ...values });
+              }}
+              values={payload}
+              errors={{}}
+              setValues={(values: ConnectionDraft) => {
+                setPayload((current) => ({ ...current, ...values }));
                 setTestStatus(false);
-              },
-              setErrors: () => {},
-            })}
+              }}
+              setErrors={() => {}}
+            />
             {connectButton(!payload.username || !payload.password)}
           </S.Form>
         )}
@@ -181,7 +180,7 @@ export const Step2 = () => {
       </S.StepContent>
       <StepActions
         loading={operating}
-        nextDisabled={!testStatus}
+        nextDisabled={!testStatus || testing}
         onPrevious={() => setStep(step - 1)}
         onNext={handleSubmit}
       />

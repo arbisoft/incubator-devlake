@@ -30,6 +30,9 @@ export const LOG_STATUS = { PENDING: 'pending', RUNNING: 'running', SUCCESS: 'su
 
 export const CLONE_REPO_TASK = 'Clone Git Repo';
 
+export const DASHBOARD_WINDOW_TARGET = '_blank';
+export const DASHBOARD_WINDOW_FEATURES = 'noopener,noreferrer';
+
 export const GUIDE_ROOT = '/onboard';
 export const DEFAULT_GUIDE = 'default';
 export const GUIDE_STEP = { PROJECT: 'step-1', CONNECTION: 'step-2', SCOPE: 'step-3' } as const;
@@ -80,6 +83,7 @@ export const COPY = {
     nameDescription: 'Give your project a unique name with letters, numbers, -, _ or /',
     namePlaceholder: 'Your Project Name',
     nameTaken: (name: string) => `Project name "${name}" already exists, please try another name.`,
+    checkFailed: 'Could not check this project name. Try again.',
     connection: 'Data Connection',
     connectionDescription: 'For self-managed GitLab/GitHub/Bitbucket, please skip the onboarding and configure via',
     connectionPlaceholder: 'Select a Data Connection',
@@ -95,6 +99,8 @@ export const COPY = {
   },
   scope: {
     congratulations: 'Congratulations！You have successfully connected to your first repository!',
+    pipelineUnavailable: 'The collection started, but its pipeline could not be found. Refresh and try again.',
+    operationFailed: 'Operation failed.',
   },
   result: {
     syncing: (scope: string) => `Syncing up data from ${scope}...`,

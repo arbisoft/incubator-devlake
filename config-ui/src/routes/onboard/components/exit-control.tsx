@@ -23,9 +23,7 @@ import { ConfirmModal, CONFIRM_TONE, IconButton } from '@/ui';
 
 import { COPY } from '../constants';
 
-type ExitControlProps = {
-  onExit: () => Promise<boolean>;
-};
+import type { ExitControlProps } from './types';
 
 export const ExitControl = ({ onExit }: ExitControlProps) => {
   const [open, setOpen] = useState(false);
@@ -33,10 +31,13 @@ export const ExitControl = ({ onExit }: ExitControlProps) => {
 
   const handleConfirm = async () => {
     setLoading(true);
-    const exited = await onExit();
-    setLoading(false);
-    if (exited) {
-      setOpen(false);
+    try {
+      const exited = await onExit();
+      if (exited) {
+        setOpen(false);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 

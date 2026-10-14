@@ -24,6 +24,7 @@ import API from '@/api';
 import { Block } from '@/components';
 import { PATHS } from '@/config';
 import { ConnectionSelect } from '@/plugins';
+import { toUserMessage } from '@/ui/utils';
 import { operator } from '@/utils';
 
 import { STORE_KEY } from './components/constants';
@@ -45,10 +46,15 @@ export const Step1 = () => {
       return;
     }
 
-    const [, res] = await operator(() => API.project.checkName(projectName), {
+    const [checked, res] = await operator(() => API.project.checkName(projectName), {
       setOperating,
       hideToast: true,
     });
+
+    if (!checked) {
+      message.error(toUserMessage(res, {}, COPY.project.checkFailed));
+      return;
+    }
 
     if (res.exist) {
       message.error(COPY.project.nameTaken(projectName));
