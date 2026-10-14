@@ -146,7 +146,7 @@ func stripContentAttributes(request *collectorlogs.ExportLogsServiceRequest) {
 		}
 		for _, record := range resourceLogRecords(resourceLogs) {
 			record.Attributes = filterToolParameters(normalizePromptText(withoutAttributes(record.GetAttributes(), contentAttributes)))
-			if logEventName(record) == "tool_result" {
+			if logEventName(record) == eventToolResult {
 				record.Attributes = withoutAttributes(record.GetAttributes(), toolResultContentAttributes)
 			}
 		}
