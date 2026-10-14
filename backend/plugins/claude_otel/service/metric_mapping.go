@@ -188,8 +188,9 @@ func unixNanoTime(value uint64) (time.Time, error) {
 // metricSeriesHash identifies one SDK counter for CUMULATIVE state; Claude Code exports
 // DELTA by default, which needs no state. Every resource and datapoint attribute is part of
 // OTLP stream identity: attributes such as effort or terminal.type distinguish separate
-// counters. Managed settings omit session.id, so concurrent CLI sessions of one developer
-// share attributes; the counter start time keeps their cumulative counters apart.
+// counters. Managed settings send session.id (for events), so cumulative state is one row
+// per session and counter. The counter start time already split it per CLI process, and
+// state idle for seriesStateRetention is deleted, so the table stays bounded.
 func metricSeriesHash(connectionID uint64, scope *commonv1.InstrumentationScope, metric *metricsv1.Metric, resourceAttrs []*commonv1.KeyValue, point *metricsv1.NumberDataPoint) []byte {
 	scopeIdentity, _ := proto.MarshalOptions{Deterministic: true}.Marshal(scope)
 	identity := []string{strconv.FormatUint(connectionID, 10), string(scopeIdentity), metric.GetName(), metric.GetUnit(), strconv.FormatUint(point.GetStartTimeUnixNano(), 10)}
