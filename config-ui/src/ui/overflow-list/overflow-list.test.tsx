@@ -21,6 +21,7 @@ import { describe, expect, it } from 'vitest';
 
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
+import { OVERFLOW_LAYOUT } from './constants';
 import { OverflowList } from './overflow-list';
 import { splitOverflow } from './utils';
 
@@ -61,5 +62,16 @@ describe('OverflowList', () => {
     fireEvent.focus(screen.getByRole('button', { name: MORE(2) }));
     await waitFor(() => expect(screen.getByText('item 4')).toBeTruthy());
     expect(screen.getByText('item 3')).toBeTruthy();
+  });
+
+  it('lays the items out in a row for the inline layout and keeps the toggle a button', () => {
+    renderWithTheme(<OverflowList items={items(4)} max={2} moreLabel={MORE} layout={OVERFLOW_LAYOUT.INLINE} />);
+    expect(getComputedStyle(screen.getByRole('list')).flexWrap).toBe('wrap');
+    expect(screen.getByRole('button', { name: MORE(2) }).tagName).toBe('BUTTON');
+  });
+
+  it('stacks the items by default', () => {
+    renderWithTheme(<OverflowList items={items(2)} max={2} moreLabel={MORE} />);
+    expect(getComputedStyle(screen.getByRole('list')).flexWrap).not.toBe('wrap');
   });
 });

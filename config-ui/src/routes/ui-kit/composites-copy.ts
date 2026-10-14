@@ -97,6 +97,7 @@ export const COMPOSITES_COPY = {
   overflowList: {
     more: (count: number) => `+${count} more`,
     items: ['arbisoft-app-devlake', 'corey-systems', 'hirestream-platform', 'sophia-web', 'fixalert-mobile'],
+    inline: 'Inline chips',
     longItem: 'a-connection-with-an-extraordinarily-long-name-that-has-to-be-clipped-inside-the-cell',
   },
   formModal: {

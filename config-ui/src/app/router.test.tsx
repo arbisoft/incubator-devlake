@@ -28,7 +28,7 @@ import {
   ProjectDetailPage,
   SettingsActivity,
   SettingsAuthentication,
-  SettingsUsers,
+  SettingsUserManagement,
 } from '@/routes';
 
 import { routes } from './router';
@@ -86,7 +86,8 @@ describe('legacy redirects', () => {
   });
 
   it.each([
-    [PATHS.SETTINGS_USERS(), SettingsUsers],
+    [PATHS.SETTINGS_USERS(), SettingsUserManagement],
+    [PATHS.SETTINGS_GRAFANA_USERS(), SettingsUserManagement],
     [PATHS.SETTINGS_AUTHENTICATION(), SettingsAuthentication],
     [PATHS.SETTINGS_ACTIVITY(), SettingsActivity],
   ])('guards %s with the access loader and renders its page', (path, page) => {

@@ -43,6 +43,7 @@ export const PATHS = {
   keys: '/keys',
   access: '/access',
   settingsUsers: '/settings/users',
+  settingsGrafanaUsers: '/settings/users/grafana',
   settingsAuthentication: '/settings/authentication',
   settingsActivity: '/settings/activity',
   otel: '/otel',

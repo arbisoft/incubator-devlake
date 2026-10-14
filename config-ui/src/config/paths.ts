@@ -50,6 +50,7 @@ export const ROUTE_SEGMENTS = {
   OTEL: 'otel',
   SETTINGS: 'settings',
   SETTINGS_USERS: 'users',
+  SETTINGS_GRAFANA_USERS: 'users/grafana',
   SETTINGS_AUTHENTICATION: 'authentication',
   SETTINGS_ACTIVITY: 'activity',
 } as const;
@@ -83,6 +84,7 @@ export const PATHS = {
   OTEL: () => `${PATH_PREFIX}/otel`,
   APIKEYS: () => `${PATH_PREFIX}/keys`,
   SETTINGS_USERS: () => `${PATH_PREFIX}/settings/users`,
+  SETTINGS_GRAFANA_USERS: () => `${PATH_PREFIX}/settings/users/grafana`,
   SETTINGS_AUTHENTICATION: () => `${PATH_PREFIX}/settings/authentication`,
   SETTINGS_ACTIVITY: () => `${PATH_PREFIX}/settings/activity`,
   DASHBOARDS: () => '/api/access/grafana-login',

@@ -16,29 +16,17 @@
  *
  */
 
-import { Modal } from 'antd';
-import styled from 'styled-components';
+import { PATHS, USER_MANAGEMENT_VIEW, type UserManagementView } from '@/config';
+import { toRouteTabs, toTabKey } from '@/ui/utils';
 
-import { textStyle } from '@/ui/style-helpers';
+import { COPY, USER_MANAGEMENT_VIEW_ORDER } from './constants';
 
-export const Dialog = styled(Modal)`
-  .ant-modal-title {
-    ${textStyle('h3')}
-  }
+const VIEW_PATH: Record<UserManagementView, string> = {
+  [USER_MANAGEMENT_VIEW.DEVLAKE]: PATHS.SETTINGS_USERS(),
+  [USER_MANAGEMENT_VIEW.GRAFANA]: PATHS.SETTINGS_GRAFANA_USERS(),
+};
 
-  .ant-modal-header {
-    margin-bottom: ${({ theme }) => theme.space.lg}px;
-  }
-`;
+export const getUserManagementViews = () => toRouteTabs(USER_MANAGEMENT_VIEW_ORDER, COPY.views, VIEW_PATH);
 
-export const TitleRow = styled.span`
-  display: flex;
-  align-items: center;
-  gap: ${({ theme }) => theme.space.xs}px;
-`;
-
-export const Hint = styled.p`
-  ${textStyle('body')}
-  margin: 0 0 ${({ theme }) => theme.space.md}px;
-  color: ${({ theme }) => theme.colors.textSecondary};
-`;
+export const toUserManagementView = (key: string | undefined): UserManagementView =>
+  toTabKey(USER_MANAGEMENT_VIEW_ORDER, key, USER_MANAGEMENT_VIEW.DEVLAKE);

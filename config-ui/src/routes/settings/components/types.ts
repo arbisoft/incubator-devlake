@@ -53,3 +53,21 @@ export type AccessFormModalProps<T extends object> = {
   submit: (values: T, setSaving: (saving: boolean) => void) => Promise<boolean>;
   children: (values: T, setField: <K extends keyof T>(key: K, value: T[K]) => void) => ReactNode;
 };
+
+export type TemporaryCredential = { loginName: string; temporaryPassword: string };
+
+type TemporaryPasswordCopy = {
+  title: string;
+  hint: string;
+  passwordFor: (loginName: string) => string;
+  copy: string;
+  done: string;
+};
+
+export type TemporaryPasswordModalProps = {
+  open: boolean;
+  credential?: TemporaryCredential;
+  copy?: TemporaryPasswordCopy;
+  onClose: () => void;
+  onClosed: () => void;
+};

@@ -44,25 +44,90 @@ export const tableWithRow = (page: Page, text: string | RegExp): Locator =>
 const toast = (page: Page, text: string | RegExp): Locator =>
   page.locator('.ant-message-notice').filter({ hasText: text });
 
-const selectOption = (page: Page, label: string | RegExp): Locator =>
-  page.locator('.ant-select-item-option').filter({ hasText: label });
+const selectOption = (dropdown: Locator, label: string | RegExp): Locator =>
+  dropdown.locator('.ant-select-item-option').filter({ hasText: label });
 
-// The list is virtual and antd scrolls a reopened one to its selected value, so start from the top and page down until the option renders.
+interface Bounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface VisibleBounds {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+const visibleBounds = (holder: Bounds, viewport: { width: number; height: number }): VisibleBounds | null => {
+  const bounds = {
+    left: Math.max(holder.x, 0),
+    top: Math.max(holder.y, 0),
+    right: Math.min(holder.x + holder.width, viewport.width),
+    bottom: Math.min(holder.y + holder.height, viewport.height),
+  };
+  return bounds.right <= bounds.left || bounds.bottom <= bounds.top ? null : bounds;
+};
+
+const fitsBounds = (option: Bounds, bounds: VisibleBounds): boolean =>
+  option.x >= bounds.left &&
+  option.y >= bounds.top &&
+  option.x + option.width <= bounds.right &&
+  option.y + option.height <= bounds.bottom;
+
+const verticalScrollDelta = (option: Bounds, bounds: VisibleBounds): number => {
+  if (option.y < bounds.top) return option.y - bounds.top;
+  if (option.y + option.height > bounds.bottom) return option.y + option.height - bounds.bottom;
+  return 0;
+};
+
+const alignRenderedOption = async (
+  page: Page,
+  holder: Locator,
+  option: Locator,
+): Promise<'ready' | 'pending' | 'missing'> => {
+  if (!(await option.count())) return 'missing';
+
+  const holderBox = await holder.boundingBox();
+  const optionBox = await option.boundingBox();
+  if (!holderBox || !optionBox) return 'pending';
+
+  const viewport = await page.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight }));
+  const bounds = visibleBounds(holderBox, viewport);
+  if (!bounds) return 'pending';
+  if (fitsBounds(optionBox, bounds)) return 'ready';
+
+  const delta = verticalScrollDelta(optionBox, bounds);
+  if (delta !== 0) await holder.evaluate((el, scrollDelta) => el.scrollBy(0, scrollDelta), delta);
+  return 'pending';
+};
+
+const advanceOptionList = async (holder: Locator, atTop: boolean): Promise<void> => {
+  if (atTop) {
+    await holder.evaluate((el) => el.scrollBy(0, el.clientHeight));
+    return;
+  }
+  await holder.evaluate((el) => el.scrollTo(0, 0));
+};
+
+// The list is virtual and antd scrolls a reopened one to its selected value, so expose the matching option before clicking it.
 export async function chooseOption(page: Page, label: string | RegExp): Promise<void> {
-  const option = selectOption(page, label);
-  const holder = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) [class$="-holder"]');
+  const dropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
+  const option = selectOption(dropdown, label);
+  const holder = dropdown.locator('[class$="-holder"]');
   let atTop = false;
   await expect
     .poll(
       async () => {
-        if (await option.count()) return true;
-        if (!(await holder.count())) return false;
-        if (atTop) {
-          await holder.evaluate((el) => el.scrollBy(0, el.clientHeight));
-        } else {
-          await holder.evaluate((el) => el.scrollTo(0, 0));
-          atTop = true;
-        }
+        if ((await dropdown.count()) !== 1 || (await holder.count()) !== 1) return false;
+        const state = await alignRenderedOption(page, holder, option);
+        if (state === 'ready') return true;
+        if (state === 'pending') return false;
+
+        await advanceOptionList(holder, atTop);
+        atTop = true;
         return false;
       },
       { intervals: [50] },

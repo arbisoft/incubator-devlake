@@ -26,6 +26,7 @@ Playwright specs that drive a running DevLake stack (config-ui, devlake API, MyS
 - An existing `customer_admin` in the access directory (the bootstrap admin); its identity is used for the minted session.
 - Auth state: `auth/local-auth-e2e.spec.ts` and `auth/rebase-matrix.spec.ts` need local password auth enabled (`AUTH_LOCAL_ENABLED=true`, state B); `auth/local-auth-state-a.spec.ts` needs it disabled (state A). Specs for the other state skip themselves, detected via `GET /auth/methods`.
 - The `/otel` specs need the Grafana, Prometheus and collector endpoints reachable; they create and remove their own DevLake project.
+- `settings/grafana-users.spec.ts` also needs local Grafana and the existing management credentials. Its support loader reads `GRAFANA_MANAGEMENT_USER` / `GRAFANA_MANAGEMENT_PASSWORD` from the repo-root `auth-secrets.env` when not supplied in the environment. Values remain private. It creates independent `e2e-` accounts and projects; protected-account writes use a temporary server admin whose status is revoked before deletion. Real Grafana accounts are read-only.
 - `ui-kit/ui-kit.spec.ts` skips unless `E2E_UI_KIT_URL` points at a running `yarn start --port <port>` server, because `/ui-kit` is registered only in dev builds and is absent from `dist`. It needs no login or backend.
 - The GitHub-backed specs skip unless `E2E_GITHUB_TOKEN` is set (and `E2E_GITHUB_REPO` for data scopes): the create-and-test test in `connections/connection-lifecycle` and all of `connections/data-scope`. `connections/health` and `connections/manage-dialog` always run; with a token they expect online connections, without one they use a dummy token and expect failed ones.
 - Specs create only `e2e-` prefixed data (and `e2e_` users) and remove it.
@@ -107,6 +108,7 @@ Auth state: B means local login on, A means local login off, "any" means the spe
 **`settings/`**
 
 - `users.spec.ts`: the access page for an admin, and users search with its empty state.
+- `grafana-users.spec.ts`: 15 ordinary user-management flows covering tabs, search/pagination, creation and template reset/detachment, validation, role/status/details/password changes, project access, deletion, a temporary protected account and owned orphan cleanup. Runs in either auth state. Generated passwords stay in memory; automatic captures are disabled and credential-visible assertions avoid locator snapshots.
 - `activity.spec.ts`: an activity row opens a drawer with the event action and target.
 
 **`otel/`**
@@ -125,6 +127,9 @@ Need Grafana, Prometheus and the collector (see Prerequisites).
 
 - `support/pages/`: page objects (see Page objects), plus `paths.ts` (`PATHS`).
 - `support/api.ts`: admin API helpers (`adminApi()`, create and delete helpers, `uniqueName`, the OTel restart cooldown wait).
+- `support/api-grafana.ts`: guarded DevLake Grafana API helpers, re-exported through `api.ts`.
+- `support/grafana.ts`, `grafana-safety.ts` and `grafana-cleanup.ts`: local-only direct-Grafana support, live account-ownership checks and tracked failure-safe cleanup. Specs consume them through `api.ts`; direct mutations refuse non-`e2e-` identities.
+- `support/env-file.ts`: shared environment-file parsing used by the existing environment loader and Grafana support.
 - `support/db.ts`: SQL through `docker exec` in the MySQL container; refuses remote Docker hosts and non-local DB hosts.
 - `support/env.ts`: loads the repo-root `.env`, exports the URLs and `requireEnv`.
 - `support/auth-state.ts`: `fetchAuthMethods` reads `GET /auth/methods` so specs can detect the auth state.

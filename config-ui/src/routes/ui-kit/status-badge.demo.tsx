@@ -28,10 +28,7 @@ const TONES = Object.values(STATUS_TONE);
 export const StatusBadgeDemo = () => (
   <DemoSection id={SECTION.STATUS_BADGE} title={COPY.sections.statusBadge}>
     {Object.values(STATUS_BADGE_VARIANT).map((variant) => (
-      <DemoCase
-        key={variant}
-        label={variant === STATUS_BADGE_VARIANT.DOT ? COPY.statusBadge.dot : COPY.statusBadge.text}
-      >
+      <DemoCase key={variant} label={COPY.statusBadge[variant]}>
         <Row>
           {TONES.map((tone) => (
             <StatusBadge key={tone} tone={tone} label={TONE_LABELS[tone]} variant={variant} />
@@ -41,6 +38,11 @@ export const StatusBadgeDemo = () => (
     ))}
     <DemoCase label={COPY.cases.longText}>
       <Narrow>
+        <StatusBadge
+          tone={STATUS_TONE.NEUTRAL}
+          label={COPY.statusBadge.longLabel}
+          variant={STATUS_BADGE_VARIANT.CHIP}
+        />
         <StatusBadge tone={STATUS_TONE.WARNING} label={COPY.statusBadge.longLabel} variant={STATUS_BADGE_VARIANT.DOT} />
       </Narrow>
     </DemoCase>

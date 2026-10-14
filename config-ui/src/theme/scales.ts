@@ -80,6 +80,7 @@ export type LayoutTokens = {
   sortSelectWidth: number;
   datePickerWidth: number;
   statusDotSize: number;
+  chipMaxWidth: number;
   stageDotSize: number;
   sidebarHeaderHeight: number;
   sidebarControlSize: number;
@@ -188,6 +189,7 @@ export const LAYOUT: LayoutTokens = {
   sortSelectWidth: 168,
   datePickerWidth: 224,
   statusDotSize: 6,
+  chipMaxWidth: 120,
   stageDotSize: 10,
   sidebarHeaderHeight: 70,
   sidebarControlSize: 28,

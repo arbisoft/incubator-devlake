@@ -18,7 +18,7 @@
 
 import { SearchOutlined } from '@ant-design/icons';
 import { useDebounce } from 'ahooks';
-import { Input } from 'antd';
+import { Input, message } from 'antd';
 import { uniqBy } from 'lodash';
 import type { McsItem } from 'miller-columns-select';
 import { useState, useEffect, useEffectEvent, useMemo } from 'react';
@@ -26,8 +26,16 @@ import { useState, useEffect, useEffectEvent, useMemo } from 'react';
 import API from '@/api';
 import { Block } from '@/components';
 import { getPluginScopeName } from '@/plugins/utils';
+import { toUserMessage } from '@/ui/utils';
 
-import { COPY, ROOT_COLUMN_ID, SCOPE_ITEM_TYPE, SEARCH_DEBOUNCE_MS, SEARCH_PAGE_SIZE } from './constants';
+import {
+  COPY,
+  LOAD_ERROR_MAP,
+  ROOT_COLUMN_ID,
+  SCOPE_ITEM_TYPE,
+  SEARCH_DEBOUNCE_MS,
+  SEARCH_PAGE_SIZE,
+} from './constants';
 import { loadChildren } from './load-children';
 import { ScopePanes } from './scope-panes';
 import { SelectedScopes } from './selected-scopes';
@@ -147,8 +155,11 @@ export const SearchRemote = ({
         total,
         hasMore,
       }));
-    } catch {
-      if (!isStale()) setSearch((s) => ({ ...s, loading: false, hasMore: false }));
+    } catch (error) {
+      if (!isStale()) {
+        message.error(toUserMessage(error, LOAD_ERROR_MAP, COPY.loadFailed));
+        setSearch((s) => ({ ...s, loading: false, hasMore: false }));
+      }
     }
   });
 

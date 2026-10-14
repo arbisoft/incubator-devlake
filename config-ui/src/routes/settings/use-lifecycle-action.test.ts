@@ -28,10 +28,10 @@ import { ACCESS_ERROR, COPY, LIFECYCLE_ACTION, LIFECYCLE_SUBJECT } from './const
 import type { LifecycleAction } from './types';
 import { useLifecycleAction, type LifecycleTarget } from './use-lifecycle-action';
 
-vi.mock('antd', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('antd')>()),
-  message: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
-}));
+vi.mock('antd', async (importOriginal) => {
+  const { withMockedAntdMessage } = await import('./__tests__/test-utils');
+  return withMockedAntdMessage(importOriginal);
+});
 
 vi.mock('@/api', () => ({
   default: {

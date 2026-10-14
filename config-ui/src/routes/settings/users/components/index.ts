@@ -20,5 +20,4 @@ export * from './add-domain-modal';
 export * from './add-local-credential-modal';
 export * from './add-local-user-modal';
 export * from './add-user-modal';
-export * from './temporary-password-modal';
 export type * from './types';

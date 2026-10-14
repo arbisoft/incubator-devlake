@@ -16,14 +16,20 @@
  *
  */
 
+import type { ReactNode } from 'react';
+
 import type { AccessRole, AccessStatus } from '@/api/access';
 
-export type RoleColumnOptions<T> = {
+export type RoleOption<R extends string> = { value: R; label: string };
+
+export type RoleColumnOptions<T, R extends string = AccessRole> = {
   key: string;
   title: string;
-  getRole: (record: T) => AccessRole;
+  options?: RoleOption<R>[];
+  getRole: (record: T) => string;
   getLabel: (record: T) => string;
-  onChange: (record: T, role: AccessRole) => void;
+  getLockedReason?: (record: T) => string | undefined;
+  onChange: (record: T, role: R) => void;
 };
 
 export type StatusColumnFilter = {
@@ -51,6 +57,9 @@ export type ActionsColumnOptions<T> = {
     disableFor: (name: string) => string;
     removeFor: (name: string) => string;
   };
+  canToggle?: (record: T) => boolean;
+  canRemove?: (record: T) => boolean;
+  renderExtra?: (record: T) => ReactNode;
   onToggle: (record: T, nextStatus: AccessStatus) => void;
   onRemove: (record: T) => void;
 };

@@ -153,6 +153,7 @@ describe('active item', () => {
     [PATHS.PIPELINE(3), NAV_KEY.PIPELINES],
     [PATHS.APIKEYS(), NAV_KEY.API_KEYS],
     [PATHS.SETTINGS_USERS(), NAV_KEY.USERS],
+    [PATHS.SETTINGS_GRAFANA_USERS(), NAV_KEY.USERS],
   ])('highlights the right item for %s', (pathname, key) => {
     expect(activeKey(pathname)).toBe(key);
   });

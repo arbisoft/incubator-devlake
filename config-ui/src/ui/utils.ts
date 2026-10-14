@@ -21,6 +21,7 @@ import dayjs from 'dayjs';
 import { formatTime } from '@/utils/time';
 
 import { COMMON_COPY, DATE_TIME_FORMAT, MS_PER_SECOND, RELATIVE_NOW_SECONDS } from './constants';
+import type { RouteTab } from './types';
 
 type TimeInput = Date | string | number | null | undefined;
 
@@ -49,3 +50,12 @@ export const formatRelativeTime = (value: TimeInput, now: Date | number = Date.n
   const seconds = Math.abs(dayjs(now).diff(value)) / MS_PER_SECOND;
   return seconds < RELATIVE_NOW_SECONDS ? COMMON_COPY.justNow : dayjs(value).from(now);
 };
+
+export const toRouteTabs = <K extends string>(
+  order: readonly K[],
+  labels: Record<K, string>,
+  paths: Record<K, string>,
+): RouteTab[] => order.map((key) => ({ key, label: labels[key], path: paths[key] }));
+
+export const toTabKey = <K extends string>(order: readonly K[], key: string | undefined, fallback: K): K =>
+  order.find((item) => item === key) ?? fallback;

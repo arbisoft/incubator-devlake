@@ -119,6 +119,7 @@ export const RELATIVE_OFFSETS_MS = [10_000, 5 * 60_000, 3 * 3_600_000, 2 * 86_40
 export const DOCS_HREF = 'https://devlake.apache.org/docs/Overview';
 
 export const IDENTITY = { primary: 'Jane Admin', secondary: 'jane.admin@example.com' };
+export const IDENTITY_TAG = 'SSO';
 export const IDENTITY_LONG = {
   primary: 'A user with an extraordinarily long display name that cannot fit',
   secondary: 'a.user.with.an.extraordinarily.long.address@subdomain.example.com',

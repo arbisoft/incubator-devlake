@@ -16,4 +16,4 @@
  *
  */
 
-export const STATUS_BADGE_VARIANT = { DOT: 'dot', TEXT: 'text' } as const;
+export const STATUS_BADGE_VARIANT = { DOT: 'dot', TEXT: 'text', CHIP: 'chip' } as const;

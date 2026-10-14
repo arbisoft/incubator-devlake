@@ -39,6 +39,7 @@ import (
 	"github.com/apache/incubator-devlake/server/api/auth"
 	_ "github.com/apache/incubator-devlake/server/api/docs"
 	"github.com/apache/incubator-devlake/server/api/grafanarole"
+	"github.com/apache/incubator-devlake/server/api/grafanausers"
 	"github.com/apache/incubator-devlake/server/api/ping"
 	"github.com/apache/incubator-devlake/server/api/shared"
 	"github.com/apache/incubator-devlake/server/api/version"
@@ -65,6 +66,7 @@ func Init() {
 	access.Init(basicRes)
 	auth.Init(basicRes)
 	grafanarole.Init(basicRes)
+	grafanausers.Init(basicRes)
 }
 
 func InjectCustomService(pipelineNotifier services.PipelineNotificationService, projectService services.ProjectService) errors.Error {

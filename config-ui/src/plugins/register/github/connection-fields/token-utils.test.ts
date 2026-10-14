@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { isMaskedGithubToken } from './token-utils';
+import { getGithubTokenType, isMaskedGithubToken } from './token-utils';
 
 describe('plugins/register/github/connection-fields/token-utils', () => {
   it('detects masked GitHub tokens returned by the API', () => {
@@ -34,5 +34,16 @@ describe('plugins/register/github/connection-fields/token-utils', () => {
     expect(isMaskedGithubToken('ghp_exampleTokenWithoutMaskCharacters12345')).toBe(false);
     expect(isMaskedGithubToken('')).toBe(false);
     expect(isMaskedGithubToken(undefined)).toBe(false);
+  });
+
+  it('selects fine-grained guidance from the preserved prefix, including masked tokens', () => {
+    expect(getGithubTokenType('github_pat_example')).toBe('fine-grained');
+    expect(getGithubTokenType('github_pat_example****************Suffix12')).toBe('fine-grained');
+  });
+
+  it('keeps classic guidance for classic, legacy, and unknown token formats', () => {
+    expect(getGithubTokenType('ghp_example')).toBe('classic');
+    expect(getGithubTokenType('legacy-token')).toBe('classic');
+    expect(getGithubTokenType(undefined)).toBe('classic');
   });
 });

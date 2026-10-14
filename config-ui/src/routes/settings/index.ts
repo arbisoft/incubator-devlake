@@ -19,4 +19,4 @@
 export * from './activity';
 export * from './authentication';
 export * from './loader';
-export * from './users';
+export * from './user-management';

@@ -16,12 +16,19 @@
  *
  */
 
-import { Cell, Primary, Secondary } from './styled';
+import { Cell, Primary, PrimaryRow, Secondary } from './styled';
 import type { IdentityCellProps } from './types';
 
-export const IdentityCell = ({ primary, secondary }: IdentityCellProps) => (
+export const IdentityCell = ({ primary, secondary, adornment }: IdentityCellProps) => (
   <Cell>
-    <Primary title={primary}>{primary}</Primary>
+    {adornment ? (
+      <PrimaryRow>
+        <Primary title={primary}>{primary}</Primary>
+        {adornment}
+      </PrimaryRow>
+    ) : (
+      <Primary title={primary}>{primary}</Primary>
+    )}
     {secondary && <Secondary title={secondary}>{secondary}</Secondary>}
   </Cell>
 );

@@ -18,11 +18,16 @@
 
 import type { ReactNode, Ref } from 'react';
 
+import type { OVERFLOW_LAYOUT } from './constants';
+
+export type OverflowLayout = (typeof OVERFLOW_LAYOUT)[keyof typeof OVERFLOW_LAYOUT];
+
 type OverflowItem = { key: string; node: ReactNode };
 
 export type OverflowListProps = {
   items: OverflowItem[];
   max: number;
   moreLabel: (count: number) => string;
+  layout?: OverflowLayout;
   listRef?: Ref<HTMLUListElement>;
 };

@@ -23,14 +23,19 @@ import { useTheme } from 'styled-components';
 
 import { FormField, MODAL_WIDTH } from '@/ui';
 
-import { COPY } from '../../constants';
+import { COPY } from '../constants';
 
 import { Dialog, Hint, TitleRow } from './styled';
 import type { TemporaryPasswordModalProps } from './types';
 
-export const TemporaryPasswordModal = ({ open, credential, onClose, onClosed }: TemporaryPasswordModalProps) => {
+export const TemporaryPasswordModal = ({
+  open,
+  credential,
+  copy = COPY.modals.temporaryPassword,
+  onClose,
+  onClosed,
+}: TemporaryPasswordModalProps) => {
   const { layout } = useTheme();
-  const copy = COPY.modals.temporaryPassword;
 
   return (
     <Dialog

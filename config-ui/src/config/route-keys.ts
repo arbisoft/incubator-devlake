@@ -27,3 +27,8 @@ export const BLUEPRINT_VIEW = {
   STATUS: 'status',
   CONFIGURATION: 'configuration',
 } as const;
+
+export const USER_MANAGEMENT_VIEW = {
+  DEVLAKE: 'devlake',
+  GRAFANA: 'grafana',
+} as const;
