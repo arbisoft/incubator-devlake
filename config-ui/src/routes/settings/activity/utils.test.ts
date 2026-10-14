@@ -19,7 +19,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { AccessAuditEvent } from '@/api/access';
-import { COMMON_COPY, formatDateTime } from '@/ui';
+import { COMMON_COPY, SHORT_DATE_TIME_FORMAT, formatDateTime } from '@/ui';
 
 import { COPY } from './constants';
 import { filterActivityRows, paginateRows, toActivityRow } from './utils';
@@ -37,7 +37,7 @@ describe('toActivityRow', () => {
   it('maps an event to its view model and keeps the event for the raw view', () => {
     expect(toActivityRow(EVENT)).toEqual({
       id: 1,
-      when: formatDateTime(EVENT.createdAt),
+      when: formatDateTime(EVENT.createdAt, SHORT_DATE_TIME_FORMAT),
       action: 'user.created',
       actor: 'admin@example.com',
       target: 'ada@example.com',

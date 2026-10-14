@@ -67,6 +67,13 @@ export const PageHeaderDemo = () => (
         actions={<Button>{text.action}</Button>}
       />
     </DemoCase>
+    <DemoCase label={COPY.cases.withoutTitle}>
+      <PageHeader
+        title={text.projectTitle}
+        showTitle={false}
+        breadcrumbs={[{ label: text.crumbs.settings, path: PATHS.UI_KIT() }, { label: text.projectTitle }]}
+      />
+    </DemoCase>
     <DemoCase label={COPY.cases.longText}>
       <Narrow>
         <PageHeader

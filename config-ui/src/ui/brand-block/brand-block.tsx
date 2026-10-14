@@ -16,41 +16,38 @@
  *
  */
 
-import { POWERED_BY, TITLE_CUSTOM } from '@/config/brand';
-import wordmark from '@/images/brand/arbisoft-wordmark.png';
-import Mark from '@/images/brand/devlake-mark.svg?react';
+import { TITLE_CUSTOM } from '@/config/brand';
 
-import { COPY } from './constants';
-import { CustomInitial, CustomTitle, MarkTile, PoweredBy, Root, Wordmark } from './styled';
+import { BRAND_TONE, COPY } from './constants';
+import { BrandMark, BrandName, CustomInitial, CustomTitle, Lockup, Names, ProductName, Root } from './styled';
 import type { BrandBlockProps } from './types';
 
-export const BrandBlock = ({ collapsed, title = TITLE_CUSTOM }: BrandBlockProps) => {
+export const BrandBlock = ({ collapsed = false, tone = BRAND_TONE.SIDEBAR, title = TITLE_CUSTOM }: BrandBlockProps) => {
   if (title) {
-    return collapsed ? (
-      <Root $collapsed>
-        <MarkTile>
-          <CustomInitial role="img" aria-label={title}>
+    return (
+      <Root $collapsed={collapsed} $tone={tone}>
+        {collapsed ? (
+          <CustomInitial $tone={tone} role="img" aria-label={title}>
             {title.charAt(0).toUpperCase()}
           </CustomInitial>
-        </MarkTile>
-      </Root>
-    ) : (
-      <Root $collapsed={false}>
-        <CustomTitle>{title}</CustomTitle>
+        ) : (
+          <CustomTitle $tone={tone}>{title}</CustomTitle>
+        )}
       </Root>
     );
   }
 
-  return collapsed ? (
-    <Root $collapsed>
-      <MarkTile>
-        <Mark role="img" aria-label={COPY.markAlt} />
-      </MarkTile>
-    </Root>
-  ) : (
-    <Root $collapsed={false}>
-      <Wordmark src={wordmark} alt={COPY.wordmarkAlt} />
-      <PoweredBy>{POWERED_BY}</PoweredBy>
+  return (
+    <Root $collapsed={collapsed} $tone={tone}>
+      <Lockup>
+        <BrandMark $tone={tone} role="img" aria-label={COPY.markAlt} />
+        {!collapsed && (
+          <Names>
+            <BrandName $tone={tone}>{COPY.brandName}</BrandName>
+            <ProductName $tone={tone}>{COPY.productName}</ProductName>
+          </Names>
+        )}
+      </Lockup>
     </Root>
   );
 };

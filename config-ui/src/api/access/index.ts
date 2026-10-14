@@ -133,7 +133,7 @@ export type PaginatedAccessDomains = {
 const basePath = '/access';
 
 export const current = (): Promise<AccessCurrent> => request(`${basePath}/me`);
-export type AccessUserListParams = AccessPagination & KeywordParams;
+export type AccessUserListParams = AccessPagination & KeywordParams & { status?: AccessStatus };
 
 export const listUsers = (params: AccessUserListParams, signal?: AbortSignal): Promise<PaginatedAccessUsers> =>
   request(`${basePath}/users`, { data: params, signal });

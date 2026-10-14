@@ -27,6 +27,7 @@ import {
   ConfirmModal,
   DEFAULT_PAGE,
   DataTable,
+  type DataTableFilters,
   EMPTY_ILLUSTRATION,
   ListPage,
   ListToolbar,
@@ -44,10 +45,13 @@ import {
   LIFECYCLE_ACTION,
   LIFECYCLE_SUBJECT,
   PAGE_SIZE_OPTIONS,
+  USER_COLUMN,
+  USER_FILTER,
+  USER_STATUS_FILTER_OPTIONS,
 } from '../constants';
 import type { AccessModal } from '../types';
 import { useLifecycleAction } from '../use-lifecycle-action';
-import { toAccessPagination } from '../utils';
+import { toAccessPagination, toStatusFilter } from '../utils';
 
 import { getDomainColumns, getUserColumns } from './columns';
 import {
@@ -60,12 +64,13 @@ import {
 } from './components';
 
 export const SettingsUsers = () => {
-  const list = useListState<string, Record<string, never>>({
+  const list = useListState<string, Record<string, string>>({
     pageSize: DEFAULT_PAGE_SIZE,
     pageSizeOptions: PAGE_SIZE_OPTIONS,
-    filters: {},
+    filters: { [USER_FILTER.STATUS]: '' },
   });
   const { keyword } = list;
+  const status = toStatusFilter(list.filters[USER_FILTER.STATUS]);
   const { version, refresh } = useRefreshVersion();
   const [domainPage, setDomainPage] = useState(DEFAULT_PAGE);
   const [domainPageSize, setDomainPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
@@ -75,8 +80,9 @@ export const SettingsUsers = () => {
   const [credentialOpen, setCredentialOpen] = useState(false);
 
   const users = useRefreshData(
-    (signal) => API.access.listUsers({ ...toAccessPagination(list.query), keyword: list.query.keyword }, signal),
-    [version, list.query],
+    (signal) =>
+      API.access.listUsers({ ...toAccessPagination(list.query), keyword: list.query.keyword, status }, signal),
+    [version, list.query, status],
   );
   const domains = useRefreshData(
     (signal) => API.access.listDomains(toAccessPagination({ page: domainPage, pageSize: domainPageSize }), signal),
@@ -85,6 +91,14 @@ export const SettingsUsers = () => {
   const methods = useRefreshData(() => API.auth.methods().catch(() => undefined), []);
   const localAuthEnabled = methods.data?.localPassword?.enabled === true;
 
+  const { setFilter } = list;
+  const handleFilterChange = useCallback(
+    (filters: DataTableFilters) => {
+      const [selected] = filters[USER_COLUMN.STATUS] ?? [];
+      setFilter(USER_FILTER.STATUS, toStatusFilter(selected) ?? '');
+    },
+    [setFilter],
+  );
   const closeModal = useCallback(() => setModal(undefined), []);
   const showCredential = useCallback((credential: LocalCredentialResponse) => {
     setTemporaryCredential({ loginName: credential.loginName, temporaryPassword: credential.temporaryPassword });
@@ -124,8 +138,9 @@ export const SettingsUsers = () => {
         onRemoveLocalCredential: (user) =>
           start(LIFECYCLE_ACTION.REMOVE_PASSWORD, { subject: LIFECYCLE_SUBJECT.USER, item: user }),
         localAuthEnabled,
+        statusFilter: { value: status, options: USER_STATUS_FILTER_OPTIONS },
       }),
-    [changeRole, localAuthEnabled, start],
+    [changeRole, localAuthEnabled, start, status],
   );
 
   const domainColumns = useMemo(
@@ -152,7 +167,7 @@ export const SettingsUsers = () => {
   const usersEmpty = buildListEmpty({
     failed: users.error !== undefined,
     onRetry: refresh,
-    filtered: keyword !== '',
+    filtered: keyword !== '' || status !== undefined,
     empty: { ...COPY.users.empty, illustration: EMPTY_ILLUSTRATION.NO_USERS, action: addUserButton },
     noResults: COPY.users.noResults,
   });
@@ -188,6 +203,7 @@ export const SettingsUsers = () => {
           dataSource={users.data?.users ?? []}
           empty={usersEmpty}
           list={list}
+          onFilterChange={handleFilterChange}
           total={users.data?.count ?? 0}
         />
       </SectionCard>

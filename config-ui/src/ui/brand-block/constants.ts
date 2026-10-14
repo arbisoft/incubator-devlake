@@ -17,6 +17,9 @@
  */
 
 export const COPY = {
-  wordmarkAlt: 'Arbisoft',
   markAlt: 'Arbisoft',
+  brandName: 'Arbisoft',
+  productName: 'DevLake',
 };
+
+export const BRAND_TONE = { SIDEBAR: 'sidebar', PAGE: 'page' } as const;

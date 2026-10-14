@@ -25,6 +25,7 @@ import { STATUS_TONE } from '@/ui';
 
 import {
   ACCESS_ERROR_CODE,
+  ACCESS_STATUS,
   GRAFANA_PROVIDER_KIND,
   OIDC_PROVIDER_SYNC_STATUS,
   type OIDCProvider,
@@ -49,6 +50,7 @@ import {
   normalizeOIDCProviderInput,
   canSelectGenericOIDCProvider,
   normalizeDomain,
+  toStatusFilter,
 } from './utils';
 
 const createAxiosError = (status: number, data: unknown) =>
@@ -401,5 +403,13 @@ describe('routes/settings/utils', () => {
     expect(canSelectGenericOIDCProvider(provider)).toBe(true);
     expect(canSelectGenericOIDCProvider({ ...provider, enabled: false })).toBe(false);
     expect(canSelectGenericOIDCProvider({ ...provider, hasCandidate: true })).toBe(false);
+  });
+
+  it('accepts only known access statuses as a status filter', () => {
+    expect(toStatusFilter(ACCESS_STATUS.ACTIVE)).toBe(ACCESS_STATUS.ACTIVE);
+    expect(toStatusFilter(ACCESS_STATUS.DISABLED)).toBe(ACCESS_STATUS.DISABLED);
+    expect(toStatusFilter('')).toBeUndefined();
+    expect(toStatusFilter('inactive')).toBeUndefined();
+    expect(toStatusFilter(undefined)).toBeUndefined();
   });
 });

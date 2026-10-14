@@ -39,10 +39,11 @@ export const BlueprintDetailPage = () => {
     <ListPage>
       <PageHeader
         title={BLUEPRINT_COPY.detailTitle(id)}
+        showTitle={false}
         breadcrumbs={[
           { label: BLUEPRINT_COPY.breadcrumbAdvanced, path: PATHS.BLUEPRINTS() },
           { label: BLUEPRINT_COPY.breadcrumbBlueprints, path: PATHS.BLUEPRINTS() },
-          { label: id },
+          { label: BLUEPRINT_COPY.detailTitle(id) },
         ]}
         switcher={<RouteTabs items={views} variant={ROUTE_TABS_VARIANT.SEGMENTED} />}
       />

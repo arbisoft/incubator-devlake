@@ -441,6 +441,13 @@ export async function findAccessUserByLogin(
   return (await listAccessUsers(api)).find((u) => u.localLoginName === loginName);
 }
 
+export async function disableAccessUser(api: APIRequestContext, user: ApiAccessUser): Promise<ApiAccessUser> {
+  return json<ApiAccessUser>(
+    await api.patch(`/access/users/${user.id}`, { data: { role: user.role, status: 'disabled' } }),
+    'disable access user',
+  );
+}
+
 export interface ApiAuditEvent {
   id: number;
   action: string;

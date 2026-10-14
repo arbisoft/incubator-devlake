@@ -19,7 +19,7 @@
 import { Form, Input } from 'antd';
 
 import { COPY } from './constants';
-import { ActionButton } from './styled';
+import { ActionButton, Fields } from './styled';
 import type { LocalLoginValues } from './types';
 
 type LocalLoginFormProps = {
@@ -28,20 +28,26 @@ type LocalLoginFormProps = {
 };
 
 export const LocalLoginForm = ({ pending, onSubmit }: LocalLoginFormProps) => (
-  <Form<LocalLoginValues> layout="vertical" onFinish={onSubmit} requiredMark={false}>
-    <Form.Item label={COPY.usernameLabel} name="loginName" rules={[{ required: true, message: COPY.usernameRequired }]}>
-      <Input autoComplete="username" />
-    </Form.Item>
-    <Form.Item
-      label={COPY.passwordLabel}
-      name="password"
-      extra={COPY.passwordHelp}
-      rules={[{ required: true, message: COPY.passwordRequired }]}
-    >
-      <Input.Password autoComplete="current-password" />
-    </Form.Item>
-    <ActionButton type="primary" htmlType="submit" block loading={pending}>
-      {COPY.submit}
-    </ActionButton>
-  </Form>
+  <Fields>
+    <Form<LocalLoginValues> layout="vertical" onFinish={onSubmit} requiredMark={false}>
+      <Form.Item
+        label={COPY.usernameLabel}
+        name="loginName"
+        rules={[{ required: true, message: COPY.usernameRequired }]}
+      >
+        <Input autoComplete="username" />
+      </Form.Item>
+      <Form.Item
+        label={COPY.passwordLabel}
+        name="password"
+        extra={COPY.passwordHelp}
+        rules={[{ required: true, message: COPY.passwordRequired }]}
+      >
+        <Input.Password autoComplete="current-password" />
+      </Form.Item>
+      <ActionButton type="primary" htmlType="submit" block loading={pending}>
+        {COPY.submit}
+      </ActionButton>
+    </Form>
+  </Fields>
 );

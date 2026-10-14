@@ -17,7 +17,7 @@
  */
 import { Locator } from '@playwright/test';
 
-import { LOGIN_COPY } from '../app-copy';
+import { LOGIN_COPY, LOGIN_PARAMS } from '../app-copy';
 
 import { BasePage } from './common';
 import { PATHS } from './paths';
@@ -32,6 +32,14 @@ export interface StubProvider {
 export class LoginPage extends BasePage {
   async open(): Promise<void> {
     await this.visit(PATHS.login);
+  }
+
+  async openWithError(error: string): Promise<void> {
+    await this.visit(`${PATHS.login}?${LOGIN_PARAMS.ERROR}=${error}`);
+  }
+
+  get accessDeniedAlert(): Locator {
+    return this.page.getByRole('alert').filter({ hasText: LOGIN_COPY.accessDenied });
   }
 
   providerButton(providerName: string): Locator {

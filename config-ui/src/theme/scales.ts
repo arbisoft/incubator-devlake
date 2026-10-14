@@ -32,7 +32,6 @@ export type SidebarTokens = {
   itemActiveBg: string;
   itemActiveText: string;
   logoFilter: string;
-  markBg: string;
 };
 
 type TypographyStyle = { fontSize: number; lineHeight: number; fontWeight: number; letterSpacing: number };
@@ -75,18 +74,21 @@ export type LayoutTokens = {
   authGlowInsetX: number;
   authGlowInsetBottom: number;
   searchMaxWidth: number;
+  searchMinWidth: number;
   connectionNameWidth: number;
   sortSelectWidth: number;
   datePickerWidth: number;
   statusDotSize: number;
+  stageDotSize: number;
   sidebarHeaderHeight: number;
   sidebarControlSize: number;
   railItemWidth: number;
   navIconSize: number;
   railIconSize: number;
   avatarSize: number;
-  markTileSize: number;
-  wordmarkWidth: number;
+  brandMarkHeight: number;
+  poweredByMarkSize: number;
+  metricTileMinWidth: number;
   confirmModalWidth: number;
   pipelineTaskIdWidth: number;
   pipelineTaskDurationWidth: number;
@@ -105,6 +107,7 @@ export type LayoutTokens = {
   segmentPaddingInline: number;
   modalWidth: { sm: number; md: number; lg: number };
   modalViewportMargin: number;
+  modalTitleIconSize: number;
   scopePaneHeight: number;
   scopePaneHeightCompact: number;
   scopeRowHeight: number;
@@ -173,18 +176,21 @@ export const LAYOUT: LayoutTokens = {
   authGlowInsetX: -180,
   authGlowInsetBottom: -130,
   searchMaxWidth: 400,
+  searchMinWidth: 140,
   connectionNameWidth: 200,
   sortSelectWidth: 168,
   datePickerWidth: 224,
   statusDotSize: 6,
+  stageDotSize: 10,
   sidebarHeaderHeight: 70,
   sidebarControlSize: 28,
   railItemWidth: 48,
   navIconSize: 14,
   railIconSize: 18,
   avatarSize: 32,
-  markTileSize: 32,
-  wordmarkWidth: 120,
+  brandMarkHeight: 28,
+  poweredByMarkSize: 20,
+  metricTileMinWidth: 160,
   confirmModalWidth: 416,
   pipelineTaskIdWidth: 84,
   pipelineTaskDurationWidth: 64,
@@ -203,6 +209,7 @@ export const LAYOUT: LayoutTokens = {
   segmentPaddingInline: 11,
   modalWidth: { sm: 520, md: 600, lg: 800 },
   modalViewportMargin: 40,
+  modalTitleIconSize: 26,
   scopePaneHeight: 300,
   scopePaneHeightCompact: 200,
   scopeRowHeight: 40,

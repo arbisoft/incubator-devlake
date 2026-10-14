@@ -106,6 +106,24 @@ describe('DataTable', () => {
     expect(onChange).toHaveBeenCalledExactlyOnceWith({ sortBy: 'name', sortOrder: SORT_ORDER.DESC });
   });
 
+  it('reports a column filter choice', () => {
+    const onFilterChange = vi.fn();
+    const columns: TableColumnsType<Row> = [
+      {
+        key: 'name',
+        title: 'Name',
+        dataIndex: 'name',
+        filters: [{ text: 'Alpha only', value: 'alpha' }],
+        filterMultiple: false,
+      },
+    ];
+    const { container } = setup({ columns, onFilterChange });
+    fireEvent.click(container.querySelector('.ant-table-filter-trigger') as Element);
+    fireEvent.click(screen.getByText('Alpha only'));
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }));
+    expect(onFilterChange).toHaveBeenCalledExactlyOnceWith({ name: ['alpha'] });
+  });
+
   it('reports page changes', () => {
     const onPageChange = vi.fn();
     setup({ pagination: { page: 1, pageSize: 1, total: 2, onPageChange, onPageSizeChange: vi.fn() } });

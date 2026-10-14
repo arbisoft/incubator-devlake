@@ -146,7 +146,11 @@ export const TABLE_ROWS: UserRow[] = Array.from({ length: TABLE_ROW_COUNT }, (_,
   };
 });
 
-export const TABLE_LIST_DEFAULTS = { pageSize: 10, sort: { sortBy: 'name', sortOrder: 'asc' as const }, filters: {} };
+export const TABLE_LIST_DEFAULTS = {
+  pageSize: 10,
+  sort: { sortBy: 'name', sortOrder: 'asc' as const },
+  filters: { status: '' },
+};
 export const TABLE_SELECTED_ROWS = [1, 3];
 
 export const HEALTH_RETEST_MS = 1200;

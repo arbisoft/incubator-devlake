@@ -50,9 +50,15 @@ export const buildStatusColumn = <T extends object>({
   title,
   getStatus,
   labels,
+  filter,
 }: StatusColumnOptions<T>): TableColumnType<T> => ({
   key,
   title,
+  ...(filter && {
+    filters: filter.options,
+    filterMultiple: false,
+    filteredValue: filter.value ? [filter.value] : null,
+  }),
   render: (_, record) => {
     const status = getStatus(record);
     return <StatusBadge tone={ACCESS_STATUS_TONE[status]} label={labels[status]} variant="dot" />;

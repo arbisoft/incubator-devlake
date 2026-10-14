@@ -18,22 +18,38 @@
 
 import styled from 'styled-components';
 
+import type { AppThemeColors } from '@/theme/tokens';
 import { textStyle } from '@/ui/style-helpers';
 
 import { METRIC_TILE_TONE } from './constants';
 import type { MetricTileTone } from './types';
 
 type ToneProps = { $tone: MetricTileTone };
+type TileProps = ToneProps & { $bordered: boolean };
+
+type TonePalette = { value: keyof AppThemeColors; border: keyof AppThemeColors; bg: keyof AppThemeColors };
+
+const DEFAULT_PALETTE: TonePalette = { value: 'text', border: 'borderSubtle', bg: 'bgContainer' };
+
+const TONE_PALETTE: Partial<Record<MetricTileTone, TonePalette>> = {
+  [METRIC_TILE_TONE.WARNING]: { value: 'warningText', border: 'warning', bg: 'warningBg' },
+  [METRIC_TILE_TONE.DANGER]: { value: 'error', border: 'error', bg: 'errorBg' },
+};
+
+const palette = ({ $tone }: ToneProps) => TONE_PALETTE[$tone] ?? DEFAULT_PALETTE;
 
 const onBrand = ({ $tone }: ToneProps) => $tone === METRIC_TILE_TONE.ON_BRAND;
 
-export const Tile = styled.dl<ToneProps>`
+export const Tile = styled.dl<TileProps>`
   display: flex;
   flex-direction: column;
   gap: ${({ theme, $tone }) => (onBrand({ $tone }) ? 0 : theme.space.xs)}px;
   min-width: 0;
   margin: 0;
   padding: ${({ theme, $tone }) => (onBrand({ $tone }) ? 0 : theme.space.md)}px;
+  border: ${({ $bordered }) => ($bordered ? 1 : 0)}px solid ${(props) => props.theme.colors[palette(props).border]};
+  border-radius: ${({ theme }) => theme.radius.lg}px;
+  background: ${(props) => (props.$bordered ? props.theme.colors[palette(props).bg] : 'transparent')};
 `;
 
 export const Label = styled.dt<ToneProps>`
@@ -49,7 +65,7 @@ export const Value = styled.dd<ToneProps>`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: ${({ theme, $tone }) => (onBrand({ $tone }) ? theme.sidebar.text : theme.colors.text)};
+  color: ${(props) => (onBrand(props) ? props.theme.sidebar.text : props.theme.colors[palette(props).value])};
 `;
 
 export const Hint = styled.dd<ToneProps>`

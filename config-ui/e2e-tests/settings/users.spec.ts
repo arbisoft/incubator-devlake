@@ -19,7 +19,8 @@ import { APIRequestContext } from '@playwright/test';
 
 import { loginAsAdmin } from '../auth-helpers';
 import { test, expect } from '../fixtures';
-import { adminApi, createEmailUser, uniqueName } from '../support/api';
+import { adminApi, createEmailUser, disableAccessUser, uniqueName } from '../support/api';
+import { SETTINGS_COPY } from '../support/app-copy';
 import { deleteEmailUsersNamedLike } from '../support/db';
 import { ActivityPage } from '../support/pages/activity';
 import { SettingsUsersPage } from '../support/pages/settings-users';
@@ -92,5 +93,51 @@ test.describe.serial('Settings users search', () => {
     await usersPage.search(keyword);
     await expect.poll(() => usersPage.urlParams.get('keyword')).toBe(keyword);
     await expect(usersPage.noResults).toBeVisible();
+  });
+});
+
+test.describe.serial('Settings users status filter', () => {
+  let api: APIRequestContext;
+  const prefix = uniqueName('status');
+  const activeEmail = `${prefix}-a@example.com`;
+  const disabledEmail = `${prefix}-b@example.com`;
+  const { ACTIVE, DISABLED } = { ACTIVE: 'active', DISABLED: 'disabled' } as const;
+
+  test.beforeAll(async ({ playwright }) => {
+    api = await adminApi(playwright);
+    deleteEmailUsersNamedLike(prefix);
+    await createEmailUser(api, activeEmail);
+    await disableAccessUser(api, await createEmailUser(api, disabledEmail));
+  });
+
+  test.afterAll(async () => {
+    deleteEmailUsersNamedLike(prefix);
+    await api?.dispose();
+  });
+
+  test.beforeEach(async ({ context }) => {
+    await loginAsAdmin(context);
+  });
+
+  test('the Status column filter narrows the users table, survives a reload and clears', async ({ page }) => {
+    const usersPage = new SettingsUsersPage(page);
+    await usersPage.open();
+    await usersPage.search(prefix);
+    await expect.poll(async () => (await usersPage.userIdentities()).sort()).toEqual([activeEmail, disabledEmail]);
+
+    await usersPage.filterByStatus(SETTINGS_COPY.users.status[ACTIVE]);
+    await expect.poll(() => usersPage.urlParams.get('status')).toBe(ACTIVE);
+    await expect.poll(() => usersPage.userIdentities()).toEqual([activeEmail]);
+
+    await usersPage.filterByStatus(SETTINGS_COPY.users.status[DISABLED]);
+    await expect.poll(() => usersPage.urlParams.get('status')).toBe(DISABLED);
+    await expect.poll(() => usersPage.userIdentities()).toEqual([disabledEmail]);
+    await usersPage.reload();
+    expect(usersPage.urlParams.get('status')).toBe(DISABLED);
+    await expect.poll(() => usersPage.userIdentities()).toEqual([disabledEmail]);
+
+    await usersPage.clearStatusFilter();
+    await expect.poll(() => usersPage.urlParams.get('status')).toBeNull();
+    await expect.poll(async () => (await usersPage.userIdentities()).sort()).toEqual([activeEmail, disabledEmail]);
   });
 });

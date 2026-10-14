@@ -19,6 +19,7 @@
 import { AccountBlockDemo } from './account-block.demo';
 import { AppShellDemo } from './app-shell.demo';
 import { BrandBlockDemo } from './brand-block.demo';
+import { CellButtonDemo } from './cell-button.demo';
 import { CodeBlockDemo } from './code-block.demo';
 import { ConfirmModalDemo } from './confirm-modal.demo';
 import { ConnectionHealthDemo } from './connection-health.demo';
@@ -94,6 +95,7 @@ export const SECTIONS: SectionDefinition[] = [
   { id: SECTION.LIST_PAGE, Demo: ListPageDemo },
   { id: SECTION.LIST_TOOLBAR, Demo: ListToolbarDemo },
   { id: SECTION.ROW_LINK, Demo: RowLinkDemo },
+  { id: SECTION.CELL_BUTTON, Demo: CellButtonDemo },
   { id: SECTION.INTEGRATION_CARD, Demo: IntegrationCardDemo },
   { id: SECTION.PAGE_FOOTER, Demo: PageFooterDemo },
   { id: SECTION.PAGE_HEADER, Demo: PageHeaderDemo },

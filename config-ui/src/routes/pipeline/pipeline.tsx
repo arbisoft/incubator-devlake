@@ -33,10 +33,11 @@ export const Pipeline = () => {
     <ListPage>
       <PageHeader
         title={COPY.detailTitle(id as string)}
+        showTitle={false}
         breadcrumbs={[
           { label: COPY.breadcrumbAdvanced, path: PATHS.BLUEPRINTS() },
           { label: COPY.title, path: PATHS.PIPELINES() },
-          { label: id as string },
+          { label: COPY.detailTitle(id as string) },
         ]}
       />
       <PipelinePanel id={id as string} />

@@ -17,10 +17,10 @@
  */
 
 import { DeleteOutlined, EyeOutlined, FormOutlined } from '@ant-design/icons';
-import { Button, type TableColumnsType } from 'antd';
+import type { TableColumnsType } from 'antd';
 
 import type { IWebhook } from '@/types';
-import { ICON_BUTTON_TONE, IconButton } from '@/ui';
+import { CellButton, ICON_BUTTON_TONE, IconButton } from '@/ui';
 
 import { COLUMN_KEY, COPY, WEBHOOK_DIALOG } from './constants';
 import type { WebhookDialogKind } from './types';
@@ -36,9 +36,7 @@ export const getColumns = ({ onOpen }: ColumnOptions): TableColumnsType<IWebhook
     title: COPY.columns.name,
     dataIndex: 'name',
     render: (name: string, webhook) => (
-      <Button type="link" onClick={() => onOpen(WEBHOOK_DIALOG.VIEW, webhook)}>
-        {name}
-      </Button>
+      <CellButton onClick={() => onOpen(WEBHOOK_DIALOG.VIEW, webhook)}>{name}</CellButton>
     ),
   },
   {

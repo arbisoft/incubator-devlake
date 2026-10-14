@@ -50,6 +50,7 @@ export const STORAGE_KEYS = {
 export const ICON_SIZE_PX = { sm: 16, md: 24, lg: 40 } as const;
 
 export const DATE_TIME_FORMAT = 'YYYY-MM-DD HH:mm';
+export const SHORT_DATE_TIME_FORMAT = 'D MMM YYYY, HH:mm';
 export const RELATIVE_NOW_SECONDS = 45;
 export const MS_PER_SECOND = 1000;
 

@@ -162,7 +162,7 @@ test.describe.serial('Project, blueprint, pipeline and webhook flows', () => {
     await expect(listed).toContainText(blueprint.name);
 
     await pipelines.openDetail(pipeline.id);
-    await expect(pipelines.detailHeading(pipeline.id)).toBeVisible();
+    await expect(pipelines.detailBreadcrumb(pipeline.id)).toBeVisible();
     await expect(pipelines.tasksCompletedLabel).toBeVisible();
 
     await cancelPipelinesOfBlueprint(api, blueprint.id);

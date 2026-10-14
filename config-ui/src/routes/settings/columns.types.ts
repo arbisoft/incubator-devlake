@@ -26,11 +26,17 @@ export type RoleColumnOptions<T> = {
   onChange: (record: T, role: AccessRole) => void;
 };
 
+export type StatusColumnFilter = {
+  value?: AccessStatus;
+  options: { text: string; value: AccessStatus }[];
+};
+
 export type StatusColumnOptions<T> = {
   key: string;
   title: string;
   getStatus: (record: T) => AccessStatus;
   labels: Record<AccessStatus, string>;
+  filter?: StatusColumnFilter;
 };
 
 export type ActionsColumnOptions<T> = {

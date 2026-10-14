@@ -15,9 +15,9 @@
  * limitations under the License.
  *
  */
-import { Locator } from '@playwright/test';
+import { Download, Locator } from '@playwright/test';
 
-import { PIPELINE_COPY as COPY } from '../app-copy';
+import { PAGE_HEADER_COPY, PIPELINE_COPY as COPY } from '../app-copy';
 
 import {
   BasePage,
@@ -78,6 +78,14 @@ export class PipelinesPage extends BasePage implements Screen {
     await this.page.getByRole('menuitem', { name: COPY.rowActions.configuration }).click();
   }
 
+  // Starts the row's Download Logs action and returns the browser download it triggers.
+  async downloadLogs(id: number): Promise<Download> {
+    const download = this.page.waitForEvent('download');
+    await this.rowActionsButton(id).click();
+    await this.page.getByRole('menuitem', { name: COPY.rowActions.downloadLogs }).click();
+    return download;
+  }
+
   rowActionsButton(id: number): Locator {
     return pipelineRowMenuButton(this.page, id);
   }
@@ -110,8 +118,11 @@ export class PipelinesPage extends BasePage implements Screen {
     await this.visit(PATHS.pipeline(id));
   }
 
-  detailHeading(id: number): Locator {
-    return this.page.getByRole('heading', { level: 1, name: COPY.detailTitle(String(id)), exact: true });
+  detailBreadcrumb(id: number): Locator {
+    return this.page
+      .getByRole('navigation', { name: PAGE_HEADER_COPY.breadcrumb })
+      .locator('.ant-breadcrumb-link')
+      .getByText(COPY.detailTitle(String(id)), { exact: true });
   }
 
   get tasksCompletedLabel(): Locator {

@@ -25,46 +25,60 @@ import { useRefreshData } from '@/hooks';
 import {
   CODE_LANGUAGE,
   CodeBlock,
-  DEFAULT_PAGE,
   DataTable,
   DetailDrawer,
   EMPTY_STATE_SIZE,
-  KeyValueList,
+  MetricTile,
   SectionCard,
   STATUS_BADGE_VARIANT,
   StatusBadge,
 } from '@/ui';
 
-import { BATCH_PAGE_SIZE_OPTIONS, COPY, DEFAULT_BATCH_PAGE_SIZE } from './constants';
+import { COPY } from './constants';
 import { getBatchColumns } from './ingestion-columns';
-import { Hint, Stack } from './styled';
+import { Hint, MetricGrid, Stack } from './styled';
 import { INGESTION_STATE_TONE } from './tones';
 import type { OtelIngestionHealthProps } from './types';
-import { formatAge, getConverterLabel } from './utils';
+import { useClientPagination } from './use-client-pagination';
+import { formatAge, getBacklogTone, getConverterLabel, getPermanentErrorTone } from './utils';
 
 export const OtelIngestionHealth = ({ loading, failed, status, onRetry }: OtelIngestionHealthProps) => {
   const [batchId, setBatchId] = useState<ID>();
   const [payloadVersion, setPayloadVersion] = useState(0);
-  const [page, setPage] = useState(DEFAULT_PAGE);
-  const [pageSize, setPageSize] = useState<number>(DEFAULT_BATCH_PAGE_SIZE);
   const payload = useRefreshData(
     (signal) => (batchId === undefined ? Promise.resolve(undefined) : API.otel.metricBatchPayload(batchId, signal)),
     [batchId, payloadVersion],
   );
 
   const batches = useMemo(() => status?.recentBatches ?? [], [status]);
-  const rows = useMemo(() => batches.slice((page - 1) * pageSize, page * pageSize), [batches, page, pageSize]);
+  const { rows, pagination } = useClientPagination(batches);
   const columns = useMemo(() => getBatchColumns((batch) => setBatchId(batch.id)), []);
 
   const metrics = status && [
     { label: COPY.health.metrics.pending, value: status.batchCounts.pending ?? 0 },
     { label: COPY.health.metrics.retrying, value: status.batchCounts.retryable_error ?? 0 },
-    { label: COPY.health.metrics.oldestBacklog, value: formatAge(status.oldestNonterminal?.ageSeconds) },
-    { label: COPY.health.metrics.permanentErrors, value: status.recentPermanentErrors },
+    {
+      label: COPY.health.metrics.oldestBacklog,
+      value: formatAge(status.oldestNonterminal?.ageSeconds),
+      tone: getBacklogTone(status.oldestNonterminal?.ageSeconds),
+    },
+    {
+      label: COPY.health.metrics.permanentErrors,
+      value: status.recentPermanentErrors,
+      tone: getPermanentErrorTone(status.recentPermanentErrors),
+    },
     { label: COPY.health.metrics.converter, value: getConverterLabel(status) },
   ];
   const healthContent = () => {
-    if (metrics) return <KeyValueList items={metrics} />;
+    if (metrics) {
+      return (
+        <MetricGrid>
+          {metrics.map((metric) => (
+            <MetricTile key={metric.label} bordered {...metric} />
+          ))}
+        </MetricGrid>
+      );
+    }
     if (failed) {
       return (
         <Alert
@@ -112,17 +126,7 @@ export const OtelIngestionHealth = ({ loading, failed, status, onRetry }: OtelIn
           columns={columns}
           dataSource={rows}
           empty={{ ...COPY.health.emptyBatches, size: EMPTY_STATE_SIZE.SECTION }}
-          pagination={{
-            page,
-            pageSize,
-            total: batches.length,
-            pageSizeOptions: BATCH_PAGE_SIZE_OPTIONS,
-            onPageChange: setPage,
-            onPageSizeChange: (size) => {
-              setPageSize(size);
-              setPage(DEFAULT_PAGE);
-            },
-          }}
+          pagination={pagination}
         />
       </SectionCard>
       <DetailDrawer open={batchId !== undefined} title={COPY.health.payloadTitle} onClose={() => setBatchId(undefined)}>

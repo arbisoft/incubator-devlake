@@ -34,7 +34,7 @@ export const FIRST_PAGE = 1;
 
 export const COPY = {
   tableLabel: (name: string) => `${name} connections`,
-  add: 'Add a Connection',
+  add: 'Add connection',
   columns: { name: 'Connection Name', status: 'Status', repos: 'Repo Count', actions: 'Action' },
   filters: { all: 'All', connected: 'Connected', failed: 'Failed' },
   details: 'Details',

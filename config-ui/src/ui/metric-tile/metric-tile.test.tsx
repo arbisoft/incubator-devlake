@@ -19,10 +19,17 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
+import { getTheme } from '@/theme/tokens';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
 import { METRIC_TILE_TONE } from './constants';
 import { MetricTile } from './metric-tile';
+
+const normaliseColor = (value: string) => {
+  const probe = document.createElement('span');
+  probe.style.color = value;
+  return probe.style.color;
+};
 
 describe('MetricTile', () => {
   it('shows its label, value and hint as a term and its descriptions', () => {
@@ -36,5 +43,19 @@ describe('MetricTile', () => {
     renderWithTheme(<MetricTile label="DORA metrics" value="4" tone={METRIC_TILE_TONE.ON_BRAND} />);
     expect(screen.getByText('DORA metrics').tagName).toBe('DT');
     expect(screen.getByText('4').getAttribute('title')).toBe('4');
+  });
+
+  it('colours the value for the warning and danger tones', () => {
+    const { colors } = getTheme('light');
+    renderWithTheme(
+      <>
+        <MetricTile label="Backlog" value="6m" tone={METRIC_TILE_TONE.WARNING} bordered />
+        <MetricTile label="Errors" value={5} tone={METRIC_TILE_TONE.DANGER} bordered />
+        <MetricTile label="Pending" value={0} />
+      </>,
+    );
+    expect(getComputedStyle(screen.getByText('6m')).color).toBe(normaliseColor(colors.warningText));
+    expect(getComputedStyle(screen.getByText('5')).color).toBe(normaliseColor(colors.error));
+    expect(getComputedStyle(screen.getByText('0')).color).toBe(normaliseColor(colors.text));
   });
 });

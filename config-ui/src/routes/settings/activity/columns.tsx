@@ -16,20 +16,27 @@
  *
  */
 
-import { Button, type TableColumnsType } from 'antd';
+import type { TableColumnsType } from 'antd';
+
+import { CellButton } from '@/ui';
 
 import { ACTIVITY_COLUMN, COPY } from './constants';
+import { When } from './styled';
 import type { ActivityRow } from './types';
 
 export const getActivityColumns = (onOpen: (row: ActivityRow) => void): TableColumnsType<ActivityRow> => [
-  { key: ACTIVITY_COLUMN.WHEN, title: COPY.columns.when, dataIndex: 'when' },
+  {
+    key: ACTIVITY_COLUMN.WHEN,
+    title: COPY.columns.when,
+    render: (_, row) => <When>{row.when}</When>,
+  },
   {
     key: ACTIVITY_COLUMN.ACTION,
     title: COPY.columns.action,
     render: (_, row) => (
-      <Button type="link" aria-label={COPY.openEvent(row.action, row.when)} onClick={() => onOpen(row)}>
+      <CellButton aria-label={COPY.openEvent(row.action, row.when)} onClick={() => onOpen(row)}>
         {row.action}
-      </Button>
+      </CellButton>
     ),
   },
   { key: ACTIVITY_COLUMN.ACTOR, title: COPY.columns.actor, dataIndex: 'actor' },

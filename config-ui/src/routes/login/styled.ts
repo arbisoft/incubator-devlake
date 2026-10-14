@@ -16,7 +16,7 @@
  *
  */
 
-import { Button } from 'antd';
+import { Button, Divider } from 'antd';
 import styled from 'styled-components';
 
 import { WEIGHT } from '@/theme/scales';
@@ -135,4 +135,16 @@ export const LogoImage = styled.img<{ $adaptive: boolean }>`
   width: ${({ theme }) => theme.layout.authProviderLogoSize}px;
   height: ${({ theme }) => theme.layout.authProviderLogoSize}px;
   filter: ${({ theme, $adaptive }) => ($adaptive && theme.mode === 'dark' ? theme.sidebar.logoFilter : 'none')};
+`;
+
+export const Fields = styled.div`
+  .ant-form-item-label > label {
+    font-weight: ${WEIGHT.semibold};
+  }
+`;
+
+export const OrDivider = styled(Divider)`
+  &&.ant-divider-with-text {
+    color: ${({ theme }) => theme.colors.textSecondary};
+  }
 `;

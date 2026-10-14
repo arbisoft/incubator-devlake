@@ -56,6 +56,31 @@ describe('buildStatusColumn', () => {
     labels: COPY.users.status,
   });
 
+  it('adds no filter unless asked', () => {
+    expect(column.filters).toBeUndefined();
+    expect(column.filteredValue).toBeUndefined();
+  });
+
+  it('offers a single-choice filter and reports the chosen value as the filtered value', () => {
+    const options = [{ text: COPY.users.status[ACCESS_STATUS.ACTIVE], value: ACCESS_STATUS.ACTIVE }];
+    const filtered = buildStatusColumn<Row>({
+      key: 'status',
+      title: COPY.users.columns.status,
+      getStatus: (row) => row.status,
+      labels: COPY.users.status,
+      filter: { value: ACCESS_STATUS.ACTIVE, options },
+    });
+    expect(filtered.filters).toEqual(options);
+    expect(filtered.filterMultiple).toBe(false);
+    expect(filtered.filteredValue).toEqual([ACCESS_STATUS.ACTIVE]);
+    expect(
+      buildStatusColumn<Row>({
+        ...{ key: 'status', title: 'S', getStatus: (row) => row.status, labels: COPY.users.status },
+        filter: { options },
+      }).filteredValue,
+    ).toBeNull();
+  });
+
   it('shows the label for the row status as text', () => {
     renderCell(column, { name: 'Ada', status: ACCESS_STATUS.ACTIVE });
     expect(screen.getByText(COPY.users.status[ACCESS_STATUS.ACTIVE])).toBeTruthy();

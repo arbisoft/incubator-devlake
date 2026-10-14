@@ -19,6 +19,7 @@
 import { HttpStatusCode } from 'axios';
 
 import { OTEL_STATUS, type OtelConnectionResponse, type OtelIngestionStatus } from '@/api/otel';
+import { METRIC_TILE_TONE, type MetricTileTone } from '@/ui/metric-tile';
 import { toUserMessage } from '@/ui/utils';
 import { formatPlural } from '@/utils/text';
 
@@ -36,6 +37,12 @@ import {
   SECONDS_PER_MINUTE,
 } from './constants';
 import type { ConnectionState, LifecycleAction, OtelAttentionState } from './types';
+
+const HEALTH_THRESHOLD = {
+  DEGRADED_BACKLOG_SECONDS: 5 * SECONDS_PER_MINUTE,
+  UNHEALTHY_BACKLOG_SECONDS: 30 * SECONDS_PER_MINUTE,
+  UNHEALTHY_PERMANENT_ERRORS: 5,
+} as const;
 
 type AttentionTarget = {
   restartRequired?: boolean;
@@ -127,6 +134,17 @@ export const formatAge = (seconds?: number) => {
   return seconds < SECONDS_PER_MINUTE
     ? COPY.health.seconds(seconds)
     : COPY.health.minutes(Math.floor(seconds / SECONDS_PER_MINUTE));
+};
+
+export const getBacklogTone = (seconds?: number): MetricTileTone => {
+  if (seconds === undefined) return METRIC_TILE_TONE.DEFAULT;
+  if (seconds >= HEALTH_THRESHOLD.UNHEALTHY_BACKLOG_SECONDS) return METRIC_TILE_TONE.DANGER;
+  return seconds >= HEALTH_THRESHOLD.DEGRADED_BACKLOG_SECONDS ? METRIC_TILE_TONE.WARNING : METRIC_TILE_TONE.DEFAULT;
+};
+
+export const getPermanentErrorTone = (count: number): MetricTileTone => {
+  if (count >= HEALTH_THRESHOLD.UNHEALTHY_PERMANENT_ERRORS) return METRIC_TILE_TONE.DANGER;
+  return count > 0 ? METRIC_TILE_TONE.WARNING : METRIC_TILE_TONE.DEFAULT;
 };
 
 export const getConverterLabel = ({ converterLease }: Pick<OtelIngestionStatus, 'converterLease'>) => {

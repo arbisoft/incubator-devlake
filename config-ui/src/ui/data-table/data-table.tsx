@@ -37,6 +37,7 @@ export const DataTable = <T extends object, S extends string = string>({
   list,
   total = 0,
   sort: sortProp,
+  onFilterChange,
   empty,
   rowSelection,
   onRow,
@@ -77,7 +78,10 @@ export const DataTable = <T extends object, S extends string = string>({
             pageSize === pagination.pageSize ? pagination.onPageChange(page) : pagination.onPageSizeChange(pageSize),
         }
       }
-      onChange={(_, __, sorter, { action }) => action === 'sort' && sort?.onChange(toSortState<T, S>(sorter))}
+      onChange={(_, filters, sorter, { action }) => {
+        if (action === 'sort') sort?.onChange(toSortState<T, S>(sorter));
+        if (action === 'filter') onFilterChange?.(filters);
+      }}
     />
   );
 };

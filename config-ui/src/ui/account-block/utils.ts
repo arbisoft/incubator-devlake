@@ -16,6 +16,10 @@
  *
  */
 
+import type { ThemeConfig } from 'antd';
+
+import type { ShadowTokens, SidebarTokens } from '@/theme/scales';
+
 import { INITIALS_LENGTH } from './constants';
 
 export const getInitials = (name: string) =>
@@ -25,3 +29,15 @@ export const getInitials = (name: string) =>
     .slice(0, INITIALS_LENGTH)
     .map((part) => part[0].toUpperCase())
     .join('');
+
+export const getMenuTheme = (sidebar: SidebarTokens, shadow: ShadowTokens): ThemeConfig => ({
+  token: {
+    colorBgElevated: sidebar.bg,
+    boxShadowSecondary: `0 0 0 1px ${sidebar.divider}, ${shadow.flyout}`,
+    colorText: sidebar.text,
+    colorTextDescription: sidebar.textMuted,
+    colorTextDisabled: sidebar.textMuted,
+    colorSplit: sidebar.divider,
+    controlItemBgHover: sidebar.itemHoverBg,
+  },
+});

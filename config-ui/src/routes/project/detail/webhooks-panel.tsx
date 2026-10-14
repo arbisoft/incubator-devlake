@@ -16,7 +16,7 @@
  *
  */
 
-import { Alert, Button, Tooltip } from 'antd';
+import { Button, Tooltip } from 'antd';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -65,18 +65,14 @@ export const WebhooksPanel = ({ project, onRefresh }: ProjectPanelProps) => {
 
   return (
     <Stack>
-      <Alert
-        title={
-          <NoticeBody>
-            <NoticeText>{COPY.webhooks.notice.dora}</NoticeText>
-            <NoticeText>
-              {COPY.webhooks.notice.beforeLink}{' '}
-              <Link to={PATHS.PROJECT_TAB(project.name, PROJECT_TAB.BLUEPRINT)}>{COPY.webhooks.notice.link}</Link>{' '}
-              {COPY.webhooks.notice.afterLink}
-            </NoticeText>
-          </NoticeBody>
-        }
-      />
+      <NoticeBody role="note">
+        <NoticeText>{COPY.webhooks.notice.dora}</NoticeText>
+        <NoticeText>
+          {COPY.webhooks.notice.beforeLink}{' '}
+          <Link to={PATHS.PROJECT_TAB(project.name, PROJECT_TAB.BLUEPRINT)}>{COPY.webhooks.notice.link}</Link>{' '}
+          {COPY.webhooks.notice.afterLink}
+        </NoticeText>
+      </NoticeBody>
       <SectionCard title={COPY.webhooks.title} count={webhookIds.length}>
         <WebHookConnection
           filterIds={webhookIds}

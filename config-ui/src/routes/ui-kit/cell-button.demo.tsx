@@ -16,25 +16,18 @@
  *
  */
 
-import styled from 'styled-components';
+import { CellButton } from '@/ui';
 
-import LogoHorizontalImg from '@/images/logo-horizontal.svg';
-import LogoImg from '@/images/logo.svg';
+import { COPY, SECTION } from './constants';
+import { DemoCase, DemoSection } from './demo-section';
 
-const Wrapper = styled.div`
-  display: flex;
-  justify-content: center;
-`;
-
-interface Props {
-  style?: React.CSSProperties;
-  direction?: 'vertical' | 'horizontal';
-}
-
-export const Logo = ({ style, direction = 'vertical' }: Props) => {
-  return (
-    <Wrapper style={style}>
-      <img src={direction === 'horizontal' ? LogoHorizontalImg : LogoImg} alt="Logo" />
-    </Wrapper>
-  );
-};
+export const CellButtonDemo = () => (
+  <DemoSection id={SECTION.CELL_BUTTON} title={COPY.sections.cellButton}>
+    <DemoCase label={COPY.cases.default}>
+      <CellButton>{COPY.cellButton.label}</CellButton>
+    </DemoCase>
+    <DemoCase label={COPY.cases.disabled}>
+      <CellButton disabled>{COPY.cellButton.label}</CellButton>
+    </DemoCase>
+  </DemoSection>
+);

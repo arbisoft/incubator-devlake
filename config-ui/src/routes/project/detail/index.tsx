@@ -74,7 +74,10 @@ export const ProjectDetailPage = () => {
 
   const panels = {
     [PROJECT_TAB.BLUEPRINT]: project.blueprint ? (
-      <BlueprintDetail blueprintId={project.blueprint.id} context={BLUEPRINT_CONTEXT.PROJECT} view={view} />
+      <>
+        <RouteTabs items={views} variant={ROUTE_TABS_VARIANT.SEGMENTED} />
+        <BlueprintDetail blueprintId={project.blueprint.id} context={BLUEPRINT_CONTEXT.PROJECT} view={view} />
+      </>
     ) : (
       <EmptyState
         size={EMPTY_STATE_SIZE.SECTION}
@@ -91,15 +94,11 @@ export const ProjectDetailPage = () => {
     <ListPage>
       <PageHeader
         title={project.name}
+        showTitle={false}
         breadcrumbs={[
           { label: COPY.breadcrumbProjects, path: PATHS.PROJECTS() },
           { label: project.name, path: PATHS.PROJECT_TAB(pname, PROJECT_TAB.BLUEPRINT) },
         ]}
-        switcher={
-          activeTab === PROJECT_TAB.BLUEPRINT && project.blueprint ? (
-            <RouteTabs items={views} variant={ROUTE_TABS_VARIANT.SEGMENTED} />
-          ) : undefined
-        }
       />
       <RouteTabs items={tabs} variant={ROUTE_TABS_VARIANT.TABS} />
       {panels[activeTab]}

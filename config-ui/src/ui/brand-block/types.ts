@@ -16,7 +16,18 @@
  *
  */
 
+import type { ReactNode } from 'react';
+
+import type { BRAND_TONE } from './constants';
+
+export type BrandTone = (typeof BRAND_TONE)[keyof typeof BRAND_TONE];
+
 export type BrandBlockProps = {
-  collapsed: boolean;
+  collapsed?: boolean;
+  tone?: BrandTone;
   title?: string;
+};
+
+export type PoweredByRowProps = {
+  children?: ReactNode;
 };

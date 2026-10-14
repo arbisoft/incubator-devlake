@@ -19,7 +19,6 @@
 export * from './action';
 export * from './block';
 export * from './loading';
-export * from './logo';
 export * from './markdown';
 export * from './message';
 export * from './tooltip';

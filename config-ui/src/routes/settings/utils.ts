@@ -19,8 +19,10 @@
 import axios, { HttpStatusCode } from 'axios';
 
 import {
+  ACCESS_STATUS,
   GRAFANA_PROVIDER_KIND,
   OIDC_PROVIDER_SYNC_STATUS,
+  type AccessStatus,
   type AccessUser,
   type AccessDomain,
   type OIDCProvider,
@@ -216,3 +218,6 @@ export const toAccessPagination = ({ page, pageSize }: { page: number; pageSize:
   page,
   pageSize: PAGE_SIZE_OPTIONS.find((size) => size === pageSize) ?? PAGE_SIZE_OPTIONS[0],
 });
+
+export const toStatusFilter = (value: unknown): AccessStatus | undefined =>
+  Object.values(ACCESS_STATUS).find((status) => status === value);

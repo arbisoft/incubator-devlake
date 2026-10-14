@@ -22,6 +22,10 @@ import { COMMON_COPY, SETTINGS_COPY } from '../app-copy';
 import { BasePage, Screen, firstCellTexts, modalWithText, selectBox, chooseOption, urlEndingWith } from './common';
 import { PATHS } from './paths';
 
+// antd's own labels for the column filter buttons.
+const ANTD_FILTER_OK = 'OK';
+const ANTD_FILTER_RESET = 'Reset';
+
 // The one-time password dialog shown after a local user is created or reset.
 export class OneTimePasswordDialog {
   constructor(private readonly page: Page) {}
@@ -190,6 +194,30 @@ export class SettingsUsersPage extends BasePage implements Screen {
     const box = this.page.getByRole('textbox', { name: SETTINGS_COPY.users.searchPlaceholder });
     await box.fill(keyword);
     await box.press('Enter');
+  }
+
+  get statusFilterTrigger(): Locator {
+    return this.page
+      .getByRole('region', { name: SETTINGS_COPY.users.title, exact: true })
+      .getByRole('columnheader', { name: SETTINGS_COPY.users.columns.status })
+      .locator('.ant-table-filter-trigger');
+  }
+
+  private get statusFilterDropdown(): Locator {
+    return this.page.locator('.ant-table-filter-dropdown');
+  }
+
+  // Picks one status in the Status column filter; the label is the visible one, e.g. "Inactive".
+  async filterByStatus(label: string): Promise<void> {
+    await this.statusFilterTrigger.click();
+    await this.statusFilterDropdown.getByText(label, { exact: true }).click();
+    await this.statusFilterDropdown.getByRole('button', { name: ANTD_FILTER_OK, exact: true }).click();
+  }
+
+  async clearStatusFilter(): Promise<void> {
+    await this.statusFilterTrigger.click();
+    await this.statusFilterDropdown.getByRole('button', { name: ANTD_FILTER_RESET, exact: true }).click();
+    await this.statusFilterDropdown.getByRole('button', { name: ANTD_FILTER_OK, exact: true }).click();
   }
 
   // The email or login shown under each name in the users table.

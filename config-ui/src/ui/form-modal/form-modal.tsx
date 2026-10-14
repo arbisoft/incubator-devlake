@@ -21,7 +21,7 @@ import { useTheme } from 'styled-components';
 
 import { COMMON_COPY, MODAL_WIDTH } from '@/ui/constants';
 
-import { Dialog, Footer, SubmitButton, TitleRow } from './styled';
+import { Dialog, Footer, SubmitButton, TitleIcon, TitleRow } from './styled';
 import type { FormModalProps } from './types';
 
 export const FormModal = ({
@@ -51,7 +51,7 @@ export const FormModal = ({
       width={layout.modalWidth[width]}
       title={
         <TitleRow>
-          {icon}
+          {icon && <TitleIcon>{icon}</TitleIcon>}
           {title}
         </TitleRow>
       }

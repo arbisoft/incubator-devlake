@@ -44,8 +44,12 @@ export {
   COPY as BLUEPRINT_HOME_COPY,
   STATUS_FILTER as BLUEPRINT_STATUS_FILTER,
 } from '../../src/routes/blueprint/home/constants';
-export { COPY as PIPELINE_COPY } from '../../src/routes/pipeline/constants';
-export { COPY as BLUEPRINT_DETAIL_COPY } from '../../src/routes/blueprint/detail/constants';
+export { COPY as PIPELINE_COPY, LOGS_FILE_NAME as PIPELINE_LOGS_FILE_NAME } from '../../src/routes/pipeline/constants';
+export {
+  COPY as BLUEPRINT_DETAIL_COPY,
+  CONFIRM as BLUEPRINT_CONFIRM,
+  CONFIRM_KIND as BLUEPRINT_CONFIRM_KIND,
+} from '../../src/routes/blueprint/detail/constants';
 export { COPY as BLUEPRINT_CONFIGURATION_COPY } from '../../src/routes/blueprint/detail/configuration/constants';
 export { COPY as SYNC_POLICY_COPY, CUSTOM_CRON_FIELDS } from '../../src/routes/blueprint/sync-policy/constants';
 export { COPY as BLUEPRINT_CONNECTION_COPY } from '../../src/routes/blueprint/connection-detail/constants';
@@ -58,7 +62,7 @@ export { COPY as SORT_SELECT_COPY } from '../../src/ui/sort-select/constants';
 export { COPY as DB_MIGRATE_COPY } from '../../src/routes/db-migrate/constants';
 export { COPY as NOT_FOUND_COPY } from '../../src/routes/not-found/constants';
 export { COPY as ONBOARD_COPY } from '../../src/routes/onboard/constants';
-export { COPY as LOGIN_COPY, PROVIDER_ID } from '../../src/routes/login/constants';
+export { COPY as LOGIN_COPY, LOGIN_PARAMS, PROVIDER_ID } from '../../src/routes/login/constants';
 export { COPY as CHANGE_PASSWORD_COPY } from '../../src/routes/change-password/constants';
 export { COPY as OTEL_COPY } from '../../src/routes/otel/constants';
 export { COPY as OTEL_MODAL_COPY } from '../../src/routes/otel/components/constants';

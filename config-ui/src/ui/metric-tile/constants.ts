@@ -16,4 +16,9 @@
  *
  */
 
-export const METRIC_TILE_TONE = { DEFAULT: 'default', ON_BRAND: 'onBrand' } as const;
+export const METRIC_TILE_TONE = {
+  DEFAULT: 'default',
+  ON_BRAND: 'onBrand',
+  WARNING: 'warning',
+  DANGER: 'danger',
+} as const;

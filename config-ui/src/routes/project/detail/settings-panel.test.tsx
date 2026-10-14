@@ -137,6 +137,12 @@ describe('SettingsPanel', () => {
     expect(name.value).toBe(PROJECT.name);
   });
 
+  it('draws the trash icon on the delete button', async () => {
+    setup();
+    const button = await screen.findByRole('button', { name: COPY.settings.delete.open });
+    expect(button.querySelector('.anticon-delete')).not.toBeNull();
+  });
+
   it('deletes a project without placements after one confirmation', async () => {
     setup();
     const dialog = await openDelete();

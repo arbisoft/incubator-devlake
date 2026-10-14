@@ -98,3 +98,100 @@ func TestUserListQueryBindsKeywordAndPaging(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, UserListQuery{PageQuery: PageQuery{Page: 2, PageSize: 25}, Keyword: "Ada"}, query)
 }
+
+func listUsersWheres(t *testing.T, query UserListQuery, total int64) (count, list []dal.DalClause, order string, listClauses []dal.Clause) {
+	t.Helper()
+	var countClauses []dal.Clause
+	testDal := dalmocks.NewDal(t)
+	testDal.On("Count", mock.Anything).Run(func(args mock.Arguments) {
+		countClauses = args.Get(0).([]dal.Clause)
+	}).Return(total, nil)
+	testDal.On("All", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		listClauses = args.Get(1).([]dal.Clause)
+	}).Return(nil)
+	service := &Service{db: testDal}
+	result, err := service.ListUsers(query)
+	assert.Nil(t, err)
+	assert.Equal(t, total, result.Count)
+	collect := func(clauses []dal.Clause) []dal.DalClause {
+		wheres := make([]dal.DalClause, 0)
+		for _, clause := range clauses {
+			if clause.Type == dal.WhereClause {
+				wheres = append(wheres, clause.Data.(dal.DalClause))
+			}
+			if clause.Type == dal.OrderbyClause {
+				order = clause.Data.(string)
+			}
+		}
+		return wheres
+	}
+	return collect(countClauses), collect(listClauses), order, listClauses
+}
+
+func TestListUsersStatusFilter(t *testing.T) {
+	for _, status := range []string{StatusActive, StatusDisabled} {
+		t.Run(status, func(t *testing.T) {
+			countWheres, listWheres, order, _ := listUsersWheres(t, UserListQuery{Status: status}, 3)
+			for _, wheres := range [][]dal.DalClause{countWheres, listWheres} {
+				if assert.Len(t, wheres, 2) {
+					assert.Equal(t, "hidden_at IS NULL", wheres[0].Expr)
+					assert.Equal(t, "status = ?", wheres[1].Expr)
+					assert.Equal(t, []interface{}{status}, wheres[1].Params)
+				}
+			}
+			assert.Equal(t, "email ASC", order)
+		})
+	}
+}
+
+func TestListUsersStatusAbsentAddsNoFilter(t *testing.T) {
+	countWheres, listWheres, _, _ := listUsersWheres(t, UserListQuery{}, 0)
+	assert.Len(t, countWheres, 1)
+	assert.Len(t, listWheres, 1)
+}
+
+func TestListUsersRejectsUnknownStatus(t *testing.T) {
+	service := &Service{db: dalmocks.NewDal(t)}
+	_, err := service.ListUsers(UserListQuery{Status: "enabled"})
+	if assert.NotNil(t, err) {
+		assert.Equal(t, http.StatusBadRequest, err.GetType().GetHttpCode())
+	}
+}
+
+func TestListUsersStatusWithKeywordAndPaging(t *testing.T) {
+	query := UserListQuery{PageQuery: PageQuery{Page: 2, PageSize: 25}, Keyword: "Ada", Status: StatusDisabled}
+	countWheres, listWheres, order, listClauses := listUsersWheres(t, query, 41)
+	for _, wheres := range [][]dal.DalClause{countWheres, listWheres} {
+		if assert.Len(t, wheres, 3) {
+			assert.Equal(t, "hidden_at IS NULL", wheres[0].Expr)
+			assert.Equal(t, "status = ?", wheres[1].Expr)
+			assert.Equal(t, "(LOWER(email) LIKE ? OR LOWER(display_name) LIKE ?)", wheres[2].Expr)
+		}
+	}
+	assert.Equal(t, "email ASC", order)
+	for _, clause := range listClauses {
+		switch clause.Type {
+		case dal.OffsetClause:
+			assert.Equal(t, 25, clause.Data)
+		case dal.LimitClause:
+			assert.Equal(t, 25, clause.Data)
+		}
+	}
+}
+
+func TestUserListQueryBindsStatus(t *testing.T) {
+	context, _ := gin.CreateTestContext(httptest.NewRecorder())
+	context.Request = httptest.NewRequest(http.MethodGet, "/access/users?status=disabled", nil)
+	query, ok := userListQuery(context)
+	assert.True(t, ok)
+	assert.Equal(t, UserListQuery{PageQuery: PageQuery{Page: 1, PageSize: DefaultPageSize}, Status: StatusDisabled}, query)
+}
+
+func TestUserListQueryRejectsUnknownStatus(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/access/users?status=enabled", nil)
+	_, ok := userListQuery(context)
+	assert.False(t, ok)
+	assert.Equal(t, http.StatusBadRequest, recorder.Code)
+}

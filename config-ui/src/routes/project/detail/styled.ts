@@ -35,6 +35,23 @@ export const NoticeBody = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.space.sm}px;
+  padding: ${({ theme }) => theme.space.md}px;
+  background: ${({ theme }) => theme.colors.primarySubtle};
+  border: 1px solid ${({ theme }) => theme.colors.primarySubtleBorder};
+  border-radius: ${({ theme }) => theme.radius.lg}px;
+
+  a {
+    color: ${({ theme }) => theme.colors.link};
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+
+    &:focus-visible {
+      ${focusRingStyle}
+    }
+  }
 `;
 
 export const Fields = styled.div`

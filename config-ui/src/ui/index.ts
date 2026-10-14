@@ -18,6 +18,7 @@
 export * from './account-block';
 export * from './app-shell';
 export * from './brand-block';
+export * from './cell-button';
 export * from './code-block';
 export * from './confirm-modal';
 export * from './connection-health';

@@ -26,7 +26,7 @@ import { init, selectError, selectStatus, selectThemeMode, setMode } from '@/fea
 import { useAppDispatch, useAppSelector } from '@/hooks';
 import { OnboardCard } from '@/routes/onboard/components';
 import { OtelAttention } from '@/routes/otel/attention';
-import { AccountBlock, AppShell, BrandBlock, SidebarNav, useSidebarCollapsed } from '@/ui';
+import { AccountBlock, AppShell, BrandBlock, PoweredByRow, SidebarNav, useSidebarCollapsed } from '@/ui';
 
 import { COPY } from './constants';
 import { getNavItems } from './nav';
@@ -95,7 +95,9 @@ export const Layout = () => {
           header={<BrandBlock collapsed={collapsed} />}
           footer={
             <>
-              {!collapsed && version && <Version>{COPY.account.version(version)}</Version>}
+              {!collapsed && (
+                <PoweredByRow>{version && <Version>{COPY.account.version(version)}</Version>}</PoweredByRow>
+              )}
               <AccountBlock
                 name={name}
                 secondary={secondary}

@@ -17,5 +17,5 @@
  */
 
 export const COPY = {
-  title: (pluginName: string) => `Manage Connections: ${pluginName}`,
+  title: (pluginName: string) => `Manage connections: ${pluginName}`,
 };

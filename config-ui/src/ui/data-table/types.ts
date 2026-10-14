@@ -17,6 +17,7 @@
  */
 
 import type { TableColumnsType, TableProps } from 'antd';
+import type { FilterValue } from 'antd/es/table/interface';
 
 import type { EmptyStateProps } from '@/ui/empty-state';
 import type { SortState } from '@/ui/types';
@@ -45,6 +46,8 @@ type DataTableList<S extends string> = {
   setSort: (sort?: SortState<S>) => void;
 };
 
+export type DataTableFilters = Record<string, FilterValue | null>;
+
 export type DataTableProps<T extends object, S extends string = string> = {
   columns: TableColumnsType<T>;
   dataSource: T[];
@@ -55,6 +58,7 @@ export type DataTableProps<T extends object, S extends string = string> = {
   list?: DataTableList<S>;
   total?: number;
   sort?: DataTableSort<S>;
+  onFilterChange?: (filters: DataTableFilters) => void;
   empty: EmptyStateProps;
   rowSelection?: TableProps<T>['rowSelection'];
   onRow?: TableProps<T>['onRow'];

@@ -27,11 +27,14 @@ import (
 )
 
 func (s *Service) ListUsers(query UserListQuery) (*PaginatedUsers, errors.Error) {
-	query, valid := query.Normalize()
-	if !valid {
-		return nil, errors.BadInput.New(invalidPageSizeMessage)
+	query, normalizeErr := query.Normalize()
+	if normalizeErr != nil {
+		return nil, normalizeErr
 	}
 	filters := []dal.Clause{dal.Where("hidden_at IS NULL")}
+	if query.Status != "" {
+		filters = append(filters, dal.Where("status = ?", query.Status))
+	}
 	if keyword := strings.ToLower(query.Keyword); keyword != "" {
 		pattern := "%" + keyword + "%"
 		filters = append(filters, dal.Where("(LOWER(email) LIKE ? OR LOWER(display_name) LIKE ?)", pattern, pattern))

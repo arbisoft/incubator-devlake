@@ -16,6 +16,7 @@
  *
  */
 
+import { DeleteOutlined } from '@ant-design/icons';
 import { Button, Input } from 'antd';
 import { isEqual } from 'lodash';
 import { useState } from 'react';
@@ -94,7 +95,7 @@ export const SettingsPanel = ({ project, onRefresh }: ProjectPanelProps) => {
     <Stack>
       <Toolbar
         end={
-          <Button danger disabled={!otelReady} onClick={() => setDeleting(true)}>
+          <Button danger icon={<DeleteOutlined aria-hidden />} disabled={!otelReady} onClick={() => setDeleting(true)}>
             {COPY.settings.delete.open}
           </Button>
         }

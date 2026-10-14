@@ -43,6 +43,11 @@ export const TitleRow = styled.span`
   gap: ${({ theme }) => theme.space.xs}px;
 `;
 
+export const TitleIcon = styled.span`
+  display: inline-flex;
+  font-size: ${({ theme }) => theme.layout.modalTitleIconSize}px;
+`;
+
 export const Footer = styled.div`
   display: flex;
   justify-content: flex-start;

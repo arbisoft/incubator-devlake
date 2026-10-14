@@ -19,6 +19,7 @@
 import { Modal } from 'antd';
 import styled, { css, type DefaultTheme } from 'styled-components';
 
+import { WEIGHT } from '@/theme/scales';
 import { scrollableModal, textStyle } from '@/ui/style-helpers';
 
 import { STAGE_STATE } from '../constants';
@@ -156,6 +157,7 @@ export const StageTitle = styled.div`
 
 export const StageName = styled.h4`
   ${textStyle('h3')}
+  font-weight: ${WEIGHT.medium};
   margin: 0;
   color: ${({ theme }) => theme.colors.text};
 `;
@@ -167,8 +169,8 @@ export const StageNote = styled.span`
 
 export const StageDot = styled.span<{ $state: StageState }>`
   flex: none;
-  width: ${({ theme }) => theme.layout.statusDotSize}px;
-  height: ${({ theme }) => theme.layout.statusDotSize}px;
+  width: ${({ theme }) => theme.layout.stageDotSize}px;
+  height: ${({ theme }) => theme.layout.stageDotSize}px;
   border-radius: ${({ theme }) => theme.radius.pill}px;
   background: ${({ $state, theme }) => stateColors(theme)[$state].text};
   box-shadow: 0 0 0 ${({ theme }) => theme.space.xxs}px ${({ $state, theme }) => stateColors(theme)[$state].bg};
