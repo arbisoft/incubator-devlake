@@ -16,12 +16,15 @@
  *
  */
 
+import { Alert, Button } from 'antd';
 import { useNavigate } from 'react-router-dom';
 
 import { PageLoading } from '@/components';
 import { BLUEPRINT_VIEW } from '@/config';
+import { COMMON_COPY, EMPTY_ILLUSTRATION, EMPTY_STATE_SIZE, EmptyState } from '@/ui';
 
 import { BlueprintConfiguration } from './configuration';
+import { COPY } from './constants';
 import { useBlueprintDetail } from './hooks';
 import { BlueprintStatus } from './status';
 import type { BlueprintDetailProps } from './types';
@@ -29,29 +32,51 @@ import { CONTEXT_ROUTES } from './utils';
 
 export const BlueprintDetail = ({ blueprintId, context, view }: BlueprintDetailProps) => {
   const navigate = useNavigate();
-  const { detail, version, refresh } = useBlueprintDetail(blueprintId);
+  const { detail, error, version, refresh } = useBlueprintDetail(blueprintId);
 
   if (!detail) {
+    if (error !== undefined) {
+      return (
+        <EmptyState
+          illustration={EMPTY_ILLUSTRATION.ERROR}
+          size={EMPTY_STATE_SIZE.SECTION}
+          title={COPY.errors.load}
+          action={<Button onClick={refresh}>{COMMON_COPY.retry}</Button>}
+        />
+      );
+    }
     return <PageLoading />;
   }
 
   const { blueprint, latestPipelineId } = detail;
   const routes = CONTEXT_ROUTES[context];
 
-  return view === BLUEPRINT_VIEW.STATUS ? (
-    <BlueprintStatus
-      context={context}
-      blueprint={blueprint}
-      pipelineId={latestPipelineId}
-      version={version}
-      onRefresh={refresh}
-    />
-  ) : (
-    <BlueprintConfiguration
-      blueprint={blueprint}
-      connectionPath={(plugin, connectionId) => routes.connection(blueprint, plugin, connectionId)}
-      onRefresh={refresh}
-      onShowStatus={() => navigate(routes.status(blueprint))}
-    />
+  return (
+    <>
+      {error !== undefined && (
+        <Alert
+          type="error"
+          showIcon
+          title={COPY.errors.load}
+          action={<Button onClick={refresh}>{COMMON_COPY.retry}</Button>}
+        />
+      )}
+      {view === BLUEPRINT_VIEW.STATUS ? (
+        <BlueprintStatus
+          context={context}
+          blueprint={blueprint}
+          pipelineId={latestPipelineId}
+          version={version}
+          onRefresh={refresh}
+        />
+      ) : (
+        <BlueprintConfiguration
+          blueprint={blueprint}
+          connectionPath={(plugin, connectionId) => routes.connection(blueprint, plugin, connectionId)}
+          onRefresh={refresh}
+          onShowStatus={() => navigate(routes.status(blueprint))}
+        />
+      )}
+    </>
   );
 };

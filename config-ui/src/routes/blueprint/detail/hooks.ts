@@ -17,8 +17,8 @@
  */
 
 import { message } from 'antd';
-import axios from 'axios';
-import { useCallback, useEffect, useState } from 'react';
+import axios, { HttpStatusCode } from 'axios';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import API from '@/api';
@@ -31,7 +31,7 @@ import { toUserMessage } from '@/ui/utils';
 import { operator } from '@/utils';
 
 import { CONFIRM, CONFIRM_KIND, COPY, HISTORY_PAGE_SIZE, RUN_ERROR_MAP } from './constants';
-import type { ConfirmKind, RunPolicy } from './types';
+import type { ActionsOptions, ConfirmKind, RunPolicy } from './types';
 import { toBlueprintView } from './utils';
 
 export const useBlueprintView = (views: RouteTab[]) => toBlueprintView(useRouteTab(views));
@@ -53,13 +53,13 @@ export const useBlueprintDetail = (blueprintId: ID) => {
   const detail = useLastLoaded(data, blueprintId);
 
   useEffect(() => {
-    if (axios.isAxiosError(error) && error.response?.status === 404) {
+    if (axios.isAxiosError(error) && error.response?.status === HttpStatusCode.NotFound) {
       message.error(COPY.notFound(blueprintId));
       navigate(PATHS.BLUEPRINTS(), { replace: true });
     }
   }, [error, navigate, blueprintId]);
 
-  return { detail, version, refresh };
+  return { detail, error, version, refresh };
 };
 
 export const useBlueprintPipelines = (blueprintId: ID, version: number) => {
@@ -86,11 +86,10 @@ export const useBlueprintPipelines = (blueprintId: ID, version: number) => {
   return { pipelines: (history?.pipelines ?? []) as IPipeline[], loading: !ready, pagination };
 };
 
-type ActionsOptions = { blueprint: IBlueprint; onRefresh: () => void };
-
 export const useBlueprintActions = ({ blueprint, onRefresh }: ActionsOptions) => {
   const navigate = useNavigate();
   const [operating, setOperating] = useState(false);
+  const enablePending = useRef(false);
   const { id, name } = blueprint;
 
   const trigger = useCallback(
@@ -110,12 +109,18 @@ export const useBlueprintActions = ({ blueprint, onRefresh }: ActionsOptions) =>
   );
 
   const setEnabled = async (enable: boolean) => {
-    const [success] = await operator(() => API.blueprint.update(id, { ...blueprint, enable }), {
-      setOperating,
-      formatMessage: () => COPY.messages.updated,
-      formatReason: (error) => toUserMessage(error, {}, COPY.errors.update),
-    });
-    if (success) onRefresh();
+    if (operating || enablePending.current) return;
+    enablePending.current = true;
+    try {
+      const [success] = await operator(() => API.blueprint.update(id, { ...blueprint, enable }), {
+        setOperating,
+        formatMessage: () => COPY.messages.updated,
+        formatReason: (error) => toUserMessage(error, {}, COPY.errors.update),
+      });
+      if (success) onRefresh();
+    } finally {
+      enablePending.current = false;
+    }
   };
 
   const remove = useCallback(

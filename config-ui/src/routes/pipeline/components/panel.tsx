@@ -16,7 +16,7 @@
  *
  */
 
-import { Button } from 'antd';
+import { Alert, Button } from 'antd';
 
 import API from '@/api';
 import { Loading } from '@/components';
@@ -39,7 +39,7 @@ export const PipelinePanel = ({ id }: PipelinePanelProps) => {
     cancel: (data) => !!data && isPipelineFinished(data.status),
     retryOnError: LOAD_RETRY,
   });
-  const { data: tasks } = useAutoRefresh<ITask[]>(
+  const { data: tasks, error: tasksError } = useAutoRefresh<ITask[]>(
     async (signal) => (await API.pipeline.tasks(id, signal)).tasks,
     [id, version],
     {
@@ -70,6 +70,19 @@ export const PipelinePanel = ({ id }: PipelinePanelProps) => {
   return (
     <Panel>
       <PipelineSummary pipeline={pipeline} onChanged={refresh} />
+      {tasks === undefined && tasksError === undefined && (
+        <PanelLoading>
+          <Loading text={COPY.tasksLoading} />
+        </PanelLoading>
+      )}
+      {tasksError !== undefined && (
+        <Alert
+          type="error"
+          showIcon
+          title={COPY.tasksLoadFailed}
+          action={<Button onClick={refresh}>{COMMON_COPY.retry}</Button>}
+        />
+      )}
       {tasks && <PipelineStages tasks={tasks} onChanged={refresh} />}
     </Panel>
   );

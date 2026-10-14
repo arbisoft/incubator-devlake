@@ -91,6 +91,7 @@ export const COPY = {
     deleted: 'Delete blueprint successful.',
   },
   errors: {
+    load: 'The blueprint could not be loaded.',
     notRunnable: 'This blueprint cannot run right now. Make sure it is enabled and has data connections.',
     run: 'The blueprint could not be run. Try again in a moment.',
     update: 'The blueprint could not be updated. Try again in a moment.',

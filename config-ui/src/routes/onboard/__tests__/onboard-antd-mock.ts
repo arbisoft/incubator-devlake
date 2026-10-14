@@ -16,7 +16,4 @@
  *
  */
 
-import { withMockedMessage } from '@/ui/__tests__/antd-message-mock';
-
-export const mockOnboardAntd = async (importOriginal: () => Promise<typeof import('antd')>) =>
-  withMockedMessage(await importOriginal());
+export { loadMockedMessage as mockOnboardAntd } from '@/ui/__tests__/antd-message-mock';

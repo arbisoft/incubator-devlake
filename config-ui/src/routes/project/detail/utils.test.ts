@@ -16,18 +16,20 @@
  *
  */
 
+import { HttpStatusCode } from 'axios';
 import { describe, expect, it } from 'vitest';
 
 import { OTEL_STATUS, type OtelConnectionResponse } from '@/api/otel';
 import { PROJECT_TAB } from '@/config';
 import { IBPMode, type IBlueprint, type IProject } from '@/types';
 
-import { COPY, DEFAULT_PR_ISSUE_REGEXP, DELETE_WARNING } from './constants';
+import { COPY, DEFAULT_PR_ISSUE_REGEXP, DELETE_WARNING, OTEL_FINAL_PLACEMENT_MARKER } from './constants';
 import {
   attachWebhooks,
   buildProjectPayload,
   detachWebhook,
   getDeleteWarnings,
+  getProjectDeleteError,
   getOtelPlacementState,
   getProjectTabs,
   getWebhookIds,
@@ -190,5 +192,35 @@ describe('project delete warnings', () => {
     const state = getOtelPlacementState([placement(OTEL_STATUS.ACTIVE, 2), placement(OTEL_STATUS.ACTIVE, 1)]);
     expect(state).toEqual({ hasPlacements: true, hasActiveFinal: true });
     expect(getDeleteWarnings(state)).toEqual([DELETE_WARNING.OTEL_FINAL_ACTIVE]);
+  });
+});
+
+describe('getProjectDeleteError', () => {
+  const httpError = (status: number, message?: unknown) => ({ response: { status, data: { message } } });
+
+  it('maps an exact or wrapped final OTel placement conflict to the safe project copy', () => {
+    const exact = httpError(HttpStatusCode.Conflict, OTEL_FINAL_PLACEMENT_MARKER);
+    const wrapped = httpError(HttpStatusCode.Conflict, `blocked: ${OTEL_FINAL_PLACEMENT_MARKER}; retry later`);
+
+    expect(getProjectDeleteError(exact)).toBe(COPY.settings.delete.otelFinalActive);
+    expect(getProjectDeleteError(wrapped)).toBe(COPY.settings.delete.otelFinalActive);
+  });
+
+  it('keeps other delete conflicts mapped to unfinished pipelines', () => {
+    expect(getProjectDeleteError(httpError(HttpStatusCode.Conflict, 'pipeline running'))).toBe(
+      COPY.settings.delete.unfinishedPipelines,
+    );
+  });
+
+  it('uses safe fallback copy for a non-conflict, non-string, or missing message', () => {
+    expect(getProjectDeleteError(httpError(HttpStatusCode.InternalServerError, OTEL_FINAL_PLACEMENT_MARKER))).toBe(
+      COPY.settings.delete.failed,
+    );
+    expect(getProjectDeleteError(httpError(HttpStatusCode.Conflict, false))).toBe(
+      COPY.settings.delete.unfinishedPipelines,
+    );
+    expect(getProjectDeleteError({ response: { status: HttpStatusCode.Conflict, data: {} } })).toBe(
+      COPY.settings.delete.unfinishedPipelines,
+    );
   });
 });

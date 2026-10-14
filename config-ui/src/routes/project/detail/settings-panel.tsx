@@ -17,7 +17,7 @@
  */
 
 import { DeleteOutlined } from '@ant-design/icons';
-import { Button, Input } from 'antd';
+import { Alert, Button, Input, message } from 'antd';
 import { isEqual } from 'lodash';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -26,17 +26,23 @@ import API from '@/api';
 import { PATHS, PROJECT_TAB } from '@/config';
 import { useRefreshData } from '@/hooks';
 import { getOtelProjectError } from '@/routes/otel/utils';
-import { FormField, SectionCard, Toolbar, toUserMessage } from '@/ui';
+import { COMMON_COPY, FormField, SectionCard, Toolbar, toUserMessage, useRefreshVersion } from '@/ui';
 import { operator } from '@/utils';
 
-import { COPY, DEFAULT_PR_ISSUE_REGEXP, DELETE_ERROR_MAP, SAVE_ERROR_MAP } from './constants';
+import { COPY, DEFAULT_PR_ISSUE_REGEXP, SAVE_ERROR_MAP } from './constants';
 import { DeleteProjectModal } from './delete-project-modal';
 import { ReadinessCard } from './readiness-card';
 import { RegexHelp } from './regex-help';
 import { SettingOption } from './setting-option';
 import { FieldBox, Fields, Footer, Stack } from './styled';
 import type { ProjectPanelProps, SettingsForm } from './types';
-import { buildProjectPayload, getDeleteWarnings, getOtelPlacementState, readSettingsForm } from './utils';
+import {
+  buildProjectPayload,
+  getDeleteWarnings,
+  getOtelPlacementState,
+  getProjectDeleteError,
+  readSettingsForm,
+} from './utils';
 
 export const SettingsPanel = ({ project, onRefresh }: ProjectPanelProps) => {
   const [source, setSource] = useState(project);
@@ -44,12 +50,16 @@ export const SettingsPanel = ({ project, onRefresh }: ProjectPanelProps) => {
   const [operating, setOperating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const navigate = useNavigate();
+  const { version, refresh } = useRefreshVersion();
 
-  const { data: otelConnections, ready: otelReady } = useRefreshData(
-    (signal) => API.otel.listForProject(project.name, signal),
-    [project.name],
-  );
-  const placements = getOtelPlacementState(otelConnections);
+  const {
+    data: otelConnections,
+    ready: otelReady,
+    error: otelError,
+  } = useRefreshData((signal) => API.otel.listForProject(project.name, signal), [project.name, version]);
+  const placementsAuthoritative = otelReady && otelError === undefined && Array.isArray(otelConnections);
+  const placementsFailed = otelError !== undefined || (otelReady && !Array.isArray(otelConnections));
+  const placements = getOtelPlacementState(placementsAuthoritative ? otelConnections : undefined);
   const dirty = !isEqual(form, readSettingsForm(project));
 
   if (source !== project) {
@@ -77,17 +87,22 @@ export const SettingsPanel = ({ project, onRefresh }: ProjectPanelProps) => {
   };
 
   const handleDelete = async () => {
+    if (!placementsAuthoritative) return;
     if (placements.hasPlacements) {
-      const [prepared] = await operator(() => API.otel.validateProjectRemoval(project.name), {
+      const [prepared, reason] = await operator(() => API.otel.validateProjectRemoval(project.name), {
         setOperating,
+        hideToast: true,
         formatReason: getOtelProjectError,
       });
-      if (!prepared) return;
+      if (!prepared) {
+        message.error(getOtelProjectError(reason));
+        return;
+      }
     }
     const [success] = await operator(() => API.project.remove(project.name), {
       setOperating,
       formatMessage: () => COPY.settings.delete.success,
-      formatReason: (error) => toUserMessage(error, DELETE_ERROR_MAP, COPY.settings.delete.failed),
+      formatReason: getProjectDeleteError,
     });
 
     if (success) {
@@ -97,9 +112,22 @@ export const SettingsPanel = ({ project, onRefresh }: ProjectPanelProps) => {
 
   return (
     <Stack>
+      {placementsFailed && (
+        <Alert
+          type="error"
+          showIcon
+          title={COPY.settings.delete.placementsFailed}
+          action={<Button onClick={refresh}>{COMMON_COPY.retry}</Button>}
+        />
+      )}
       <Toolbar
         end={
-          <Button danger icon={<DeleteOutlined aria-hidden />} disabled={!otelReady} onClick={() => setDeleting(true)}>
+          <Button
+            danger
+            icon={<DeleteOutlined aria-hidden />}
+            disabled={!placementsAuthoritative}
+            onClick={() => setDeleting(true)}
+          >
             {COPY.settings.delete.open}
           </Button>
         }

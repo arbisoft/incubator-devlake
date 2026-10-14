@@ -16,12 +16,23 @@
  *
  */
 
+import { HttpStatusCode } from 'axios';
+
 import { OTEL_STATUS, type OtelConnectionResponse } from '@/api/otel';
 import { PATHS, PROJECT_TAB, type ProjectTab } from '@/config';
 import { WEBHOOK_PLUGIN } from '@/features';
+import { getErrorResponse } from '@/features/connections/utils';
 import type { IBlueprint, IProject } from '@/types';
+import { toUserMessage } from '@/ui';
 
-import { COPY, DEFAULT_PR_ISSUE_REGEXP, DELETE_WARNING, PROJECT_PLUGIN } from './constants';
+import {
+  COPY,
+  DEFAULT_PR_ISSUE_REGEXP,
+  DELETE_ERROR_MAP,
+  DELETE_WARNING,
+  OTEL_FINAL_PLACEMENT_MARKER,
+  PROJECT_PLUGIN,
+} from './constants';
 import type { DeleteWarning, OtelPlacementState, ProjectPayload, ProjectRouteTab, SettingsForm } from './types';
 
 const TAB_ORDER: ProjectTab[] = [
@@ -89,4 +100,17 @@ export const getOtelPlacementState = (connections?: OtelConnectionResponse[]): O
 export const getDeleteWarnings = ({ hasPlacements, hasActiveFinal }: OtelPlacementState): DeleteWarning[] => {
   if (!hasPlacements) return [];
   return [hasActiveFinal ? DELETE_WARNING.OTEL_FINAL_ACTIVE : DELETE_WARNING.OTEL_REMOVED];
+};
+
+export const getProjectDeleteError = (error: unknown) => {
+  const response = getErrorResponse(error);
+  const serverMessage = response?.data.message;
+  if (
+    response?.status === HttpStatusCode.Conflict &&
+    typeof serverMessage === 'string' &&
+    serverMessage.includes(OTEL_FINAL_PLACEMENT_MARKER)
+  ) {
+    return COPY.settings.delete.otelFinalActive;
+  }
+  return toUserMessage(error, DELETE_ERROR_MAP, COPY.settings.delete.failed);
 };

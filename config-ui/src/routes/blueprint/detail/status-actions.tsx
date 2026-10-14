@@ -79,7 +79,12 @@ export const StatusActions = ({ context, blueprint, onRefresh }: StatusActionsPr
     ),
     [STATUS_ACTION.ENABLED]: (
       <EnabledSwitch>
-        <Switch disabled={inProject} checked={blueprint.enable} onChange={setEnabled} />
+        <Switch
+          disabled={inProject || operating}
+          loading={operating}
+          checked={blueprint.enable}
+          onChange={setEnabled}
+        />
         {COPY.actions.enabled}
       </EnabledSwitch>
     ),

@@ -25,10 +25,12 @@ import { FormModal } from '@/ui/form-modal';
 import { COPY } from './constants';
 import { SyncPolicyForm } from './sync-policy-form';
 import type { SyncPolicyModalProps, SyncPolicyValues } from './types';
+import { getNextRunTime } from './utils';
 
 export const SyncPolicyModal = ({ open, mode, values, loading, onSubmit, onCancel }: SyncPolicyModalProps) => {
   const [draft, setDraft] = useState<Partial<SyncPolicyValues>>({});
   const current = { ...values, ...draft };
+  const valid = current.isManual || Boolean(getNextRunTime(current.isManual, current.cronConfig));
 
   return (
     <FormModal
@@ -37,7 +39,11 @@ export const SyncPolicyModal = ({ open, mode, values, loading, onSubmit, onCance
       submitLabel={COPY.modal.submit}
       width={MODAL_WIDTH.LG}
       loading={loading}
-      onSubmit={() => onSubmit(current)}
+      submitDisabled={!valid}
+      disabledReason={COPY.frequency.invalid}
+      onSubmit={() => {
+        if (valid) onSubmit(current);
+      }}
       onCancel={onCancel}
       afterClose={() => setDraft({})}
     >
