@@ -38,7 +38,8 @@ const (
 )
 
 // AiPrompt is one developer prompt and everything it caused: model requests, tool calls,
-// subagents and skills. Prompt text is never stored.
+// subagents and skills. Prompt text is not stored here. The claude_otel plugin keeps it
+// in its raw log batches and _tool_claude_code_otel_events.prompt_text for 90 days.
 type AiPrompt struct {
 	domainlayer.DomainEntity
 	Provider           string    `gorm:"type:varchar(100);index" json:"provider"`
