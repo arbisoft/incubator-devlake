@@ -53,6 +53,10 @@ processors:
         action: delete
       - key: ccr.session.id
         action: delete
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 25
   delta_to_cumulative: {}
   batch/prometheus:
     send_batch_size: 1024
@@ -130,7 +134,7 @@ service:
   pipelines:
     metrics:
       receivers: [otlp]
-      processors: [resource/attribution, attributes/team]
+      processors: [memory_limiter, resource/attribution, attributes/team]
       exporters: [forward/claude_raw, forward/prometheus]
     metrics/claude_raw:
       receivers: [forward/claude_raw]
@@ -140,7 +144,7 @@ service:
     # batch processor is needed.
     logs:
       receivers: [otlp]
-      processors: [resource/attribution, attributes/team, transform/strip_content]
+      processors: [memory_limiter, resource/attribution, attributes/team, transform/strip_content]
       exporters: [otlphttp/claude_raw]
     metrics/prometheus:
       receivers: [forward/prometheus]
