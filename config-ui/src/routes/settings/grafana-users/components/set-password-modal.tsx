@@ -24,7 +24,7 @@ import { operator } from '@/utils';
 
 import { Fields, Hint } from '../../components';
 import { COPY, GRAFANA_FLOW_ERRORS } from '../constants';
-import { getFlowError, isValidPassword } from '../utils';
+import { getFlowError, isValidPassword, stripPasswordRequestBody } from '../utils';
 
 import { PasswordField } from './password-field';
 import type { SetPasswordModalProps } from './types';
@@ -39,10 +39,13 @@ export const SetPasswordModal = ({ open, user, onClose, onChanged, onPassword }:
 
   const handleSubmit = async () => {
     if (!user) return;
-    const [success] = await operator(() => API.grafanaUsers.setPassword(user.id, values.password), {
-      setOperating: setSaving,
-      formatReason: getFlowError(GRAFANA_FLOW_ERRORS.PASSWORD),
-    });
+    const [success] = await operator(
+      () => API.grafanaUsers.setPassword(user.id, values.password).catch(stripPasswordRequestBody),
+      {
+        setOperating: setSaving,
+        formatReason: getFlowError(GRAFANA_FLOW_ERRORS.PASSWORD),
+      },
+    );
     if (!success) return;
     onChanged();
     onPassword({ email: user.email, password: values.password });

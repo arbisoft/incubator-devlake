@@ -20,10 +20,8 @@ import { WEBHOOK_PLUGIN } from '@/features/connections/constants';
 import type { IConnection } from '@/types';
 import type { BlueprintConnectionPayload } from '@/types/blueprint';
 
-import { validRawPlan } from '../../utils';
-
-import { COPY, EMPTY_PLAN, NEW_CONNECTION_VALUE, PLAN_INDENT } from './constants';
-import type { ConnectionCardData, ConnectionOption } from './types';
+import { COPY, NEW_CONNECTION_VALUE, PLAN_INDENT } from './constants';
+import type { ConnectionCardData, ConnectionOption, PipelinePlan, PipelineTask } from './types';
 
 export const toConnectionKey = (plugin: string, connectionId: ID) => `${plugin}-${connectionId}`;
 
@@ -46,9 +44,33 @@ export const buildConnectionOptions = (connections: IConnection[], disabled: str
 
 export const stringifyPlan = (plan: unknown) => JSON.stringify(plan, null, PLAN_INDENT);
 
-// An unparsable or empty plan is saved as the empty plan, serialised.
-export const toPlanPayload = (rawPlan: string) =>
-  !validRawPlan(rawPlan) ? JSON.parse(rawPlan) : stringifyPlan(EMPTY_PLAN);
+const isPipelineTask = (value: unknown): value is PipelineTask => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const { plugin } = value as { plugin?: unknown };
+  return typeof plugin === 'string' && plugin.trim().length > 0;
+};
+
+const isPipelinePlan = (value: unknown): value is PipelinePlan => {
+  if (!Array.isArray(value)) return false;
+  let taskCount = 0;
+  for (const stage of value) {
+    if (!Array.isArray(stage)) return false;
+    for (const task of stage) {
+      if (!isPipelineTask(task)) return false;
+      taskCount += 1;
+    }
+  }
+  return taskCount > 0;
+};
+
+export const toPlanPayload = (rawPlan: string): PipelinePlan | undefined => {
+  try {
+    const parsed: unknown = JSON.parse(rawPlan);
+    return isPipelinePlan(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+};
 
 export const toScopeConnection = ({ plugin, id }: IConnection, scopeIds: ID[]): BlueprintConnectionPayload => ({
   pluginName: plugin,

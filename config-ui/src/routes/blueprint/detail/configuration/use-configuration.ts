@@ -83,6 +83,8 @@ export const useBlueprintConfiguration = ({
 
   const savedPlan = useMemo(() => stringifyPlan(blueprint.plan), [blueprint.plan]);
   const rawPlan = planEdit?.base === savedPlan ? planEdit.text : savedPlan;
+  const parsedPlan = useMemo(() => toPlanPayload(rawPlan), [rawPlan]);
+  const invalidPlan = parsedPlan === undefined;
 
   const update = async (payload: Partial<IBlueprint>) => {
     const [success] = await operator(() => API.blueprint.update(blueprint.id, { ...blueprint, ...payload }), {
@@ -115,10 +117,14 @@ export const useBlueprintConfiguration = ({
     openModal: setModal,
     closeModal: () => setModal(undefined),
     rawPlan,
+    invalidPlan,
     setRawPlan: (text: string) => setPlanEdit({ base: savedPlan, text }),
     saveName: (name: string) => update({ name }),
     savePolicy: (policy: Partial<IBlueprint>) => update(policy),
-    savePlan: () => update({ plan: toPlanPayload(rawPlan) }),
+    savePlan: async () => {
+      if (invalidPlan || !parsedPlan) return false;
+      return update({ plan: parsedPlan });
+    },
     collect,
     addConnection: { ...addConnection, submit: addScopes },
     isNameOpen: modal === CONFIG_MODAL.NAME,

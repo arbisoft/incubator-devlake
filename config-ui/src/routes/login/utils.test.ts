@@ -34,6 +34,29 @@ describe('routes/login/utils', () => {
     expect(normalizeLoginReturnPath('//example.com', '/devlake/')).toBe('/devlake/');
     expect(normalizeLoginReturnPath('connections', '/devlake/')).toBe('/devlake/');
     expect(normalizeLoginReturnPath('/\\example.com', '/devlake/')).toBe('/devlake/');
+    expect(normalizeLoginReturnPath('/%5cexample.com', '/devlake/')).toBe('/devlake/');
+    expect(normalizeLoginReturnPath(`${window.location.origin}/devlake/connections`, '/devlake/')).toBe('/devlake/');
+    expect(normalizeLoginReturnPath('/devlake/connections', '/devlake/')).toBe('/devlake/connections');
+  });
+
+  it.each([
+    '/\t/example.com',
+    '/\n/example.com',
+    '/\r/example.com',
+    '/\t//example.com',
+    '/\n//example.com',
+    '/\r//example.com',
+  ])('rejects a path parsed as an external host after whitespace normalization', (path) => {
+    expect(normalizeLoginReturnPath(path, '/')).toBe('/');
+  });
+
+  it('keeps canonical local paths within the configured prefix', () => {
+    expect(normalizeLoginReturnPath('/devlakeevil/connections', '/devlake/')).toBe('/devlake/');
+    expect(normalizeLoginReturnPath('/devlake/../outside', '/devlake/')).toBe('/devlake/');
+    expect(normalizeLoginReturnPath('/devlake/connections/../projects', '/devlake/')).toBe('/devlake/projects');
+    expect(normalizeLoginReturnPath('/devlake/%2F%2Fexample.com?tab=active#list', '/devlake/')).toBe(
+      '/devlake/%2F%2Fexample.com?tab=active#list',
+    );
   });
 
   it.each([

@@ -61,11 +61,14 @@ export const SettingsPanel = ({ project, onRefresh }: ProjectPanelProps) => {
     setForm((current) => ({ ...current, [key]: value }));
 
   const handleSave = async () => {
-    const [success] = await operator(() => API.project.update(project.name, buildProjectPayload(form)), {
-      setOperating,
-      formatMessage: () => COPY.settings.saved,
-      formatReason: (error) => toUserMessage(error, SAVE_ERROR_MAP, COPY.settings.saveFailed),
-    });
+    const [success] = await operator(
+      () => API.project.update(project.name, buildProjectPayload(form, project.description)),
+      {
+        setOperating,
+        formatMessage: () => COPY.settings.saved,
+        formatReason: (error) => toUserMessage(error, SAVE_ERROR_MAP, COPY.settings.saveFailed),
+      },
+    );
 
     if (!success) return;
     // The new name's page loads the saved project itself, so only an unchanged name needs a refresh.

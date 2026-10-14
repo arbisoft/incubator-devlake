@@ -22,6 +22,7 @@ import { ACCESS_ROLE, ACCESS_STATUS, type AccessUser } from '@/api/access';
 import { GRAFANA_ERROR_CODE, GRAFANA_ROLE } from '@/api/grafana-users/constants';
 import type { GrafanaUser } from '@/api/grafana-users/types';
 
+import { makePasswordError } from './components/__tests__/password-error';
 import {
   COPY,
   GENERATED_PASSWORD_LENGTH,
@@ -40,12 +41,14 @@ import {
   getUserIdentity,
   hasPatchChanges,
   isValidNewUser,
+  stripPasswordRequestBody,
   toDevlakeUserOption,
   toGrafanaListParams,
   toUserStatus,
 } from './utils';
 
 const EMAIL = 'ann@example.com';
+const MIXED_CASE_EMAIL = 'Ann@Example.com';
 
 const user: GrafanaUser = {
   id: 1,
@@ -114,7 +117,7 @@ describe('generatePassword', () => {
     const password = generatePassword();
     expect(password).toHaveLength(GENERATED_PASSWORD_LENGTH);
     expect(GENERATED_PASSWORD_LENGTH).toBe(24);
-    expect([...password].every((char) => PASSWORD_ALPHABET.includes(char))).toBe(true);
+    expect([...password].every((char) => PASSWORD_ALPHABET.includes(char)) === true).toBeTruthy();
     expect(PASSWORD_ALPHABET).not.toMatch(/[0O1lI]/);
   });
 
@@ -144,10 +147,10 @@ describe('isValidNewUser', () => {
   const valid = { email: EMAIL, name: 'Ann', password: 'x'.repeat(PASSWORD_MIN_LENGTH) };
 
   it('needs a valid email, a name and a long enough password', () => {
-    expect(isValidNewUser(valid)).toBe(true);
-    expect(isValidNewUser({ ...valid, email: 'ann' })).toBe(false);
-    expect(isValidNewUser({ ...valid, name: '  ' })).toBe(false);
-    expect(isValidNewUser({ ...valid, password: 'x'.repeat(PASSWORD_MIN_LENGTH - 1) })).toBe(false);
+    expect(isValidNewUser(valid) === true).toBeTruthy();
+    expect(isValidNewUser({ ...valid, email: 'ann' }) === false).toBeTruthy();
+    expect(isValidNewUser({ ...valid, name: '  ' }) === false).toBeTruthy();
+    expect(isValidNewUser({ ...valid, password: 'x'.repeat(PASSWORD_MIN_LENGTH - 1) }) === false).toBeTruthy();
   });
 });
 
@@ -162,8 +165,47 @@ describe('buildDetailsPatch', () => {
   });
 
   it('reports whether anything changed', () => {
-    expect(hasPatchChanges({ name: undefined, email: undefined })).toBe(false);
-    expect(hasPatchChanges({ name: 'Anna' })).toBe(true);
+    expect(hasPatchChanges({ name: undefined, email: undefined }) === false).toBeTruthy();
+    expect(hasPatchChanges({ name: 'Anna' }) === true).toBeTruthy();
+  });
+
+  it('normalises the current address before comparing a name-only edit', () => {
+    const mixedCaseUser = { ...user, email: MIXED_CASE_EMAIL };
+    const patch = buildDetailsPatch(mixedCaseUser, { name: 'Anna', email: ` ${MIXED_CASE_EMAIL} ` });
+    expect(patch.name).toBe('Anna');
+    expect(patch.email).toBeUndefined();
+  });
+});
+
+describe('stripPasswordRequestBody', () => {
+  it('removes request data while preserving the error response and rethrowing the same error', () => {
+    const error = makePasswordError('test-only-value', 409, GRAFANA_ERROR_CODE.PARTIAL, { userId: 12 });
+
+    let caught: unknown;
+    try {
+      stripPasswordRequestBody(error);
+    } catch (source) {
+      caught = source;
+    }
+
+    expect(caught === error).toBeTruthy();
+    expect(error.config?.data === undefined).toBeTruthy();
+    expect(error.code === 'ERR_BAD_REQUEST').toBeTruthy();
+    expect(error.response?.status === 409).toBeTruthy();
+    const responseData = error.response?.data as { code?: unknown; userId?: unknown } | undefined;
+    expect(responseData?.code === GRAFANA_ERROR_CODE.PARTIAL).toBeTruthy();
+    expect(responseData?.userId === 12).toBeTruthy();
+  });
+
+  it('rethrows an ordinary non-Axios error unchanged', () => {
+    const error = new Error('request failed');
+    let caught: unknown;
+    try {
+      stripPasswordRequestBody(error);
+    } catch (source) {
+      caught = source;
+    }
+    expect(caught === error).toBeTruthy();
   });
 });
 

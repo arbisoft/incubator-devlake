@@ -16,6 +16,8 @@
  *
  */
 
+import axios from 'axios';
+
 import type { AccessUser } from '@/api/access';
 import { ACCESS_STATUS, type AccessStatus } from '@/api/access/constants';
 import { GRAFANA_ERROR_CODE } from '@/api/grafana-users/constants';
@@ -59,6 +61,11 @@ export const getUnavailableMessage = (source: unknown) =>
 
 export const getFlowError = (map: Record<string, string>) => (error: unknown) => toUserMessage(error, map);
 
+export const stripPasswordRequestBody = (error: unknown): never => {
+  if (axios.isAxiosError(error) && error.config) delete error.config.data;
+  throw error;
+};
+
 const UINT32_RANGE = 2 ** 32;
 
 // Rejection sampling keeps every character equally likely.
@@ -86,7 +93,10 @@ export const getUserDisplayName = ({ name, email }: GrafanaUser) => name || emai
 export const buildDetailsPatch = (user: GrafanaUser, values: { name: string; email: string }): GrafanaPatchUserBody => {
   const name = values.name.trim();
   const email = normalizeEmail(values.email);
-  return { name: name === user.name ? undefined : name, email: email === user.email ? undefined : email };
+  return {
+    name: name === user.name ? undefined : name,
+    email: email === normalizeEmail(user.email) ? undefined : email,
+  };
 };
 
 export const hasPatchChanges = (patch: GrafanaPatchUserBody) =>

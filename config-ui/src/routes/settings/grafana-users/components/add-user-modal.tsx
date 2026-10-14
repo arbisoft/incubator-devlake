@@ -38,6 +38,7 @@ import {
   getPartialUserId,
   isValidNewUser,
   normalizeEmail,
+  stripPasswordRequestBody,
 } from '../utils';
 
 import { DevlakeUserSelect } from './devlake-user-select';
@@ -114,8 +115,9 @@ export const AddUserModal = ({ open, onClose, onChanged, onPassword }: AddUserMo
   const handleSubmit = async () => {
     const [success, result] = await operator(
       async (): Promise<void> => {
-        if (partialId === undefined) await API.grafanaUsers.createUser(buildCreateBody(values));
-        else await finishPartial(partialId, values);
+        if (partialId === undefined) {
+          await API.grafanaUsers.createUser(buildCreateBody(values)).catch(stripPasswordRequestBody);
+        } else await finishPartial(partialId, values);
       },
       { setOperating: setSaving, formatReason: getFlowError(GRAFANA_FLOW_ERRORS.CREATE) },
     );

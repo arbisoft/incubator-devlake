@@ -145,7 +145,7 @@ describe('project settings form', () => {
 
   it('sends the same payload the page has always sent', () => {
     expect(
-      buildProjectPayload({ name: 'n', dora: true, linker: false, linkerRegexp: '(y)', issueTrace: true }),
+      buildProjectPayload({ name: 'n', dora: true, linker: false, linkerRegexp: '(y)', issueTrace: true }, ''),
     ).toEqual({
       name: 'n',
       description: '',
@@ -155,6 +155,15 @@ describe('project settings form', () => {
         { pluginName: 'issue_trace', pluginOption: {}, enable: true },
       ],
     });
+  });
+
+  it('preserves a non-empty project description in the update payload', () => {
+    expect(
+      buildProjectPayload(
+        { name: 'n', dora: true, linker: false, linkerRegexp: '(y)', issueTrace: true },
+        'Project details',
+      ).description,
+    ).toBe('Project details');
   });
 });
 

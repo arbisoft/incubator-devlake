@@ -54,7 +54,7 @@ const scorecard = vi.mocked(API.complianceScorecard);
 
 const PROJECT: IProject = {
   name: 'Arbisoft Website',
-  description: '',
+  description: 'Project details',
   metrics: [{ pluginName: 'dora', pluginOption: {}, enable: true }],
   blueprint: {
     id: 1,
@@ -112,7 +112,7 @@ describe('SettingsPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: COPY.settings.save }));
     await waitFor(() => expect(project.update).toHaveBeenCalledOnce());
     expect(project.update.mock.calls[0][0]).toBe(PROJECT.name);
-    expect(project.update.mock.calls[0][1]).toMatchObject({ name: 'Renamed', description: '' });
+    expect(project.update.mock.calls[0][1]).toMatchObject({ name: 'Renamed', description: PROJECT.description });
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/projects/Renamed/settings'));
     expect(onRefresh).not.toHaveBeenCalled();
   });
@@ -121,6 +121,7 @@ describe('SettingsPanel', () => {
     const { onRefresh } = setup();
     fireEvent.click(await screen.findByRole('button', { name: COPY.settings.save }));
     await waitFor(() => expect(onRefresh).toHaveBeenCalledOnce());
+    expect(project.update.mock.calls[0][1]).toMatchObject({ description: PROJECT.description });
     expect(navigate).not.toHaveBeenCalled();
   });
 

@@ -17,7 +17,10 @@
  */
 
 import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { message } from 'antd';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { GRAFANA_ERROR_CODE } from '@/api/grafana-users/constants';
 
 import { COPY, PASSWORD_MIN_LENGTH } from '../constants';
 
@@ -25,13 +28,16 @@ import {
   cleanupAddUserMocks,
   disabledAttribute as ARIA_DISABLED_ATTRIBUTE,
   disabledValue as ARIA_DISABLED_VALUE,
+  EMAIL,
   fillAdd,
   grafana,
+  PASSWORD,
   projectList,
   resetAddUserMocks,
   setup,
   submit,
 } from './__tests__/add-user-modal-helpers';
+import { captureLoggedRequestBody, expectPasswordErrorSafe, makePasswordError } from './__tests__/password-error';
 
 import './__tests__/add-user-modal-basic-cases';
 import './__tests__/add-user-modal-picker-cases';
@@ -54,6 +60,28 @@ describe('AddUserModal initial form', () => {
     fillAdd({ password: 'x'.repeat(PASSWORD_MIN_LENGTH) });
     expect(submit(COPY.add.submit).getAttribute(ARIA_DISABLED_ATTRIBUTE)).toBe(ARIA_DISABLED_VALUE.FALSE);
     await waitFor(() => expect(projectList).toHaveBeenCalled());
+  });
+
+  it('keeps the failed form ready for retry without reporting its request body', async () => {
+    const error = makePasswordError(PASSWORD, 409, GRAFANA_ERROR_CODE.USER_EXISTS);
+    grafana.createUser.mockRejectedValueOnce(error);
+    const loggedRequestBody = captureLoggedRequestBody();
+
+    const props = setup();
+    fillAdd();
+    fireEvent.click(submit(COPY.add.submit));
+    await waitFor(() => expect(message.error).toHaveBeenCalledWith(COPY.errors[GRAFANA_ERROR_CODE.USER_EXISTS]));
+
+    const email = screen.getByLabelText(new RegExp(`^${COPY.add.email.label}`)) as HTMLInputElement;
+    const password = screen.getByLabelText(new RegExp(`^${COPY.password.label}`)) as HTMLInputElement;
+    expectPasswordErrorSafe(error, loggedRequestBody, password, PASSWORD);
+    expect(email.value === EMAIL).toBeTruthy();
+    expect(props.onClose).not.toHaveBeenCalled();
+
+    fireEvent.click(submit(COPY.add.submit));
+    await waitFor(() => expect(props.onPassword).toHaveBeenCalledOnce());
+    expect(grafana.createUser).toHaveBeenCalledTimes(2);
+    expect(props.onPassword.mock.calls[0]?.[0].password === PASSWORD).toBeTruthy();
   });
 });
 

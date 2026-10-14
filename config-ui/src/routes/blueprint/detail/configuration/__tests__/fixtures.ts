@@ -16,10 +16,18 @@
  *
  */
 
-export const validRawPlan = (rp: string) => {
-  try {
-    return JSON.parse(rp).flat().length === 0;
-  } catch {
-    return true;
-  }
+import { IBPMode, type IBlueprint } from '@/types';
+
+export const blueprint: IBlueprint = {
+  id: 12,
+  name: 'Example blueprint',
+  projectName: 'Example project',
+  mode: IBPMode.ADVANCED,
+  enable: true,
+  isManual: false,
+  cronConfig: '0 0 * * *',
+  skipOnFail: false,
+  plan: [[{ plugin: 'github' }]],
+  timeAfter: null,
+  connections: [],
 };

@@ -69,9 +69,9 @@ export const readSettingsForm = (project: IProject): SettingsForm => {
   };
 };
 
-export const buildProjectPayload = (form: SettingsForm): ProjectPayload => ({
+export const buildProjectPayload = (form: SettingsForm, description: IProject['description']): ProjectPayload => ({
   name: form.name,
-  description: '',
+  description,
   metrics: [
     { pluginName: PROJECT_PLUGIN.DORA, pluginOption: {}, enable: form.dora },
     { pluginName: PROJECT_PLUGIN.LINKER, pluginOption: { prToIssueRegexp: form.linkerRegexp }, enable: form.linker },
