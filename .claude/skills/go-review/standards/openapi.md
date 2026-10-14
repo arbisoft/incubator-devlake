@@ -52,7 +52,7 @@ These rules apply to every new or changed HTTP route. They don't depend on the s
   - `413` for a body that's too large.
   - `422` only if the API already uses it for validation.
   - `429` for rate limits.
-- **API-S3 Never `500` for client mistakes.** Bad input, a missing resource or a conflict must map to 4xx. The handler or error mapper translates domain errors (`ErrNotFound` → 404, `ErrConflict` → 409, a validation error → 400). If the project's error kinds carry a status (GO-X1, e.g. `errors.NotFound` → 404, `errors.BadInput` → 400), the code must create the error with the right kind. Wrapping a not-found error in `errors.Default` turns it into a 500.
+- **API-S3 Never `500` for client mistakes.** Bad input, a missing resource or a conflict must map to 4xx. The handler or error mapper translates domain errors (`ErrNotFound` → 404, `ErrConflict` → 409, a validation error → 400). If the project's error kinds carry a status (GO-X1, e.g. `errors.NotFound` → 404, `errors.BadInput` → 400), the code must create or wrap the error with the right kind. Know how the package's generic kind behaves before flagging it. In this repo, `errors.Default.Wrap` **takes on the kind of a wrapped project error** (`core/errors/crdb_impl.go:125-128`), so `errors.Default.Wrap(errors.NotFound.New(…), …)` is still a 404. It gives a **500** only when it wraps a **plain Go error**, because a kind with no HTTP code falls back to 500 (`core/errors/types.go:122`). The real trap is client-caused failures that arrive as plain errors (decode, validation, parsing) and are returned through `errors.Default` / `errors.Convert` or returned unwrapped. They become 500s. Wrap them with the client-error kind at the boundary (`errors.BadInput.Wrap(err, "…")`).
 - **API-S4 Never `200` with an error body**, and never a 2xx on failure.
 - **API-S5 Every status a route can return is documented** (API-D3).
 
@@ -65,7 +65,16 @@ These rules apply to every new or changed HTTP route. They don't depend on the s
 
 ## API-B — Request and response bodies
 
-- **API-B1 Validate all input at the boundary**, before calling the service. When the framework hands over a generic body (API-H0), validation happens as it's decoded into the typed request struct, via the project's decode helper with a validator (e.g. `api.Decode(input.Body, &req, vld)`), or through explicit checks right after. Either way, check:
+- **API-B1 Validate all input at the boundary**, before calling the service. When the framework hands over a generic body (API-H0), validation happens as it's decoded into the typed request struct, via the project's decode helper with a validator, or through explicit checks right after. **Return decode and validation failures as client errors.** Check what kind the helper returns. Here, `api.Decode` wraps mapstructure and validator failures in `errors.Default` and `api.DecodeMapStruct` uses `errors.Convert` (`helpers/pluginhelper/api/mapstructure.go:107-139`). Both are plain errors underneath, so they come out as **500** unless re-wrapped:
+
+  ```go
+  var req CreateXRequest
+  if err := api.Decode(input.Body, &req, vld); err != nil {
+  	return nil, errors.BadInput.Wrap(err, "invalid request body")
+  }
+  ```
+
+  A decode or validation result returned without the client-error kind is an **API-S3** finding (blocking). Either way, check:
   - required fields are present;
   - types, formats, ranges and enum values are valid;
   - string lengths and collection sizes are within limits;

@@ -37,8 +37,22 @@ Read all six files before reviewing. Don't rely on memory of them. The `go-imple
 ## Input
 
 Arguments (both optional, any order):
-- **base branch**: what to diff against. Default `main`. If `main` doesn't exist locally, use `origin/main`.
+- **base branch**: what to diff against. If given, use it as is.
 - **`detailed`**: adds the Specific Comments section.
+
+**Choosing the base when none is given.** Forks often target a branch other than `main`. Diffing against the wrong base reviews the whole fork's history, not the branch. So don't assume `main`. Pick the candidate **closest to HEAD**:
+
+```bash
+for b in main-arbisoft origin/main-arbisoft main origin/main \
+         "$(git symbolic-ref -q --short refs/remotes/origin/HEAD)"; do
+  [ -n "$b" ] && git rev-parse -q --verify "$b^{commit}" >/dev/null || continue
+  printf '%s %s\n' "$(git rev-list --count "$(git merge-base HEAD "$b")"..HEAD)" "$b"
+done | sort -n -s -k1,1 | head -1        # fewest commits ahead wins; ties keep list order
+```
+
+- The candidate list gives this fork's integration branch (`main-arbisoft`) first, then `main`, then the remote's default branch. Edit the list if the fork's target branch changes.
+- If the winner leaves more than ~100 commits to review, or two candidates are close, stop and ask which base to use instead of guessing.
+- State the chosen base and the number of commits under review in the Summary header (`vs <base>, N commits`).
 
 Collect the changes:
 
@@ -80,6 +94,7 @@ If nothing is left to review, say so and stop.
    - a "missing test" may exist in another `_test.go` file;
    - a "non-standard" status code may be the API's existing convention (see the openapi.md consistency note);
    - a "missing timeout" may be set on a shared client;
+   - a handler that reads a package-level framework var (`basicRes`, `vld`, `dsHelper`) may be the composition root for its request (DI-B4). Check whether the logic below it receives its dependencies;
    - a generic body map (`map[string]interface{}`) may be the framework's input type, decoded straight into a struct (API-H0);
    - a "non-idiomatic" error or constructor shape (`errors.Default.Wrap`, `(*X, errors.Error)`) may be the project's convention (GO-X1).
    A wrong finding is worse than none.
@@ -87,7 +102,7 @@ If nothing is left to review, say so and stop.
 6. **Strict, but only on the change.** The standard applies to new and changed lines, and to new types and routes in full. Existing violations in untouched code are not findings. When a change *spreads* an existing violation (a new `time.Now()` call, a new use of a global, a new route copying a non-standard convention), that is a finding (DI-B2, API-R4).
 7. **Each finding appears exactly once.** See Step 5.
 8. **Label every finding** **[blocking]** or **[non-blocking]**:
-   - Blocking: anything in "Always Request Changes" below, any correctness, concurrency, error-handling or security defect, any API contract break, any DI or DIP violation in new code, and LSP-1/LSP-2 (they change behavior). SRP, OCP, ISP and GoF findings are blocking **only** per the Severity rules in `design-patterns.md`: when the diff duplicates or grows the anti-pattern, or a pattern is broken (GOF-X2). Otherwise they're non-blocking.
+   - Blocking: anything in "Always Request Changes" below, any correctness, concurrency, error-handling or security defect, any API contract break, any DI or DIP violation in new code (but framework init globals read at the composition root, such as `basicRes` in a handler, are not violations: DI-B4), and LSP-1/LSP-2 (they change behavior). SRP, OCP, ISP and GoF findings are blocking **only** per the Severity rules in `design-patterns.md`: when the diff duplicates or grows the anti-pattern, or a pattern is broken (GOF-X2). Otherwise they're non-blocking.
    - Non-blocking: naming, doc comments, small idiom issues, HYG-4 split suggestions, and missing examples in the spec (API-D6).
 9. **Assume a competent author.** Explain only what's not obvious. Don't lecture about what SOLID or REST is.
 
@@ -121,6 +136,7 @@ Skip this step if no routes or spec files changed. For **each new or changed rou
 - **Contract:**
   - path and naming (API-R), method semantics (API-M);
   - every status the handler can return, and how domain errors map to statuses (API-S, API-E4);
+  - the error kind of every failure caused by the client: decode, validation and parse failures must be returned as the client-error kind (e.g. `errors.BadInput.Wrap`), not passed through a helper's generic kind, which gives a 500 (API-S3, API-B1);
   - the error body shape and internal leaks (API-E1–E3);
   - input validation (API-B1), DTOs vs models, secret fields (API-B2, API-B3);
   - times, nullability and number types (API-B5, API-B6, API-B8);
@@ -169,7 +185,7 @@ Leave out any finding section with no findings. Assign each finding to **exactly
 15. **Code hygiene**: `HYG-*`.
 
 ```markdown
-## Go Review: <branch> (vs <base>)
+## Go Review: <branch> (vs <base>, N commits)
 
 ### Summary
 <One sentence on what the change does.> <Go version.> <Conventions: error package, logger, test library, handler shape.> <Routes changed: N, or none.> <Overall verdict: N blocking, M non-blocking findings — or "No issues found.">

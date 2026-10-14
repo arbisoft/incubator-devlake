@@ -71,7 +71,7 @@ Follow the standards by rule ID. The rules that are most often missed:
   - Every dependency that is external, has side effects or isn't deterministic comes through the constructor, as a consumer-side interface.
   - No `time.Now()`, `http.DefaultClient`, `os.Getenv`, global vars or `init()` side effects in logic (DI-M, DI-H).
   - Constructors validate their required dependencies and do no I/O (DI-C2, DI-C4).
-  - Existing globals are wrapped once in an adapter at the boundary (DI-B1).
+  - Existing globals are wrapped once in an adapter at the boundary (DI-B1). Framework globals set at init (e.g. a plugin's `basicRes`) are read **only in the handler or task entry point**, which passes `GetDal()`, `GetLogger()` and config into constructor-injected services (DI-B3, DI-B4). Never read them from services or helpers.
 - **SOLID**:
   - Separate pure decision logic from I/O (SRP-2).
   - No growing switches on kind (OCP-1).
@@ -85,7 +85,7 @@ Follow the standards by rule ID. The rules that are most often missed:
   - `var _ I = (*T)(nil)` assertions (GO-I4).
   - Doc comments on every exported identifier, stating the contract (GO-P3, LSP-4).
 - **API**:
-  - Thin handlers: decode the framework's input (`input.Body`, or its equivalent) straight into a named request struct with the project's decode helper and a validator (API-B1, SEC-I6). Then call the injected service, passing the framework's request context to any ctx-aware call, and map the result to a DTO. Return the right error kind, so the adapter or shared mapper produces the right status (API-H0–H2, API-E4).
+  - Thin handlers: decode the framework's input (`input.Body`, or its equivalent) straight into a named request struct with the project's decode helper and a validator (API-B1, SEC-I6). Wrap any decode or validation failure as a client error, e.g. `errors.BadInput.Wrap(err, "invalid request body")`. Helpers like `api.Decode` return `errors.Default` around a plain error, which comes out as a 500 (API-S3). Then call the injected service, passing the framework's request context to any ctx-aware call, and map the result to a DTO. Return the right error kind, so the adapter or shared mapper produces the right status (API-H0–H2, API-E4).
   - Request and response DTOs are separate from DB models. Secrets are write-only (API-B2, API-B3).
   - Write the spec annotations together with the handler: every param, the body, each success and error status, named schemas, security (API-D1–D7). Then regenerate the spec (API-D8).
 - **Good practices**:

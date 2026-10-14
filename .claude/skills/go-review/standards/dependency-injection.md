@@ -46,7 +46,7 @@ The following are always dependencies. Business logic never creates, looks up or
 
 ## DI-H — No hidden dependencies
 
-- **DI-H1 No package-level mutable state.** `var client = …`, `var cache = map…`, and `var defaultX` that logic reads are all violations. Package-level `const`, immutable lookup tables and sentinel errors are fine.
+- **DI-H1 No package-level mutable state** (except framework-set init globals, read only at the composition root: DI-B4). `var client = …`, `var cache = map…`, and `var defaultX` that logic reads are all violations. Package-level `const`, immutable lookup tables and sentinel errors are fine.
 - **DI-H2 No `init()` with side effects** (connecting, registering into globals, reading env). `init` may only set up immutable package data.
 - **DI-H3 No service locator.** Don't pull dependencies out of a `context.Context`, a global registry, or a `map[string]any` container at call time. Dependencies go through the constructor.
 - **DI-H4 No singletons.** "Only one instance" is decided by the composition root, which builds it once and injects it (see GOF-C3).
@@ -69,8 +69,30 @@ The following are always dependencies. Business logic never creates, looks up or
 
 Strict applies to **new and changed code**, not to rewriting the whole codebase:
 - **DI-B1** When new code must call an existing global or concrete dependency, wrap it once at the boundary: declare an interface in the new code, write an adapter around the global, and inject the adapter from the composition root.
-- **DI-B2** Don't spread a global further. A changed function that adds a new direct call to a global, or a new `time.Now()`, is a finding even if the file already does it elsewhere.
+- **DI-B2** Don't spread a global further. A changed function that adds a new direct call to a global, or a new `time.Now()`, is a finding even if the file already does it elsewhere. **The exception is the composition root for the scope (DI-B3, DI-B4):** reading framework-provided globals there, to build injected dependencies, is the intended use.
 - **DI-B3** If an existing framework fixes the entry point's shape (a plugin interface method with a fixed signature, an HTTP handler signature), that method is the composition root for its scope. It builds the dependencies and hands them to constructor-injected types that hold the logic.
+- **DI-B4 Framework globals set at init.** Some frameworks hand a plugin or module its resources once, at init, and the package stores them in package-level vars. In this repo, a plugin's `Init(br context.BasicRes, …)` sets `basicRes`, `vld` and `dsHelper` (e.g. `plugins/github/api/init.go`); about 34 plugin packages do this. These vars are the framework's composition-root output, not a hidden dependency. The rules:
+  - **Not a finding:** a handler (the composition root for its request, DI-B3) that reads them **once** and passes what it needs into a constructor-injected service:
+
+    ```go
+    func PostThing(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+    	var req CreateThingRequest
+    	if err := api.Decode(input.Body, &req, vld); err != nil {
+    		return nil, errors.BadInput.Wrap(err, "invalid request body")
+    	}
+    	svc := newThingService(basicRes.GetDal(), basicRes.GetLogger()) // wiring only
+    	out, err := svc.Create(req)
+    	if err != nil {
+    		return nil, err
+    	}
+    	return &plugin.ApiResourceOutput{Body: out, Status: http.StatusCreated}, nil
+    }
+    ```
+
+  - **Not a finding:** a handler that only delegates to a framework helper built at init (`return dsHelper.ConnApi.Post(input)`). It has no logic of its own.
+  - **Not a finding:** existing handlers that already use `basicRes` the same way. DI-B2 is about the change, not untouched code.
+  - **Finding** (blocking, DI-H1/DI-B2): **logic below the handler** that reaches the global itself: a service, converter, helper or domain function in the change that calls `basicRes.GetDal()`, `basicRes.GetConfig(…)` or `basicRes.GetLogger()` instead of receiving the dependency. Also a finding: a new handler with real logic (queries, decisions, loops over data) written inline against `basicRes.GetDal()` instead of in an injected service. Small handlers that do one DAL read and map it to a DTO are **non-blocking** (SRP-3), not blocking.
+  - The same reading applies to task code. `PrepareTaskData` / `SubTaskEntryPoint` get `taskCtx` from the framework and are the composition root for the task. They take `taskCtx.GetDal()` and `taskCtx.GetLogger()` and pass them down. Code below them that uses a stored context is a finding.
 
 ## Example
 
