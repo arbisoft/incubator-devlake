@@ -49,8 +49,8 @@ type AiPrompt struct {
 	UserAccountId      *string   `gorm:"type:varchar(255);index" json:"userAccountId,omitempty"`
 	UserEmail          string    `gorm:"type:varchar(255);index" json:"userEmail"`
 	SourceConnectionId uint64    `gorm:"index" json:"sourceConnectionId"`
-	SessionId          string    `gorm:"type:varchar(64);index" json:"sessionId"`
-	PromptId           string    `gorm:"type:varchar(64);index" json:"promptId"`
+	SessionId          string    `gorm:"type:varchar(128);index" json:"sessionId"`
+	PromptId           string    `gorm:"type:varchar(128);index" json:"promptId"`
 	StartedAt          time.Time `gorm:"type:datetime(3);index" json:"startedAt"`
 	EndedAt            time.Time `gorm:"type:datetime(3)" json:"endedAt"`
 	PromptLength       int64     `json:"promptLength"`
@@ -87,8 +87,8 @@ type AiPromptSkill struct {
 	Provider     string `gorm:"type:varchar(100);index" json:"provider"`
 	WorkspaceKey string `gorm:"type:varchar(255);index" json:"workspaceKey"`
 	UserKey      string `gorm:"type:varchar(255);index" json:"userKey"`
-	SessionId    string `gorm:"type:varchar(64);index" json:"sessionId"`
-	PromptId     string `gorm:"type:varchar(64);index" json:"promptId"`
+	SessionId    string `gorm:"type:varchar(128);index" json:"sessionId"`
+	PromptId     string `gorm:"type:varchar(128);index" json:"promptId"`
 	SkillName    string `gorm:"type:varchar(255);index" json:"skillName"`
 	// InvocationTrigger is user-slash, claude-proactive or nested-skill when known.
 	InvocationTrigger string    `gorm:"type:varchar(64)" json:"invocationTrigger"`
@@ -107,7 +107,7 @@ type AiPermissionModeChange struct {
 	WorkspaceKey string    `gorm:"type:varchar(255);index" json:"workspaceKey"`
 	UserKey      string    `gorm:"type:varchar(255);index" json:"userKey"`
 	UserEmail    string    `gorm:"type:varchar(255);index" json:"userEmail"`
-	SessionId    string    `gorm:"type:varchar(64);index" json:"sessionId"`
+	SessionId    string    `gorm:"type:varchar(128);index" json:"sessionId"`
 	ChangedAt    time.Time `gorm:"type:datetime(3);index" json:"changedAt"`
 	FromMode     string    `gorm:"type:varchar(64)" json:"fromMode"`
 	ToMode       string    `gorm:"type:varchar(64);index" json:"toMode"`
