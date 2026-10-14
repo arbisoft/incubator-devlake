@@ -34,7 +34,7 @@ import (
 // rollupEventColumns are the event columns the rollup reads. prompt_text is left out, so
 // prompt text can never reach ai_* tables and large texts are not loaded per rollup.
 var rollupEventColumns = dal.Select("event_key, connection_id, user_key, user_account_id, user_email, session_id, prompt_id, " +
-	"event_name, event_sequence, event_timestamp, model, tool_name, skill_name, plugin_name, success, cost_usd, " +
+	"event_name, event_sequence, event_timestamp, command_name, model, tool_name, skill_name, plugin_name, success, cost_usd, " +
 	"input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, attributes")
 
 const (
@@ -108,7 +108,7 @@ func isModeChangeEvent(event *models.OtelEvent) bool {
 	if event.EventName == eventPermissionModeChanged {
 		return true
 	}
-	return event.EventName == eventUserPrompt && eventString(eventAttributes(event), "command_name") == planCommand
+	return event.EventName == eventUserPrompt && event.CommandName == planCommand
 }
 
 func newSessionModes(events []*models.OtelEvent) sessionModes {
@@ -206,7 +206,7 @@ func buildPromptRollup(workspaceKey, promptID string, events []*models.OtelEvent
 			prompt.StartedAt = event.EventTimestamp
 			fillPromptIdentity(prompt, event)
 			prompt.PromptLength = int64Value(eventNumber(attributes, "prompt_length"))
-			prompt.CommandName = eventString(attributes, "command_name")
+			prompt.CommandName = event.CommandName
 			prompt.CommandSource = eventString(attributes, "command_source")
 		case eventAPIRequest:
 			prompt.ApiRequestCount++
@@ -339,21 +339,24 @@ func rollupSession(tx dal.Transaction, workspaceKey string, target *sessionTarge
 	modes := sessionModes{}
 	promptSequences := make(map[string]int64)
 	if target.sessionID != "" {
-		// Mode changes and the session's user_prompt events, one per prompt, are enough to
-		// derive every prompt's mode.
-		sessionEvents := make([]*models.OtelEvent, 0)
-		if err := tx.All(&sessionEvents, rollupEventColumns, dal.Where("connection_id = ? AND user_key = ? AND session_id = ? AND event_name IN ?",
-			target.connectionID, target.userKey, target.sessionID, []string{eventPermissionModeChanged, eventUserPrompt})); err != nil {
+		// Only the session's mode changes are loaded, so the work per batch does not grow
+		// with the number of prompts in the session.
+		changeEvents := make([]*models.OtelEvent, 0)
+		if err := tx.All(&changeEvents, rollupEventColumns, dal.Where(
+			"connection_id = ? AND user_key = ? AND session_id = ? AND (event_name = ? OR (event_name = ? AND command_name = ?))",
+			target.connectionID, target.userKey, target.sessionID, eventPermissionModeChanged, eventUserPrompt, planCommand)); err != nil {
 			return fmt.Errorf("load Claude Code session mode events: %w", err)
 		}
-		modes = newSessionModes(sessionEvents)
-		if err := writeModeChanges(tx, workspaceKey, target, sessionEvents, modes); err != nil {
-			return err
-		}
-		for _, event := range sessionEvents {
-			if event.EventName == eventUserPrompt {
-				promptSequences[event.PromptId] = int64Value(event.EventSequence)
+		modes = newSessionModes(changeEvents)
+		if target.modeChanged {
+			if err := writeModeChanges(tx, workspaceKey, target, changeEvents, modes); err != nil {
+				return err
 			}
+			sequences, err := loadPromptSequences(tx, target)
+			if err != nil {
+				return err
+			}
+			promptSequences = sequences
 		}
 	}
 	accounts := make(map[string]string)
@@ -380,6 +383,21 @@ func rollupSession(tx dal.Transaction, workspaceKey string, target *sessionTarge
 		return refreshSessionModes(tx, workspaceKey, target, modes, promptSequences)
 	}
 	return nil
+}
+
+// loadPromptSequences returns the event.sequence of each user_prompt in the session, which
+// refreshSessionModes needs to order prompts it did not rebuild against mode changes.
+func loadPromptSequences(tx dal.Transaction, target *sessionTarget) (map[string]int64, error) {
+	promptEvents := make([]*models.OtelEvent, 0)
+	if err := tx.All(&promptEvents, dal.Select("prompt_id, event_sequence"), dal.Where("connection_id = ? AND user_key = ? AND session_id = ? AND event_name = ?",
+		target.connectionID, target.userKey, target.sessionID, eventUserPrompt)); err != nil {
+		return nil, fmt.Errorf("load Claude Code session prompt sequences: %w", err)
+	}
+	sequences := make(map[string]int64, len(promptEvents))
+	for _, event := range promptEvents {
+		sequences[event.PromptId] = int64Value(event.EventSequence)
+	}
+	return sequences, nil
 }
 
 // promptSequence is the event.sequence of the prompt's user_prompt event, which orders it

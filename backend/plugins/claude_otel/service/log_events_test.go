@@ -20,6 +20,7 @@ package service
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -188,6 +189,15 @@ func TestPrepareEventsMapsTypedColumnsAndKeepsAttributes(t *testing.T) {
 	if len(keys) != 13 {
 		t.Fatalf("event keys are not unique: %d", len(keys))
 	}
+	commandPrompts := 0
+	for _, item := range prepared.events {
+		if item.event.CommandName == "review" && item.event.EventName == eventUserPrompt {
+			commandPrompts++
+		}
+	}
+	if commandPrompts != 1 {
+		t.Fatalf("user_prompt events with command_name review = %d, want 1", commandPrompts)
+	}
 
 	skillTool := findPreparedEvent(t, prepared, eventToolResult, "tu-1")
 	if skillTool.SkillName != "code-review" || skillTool.Success == nil || !*skillTool.Success || int64Value(skillTool.DurationMs) != 12 {
@@ -296,7 +306,7 @@ func TestSessionModesInferEachPromptMode(t *testing.T) {
 	}
 	promptEvent := func(minute int, command string) *models.OtelEvent {
 		attributes, _ := json.Marshal(map[string]string{"command_name": command})
-		return &models.OtelEvent{EventName: eventUserPrompt, EventTimestamp: at(minute), Attributes: attributes}
+		return &models.OtelEvent{EventName: eventUserPrompt, EventTimestamp: at(minute), CommandName: command, Attributes: attributes}
 	}
 	planCommand := func(minute int) *models.OtelEvent { return promptEvent(minute, "plan") }
 	testCases := []struct {
@@ -410,6 +420,54 @@ func TestSessionTargetsGroupPromptsAndFlagModeChanges(t *testing.T) {
 	targets := sessionTargets(prepared.events)
 	if len(targets) != 1 || !targets[0].modeChanged || len(targets[0].promptIDs) != 3 {
 		t.Fatalf("sessionTargets() = %d targets, modeChanged %t, prompts %d", len(targets), targets[0].modeChanged, len(targets[0].promptIDs))
+	}
+}
+
+func TestRollupSessionLoadsAndWritesModesOnlyWhenNeeded(t *testing.T) {
+	at := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
+	for _, modeChanged := range []bool{false, true} {
+		t.Run(fmt.Sprintf("modeChanged=%t", modeChanged), func(t *testing.T) {
+			tx := dalmocks.NewTransaction(t)
+			loads := make([]string, 0)
+			tx.EXPECT().All(mock.Anything, mock.Anything, mock.Anything).Run(func(result interface{}, clauses ...dal.Clause) {
+				where := clauses[1].Data.(dal.DalClause).Expr
+				loads = append(loads, where)
+				switch {
+				case strings.Contains(where, "command_name = ?"):
+					attributes, _ := json.Marshal(map[string]string{"from_mode": "default", "to_mode": "plan"})
+					*result.(*[]*models.OtelEvent) = []*models.OtelEvent{{EventName: eventPermissionModeChanged, EventTimestamp: at, Attributes: attributes}}
+				case strings.Contains(where, "prompt_id = ?"):
+					*result.(*[]*models.OtelEvent) = []*models.OtelEvent{{EventName: eventUserPrompt, SessionId: "sess-1", PromptId: "p1", EventTimestamp: at.Add(time.Minute)}}
+				}
+			}).Return(nil)
+			tx.EXPECT().CreateOrUpdate(mock.AnythingOfType("*ai.AiPrompt")).Return(nil).Once()
+			tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptSkill"), mock.Anything).Return(nil).Once()
+			if modeChanged {
+				tx.EXPECT().CreateOrUpdate(mock.AnythingOfType("*ai.AiPermissionModeChange")).Return(nil).Once()
+			}
+
+			target := &sessionTarget{connectionID: 1, userKey: "uuid:u1", sessionID: "sess-1", promptIDs: map[string]struct{}{"p1": {}}, modeChanged: modeChanged}
+			if err := rollupSession(tx, testOrganizationID, target); err != nil {
+				t.Fatalf("rollupSession() error = %v", err)
+			}
+			if !strings.Contains(loads[0], "command_name = ?") {
+				t.Fatalf("first load = %q, want only the session's mode changes", loads[0])
+			}
+			sessionPromptLoads := 0
+			for _, where := range loads {
+				if strings.Contains(where, "event_name = ?") && !strings.Contains(where, "command_name") {
+					sessionPromptLoads++
+				}
+			}
+			wantLoads, wantPromptLoads := 2, 0
+			if modeChanged {
+				// The prompt sequences and the session's prompts for refreshSessionModes.
+				wantLoads, wantPromptLoads = 4, 1
+			}
+			if len(loads) != wantLoads || sessionPromptLoads != wantPromptLoads {
+				t.Fatalf("loads = %q, want %d loads with %d session prompt sequence load(s)", loads, wantLoads, wantPromptLoads)
+			}
+		})
 	}
 }
 

@@ -173,6 +173,7 @@ func (p *batchPreparer) prepareLogRecord(teamSlug string, resourceAttrs []*commo
 		PluginName:          attributeString(recordAttrs, "plugin.name"),
 		McpServerName:       firstNonEmpty(attributeString(recordAttrs, "mcp_server.name"), toolParameter(attributes, "mcp_server_name")),
 		QuerySource:         attributeString(recordAttrs, "query_source"),
+		CommandName:         attributeString(recordAttrs, "command_name"),
 		Success:             attributeBool(recordAttrs, "success"),
 		DurationMs:          attributeInt(recordAttrs, "duration_ms"),
 		CostUsd:             attributeDecimal(recordAttrs, "cost_usd", 8),
