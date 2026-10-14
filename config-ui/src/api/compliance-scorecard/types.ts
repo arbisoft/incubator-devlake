@@ -16,16 +16,15 @@
  *
  */
 
-import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?react';
-import { PluginIcon } from '@/ui';
+export type ComplianceScorecardRow = {
+  Project: string;
+  'Issue Visibility'?: string;
+  'PR Visibility'?: string;
+  'AI Visibility'?: string;
+  Compliance?: string;
+};
 
-import { OtelLabel, OtelName } from '../styled';
-
-import type { OtelConnectionNameProps } from './types';
-
-export const OtelConnectionName = ({ connection }: OtelConnectionNameProps) => (
-  <OtelName>
-    <PluginIcon icon={() => <ClaudeCodeOtelIcon />} size="md" />
-    <OtelLabel title={connection.connection.name}>{connection.connection.name}</OtelLabel>
-  </OtelName>
-);
+export type ComplianceScorecardResponse = {
+  count: number;
+  rows: ComplianceScorecardRow[];
+};

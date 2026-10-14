@@ -44,11 +44,13 @@ vi.mock('@/api', () => ({
   default: {
     project: { update: vi.fn(), remove: vi.fn() },
     otel: { listForProject: vi.fn(), validateProjectRemoval: vi.fn() },
+    complianceScorecard: { list: vi.fn() },
   },
 }));
 
 const project = vi.mocked(API.project);
 const otel = vi.mocked(API.otel);
+const scorecard = vi.mocked(API.complianceScorecard);
 
 const PROJECT: IProject = {
   name: 'Arbisoft Website',
@@ -99,6 +101,7 @@ describe('SettingsPanel', () => {
     project.update.mockResolvedValue({});
     project.remove.mockResolvedValue({});
     otel.validateProjectRemoval.mockResolvedValue(undefined);
+    scorecard.list.mockResolvedValue({ count: 0, rows: [] });
   });
 
   it('saves a renamed project and moves to the new name, which loads it afresh', async () => {

@@ -16,5 +16,6 @@
  *
  */
 
+export * from './connections-cell';
 export * from './new-project-modal';
-export * from './otel-connection-name';
+export * from './readiness-cell';

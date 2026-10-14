@@ -27,6 +27,8 @@ import { useRefreshData } from '@/hooks';
 import { OnboardTour } from '@/routes/onboard/components';
 import { DataTable, ListPage, ListToolbar, PageHeader, buildListEmpty, useListState, useRefreshVersion } from '@/ui';
 
+import { toReadinessMap } from '../readiness';
+
 import { NewProjectModal } from './components';
 import { COPY } from './constants';
 import type { ProjectRow, ProjectSortKey } from './types';
@@ -46,17 +48,20 @@ export const ProjectHomePage = () => {
     [version, list.query],
   );
   const { data: otelConnections } = useRefreshData(() => API.otel.list(), []);
+  const { data: scorecard } = useRefreshData((signal) => API.complianceScorecard.list(signal), [version]);
 
   const rows = useMemo(
     () => (data?.projects ?? []).map((project) => toProjectRow(project, otelConnections)),
     [data, otelConnections],
   );
 
+  const readiness = useMemo(() => toReadinessMap(scorecard?.rows), [scorecard]);
+
   const handleConfigure = useCallback(
     (name: string) => navigate(PATHS.PROJECT_BLUEPRINT_VIEW(name, BLUEPRINT_VIEW.CONFIGURATION)),
     [navigate],
   );
-  const { columns, tourRefs } = useProjectColumns(handleConfigure);
+  const { columns, tourRefs } = useProjectColumns(handleConfigure, readiness);
 
   const handleCreated = () => {
     setCreating(false);

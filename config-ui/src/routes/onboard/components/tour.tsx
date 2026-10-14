@@ -28,7 +28,7 @@ import type { OnboardStore } from './types';
 
 interface Props {
   nameRef: React.RefObject<HTMLAnchorElement | null>;
-  connectionRef: React.RefObject<HTMLUListElement | null>;
+  connectionRef: React.RefObject<HTMLButtonElement | null>;
   configRef: React.RefObject<HTMLAnchorElement | HTMLButtonElement | null>;
 }
 

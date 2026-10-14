@@ -22,6 +22,7 @@ import * as access from './access';
 import * as apiKey from './api-key';
 import * as auth from './auth';
 import * as blueprint from './blueprint';
+import * as complianceScorecard from './compliance-scorecard';
 import * as connection from './connection';
 import * as otel from './otel';
 import * as pipeline from './pipeline';
@@ -41,6 +42,7 @@ const API = {
   apiKey,
   auth,
   blueprint,
+  complianceScorecard,
   connection,
   otel,
   pipeline,

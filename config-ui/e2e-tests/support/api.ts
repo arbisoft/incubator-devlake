@@ -365,6 +365,26 @@ export async function createWebhook(api: APIRequestContext, name: string): Promi
   return json(await api.post('/plugins/webhook/connections', { data: { name } }), `create webhook ${name}`);
 }
 
+// Creates the webhooks and attaches them all to the project's blueprint, so the project lists that many connections.
+export async function attachWebhooksToProject(
+  api: APIRequestContext,
+  projectName: string,
+  webhookNames: string[],
+): Promise<{ id: number; name: string }[]> {
+  const webhooks: { id: number; name: string }[] = [];
+  for (const name of webhookNames) {
+    webhooks.push(await createWebhook(api, name));
+  }
+  const blueprint = (await getProject(api, projectName))?.blueprint;
+  expect(blueprint, `project ${projectName} has a blueprint`).toBeTruthy();
+  await setBlueprintConnections(
+    api,
+    blueprint as ApiBlueprint,
+    webhooks.map(({ id }) => ({ pluginName: 'webhook', connectionId: id, scopes: [] })),
+  );
+  return webhooks;
+}
+
 export async function deleteWebhooksByPrefix(api: APIRequestContext): Promise<void> {
   for (const w of await listWebhooks(api)) {
     if (w.name.startsWith(E2E_PREFIX)) {

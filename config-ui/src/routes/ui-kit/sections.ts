@@ -48,6 +48,7 @@ import { RouteTabsDemo } from './route-tabs.demo';
 import { RowLinkDemo } from './row-link.demo';
 import { SearchInputDemo } from './search-input.demo';
 import { SectionCardDemo } from './section-card.demo';
+import { SegmentedMeterDemo } from './segmented-meter.demo';
 import { SidebarNavDemo } from './sidebar-nav.demo';
 import { SortSelectDemo } from './sort-select.demo';
 import { StandalonePageDemo } from './standalone-page.demo';
@@ -77,6 +78,7 @@ export const SECTIONS: SectionDefinition[] = [
   { id: SECTION.EMPTY_STATE, Demo: EmptyStateDemo },
   { id: SECTION.METRIC_TILE, Demo: MetricTileDemo },
   { id: SECTION.PIPELINE_PROGRESS, Demo: PipelineProgressDemo },
+  { id: SECTION.SEGMENTED_METER, Demo: SegmentedMeterDemo },
   { id: SECTION.SEARCH_INPUT, Demo: SearchInputDemo },
   { id: SECTION.FILTER_TABS, Demo: FilterTabsDemo },
   { id: SECTION.SORT_SELECT, Demo: SortSelectDemo },

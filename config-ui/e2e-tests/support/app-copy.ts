@@ -54,6 +54,7 @@ export { COPY as BLUEPRINT_CONFIGURATION_COPY } from '../../src/routes/blueprint
 export { COPY as SYNC_POLICY_COPY, CUSTOM_CRON_FIELDS } from '../../src/routes/blueprint/sync-policy/constants';
 export { COPY as BLUEPRINT_CONNECTION_COPY } from '../../src/routes/blueprint/connection-detail/constants';
 export { COPY as DATA_SCOPE_SELECT_COPY } from '../../src/plugins/components/data-scope-select/constants';
+export { COPY as READINESS_COPY, READINESS_SIGNAL } from '../../src/routes/project/readiness/constants';
 export { COPY as PROJECT_DETAIL_COPY } from '../../src/routes/project/detail/constants';
 export { COPY as SETTINGS_COPY } from '../../src/routes/settings/constants';
 export { COPY as AUTH_COPY } from '../../src/routes/settings/authentication/constants';

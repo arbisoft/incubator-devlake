@@ -19,6 +19,7 @@
 export const PROJECT_COLUMN = {
   NAME: 'name',
   CONNECTIONS: 'connections',
+  READINESS: 'readiness',
   FREQUENCY: 'frequency',
   CREATED_AT: 'createdAt',
   LAST_RUN_AT: 'lastRunAt',
@@ -32,7 +33,7 @@ export const PROJECT_METRICS = [
 ];
 
 export const NO_CONNECTIONS = 'N/A';
-export const MAX_VISIBLE_CONNECTIONS = 2;
+export const MAX_VISIBLE_CONNECTIONS = 5;
 export const CONNECTION_ENTRY_KIND = { PLUGIN: 'plugin', OTEL: 'otel' } as const;
 
 export const COPY = {
@@ -43,6 +44,7 @@ export const COPY = {
   columns: {
     name: 'Project name',
     connections: 'Data connections',
+    readiness: 'Readiness',
     frequency: 'Sync frequency',
     createdAt: 'Created at',
     lastRunAt: 'Last run completed at',
@@ -50,7 +52,17 @@ export const COPY = {
     action: 'Action',
   },
   noConnections: NO_CONNECTIONS,
-  moreConnections: (count: number) => `+${count} more`,
+  otelPluginLabel: 'Claude Code OTel',
+  moreConnections: (count: number) => `+${count}`,
+  connectionsLabel: (names: string[]) => `Data connections: ${names.join(', ')}`,
+  connectionsPopover: {
+    title: 'Data connections',
+    subtitle: (plugin: string, category: string) => `${plugin} · ${category}`,
+  },
+  readinessPopover: {
+    projectSummary: (available: number, total: number) =>
+      `${available} of ${total} signals available for this project.`,
+  },
   configure: 'Project Configuration',
   empty: {
     title: 'No projects yet',

@@ -17,7 +17,8 @@
  */
 
 import type { OtelConnectionResponse } from '@/api/otel';
-import type { IBlueprint, IPipelineStatus } from '@/types';
+import type { IntegrationCategory } from '@/plugins/catalog';
+import type { IBlueprint, IPipelineStatus, IPluginConfig } from '@/types';
 
 import type { CONNECTION_ENTRY_KIND, PROJECT_COLUMN } from './constants';
 
@@ -40,3 +41,13 @@ type PluginConnection = IBlueprint['connections'][number];
 export type ConnectionEntry =
   | { kind: typeof CONNECTION_ENTRY_KIND.PLUGIN; key: string; connection: PluginConnection }
   | { kind: typeof CONNECTION_ENTRY_KIND.OTEL; key: string; connection: OtelConnectionResponse };
+
+export type ConnectionDetail = {
+  key: string;
+  name: string;
+  pluginLabel: string;
+  category: IntegrationCategory;
+  icon: IPluginConfig['icon'];
+};
+
+export type CategoryCount = { category: IntegrationCategory; count: number };
