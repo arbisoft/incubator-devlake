@@ -33,6 +33,7 @@ const (
 	errorInvalidTimestamp       conversionErrorCode = "invalid_timestamp"
 	errorInvalidValue           conversionErrorCode = "invalid_value"
 	errorInvalidDimension       conversionErrorCode = "invalid_dimension"
+	errorValueTooLong           conversionErrorCode = "value_too_long"
 	errorMissingUserIdentity    conversionErrorCode = "missing_user_identity"
 	errorOutOfOrderCumulative   conversionErrorCode = "out_of_order_cumulative"
 	errorInvalidSeriesState     conversionErrorCode = "invalid_series_state"
@@ -74,6 +75,16 @@ var logRecordErrorCodes = map[conversionErrorCode]struct{}{
 	errorMissingUserIdentity: {},
 	errorInvalidDimension:    {},
 	errorInvalidValue:        {},
+	errorValueTooLong:        {},
+}
+
+// metricPointErrorCodes identify one data point's bad data that skips only that point.
+// Other point errors fail the batch, because skipping one cumulative sample would change
+// the next delta. An oversized identity is safe to skip: identity attributes are part of
+// the series hash, so every sample of that series is skipped alike and no series state
+// is written.
+var metricPointErrorCodes = map[conversionErrorCode]struct{}{
+	errorValueTooLong: {},
 }
 
 type conversionError struct {

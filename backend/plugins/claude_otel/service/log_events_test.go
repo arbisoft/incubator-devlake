@@ -291,8 +291,21 @@ func TestPrepareEventsSkipsOnlyRecordsWithOversizedKeys(t *testing.T) {
 		t.Fatalf("prepareEvents() events=%d skipped groups=%d records=%d, want 11, 0 and 2", len(prepared.events), prepared.skippedCount, prepared.skippedRecordCount)
 	}
 	message := prepared.diagnostic()
-	if message == nil || !strings.Contains(*message, string(errorInvalidDimension)) {
-		t.Fatalf("diagnostic() = %v, want %s", message, errorInvalidDimension)
+	if message == nil || !strings.Contains(*message, string(errorValueTooLong)) {
+		t.Fatalf("diagnostic() = %v, want %s", message, errorValueTooLong)
+	}
+}
+
+func TestPrepareEventsSkipsOnlyRecordsWithOversizedIdentity(t *testing.T) {
+	request := loadLogEventsFixture(t)
+	stripContentAttributes(request)
+	records := resourceLogRecords(request.GetResourceLogs()[0])
+	setStringAttribute(records[1], "user.email", strings.Repeat("e", identityColumnLength+1))
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
+
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 9)
+	if err != nil || len(prepared.events) != 12 || prepared.skippedRecordCount != 1 {
+		t.Fatalf("prepareEvents() = %v, %v; want 12 events and the oversized identity record skipped", prepared, err)
 	}
 }
 

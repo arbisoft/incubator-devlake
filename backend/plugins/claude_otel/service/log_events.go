@@ -48,12 +48,11 @@ const (
 
 // Typed event column widths in characters, from models.OtelEvent.
 const (
-	eventIDColumnLength       = 128 // session_id, prompt_id
-	eventNameColumnLength     = 100
-	eventIdentityColumnLength = 255 // user_key, user_account_id, user_account_uuid, user_email
-	eventVersionColumnLength  = 64  // app_version
-	eventLabelColumnLength    = 100 // terminal_type, query_source
-	eventNamedColumnLength    = 255 // model, tool, skill, agent, plugin, MCP server and command names
+	eventIDColumnLength      = 128 // session_id, prompt_id
+	eventNameColumnLength    = 100
+	eventVersionColumnLength = 64  // app_version
+	eventLabelColumnLength   = 100 // terminal_type, query_source
+	eventNamedColumnLength   = 255 // model, tool, skill, agent, plugin, MCP server and command names
 )
 
 // preparedEvent is one converted log record plus the connection binding it requires.
@@ -149,6 +148,9 @@ func (p *batchPreparer) prepareLogRecord(teamSlug string, resourceAttrs []*commo
 	if err != nil {
 		return nil, nil, err
 	}
+	if err := checkIdentityLengths(identity); err != nil {
+		return nil, nil, err
+	}
 	attributes := mergedAttributeMap(resourceAttrs, recordAttrs)
 	// Prompt text gets its own column so the attributes JSON stays small to query.
 	promptText, _ := attributes[promptTextAttribute].(string)
@@ -178,9 +180,10 @@ func (p *batchPreparer) prepareLogRecord(teamSlug string, resourceAttrs []*commo
 	return event, connection, nil
 }
 
-// checkEventKeyLengths rejects a record whose identifying values do not fit their columns.
-// Truncating them could merge different sessions, prompts or users, so the record is
+// checkEventKeyLengths rejects a record whose session, prompt or event name does not fit
+// its column. Truncating them could merge different sessions or prompts, so the record is
 // skipped on its own rather than letting MySQL reject, and quarantine, the whole batch.
+// The user identity is checked by checkIdentityLengths.
 func checkEventKeyLengths(event *models.OtelEvent) error {
 	for _, field := range []struct {
 		name  string
@@ -190,13 +193,9 @@ func checkEventKeyLengths(event *models.OtelEvent) error {
 		{"session.id", event.SessionId, eventIDColumnLength},
 		{"prompt.id", event.PromptId, eventIDColumnLength},
 		{"event.name", event.EventName, eventNameColumnLength},
-		{"user key", event.UserKey, eventIdentityColumnLength},
-		{"user.account_id", stringValue(event.UserAccountId), eventIdentityColumnLength},
-		{"user.account_uuid", stringValue(event.UserAccountUUID), eventIdentityColumnLength},
-		{"user.email", stringValue(event.UserEmail), eventIdentityColumnLength},
 	} {
 		if utf8.RuneCountInString(field.value) > field.width {
-			return permanentConversionError(errorInvalidDimension, "OTLP log record %s is longer than %d characters", field.name, field.width)
+			return permanentConversionError(errorValueTooLong, "OTLP log record %s is longer than %d characters", field.name, field.width)
 		}
 	}
 	return nil

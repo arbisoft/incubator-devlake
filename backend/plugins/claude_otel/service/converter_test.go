@@ -25,6 +25,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	devlakeerrors "github.com/apache/incubator-devlake/core/errors"
@@ -670,6 +671,68 @@ func newConnectionLookup(t *testing.T, connections map[string]*models.OtelConnec
 		},
 	).Return(nil)
 	return database
+}
+
+func TestPrepareUpdatesSkipsOnlyPointsWithOversizedIdentity(t *testing.T) {
+	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
+	request := newConverterRequest(observedAt, testOrganizationID)
+	toolDecision := request.GetResourceMetrics()[0].GetScopeMetrics()[0].GetMetrics()[2].GetSum().GetDataPoints()[0]
+	setPointAttribute(toolDecision, "user.email", strings.Repeat("e", identityColumnLength+1))
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: observedAt.Add(-time.Hour)}}})
+
+	prepared, err := newRawConverter(database, nil).prepareUpdates(request)
+	if err != nil {
+		t.Fatalf("prepareUpdates() error = %v, want only the oversized point skipped", err)
+	}
+	if len(prepared.updates) != 2 || prepared.skippedPointCount != 1 || prepared.skippedCount != 0 {
+		t.Fatalf("prepareUpdates() updates=%d skipped points=%d groups=%d, want 2, 1 and 0", len(prepared.updates), prepared.skippedPointCount, prepared.skippedCount)
+	}
+	for _, update := range prepared.updates {
+		if update.fact == hourlyToolUsageFact {
+			t.Fatalf("tool decision with an oversized email was converted: %#v", update)
+		}
+	}
+	if code := prepared.diagnosticCode(); code == nil || *code != string(diagnosticRecordsSkipped) {
+		t.Fatalf("diagnosticCode() = %v, want %s", code, diagnosticRecordsSkipped)
+	}
+	if message := prepared.diagnostic(); message == nil || !strings.Contains(*message, "1 data point(s)") || !strings.Contains(*message, string(errorValueTooLong)) {
+		t.Fatalf("diagnostic() = %v, want one %s data point", message, errorValueTooLong)
+	}
+}
+
+func TestPrepareUpdatesTruncatesDimensionsToTheirColumns(t *testing.T) {
+	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
+	request := newConverterRequest(observedAt, testOrganizationID)
+	metrics := request.GetResourceMetrics()[0].GetScopeMetrics()[0].GetMetrics()
+	tokenUsage := metrics[1].GetSum().GetDataPoints()[0]
+	setPointAttribute(tokenUsage, "model", strings.Repeat("é", 300))
+	setPointAttribute(tokenUsage, "query_source", strings.Repeat("q", 100))
+	toolDecision := metrics[2].GetSum().GetDataPoints()[0]
+	setPointAttribute(toolDecision, "tool_name", strings.Repeat("t", 150))
+	setPointAttribute(toolDecision, "language", strings.Repeat("l", 150))
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: observedAt.Add(-time.Hour)}}})
+
+	prepared, err := newRawConverter(database, nil).prepareUpdates(request)
+	if err != nil || len(prepared.updates) != 3 || prepared.skippedPointCount != 0 {
+		t.Fatalf("prepareUpdates() = %v, %v; want every point converted", prepared, err)
+	}
+	for _, update := range prepared.updates {
+		switch update.fact {
+		case hourlyModelUsageFact:
+			if update.model != strings.Repeat("é", modelDimensionLength) || len(update.query) != querySourceDimensionLength {
+				t.Fatalf("model/query_source = %d/%d characters, want %d/%d", utf8.RuneCountInString(update.model), len(update.query), modelDimensionLength, querySourceDimensionLength)
+			}
+		case hourlyToolUsageFact:
+			if len(update.tool) != toolDimensionLength || len(update.language) != toolDimensionLength {
+				t.Fatalf("tool_name/language = %d/%d characters, want %d", len(update.tool), len(update.language), toolDimensionLength)
+			}
+		}
+	}
+}
+
+// setPointAttribute replaces a data point's string attribute.
+func setPointAttribute(point *metricsv1.NumberDataPoint, key, value string) {
+	point.Attributes = append(withoutAttributes(point.GetAttributes(), map[string]struct{}{key: {}}), stringAttribute(key, value))
 }
 
 func newConverterRequest(observedAt time.Time, organizationID string) *collectormetrics.ExportMetricsServiceRequest {

@@ -23,6 +23,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
@@ -36,6 +37,15 @@ const (
 	maxResourceSkipDiagnostics = 5
 	maxUnknownMetricNames      = 10
 	maxDiagnosticNameLength    = 128
+
+	// identityColumnLength is the width of the user key, account id, account UUID and
+	// email columns in the hourly, event and ai_* tables.
+	identityColumnLength = 255
+	// Hourly fact dimension widths, from models.OtelHourlyModelUsage and
+	// OtelHourlyToolUsage. The ai_* columns they roll up into are as wide.
+	modelDimensionLength       = 255
+	querySourceDimensionLength = 64
+	toolDimensionLength        = 100 // tool_name and language
 )
 
 // preparedBatch holds a batch's fact updates plus bounded, operator-safe diagnostics.
@@ -43,6 +53,7 @@ type preparedBatch struct {
 	updates            []factUpdate
 	skippedCount       int
 	skippedRecordCount int
+	skippedPointCount  int
 	skipMessages       []string
 	unknownMetrics     []string
 }
@@ -52,7 +63,7 @@ func (p *preparedBatch) diagnosticCode() *string {
 	switch {
 	case p.skippedCount > 0:
 		code = string(diagnosticResourcesSkipped)
-	case p.skippedRecordCount > 0:
+	case p.skippedRecordCount > 0 || p.skippedPointCount > 0:
 		code = string(diagnosticRecordsSkipped)
 	default:
 		return nil
@@ -67,6 +78,9 @@ func (p *preparedBatch) diagnostic() *string {
 	}
 	if p.skippedRecordCount > 0 {
 		parts = append(parts, fmt.Sprintf("%d log record(s)", p.skippedRecordCount))
+	}
+	if p.skippedPointCount > 0 {
+		parts = append(parts, fmt.Sprintf("%d data point(s)", p.skippedPointCount))
 	}
 	if len(parts) == 0 {
 		return nil
@@ -163,6 +177,12 @@ func (p *batchPreparer) recordRecordSkip(err *conversionError) {
 	p.addSkipMessage(err)
 }
 
+// recordPointSkip notes one metric data point skipped for bad data.
+func (p *batchPreparer) recordPointSkip(err *conversionError) {
+	p.result.skippedPointCount++
+	p.addSkipMessage(err)
+}
+
 func (p *batchPreparer) addSkipMessage(err *conversionError) {
 	if len(p.result.skipMessages) < maxResourceSkipDiagnostics {
 		p.result.skipMessages = append(p.result.skipMessages, fmt.Sprintf("%s: %s", err.code, err.Error()))
@@ -191,6 +211,10 @@ func (p *batchPreparer) prepareResource(resourceMetrics *metricsv1.ResourceMetri
 			for _, point := range sum.GetDataPoints() {
 				update, err := p.prepareDatapoint(metric, mapping, sum.GetAggregationTemporality(), scopeMetrics.GetScope(), resourceAttrs, point, resourceBindings)
 				if err != nil {
+					if conversionErr, skip := conversionErrorIn(err, metricPointErrorCodes); skip {
+						p.recordPointSkip(conversionErr)
+						continue
+					}
 					return nil, err
 				}
 				updates = append(updates, update)
@@ -233,6 +257,9 @@ func (p *batchPreparer) prepareDatapoint(
 	if err != nil {
 		return factUpdate{}, err
 	}
+	if err := checkIdentityLengths(identity); err != nil {
+		return factUpdate{}, err
+	}
 	if temporality != metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_DELTA && temporality != metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_CUMULATIVE {
 		return factUpdate{}, permanentConversionError(errorUnsupportedTemporality, "metric %s has unsupported aggregation temporality", metric.GetName())
 	}
@@ -247,6 +274,8 @@ func (p *batchPreparer) prepareDatapoint(
 	if err != nil {
 		return factUpdate{}, err
 	}
+	// Dimensions are truncated to their column. Series state is keyed by the full
+	// attributes, so values that share a prefix only add into one fact row.
 	update := factUpdate{
 		connection:     connection,
 		organizationID: organizationID,
@@ -256,10 +285,10 @@ func (p *batchPreparer) prepareDatapoint(
 		metric:         metric.GetName(),
 		fact:           mapping.fact,
 		column:         column,
-		model:          attributeString(pointAttrs, "model"),
-		query:          defaultDimension(attributeString(pointAttrs, "query_source")),
-		tool:           defaultDimension(attributeString(pointAttrs, "tool_name")),
-		language:       defaultDimension(attributeString(pointAttrs, "language")),
+		model:          truncate(attributeString(pointAttrs, "model"), modelDimensionLength),
+		query:          defaultDimension(truncate(attributeString(pointAttrs, "query_source"), querySourceDimensionLength)),
+		tool:           defaultDimension(truncate(attributeString(pointAttrs, "tool_name"), toolDimensionLength)),
+		language:       defaultDimension(truncate(attributeString(pointAttrs, "language"), toolDimensionLength)),
 		value:          value,
 		temporality:    temporality,
 		startNanos:     point.GetStartTimeUnixNano(),
@@ -422,4 +451,24 @@ func identityFromAttributes(attributes []*commonv1.KeyValue) (developerIdentity,
 		return developerIdentity{}, permanentConversionError(errorMissingUserIdentity, "supported metric has no stable user identity")
 	}
 	return identity, nil
+}
+
+// checkIdentityLengths rejects an identity whose values do not fit their columns, rather
+// than letting MySQL reject the whole batch. Truncating it could merge different users,
+// so the caller skips the log record or data point instead.
+func checkIdentityLengths(identity developerIdentity) error {
+	for _, field := range []struct {
+		name  string
+		value string
+	}{
+		{"user key", identity.key},
+		{"user.account_id", stringValue(identity.accountID)},
+		{"user.account_uuid", stringValue(identity.accountUUID)},
+		{"user.email", stringValue(identity.email)},
+	} {
+		if utf8.RuneCountInString(field.value) > identityColumnLength {
+			return permanentConversionError(errorValueTooLong, "%s is longer than %d characters", field.name, identityColumnLength)
+		}
+	}
+	return nil
 }
