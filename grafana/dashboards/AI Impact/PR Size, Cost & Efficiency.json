@@ -494,6 +494,494 @@
     },
     {
       "datasource": "mysql",
+      "description": "Purple bars: Claude Code OTel tokens (input, output, cache read and cache creation), left axis. Neutral bars: merged PRs, right count axis. Different scales: compare each colour across weeks, not bar heights against each other. Completed weeks only; weeks begin Monday. Weeks before Claude Code OTel collection started show no AI bars and a per-PR ratio of 0: that means no data, not no usage. Hover for tokens per merged PR (left out when no PRs merged) and its change from the previous week. Token usage uses the Project and OTel Teams filters; merged PRs use Project only, so selecting a team narrows only the AI bars. Both sides follow the Developer filter.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 70,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 0,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tokens per merged PR"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": false
+                }
+              },
+              {
+                "id": "noValue",
+                "value": "N/A"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "text",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tokens"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#6c5fc7",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 70
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Tokens"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "displayName",
+                "value": "Tokens · left axis"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "PRs merged"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "text",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 80
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "PRs merged"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "displayName",
+                "value": "PRs merged · right count axis"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tokens per merged PR · WoW change"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": false
+                }
+              },
+              {
+                "id": "noValue",
+                "value": "N/A"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "text",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 15,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.9,
+        "fullHighlight": false,
+        "groupWidth": 0.8,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "never",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xField": "Week",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH weekly_prs AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') AS week, COUNT(*) AS n\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer) OR (pr.author_id LIKE 'github:GithubAccount:%' AND CONCAT('gh:', SUBSTRING_INDEX(pr.author_id, ':', -1)) IN ($developer)))\n  GROUP BY 1\n),\nweekly_tok AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week, SUM(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens) AS v\n  FROM ai_model_usages\n  WHERE source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  )\n  AND $__timeFilter(date) AND ('__all' IN ($developer) OR CONCAT('em:', user_email) IN ($developer) OR user_email IN (SELECT g_d.author_email FROM _tool_github_commits g_d WHERE g_d.author_id > 0 AND CONCAT('gh:', g_d.author_id) IN ($developer)))\n  GROUP BY 1\n),\nweeks AS (\n  SELECT week FROM weekly_prs UNION SELECT week FROM weekly_tok\n),\nr AS (\n  SELECT w.week, COALESCE(a.v, 0) AS ai, COALESCE(p.n, 0) AS prs, COALESCE(a.v, 0) / NULLIF(p.n, 0) AS ratio\n  FROM weeks w\n  LEFT JOIN weekly_tok a ON a.week = w.week\n  LEFT JOIN weekly_prs p ON p.week = w.week\n  WHERE w.week >= DATE_FORMAT($__timeFrom(), '%Y-%m-%d') AND w.week <= DATE_FORMAT(DATE_SUB($__timeTo(), INTERVAL 7 DAY), '%Y-%m-%d')\n)\nSELECT DATE_FORMAT(r.week, '%b %e') AS \"Week\",\n  ROUND(ratio, 0) AS \"Tokens per merged PR\",\n  ROUND(ai, 0) AS \"Tokens\",\n  prs AS \"PRs merged\",\n  ROUND(100 * (ratio / NULLIF(LAG(ratio) OVER (ORDER BY r.week), 0) - 1), 1) AS \"Tokens per merged PR · WoW change\"\nFROM r\nORDER BY r.week",
+          "refId": "A"
+        }
+      ],
+      "title": "Tokens and PRs Merged (Weekly)",
+      "type": "barchart"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Purple bars: Claude Code OTel lines added, left axis. Neutral bars: merged PRs, right count axis. Different scales: compare each colour across weeks, not bar heights against each other. Completed weeks only; weeks begin Monday. Weeks before Claude Code OTel collection started show no AI bars and a per-PR ratio of 0: that means no data, not no usage. Hover for AI lines per merged PR (left out when no PRs merged) and its change from the previous week. AI lines uses the Project and OTel Teams filters; merged PRs use Project only, so selecting a team narrows only the AI bars. Both sides follow the Developer filter.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 70,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 0,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI lines per merged PR"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": false
+                }
+              },
+              {
+                "id": "noValue",
+                "value": "N/A"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "text",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI lines"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#6c5fc7",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 70
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "AI lines added"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "displayName",
+                "value": "AI lines · left axis"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "PRs merged"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "text",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 80
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "PRs merged"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "displayName",
+                "value": "PRs merged · right count axis"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AI lines per merged PR · WoW change"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": false
+                }
+              },
+              {
+                "id": "noValue",
+                "value": "N/A"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "text",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 16,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.9,
+        "fullHighlight": false,
+        "groupWidth": 0.8,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "never",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xField": "Week",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH weekly_prs AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') AS week, COUNT(*) AS n\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer) OR (pr.author_id LIKE 'github:GithubAccount:%' AND CONCAT('gh:', SUBSTRING_INDEX(pr.author_id, ':', -1)) IN ($developer)))\n  GROUP BY 1\n),\nweekly_lines AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week, SUM(lines_added) AS v\n  FROM ai_activities\n  WHERE record_kind = 'canonical_activity'\n    AND source_connection_id IN (\n      SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n    )\n    AND $__timeFilter(date) AND ('__all' IN ($developer) OR CONCAT('em:', user_email) IN ($developer) OR user_email IN (SELECT g_d.author_email FROM _tool_github_commits g_d WHERE g_d.author_id > 0 AND CONCAT('gh:', g_d.author_id) IN ($developer)))\n  GROUP BY 1\n),\nweeks AS (\n  SELECT week FROM weekly_prs UNION SELECT week FROM weekly_lines\n),\nr AS (\n  SELECT w.week, COALESCE(a.v, 0) AS ai, COALESCE(p.n, 0) AS prs, COALESCE(a.v, 0) / NULLIF(p.n, 0) AS ratio\n  FROM weeks w\n  LEFT JOIN weekly_lines a ON a.week = w.week\n  LEFT JOIN weekly_prs p ON p.week = w.week\n  WHERE w.week >= DATE_FORMAT($__timeFrom(), '%Y-%m-%d') AND w.week <= DATE_FORMAT(DATE_SUB($__timeTo(), INTERVAL 7 DAY), '%Y-%m-%d')\n)\nSELECT DATE_FORMAT(r.week, '%b %e') AS \"Week\",\n  ROUND(ratio, 1) AS \"AI lines per merged PR\",\n  ROUND(ai, 0) AS \"AI lines\",\n  prs AS \"PRs merged\",\n  ROUND(100 * (ratio / NULLIF(LAG(ratio) OVER (ORDER BY r.week), 0) - 1), 1) AS \"AI lines per merged PR · WoW change\"\nFROM r\nORDER BY r.week",
+          "refId": "A"
+        }
+      ],
+      "title": "AI Lines and PRs Merged (Weekly)",
+      "type": "barchart"
+    },
+    {
+      "datasource": "mysql",
       "description": "Weekly estimated cost, token use, and OTel lines added divided by merged PRs in the same week. The AI numerators use Project and OTel Teams; the PR denominator uses Project only. Each cell shows the ratio and its change from the previous available week. Weeks begin Monday; read the indexed chart below only for relative trend shape.",
       "fieldConfig": {
         "defaults": {
@@ -679,7 +1167,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 16
+        "y": 26
       },
       "id": 14,
       "options": {
@@ -713,143 +1201,12 @@
       "type": "table"
     },
     {
-      "datasource": "mysql",
-      "description": "Each metric here is indexed to its own first non-zero week in the selected range, which is forced to exactly 100 — every other week is shown as a percentage of that one week's value, not as a real number. This makes the chart fragile whenever that first week happens to have a tiny real denominator: a first week with just 1 merged PR, for example, would make a completely normal later week with 17 PRs show as 1700%. Read this chart for trend shape only — use the table above for the real weekly values. As in the weekly value table above, AI numerators use Project and OTel Teams while merged-PR denominators use Project only.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "fillOpacity": 80,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineWidth": 1,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Cost / PR"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#eb6834",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Tokens / PR"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#eda100",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "AI lines / PR"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#2a78d6",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 24,
-        "x": 0,
-        "y": 25
-      },
-      "id": 11,
-      "options": {
-        "barRadius": 0,
-        "barWidth": 0.7,
-        "fullHighlight": false,
-        "groupWidth": 0.7,
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "orientation": "auto",
-        "showValue": "auto",
-        "stacking": "none",
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        },
-        "xField": "week",
-        "xTickLabelRotation": 0,
-        "xTickLabelSpacing": 0
-      },
-      "pluginVersion": "11.0.0",
-      "targets": [
-        {
-          "datasource": "mysql",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "WITH weekly_prs AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') AS week, COUNT(*) AS n\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer) OR (pr.author_id LIKE 'github:GithubAccount:%' AND CONCAT('gh:', SUBSTRING_INDEX(pr.author_id, ':', -1)) IN ($developer)))\n  GROUP BY 1\n),\nweekly_spend AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week, SUM(estimated_cost_usd) AS v\n  FROM ai_model_usages\n  WHERE source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  )\n  AND $__timeFilter(date) AND ('__all' IN ($developer) OR CONCAT('em:', user_email) IN ($developer) OR user_email IN (SELECT g_d.author_email FROM _tool_github_commits g_d WHERE g_d.author_id > 0 AND CONCAT('gh:', g_d.author_id) IN ($developer)))\n  GROUP BY 1\n),\nweekly_tok AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week, SUM(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens) AS v\n  FROM ai_model_usages\n  WHERE source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  )\n  AND $__timeFilter(date) AND ('__all' IN ($developer) OR CONCAT('em:', user_email) IN ($developer) OR user_email IN (SELECT g_d.author_email FROM _tool_github_commits g_d WHERE g_d.author_id > 0 AND CONCAT('gh:', g_d.author_id) IN ($developer)))\n  GROUP BY 1\n),\nweekly_lines AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week, SUM(lines_added) AS v\n  FROM ai_activities\n  WHERE record_kind = 'canonical_activity'\n    AND source_connection_id IN (\n      SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n    )\n    AND $__timeFilter(date) AND ('__all' IN ($developer) OR CONCAT('em:', user_email) IN ($developer) OR user_email IN (SELECT g_d.author_email FROM _tool_github_commits g_d WHERE g_d.author_id > 0 AND CONCAT('gh:', g_d.author_id) IN ($developer)))\n  GROUP BY 1\n),\nweeks AS (\n  SELECT week FROM weekly_prs\n  UNION SELECT week FROM weekly_spend\n  UNION SELECT week FROM weekly_tok\n  UNION SELECT week FROM weekly_lines\n),\nfilled AS (\n  SELECT w.week,\n    COALESCE(s.v, 0) / NULLIF(p.n, 0) AS cost_per_pr,\n    COALESCE(t.v, 0) / NULLIF(p.n, 0) AS tok_per_pr,\n    COALESCE(l.v, 0) / NULLIF(p.n, 0) AS lines_per_pr\n  FROM weeks w\n  LEFT JOIN weekly_prs p ON p.week = w.week\n  LEFT JOIN weekly_spend s ON s.week = w.week\n  LEFT JOIN weekly_tok t ON t.week = w.week\n  LEFT JOIN weekly_lines l ON l.week = w.week\n)\nSELECT week,\n  ROUND(cost_per_pr * 100.0 / NULLIF((SELECT cost_per_pr FROM filled f WHERE f.cost_per_pr > 0 ORDER BY f.week LIMIT 1), 0), 1) AS `Cost / PR`,\n  ROUND(tok_per_pr * 100.0 / NULLIF((SELECT tok_per_pr FROM filled f WHERE f.tok_per_pr > 0 ORDER BY f.week LIMIT 1), 0), 1) AS `Tokens / PR`,\n  ROUND(lines_per_pr * 100.0 / NULLIF((SELECT lines_per_pr FROM filled f WHERE f.lines_per_pr > 0 ORDER BY f.week LIMIT 1), 0), 1) AS `AI lines / PR`\nFROM filled\nORDER BY week",
-          "refId": "A"
-        }
-      ],
-      "title": "Cost / Tokens / AI Lines per PR — Indexed (Weekly, Trend Shape Only)",
-      "type": "barchart"
-    },
-    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 30
+        "y": 35
       },
       "id": 12,
       "panels": [],
@@ -958,7 +1315,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 31
+        "y": 36
       },
       "id": 13,
       "options": {
