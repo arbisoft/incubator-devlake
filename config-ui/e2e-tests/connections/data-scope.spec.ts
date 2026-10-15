@@ -20,6 +20,7 @@ import { APIRequestContext } from '@playwright/test';
 import { loginAsAdmin } from '../auth-helpers';
 import { test, expect } from '../fixtures';
 import { adminApi, createGithubConnection, deleteConnection, listScopes, uniqueName } from '../support/api';
+import { GITHUB_COPY } from '../support/app-copy';
 import { ConnectionDetailPage, PLUGINS } from '../support/pages/connections';
 
 const GITHUB_TOKEN = process.env.E2E_GITHUB_TOKEN;
@@ -53,7 +54,7 @@ test.describe.serial('GitHub data scope and scope config on a connection', () =>
     const detail = new ConnectionDetailPage(page, PLUGINS.github);
     await detail.open(connectionId);
     await detail.openAddScope();
-    await detail.searchRemoteScope(repo.split('/')[1]);
+    await detail.searchRemoteScope(repo.split('/')[1], GITHUB_COPY.searchPlaceholder);
     await detail.pickRemoteScope(repo);
     await expect(detail.pickedScopeTag(repo)).toBeVisible();
     await detail.saveAddScope();
