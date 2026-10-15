@@ -586,6 +586,53 @@ func TestCommitReplayAbortsWhenConverterLeaseWasTakenOver(t *testing.T) {
 	}
 }
 
+func TestAdvanceQueuesRunsLogsWhenMetricsFail(t *testing.T) {
+	logsRan := false
+	advanced, err := advanceQueues(
+		func() (bool, devlakeerrors.Error) { return false, devlakeerrors.Default.New("metric claim failed") },
+		func() (bool, devlakeerrors.Error) { logsRan = true; return true, nil },
+	)
+	if !logsRan || !advanced {
+		t.Fatalf("advanceQueues() logs ran=%t advanced=%t; want the log batch converted despite the metric failure", logsRan, advanced)
+	}
+	if err == nil || !strings.Contains(err.Error(), "metric claim failed") {
+		t.Fatalf("advanceQueues() error = %v; want the metric failure reported", err)
+	}
+}
+
+func TestAdvanceQueuesCombinesBothFailures(t *testing.T) {
+	advanced, err := advanceQueues(
+		func() (bool, devlakeerrors.Error) { return false, devlakeerrors.Default.New("metric claim failed") },
+		func() (bool, devlakeerrors.Error) { return false, devlakeerrors.Default.New("log claim failed") },
+	)
+	if advanced || err == nil || !strings.Contains(err.Error(), "metric claim failed") || !strings.Contains(err.Error(), "log claim failed") {
+		t.Fatalf("advanceQueues() = %t, %v; want no progress and both failures", advanced, err)
+	}
+}
+
+func TestPollUntilIdleKeepsConvertingWhileAQueueAdvances(t *testing.T) {
+	failure := devlakeerrors.Default.New("metric claim failed")
+	rounds := []struct {
+		processed bool
+		err       devlakeerrors.Error
+	}{
+		{true, failure}, // metrics failed, logs converted a batch
+		{true, failure},
+		{false, failure}, // log backlog drained; the failure ends this run
+		{true, nil},      // must not be reached
+	}
+	calls := 0
+	converter := newRawConverter(nil, nil)
+	converter.pollUntilIdle(func() (bool, devlakeerrors.Error) {
+		round := rounds[calls]
+		calls++
+		return round.processed, round.err
+	})
+	if calls != 3 || !converter.pollErrorLogged {
+		t.Fatalf("pollUntilIdle() rounds=%d error logged=%t; want 3 rounds and the failure logged", calls, converter.pollErrorLogged)
+	}
+}
+
 func TestClaimNextWaitsBehindRetryDelayedHeadBatch(t *testing.T) {
 	now := time.Date(2026, 9, 14, 10, 0, 0, 0, time.UTC)
 	nextAttemptAt := now.Add(time.Minute)

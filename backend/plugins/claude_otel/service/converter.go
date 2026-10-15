@@ -89,16 +89,22 @@ func startRawConverter(database dal.Dal, logger log.Logger) {
 // poll runs retention, replay requests, and raw conversion in receipt order while this
 // process holds the converter lease.
 func (c *rawConverter) poll() {
+	c.pollUntilIdle(c.pollOnce)
+}
+
+// pollUntilIdle repeats pollOnce while it makes progress. An error ends the run only when
+// nothing advanced: one queue failing must not hold back the other's backlog. A batch
+// whose failure could not be recorded keeps its lease, so a failing queue reports no
+// progress on the next round instead of spinning.
+func (c *rawConverter) pollUntilIdle(pollOnce func() (bool, errors.Error)) {
 	for {
-		processed, err := c.pollOnce()
-		if err != nil {
-			if !c.pollErrorLogged {
-				c.logWarn(err, "Claude Code OTel raw batch converter poll failed")
-				c.pollErrorLogged = true
-			}
-			return
+		processed, err := pollOnce()
+		if err == nil {
+			c.pollErrorLogged = false
+		} else if !c.pollErrorLogged {
+			c.logWarn(err, "Claude Code OTel raw batch converter poll failed")
+			c.pollErrorLogged = true
 		}
-		c.pollErrorLogged = false
 		if !processed {
 			return
 		}
@@ -117,12 +123,27 @@ func (c *rawConverter) pollOnce() (bool, errors.Error) {
 		return replayed, err
 	}
 	// Metrics and logs advance one batch each per round so neither backlog starves the other.
-	processedMetrics, err := c.processNext()
-	if err != nil {
-		return processedMetrics, err
+	return advanceQueues(c.processNext, c.processNextLogBatch)
+}
+
+// advanceQueues runs every queue step, even after one fails, so a failing queue cannot
+// stop the others. It reports whether any step advanced, and the steps' errors combined.
+func advanceQueues(steps ...func() (bool, errors.Error)) (bool, errors.Error) {
+	advanced := false
+	var failures []error
+	var failure errors.Error
+	for _, step := range steps {
+		processed, err := step()
+		advanced = advanced || processed
+		if err != nil {
+			failures = append(failures, err)
+			failure = err
+		}
 	}
-	processedLogs, err := c.processNextLogBatch()
-	return processedMetrics || processedLogs, err
+	if len(failures) > 1 {
+		failure = errors.Default.Combine(failures)
+	}
+	return advanced, failure
 }
 
 // acquireLease takes or renews the singleton converter lease. The conditional update
