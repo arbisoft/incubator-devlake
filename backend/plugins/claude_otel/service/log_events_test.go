@@ -387,21 +387,53 @@ func TestPromptRollupNeverCarriesPromptText(t *testing.T) {
 	}
 }
 
-func TestClearExpiredPromptTextKeepsEventRows(t *testing.T) {
+// An event whose client clock ran ahead carries an event_timestamp far in the future. Its prompt
+// text must still be cleared when its raw batch expires, so the clear selects events by raw
+// batch ID only and never by event_timestamp.
+func TestDeleteExpiredLogBatchesClearsPromptTextRegardlessOfEventTimestamp(t *testing.T) {
 	database := dalmocks.NewDal(t)
 	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
-	expiredKeys := [][]byte{{1}, {2}}
-	database.EXPECT().Pluck("event_key", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(_ string, destination interface{}, clauses ...dal.Clause) {
+	futureEvent := models.OtelEvent{RawBatchId: 7, EventTimestamp: now.AddDate(5, 0, 0)}
+	expiredBatchIDs := []uint64{futureEvent.RawBatchId, 8}
+	var calls []string
+	database.EXPECT().Pluck("id", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(_ string, destination interface{}, clauses ...dal.Clause) {
 		where := clauses[1].Data.(dal.DalClause)
-		if where.Expr != "prompt_text IS NOT NULL AND event_timestamp < ?" || !where.Params[0].(time.Time).Equal(now.Add(-rawBatchRetention)) {
+		if where.Expr != "received_at < ? AND status IN ?" || !where.Params[0].(time.Time).Equal(now.Add(-rawBatchRetention)) {
 			t.Fatalf("Pluck() where = %q %v", where.Expr, where.Params)
 		}
-		*destination.(*[][]byte) = expiredKeys
+		*destination.(*[]uint64) = expiredBatchIDs
 	}).Return(nil).Once()
-	database.EXPECT().UpdateColumn(mock.AnythingOfType("*models.OtelEvent"), "prompt_text", nil, mock.Anything).Return(nil).Once()
+	// The generated Run helper cannot pass a nil value through, so read the raw arguments.
+	database.On("UpdateColumn", mock.AnythingOfType("*models.OtelEvent"), "prompt_text", nil, mock.Anything).Run(func(args mock.Arguments) {
+		where := args.Get(3).(dal.Clause).Data.(dal.DalClause)
+		ids, _ := where.Params[0].([]uint64)
+		if where.Expr != "raw_batch_id IN ?" || len(ids) != 2 || ids[0] != futureEvent.RawBatchId || ids[1] != 8 {
+			t.Fatalf("UpdateColumn() where = %q %v", where.Expr, where.Params)
+		}
+		calls = append(calls, "clear")
+	}).Return(nil).Once()
+	database.EXPECT().Delete(mock.AnythingOfType("*models.OtelLogBatch"), mock.Anything).Run(func(_ interface{}, _ ...dal.Clause) {
+		calls = append(calls, "delete")
+	}).Return(nil).Once()
 
-	if err := newRawMetricConverter(database, nil).clearExpiredPromptText(now); err != nil {
-		t.Fatalf("clearExpiredPromptText() error = %v", err)
+	if err := newRawMetricConverter(database, nil).deleteExpiredRawBatches(now, &models.OtelLogBatch{}); err != nil {
+		t.Fatalf("deleteExpiredRawBatches() error = %v", err)
+	}
+	if strings.Join(calls, ",") != "clear,delete" {
+		t.Fatalf("calls = %v; want prompt text cleared before the batches are deleted", calls)
+	}
+}
+
+func TestDeleteExpiredMetricBatchesLeavesEventsAlone(t *testing.T) {
+	database := dalmocks.NewDal(t)
+	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	database.EXPECT().Pluck("id", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(_ string, destination interface{}, _ ...dal.Clause) {
+		*destination.(*[]uint64) = []uint64{3}
+	}).Return(nil).Once()
+	database.EXPECT().Delete(mock.AnythingOfType("*models.OtelMetricBatch"), mock.Anything).Return(nil).Once()
+
+	if err := newRawMetricConverter(database, nil).deleteExpiredRawBatches(now, &models.OtelMetricBatch{}); err != nil {
+		t.Fatalf("deleteExpiredRawBatches() error = %v", err)
 	}
 }
 
