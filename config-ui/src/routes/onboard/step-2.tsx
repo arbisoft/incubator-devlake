@@ -43,6 +43,7 @@ export const Step2 = () => {
   const [testing, setTesting] = useState(false);
   const [testStatus, setTestStatus] = useState(false);
   const [payload, setPayload] = useState<ConnectionDraft>({});
+  const [createdConnectionId, setCreatedConnectionId] = useState<ID>();
 
   const { step, records, done, projectName, plugin, setStep, setRecords } = useContext(Context);
 
@@ -84,18 +85,19 @@ export const Step2 = () => {
 
     const [success] = await operator(
       async () => {
-        const connection = await API.connection.create(plugin, {
-          name: `${plugin}-${Date.now()}`,
-          ...getDefaults(plugin),
-          ...payload,
-        } as Parameters<typeof API.connection.create>[1]);
+        // Reuse the connection from a failed save so a retry does not create a duplicate.
+        let connectionId = createdConnectionId;
+        if (connectionId === undefined) {
+          const connection = await API.connection.create(plugin, {
+            name: `${plugin}-${Date.now()}`,
+            ...getDefaults(plugin),
+            ...payload,
+          } as Parameters<typeof API.connection.create>[1]);
+          connectionId = connection.id;
+          setCreatedConnectionId(connectionId);
+        }
 
-        const newRecords = [
-          ...records,
-          { plugin, connectionId: connection.id, blueprintId: '', pipelineId: '', scopeName: '' },
-        ];
-
-        setRecords(newRecords);
+        const newRecords = [...records, { plugin, connectionId, blueprintId: '', pipelineId: '', scopeName: '' }];
 
         await API.store.set(STORE_KEY, {
           step: WIZARD_STEP.SCOPE,
@@ -104,6 +106,8 @@ export const Step2 = () => {
           projectName,
           plugin,
         });
+
+        setRecords(newRecords);
       },
       {
         setOperating,
@@ -149,6 +153,7 @@ export const Step2 = () => {
               setValue={(token) => {
                 setPayload((current) => ({ ...current, token }));
                 setTestStatus(false);
+                setCreatedConnectionId(undefined);
               }}
               error=""
               setError={() => {}}
@@ -170,6 +175,7 @@ export const Step2 = () => {
               setValues={(values: ConnectionDraft) => {
                 setPayload((current) => ({ ...current, ...values }));
                 setTestStatus(false);
+                setCreatedConnectionId(undefined);
               }}
               setErrors={() => {}}
             />

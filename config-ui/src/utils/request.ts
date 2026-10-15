@@ -99,7 +99,6 @@ instance.interceptors.response.use(
 export const request = (path: string, config?: RequestConfig) => {
   const { method = DEFAULT_REQUEST_METHOD, data, timeout, headers, signal } = config || {};
 
-  const controller = new AbortController();
   const token = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
   const h = { ...headers };
   if (token) {
@@ -112,7 +111,7 @@ export const request = (path: string, config?: RequestConfig) => {
     method,
     timeout,
     headers: h,
-    signal: controller.signal,
+    signal,
     responseType: config?.responseType,
   };
 
@@ -122,13 +121,5 @@ export const request = (path: string, config?: RequestConfig) => {
     params.data = data;
   }
 
-  const promise = instance.request(params).then((resp) => resp.data);
-
-  if (signal) {
-    signal.addEventListener('abort', () => {
-      controller.abort();
-    });
-  }
-
-  return promise;
+  return instance.request(params).then((resp) => resp.data);
 };

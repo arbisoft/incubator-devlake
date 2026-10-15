@@ -59,6 +59,7 @@ const NEXT_BUTTON = COPY.next;
 const CONNECT_BUTTON = COPY.connection.connect;
 const CREDENTIAL_BUTTON = 'Provide credential';
 const SUCCESSFUL_TEST_MESSAGE = 'safe connection success';
+const LOADING_CLASS = 'ant-btn-loading';
 type ConnectionTestResponse = Awaited<ReturnType<typeof API.connection.testOld>>;
 type DeferredConnectionTest = ReturnType<typeof createDeferred<ConnectionTestResponse>>;
 
@@ -79,11 +80,11 @@ const getConnectButton = () => {
 };
 
 const waitForPending = async () => {
-  await waitFor(() => expect(getConnectButton().classList.contains('ant-btn-loading')).toBe(true));
+  await waitFor(() => expect(getConnectButton().classList.contains(LOADING_CLASS)).toBe(true));
 };
 
 const waitForSettled = async () => {
-  await waitFor(() => expect(getConnectButton().classList.contains('ant-btn-loading')).toBe(false));
+  await waitFor(() => expect(getConnectButton().classList.contains(LOADING_CLASS)).toBe(false));
 };
 
 const resolveSuccessfulConnectionTest = async (result: DeferredConnectionTest) => {
@@ -141,6 +142,36 @@ describe('Step2 connection tests', () => {
     expect(createConnection).toHaveBeenCalledTimes(1);
     expect(Boolean(createConnection.mock.calls[0]?.[1].token)).toBe(true);
     expect(storeSet).toHaveBeenCalledTimes(1);
+  });
+
+  it('reuses the created connection when retrying a failed progress save', async () => {
+    const successfulTest = createDeferred<ConnectionTestResponse>();
+    testOld.mockReturnValueOnce(successfulTest.promise);
+    storeSet.mockRejectedValueOnce(new Error('safe store failure'));
+    const { value } = setup();
+    fireEvent.click(screen.getByRole('button', { name: CREDENTIAL_BUTTON }));
+    fireEvent.click(getConnectButton());
+    await waitForPending();
+    await resolveSuccessfulConnectionTest(successfulTest);
+
+    fireEvent.click(next());
+    await waitFor(() => expect(storeSet).toHaveBeenCalledTimes(1));
+    const nextButton = screen.getByText(NEXT_BUTTON).closest('button');
+    if (!nextButton) {
+      throw new Error('Next button is unavailable.');
+    }
+    await waitFor(() => expect(nextButton.classList.contains(LOADING_CLASS)).toBe(false));
+    expect(value.setStep).not.toHaveBeenCalled();
+    expect(value.setRecords).not.toHaveBeenCalled();
+
+    fireEvent.click(nextButton);
+    await waitFor(() => expect(value.setStep).toHaveBeenCalledWith(WIZARD_STEP.SCOPE));
+    expect(createConnection).toHaveBeenCalledTimes(1);
+    expect(storeSet).toHaveBeenCalledTimes(2);
+    expect(storeSet.mock.calls[1]?.[1]).toMatchObject({ records: [{ connectionId: CONNECTION_ID }] });
+    expect(value.setRecords).toHaveBeenCalledExactlyOnceWith([
+      expect.objectContaining({ connectionId: CONNECTION_ID }),
+    ]);
   });
 
   it('disables Next after a failed retest even when an earlier test succeeded', async () => {

@@ -47,7 +47,7 @@ type CapturedRequestConfig = {
   data?: unknown;
   responseType?: unknown;
   headers?: unknown;
-  signal: AbortSignal;
+  signal?: AbortSignal;
 };
 type CapturedInstanceConfig = {
   withCredentials?: unknown;
@@ -171,50 +171,25 @@ describe('request', () => {
     expect(localStorage.getItem).toHaveBeenCalledExactlyOnceWith('accessToken');
   });
 
-  it('connects a caller abort to the request cancellation signal', async () => {
+  it('passes the caller abort signal straight to Axios', async () => {
     const callerController = new AbortController();
     await request('/projects', { signal: callerController.signal });
 
-    const requestSignal = capturedRequestConfig().signal;
-    expect(requestSignal).toBeInstanceOf(AbortSignal);
-    expect(requestSignal.aborted).toBe(false);
-    const signalsAreIndependent = requestSignal !== callerController.signal;
-    expect(signalsAreIndependent).toBe(true);
-
-    callerController.abort();
-
-    expect(requestSignal.aborted).toBe(true);
+    expect(capturedRequestConfig().signal).toBe(callerController.signal);
   });
 
-  it('leaves an internal request signal active when the caller signal is already aborted', async () => {
+  it('keeps an already-aborted caller signal so Axios cancels the request', async () => {
     const callerController = new AbortController();
     callerController.abort();
     await request('/projects', { signal: callerController.signal });
 
-    const requestSignal = capturedRequestConfig().signal;
-    const requestSignalRemainsActive = requestSignal.aborted === false;
-    expect(requestSignalRemainsActive).toBe(true);
+    expect(capturedRequestConfig().signal?.aborted).toBe(true);
   });
 
-  it('cancels each request independently', async () => {
-    const firstCallerController = new AbortController();
-    const secondCallerController = new AbortController();
-    await request('/projects/first', { signal: firstCallerController.signal });
-    await request('/projects/second', { signal: secondCallerController.signal });
+  it('sends no abort signal when the caller passes none', async () => {
+    await request('/projects');
 
-    const firstRequestSignal = capturedRequestConfig(0).signal;
-    const secondRequestSignal = capturedRequestConfig(1).signal;
-    const requestSignalsAreIndependent = firstRequestSignal !== secondRequestSignal;
-    expect(requestSignalsAreIndependent).toBe(true);
-
-    firstCallerController.abort();
-
-    expect(firstRequestSignal.aborted).toBe(true);
-    expect(secondRequestSignal.aborted).toBe(false);
-
-    secondCallerController.abort();
-
-    expect(secondRequestSignal.aborted).toBe(true);
+    expect(capturedRequestConfig().signal).toBeUndefined();
   });
 
   it.each(['/login', '/login/', '/login///', '/prefix/login///'])(
