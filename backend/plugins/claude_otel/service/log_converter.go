@@ -44,15 +44,22 @@ func (c *rawConverter) processNextLogBatch() (bool, errors.Error) {
 	return true, nil
 }
 
-// claimNextLogBatch claims the earliest nonterminal log batch. Like metrics, a batch
-// waiting for retry holds the queue, so events of one session are applied in order.
+// claimNextLogBatch claims the earliest live log batch, or when none is claimable, the
+// earliest batch requeued by a replay. Like metrics, a live batch waiting for retry holds
+// the live queue. Log conversion does not depend on receipt order, so a replay backlog is
+// converted only while the live queue is empty or waiting, and never delays new events.
 func (c *rawConverter) claimNextLogBatch() (*models.OtelLogBatch, *batchLease, errors.Error) {
-	batch := &models.OtelLogBatch{}
-	lease, err := c.claimNextBatch(batch, &models.OtelLogBatch{})
-	if err != nil || lease == nil {
-		return nil, nil, err
+	for _, statuses := range [][]string{nonterminalBatchStatuses, {models.OtelBatchStatusReplayPending}} {
+		batch := &models.OtelLogBatch{}
+		lease, err := c.claimNextBatch(batch, &models.OtelLogBatch{}, statuses)
+		if err != nil {
+			return nil, nil, err
+		}
+		if lease != nil {
+			return batch, lease, nil
+		}
 	}
-	return batch, lease, nil
+	return nil, nil, nil
 }
 
 // convertLogBatch prepares events outside a transaction, then verifies the batch lease and
@@ -71,10 +78,7 @@ func (c *rawConverter) convertLogBatch(batch *models.OtelLogBatch, lease *batchL
 		if err != nil {
 			return err
 		}
-		if err := rollupSessions(tx, workspaceKeys, sessionTargets(prepared.events)); err != nil {
-			return classifyStorageError(err)
-		}
-		return nil
+		return rollupSessions(tx, workspaceKeys, sessionTargets(prepared.events))
 	})
 	if err != nil {
 		return nil, err

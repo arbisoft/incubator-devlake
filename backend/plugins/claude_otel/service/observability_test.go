@@ -60,6 +60,53 @@ func TestClassifyOtelIngestionHealth(t *testing.T) {
 	}
 }
 
+func TestWorseOtelIngestionHealth(t *testing.T) {
+	for _, testCase := range []struct{ left, right, want string }{
+		{ingestionHealthHealthy, ingestionHealthHealthy, ingestionHealthHealthy},
+		{ingestionHealthHealthy, ingestionHealthDegraded, ingestionHealthDegraded},
+		{ingestionHealthUnhealthy, ingestionHealthDegraded, ingestionHealthUnhealthy},
+		{ingestionHealthDegraded, ingestionHealthUnhealthy, ingestionHealthUnhealthy},
+	} {
+		if got := worseOtelIngestionHealth(testCase.left, testCase.right); got != testCase.want {
+			t.Errorf("worseOtelIngestionHealth(%q, %q) = %q, want %q", testCase.left, testCase.right, got, testCase.want)
+		}
+	}
+}
+
+// The log queue reports replay_pending, and its backlog query and error counts read the
+// log batch table.
+func TestOtelQueueStatusReadsLogBatchTable(t *testing.T) {
+	now := time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC)
+	mockDal := withMockDal(t)
+	readsLogTable := func(clauses []dal.Clause) {
+		t.Helper()
+		if _, isLogBatch := clauses[0].Data.(*models.OtelLogBatch); clauses[0].Type != dal.FromClause || !isLogBatch {
+			t.Fatalf("query clauses = %#v; want FROM the log batch table", clauses)
+		}
+	}
+	mockDal.EXPECT().All(mock.AnythingOfType("*[]service.ingestionStatusCount"), mock.Anything, mock.Anything, mock.Anything).Run(
+		func(rows interface{}, clauses ...dal.Clause) {
+			readsLogTable(clauses)
+			*rows.(*[]ingestionStatusCount) = []ingestionStatusCount{{Status: models.OtelBatchStatusReplayPending, Count: 4}}
+		},
+	).Return(nil)
+	mockDal.EXPECT().All(mock.AnythingOfType("*[]service.oldestNonterminalBatch"), mock.Anything, mock.Anything, mock.Anything).Run(
+		func(_ interface{}, clauses ...dal.Clause) { readsLogTable(clauses) },
+	).Return(nil)
+	mockDal.EXPECT().Count(mock.Anything, mock.Anything).Run(func(clauses ...dal.Clause) { readsLogTable(clauses) }).Return(int64(0), nil)
+	mockDal.EXPECT().All(mock.AnythingOfType("*[]service.permanentErrorReason"), mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(
+		func(_ interface{}, clauses ...dal.Clause) { readsLogTable(clauses) },
+	).Return(nil)
+
+	status, err := otelQueueStatus(&models.OtelLogBatch{}, now)
+	if err != nil {
+		t.Fatalf("otelQueueStatus() error = %v", err)
+	}
+	if status.BatchCounts[models.OtelBatchStatusReplayPending] != 4 || status.BatchCounts[models.OtelBatchStatusPending] != 0 || status.OldestNonterminal != nil {
+		t.Fatalf("otelQueueStatus() = %#v; want 4 replay_pending batches and no live backlog", status)
+	}
+}
+
 func TestDecodeOtelMetricBatchPayload(t *testing.T) {
 	payload := marshalOtelMetricsRequest(t, newOtelMetricsRequest("platform", ""))
 	decoded, err := decodeOtelMetricBatchPayload(&models.OtelMetricBatch{
@@ -146,7 +193,7 @@ func TestOtelRecentPermanentErrorsToleratesMissingProcessedAt(t *testing.T) {
 		},
 	).Return(nil)
 
-	count, _, err := otelRecentPermanentErrors(now)
+	count, _, err := otelRecentPermanentErrors(&models.OtelMetricBatch{}, now)
 	if err != nil {
 		t.Fatalf("otelRecentPermanentErrors() error = %v", err)
 	}

@@ -69,8 +69,11 @@ var attributionErrorCodes = map[conversionErrorCode]struct{}{
 }
 
 // logRecordErrorCodes identify one log record's bad data. They skip only that record:
-// unlike cumulative metrics, events have no ordering that a missing record breaks.
+// unlike cumulative metrics, events have no ordering that a missing record breaks. A
+// record without organization.id, such as one sent before the client signed in, carries no
+// conflicting attribution, so it is skipped without discarding its resource group.
 var logRecordErrorCodes = map[conversionErrorCode]struct{}{
+	errorMissingOrganization: {},
 	errorInvalidTimestamp:    {},
 	errorMissingUserIdentity: {},
 	errorInvalidDimension:    {},

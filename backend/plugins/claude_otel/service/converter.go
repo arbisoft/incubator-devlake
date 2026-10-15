@@ -208,7 +208,7 @@ func (c *rawConverter) processNext() (bool, errors.Error) {
 // claimNext claims the earliest nonterminal metric batch; see claimNextBatch.
 func (c *rawConverter) claimNext() (*models.OtelMetricBatch, *batchLease, errors.Error) {
 	batch := &models.OtelMetricBatch{}
-	lease, err := c.claimNextBatch(batch, &models.OtelMetricBatch{})
+	lease, err := c.claimNextBatch(batch, &models.OtelMetricBatch{}, nonterminalBatchStatuses)
 	if err != nil || lease == nil {
 		return nil, nil, err
 	}

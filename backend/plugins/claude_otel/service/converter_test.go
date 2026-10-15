@@ -721,7 +721,7 @@ func TestClaimHeadQueryLooksUpEachStatusThenPicksEarliest(t *testing.T) {
 		func(_ interface{}, query ...dal.Clause) { clauses = query },
 	).Return(nil).Once()
 
-	head, err := newRawConverter(database, nil).claimHead(&models.OtelLogBatch{})
+	head, err := newRawConverter(database, nil).claimHead(&models.OtelLogBatch{}, nonterminalBatchStatuses)
 	if err != nil || head != nil {
 		t.Fatalf("claimHead() = %#v, %v; want no head from an empty queue", head, err)
 	}

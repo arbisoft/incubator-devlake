@@ -38,6 +38,10 @@ const (
 	OtelBatchStatusProcessed      = "processed"
 	OtelBatchStatusRetryableError = "retryable_error"
 	OtelBatchStatusPermanentError = "permanent_error"
+	// OtelBatchStatusReplayPending marks a log batch requeued by a replay request. The log
+	// queue claims these only when no live batch is claimable, so a replay cannot delay
+	// new events.
+	OtelBatchStatusReplayPending = "replay_pending"
 )
 
 const (
@@ -95,9 +99,10 @@ func (OtelConverterLease) TableName() string {
 }
 
 // OtelReplayRequest asks the elected converter to replay whole UTC days of retained raw
-// batches. Kind metrics rebuilds hourly and canonical daily facts; kind logs requeues the
-// log batches so their events and prompts are converted again. Operators insert requests
-// directly; there is intentionally no API or UI trigger.
+// batches. Kind metrics rebuilds hourly and canonical daily facts of completed days; kind
+// logs requeues the log batches received in the range, which may include the current day,
+// so their events and prompts are converted again. Operators insert requests directly;
+// there is intentionally no API or UI trigger.
 type OtelReplayRequest struct {
 	common.Model
 	Kind            string     `gorm:"type:varchar(16);not null;default:'metrics'"`

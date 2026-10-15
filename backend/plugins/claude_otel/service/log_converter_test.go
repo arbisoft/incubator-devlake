@@ -280,13 +280,50 @@ func TestClaimNextLogBatchWaitsBehindRetryDelayedHead(t *testing.T) {
 	now := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
 	nextAttemptAt := now.Add(time.Minute)
 	database := dalmocks.NewDal(t)
-	expectClaimHead(database, &rawBatchHead{ID: 4, ReceivedAt: now.Add(-time.Hour), Status: models.OtelBatchStatusRetryableError, NextAttemptAt: &nextAttemptAt})
+	expectClaimHead(database, &rawBatchHead{ID: 4, ReceivedAt: now.Add(-time.Hour), Status: models.OtelBatchStatusRetryableError, NextAttemptAt: &nextAttemptAt}).Once()
+	// No replay backlog.
+	expectClaimHead(database, nil).Once()
 	converter := newRawConverter(database, nil)
 	converter.now = func() time.Time { return now }
 
 	batch, _, err := converter.claimNextLogBatch()
 	if err != nil || batch != nil {
 		t.Fatalf("claimNextLogBatch() = %#v, %v; want no claim while the head waits for retry", batch, err)
+	}
+}
+
+// A replay backlog is converted only while no live batch is claimable, so it never
+// delays new events.
+func TestClaimNextLogBatchClaimsReplayBacklogOnlyAfterLiveQueue(t *testing.T) {
+	now := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
+	database := dalmocks.NewDal(t)
+	var queries [][]interface{}
+	database.EXPECT().All(mock.AnythingOfType("*[]*service.rawBatchHead"), mock.Anything, mock.Anything, mock.Anything).Run(
+		func(heads interface{}, clauses ...dal.Clause) {
+			queries = append(queries, clauses[0].Data.(dal.DalClause).Params)
+			if len(queries) == 2 {
+				*heads.(*[]*rawBatchHead) = []*rawBatchHead{{ID: 2, ReceivedAt: now.AddDate(0, 0, -3), Status: models.OtelBatchStatusReplayPending}}
+			}
+		},
+	).Return(nil).Times(2)
+	database.EXPECT().UpdateColumns(mock.AnythingOfType("*models.OtelLogBatch"), mock.Anything, mock.Anything).Return(nil).Once()
+	database.EXPECT().First(mock.AnythingOfType("*models.OtelLogBatch"), mock.Anything).Run(func(batch interface{}, _ ...dal.Clause) {
+		*batch.(*models.OtelLogBatch) = models.OtelLogBatch{Model: common.Model{ID: 2}, Status: models.OtelBatchStatusProcessing}
+	}).Return(nil).Once()
+	converter := newRawConverter(database, nil)
+	converter.now = func() time.Time { return now }
+
+	batch, lease, err := converter.claimNextLogBatch()
+	if err != nil || batch == nil || batch.ID != 2 || lease == nil || lease.attempts != 1 {
+		t.Fatalf("claimNextLogBatch() = %#v, %#v, %v; want replayed batch 2 leased for attempt 1", batch, lease, err)
+	}
+	for i, status := range nonterminalBatchStatuses {
+		if queries[0][i] != status {
+			t.Fatalf("first claim query statuses = %v, want the live statuses %v", queries[0], nonterminalBatchStatuses)
+		}
+	}
+	if len(queries[1]) != 1 || queries[1][0] != models.OtelBatchStatusReplayPending {
+		t.Fatalf("second claim query statuses = %v, want only replay_pending", queries[1])
 	}
 }
 

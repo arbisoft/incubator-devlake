@@ -111,6 +111,16 @@ export type OtelMetricBatchSummary = {
   processedAt?: string;
 };
 
+export type OtelQueueStatus = {
+  batchCounts: Record<string, number>;
+  oldestNonterminal?: {
+    receivedAt: string;
+    ageSeconds: number;
+  };
+  recentPermanentErrors: number;
+  permanentErrorReasons: Array<{ code: string; count: number }>;
+};
+
 export type OtelIngestionStatus = {
   contractVersion: number;
   state: OtelIngestionState;
@@ -129,4 +139,5 @@ export type OtelIngestionStatus = {
   recentPermanentErrors: number;
   permanentErrorReasons: Array<{ code: string; count: number }>;
   recentBatches: OtelMetricBatchSummary[];
+  logs?: OtelQueueStatus;
 };

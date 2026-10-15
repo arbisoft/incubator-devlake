@@ -56,6 +56,18 @@ type OtelIngestionStatus struct {
 	RecentPermanentErrors int64                       `json:"recentPermanentErrors"`
 	PermanentErrorReasons []OtelPermanentErrorReason  `json:"permanentErrorReasons"`
 	RecentBatches         []OtelMetricBatchSummary    `json:"recentBatches"`
+	// Logs reports the raw log queue, which produces events and ai_prompts. The fields
+	// above report the raw metric queue; State and Reasons cover both.
+	Logs *OtelQueueStatus `json:"logs"`
+}
+
+// OtelQueueStatus is one raw batch queue's backlog and recent quarantines. Log batches
+// requeued by a replay are counted under replay_pending and are not part of the backlog.
+type OtelQueueStatus struct {
+	BatchCounts           map[string]int64            `json:"batchCounts"`
+	OldestNonterminal     *OtelOldestNonterminalBatch `json:"oldestNonterminal,omitempty"`
+	RecentPermanentErrors int64                       `json:"recentPermanentErrors"`
+	PermanentErrorReasons []OtelPermanentErrorReason  `json:"permanentErrorReasons"`
 }
 
 type OtelOldestNonterminalBatch struct {
@@ -107,11 +119,11 @@ type permanentErrorReason struct {
 // exposing accepted telemetry. Thresholds are versioned by ContractVersion.
 func GetOtelIngestionStatus() (*OtelIngestionStatus, errors.Error) {
 	now := time.Now().UTC()
-	counts, err := otelBatchCounts()
+	metrics, err := otelQueueStatus(&models.OtelMetricBatch{}, now)
 	if err != nil {
 		return nil, err
 	}
-	oldest, err := otelOldestNonterminal(now)
+	logs, err := otelQueueStatus(&models.OtelLogBatch{}, now)
 	if err != nil {
 		return nil, err
 	}
@@ -119,30 +131,54 @@ func GetOtelIngestionStatus() (*OtelIngestionStatus, errors.Error) {
 	if err != nil {
 		return nil, err
 	}
-	permanentCount, reasons, err := otelRecentPermanentErrors(now)
-	if err != nil {
-		return nil, err
-	}
 	recentBatches, err := ListOtelMetricBatchSummaries(ingestionStatusRecentBatchLimit)
 	if err != nil {
 		return nil, err
 	}
-	state, healthReasons := classifyOtelIngestionHealth(oldest, permanentCount)
+	state, healthReasons := classifyOtelIngestionHealth(metrics.OldestNonterminal, metrics.RecentPermanentErrors)
+	logState, logReasons := classifyOtelIngestionHealth(logs.OldestNonterminal, logs.RecentPermanentErrors)
+	state = worseOtelIngestionHealth(state, logState)
+	for _, reason := range logReasons {
+		healthReasons = append(healthReasons, "log queue: "+reason)
+	}
 	return &OtelIngestionStatus{
 		ContractVersion:       ingestionStatusContractVersion,
 		State:                 state,
 		Reasons:               healthReasons,
-		BatchCounts:           counts,
-		OldestNonterminal:     oldest,
+		BatchCounts:           metrics.BatchCounts,
+		OldestNonterminal:     metrics.OldestNonterminal,
 		ConverterLease:        lease,
-		RecentPermanentErrors: permanentCount,
-		PermanentErrorReasons: reasons,
+		RecentPermanentErrors: metrics.RecentPermanentErrors,
+		PermanentErrorReasons: metrics.PermanentErrorReasons,
 		RecentBatches:         recentBatches,
+		Logs:                  logs,
 	}, nil
 }
 
-func otelBatchCounts() (map[string]int64, errors.Error) {
-	counts := make(map[string]int64, 5)
+// otelQueueStatus reads the backlog and recent quarantines of one raw batch table.
+func otelQueueStatus(table dal.Tabler, now time.Time) (*OtelQueueStatus, errors.Error) {
+	counts, err := otelBatchCounts(table)
+	if err != nil {
+		return nil, err
+	}
+	oldest, err := otelOldestNonterminal(table, now)
+	if err != nil {
+		return nil, err
+	}
+	permanentCount, reasons, err := otelRecentPermanentErrors(table, now)
+	if err != nil {
+		return nil, err
+	}
+	return &OtelQueueStatus{
+		BatchCounts:           counts,
+		OldestNonterminal:     oldest,
+		RecentPermanentErrors: permanentCount,
+		PermanentErrorReasons: reasons,
+	}, nil
+}
+
+func otelBatchCounts(table dal.Tabler) (map[string]int64, errors.Error) {
+	counts := make(map[string]int64, 6)
 	for _, status := range []string{
 		models.OtelBatchStatusPending,
 		models.OtelBatchStatusProcessing,
@@ -152,9 +188,12 @@ func otelBatchCounts() (map[string]int64, errors.Error) {
 	} {
 		counts[status] = 0
 	}
+	if _, isLogBatch := table.(*models.OtelLogBatch); isLogBatch {
+		counts[models.OtelBatchStatusReplayPending] = 0
+	}
 	rows := make([]ingestionStatusCount, 0)
 	if err := db.All(&rows,
-		dal.From(&models.OtelMetricBatch{}),
+		dal.From(table),
 		dal.Select("status, COUNT(*) AS count"),
 		dal.Groupby("status"),
 	); err != nil {
@@ -166,10 +205,10 @@ func otelBatchCounts() (map[string]int64, errors.Error) {
 	return counts, nil
 }
 
-func otelOldestNonterminal(now time.Time) (*OtelOldestNonterminalBatch, errors.Error) {
+func otelOldestNonterminal(table dal.Tabler, now time.Time) (*OtelOldestNonterminalBatch, errors.Error) {
 	rows := make([]oldestNonterminalBatch, 0, 1)
 	if err := db.All(&rows,
-		dal.From(&models.OtelMetricBatch{}),
+		dal.From(table),
 		dal.Select("MIN(received_at) AS received_at"),
 		dal.Where("status IN ?", nonterminalBatchStatuses),
 	); err != nil {
@@ -201,18 +240,18 @@ func otelConverterLeaseStatus(now time.Time) (*OtelConverterLeaseStatus, errors.
 	}, nil
 }
 
-func otelRecentPermanentErrors(now time.Time) (int64, []OtelPermanentErrorReason, errors.Error) {
+func otelRecentPermanentErrors(table dal.Tabler, now time.Time) (int64, []OtelPermanentErrorReason, errors.Error) {
 	// COALESCE covers permanent_error rows quarantined before recordFailure started setting
 	// processed_at on write; those rows have NULL, and processed_at >= ? alone is never true
 	// for NULL, which would silently zero out this count for pre-existing rows.
 	where := dal.Where("status = ? AND COALESCE(processed_at, received_at) >= ?", models.OtelBatchStatusPermanentError, now.Add(-permanentErrorWindow))
-	count, err := db.Count(dal.From(&models.OtelMetricBatch{}), where)
+	count, err := db.Count(dal.From(table), where)
 	if err != nil {
 		return 0, nil, errors.Default.Wrap(err, "failed to count recent Claude Code OTel permanent errors")
 	}
 	rows := make([]permanentErrorReason, 0)
 	if err := db.All(&rows,
-		dal.From(&models.OtelMetricBatch{}),
+		dal.From(table),
 		dal.Select("processing_error_code AS code, COUNT(*) AS count"),
 		where,
 		dal.Groupby("processing_error_code"),
@@ -327,6 +366,20 @@ func classifyOtelIngestionHealth(oldest *OtelOldestNonterminalBatch, permanentEr
 		reasons = append(reasons, "permanent errors occurred in the last 24 hours")
 	}
 	return state, reasons
+}
+
+// otelIngestionHealthRank orders health states from best to worst.
+var otelIngestionHealthRank = map[string]int{
+	ingestionHealthHealthy:   0,
+	ingestionHealthDegraded:  1,
+	ingestionHealthUnhealthy: 2,
+}
+
+func worseOtelIngestionHealth(left, right string) string {
+	if otelIngestionHealthRank[right] > otelIngestionHealthRank[left] {
+		return right
+	}
+	return left
 }
 
 func maxDuration(value, minimum time.Duration) time.Duration {

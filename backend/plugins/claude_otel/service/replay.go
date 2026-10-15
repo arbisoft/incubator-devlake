@@ -180,16 +180,27 @@ func (c *rawConverter) finishReplay(requestID uint64, leaseOwner, status string,
 	return nil
 }
 
+// validateReplayRange checks a metrics replay range, which must hold completed UTC days
+// only because replay replaces whole days of facts.
 func (c *rawConverter) validateReplayRange(request *models.OtelReplayRequest) error {
+	if err := c.validateReplayDays(request); err != nil {
+		return err
+	}
+	if request.RangeEnd.UTC().After(c.now().UTC().Truncate(24 * time.Hour)) {
+		return fmt.Errorf("replay range must contain completed UTC days only")
+	}
+	return nil
+}
+
+// validateReplayDays checks the rules shared by metrics and logs replay: whole UTC days, at
+// most replayMaxRange long, within raw batch retention.
+func (c *rawConverter) validateReplayDays(request *models.OtelReplayRequest) error {
 	start, end := request.RangeStart.UTC(), request.RangeEnd.UTC()
 	if !start.Equal(start.Truncate(24*time.Hour)) || !end.Equal(end.Truncate(24*time.Hour)) {
 		return fmt.Errorf("replay range must start and end at UTC midnight")
 	}
 	if !start.Before(end) || end.Sub(start) > replayMaxRange {
 		return fmt.Errorf("replay range must be between one and %d days", int(replayMaxRange.Hours()/24))
-	}
-	if end.After(c.now().UTC().Truncate(24 * time.Hour)) {
-		return fmt.Errorf("replay range must contain completed UTC days only")
 	}
 	if start.Before(c.now().UTC().Add(-rawBatchRetention)) {
 		return fmt.Errorf("replay range starts before retained raw telemetry")

@@ -233,20 +233,8 @@ func buildPromptRollup(workspaceKey, promptID string, events []*models.OtelEvent
 			fillPromptIdentity(prompt, event)
 		}
 		prompt.EndedAt = latestTime(prompt.EndedAt, event.EventTimestamp)
-		attributes := eventAttributes(event)
-		switch event.EventName {
-		case eventUserPrompt:
-			builder.applyUserPrompt(event, attributes)
-		case eventAPIRequest:
-			builder.applyAPIRequest(event)
-		case eventAPIError:
-			builder.applyAPIError()
-		case eventToolResult:
-			builder.applyToolResult(event)
-		case eventToolDecision:
-			builder.applyToolDecision(attributes)
-		case eventSkillActivated:
-			builder.applySkillActivated(event, attributes)
+		if apply, handled := promptEventAppliers[event.EventName]; handled {
+			apply(builder, event, eventAttributes(event))
 		}
 	}
 	prompt.ModelsUsed = truncate(strings.Join(builder.modelNames, ","), maxModelsUsedLength)
@@ -264,6 +252,20 @@ type promptBuilder struct {
 	seenModels map[string]struct{}
 }
 
+// promptEventApplier adds one event's contribution to the prompt being built.
+type promptEventApplier func(b *promptBuilder, event *models.OtelEvent, attributes map[string]interface{})
+
+// promptEventAppliers maps each event name that contributes to a prompt to its applier.
+// Other events only extend the prompt's time range.
+var promptEventAppliers = map[string]promptEventApplier{
+	eventUserPrompt:     (*promptBuilder).applyUserPrompt,
+	eventAPIRequest:     (*promptBuilder).applyAPIRequest,
+	eventAPIError:       (*promptBuilder).applyAPIError,
+	eventToolResult:     (*promptBuilder).applyToolResult,
+	eventToolDecision:   (*promptBuilder).applyToolDecision,
+	eventSkillActivated: (*promptBuilder).applySkillActivated,
+}
+
 func (b *promptBuilder) applyUserPrompt(event *models.OtelEvent, attributes map[string]interface{}) {
 	// The user_prompt event marks the start, even when an earlier-stamped event of the same
 	// prompt arrived.
@@ -274,7 +276,7 @@ func (b *promptBuilder) applyUserPrompt(event *models.OtelEvent, attributes map[
 	b.prompt.CommandSource = truncate(eventString(attributes, "command_source"), maxCommandSourceLength)
 }
 
-func (b *promptBuilder) applyAPIRequest(event *models.OtelEvent) {
+func (b *promptBuilder) applyAPIRequest(event *models.OtelEvent, _ map[string]interface{}) {
 	b.prompt.ApiRequestCount++
 	b.prompt.InputTokens += event.InputTokens
 	b.prompt.OutputTokens += event.OutputTokens
@@ -292,11 +294,11 @@ func (b *promptBuilder) applyAPIRequest(event *models.OtelEvent) {
 	b.skills.add(event.SkillName, ai.SkillDetectedViaApiRequest, "", "", event.PluginName, event.EventTimestamp)
 }
 
-func (b *promptBuilder) applyAPIError() {
+func (b *promptBuilder) applyAPIError(_ *models.OtelEvent, _ map[string]interface{}) {
 	b.prompt.ApiErrorCount++
 }
 
-func (b *promptBuilder) applyToolResult(event *models.OtelEvent) {
+func (b *promptBuilder) applyToolResult(event *models.OtelEvent, _ map[string]interface{}) {
 	b.prompt.ToolCallCount++
 	if event.Success != nil && !*event.Success {
 		b.prompt.ToolFailureCount++
@@ -309,7 +311,7 @@ func (b *promptBuilder) applyToolResult(event *models.OtelEvent) {
 	}
 }
 
-func (b *promptBuilder) applyToolDecision(attributes map[string]interface{}) {
+func (b *promptBuilder) applyToolDecision(_ *models.OtelEvent, attributes map[string]interface{}) {
 	if eventString(attributes, "decision") == toolDecisionReject {
 		b.prompt.ToolRejectCount++
 	}
@@ -389,7 +391,8 @@ func (c *skillCollector) result(prompt *ai.AiPrompt) []*ai.AiPromptSkill {
 }
 
 // rollupSessions rebuilds the prompts a batch touched, and when the batch changed a
-// session's mode history, the mode of every prompt in that session.
+// session's mode history, the mode of every prompt in that session. Every storage error is
+// classified here, once, so the rollup's helpers return plain wrapped errors.
 func rollupSessions(tx dal.Transaction, workspaceKeys map[uint64]string, targets []*sessionTarget) error {
 	for _, target := range targets {
 		workspaceKey := workspaceKeys[target.connectionID]
@@ -397,7 +400,7 @@ func rollupSessions(tx dal.Transaction, workspaceKeys map[uint64]string, targets
 			continue
 		}
 		if err := rollupSession(tx, workspaceKey, target); err != nil {
-			return err
+			return classifyStorageError(err)
 		}
 	}
 	return nil
@@ -481,14 +484,14 @@ func promptSequence(events []*models.OtelEvent) int64 {
 
 func writePromptRollup(tx dal.Transaction, rollup promptRollup) error {
 	if err := tx.CreateOrUpdate(rollup.prompt); err != nil {
-		return classifyStorageError(fmt.Errorf("write Claude Code prompt: %w", err))
+		return fmt.Errorf("write Claude Code prompt: %w", err)
 	}
 	if err := tx.Delete(&ai.AiPromptSkill{}, dal.Where("workspace_key = ? AND prompt_id = ?", rollup.prompt.WorkspaceKey, rollup.prompt.PromptId)); err != nil {
-		return classifyStorageError(fmt.Errorf("clear Claude Code prompt skills: %w", err))
+		return fmt.Errorf("clear Claude Code prompt skills: %w", err)
 	}
 	for _, skill := range rollup.skills {
 		if err := tx.CreateOrUpdate(skill); err != nil {
-			return classifyStorageError(fmt.Errorf("write Claude Code prompt skill: %w", err))
+			return fmt.Errorf("write Claude Code prompt skill: %w", err)
 		}
 	}
 	return nil
@@ -516,7 +519,7 @@ func writeModeChanges(tx dal.Transaction, workspaceKey string, target *sessionTa
 			Trigger:      change.trigger,
 		}
 		if err := tx.CreateOrUpdate(row); err != nil {
-			return classifyStorageError(fmt.Errorf("write Claude Code permission mode change: %w", err))
+			return fmt.Errorf("write Claude Code permission mode change: %w", err)
 		}
 	}
 	return nil
@@ -544,7 +547,7 @@ func refreshSessionModes(tx dal.Transaction, workspaceKey string, target *sessio
 			{ColumnName: "permission_mode", Value: mode},
 			{ColumnName: "permission_mode_inferred", Value: inferred},
 		}, dal.Where("id = ?", prompt.Id)); err != nil {
-			return classifyStorageError(fmt.Errorf("update Claude Code prompt permission mode: %w", err))
+			return fmt.Errorf("update Claude Code prompt permission mode: %w", err)
 		}
 	}
 	return nil

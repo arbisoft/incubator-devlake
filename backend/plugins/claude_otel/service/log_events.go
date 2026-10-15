@@ -86,9 +86,9 @@ func (c *rawConverter) prepareEvents(request *collectorlogs.ExportLogsServiceReq
 	return result, nil
 }
 
-// prepareLogResource converts one resource group. As for metrics, any attribution failure
-// discards the whole group. A record with bad data, such as no user identity or event name,
-// is skipped on its own.
+// prepareLogResource converts one resource group. As for metrics, an attribution failure
+// discards the whole group. A record with bad data, such as no user identity, event name
+// or organization.id, is skipped on its own.
 func (p *batchPreparer) prepareLogResource(resourceLogs *logsv1.ResourceLogs, resourceBindings map[uint64]string, batchID uint64) ([]preparedEvent, error) {
 	resourceAttrs := resourceLogs.GetResource().GetAttributes()
 	records := resourceLogRecords(resourceLogs)
@@ -143,8 +143,7 @@ func (p *batchPreparer) prepareLogRecord(teamSlug string, resourceAttrs []*commo
 	attributes := mergedAttributeMap(resourceAttrs, recordAttrs)
 	// Prompt text gets its own column so the attributes JSON stays small to query.
 	promptText, _ := attributes[promptTextAttribute].(string)
-	delete(attributes, promptTextAttribute)
-	encoded, err := json.Marshal(attributes)
+	encoded, err := json.Marshal(storedAttributes(attributes))
 	if err != nil {
 		return nil, nil, permanentConversionError(errorInvalidValue, "OTLP log record attributes cannot be encoded")
 	}
@@ -270,6 +269,47 @@ func mergedAttributeMap(resourceAttrs, recordAttrs []*commonv1.KeyValue) map[str
 		}
 	}
 	return values
+}
+
+// storedEventAttributes are the attributes kept in an event's attributes column: Claude
+// Code's documented event and resource attributes that carry no content. The column is
+// kept as long as the event, so it is an allowlist: an attribute a later Claude Code
+// release adds, which might carry content, is dropped until it is reviewed and listed
+// here. The raw batch keeps it until raw retention. prompt_text has its own column.
+var storedEventAttributes = map[string]struct{}{
+	// Resource and standard attributes.
+	"service.name": {}, "service.version": {}, "os.type": {}, "os.version": {}, "host.arch": {},
+	"session.id": {}, "app.version": {}, "organization.id": {}, "terminal.type": {},
+	"user.id": {}, "user.account_id": {}, "user.account_uuid": {}, "user.email": {},
+	"prompt.id": {}, "event.name": {}, "event.timestamp": {}, "event.sequence": {},
+	devlakeTeamAttribute: {},
+	// user_prompt.
+	"prompt_length": {}, "command_name": {}, "command_source": {},
+	// api_request and api_error. On api_error, error is a service message; ingest drops
+	// the tool_result error, which can echo file contents.
+	"model": {}, "cost_usd": {}, "duration_ms": {}, "input_tokens": {}, "output_tokens": {},
+	"cache_read_tokens": {}, "cache_creation_tokens": {}, "request_id": {}, "query_source": {},
+	"speed": {}, "error": {}, "error_type": {}, "status_code": {}, "attempt": {}, "response_length": {},
+	// tool_result and tool_decision. tool_parameters keeps only toolParameterKeys.
+	"tool_name": {}, "tool_use_id": {}, "success": {}, "decision": {}, "source": {},
+	"decision_type": {}, "decision_source": {}, "tool_result_size_bytes": {},
+	toolParametersAttribute: {}, "mcp_server_scope": {},
+	// skill_activated and other named components.
+	"skill.name": {}, "skill.source": {}, "invocation_trigger": {}, "plugin.name": {},
+	"agent.name": {}, "mcp_server.name": {},
+	// permission_mode_changed.
+	"from_mode": {}, "to_mode": {}, "trigger": {},
+}
+
+// storedAttributes returns the allowlisted subset of attributes.
+func storedAttributes(attributes map[string]interface{}) map[string]interface{} {
+	stored := make(map[string]interface{}, len(attributes))
+	for key, value := range attributes {
+		if _, keep := storedEventAttributes[key]; keep {
+			stored[key] = value
+		}
+	}
+	return stored
 }
 
 // putAttributes adds attributes to values as JSON-ready values, replacing existing keys.

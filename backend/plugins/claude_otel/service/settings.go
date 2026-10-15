@@ -27,6 +27,29 @@ import (
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
 )
 
+// Claude Code telemetry settings that responseWithSettings manages.
+const (
+	envEnableTelemetry           = "CLAUDE_CODE_ENABLE_TELEMETRY"
+	envMetricsExporter           = "OTEL_METRICS_EXPORTER"
+	envLogsExporter              = "OTEL_LOGS_EXPORTER"
+	envExporterProtocol          = "OTEL_EXPORTER_OTLP_PROTOCOL"
+	envExporterEndpoint          = "OTEL_EXPORTER_OTLP_ENDPOINT"
+	envExporterHeaders           = "OTEL_EXPORTER_OTLP_HEADERS"
+	envMetricExportInterval      = "OTEL_METRIC_EXPORT_INTERVAL"
+	envMetricsIncludeSessionID   = "OTEL_METRICS_INCLUDE_SESSION_ID"
+	envMetricsIncludeAccountUUID = "OTEL_METRICS_INCLUDE_ACCOUNT_UUID"
+	envLogToolDetails            = "OTEL_LOG_TOOL_DETAILS"
+	envLogUserPrompts            = "OTEL_LOG_USER_PROMPTS"
+	envLogAssistantResponses     = "OTEL_LOG_ASSISTANT_RESPONSES"
+	envLogToolContent            = "OTEL_LOG_TOOL_CONTENT"
+	envLogRawAPIBodies           = "OTEL_LOG_RAW_API_BODIES"
+	otlpExporter                 = "otlp"
+	metricExportIntervalMillis   = "60000"
+	envFlagOn                    = "1"
+	envFlagOff                   = "0"
+	envBoolTrue                  = "true"
+)
+
 func validateOtelSettings(endpoint, protocol string) errors.Error {
 	parsed, err := url.Parse(endpoint)
 	if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
@@ -44,28 +67,28 @@ func responseWithSettings(connection *models.OtelConnection, credentials []*mode
 		Connection:  connection,
 		Credentials: credentials,
 		ManagedSettings: &models.OtelManagedSettings{Env: map[string]string{
-			"CLAUDE_CODE_ENABLE_TELEMETRY": "1",
-			"OTEL_METRICS_EXPORTER":        "otlp",
-			"OTEL_LOGS_EXPORTER":           "otlp",
-			"OTEL_EXPORTER_OTLP_PROTOCOL":  connection.Protocol,
-			"OTEL_EXPORTER_OTLP_ENDPOINT":  connection.CollectorEndpoint,
-			"OTEL_EXPORTER_OTLP_HEADERS":   fmt.Sprintf("Authorization=Basic %s", header),
-			"OTEL_METRIC_EXPORT_INTERVAL":  "60000",
+			envEnableTelemetry:      envFlagOn,
+			envMetricsExporter:      otlpExporter,
+			envLogsExporter:         otlpExporter,
+			envExporterProtocol:     connection.Protocol,
+			envExporterEndpoint:     connection.CollectorEndpoint,
+			envExporterHeaders:      fmt.Sprintf("Authorization=Basic %s", header),
+			envMetricExportInterval: metricExportIntervalMillis,
 			// Events carry session.id under this flag; per-prompt permission mode is
 			// derived per session. The Collector keeps it out of Prometheus labels.
-			"OTEL_METRICS_INCLUDE_SESSION_ID":   "true",
-			"OTEL_METRICS_INCLUDE_ACCOUNT_UUID": "true",
+			envMetricsIncludeSessionID:   envBoolTrue,
+			envMetricsIncludeAccountUUID: envBoolTrue,
 			// Skill, MCP, plugin and command names, and tool parameters. Ingest keeps only the
 			// skill and MCP names from tool parameters; command lines and paths are dropped.
-			"OTEL_LOG_TOOL_DETAILS": "1",
+			envLogToolDetails: envFlagOn,
 			// Prompt text is stored in the raw and _tool tables only, never in ai_* tables.
-			"OTEL_LOG_USER_PROMPTS": "1",
+			envLogUserPrompts: envFlagOn,
 			// Other content stays off. Managed settings take precedence, so developers
 			// cannot turn it on; the Collector and ingest also strip it. Responses must be
 			// off explicitly: unset, they follow OTEL_LOG_USER_PROMPTS.
-			"OTEL_LOG_ASSISTANT_RESPONSES": "0",
-			"OTEL_LOG_TOOL_CONTENT":        "0",
-			"OTEL_LOG_RAW_API_BODIES":      "0",
+			envLogAssistantResponses: envFlagOff,
+			envLogToolContent:        envFlagOff,
+			envLogRawAPIBodies:       envFlagOff,
 		}},
 		RestartRequired: hasPendingCollectorRestart(credentials),
 		RestartHint:     restartHint(credentials),

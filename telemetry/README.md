@@ -252,6 +252,17 @@ predecessor-checkpoint design is added; rebuilding it from an arbitrary lookback
 misstate the first increase. Resetting a single batch to `pending` is not a replay:
 cumulative samples older than live state are rejected as out of order.
 
+To convert log events again, insert a request with `kind = 'logs'`. It requeues the
+processed and quarantined log batches received in the range, which may include the
+current UTC day, as `replay_pending`. The log queue converts them only while no live
+batch is waiting, so a large replay does not delay new events. The ingestion status
+reports them under `logs.batchCounts.replay_pending`.
+
+```sql
+INSERT INTO _tool_claude_code_otel_replay_requests (kind, range_start, range_end, status, created_at, updated_at)
+VALUES ('logs', '2026-09-01 00:00:00', '2026-09-03 00:00:00', 'pending', UTC_TIMESTAMP(), UTC_TIMESTAMP());
+```
+
 ### Reset local telemetry state
 
 This removes local credentials, Prometheus data, and queued telemetry:

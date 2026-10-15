@@ -59,13 +59,13 @@ type batchLease struct {
 	owner    string
 }
 
-// claimNextBatch claims only the earliest nonterminal batch of batch's table and loads it
-// into batch, a new empty metric or log batch; table is another new empty batch of the same
-// table, which the lease keeps to address the row. A later batch never overtakes a batch that
-// is waiting for retry or held by another lease, because cumulative series state and
-// session event order depend on receipt order. It returns nil when nothing was claimed.
-func (c *rawConverter) claimNextBatch(batch dal.Tabler, table dal.Tabler) (*batchLease, errors.Error) {
-	head, err := c.claimHead(table)
+// claimNextBatch claims only the earliest batch of batch's table in one of statuses and
+// loads it into batch, a new empty metric or log batch; table is another new empty batch of
+// the same table, which the lease keeps to address the row. A later batch never overtakes a
+// batch that is waiting for retry or held by another lease, because cumulative series state
+// depends on receipt order. It returns nil when nothing was claimed.
+func (c *rawConverter) claimNextBatch(batch dal.Tabler, table dal.Tabler, statuses []string) (*batchLease, errors.Error) {
+	head, err := c.claimHead(table, statuses)
 	if err != nil || head == nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func (c *rawConverter) claimNextBatch(batch dal.Tabler, table dal.Tabler) (*batc
 }
 
 // claimHeadQuery builds the derived table claimHead reads: a UNION ALL of one
-// single-status lookup per nonterminalBatchStatuses entry.
+// single-status lookup per entry of statuses.
 //
 // It is not a single WHERE status IN (...) ORDER BY received_at query. MySQL cannot use a
 // (status, received_at) claim index such as idx_otel_metric_batch_claim or
@@ -88,10 +88,10 @@ func (c *rawConverter) claimNextBatch(batch dal.Tabler, table dal.Tabler) (*batc
 // every processed row ahead of the first match, on every poll. Each branch of the union is a
 // single-value index lookup with LIMIT 1, which MySQL always satisfies with the composite
 // index, and the outer ORDER BY sorts at most one row per status.
-func claimHeadQuery(table dal.Tabler) (string, []interface{}) {
-	branches := make([]string, 0, len(nonterminalBatchStatuses))
-	params := make([]interface{}, 0, len(nonterminalBatchStatuses))
-	for _, status := range nonterminalBatchStatuses {
+func claimHeadQuery(table dal.Tabler, statuses []string) (string, []interface{}) {
+	branches := make([]string, 0, len(statuses))
+	params := make([]interface{}, 0, len(statuses))
+	for _, status := range statuses {
 		branches = append(branches, "(SELECT id, status, attempt_count, next_attempt_at, lease_until, received_at FROM "+
 			table.TableName()+" WHERE status = ? ORDER BY received_at ASC, id ASC LIMIT 1)")
 		params = append(params, status)
@@ -99,10 +99,10 @@ func claimHeadQuery(table dal.Tabler) (string, []interface{}) {
 	return "(" + strings.Join(branches, " UNION ALL ") + ") AS claim_heads", params
 }
 
-// claimHead finds the earliest nonterminal batch of table in one query, or nil when the
-// queue is empty.
-func (c *rawConverter) claimHead(table dal.Tabler) (*rawBatchHead, errors.Error) {
-	query, params := claimHeadQuery(table)
+// claimHead finds the earliest batch of table in one of statuses in one query, or nil when
+// there is none.
+func (c *rawConverter) claimHead(table dal.Tabler, statuses []string) (*rawBatchHead, errors.Error) {
+	query, params := claimHeadQuery(table, statuses)
 	heads := make([]*rawBatchHead, 0, 1)
 	if err := c.db.All(&heads, dal.From(query, params...), dal.Orderby("received_at ASC, id ASC"), dal.Limit(1)); err != nil {
 		return nil, errors.Default.Wrap(err, fmt.Sprintf("failed to find the next Claude Code OTel %s", rawBatchLabel(table)))

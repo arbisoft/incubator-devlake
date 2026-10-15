@@ -97,6 +97,23 @@ export const OtelIngestionHealth = ({ loading, status }: OtelIngestionHealthProp
           </Descriptions.Item>
           <Descriptions.Item label="Permanent errors (24h)">{status.recentPermanentErrors}</Descriptions.Item>
           <Descriptions.Item label="Converter">{converterState(status)}</Descriptions.Item>
+          {status.logs && (
+            <>
+              <Descriptions.Item label="Log events pending">{status.logs.batchCounts.pending ?? 0}</Descriptions.Item>
+              <Descriptions.Item label="Log events retrying">
+                {status.logs.batchCounts.retryable_error ?? 0}
+              </Descriptions.Item>
+              <Descriptions.Item label="Log events replaying">
+                {status.logs.batchCounts.replay_pending ?? 0}
+              </Descriptions.Item>
+              <Descriptions.Item label="Oldest log backlog">
+                {formatAge(status.logs.oldestNonterminal?.ageSeconds)}
+              </Descriptions.Item>
+              <Descriptions.Item label="Log permanent errors (24h)">
+                {status.logs.recentPermanentErrors}
+              </Descriptions.Item>
+            </>
+          )}
         </Descriptions>
       ) : (
         <Typography.Text type="secondary">

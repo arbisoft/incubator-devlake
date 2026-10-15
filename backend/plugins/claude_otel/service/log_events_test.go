@@ -383,6 +383,54 @@ func TestPromptRollupTruncatesAttributeValuesToAiColumns(t *testing.T) {
 }
 
 // setStringAttribute replaces a record's string attribute, or adds it.
+// A record sent before the client signed in has no organization.id; the rest of its
+// resource group is still converted.
+func TestPrepareEventsSkipsOnlyRecordsWithoutOrganization(t *testing.T) {
+	request := loadLogEventsFixture(t)
+	stripContentAttributes(request)
+	records := resourceLogRecords(request.GetResourceLogs()[0])
+	records[2].Attributes = withoutAttributes(records[2].GetAttributes(), map[string]struct{}{organizationIDAttribute: {}})
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
+
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 9)
+	if err != nil || len(prepared.events) != 12 || prepared.skipped[skippedResource] != 0 || prepared.skipped[skippedLogRecord] != 1 {
+		t.Fatalf("prepareEvents() = %v, %v; want 12 events and only the record without organization.id skipped", prepared, err)
+	}
+	if message := prepared.diagnostic(); message == nil || !strings.Contains(*message, string(errorMissingOrganization)) {
+		t.Fatalf("diagnostic() = %v, want %s", message, errorMissingOrganization)
+	}
+}
+
+// The attributes column keeps only allowlisted attributes, so an attribute a later Claude
+// Code release adds is not stored with the event.
+func TestPrepareEventsStoresOnlyAllowlistedAttributes(t *testing.T) {
+	request := loadLogEventsFixture(t)
+	stripContentAttributes(request)
+	for _, record := range resourceLogRecords(request.GetResourceLogs()[0]) {
+		setStringAttribute(record, "assistant_draft", "content from a future release")
+	}
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
+
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 9)
+	if err != nil || len(prepared.events) != 13 {
+		t.Fatalf("prepareEvents() = %v, %v; want 13 events", prepared, err)
+	}
+	for _, item := range prepared.events {
+		var attributes map[string]interface{}
+		if err := json.Unmarshal(item.event.Attributes, &attributes); err != nil {
+			t.Fatalf("attributes are not JSON: %v", err)
+		}
+		for key := range attributes {
+			if _, allowed := storedEventAttributes[key]; !allowed {
+				t.Fatalf("%s attributes kept %q, which is not allowlisted", item.event.EventName, key)
+			}
+		}
+		if _, kept := attributes["event.sequence"]; !kept {
+			t.Fatalf("%s attributes = %v, want allowlisted attributes kept", item.event.EventName, attributes)
+		}
+	}
+}
+
 func setStringAttribute(record *logsv1.LogRecord, key, value string) {
 	attribute := &commonv1.KeyValue{Key: key, Value: &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: value}}}
 	record.Attributes = append(withoutAttributes(record.GetAttributes(), map[string]struct{}{key: {}}), attribute)

@@ -438,12 +438,12 @@ func organizationIDFromAttributes(resourceAttrs, pointAttrs []*commonv1.KeyValue
 	pointValue := attributeString(pointAttrs, organizationIDAttribute)
 	resourceValue := attributeString(resourceAttrs, organizationIDAttribute)
 	if pointValue == "" && resourceValue == "" {
-		return "", permanentConversionError(errorMissingOrganization, "supported metric has no organization.id")
+		return "", permanentConversionError(errorMissingOrganization, "telemetry has no organization.id")
 	}
 	pointOrganizationID, pointValid := normalizeOrganizationID(pointValue)
 	resourceOrganizationID, resourceValid := normalizeOrganizationID(resourceValue)
 	if (pointValue != "" && !pointValid) || (resourceValue != "" && !resourceValid) {
-		return "", permanentConversionError(errorInvalidOrganization, "supported metric has an invalid organization.id")
+		return "", permanentConversionError(errorInvalidOrganization, "telemetry has an invalid organization.id")
 	}
 	if pointValue != "" && resourceValue != "" && pointOrganizationID != resourceOrganizationID {
 		return "", permanentConversionError(errorOrganizationMismatch, "resource and datapoint organization IDs differ")
