@@ -711,12 +711,207 @@
       ]
     },
     {
+      "datasource": "mysql",
+      "description": "Neutral bars: PRs merged that week. Orange bars: PRs closed that week without being merged. Both are PR counts on one shared axis. Hover for the abandonment rate: closed ÷ (merged + closed). Completed weeks only; weeks begin Monday. Uses the Project filter and follows the Developer filter; the OTel Teams filter does not apply.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 70,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 0,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Abandonment rate"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": false
+                }
+              },
+              {
+                "id": "noValue",
+                "value": "N/A"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "text",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "PRs merged"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "text",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 80
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "PRs"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "displayName",
+                "value": "PRs merged"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "PRs closed, never merged"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 80
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "displayName",
+                "value": "PRs closed, never merged"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 25
+      },
+      "id": 16,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.9,
+        "fullHighlight": false,
+        "groupWidth": 0.8,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "never",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xField": "Week",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH merged AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') AS week, COUNT(*) AS n\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer) OR (pr.author_id LIKE 'github:GithubAccount:%' AND CONCAT('gh:', SUBSTRING_INDEX(pr.author_id, ':', -1)) IN ($developer)))\n  GROUP BY 1\n),\nclosed AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.closed_date), INTERVAL WEEKDAY(pr.closed_date) DAY), '%Y-%m-%d') AS week, COUNT(DISTINCT pr.id) AS n\n  FROM pull_requests pr\n  JOIN project_mapping pm ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\n  WHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status = 'CLOSED' AND $__timeFilter(pr.closed_date) AND ('__all' IN ($developer) OR (pr.author_id LIKE 'github:GithubAccount:%' AND CONCAT('gh:', SUBSTRING_INDEX(pr.author_id, ':', -1)) IN ($developer)))\n  GROUP BY 1\n),\nweeks AS (\n  SELECT week FROM merged UNION SELECT week FROM closed\n)\nSELECT DATE_FORMAT(w.week, '%b %e') AS \"Week\",\n  ROUND(100.0 * COALESCE(c.n, 0) / NULLIF(COALESCE(m.n, 0) + COALESCE(c.n, 0), 0), 1) AS \"Abandonment rate\",\n  COALESCE(m.n, 0) AS \"PRs merged\",\n  COALESCE(c.n, 0) AS \"PRs closed, never merged\"\nFROM weeks w\nLEFT JOIN merged m ON m.week = w.week\nLEFT JOIN closed c ON c.week = w.week\nWHERE w.week >= DATE_FORMAT($__timeFrom(), '%Y-%m-%d') AND w.week <= DATE_FORMAT(DATE_SUB($__timeTo(), INTERVAL 7 DAY), '%Y-%m-%d')\nORDER BY w.week",
+          "refId": "A"
+        }
+      ],
+      "title": "PRs Merged and Closed Without Merging (Weekly)",
+      "type": "barchart"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 25
+        "y": 35
       },
       "id": 12,
       "panels": [],
@@ -746,7 +941,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 26
+        "y": 36
       },
       "id": 13,
       "options": {

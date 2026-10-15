@@ -273,27 +273,36 @@
       },
       "id": 6,
       "panels": [],
-      "title": "Share of Lines Changed, With Adoption",
+      "title": "AI Lines vs Merged Lines",
       "type": "row"
     },
     {
       "datasource": "mysql",
-      "description": "Weekly Claude Code OTel lines added as a percentage of lines added by PRs merged that week, capped at 100%; the grey bar is the rest of the merged lines. The two sides are counted independently and never matched line by line, so this is a ratio of AI-produced lines to shipped lines, not verified attribution, and has the same biases as AI Lines vs Merged Lines above: it reads low for edits made through Bash or scripts, weeks before OTel collection and merged work by people not using Claude Code; it reads high for rewritten lines and code that was never merged. Weekly values are also noisier, because lines written one week are often merged the next. Weeks with no merged PRs show no bar. The dashed adopted-engineer series is on a separate scale and is an unverified ratio of OTel users to merged-PR authors. Merged PRs use the Project filter; OTel data uses Project and OTel Teams. Weeks begin Monday.",
+      "description": "Purple bars: Claude Code OTel lines added. Neutral bars: lines added by PRs merged that week. Both are lines, on one shared axis, so their heights can be compared. The two sides are counted independently and never matched line by line: AI lines include edits never committed and miss edits made through Bash or scripts, so the hover share is an upper bound capped at 100%, not verified attribution. Hover also shows engineers adopted: OTel users as a share of merged-PR authors that week, which can exceed 100% because OTel users who merged no PR that week still count. Completed weeks only; weeks begin Monday. OTel data uses the Project and OTel Teams filters; merged PRs use Project only, so selecting a team narrows only the AI bars. Both sides follow the Developer filter.",
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "fixed"
           },
           "custom": {
-            "drawStyle": "bars",
-            "fillOpacity": 80,
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 70,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
             "lineWidth": 0,
-            "pointSize": 5,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "normal"
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
             }
           },
           "mappings": [],
@@ -306,19 +315,47 @@
               }
             ]
           },
-          "unit": "percent"
+          "unit": "short"
         },
         "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "AI lines"
+              "options": "AI share of merged lines (upper bound)"
             },
             "properties": [
               {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": false
+                }
+              },
+              {
+                "id": "noValue",
+                "value": "N/A"
+              },
+              {
                 "id": "color",
                 "value": {
-                  "fixedColor": "#2a78d6",
+                  "fixedColor": "text",
                   "mode": "fixed"
                 }
               }
@@ -327,15 +364,66 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Other merged lines"
+              "options": "AI lines added"
             },
             "properties": [
               {
+                "id": "unit",
+                "value": "short"
+              },
+              {
                 "id": "color",
                 "value": {
-                  "fixedColor": "#888780",
+                  "fixedColor": "#6c5fc7",
                   "mode": "fixed"
                 }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 70
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Lines added"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "displayName",
+                "value": "AI lines added"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Merged PR lines added"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "text",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 80
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "displayName",
+                "value": "Merged PR lines added"
               }
             ]
           },
@@ -346,18 +434,8 @@
             },
             "properties": [
               {
-                "id": "custom.drawStyle",
-                "value": "line"
-              },
-              {
-                "id": "custom.lineStyle",
-                "value": {
-                  "dash": [
-                    10,
-                    10
-                  ],
-                  "fill": "dash"
-                }
+                "id": "unit",
+                "value": "percent"
               },
               {
                 "id": "custom.fillOpacity",
@@ -365,27 +443,28 @@
               },
               {
                 "id": "custom.lineWidth",
-                "value": 2
+                "value": 0
               },
               {
-                "id": "custom.pointSize",
-                "value": 5
+                "id": "custom.axisPlacement",
+                "value": "hidden"
               },
               {
-                "id": "custom.showPoints",
-                "value": "always"
-              },
-              {
-                "id": "custom.stacking",
+                "id": "custom.hideFrom",
                 "value": {
-                  "group": "line_overlay",
-                  "mode": "none"
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": false
                 }
+              },
+              {
+                "id": "noValue",
+                "value": "N/A"
               },
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "#eb6834",
+                  "fixedColor": "text",
                   "mode": "fixed"
                 }
               }
@@ -394,23 +473,33 @@
         ]
       },
       "gridPos": {
-        "h": 8,
+        "h": 10,
         "w": 24,
         "x": 0,
         "y": 11
       },
-      "id": 7,
+      "id": 11,
       "options": {
+        "barRadius": 0,
+        "barWidth": 0.9,
+        "fullHighlight": false,
+        "groupWidth": 0.8,
         "legend": {
           "calcs": [],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
+        "orientation": "auto",
+        "showValue": "never",
+        "stacking": "none",
         "tooltip": {
           "mode": "multi",
           "sort": "none"
-        }
+        },
+        "xField": "Week",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
       },
       "pluginVersion": "11.0.0",
       "targets": [
@@ -418,27 +507,12 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH weeks AS (\n  SELECT DISTINCT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week\n  FROM ai_activities\n  WHERE record_kind = 'canonical_activity'\n    AND source_connection_id IN (\n      SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n      INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n      WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n    )\n    AND $__timeFilter(date) AND ('__all' IN ($developer) OR CONCAT('em:', user_email) IN ($developer) OR user_email IN (SELECT g_d.author_email FROM _tool_github_commits g_d WHERE g_d.author_id > 0 AND CONCAT('gh:', g_d.author_id) IN ($developer)))\n  UNION\n  SELECT DISTINCT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d')\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer) OR (pr.author_id LIKE 'github:GithubAccount:%' AND CONCAT('gh:', SUBSTRING_INDEX(pr.author_id, ':', -1)) IN ($developer)))\n),\nai_w AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') week, SUM(lines_added) v\n  FROM ai_activities\n  WHERE record_kind = 'canonical_activity'\n    AND source_connection_id IN (\n      SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n      INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n      WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n    )\n    AND $__timeFilter(date) AND ('__all' IN ($developer) OR CONCAT('em:', user_email) IN ($developer) OR user_email IN (SELECT g_d.author_email FROM _tool_github_commits g_d WHERE g_d.author_id > 0 AND CONCAT('gh:', g_d.author_id) IN ($developer)))\n  GROUP BY 1\n),\nhu_w AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') week, SUM(pr.additions) v\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer) OR (pr.author_id LIKE 'github:GithubAccount:%' AND CONCAT('gh:', SUBSTRING_INDEX(pr.author_id, ':', -1)) IN ($developer)))\n  GROUP BY 1\n),\nai_users_w AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') week, COUNT(DISTINCT user_email) n\n  FROM ai_activities\n  WHERE record_kind = 'canonical_activity'\n    AND source_connection_id IN (\n      SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n      INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n      WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n    )\n    AND $__timeFilter(date) AND ('__all' IN ($developer) OR CONCAT('em:', user_email) IN ($developer) OR user_email IN (SELECT g_d.author_email FROM _tool_github_commits g_d WHERE g_d.author_id > 0 AND CONCAT('gh:', g_d.author_id) IN ($developer))) AND user_email != ''\n  GROUP BY 1\n),\ncontrib_w AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') week, COUNT(DISTINCT COALESCE(NULLIF(a.full_name,''), pr.author_name)) n\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id LEFT JOIN accounts a ON a.id = pr.author_id\n  WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer) OR (pr.author_id LIKE 'github:GithubAccount:%' AND CONCAT('gh:', SUBSTRING_INDEX(pr.author_id, ':', -1)) IN ($developer)))\n  GROUP BY 1\n)\nSELECT STR_TO_DATE(w.week, '%Y-%m-%d') AS time, 'AI lines' AS metric,\n  LEAST(100, ROUND(100.0 * COALESCE(ai_w.v, 0) / NULLIF(COALESCE(hu_w.v, 0), 0), 1)) AS value\nFROM weeks w LEFT JOIN ai_w ON ai_w.week = w.week LEFT JOIN hu_w ON hu_w.week = w.week\nUNION ALL\nSELECT STR_TO_DATE(w.week, '%Y-%m-%d'), 'Other merged lines',\n  100 - LEAST(100, ROUND(100.0 * COALESCE(ai_w.v, 0) / NULLIF(COALESCE(hu_w.v, 0), 0), 1))\nFROM weeks w LEFT JOIN ai_w ON ai_w.week = w.week LEFT JOIN hu_w ON hu_w.week = w.week\nUNION ALL\nSELECT STR_TO_DATE(w.week, '%Y-%m-%d'), 'Engineers adopted',\n  ROUND(100.0 * COALESCE(au.n, 0) / NULLIF(COALESCE(c.n, 0), 0), 1)\nFROM weeks w LEFT JOIN ai_users_w au ON au.week = w.week LEFT JOIN contrib_w c ON c.week = w.week\nORDER BY time, metric",
+          "rawSql": "WITH weeks AS (\n  SELECT DISTINCT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') AS week\n  FROM ai_activities\n  WHERE record_kind = 'canonical_activity'\n    AND source_connection_id IN (\n      SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n      INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n      WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n    )\n    AND $__timeFilter(date) AND ('__all' IN ($developer) OR CONCAT('em:', user_email) IN ($developer) OR user_email IN (SELECT g_d.author_email FROM _tool_github_commits g_d WHERE g_d.author_id > 0 AND CONCAT('gh:', g_d.author_id) IN ($developer)))\n  UNION\n  SELECT DISTINCT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d')\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer) OR (pr.author_id LIKE 'github:GithubAccount:%' AND CONCAT('gh:', SUBSTRING_INDEX(pr.author_id, ':', -1)) IN ($developer)))\n),\nai_w AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') week, SUM(lines_added) v\n  FROM ai_activities\n  WHERE record_kind = 'canonical_activity'\n    AND source_connection_id IN (\n      SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n      INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n      WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n    )\n    AND $__timeFilter(date) AND ('__all' IN ($developer) OR CONCAT('em:', user_email) IN ($developer) OR user_email IN (SELECT g_d.author_email FROM _tool_github_commits g_d WHERE g_d.author_id > 0 AND CONCAT('gh:', g_d.author_id) IN ($developer)))\n  GROUP BY 1\n),\nhu_w AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') week, SUM(pr.additions) v\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer) OR (pr.author_id LIKE 'github:GithubAccount:%' AND CONCAT('gh:', SUBSTRING_INDEX(pr.author_id, ':', -1)) IN ($developer)))\n  GROUP BY 1\n),\nai_users_w AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY), '%Y-%m-%d') week, COUNT(DISTINCT user_email) n\n  FROM ai_activities\n  WHERE record_kind = 'canonical_activity'\n    AND source_connection_id IN (\n      SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n      INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n      WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n    )\n    AND $__timeFilter(date) AND ('__all' IN ($developer) OR CONCAT('em:', user_email) IN ($developer) OR user_email IN (SELECT g_d.author_email FROM _tool_github_commits g_d WHERE g_d.author_id > 0 AND CONCAT('gh:', g_d.author_id) IN ($developer))) AND user_email != ''\n  GROUP BY 1\n),\ncontrib_w AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') week, COUNT(DISTINCT COALESCE(NULLIF(a.full_name,''), pr.author_name)) n\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id LEFT JOIN accounts a ON a.id = pr.author_id\n  WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer) OR (pr.author_id LIKE 'github:GithubAccount:%' AND CONCAT('gh:', SUBSTRING_INDEX(pr.author_id, ':', -1)) IN ($developer)))\n  GROUP BY 1\n)\nSELECT DATE_FORMAT(w.week, '%b %e') AS \"Week\",\n  LEAST(100, ROUND(100.0 * COALESCE(ai_w.v, 0) / NULLIF(hu_w.v, 0), 1)) AS \"AI share of merged lines (upper bound)\",\n  COALESCE(ai_w.v, 0) AS \"AI lines added\",\n  COALESCE(hu_w.v, 0) AS \"Merged PR lines added\",\n  ROUND(100.0 * COALESCE(au.n, 0) / NULLIF(c.n, 0), 1) AS \"Engineers adopted\"\nFROM weeks w\nLEFT JOIN ai_w ON ai_w.week = w.week\nLEFT JOIN hu_w ON hu_w.week = w.week\nLEFT JOIN ai_users_w au ON au.week = w.week\nLEFT JOIN contrib_w c ON c.week = w.week\nWHERE w.week >= DATE_FORMAT($__timeFrom(), '%Y-%m-%d') AND w.week <= DATE_FORMAT(DATE_SUB($__timeTo(), INTERVAL 7 DAY), '%Y-%m-%d')\nORDER BY w.week",
           "refId": "A"
         }
       ],
-      "title": "AI Lines vs Merged Lines (Weekly), With Adoption",
-      "transformations": [
-        {
-          "id": "prepareTimeSeries",
-          "options": {
-            "format": "many"
-          }
-        },
-        {
-          "id": "renameByRegex",
-          "options": {
-            "regex": "^value (.+)$",
-            "renamePattern": "$1"
-          }
-        }
-      ],
-      "type": "timeseries"
+      "title": "AI Lines vs Merged Lines (Weekly)",
+      "type": "barchart"
     },
     {
       "collapsed": false,
@@ -446,7 +520,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 19
+        "y": 21
       },
       "id": 8,
       "panels": [],
@@ -492,7 +566,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 20
+        "y": 22
       },
       "id": 9,
       "options": {
@@ -558,7 +632,7 @@
         "h": 6,
         "w": 24,
         "x": 0,
-        "y": 28
+        "y": 30
       },
       "id": 10,
       "options": {
