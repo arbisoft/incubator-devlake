@@ -206,7 +206,7 @@ func TestDeleteProjectPlacementsInTransaction(t *testing.T) {
 			tx := dalmocks.NewTransaction(t)
 			tx.On("All", mock.AnythingOfType("*[]*models.OtelConnectionProject"), mock.Anything).Run(func(args mock.Arguments) {
 				placements := args.Get(0).(*[]*models.OtelConnectionProject)
-				where := args.Get(1).([]dal.Clause)[0].Data.(dal.DalClause)
+				where := args.Get(1).(dal.Clause).Data.(dal.DalClause)
 				switch where.Expr {
 				case "project_name = ?":
 					*placements = []*models.OtelConnectionProject{{ConnectionId: 7, ProjectName: "Core"}}
@@ -220,10 +220,10 @@ func TestDeleteProjectPlacementsInTransaction(t *testing.T) {
 				*args.Get(0).(*models.OtelConnection) = connection
 			}).Return(nil).Once()
 
-			var deleteClauses []dal.Clause
+			var deleteWhere dal.Clause
 			if !testCase.wantErr {
 				tx.On("Delete", mock.AnythingOfType("*models.OtelConnectionProject"), mock.Anything).Run(func(args mock.Arguments) {
-					deleteClauses = args.Get(1).([]dal.Clause)
+					deleteWhere = args.Get(1).(dal.Clause)
 				}).Return(nil).Once()
 			}
 
@@ -240,7 +240,7 @@ func TestDeleteProjectPlacementsInTransaction(t *testing.T) {
 			if err != nil {
 				t.Fatalf("DeleteProjectPlacementsInTransaction() error = %v, want nil", err)
 			}
-			where := deleteClauses[0].Data.(dal.DalClause)
+			where := deleteWhere.Data.(dal.DalClause)
 			if where.Expr != "project_name = ?" || len(where.Params) != 1 || where.Params[0] != "Core" {
 				t.Fatalf("placement delete filter = (%q, %#v), want project_name = ? with Core", where.Expr, where.Params)
 			}

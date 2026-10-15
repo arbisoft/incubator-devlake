@@ -113,7 +113,8 @@ func TestRunRetentionBacksOffAfterFailure(t *testing.T) {
 	converter := newRawMetricConverter(database, nil)
 	now := time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC)
 	converter.now = func() time.Time { return now }
-	database.On("Pluck", "id", mock.Anything, mock.Anything).Return(devlakeerrors.Default.New("retention lookup failed")).Once()
+	// The retention lookup plucks ids with From, Where, Orderby and Limit clauses.
+	database.On("Pluck", "id", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(devlakeerrors.Default.New("retention lookup failed")).Once()
 
 	if err := converter.runRetention(); err == nil {
 		t.Fatal("runRetention() error = nil; want lookup failure")

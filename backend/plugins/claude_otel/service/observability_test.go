@@ -137,10 +137,10 @@ func TestOtelConverterLeaseStatusActive(t *testing.T) {
 func TestOtelRecentPermanentErrorsToleratesMissingProcessedAt(t *testing.T) {
 	now := time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC)
 	mockDal := withMockDal(t)
-	mockDal.EXPECT().Count(mock.Anything).Run(func(clauses ...dal.Clause) {
+	mockDal.EXPECT().Count(mock.Anything, mock.Anything).Run(func(clauses ...dal.Clause) {
 		assertWhereClauseTolerantOfMissingProcessedAt(t, clauses)
 	}).Return(int64(1), nil)
-	mockDal.EXPECT().All(mock.AnythingOfType("*[]service.permanentErrorReason"), mock.Anything).Run(
+	mockDal.EXPECT().All(mock.AnythingOfType("*[]service.permanentErrorReason"), mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(
 		func(_ interface{}, clauses ...dal.Clause) {
 			assertWhereClauseTolerantOfMissingProcessedAt(t, clauses)
 		},
