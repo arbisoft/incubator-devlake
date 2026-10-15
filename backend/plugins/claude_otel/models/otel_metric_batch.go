@@ -47,6 +47,14 @@ const (
 	OtelReplayRequestStatusFailed     = "failed"
 )
 
+// Replay request kinds. A metrics request rebuilds hourly and canonical daily facts by day;
+// a logs request returns the range's log batches to the log queue, whose conversion is
+// idempotent.
+const (
+	OtelReplayKindMetrics = "metrics"
+	OtelReplayKindLogs    = "logs"
+)
+
 // OtelMetricBatch is the durable, replayable OTLP Metrics request accepted from
 // the authenticated Collector. Tool and domain rows are derived asynchronously.
 type OtelMetricBatch struct {
@@ -86,11 +94,13 @@ func (OtelConverterLease) TableName() string {
 	return OtelConverterLeaseTable
 }
 
-// OtelReplayRequest asks the elected converter to rebuild hourly and canonical daily
-// facts for whole UTC days from retained raw batches. Operators insert requests directly;
-// there is intentionally no API or UI trigger.
+// OtelReplayRequest asks the elected converter to replay whole UTC days of retained raw
+// batches. Kind metrics rebuilds hourly and canonical daily facts; kind logs requeues the
+// log batches so their events and prompts are converted again. Operators insert requests
+// directly; there is intentionally no API or UI trigger.
 type OtelReplayRequest struct {
 	common.Model
+	Kind            string     `gorm:"type:varchar(16);not null;default:'metrics'"`
 	RangeStart      time.Time  `gorm:"type:datetime(3)"`
 	RangeEnd        time.Time  `gorm:"type:datetime(3)"`
 	Status          string     `gorm:"type:varchar(32);index"`

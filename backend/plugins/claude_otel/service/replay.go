@@ -49,7 +49,16 @@ func (c *rawConverter) processNextReplay() (bool, errors.Error) {
 	if err != nil || !found {
 		return false, err
 	}
-	replayed, skipped, replayErr := c.replay(request, leaseOwner)
+	var replayed, skipped int
+	var replayErr error
+	switch request.Kind {
+	case models.OtelReplayKindMetrics, "":
+		replayed, skipped, replayErr = c.replay(request, leaseOwner)
+	case models.OtelReplayKindLogs:
+		replayed, replayErr = c.requeueLogBatches(request, leaseOwner)
+	default:
+		replayErr = fmt.Errorf("unknown replay kind %q", request.Kind)
+	}
 	if replayErr != nil {
 		if stdErrors.Is(replayErr, errReplayLeaseLost) {
 			return false, nil
@@ -373,18 +382,7 @@ func hourlyAggregateKey(update factUpdate) string {
 func (c *rawConverter) commitReplayDay(requestID uint64, leaseOwner string, dayStart time.Time, aggregates map[string]*hourlyAggregate, replayed, skipped int, diagnostic *string) error {
 	dayEnd := dayStart.AddDate(0, 0, 1)
 	tx := c.db.Begin()
-	request := &models.OtelReplayRequest{}
-	if err := tx.First(request,
-		dal.Where("id = ? AND status = ? AND lease_owner = ? AND lease_until > ?", requestID, models.OtelReplayRequestStatusProcessing, leaseOwner, c.now().UTC()),
-		dal.Lock(true, false),
-	); err != nil {
-		c.rollback(tx)
-		if tx.IsErrorNotFound(err) {
-			return errReplayLeaseLost
-		}
-		return fmt.Errorf("verify replay request lease before commit: %w", err)
-	}
-	if err := c.verifyConverterLease(tx); err != nil {
+	if err := c.lockReplayLeases(tx, requestID, leaseOwner); err != nil {
 		c.rollback(tx)
 		return err
 	}
@@ -404,6 +402,22 @@ func (c *rawConverter) commitReplayDay(requestID uint64, leaseOwner string, dayS
 		return fmt.Errorf("commit Claude Code OTel replay: %w", err)
 	}
 	return nil
+}
+
+// lockReplayLeases locks the replay request row inside tx and verifies that this worker
+// still holds both the request lease and the converter lease. The caller rolls back on error.
+func (c *rawConverter) lockReplayLeases(tx dal.Transaction, requestID uint64, leaseOwner string) error {
+	request := &models.OtelReplayRequest{}
+	if err := tx.First(request,
+		dal.Where("id = ? AND status = ? AND lease_owner = ? AND lease_until > ?", requestID, models.OtelReplayRequestStatusProcessing, leaseOwner, c.now().UTC()),
+		dal.Lock(true, false),
+	); err != nil {
+		if tx.IsErrorNotFound(err) {
+			return errReplayLeaseLost
+		}
+		return fmt.Errorf("verify replay request lease before commit: %w", err)
+	}
+	return c.verifyConverterLease(tx)
 }
 
 func (c *rawConverter) replaceReplayRange(tx dal.Transaction, rangeStart, rangeEnd time.Time, aggregates map[string]*hourlyAggregate) error {

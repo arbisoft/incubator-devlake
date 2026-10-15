@@ -111,7 +111,9 @@ var deterministicMySQLDataErrors = map[uint16]struct{}{
 }
 
 // classifyStorageError marks deterministic MySQL data rejections as permanent so the
-// batch is quarantined for operator replay instead of blocking the ordered queue.
+// batch is quarantined instead of blocking the ordered queue. After the cause is fixed, an
+// operator replay request rebuilds a metric batch's days (kind metrics) or returns a log
+// batch to the log queue (kind logs).
 func classifyStorageError(err error) error {
 	var conversionErr *conversionError
 	if stderrors.As(err, &conversionErr) {
