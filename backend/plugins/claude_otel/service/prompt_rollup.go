@@ -181,17 +181,20 @@ func buildPromptRollup(workspaceKey, promptID string, events []*models.OtelEvent
 	sort.SliceStable(events, func(i, j int) bool {
 		return lessEventOrder(events[i].EventTimestamp, int64Value(events[i].EventSequence), events[j].EventTimestamp, int64Value(events[j].EventSequence))
 	})
-	prompt := &ai.AiPrompt{
-		DomainEntity:     domainlayer.NewDomainEntity(ai.PromptID(aiProviderClaude, workspaceKey, promptID)),
-		Provider:         aiProviderClaude,
-		WorkspaceKey:     workspaceKey,
-		PromptId:         promptID,
-		EstimatedCostUsd: "0.00000000",
-		SourceType:       aiSourceOtel,
+	builder := &promptBuilder{
+		prompt: &ai.AiPrompt{
+			DomainEntity:     domainlayer.NewDomainEntity(ai.PromptID(aiProviderClaude, workspaceKey, promptID)),
+			Provider:         aiProviderClaude,
+			WorkspaceKey:     workspaceKey,
+			PromptId:         promptID,
+			EstimatedCostUsd: "0.00000000",
+			SourceType:       aiSourceOtel,
+		},
+		skills:     newSkillCollector(workspaceKey, promptID),
+		modelNames: make([]string, 0),
+		seenModels: make(map[string]struct{}),
 	}
-	skills := newSkillCollector(workspaceKey, promptID)
-	modelNames := make([]string, 0)
-	seenModels := make(map[string]struct{})
+	prompt := builder.prompt
 	for index, event := range events {
 		if index == 0 {
 			prompt.StartedAt = event.EventTimestamp
@@ -201,55 +204,87 @@ func buildPromptRollup(workspaceKey, promptID string, events []*models.OtelEvent
 		attributes := eventAttributes(event)
 		switch event.EventName {
 		case eventUserPrompt:
-			// The user_prompt event marks the start, even when an earlier-stamped event of
-			// the same prompt arrived.
-			prompt.StartedAt = event.EventTimestamp
-			fillPromptIdentity(prompt, event)
-			prompt.PromptLength = int64Value(eventNumber(attributes, "prompt_length"))
-			prompt.CommandName = event.CommandName
-			prompt.CommandSource = eventString(attributes, "command_source")
+			builder.applyUserPrompt(event, attributes)
 		case eventAPIRequest:
-			prompt.ApiRequestCount++
-			prompt.InputTokens += event.InputTokens
-			prompt.OutputTokens += event.OutputTokens
-			prompt.CacheReadTokens += event.CacheReadTokens
-			prompt.CacheCreationTokens += event.CacheCreationTokens
-			if event.CostUsd != nil {
-				if total, err := addDecimal(prompt.EstimatedCostUsd, *event.CostUsd, 8); err == nil {
-					prompt.EstimatedCostUsd = total
-				}
-			}
-			if _, seen := seenModels[event.Model]; event.Model != "" && !seen {
-				seenModels[event.Model] = struct{}{}
-				modelNames = append(modelNames, event.Model)
-			}
-			skills.add(event.SkillName, ai.SkillDetectedViaApiRequest, "", "", event.PluginName, event.EventTimestamp)
+			builder.applyAPIRequest(event)
 		case eventAPIError:
-			prompt.ApiErrorCount++
+			builder.applyAPIError()
 		case eventToolResult:
-			prompt.ToolCallCount++
-			if event.Success != nil && !*event.Success {
-				prompt.ToolFailureCount++
-			}
-			if _, subagent := subagentToolNames[event.ToolName]; subagent {
-				prompt.SubagentCount++
-			}
-			if event.ToolName == skillToolName {
-				skills.add(event.SkillName, ai.SkillDetectedViaSkillTool, "", "", "", event.EventTimestamp)
-			}
+			builder.applyToolResult(event)
 		case eventToolDecision:
-			if eventString(attributes, "decision") == toolDecisionReject {
-				prompt.ToolRejectCount++
-			}
+			builder.applyToolDecision(attributes)
 		case eventSkillActivated:
-			skills.add(event.SkillName, ai.SkillDetectedViaActivation, eventString(attributes, "invocation_trigger"), eventString(attributes, "skill.source"), event.PluginName, event.EventTimestamp)
+			builder.applySkillActivated(event, attributes)
 		}
 	}
-	prompt.ModelsUsed = truncate(strings.Join(modelNames, ","), maxModelsUsedLength)
-	collected := skills.result(prompt)
+	prompt.ModelsUsed = truncate(strings.Join(builder.modelNames, ","), maxModelsUsedLength)
+	collected := builder.skills.result(prompt)
 	prompt.SkillCount = int64(len(collected))
 	prompt.UsedSkill = len(collected) > 0
 	return promptRollup{prompt: prompt, skills: collected}
+}
+
+// promptBuilder accumulates one prompt's row, skills and models from its ordered events.
+type promptBuilder struct {
+	prompt     *ai.AiPrompt
+	skills     *skillCollector
+	modelNames []string
+	seenModels map[string]struct{}
+}
+
+func (b *promptBuilder) applyUserPrompt(event *models.OtelEvent, attributes map[string]interface{}) {
+	// The user_prompt event marks the start, even when an earlier-stamped event of the same
+	// prompt arrived.
+	b.prompt.StartedAt = event.EventTimestamp
+	fillPromptIdentity(b.prompt, event)
+	b.prompt.PromptLength = int64Value(eventNumber(attributes, "prompt_length"))
+	b.prompt.CommandName = event.CommandName
+	b.prompt.CommandSource = eventString(attributes, "command_source")
+}
+
+func (b *promptBuilder) applyAPIRequest(event *models.OtelEvent) {
+	b.prompt.ApiRequestCount++
+	b.prompt.InputTokens += event.InputTokens
+	b.prompt.OutputTokens += event.OutputTokens
+	b.prompt.CacheReadTokens += event.CacheReadTokens
+	b.prompt.CacheCreationTokens += event.CacheCreationTokens
+	if event.CostUsd != nil {
+		if total, err := addDecimal(b.prompt.EstimatedCostUsd, *event.CostUsd, 8); err == nil {
+			b.prompt.EstimatedCostUsd = total
+		}
+	}
+	if _, seen := b.seenModels[event.Model]; event.Model != "" && !seen {
+		b.seenModels[event.Model] = struct{}{}
+		b.modelNames = append(b.modelNames, event.Model)
+	}
+	b.skills.add(event.SkillName, ai.SkillDetectedViaApiRequest, "", "", event.PluginName, event.EventTimestamp)
+}
+
+func (b *promptBuilder) applyAPIError() {
+	b.prompt.ApiErrorCount++
+}
+
+func (b *promptBuilder) applyToolResult(event *models.OtelEvent) {
+	b.prompt.ToolCallCount++
+	if event.Success != nil && !*event.Success {
+		b.prompt.ToolFailureCount++
+	}
+	if _, subagent := subagentToolNames[event.ToolName]; subagent {
+		b.prompt.SubagentCount++
+	}
+	if event.ToolName == skillToolName {
+		b.skills.add(event.SkillName, ai.SkillDetectedViaSkillTool, "", "", "", event.EventTimestamp)
+	}
+}
+
+func (b *promptBuilder) applyToolDecision(attributes map[string]interface{}) {
+	if eventString(attributes, "decision") == toolDecisionReject {
+		b.prompt.ToolRejectCount++
+	}
+}
+
+func (b *promptBuilder) applySkillActivated(event *models.OtelEvent, attributes map[string]interface{}) {
+	b.skills.add(event.SkillName, ai.SkillDetectedViaActivation, eventString(attributes, "invocation_trigger"), eventString(attributes, "skill.source"), event.PluginName, event.EventTimestamp)
 }
 
 func fillPromptIdentity(prompt *ai.AiPrompt, event *models.OtelEvent) {

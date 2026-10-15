@@ -146,19 +146,31 @@ func (p *batchPreparer) prepareLogRecord(teamSlug string, resourceAttrs []*commo
 	if err != nil {
 		return nil, nil, permanentConversionError(errorInvalidValue, "OTLP log record attributes cannot be encoded")
 	}
-	event := &models.OtelEvent{
-		ConnectionId:        connection.ID,
-		TeamSlug:            connection.TeamSlug,
-		OrganizationId:      organizationID,
-		UserKey:             identity.key,
-		UserAccountId:       identity.accountID,
-		UserAccountUUID:     identity.accountUUID,
-		UserEmail:           identity.email,
+	event := eventFromRecord(resourceAttrs, recordAttrs, attributes)
+	event.ConnectionId = connection.ID
+	event.TeamSlug = connection.TeamSlug
+	event.OrganizationId = organizationID
+	event.UserKey = identity.key
+	event.UserAccountId = identity.accountID
+	event.UserAccountUUID = identity.accountUUID
+	event.UserEmail = identity.email
+	event.EventName = eventName
+	event.EventTimestamp = observedAt
+	event.Attributes = encoded
+	if event.EventName == eventUserPrompt && promptText != "" {
+		event.PromptText = &promptText
+	}
+	event.EventKey = otelEventKey(event, attributeString(recordAttrs, "tool_use_id"), attributeString(recordAttrs, "request_id"))
+	return event, connection, nil
+}
+
+// eventFromRecord maps a log record's attributes to the event's typed columns. attributes
+// is the merged resource and record map, which carries the decoded tool parameters.
+func eventFromRecord(resourceAttrs, recordAttrs []*commonv1.KeyValue, attributes map[string]interface{}) *models.OtelEvent {
+	return &models.OtelEvent{
 		SessionId:           attributeString(recordAttrs, "session.id"),
 		PromptId:            attributeString(recordAttrs, "prompt.id"),
-		EventName:           eventName,
 		EventSequence:       attributeInt(recordAttrs, "event.sequence"),
-		EventTimestamp:      observedAt,
 		AppVersion:          firstNonEmpty(attributeString(recordAttrs, "app.version"), attributeString(resourceAttrs, "service.version")),
 		TerminalType:        attributeString(recordAttrs, "terminal.type"),
 		Model:               attributeString(recordAttrs, "model"),
@@ -176,13 +188,7 @@ func (p *batchPreparer) prepareLogRecord(teamSlug string, resourceAttrs []*commo
 		OutputTokens:        int64Value(attributeInt(recordAttrs, "output_tokens")),
 		CacheReadTokens:     int64Value(attributeInt(recordAttrs, "cache_read_tokens")),
 		CacheCreationTokens: int64Value(attributeInt(recordAttrs, "cache_creation_tokens")),
-		Attributes:          encoded,
 	}
-	if event.EventName == eventUserPrompt && promptText != "" {
-		event.PromptText = &promptText
-	}
-	event.EventKey = otelEventKey(event, attributeString(recordAttrs, "tool_use_id"), attributeString(recordAttrs, "request_id"))
-	return event, connection, nil
 }
 
 // otelEventKey identifies one emitted event, so a replayed or re-exported record updates
