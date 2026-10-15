@@ -610,6 +610,59 @@ func TestAdvanceQueuesCombinesBothFailures(t *testing.T) {
 	}
 }
 
+func TestConvertRoundRunsQueuesWhenReplayFails(t *testing.T) {
+	queuesRun := 0
+	queue := func() (bool, devlakeerrors.Error) { queuesRun++; return true, nil }
+	advanced, err := convertRound(
+		func() (bool, devlakeerrors.Error) { return false, devlakeerrors.Default.New("replay claim failed") },
+		queue, queue,
+	)
+	if queuesRun != 2 || !advanced {
+		t.Fatalf("convertRound() queues run=%d advanced=%t; want metrics and logs converted despite the replay failure", queuesRun, advanced)
+	}
+	if err == nil || !strings.Contains(err.Error(), "replay claim failed") {
+		t.Fatalf("convertRound() error = %v; want the replay failure reported", err)
+	}
+}
+
+func TestConvertRoundCombinesReplayAndQueueFailures(t *testing.T) {
+	_, err := convertRound(
+		func() (bool, devlakeerrors.Error) {
+			return true, devlakeerrors.Default.New("replay result not recorded")
+		},
+		func() (bool, devlakeerrors.Error) { return false, devlakeerrors.Default.New("metric claim failed") },
+		func() (bool, devlakeerrors.Error) { return false, nil },
+	)
+	if err == nil || !strings.Contains(err.Error(), "replay result not recorded") || !strings.Contains(err.Error(), "metric claim failed") {
+		t.Fatalf("convertRound() error = %v; want both failures", err)
+	}
+}
+
+func TestConvertRoundEndsAfterACompletedReplay(t *testing.T) {
+	advanced, err := convertRound(
+		func() (bool, devlakeerrors.Error) { return true, nil },
+		func() (bool, devlakeerrors.Error) {
+			t.Fatal("a queue ran in the round of a completed replay")
+			return false, nil
+		},
+	)
+	if !advanced || err != nil {
+		t.Fatalf("convertRound() = %t, %v; want a completed replay to end the round", advanced, err)
+	}
+}
+
+func TestConvertRoundRunsQueuesWithoutReplay(t *testing.T) {
+	queuesRun := 0
+	advanced, err := convertRound(
+		func() (bool, devlakeerrors.Error) { return false, nil },
+		func() (bool, devlakeerrors.Error) { queuesRun++; return false, nil },
+		func() (bool, devlakeerrors.Error) { queuesRun++; return true, nil },
+	)
+	if queuesRun != 2 || !advanced || err != nil {
+		t.Fatalf("convertRound() queues run=%d = %t, %v; want both queues run and progress reported", queuesRun, advanced, err)
+	}
+}
+
 func TestPollUntilIdleKeepsConvertingWhileAQueueAdvances(t *testing.T) {
 	failure := devlakeerrors.Default.New("metric claim failed")
 	rounds := []struct {

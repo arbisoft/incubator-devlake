@@ -119,11 +119,21 @@ func (c *rawConverter) pollOnce() (bool, errors.Error) {
 	if err := c.runRetention(); err != nil {
 		c.logWarn(err, "Claude Code OTel raw metric retention failed; conversion will continue")
 	}
-	if replayed, err := c.processNextReplay(); err != nil || replayed {
-		return replayed, err
+	return convertRound(c.processNextReplay, c.processNext, c.processNextLogBatch)
+}
+
+// convertRound runs one round of replay and live conversion. A completed replay request
+// ends the round, so queued requests run before live conversion resumes. A replay failure
+// does not: metrics and logs still advance, one batch each so neither backlog starves the
+// other, and the replay error is reported with theirs. A request whose result could not be
+// recorded keeps its lease, so the next round does not claim it again.
+func convertRound(replay func() (bool, errors.Error), queues ...func() (bool, errors.Error)) (bool, errors.Error) {
+	replayed, replayErr := replay()
+	if replayed && replayErr == nil {
+		return true, nil
 	}
-	// Metrics and logs advance one batch each per round so neither backlog starves the other.
-	return advanceQueues(c.processNext, c.processNextLogBatch)
+	replayStep := func() (bool, errors.Error) { return replayed, replayErr }
+	return advanceQueues(append([]func() (bool, errors.Error){replayStep}, queues...)...)
 }
 
 // advanceQueues runs every queue step, even after one fails, so a failing queue cannot
