@@ -46,7 +46,7 @@ func TestPrepareUpdatesUsesTypedIdentityAndSeparateFactGrains(t *testing.T) {
 	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: observedAt.Add(-time.Hour)}}})
 
-	prepared, err := newRawMetricConverter(database, nil).prepareUpdates(newConverterRequest(observedAt, testOrganizationID))
+	prepared, err := newRawConverter(database, nil).prepareUpdates(newConverterRequest(observedAt, testOrganizationID))
 	if err != nil {
 		t.Fatalf("prepareUpdates() error = %v", err)
 	}
@@ -69,7 +69,7 @@ func TestPrepareUpdatesUsesTypedIdentityAndSeparateFactGrains(t *testing.T) {
 }
 
 func TestClassifyConversionErrorUnwrapsPermanentErrors(t *testing.T) {
-	err := fmt.Errorf("context: %w", permanentMetricError(errorInvalidOrganization, "invalid stored organization"))
+	err := fmt.Errorf("context: %w", permanentConversionError(errorInvalidOrganization, "invalid stored organization"))
 	code, permanent, _ := classifyConversionError(err)
 	if code != errorInvalidOrganization || !permanent {
 		t.Fatalf("classifyConversionError() = %q, %t; want %q, true", code, permanent, errorInvalidOrganization)
@@ -110,7 +110,7 @@ func TestAddDecimalRejectsInvalidPersistedValue(t *testing.T) {
 
 func TestRunRetentionBacksOffAfterFailure(t *testing.T) {
 	database := dalmocks.NewDal(t)
-	converter := newRawMetricConverter(database, nil)
+	converter := newRawConverter(database, nil)
 	now := time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC)
 	converter.now = func() time.Time { return now }
 	// The retention lookup plucks ids with From, Where, Orderby and Limit clauses.
@@ -129,7 +129,7 @@ func TestRunRetentionBacksOffAfterFailure(t *testing.T) {
 
 func TestRecordPermanentFailureMarksTerminalTime(t *testing.T) {
 	database := dalmocks.NewDal(t)
-	converter := newRawMetricConverter(database, nil)
+	converter := newRawConverter(database, nil)
 	now := time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC)
 	converter.now = func() time.Time { return now }
 	database.EXPECT().UpdateColumns(mock.Anything, mock.Anything, mock.Anything).Run(
@@ -146,7 +146,7 @@ func TestRecordPermanentFailureMarksTerminalTime(t *testing.T) {
 		},
 	).Return(nil).Once()
 
-	err := converter.recordBatchFailure(&models.OtelMetricBatch{}, 12, 1, "worker", permanentMetricError(errorInvalidPayload, "invalid payload"))
+	err := converter.recordBatchFailure(&models.OtelMetricBatch{}, 12, 1, "worker", permanentConversionError(errorInvalidPayload, "invalid payload"))
 	if err != nil {
 		t.Fatalf("recordBatchFailure() error = %v", err)
 	}
@@ -164,7 +164,7 @@ func TestPrepareUpdatesRejectsMalformedSupportedMetric(t *testing.T) {
 		stringAttribute("type", "input"),
 	}
 
-	_, err := newRawMetricConverter(database, nil).prepareUpdates(request)
+	_, err := newRawConverter(database, nil).prepareUpdates(request)
 	if conversionErr, ok := err.(*conversionError); !ok || !conversionErr.permanent || conversionErr.code != errorInvalidDimension {
 		t.Fatalf("prepareUpdates() error = %v, want whole-batch permanent invalid_dimension", err)
 	}
@@ -182,7 +182,7 @@ func TestPrepareUpdatesSkipsOnlyResourceGroupsWithAttributionFailures(t *testing
 	}
 	request.ResourceMetrics = append([]*metricsv1.ResourceMetrics{unknownTeam}, request.ResourceMetrics...)
 
-	prepared, err := newRawMetricConverter(database, nil).prepareUpdates(request)
+	prepared, err := newRawConverter(database, nil).prepareUpdates(request)
 	if err != nil {
 		t.Fatalf("prepareUpdates() error = %v", err)
 	}
@@ -210,7 +210,7 @@ func TestPrepareUpdatesSkipsUntrustedProjectAttributionWithoutDroppingOtherResou
 	)
 	request.ResourceMetrics = append([]*metricsv1.ResourceMetrics{invalidResource}, request.ResourceMetrics...)
 
-	prepared, err := newRawMetricConverter(database, nil).prepareUpdates(request)
+	prepared, err := newRawConverter(database, nil).prepareUpdates(request)
 	if err != nil {
 		t.Fatalf("prepareUpdates() error = %v", err)
 	}
@@ -240,11 +240,11 @@ func TestReplayRejectsCumulativeTelemetryWithoutMutatingDay(t *testing.T) {
 		t.Fatalf("proto.Marshal() error = %v", err)
 	}
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: observedAt.Add(-time.Hour)}}})
-	converter := newRawMetricConverter(database, nil)
+	converter := newRawConverter(database, nil)
 	existing := &hourlyAggregate{value: big.NewRat(99, 1)}
 	aggregates := map[string]*hourlyAggregate{"existing": existing}
 	processed, skippedErr, replayErr := converter.replayBatch(
-		&models.OtelMetricBatch{PayloadProto: payload, PayloadSchemaVersion: otelPayloadSchemaVersion, Status: models.OtelMetricBatchStatusProcessed},
+		&models.OtelMetricBatch{PayloadProto: payload, PayloadSchemaVersion: otelPayloadSchemaVersion, Status: models.OtelBatchStatusProcessed},
 		observedAt.Truncate(24*time.Hour),
 		observedAt.Truncate(24*time.Hour).Add(24*time.Hour),
 		aggregates,
@@ -258,8 +258,8 @@ func TestReplayRejectsCumulativeTelemetryWithoutMutatingDay(t *testing.T) {
 }
 
 func TestReplayBatchAbortsForUnreadableProcessedPayload(t *testing.T) {
-	processed, skippedErr, replayErr := newRawMetricConverter(nil, nil).replayBatch(
-		&models.OtelMetricBatch{Model: common.Model{ID: 42}, PayloadProto: []byte("not protobuf"), PayloadSchemaVersion: otelPayloadSchemaVersion, Status: models.OtelMetricBatchStatusProcessed},
+	processed, skippedErr, replayErr := newRawConverter(nil, nil).replayBatch(
+		&models.OtelMetricBatch{Model: common.Model{ID: 42}, PayloadProto: []byte("not protobuf"), PayloadSchemaVersion: otelPayloadSchemaVersion, Status: models.OtelBatchStatusProcessed},
 		time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC),
 		time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC),
 		make(map[string]*hourlyAggregate),
@@ -275,8 +275,8 @@ func TestReplayBatchAbortsForUnreadableProcessedPayload(t *testing.T) {
 	t.Run("unsupported schema", func(t *testing.T) {
 		existing := &hourlyAggregate{value: big.NewRat(99, 1)}
 		aggregates := map[string]*hourlyAggregate{"existing": existing}
-		processed, skippedErr, replayErr := newRawMetricConverter(nil, nil).replayBatch(
-			&models.OtelMetricBatch{Model: common.Model{ID: 43}, PayloadProto: []byte("validity is irrelevant before schema validation"), PayloadSchemaVersion: otelPayloadSchemaVersion + 1, Status: models.OtelMetricBatchStatusProcessed},
+		processed, skippedErr, replayErr := newRawConverter(nil, nil).replayBatch(
+			&models.OtelMetricBatch{Model: common.Model{ID: 43}, PayloadProto: []byte("validity is irrelevant before schema validation"), PayloadSchemaVersion: otelPayloadSchemaVersion + 1, Status: models.OtelBatchStatusProcessed},
 			time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC),
 			time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC),
 			aggregates,
@@ -291,8 +291,8 @@ func TestReplayBatchAbortsForUnreadableProcessedPayload(t *testing.T) {
 }
 
 func TestReplayBatchSkipsUnreadablePermanentErrorPayload(t *testing.T) {
-	processed, skippedErr, replayErr := newRawMetricConverter(nil, nil).replayBatch(
-		&models.OtelMetricBatch{Model: common.Model{ID: 42}, PayloadProto: []byte("not protobuf"), PayloadSchemaVersion: otelPayloadSchemaVersion, Status: models.OtelMetricBatchStatusPermanentError},
+	processed, skippedErr, replayErr := newRawConverter(nil, nil).replayBatch(
+		&models.OtelMetricBatch{Model: common.Model{ID: 42}, PayloadProto: []byte("not protobuf"), PayloadSchemaVersion: otelPayloadSchemaVersion, Status: models.OtelBatchStatusPermanentError},
 		time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC),
 		time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC),
 		make(map[string]*hourlyAggregate),
@@ -330,8 +330,8 @@ func TestReplayBatchAbortsOnRetryablePreparationFailure(t *testing.T) {
 	database := dalmocks.NewDal(t)
 	database.EXPECT().All(mock.AnythingOfType("*[]*models.OtelConnection"), mock.Anything).Return(devlakeerrors.Default.New("database unavailable"))
 
-	processed, skippedErr, replayErr := newRawMetricConverter(database, nil).replayBatch(
-		&models.OtelMetricBatch{PayloadProto: payload, PayloadSchemaVersion: otelPayloadSchemaVersion, Status: models.OtelMetricBatchStatusProcessed},
+	processed, skippedErr, replayErr := newRawConverter(database, nil).replayBatch(
+		&models.OtelMetricBatch{PayloadProto: payload, PayloadSchemaVersion: otelPayloadSchemaVersion, Status: models.OtelBatchStatusProcessed},
 		observedAt.Truncate(24*time.Hour),
 		observedAt.Truncate(24*time.Hour).Add(24*time.Hour),
 		make(map[string]*hourlyAggregate),
@@ -347,7 +347,7 @@ func TestReplayBatchAbortsOnRetryablePreparationFailure(t *testing.T) {
 
 func TestReplayRejectsCurrentUTCDate(t *testing.T) {
 	now := time.Date(2026, 9, 15, 10, 0, 0, 0, time.UTC)
-	converter := newRawMetricConverter(nil, nil)
+	converter := newRawConverter(nil, nil)
 	converter.now = func() time.Time { return now }
 	request := &models.OtelReplayRequest{
 		RangeStart: now.Truncate(24 * time.Hour),
@@ -370,13 +370,13 @@ func TestReplayDeltaBatchesRebuildStableHourlyAggregates(t *testing.T) {
 		if err != nil {
 			t.Fatalf("proto.Marshal() error = %v", err)
 		}
-		return &models.OtelMetricBatch{PayloadProto: payload, PayloadSchemaVersion: otelPayloadSchemaVersion, Status: models.OtelMetricBatchStatusProcessed}
+		return &models.OtelMetricBatch{PayloadProto: payload, PayloadSchemaVersion: otelPayloadSchemaVersion, Status: models.OtelBatchStatusProcessed}
 	}
 	batches := []*models.OtelMetricBatch{marshalBatch(first), marshalBatch(second)}
 	rebuild := func() map[string]*hourlyAggregate {
 		aggregates := make(map[string]*hourlyAggregate)
 		database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: firstObservedAt.Add(-time.Hour)}}})
-		converter := newRawMetricConverter(database, nil)
+		converter := newRawConverter(database, nil)
 		for _, batch := range batches {
 			processed, skippedErr, err := converter.replayBatch(batch, firstObservedAt.Truncate(24*time.Hour), firstObservedAt.Truncate(24*time.Hour).Add(24*time.Hour), aggregates)
 			if err != nil || skippedErr != nil || !processed {
@@ -429,7 +429,7 @@ func TestCounterDeltaUsesExactCumulativeIncreaseResetAndOrder(t *testing.T) {
 			}
 			current, _ := new(big.Rat).SetString(testCase.current)
 
-			increase, err := newRawMetricConverter(nil, nil).counterDelta(transaction, factUpdate{
+			increase, err := newRawConverter(nil, nil).counterDelta(transaction, factUpdate{
 				connection:  &models.OtelConnection{},
 				metric:      metricCostUsage,
 				value:       metricNumber{value: current},
@@ -465,7 +465,7 @@ func TestRealShapedClaudeCodeExportIsAcceptedAndConverted(t *testing.T) {
 	}
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
 
-	prepared, err := newRawMetricConverter(database, nil).prepareUpdates(request)
+	prepared, err := newRawConverter(database, nil).prepareUpdates(request)
 	if err != nil {
 		t.Fatalf("prepareUpdates() error = %v", err)
 	}
@@ -489,7 +489,7 @@ func TestResolveConnectionUsesEventTimeAcrossRevokedAndRecreatedTeam(t *testing.
 			*connections.(*[]*models.OtelConnection) = []*models.OtelConnection{revoked, recreated}
 		},
 	).Return(nil).Once()
-	preparer := &batchPreparer{converter: newRawMetricConverter(database, nil), connections: make(map[string][]*models.OtelConnection)}
+	preparer := &batchPreparer{converter: newRawConverter(database, nil), connections: make(map[string][]*models.OtelConnection)}
 
 	testCases := []struct {
 		name       string
@@ -529,7 +529,7 @@ func TestAcquireLeaseRejectsSecondConverterWhileLeaseIsHeld(t *testing.T) {
 	).Return(nil)
 	transaction.EXPECT().Commit().Return(nil)
 
-	leader, err := newRawMetricConverter(database, nil).acquireLease()
+	leader, err := newRawConverter(database, nil).acquireLease()
 	if err != nil || leader {
 		t.Fatalf("acquireLease() = %v, %v; want the second converter to stand by", leader, err)
 	}
@@ -572,7 +572,7 @@ func TestCommitReplayAbortsWhenConverterLeaseWasTakenOver(t *testing.T) {
 	// commitReplay reached replaceReplayRange despite the lost lease, the mock would fail on
 	// the first unexpected call, so this also proves the delete-and-replace never ran.
 
-	converter := newRawMetricConverter(database, nil)
+	converter := newRawConverter(database, nil)
 	converter.workerID = "first-converter"
 	converter.now = func() time.Time { return now }
 	aggregates := map[string]*hourlyAggregate{
@@ -591,10 +591,10 @@ func TestClaimNextWaitsBehindRetryDelayedHeadBatch(t *testing.T) {
 	database := dalmocks.NewDal(t)
 	database.EXPECT().First(mock.AnythingOfType("*service.rawBatchHead"), mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(
 		func(head interface{}, _ ...dal.Clause) {
-			*head.(*rawBatchHead) = rawBatchHead{Status: models.OtelMetricBatchStatusRetryableError, NextAttemptAt: &nextAttemptAt}
+			*head.(*rawBatchHead) = rawBatchHead{Status: models.OtelBatchStatusRetryableError, NextAttemptAt: &nextAttemptAt}
 		},
 	).Return(nil)
-	converter := newRawMetricConverter(database, nil)
+	converter := newRawConverter(database, nil)
 	converter.now = func() time.Time { return now }
 
 	batch, _, err := converter.claimNext()
@@ -619,11 +619,11 @@ func TestClaimHeadPicksEarliestAcrossStatuses(t *testing.T) {
 			status := clauses[2].Data.(dal.DalClause).Params[0].(string)
 			head := dst.(*rawBatchHead)
 			switch status {
-			case models.OtelMetricBatchStatusPending:
+			case models.OtelBatchStatusPending:
 				*head = rawBatchHead{ID: 2, Status: status, ReceivedAt: pendingReceivedAt}
-			case models.OtelMetricBatchStatusProcessing:
+			case models.OtelBatchStatusProcessing:
 				*head = rawBatchHead{ID: 3, Status: status, ReceivedAt: processingReceivedAt}
-			case models.OtelMetricBatchStatusRetryableError:
+			case models.OtelBatchStatusRetryableError:
 				*head = rawBatchHead{ID: 1, Status: status, ReceivedAt: retryableReceivedAt}
 			default:
 				return notFound
@@ -633,12 +633,12 @@ func TestClaimHeadPicksEarliestAcrossStatuses(t *testing.T) {
 	)
 	database.EXPECT().IsErrorNotFound(mock.Anything).RunAndReturn(func(err error) bool { return err == notFound }).Maybe()
 
-	converter := newRawMetricConverter(database, nil)
+	converter := newRawConverter(database, nil)
 	head, err := converter.claimHead(&models.OtelMetricBatch{})
 	if err != nil {
 		t.Fatalf("claimHead() error = %v", err)
 	}
-	if head == nil || head.ID != 1 || head.Status != models.OtelMetricBatchStatusRetryableError {
+	if head == nil || head.ID != 1 || head.Status != models.OtelBatchStatusRetryableError {
 		t.Fatalf("claimHead() = %#v, want the retryable_error batch (id=1), the earliest received_at across all three statuses", head)
 	}
 }

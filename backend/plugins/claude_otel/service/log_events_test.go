@@ -170,7 +170,7 @@ func TestPrepareEventsMapsTypedColumnsAndKeepsAttributes(t *testing.T) {
 	stripContentAttributes(request)
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
 
-	prepared, err := newRawMetricConverter(database, nil).prepareEvents(request, 9)
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 9)
 	if err != nil {
 		t.Fatalf("prepareEvents() error = %v", err)
 	}
@@ -254,7 +254,7 @@ func TestPrepareEventsSkipsOnlyInvalidRecords(t *testing.T) {
 	records[1].Body = nil
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
 
-	prepared, err := newRawMetricConverter(database, nil).prepareEvents(request, 9)
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 9)
 	if err != nil {
 		t.Fatalf("prepareEvents() error = %v", err)
 	}
@@ -277,7 +277,7 @@ func TestPrepareEventsFailsBatchOnConnectionLookupError(t *testing.T) {
 	database := dalmocks.NewDal(t)
 	database.EXPECT().All(mock.AnythingOfType("*[]*models.OtelConnection"), mock.Anything).Return(errors.Default.New("database unavailable"))
 
-	_, err := newRawMetricConverter(database, nil).prepareEvents(request, 9)
+	_, err := newRawConverter(database, nil).prepareEvents(request, 9)
 	if code, permanent, _ := classifyConversionError(err); err == nil || code != errorConnectionLookup || permanent {
 		t.Fatalf("prepareEvents() error = %v, want retryable %s", err, errorConnectionLookup)
 	}
@@ -288,7 +288,7 @@ func TestPrepareEventsSkipsResourceWithoutTeam(t *testing.T) {
 	records := resourceLogRecords(request.GetResourceLogs()[0])
 	records[0].Attributes = withoutAttributes(records[0].GetAttributes(), map[string]struct{}{devlakeTeamAttribute: {}})
 
-	prepared, err := newRawMetricConverter(dalmocks.NewDal(t), nil).prepareEvents(request, 1)
+	prepared, err := newRawConverter(dalmocks.NewDal(t), nil).prepareEvents(request, 1)
 	if err != nil {
 		t.Fatalf("prepareEvents() error = %v", err)
 	}
@@ -416,7 +416,7 @@ func TestDeleteExpiredLogBatchesClearsPromptTextRegardlessOfEventTimestamp(t *te
 		calls = append(calls, "delete")
 	}).Return(nil).Once()
 
-	if err := newRawMetricConverter(database, nil).deleteExpiredRawBatches(now, &models.OtelLogBatch{}); err != nil {
+	if err := newRawConverter(database, nil).deleteExpiredRawBatches(now, &models.OtelLogBatch{}); err != nil {
 		t.Fatalf("deleteExpiredRawBatches() error = %v", err)
 	}
 	if strings.Join(calls, ",") != "clear,delete" {
@@ -432,7 +432,7 @@ func TestDeleteExpiredMetricBatchesLeavesEventsAlone(t *testing.T) {
 	}).Return(nil).Once()
 	database.EXPECT().Delete(mock.AnythingOfType("*models.OtelMetricBatch"), mock.Anything).Return(nil).Once()
 
-	if err := newRawMetricConverter(database, nil).deleteExpiredRawBatches(now, &models.OtelMetricBatch{}); err != nil {
+	if err := newRawConverter(database, nil).deleteExpiredRawBatches(now, &models.OtelMetricBatch{}); err != nil {
 		t.Fatalf("deleteExpiredRawBatches() error = %v", err)
 	}
 }
@@ -444,7 +444,7 @@ func rollupEventColumnsSQL() string {
 func TestSessionTargetsGroupPromptsAndFlagModeChanges(t *testing.T) {
 	request := loadLogEventsFixture(t)
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
-	prepared, err := newRawMetricConverter(database, nil).prepareEvents(request, 1)
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 1)
 	if err != nil {
 		t.Fatalf("prepareEvents() error = %v", err)
 	}
@@ -486,7 +486,7 @@ func fixturePromptEvents(t *testing.T, promptID string) []*models.OtelEvent {
 	request := loadLogEventsFixture(t)
 	stripContentAttributes(request)
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
-	prepared, err := newRawMetricConverter(database, nil).prepareEvents(request, 1)
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 1)
 	if err != nil {
 		t.Fatalf("prepareEvents() error = %v", err)
 	}

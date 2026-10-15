@@ -78,14 +78,14 @@ func (p *preparedBatch) diagnostic() *string {
 // batchPreparer resolves connections once per team for one batch conversion attempt and
 // tracks organization bindings that will be applied in the conversion transaction.
 type batchPreparer struct {
-	converter        *rawMetricConverter
+	converter        *rawConverter
 	connections      map[string][]*models.OtelConnection
 	pendingBindings  map[uint64]string
 	unknownMetricSet map[string]struct{}
 	result           preparedBatch
 }
 
-func (c *rawMetricConverter) newBatchPreparer() *batchPreparer {
+func (c *rawConverter) newBatchPreparer() *batchPreparer {
 	return &batchPreparer{
 		converter:        c,
 		connections:      make(map[string][]*models.OtelConnection),
@@ -116,7 +116,7 @@ func (p *batchPreparer) prepareResources(n int, prepare func(i int, bindings map
 	return nil
 }
 
-func (c *rawMetricConverter) prepareUpdates(request *collectormetrics.ExportMetricsServiceRequest) (*preparedBatch, error) {
+func (c *rawConverter) prepareUpdates(request *collectormetrics.ExportMetricsServiceRequest) (*preparedBatch, error) {
 	preparer := c.newBatchPreparer()
 	resources := request.GetResourceMetrics()
 	err := preparer.prepareResources(len(resources), func(i int, bindings map[uint64]string) error {
@@ -186,7 +186,7 @@ func (p *batchPreparer) prepareResource(resourceMetrics *metricsv1.ResourceMetri
 			}
 			sum := metric.GetSum()
 			if sum == nil {
-				return nil, permanentMetricError(errorUnsupportedMetricKind, "supported metric %s is not an OTLP sum", metric.GetName())
+				return nil, permanentConversionError(errorUnsupportedMetricKind, "supported metric %s is not an OTLP sum", metric.GetName())
 			}
 			for _, point := range sum.GetDataPoints() {
 				update, err := p.prepareDatapoint(metric, mapping, sum.GetAggregationTemporality(), scopeMetrics.GetScope(), resourceAttrs, point, resourceBindings)
@@ -212,11 +212,11 @@ func (p *batchPreparer) prepareDatapoint(
 	pointAttrs := point.GetAttributes()
 	teamSlug := attributeString(pointAttrs, devlakeTeamAttribute)
 	if teamSlug == "" {
-		return factUpdate{}, permanentMetricError(errorMissingTeam, "supported metric %s is missing trusted devlake_team attribution", metric.GetName())
+		return factUpdate{}, permanentConversionError(errorMissingTeam, "supported metric %s is missing trusted devlake_team attribution", metric.GetName())
 	}
 	observedAt, err := unixNanoTime(point.GetTimeUnixNano())
 	if err != nil {
-		return factUpdate{}, permanentMetricError(errorInvalidTimestamp, "supported metric %s has an invalid timestamp", metric.GetName())
+		return factUpdate{}, permanentConversionError(errorInvalidTimestamp, "supported metric %s has an invalid timestamp", metric.GetName())
 	}
 	connection, err := p.resolveConnection(teamSlug, observedAt)
 	if err != nil {
@@ -234,14 +234,14 @@ func (p *batchPreparer) prepareDatapoint(
 		return factUpdate{}, err
 	}
 	if temporality != metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_DELTA && temporality != metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_CUMULATIVE {
-		return factUpdate{}, permanentMetricError(errorUnsupportedTemporality, "metric %s has unsupported aggregation temporality", metric.GetName())
+		return factUpdate{}, permanentConversionError(errorUnsupportedTemporality, "metric %s has unsupported aggregation temporality", metric.GetName())
 	}
 	value, err := metricNumberFromPoint(point)
 	if err != nil {
-		return factUpdate{}, permanentMetricError(errorInvalidValue, "supported metric %s has an invalid numeric value", metric.GetName())
+		return factUpdate{}, permanentConversionError(errorInvalidValue, "supported metric %s has an invalid numeric value", metric.GetName())
 	}
 	if !mapping.decimal && !value.isInteger() {
-		return factUpdate{}, permanentMetricError(errorInvalidValue, "metric %s must have an integer value", metric.GetName())
+		return factUpdate{}, permanentConversionError(errorInvalidValue, "metric %s must have an integer value", metric.GetName())
 	}
 	column, err := mapping.columnFor(metric.GetName(), pointAttrs)
 	if err != nil {
@@ -266,7 +266,7 @@ func (p *batchPreparer) prepareDatapoint(
 		timeNanos:      point.GetTimeUnixNano(),
 	}
 	if mapping.fact == hourlyModelUsageFact && update.model == "" {
-		return factUpdate{}, permanentMetricError(errorInvalidDimension, "metric %s is missing model", metric.GetName())
+		return factUpdate{}, permanentConversionError(errorInvalidDimension, "metric %s is missing model", metric.GetName())
 	}
 	update.seriesHash = metricSeriesHash(connection.ID, scope, metric, resourceAttrs, point)
 	return update, nil
@@ -278,20 +278,20 @@ func (p *batchPreparer) prepareDatapoint(
 func validateResourceAttribution(resourceMetrics *metricsv1.ResourceMetrics) error {
 	resourceAttributes := resourceMetrics.GetResource().GetAttributes()
 	if hasAttribute(resourceAttributes, devlakeTeamAttribute) || hasAttribute(resourceAttributes, devlakeProjectAttribute) {
-		return permanentMetricError(errorInvalidAttribution, "OTLP metrics resource must not include DevLake attribution")
+		return permanentConversionError(errorInvalidAttribution, "OTLP metrics resource must not include DevLake attribution")
 	}
 	teamSlug := ""
 	for _, datapoint := range resourceDatapoints(resourceMetrics) {
 		attributes := datapoint.GetAttributes()
 		if hasAttribute(attributes, devlakeProjectAttribute) {
-			return permanentMetricError(errorInvalidAttribution, "OTLP metrics datapoint must not include devlake_project attribution")
+			return permanentConversionError(errorInvalidAttribution, "OTLP metrics datapoint must not include devlake_project attribution")
 		}
 		team := attributeString(attributes, devlakeTeamAttribute)
 		if team == "" {
-			return permanentMetricError(errorMissingTeam, "OTLP metrics datapoint is missing trusted devlake_team attribution")
+			return permanentConversionError(errorMissingTeam, "OTLP metrics datapoint is missing trusted devlake_team attribution")
 		}
 		if teamSlug != "" && team != teamSlug {
-			return permanentMetricError(errorInvalidAttribution, "OTLP metrics resource has inconsistent trusted devlake_team attribution")
+			return permanentConversionError(errorInvalidAttribution, "OTLP metrics resource has inconsistent trusted devlake_team attribution")
 		}
 		teamSlug = team
 	}
@@ -332,12 +332,12 @@ func (p *batchPreparer) resolveConnection(teamSlug string, observedAt time.Time)
 			continue
 		}
 		if match != nil {
-			return nil, permanentMetricError(errorAmbiguousConnection, "telemetry for team %q has ambiguous connection history", teamSlug)
+			return nil, permanentConversionError(errorAmbiguousConnection, "telemetry for team %q has ambiguous connection history", teamSlug)
 		}
 		match = connection
 	}
 	if match == nil {
-		return nil, permanentMetricError(errorConnectionNotFound, "telemetry for team %q has no connection at observed time", teamSlug)
+		return nil, permanentConversionError(errorConnectionNotFound, "telemetry for team %q has no connection at observed time", teamSlug)
 	}
 	return match, nil
 }
@@ -354,7 +354,7 @@ func (p *batchPreparer) checkOrganizationBinding(connection *models.OtelConnecti
 		var valid bool
 		boundOrganizationID, valid = normalizeOrganizationID(*connection.OrganizationId)
 		if !valid {
-			return permanentMetricError(errorInvalidOrganization, "OTel connection %d has an invalid stored organization", connection.ID)
+			return permanentConversionError(errorInvalidOrganization, "OTel connection %d has an invalid stored organization", connection.ID)
 		}
 	}
 	if boundOrganizationID == "" {
@@ -362,7 +362,7 @@ func (p *batchPreparer) checkOrganizationBinding(connection *models.OtelConnecti
 		return nil
 	}
 	if boundOrganizationID != organizationID {
-		return permanentMetricError(errorOrganizationMismatch, "telemetry for team %q does not match its connection organization", connection.TeamSlug)
+		return permanentConversionError(errorOrganizationMismatch, "telemetry for team %q does not match its connection organization", connection.TeamSlug)
 	}
 	return nil
 }
@@ -374,15 +374,15 @@ func organizationIDFromAttributes(resourceAttrs, pointAttrs []*commonv1.KeyValue
 	pointValue := attributeString(pointAttrs, organizationIDAttribute)
 	resourceValue := attributeString(resourceAttrs, organizationIDAttribute)
 	if pointValue == "" && resourceValue == "" {
-		return "", permanentMetricError(errorMissingOrganization, "supported metric has no organization.id")
+		return "", permanentConversionError(errorMissingOrganization, "supported metric has no organization.id")
 	}
 	pointOrganizationID, pointValid := normalizeOrganizationID(pointValue)
 	resourceOrganizationID, resourceValid := normalizeOrganizationID(resourceValue)
 	if (pointValue != "" && !pointValid) || (resourceValue != "" && !resourceValid) {
-		return "", permanentMetricError(errorInvalidOrganization, "supported metric has an invalid organization.id")
+		return "", permanentConversionError(errorInvalidOrganization, "supported metric has an invalid organization.id")
 	}
 	if pointValue != "" && resourceValue != "" && pointOrganizationID != resourceOrganizationID {
-		return "", permanentMetricError(errorOrganizationMismatch, "resource and datapoint organization IDs differ")
+		return "", permanentConversionError(errorOrganizationMismatch, "resource and datapoint organization IDs differ")
 	}
 	if pointOrganizationID != "" {
 		return pointOrganizationID, nil
@@ -419,7 +419,7 @@ func identityFromAttributes(attributes []*commonv1.KeyValue) (developerIdentity,
 	case installID != "":
 		identity.key = "install:" + installID
 	default:
-		return developerIdentity{}, permanentMetricError(errorMissingUserIdentity, "supported metric has no stable user identity")
+		return developerIdentity{}, permanentConversionError(errorMissingUserIdentity, "supported metric has no stable user identity")
 	}
 	return identity, nil
 }

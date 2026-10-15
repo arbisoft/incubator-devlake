@@ -29,13 +29,18 @@ const (
 	OtelMetricBatchTable    = "_raw_otel_claude_code_metric_batches"
 	OtelConverterLeaseTable = "_tool_claude_code_otel_converter_leases"
 	OtelReplayRequestTable  = "_tool_claude_code_otel_replay_requests"
+)
 
-	OtelMetricBatchStatusPending        = "pending"
-	OtelMetricBatchStatusProcessing     = "processing"
-	OtelMetricBatchStatusProcessed      = "processed"
-	OtelMetricBatchStatusRetryableError = "retryable_error"
-	OtelMetricBatchStatusPermanentError = "permanent_error"
+// The status lifecycle shared by the raw metric and log batch tables.
+const (
+	OtelBatchStatusPending        = "pending"
+	OtelBatchStatusProcessing     = "processing"
+	OtelBatchStatusProcessed      = "processed"
+	OtelBatchStatusRetryableError = "retryable_error"
+	OtelBatchStatusPermanentError = "permanent_error"
+)
 
+const (
 	OtelReplayRequestStatusPending    = "pending"
 	OtelReplayRequestStatusProcessing = "processing"
 	OtelReplayRequestStatusCompleted  = "completed"

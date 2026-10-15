@@ -144,11 +144,11 @@ func GetOtelIngestionStatus() (*OtelIngestionStatus, errors.Error) {
 func otelBatchCounts() (map[string]int64, errors.Error) {
 	counts := make(map[string]int64, 5)
 	for _, status := range []string{
-		models.OtelMetricBatchStatusPending,
-		models.OtelMetricBatchStatusProcessing,
-		models.OtelMetricBatchStatusProcessed,
-		models.OtelMetricBatchStatusRetryableError,
-		models.OtelMetricBatchStatusPermanentError,
+		models.OtelBatchStatusPending,
+		models.OtelBatchStatusProcessing,
+		models.OtelBatchStatusProcessed,
+		models.OtelBatchStatusRetryableError,
+		models.OtelBatchStatusPermanentError,
 	} {
 		counts[status] = 0
 	}
@@ -205,7 +205,7 @@ func otelRecentPermanentErrors(now time.Time) (int64, []OtelPermanentErrorReason
 	// COALESCE covers permanent_error rows quarantined before recordFailure started setting
 	// processed_at on write; those rows have NULL, and processed_at >= ? alone is never true
 	// for NULL, which would silently zero out this count for pre-existing rows.
-	where := dal.Where("status = ? AND COALESCE(processed_at, received_at) >= ?", models.OtelMetricBatchStatusPermanentError, now.Add(-permanentErrorWindow))
+	where := dal.Where("status = ? AND COALESCE(processed_at, received_at) >= ?", models.OtelBatchStatusPermanentError, now.Add(-permanentErrorWindow))
 	count, err := db.Count(dal.From(&models.OtelMetricBatch{}), where)
 	if err != nil {
 		return 0, nil, errors.Default.Wrap(err, "failed to count recent Claude Code OTel permanent errors")

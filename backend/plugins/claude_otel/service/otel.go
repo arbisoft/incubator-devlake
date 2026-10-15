@@ -66,7 +66,7 @@ func Init(basicRes corecontext.BasicRes) {
 	db = basicRes.GetDal()
 	logger = basicRes.GetLogger()
 	rawIngest = NewRawIngestService(db, cfg, logger)
-	startRawMetricConverter(db, logger)
+	startRawConverter(db, logger)
 }
 
 type OtelConnectionInput struct {

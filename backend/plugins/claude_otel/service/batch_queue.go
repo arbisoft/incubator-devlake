@@ -53,7 +53,7 @@ func rawBatchLabel(table dal.Tabler) string {
 // is waiting for retry or held by another lease, because cumulative series state and
 // session event order depend on receipt order. It returns the lease owner, or "" when
 // nothing was claimed.
-func (c *rawMetricConverter) claimNextBatch(batch dal.Tabler) (string, errors.Error) {
+func (c *rawConverter) claimNextBatch(batch dal.Tabler) (string, errors.Error) {
 	head, err := c.claimHead(batch)
 	if err != nil || head == nil {
 		return "", err
@@ -76,7 +76,7 @@ func (c *rawMetricConverter) claimNextBatch(batch dal.Tabler) (string, errors.Er
 // already-processed row ahead of the first match, on every poll. Querying per status keeps
 // each query to a single-value index lookup, which MySQL always satisfies with the
 // composite index.
-func (c *rawMetricConverter) claimHead(table dal.Tabler) (*rawBatchHead, errors.Error) {
+func (c *rawConverter) claimHead(table dal.Tabler) (*rawBatchHead, errors.Error) {
 	var head *rawBatchHead
 	for _, status := range nonterminalBatchStatuses {
 		candidate := &rawBatchHead{}
@@ -102,13 +102,13 @@ func (c *rawMetricConverter) claimHead(table dal.Tabler) (*rawBatchHead, errors.
 
 // claimBatch leases head unless another worker changed it first, then loads the claimed
 // row into batch. It returns the lease owner, or "" when the claim was lost.
-func (c *rawMetricConverter) claimBatch(batch dal.Tabler, head *rawBatchHead) (string, errors.Error) {
+func (c *rawConverter) claimBatch(batch dal.Tabler, head *rawBatchHead) (string, errors.Error) {
 	label := rawBatchLabel(batch)
 	leaseOwner := uuid.NewString()
 	if err := c.db.UpdateColumns(
 		batch,
 		[]dal.DalSet{
-			{ColumnName: "status", Value: models.OtelMetricBatchStatusProcessing},
+			{ColumnName: "status", Value: models.OtelBatchStatusProcessing},
 			{ColumnName: "lease_owner", Value: leaseOwner},
 			{ColumnName: "lease_until", Value: c.now().UTC().Add(converterLeaseDuration)},
 			{ColumnName: "next_attempt_at", Value: nil},
@@ -130,9 +130,9 @@ func (c *rawMetricConverter) claimBatch(batch dal.Tabler, head *rawBatchHead) (s
 // isBatchClaimable applies to metric and log batches, which share the status lifecycle.
 func isBatchClaimable(status string, leaseUntil, nextAttemptAt *time.Time, now time.Time) bool {
 	switch status {
-	case models.OtelMetricBatchStatusProcessing:
+	case models.OtelBatchStatusProcessing:
 		return leaseUntil == nil || leaseUntil.Before(now)
-	case models.OtelMetricBatchStatusRetryableError:
+	case models.OtelBatchStatusRetryableError:
 		return nextAttemptAt == nil || !nextAttemptAt.After(now)
 	default:
 		return true
@@ -142,12 +142,12 @@ func isBatchClaimable(status string, leaseUntil, nextAttemptAt *time.Time, now t
 // commitInLease verifies the batch lease under lock, runs apply and marks the batch
 // processed in one transaction. table is a new empty batch of the batch's table; diag
 // carries the skip diagnostics recorded on the processed batch.
-func (c *rawMetricConverter) commitInLease(table dal.Tabler, id uint64, leaseOwner string, diag *preparedBatch, apply func(dal.Transaction) error) error {
+func (c *rawConverter) commitInLease(table dal.Tabler, id uint64, leaseOwner string, diag *preparedBatch, apply func(dal.Transaction) error) error {
 	label := rawBatchLabel(table)
 	tx := c.db.Begin()
 	if err := tx.First(table,
 		dal.Select("id"),
-		dal.Where("id = ? AND status = ? AND lease_owner = ? AND lease_until > ?", id, models.OtelMetricBatchStatusProcessing, leaseOwner, c.now().UTC()),
+		dal.Where("id = ? AND status = ? AND lease_owner = ? AND lease_until > ?", id, models.OtelBatchStatusProcessing, leaseOwner, c.now().UTC()),
 		dal.Lock(true, false),
 	); err != nil {
 		c.rollback(tx)
@@ -160,14 +160,14 @@ func (c *rawMetricConverter) commitInLease(table dal.Tabler, id uint64, leaseOwn
 	if err := tx.UpdateColumns(
 		table,
 		[]dal.DalSet{
-			{ColumnName: "status", Value: models.OtelMetricBatchStatusProcessed},
+			{ColumnName: "status", Value: models.OtelBatchStatusProcessed},
 			{ColumnName: "lease_owner", Value: nil},
 			{ColumnName: "lease_until", Value: nil},
 			{ColumnName: "processing_error_code", Value: diag.diagnosticCode()},
 			{ColumnName: "processing_error_message", Value: diag.diagnostic()},
 			{ColumnName: "processed_at", Value: c.now().UTC()},
 		},
-		dal.Where("id = ? AND status = ? AND lease_owner = ?", id, models.OtelMetricBatchStatusProcessing, leaseOwner),
+		dal.Where("id = ? AND status = ? AND lease_owner = ?", id, models.OtelBatchStatusProcessing, leaseOwner),
 	); err != nil {
 		c.rollback(tx)
 		return classifyStorageError(fmt.Errorf("mark %s processed: %w", label, err))
@@ -180,7 +180,7 @@ func (c *rawMetricConverter) commitInLease(table dal.Tabler, id uint64, leaseOwn
 
 // recordBatchFailure releases the batch lease with a classified retry or quarantine state.
 // A failure to persist that state is returned; lease expiry keeps the batch reclaimable.
-func (c *rawMetricConverter) recordBatchFailure(table dal.Tabler, id uint64, attempts int, leaseOwner string, conversionErr error) errors.Error {
+func (c *rawConverter) recordBatchFailure(table dal.Tabler, id uint64, attempts int, leaseOwner string, conversionErr error) errors.Error {
 	label := rawBatchLabel(table)
 	code, permanent, message := classifyConversionError(conversionErr)
 	now := c.now().UTC()
@@ -200,17 +200,17 @@ func (c *rawMetricConverter) recordBatchFailure(table dal.Tabler, id uint64, att
 	}
 	if permanent {
 		sets = append(sets,
-			dal.DalSet{ColumnName: "status", Value: models.OtelMetricBatchStatusPermanentError},
+			dal.DalSet{ColumnName: "status", Value: models.OtelBatchStatusPermanentError},
 			dal.DalSet{ColumnName: "processed_at", Value: now},
 		)
 	} else {
 		sets = append(sets,
-			dal.DalSet{ColumnName: "status", Value: models.OtelMetricBatchStatusRetryableError},
+			dal.DalSet{ColumnName: "status", Value: models.OtelBatchStatusRetryableError},
 			dal.DalSet{ColumnName: "next_attempt_at", Value: now.Add(converterBackoff(attempts))},
 		)
 	}
 	if err := c.db.UpdateColumns(table, sets,
-		dal.Where("id = ? AND status = ? AND lease_owner = ?", id, models.OtelMetricBatchStatusProcessing, leaseOwner),
+		dal.Where("id = ? AND status = ? AND lease_owner = ?", id, models.OtelBatchStatusProcessing, leaseOwner),
 	); err != nil {
 		return errors.Default.Wrap(err, fmt.Sprintf("failed to record Claude Code OTel %s %d failure", label, id))
 	}

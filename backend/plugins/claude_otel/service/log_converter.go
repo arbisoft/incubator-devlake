@@ -29,7 +29,7 @@ import (
 
 // processNextLogBatch claims and converts the head of the raw log queue under the
 // converter lease. It returns true when a batch reached a new state.
-func (c *rawMetricConverter) processNextLogBatch() (bool, errors.Error) {
+func (c *rawConverter) processNextLogBatch() (bool, errors.Error) {
 	batch, leaseOwner, err := c.claimNextLogBatch()
 	if err != nil || batch == nil {
 		return false, err
@@ -46,7 +46,7 @@ func (c *rawMetricConverter) processNextLogBatch() (bool, errors.Error) {
 
 // claimNextLogBatch claims the earliest nonterminal log batch. Like metrics, a batch
 // waiting for retry holds the queue, so events of one session are applied in order.
-func (c *rawMetricConverter) claimNextLogBatch() (*models.OtelLogBatch, string, errors.Error) {
+func (c *rawConverter) claimNextLogBatch() (*models.OtelLogBatch, string, errors.Error) {
 	batch := &models.OtelLogBatch{}
 	leaseOwner, err := c.claimNextBatch(batch)
 	if err != nil || leaseOwner == "" {
@@ -57,7 +57,7 @@ func (c *rawMetricConverter) claimNextLogBatch() (*models.OtelLogBatch, string, 
 
 // convertLogBatch prepares events outside a transaction, then verifies the batch lease and
 // commits events, prompt rollups and raw completion atomically.
-func (c *rawMetricConverter) convertLogBatch(batch *models.OtelLogBatch, leaseOwner string) (*preparedLogBatch, error) {
+func (c *rawConverter) convertLogBatch(batch *models.OtelLogBatch, leaseOwner string) (*preparedLogBatch, error) {
 	request, decodeErr := decodeOtelLogBatchRequest(batch)
 	if decodeErr != nil {
 		return nil, &conversionError{code: errorInvalidPayload, permanent: true, err: fmt.Errorf("decode raw OTLP logs payload: %w", decodeErr)}
@@ -84,7 +84,7 @@ func (c *rawMetricConverter) convertLogBatch(batch *models.OtelLogBatch, leaseOw
 
 // applyEvents binds connections to their organization and upserts the events. It returns
 // each connection's organization, which is the workspace key of its domain rows.
-func (c *rawMetricConverter) applyEvents(tx dal.Transaction, events []preparedEvent) (map[uint64]string, error) {
+func (c *rawConverter) applyEvents(tx dal.Transaction, events []preparedEvent) (map[uint64]string, error) {
 	workspaceKeys := make(map[uint64]string)
 	for _, prepared := range events {
 		if _, bound := workspaceKeys[prepared.connection.ID]; !bound {

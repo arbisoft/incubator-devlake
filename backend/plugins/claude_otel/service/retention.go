@@ -40,7 +40,7 @@ const (
 
 // runRetention deletes expired terminal raw batches, clearing the prompt text of events from
 // deleted log batches, and deletes idle series state at most once per retentionInterval. Nonterminal batches are never deleted.
-func (c *rawMetricConverter) runRetention() errors.Error {
+func (c *rawConverter) runRetention() errors.Error {
 	now := c.now().UTC()
 	if now.Before(c.nextRetentionAt) {
 		return nil
@@ -61,7 +61,7 @@ func (c *rawMetricConverter) runRetention() errors.Error {
 // batches it first clears the prompt text of the events they produced, so prompt text is kept
 // no longer than the raw batches holding it, whatever the client's event timestamps say. The
 // event rows are kept.
-func (c *rawMetricConverter) deleteExpiredRawBatches(now time.Time, table dal.Tabler) errors.Error {
+func (c *rawConverter) deleteExpiredRawBatches(now time.Time, table dal.Tabler) errors.Error {
 	_, isLogBatch := table.(*models.OtelLogBatch)
 	for deletes := 0; deletes < retentionMaxDeleteBatches; deletes++ {
 		batchIDs := make([]uint64, 0, retentionDeleteBatch)
@@ -92,7 +92,7 @@ func (c *rawMetricConverter) deleteExpiredRawBatches(now time.Time, table dal.Ta
 	return nil
 }
 
-func (c *rawMetricConverter) deleteExpiredSeriesState(now time.Time) errors.Error {
+func (c *rawConverter) deleteExpiredSeriesState(now time.Time) errors.Error {
 	for deletes := 0; deletes < retentionMaxDeleteBatches; deletes++ {
 		stateHashes := make([][]byte, 0, retentionDeleteBatch)
 		if err := c.db.Pluck("series_hash", &stateHashes,

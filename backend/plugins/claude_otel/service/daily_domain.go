@@ -225,7 +225,7 @@ func writeCanonicalModelUsage(tx dal.Transaction, target dailyTarget, accountID,
 		usage.CacheCreationTokens += row.CacheCreationTokens
 		cost, err := addDecimal(usage.EstimatedCostUsd, row.EstimatedCostUSD, 8)
 		if err != nil {
-			return permanentMetricError(errorInvalidDecimal, "aggregate canonical Claude model cost: %v", err)
+			return permanentConversionError(errorInvalidDecimal, "aggregate canonical Claude model cost: %v", err)
 		}
 		usage.EstimatedCostUsd = cost
 		usage.SourceUpdatedAt = latestTime(usage.SourceUpdatedAt, row.LastObservedAt)

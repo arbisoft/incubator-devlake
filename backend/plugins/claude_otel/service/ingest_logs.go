@@ -97,7 +97,7 @@ func (s *RawIngestService) IngestLogs(request *http.Request) (*RawIngestResult, 
 		RecordCount:          recordCount,
 		MinObservedAt:        minObservedAt,
 		MaxObservedAt:        maxObservedAt,
-		Status:               models.OtelMetricBatchStatusPending,
+		Status:               models.OtelBatchStatusPending,
 	}
 	duplicate, err := s.insertRawBatch(batch)
 	if err != nil {

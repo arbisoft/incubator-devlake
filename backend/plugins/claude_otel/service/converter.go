@@ -31,6 +31,8 @@ import (
 )
 
 const (
+	// converterLeaseName is stored in the lease rows. It keeps its historical name, which
+	// predates log batches, so replicas on either side of an upgrade share one lease.
 	converterLeaseName          = "raw_metric_converter"
 	converterLeaseDuration      = 30 * time.Second
 	converterPollInterval       = 2 * time.Second
@@ -41,12 +43,12 @@ const (
 )
 
 var nonterminalBatchStatuses = []string{
-	models.OtelMetricBatchStatusPending,
-	models.OtelMetricBatchStatusProcessing,
-	models.OtelMetricBatchStatusRetryableError,
+	models.OtelBatchStatusPending,
+	models.OtelBatchStatusProcessing,
+	models.OtelBatchStatusRetryableError,
 }
 
-type rawMetricConverter struct {
+type rawConverter struct {
 	db       dal.Dal
 	logger   log.Logger
 	now      func() time.Time
@@ -61,18 +63,19 @@ type rawMetricConverter struct {
 
 var converterStartOnce sync.Once
 
-func newRawMetricConverter(db dal.Dal, logger log.Logger) *rawMetricConverter {
-	return &rawMetricConverter{db: db, logger: logger, now: time.Now, workerID: uuid.NewString()}
+func newRawConverter(db dal.Dal, logger log.Logger) *rawConverter {
+	return &rawConverter{db: db, logger: logger, now: time.Now, workerID: uuid.NewString()}
 }
 
-// startRawMetricConverter starts this process's converter loop. Every Lake replica polls,
-// but only the holder of the database-backed converter lease converts batches.
-func startRawMetricConverter(database dal.Dal, logger log.Logger) {
+// startRawConverter starts this process's converter loop, which converts raw metric and
+// log batches. Every Lake replica polls, but only the holder of the database-backed
+// converter lease converts batches.
+func startRawConverter(database dal.Dal, logger log.Logger) {
 	if database == nil {
 		return
 	}
 	converterStartOnce.Do(func() {
-		converter := newRawMetricConverter(database, logger)
+		converter := newRawConverter(database, logger)
 		go func() {
 			ticker := time.NewTicker(converterPollInterval)
 			defer ticker.Stop()
@@ -85,12 +88,12 @@ func startRawMetricConverter(database dal.Dal, logger log.Logger) {
 
 // poll runs retention, replay requests, and raw conversion in receipt order while this
 // process holds the converter lease.
-func (c *rawMetricConverter) poll() {
+func (c *rawConverter) poll() {
 	for {
 		processed, err := c.pollOnce()
 		if err != nil {
 			if !c.pollErrorLogged {
-				c.logWarn(err, "Claude Code OTel raw metric converter poll failed")
+				c.logWarn(err, "Claude Code OTel raw batch converter poll failed")
 				c.pollErrorLogged = true
 			}
 			return
@@ -102,7 +105,7 @@ func (c *rawMetricConverter) poll() {
 	}
 }
 
-func (c *rawMetricConverter) pollOnce() (bool, errors.Error) {
+func (c *rawConverter) pollOnce() (bool, errors.Error) {
 	leader, err := c.acquireLease()
 	if err != nil || !leader {
 		return false, err
@@ -124,7 +127,7 @@ func (c *rawMetricConverter) pollOnce() (bool, errors.Error) {
 
 // acquireLease takes or renews the singleton converter lease. The conditional update
 // succeeds only for the current owner or after the previous owner's lease expired.
-func (c *rawMetricConverter) acquireLease() (bool, errors.Error) {
+func (c *rawConverter) acquireLease() (bool, errors.Error) {
 	now := c.now().UTC()
 	leaseUntil := now.Add(converterLeaseDuration)
 	tx := c.db.Begin()
@@ -158,7 +161,7 @@ func (c *rawMetricConverter) acquireLease() (bool, errors.Error) {
 
 // processNext claims and converts the head of the raw queue. It returns true when a batch
 // reached a new state, including retry scheduling or quarantine.
-func (c *rawMetricConverter) processNext() (bool, errors.Error) {
+func (c *rawConverter) processNext() (bool, errors.Error) {
 	batch, leaseOwner, err := c.claimNext()
 	if err != nil || batch == nil {
 		return false, err
@@ -172,7 +175,7 @@ func (c *rawMetricConverter) processNext() (bool, errors.Error) {
 }
 
 // claimNext claims the earliest nonterminal metric batch; see claimNextBatch.
-func (c *rawMetricConverter) claimNext() (*models.OtelMetricBatch, string, errors.Error) {
+func (c *rawConverter) claimNext() (*models.OtelMetricBatch, string, errors.Error) {
 	batch := &models.OtelMetricBatch{}
 	leaseOwner, err := c.claimNextBatch(batch)
 	if err != nil || leaseOwner == "" {
@@ -183,7 +186,7 @@ func (c *rawMetricConverter) claimNext() (*models.OtelMetricBatch, string, error
 
 // convert prepares facts outside a transaction, then verifies the batch lease and commits
 // facts, series state, canonical rows, and raw completion atomically.
-func (c *rawMetricConverter) convert(batch *models.OtelMetricBatch, leaseOwner string) (*preparedBatch, error) {
+func (c *rawConverter) convert(batch *models.OtelMetricBatch, leaseOwner string) (*preparedBatch, error) {
 	request, decodeErr := decodeOtelMetricBatchRequest(batch)
 	if decodeErr != nil {
 		return nil, &conversionError{code: errorInvalidPayload, permanent: true, err: fmt.Errorf("decode raw OTLP payload: %w", decodeErr)}
@@ -207,7 +210,7 @@ func (c *rawMetricConverter) convert(batch *models.OtelMetricBatch, leaseOwner s
 	return prepared, nil
 }
 
-func (c *rawMetricConverter) logConverted(batch *models.OtelMetricBatch, prepared *preparedBatch) {
+func (c *rawConverter) logConverted(batch *models.OtelMetricBatch, prepared *preparedBatch) {
 	if c.logger == nil {
 		return
 	}
@@ -219,7 +222,7 @@ func (c *rawMetricConverter) logConverted(batch *models.OtelMetricBatch, prepare
 	}
 }
 
-func (c *rawMetricConverter) logWarn(err error, message string) {
+func (c *rawConverter) logWarn(err error, message string) {
 	if c.logger != nil {
 		c.logger.Warn(err, "%s", message)
 	}
@@ -227,7 +230,7 @@ func (c *rawMetricConverter) logWarn(err error, message string) {
 
 // rollback is best-effort cleanup after a failed transaction step; the caller returns the
 // primary failure.
-func (c *rawMetricConverter) rollback(tx dal.Transaction) {
+func (c *rawConverter) rollback(tx dal.Transaction) {
 	if err := tx.Rollback(); err != nil {
 		c.logWarn(err, "failed to roll back Claude Code OTel converter transaction")
 	}

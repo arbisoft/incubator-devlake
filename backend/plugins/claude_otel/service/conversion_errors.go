@@ -86,7 +86,7 @@ func (e *conversionError) Error() string { return e.err.Error() }
 
 func (e *conversionError) Unwrap() error { return e.err }
 
-func permanentMetricError(code conversionErrorCode, format string, args ...interface{}) error {
+func permanentConversionError(code conversionErrorCode, format string, args ...interface{}) error {
 	return &conversionError{code: code, permanent: true, err: fmt.Errorf(format, args...)}
 }
 

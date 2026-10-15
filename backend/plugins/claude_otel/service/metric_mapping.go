@@ -147,7 +147,7 @@ func (m metricMapping) columnFor(metricName string, attributes []*commonv1.KeyVa
 	}
 	column := m.dimensionColumns[attributeString(attributes, m.dimension)]
 	if column == "" {
-		return "", permanentMetricError(errorInvalidDimension, "metric %s has an invalid %s dimension", metricName, m.dimension)
+		return "", permanentConversionError(errorInvalidDimension, "metric %s has an invalid %s dimension", metricName, m.dimension)
 	}
 	return column, nil
 }

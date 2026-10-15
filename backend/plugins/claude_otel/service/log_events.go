@@ -57,7 +57,7 @@ type preparedLogBatch struct {
 	events []preparedEvent
 }
 
-func (c *rawMetricConverter) prepareEvents(request *collectorlogs.ExportLogsServiceRequest, batchID uint64) (*preparedLogBatch, error) {
+func (c *rawConverter) prepareEvents(request *collectorlogs.ExportLogsServiceRequest, batchID uint64) (*preparedLogBatch, error) {
 	preparer := c.newBatchPreparer()
 	result := &preparedLogBatch{}
 	resources := request.GetResourceLogs()
@@ -82,21 +82,21 @@ func (c *rawMetricConverter) prepareEvents(request *collectorlogs.ExportLogsServ
 func (p *batchPreparer) prepareLogResource(resourceLogs *logsv1.ResourceLogs, resourceBindings map[uint64]string, batchID uint64) ([]preparedEvent, error) {
 	resourceAttrs := resourceLogs.GetResource().GetAttributes()
 	if hasAttribute(resourceAttrs, devlakeTeamAttribute) || hasAttribute(resourceAttrs, devlakeProjectAttribute) {
-		return nil, permanentMetricError(errorInvalidAttribution, "OTLP logs resource must not include DevLake attribution")
+		return nil, permanentConversionError(errorInvalidAttribution, "OTLP logs resource must not include DevLake attribution")
 	}
 	events := make([]preparedEvent, 0)
 	teamSlug := ""
 	for _, record := range resourceLogRecords(resourceLogs) {
 		recordAttrs := record.GetAttributes()
 		if hasAttribute(recordAttrs, devlakeProjectAttribute) {
-			return nil, permanentMetricError(errorInvalidAttribution, "OTLP log record must not include devlake_project attribution")
+			return nil, permanentConversionError(errorInvalidAttribution, "OTLP log record must not include devlake_project attribution")
 		}
 		team := attributeString(recordAttrs, devlakeTeamAttribute)
 		if team == "" {
-			return nil, permanentMetricError(errorMissingTeam, "OTLP log record is missing trusted devlake_team attribution")
+			return nil, permanentConversionError(errorMissingTeam, "OTLP log record is missing trusted devlake_team attribution")
 		}
 		if teamSlug != "" && team != teamSlug {
-			return nil, permanentMetricError(errorInvalidAttribution, "OTLP logs resource has inconsistent trusted devlake_team attribution")
+			return nil, permanentConversionError(errorInvalidAttribution, "OTLP logs resource has inconsistent trusted devlake_team attribution")
 		}
 		teamSlug = team
 		event, connection, err := p.prepareLogRecord(team, resourceAttrs, record, resourceBindings)
@@ -117,11 +117,11 @@ func (p *batchPreparer) prepareLogRecord(teamSlug string, resourceAttrs []*commo
 	recordAttrs := record.GetAttributes()
 	eventName := logEventName(record)
 	if eventName == "" {
-		return nil, nil, permanentMetricError(errorInvalidDimension, "OTLP log record has no event name")
+		return nil, nil, permanentConversionError(errorInvalidDimension, "OTLP log record has no event name")
 	}
 	observedAt, err := logRecordTime(record)
 	if err != nil {
-		return nil, nil, permanentMetricError(errorInvalidTimestamp, "OTLP log record has an invalid timestamp")
+		return nil, nil, permanentConversionError(errorInvalidTimestamp, "OTLP log record has an invalid timestamp")
 	}
 	connection, err := p.resolveConnection(teamSlug, observedAt)
 	if err != nil {
@@ -144,7 +144,7 @@ func (p *batchPreparer) prepareLogRecord(teamSlug string, resourceAttrs []*commo
 	delete(attributes, promptTextAttribute)
 	encoded, err := json.Marshal(attributes)
 	if err != nil {
-		return nil, nil, permanentMetricError(errorInvalidValue, "OTLP log record attributes cannot be encoded")
+		return nil, nil, permanentConversionError(errorInvalidValue, "OTLP log record attributes cannot be encoded")
 	}
 	event := &models.OtelEvent{
 		ConnectionId:        connection.ID,

@@ -54,7 +54,7 @@ type RawIngestResult struct {
 }
 
 // RawIngestService owns the authenticated OTLP request-to-raw-record transition.
-// It deliberately does no metric aggregation; the raw metric converter derives facts.
+// It deliberately does no metric aggregation; the raw batch converter derives facts.
 type RawIngestService struct {
 	db     dal.Dal
 	cfg    config.ConfigReader
@@ -99,7 +99,7 @@ func (s *RawIngestService) Ingest(request *http.Request) (*RawIngestResult, erro
 		DatapointCount:       datapointCount,
 		MinObservedAt:        minObservedAt,
 		MaxObservedAt:        maxObservedAt,
-		Status:               models.OtelMetricBatchStatusPending,
+		Status:               models.OtelBatchStatusPending,
 	}
 
 	duplicate, err := s.insertRawBatch(batch)
