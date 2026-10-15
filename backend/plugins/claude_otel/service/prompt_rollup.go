@@ -43,6 +43,11 @@ const (
 	skillToolName       = "Skill"
 	toolDecisionReject  = "reject"
 	maxModelsUsedLength = 1024
+	// Widths of ai_* columns filled straight from event attributes, which have no typed
+	// event column to bound them. The rollup rereads stored events, so an oversized value
+	// would otherwise fail every later batch that touches its prompt or session.
+	maxCommandSourceLength = 32 // ai_prompts.command_source
+	maxAiLabelLength       = 64 // skill invocation_trigger and skill_source, permission modes and trigger
 )
 
 // subagentToolNames launch a subagent; Task is the legacy name of Agent.
@@ -120,9 +125,9 @@ func newSessionModes(events []*models.OtelEvent) sessionModes {
 		attributes := eventAttributes(event)
 		change := modeChange{at: event.EventTimestamp, sequence: int64Value(event.EventSequence)}
 		if event.EventName == eventPermissionModeChanged {
-			change.fromMode = eventString(attributes, "from_mode")
-			change.toMode = eventString(attributes, "to_mode")
-			change.trigger = eventString(attributes, "trigger")
+			change.fromMode = truncate(eventString(attributes, "from_mode"), maxAiLabelLength)
+			change.toMode = truncate(eventString(attributes, "to_mode"), maxAiLabelLength)
+			change.trigger = truncate(eventString(attributes, "trigger"), maxAiLabelLength)
 		} else {
 			// The mode before /plan is unknown; prompts before it fall back to the default.
 			change.toMode = ai.PermissionModePlan
@@ -239,7 +244,7 @@ func (b *promptBuilder) applyUserPrompt(event *models.OtelEvent, attributes map[
 	fillPromptIdentity(b.prompt, event)
 	b.prompt.PromptLength = int64Value(eventNumber(attributes, "prompt_length"))
 	b.prompt.CommandName = event.CommandName
-	b.prompt.CommandSource = eventString(attributes, "command_source")
+	b.prompt.CommandSource = truncate(eventString(attributes, "command_source"), maxCommandSourceLength)
 }
 
 func (b *promptBuilder) applyAPIRequest(event *models.OtelEvent) {
@@ -284,7 +289,8 @@ func (b *promptBuilder) applyToolDecision(attributes map[string]interface{}) {
 }
 
 func (b *promptBuilder) applySkillActivated(event *models.OtelEvent, attributes map[string]interface{}) {
-	b.skills.add(event.SkillName, ai.SkillDetectedViaActivation, eventString(attributes, "invocation_trigger"), eventString(attributes, "skill.source"), event.PluginName, event.EventTimestamp)
+	b.skills.add(event.SkillName, ai.SkillDetectedViaActivation, truncate(eventString(attributes, "invocation_trigger"), maxAiLabelLength),
+		truncate(eventString(attributes, "skill.source"), maxAiLabelLength), event.PluginName, event.EventTimestamp)
 }
 
 func fillPromptIdentity(prompt *ai.AiPrompt, event *models.OtelEvent) {

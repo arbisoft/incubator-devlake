@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
 	collectorlogs "go.opentelemetry.io/proto/otlp/collector/logs/v1"
@@ -43,6 +44,16 @@ const (
 	eventToolDecision          = "tool_decision"
 	eventSkillActivated        = "skill_activated"
 	eventPermissionModeChanged = "permission_mode_changed"
+)
+
+// Typed event column widths in characters, from models.OtelEvent.
+const (
+	eventIDColumnLength       = 128 // session_id, prompt_id
+	eventNameColumnLength     = 100
+	eventIdentityColumnLength = 255 // user_key, user_account_id, user_account_uuid, user_email
+	eventVersionColumnLength  = 64  // app_version
+	eventLabelColumnLength    = 100 // terminal_type, query_source
+	eventNamedColumnLength    = 255 // model, tool, skill, agent, plugin, MCP server and command names
 )
 
 // preparedEvent is one converted log record plus the connection binding it requires.
@@ -160,27 +171,55 @@ func (p *batchPreparer) prepareLogRecord(teamSlug string, resourceAttrs []*commo
 	if event.EventName == eventUserPrompt && promptText != "" {
 		event.PromptText = &promptText
 	}
+	if err := checkEventKeyLengths(event); err != nil {
+		return nil, nil, err
+	}
 	event.EventKey = otelEventKey(event, attributeString(recordAttrs, "tool_use_id"), attributeString(recordAttrs, "request_id"))
 	return event, connection, nil
 }
 
+// checkEventKeyLengths rejects a record whose identifying values do not fit their columns.
+// Truncating them could merge different sessions, prompts or users, so the record is
+// skipped on its own rather than letting MySQL reject, and quarantine, the whole batch.
+func checkEventKeyLengths(event *models.OtelEvent) error {
+	for _, field := range []struct {
+		name  string
+		value string
+		width int
+	}{
+		{"session.id", event.SessionId, eventIDColumnLength},
+		{"prompt.id", event.PromptId, eventIDColumnLength},
+		{"event.name", event.EventName, eventNameColumnLength},
+		{"user key", event.UserKey, eventIdentityColumnLength},
+		{"user.account_id", stringValue(event.UserAccountId), eventIdentityColumnLength},
+		{"user.account_uuid", stringValue(event.UserAccountUUID), eventIdentityColumnLength},
+		{"user.email", stringValue(event.UserEmail), eventIdentityColumnLength},
+	} {
+		if utf8.RuneCountInString(field.value) > field.width {
+			return permanentConversionError(errorInvalidDimension, "OTLP log record %s is longer than %d characters", field.name, field.width)
+		}
+	}
+	return nil
+}
+
 // eventFromRecord maps a log record's attributes to the event's typed columns. attributes
 // is the merged resource and record map, which carries the decoded tool parameters.
+// Descriptive columns are truncated to their width; the full value stays in attributes.
 func eventFromRecord(resourceAttrs, recordAttrs []*commonv1.KeyValue, attributes map[string]interface{}) *models.OtelEvent {
 	return &models.OtelEvent{
 		SessionId:           attributeString(recordAttrs, "session.id"),
 		PromptId:            attributeString(recordAttrs, "prompt.id"),
 		EventSequence:       attributeInt(recordAttrs, "event.sequence"),
-		AppVersion:          firstNonEmpty(attributeString(recordAttrs, "app.version"), attributeString(resourceAttrs, "service.version")),
-		TerminalType:        attributeString(recordAttrs, "terminal.type"),
-		Model:               attributeString(recordAttrs, "model"),
-		ToolName:            attributeString(recordAttrs, "tool_name"),
-		SkillName:           firstNonEmpty(attributeString(recordAttrs, "skill.name"), toolParameter(attributes, "skill_name")),
-		AgentName:           attributeString(recordAttrs, "agent.name"),
-		PluginName:          attributeString(recordAttrs, "plugin.name"),
-		McpServerName:       firstNonEmpty(attributeString(recordAttrs, "mcp_server.name"), toolParameter(attributes, "mcp_server_name")),
-		QuerySource:         attributeString(recordAttrs, "query_source"),
-		CommandName:         attributeString(recordAttrs, "command_name"),
+		AppVersion:          truncate(firstNonEmpty(attributeString(recordAttrs, "app.version"), attributeString(resourceAttrs, "service.version")), eventVersionColumnLength),
+		TerminalType:        truncate(attributeString(recordAttrs, "terminal.type"), eventLabelColumnLength),
+		Model:               truncate(attributeString(recordAttrs, "model"), eventNamedColumnLength),
+		ToolName:            truncate(attributeString(recordAttrs, "tool_name"), eventNamedColumnLength),
+		SkillName:           truncate(firstNonEmpty(attributeString(recordAttrs, "skill.name"), toolParameter(attributes, "skill_name")), eventNamedColumnLength),
+		AgentName:           truncate(attributeString(recordAttrs, "agent.name"), eventNamedColumnLength),
+		PluginName:          truncate(attributeString(recordAttrs, "plugin.name"), eventNamedColumnLength),
+		McpServerName:       truncate(firstNonEmpty(attributeString(recordAttrs, "mcp_server.name"), toolParameter(attributes, "mcp_server_name")), eventNamedColumnLength),
+		QuerySource:         truncate(attributeString(recordAttrs, "query_source"), eventLabelColumnLength),
+		CommandName:         truncate(attributeString(recordAttrs, "command_name"), eventNamedColumnLength),
 		Success:             attributeBool(recordAttrs, "success"),
 		DurationMs:          attributeInt(recordAttrs, "duration_ms"),
 		CostUsd:             attributeDecimal(recordAttrs, "cost_usd", 8),

@@ -26,6 +26,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
@@ -35,6 +36,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	collectorlogs "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	commonv1 "go.opentelemetry.io/proto/otlp/common/v1"
+	logsv1 "go.opentelemetry.io/proto/otlp/logs/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -269,6 +271,106 @@ func TestPrepareEventsSkipsOnlyInvalidRecords(t *testing.T) {
 		!strings.Contains(*message, string(errorMissingUserIdentity)) || !strings.Contains(*message, string(errorInvalidDimension)) {
 		t.Fatalf("diagnostic() = %v, want both skipped records", message)
 	}
+}
+
+func TestPrepareEventsSkipsOnlyRecordsWithOversizedKeys(t *testing.T) {
+	request := loadLogEventsFixture(t)
+	stripContentAttributes(request)
+	records := resourceLogRecords(request.GetResourceLogs()[0])
+	setStringAttribute(records[0], "session.id", strings.Repeat("s", eventIDColumnLength+1))
+	setStringAttribute(records[7], "prompt.id", strings.Repeat("p", eventIDColumnLength+1))
+	// A value at the column width still fits.
+	setStringAttribute(records[6], "prompt.id", strings.Repeat("é", eventIDColumnLength))
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
+
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 9)
+	if err != nil {
+		t.Fatalf("prepareEvents() error = %v, want only the oversized records skipped", err)
+	}
+	if len(prepared.events) != 11 || prepared.skippedCount != 0 || prepared.skippedRecordCount != 2 {
+		t.Fatalf("prepareEvents() events=%d skipped groups=%d records=%d, want 11, 0 and 2", len(prepared.events), prepared.skippedCount, prepared.skippedRecordCount)
+	}
+	message := prepared.diagnostic()
+	if message == nil || !strings.Contains(*message, string(errorInvalidDimension)) {
+		t.Fatalf("diagnostic() = %v, want %s", message, errorInvalidDimension)
+	}
+}
+
+func TestPrepareEventsTruncatesDescriptiveColumnsToTheirWidth(t *testing.T) {
+	request := loadLogEventsFixture(t)
+	stripContentAttributes(request)
+	records := resourceLogRecords(request.GetResourceLogs()[0])
+	longToolName := strings.Repeat("é", 300)
+	setStringAttribute(records[7], "tool_name", longToolName)
+	setStringAttribute(records[6], "model", strings.Repeat("m", 300))
+	setStringAttribute(records[6], "app.version", strings.Repeat("9", 100))
+	setStringAttribute(records[6], "query_source", strings.Repeat("q", 200))
+	setStringAttribute(records[11], "command_name", strings.Repeat("c", 300))
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
+
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 9)
+	if err != nil || len(prepared.events) != 13 || prepared.skippedRecordCount != 0 {
+		t.Fatalf("prepareEvents() = %v, %v; want every record kept", prepared, err)
+	}
+	bash := findPreparedEvent(t, prepared, eventToolResult, "tu-2")
+	if bash.ToolName != strings.Repeat("é", eventNamedColumnLength) || !utf8.ValidString(bash.ToolName) {
+		t.Fatalf("tool_name = %d characters, want %d whole characters", utf8.RuneCountInString(bash.ToolName), eventNamedColumnLength)
+	}
+	var attributes map[string]interface{}
+	if err := json.Unmarshal(bash.Attributes, &attributes); err != nil || attributes["tool_name"] != longToolName {
+		t.Fatalf("attributes tool_name = %v, want the full value kept", attributes["tool_name"])
+	}
+	apiRequest := findPreparedEvent(t, prepared, eventAPIRequest, "req-2")
+	if len(apiRequest.Model) != eventNamedColumnLength || len(apiRequest.AppVersion) != eventVersionColumnLength || len(apiRequest.QuerySource) != eventLabelColumnLength {
+		t.Fatalf("api_request model/app_version/query_source lengths = %d/%d/%d", len(apiRequest.Model), len(apiRequest.AppVersion), len(apiRequest.QuerySource))
+	}
+	for _, item := range prepared.events {
+		if item.event.PromptId == "p3" && item.event.EventName == eventUserPrompt && len(item.event.CommandName) != eventNamedColumnLength {
+			t.Fatalf("command_name length = %d, want %d", len(item.event.CommandName), eventNamedColumnLength)
+		}
+	}
+}
+
+func TestPromptRollupTruncatesAttributeValuesToAiColumns(t *testing.T) {
+	request := loadLogEventsFixture(t)
+	stripContentAttributes(request)
+	records := resourceLogRecords(request.GetResourceLogs()[0])
+	setStringAttribute(records[11], "command_source", strings.Repeat("b", 40))
+	setStringAttribute(records[4], "invocation_trigger", strings.Repeat("t", 100))
+	setStringAttribute(records[2], "from_mode", strings.Repeat("f", 100))
+	setStringAttribute(records[2], "to_mode", strings.Repeat("o", 100))
+	setStringAttribute(records[2], "trigger", strings.Repeat("r", 100))
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 1)
+	if err != nil {
+		t.Fatalf("prepareEvents() error = %v", err)
+	}
+	byPrompt := make(map[string][]*models.OtelEvent)
+	modeEvents := make([]*models.OtelEvent, 0)
+	for _, item := range prepared.events {
+		byPrompt[item.event.PromptId] = append(byPrompt[item.event.PromptId], item.event)
+		if isModeChangeEvent(item.event) {
+			modeEvents = append(modeEvents, item.event)
+		}
+	}
+
+	if command := buildPromptRollup(testOrganizationID, "p3", byPrompt["p3"]).prompt; len(command.CommandSource) != maxCommandSourceLength {
+		t.Fatalf("command_source length = %d, want %d", len(command.CommandSource), maxCommandSourceLength)
+	}
+	skills := buildPromptRollup(testOrganizationID, "p2", byPrompt["p2"]).skills
+	if len(skills) != 1 || len(skills[0].InvocationTrigger) != maxAiLabelLength {
+		t.Fatalf("skills = %#v, want one skill with a %d-character trigger", skills, maxAiLabelLength)
+	}
+	change := newSessionModes(modeEvents).changes[0]
+	if len(change.fromMode) != maxAiLabelLength || len(change.toMode) != maxAiLabelLength || len(change.trigger) != maxAiLabelLength {
+		t.Fatalf("mode change lengths = %d/%d/%d, want %d", len(change.fromMode), len(change.toMode), len(change.trigger), maxAiLabelLength)
+	}
+}
+
+// setStringAttribute replaces a record's string attribute, or adds it.
+func setStringAttribute(record *logsv1.LogRecord, key, value string) {
+	attribute := &commonv1.KeyValue{Key: key, Value: &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: value}}}
+	record.Attributes = append(withoutAttributes(record.GetAttributes(), map[string]struct{}{key: {}}), attribute)
 }
 
 func TestPrepareEventsFailsBatchOnConnectionLookupError(t *testing.T) {
