@@ -238,9 +238,8 @@ func TestRecordLogBatchFailureStates(t *testing.T) {
 			converter := newRawMetricConverter(database, nil)
 			converter.now = func() time.Time { return now }
 
-			batch := &models.OtelLogBatch{Model: common.Model{ID: 3}, AttemptCount: test.attempts}
-			if err := converter.recordLogBatchFailure(batch, "worker", test.err); err != nil {
-				t.Fatalf("recordLogBatchFailure() error = %v", err)
+			if err := converter.recordBatchFailure(&models.OtelLogBatch{}, 3, test.attempts, "worker", test.err); err != nil {
+				t.Fatalf("recordBatchFailure() error = %v", err)
 			}
 			if columns["status"] != test.status || columns["processing_error_code"] != string(test.code) || columns["lease_owner"] != nil {
 				t.Fatalf("columns = %v, want status %s code %s", columns, test.status, test.code)
@@ -256,9 +255,8 @@ func TestRecordLogBatchFailureStates(t *testing.T) {
 
 func TestRecordLogBatchFailureLeavesLostLeaseAlone(t *testing.T) {
 	converter := newRawMetricConverter(dalmocks.NewDal(t), nil)
-	batch := &models.OtelLogBatch{Model: common.Model{ID: 3}, AttemptCount: 1}
-	if err := converter.recordLogBatchFailure(batch, "worker", &conversionError{code: errorLeaseLost, err: fmt.Errorf("lease taken")}); err != nil {
-		t.Fatalf("recordLogBatchFailure() error = %v", err)
+	if err := converter.recordBatchFailure(&models.OtelLogBatch{}, 3, 1, "worker", &conversionError{code: errorLeaseLost, err: fmt.Errorf("lease taken")}); err != nil {
+		t.Fatalf("recordBatchFailure() error = %v", err)
 	}
 }
 
@@ -266,8 +264,8 @@ func TestClaimNextLogBatchWaitsBehindRetryDelayedHead(t *testing.T) {
 	now := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
 	nextAttemptAt := now.Add(time.Minute)
 	database := dalmocks.NewDal(t)
-	database.EXPECT().First(mock.AnythingOfType("*models.OtelLogBatch"), mock.Anything, mock.Anything, mock.Anything).Run(func(batch interface{}, _ ...dal.Clause) {
-		*batch.(*models.OtelLogBatch) = models.OtelLogBatch{Model: common.Model{ID: 4}, ReceivedAt: now.Add(-time.Hour), Status: models.OtelMetricBatchStatusRetryableError, NextAttemptAt: &nextAttemptAt}
+	database.EXPECT().First(mock.AnythingOfType("*service.rawBatchHead"), mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(head interface{}, _ ...dal.Clause) {
+		*head.(*rawBatchHead) = rawBatchHead{ID: 4, ReceivedAt: now.Add(-time.Hour), Status: models.OtelMetricBatchStatusRetryableError, NextAttemptAt: &nextAttemptAt}
 	}).Return(nil)
 	converter := newRawMetricConverter(database, nil)
 	converter.now = func() time.Time { return now }
@@ -282,11 +280,14 @@ func TestClaimNextLogBatchClaimsEarliestPendingBatch(t *testing.T) {
 	now := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
 	notFound := errors.NotFound.New("no batch")
 	database := dalmocks.NewDal(t)
-	database.EXPECT().First(mock.AnythingOfType("*models.OtelLogBatch"), mock.Anything, mock.Anything, mock.Anything).RunAndReturn(func(batch interface{}, clauses ...dal.Clause) errors.Error {
-		if whereParams(clauses, 1)[0] != models.OtelMetricBatchStatusPending {
+	database.EXPECT().First(mock.AnythingOfType("*service.rawBatchHead"), mock.Anything, mock.Anything, mock.Anything, mock.Anything).RunAndReturn(func(head interface{}, clauses ...dal.Clause) errors.Error {
+		if _, fromLogBatches := clauses[0].Data.(*models.OtelLogBatch); !fromLogBatches {
+			t.Fatalf("claim head query reads from %T, want the log batch table", clauses[0].Data)
+		}
+		if whereParams(clauses, 2)[0] != models.OtelMetricBatchStatusPending {
 			return notFound
 		}
-		*batch.(*models.OtelLogBatch) = models.OtelLogBatch{Model: common.Model{ID: 5}, ReceivedAt: now.Add(-time.Minute), Status: models.OtelMetricBatchStatusPending, AttemptCount: 2}
+		*head.(*rawBatchHead) = rawBatchHead{ID: 5, ReceivedAt: now.Add(-time.Minute), Status: models.OtelMetricBatchStatusPending, AttemptCount: 2}
 		return nil
 	}).Times(len(nonterminalBatchStatuses))
 	database.EXPECT().IsErrorNotFound(notFound).Return(true)

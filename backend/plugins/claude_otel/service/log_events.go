@@ -58,28 +58,19 @@ type preparedLogBatch struct {
 }
 
 func (c *rawMetricConverter) prepareEvents(request *collectorlogs.ExportLogsServiceRequest, batchID uint64) (*preparedLogBatch, error) {
-	preparer := &batchPreparer{
-		converter:        c,
-		connections:      make(map[string][]*models.OtelConnection),
-		pendingBindings:  make(map[uint64]string),
-		unknownMetricSet: make(map[string]struct{}),
-	}
+	preparer := c.newBatchPreparer()
 	result := &preparedLogBatch{}
-	for _, resourceLogs := range request.GetResourceLogs() {
-		resourceBindings := make(map[uint64]string)
-		events, err := preparer.prepareLogResource(resourceLogs, resourceBindings, batchID)
-		if err == nil {
-			result.events = append(result.events, events...)
-			for connectionID, organizationID := range resourceBindings {
-				preparer.pendingBindings[connectionID] = organizationID
-			}
-			continue
+	resources := request.GetResourceLogs()
+	err := preparer.prepareResources(len(resources), func(i int, bindings map[uint64]string) error {
+		events, err := preparer.prepareLogResource(resources[i], bindings, batchID)
+		if err != nil {
+			return err
 		}
-		conversionErr, attribution := attributionError(err)
-		if !attribution {
-			return nil, err
-		}
-		preparer.recordSkip(conversionErr)
+		result.events = append(result.events, events...)
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	result.preparedBatch = preparer.result
 	return result, nil

@@ -141,17 +141,13 @@ func TestRecordPermanentFailureMarksTerminalTime(t *testing.T) {
 					return
 				}
 			}
-			t.Fatalf("recordFailure() did not record terminal processed_at: %#v", sets)
+			t.Fatalf("recordBatchFailure() did not record terminal processed_at: %#v", sets)
 		},
 	).Return(nil).Once()
 
-	err := converter.recordFailure(
-		&models.OtelMetricBatch{Model: common.Model{ID: 12}, AttemptCount: 1},
-		"worker",
-		permanentMetricError(errorInvalidPayload, "invalid payload"),
-	)
+	err := converter.recordBatchFailure(&models.OtelMetricBatch{}, 12, 1, "worker", permanentMetricError(errorInvalidPayload, "invalid payload"))
 	if err != nil {
-		t.Fatalf("recordFailure() error = %v", err)
+		t.Fatalf("recordBatchFailure() error = %v", err)
 	}
 }
 
@@ -592,9 +588,9 @@ func TestClaimNextWaitsBehindRetryDelayedHeadBatch(t *testing.T) {
 	now := time.Date(2026, 9, 14, 10, 0, 0, 0, time.UTC)
 	nextAttemptAt := now.Add(time.Minute)
 	database := dalmocks.NewDal(t)
-	database.EXPECT().First(mock.AnythingOfType("*models.OtelMetricBatch"), mock.Anything, mock.Anything, mock.Anything).Run(
-		func(batch interface{}, _ ...dal.Clause) {
-			*batch.(*models.OtelMetricBatch) = models.OtelMetricBatch{Status: models.OtelMetricBatchStatusRetryableError, NextAttemptAt: &nextAttemptAt}
+	database.EXPECT().First(mock.AnythingOfType("*service.rawBatchHead"), mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(
+		func(head interface{}, _ ...dal.Clause) {
+			*head.(*rawBatchHead) = rawBatchHead{Status: models.OtelMetricBatchStatusRetryableError, NextAttemptAt: &nextAttemptAt}
 		},
 	).Return(nil)
 	converter := newRawMetricConverter(database, nil)
@@ -606,28 +602,28 @@ func TestClaimNextWaitsBehindRetryDelayedHeadBatch(t *testing.T) {
 	}
 }
 
-// TestFindClaimHeadPicksEarliestAcrossStatuses guards the per-status query merge in
-// findClaimHead: it must still pick the single earliest row across all nonterminal
+// TestClaimHeadPicksEarliestAcrossStatuses guards the per-status query merge in
+// claimHead: it must still pick the single earliest row across all nonterminal
 // statuses, exactly as the old combined "status IN (...)" query did, since a later batch
 // must never overtake an earlier one regardless of which status holds it.
-func TestFindClaimHeadPicksEarliestAcrossStatuses(t *testing.T) {
+func TestClaimHeadPicksEarliestAcrossStatuses(t *testing.T) {
 	pendingReceivedAt := time.Date(2026, 9, 16, 10, 0, 0, 0, time.UTC)
 	processingReceivedAt := time.Date(2026, 9, 16, 11, 0, 0, 0, time.UTC)
 	retryableReceivedAt := time.Date(2026, 9, 16, 9, 0, 0, 0, time.UTC)
 	notFound := devlakeerrors.NotFound.New("not found")
 
 	database := dalmocks.NewDal(t)
-	database.EXPECT().First(mock.AnythingOfType("*models.OtelMetricBatch"), mock.Anything, mock.Anything, mock.Anything).RunAndReturn(
+	database.EXPECT().First(mock.AnythingOfType("*service.rawBatchHead"), mock.Anything, mock.Anything, mock.Anything, mock.Anything).RunAndReturn(
 		func(dst interface{}, clauses ...dal.Clause) devlakeerrors.Error {
-			status := clauses[1].Data.(dal.DalClause).Params[0].(string)
-			batch := dst.(*models.OtelMetricBatch)
+			status := clauses[2].Data.(dal.DalClause).Params[0].(string)
+			head := dst.(*rawBatchHead)
 			switch status {
 			case models.OtelMetricBatchStatusPending:
-				*batch = models.OtelMetricBatch{Model: common.Model{ID: 2}, Status: status, ReceivedAt: pendingReceivedAt}
+				*head = rawBatchHead{ID: 2, Status: status, ReceivedAt: pendingReceivedAt}
 			case models.OtelMetricBatchStatusProcessing:
-				*batch = models.OtelMetricBatch{Model: common.Model{ID: 3}, Status: status, ReceivedAt: processingReceivedAt}
+				*head = rawBatchHead{ID: 3, Status: status, ReceivedAt: processingReceivedAt}
 			case models.OtelMetricBatchStatusRetryableError:
-				*batch = models.OtelMetricBatch{Model: common.Model{ID: 1}, Status: status, ReceivedAt: retryableReceivedAt}
+				*head = rawBatchHead{ID: 1, Status: status, ReceivedAt: retryableReceivedAt}
 			default:
 				return notFound
 			}
@@ -637,12 +633,12 @@ func TestFindClaimHeadPicksEarliestAcrossStatuses(t *testing.T) {
 	database.EXPECT().IsErrorNotFound(mock.Anything).RunAndReturn(func(err error) bool { return err == notFound }).Maybe()
 
 	converter := newRawMetricConverter(database, nil)
-	head, err := converter.findClaimHead()
+	head, err := converter.claimHead(&models.OtelMetricBatch{})
 	if err != nil {
-		t.Fatalf("findClaimHead() error = %v", err)
+		t.Fatalf("claimHead() error = %v", err)
 	}
 	if head == nil || head.ID != 1 || head.Status != models.OtelMetricBatchStatusRetryableError {
-		t.Fatalf("findClaimHead() = %#v, want the retryable_error batch (id=1), the earliest received_at across all three statuses", head)
+		t.Fatalf("claimHead() = %#v, want the retryable_error batch (id=1), the earliest received_at across all three statuses", head)
 	}
 }
 

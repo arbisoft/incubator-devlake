@@ -85,28 +85,50 @@ type batchPreparer struct {
 	result           preparedBatch
 }
 
-func (c *rawMetricConverter) prepareUpdates(request *collectormetrics.ExportMetricsServiceRequest) (*preparedBatch, error) {
-	preparer := &batchPreparer{
+func (c *rawMetricConverter) newBatchPreparer() *batchPreparer {
+	return &batchPreparer{
 		converter:        c,
 		connections:      make(map[string][]*models.OtelConnection),
 		pendingBindings:  make(map[uint64]string),
 		unknownMetricSet: make(map[string]struct{}),
 	}
-	for _, resourceMetrics := range request.GetResourceMetrics() {
+}
+
+// prepareResources runs prepare for each of a batch's n resource groups with that group's
+// own binding map. A group's bindings are kept only when it succeeds. An attribution
+// failure skips the group; any other error fails the batch.
+func (p *batchPreparer) prepareResources(n int, prepare func(i int, bindings map[uint64]string) error) error {
+	for i := 0; i < n; i++ {
 		resourceBindings := make(map[uint64]string)
-		updates, err := preparer.prepareResource(resourceMetrics, resourceBindings)
+		err := prepare(i, resourceBindings)
 		if err == nil {
-			preparer.result.updates = append(preparer.result.updates, updates...)
 			for connectionID, organizationID := range resourceBindings {
-				preparer.pendingBindings[connectionID] = organizationID
+				p.pendingBindings[connectionID] = organizationID
 			}
 			continue
 		}
 		conversionErr, attribution := attributionError(err)
 		if !attribution {
-			return nil, err
+			return err
 		}
-		preparer.recordSkip(conversionErr)
+		p.recordSkip(conversionErr)
+	}
+	return nil
+}
+
+func (c *rawMetricConverter) prepareUpdates(request *collectormetrics.ExportMetricsServiceRequest) (*preparedBatch, error) {
+	preparer := c.newBatchPreparer()
+	resources := request.GetResourceMetrics()
+	err := preparer.prepareResources(len(resources), func(i int, bindings map[uint64]string) error {
+		updates, err := preparer.prepareResource(resources[i], bindings)
+		if err != nil {
+			return err
+		}
+		preparer.result.updates = append(preparer.result.updates, updates...)
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	sort.SliceStable(preparer.result.updates, func(i, j int) bool {
 		return lessSeriesSample(preparer.result.updates[i], preparer.result.updates[j])
