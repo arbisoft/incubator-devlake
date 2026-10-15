@@ -498,6 +498,10 @@ func domainAccountID(tx dal.Transaction, cache map[string]string, email string) 
 	return account.Id, nil
 }
 
+// eventAttributes decodes an event's attributes. The decode error is discarded because
+// prepareLogRecord always writes Attributes with json.Marshal of a map, so it cannot fail.
+// Failing here would also quarantine the wrong batch: the rollup reads events written by
+// earlier batches, so one bad row would block every later batch for its session.
 func eventAttributes(event *models.OtelEvent) map[string]interface{} {
 	attributes := make(map[string]interface{})
 	if len(event.Attributes) > 0 {
