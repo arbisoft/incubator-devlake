@@ -193,31 +193,31 @@ func (c *rawConverter) acquireLease() (bool, errors.Error) {
 // processNext claims and converts the head of the raw queue. It returns true when a batch
 // reached a new state, including retry scheduling or quarantine.
 func (c *rawConverter) processNext() (bool, errors.Error) {
-	batch, leaseOwner, err := c.claimNext()
+	batch, lease, err := c.claimNext()
 	if err != nil || batch == nil {
 		return false, err
 	}
-	prepared, conversionErr := c.convert(batch, leaseOwner)
+	prepared, conversionErr := c.convert(batch, lease)
 	if conversionErr != nil {
-		return true, c.recordBatchFailure(&models.OtelMetricBatch{}, batch.ID, batch.AttemptCount, leaseOwner, conversionErr)
+		return true, c.recordBatchFailure(lease, conversionErr)
 	}
 	c.logConverted(batch, prepared)
 	return true, nil
 }
 
 // claimNext claims the earliest nonterminal metric batch; see claimNextBatch.
-func (c *rawConverter) claimNext() (*models.OtelMetricBatch, string, errors.Error) {
+func (c *rawConverter) claimNext() (*models.OtelMetricBatch, *batchLease, errors.Error) {
 	batch := &models.OtelMetricBatch{}
-	leaseOwner, err := c.claimNextBatch(batch)
-	if err != nil || leaseOwner == "" {
-		return nil, "", err
+	lease, err := c.claimNextBatch(batch, &models.OtelMetricBatch{})
+	if err != nil || lease == nil {
+		return nil, nil, err
 	}
-	return batch, leaseOwner, nil
+	return batch, lease, nil
 }
 
 // convert prepares facts outside a transaction, then verifies the batch lease and commits
 // facts, series state, canonical rows, and raw completion atomically.
-func (c *rawConverter) convert(batch *models.OtelMetricBatch, leaseOwner string) (*preparedBatch, error) {
+func (c *rawConverter) convert(batch *models.OtelMetricBatch, lease *batchLease) (*preparedBatch, error) {
 	request, decodeErr := decodeOtelMetricBatchRequest(batch)
 	if decodeErr != nil {
 		return nil, &conversionError{code: errorInvalidPayload, permanent: true, err: fmt.Errorf("decode raw OTLP payload: %w", decodeErr)}
@@ -226,7 +226,7 @@ func (c *rawConverter) convert(batch *models.OtelMetricBatch, leaseOwner string)
 	if err != nil {
 		return nil, err
 	}
-	err = c.commitInLease(&models.OtelMetricBatch{}, batch.ID, leaseOwner, prepared, func(tx dal.Transaction) error {
+	err = c.commitInLease(lease, prepared, func(tx dal.Transaction) error {
 		if err := c.applyHourlyUpdates(tx, prepared.updates); err != nil {
 			return err
 		}
@@ -245,8 +245,8 @@ func (c *rawConverter) logConverted(batch *models.OtelMetricBatch, prepared *pre
 	if c.logger == nil {
 		return
 	}
-	if prepared.skippedCount > 0 {
-		c.logger.Warn(nil, "Claude Code OTel raw batch %d skipped %d resource group(s)", batch.ID, prepared.skippedCount)
+	if prepared.skipped[skippedResource] > 0 {
+		c.logger.Warn(nil, "Claude Code OTel raw batch %d skipped %d resource group(s)", batch.ID, prepared.skipped[skippedResource])
 	}
 	if len(prepared.unknownMetrics) > 0 {
 		c.logger.Info("Claude Code OTel raw batch %d ignored unmapped metrics: %s", batch.ID, strings.Join(prepared.unknownMetrics, ", "))

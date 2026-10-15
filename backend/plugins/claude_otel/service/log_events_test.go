@@ -20,6 +20,8 @@ package service
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -176,8 +178,8 @@ func TestPrepareEventsMapsTypedColumnsAndKeepsAttributes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("prepareEvents() error = %v", err)
 	}
-	if len(prepared.events) != 13 || prepared.skippedCount != 0 {
-		t.Fatalf("prepareEvents() events=%d skipped=%d, want 13 and 0", len(prepared.events), prepared.skippedCount)
+	if len(prepared.events) != 13 || prepared.skipped[skippedResource] != 0 {
+		t.Fatalf("prepareEvents() events=%d skipped=%d, want 13 and 0", len(prepared.events), prepared.skipped[skippedResource])
 	}
 	keys := make(map[string]struct{})
 	for _, item := range prepared.events {
@@ -260,8 +262,8 @@ func TestPrepareEventsSkipsOnlyInvalidRecords(t *testing.T) {
 	if err != nil {
 		t.Fatalf("prepareEvents() error = %v", err)
 	}
-	if len(prepared.events) != 11 || prepared.skippedCount != 0 || prepared.skippedRecordCount != 2 {
-		t.Fatalf("prepareEvents() events=%d skipped groups=%d records=%d, want 11, 0 and 2", len(prepared.events), prepared.skippedCount, prepared.skippedRecordCount)
+	if len(prepared.events) != 11 || prepared.skipped[skippedResource] != 0 || prepared.skipped[skippedLogRecord] != 2 {
+		t.Fatalf("prepareEvents() events=%d skipped groups=%d records=%d, want 11, 0 and 2", len(prepared.events), prepared.skipped[skippedResource], prepared.skipped[skippedLogRecord])
 	}
 	if code := prepared.diagnosticCode(); code == nil || *code != string(diagnosticRecordsSkipped) {
 		t.Fatalf("diagnosticCode() = %v, want %s", code, diagnosticRecordsSkipped)
@@ -287,8 +289,8 @@ func TestPrepareEventsSkipsOnlyRecordsWithOversizedKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("prepareEvents() error = %v, want only the oversized records skipped", err)
 	}
-	if len(prepared.events) != 11 || prepared.skippedCount != 0 || prepared.skippedRecordCount != 2 {
-		t.Fatalf("prepareEvents() events=%d skipped groups=%d records=%d, want 11, 0 and 2", len(prepared.events), prepared.skippedCount, prepared.skippedRecordCount)
+	if len(prepared.events) != 11 || prepared.skipped[skippedResource] != 0 || prepared.skipped[skippedLogRecord] != 2 {
+		t.Fatalf("prepareEvents() events=%d skipped groups=%d records=%d, want 11, 0 and 2", len(prepared.events), prepared.skipped[skippedResource], prepared.skipped[skippedLogRecord])
 	}
 	message := prepared.diagnostic()
 	if message == nil || !strings.Contains(*message, string(errorValueTooLong)) {
@@ -304,7 +306,7 @@ func TestPrepareEventsSkipsOnlyRecordsWithOversizedIdentity(t *testing.T) {
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
 
 	prepared, err := newRawConverter(database, nil).prepareEvents(request, 9)
-	if err != nil || len(prepared.events) != 12 || prepared.skippedRecordCount != 1 {
+	if err != nil || len(prepared.events) != 12 || prepared.skipped[skippedLogRecord] != 1 {
 		t.Fatalf("prepareEvents() = %v, %v; want 12 events and the oversized identity record skipped", prepared, err)
 	}
 }
@@ -322,7 +324,7 @@ func TestPrepareEventsTruncatesDescriptiveColumnsToTheirWidth(t *testing.T) {
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
 
 	prepared, err := newRawConverter(database, nil).prepareEvents(request, 9)
-	if err != nil || len(prepared.events) != 13 || prepared.skippedRecordCount != 0 {
+	if err != nil || len(prepared.events) != 13 || prepared.skipped[skippedLogRecord] != 0 {
 		t.Fatalf("prepareEvents() = %v, %v; want every record kept", prepared, err)
 	}
 	bash := findPreparedEvent(t, prepared, eventToolResult, "tu-2")
@@ -407,8 +409,8 @@ func TestPrepareEventsSkipsResourceWithoutTeam(t *testing.T) {
 	if err != nil {
 		t.Fatalf("prepareEvents() error = %v", err)
 	}
-	if len(prepared.events) != 0 || prepared.skippedCount != 1 || prepared.diagnosticCode() == nil {
-		t.Fatalf("prepareEvents() events=%d skipped=%d, want the resource group skipped", len(prepared.events), prepared.skippedCount)
+	if len(prepared.events) != 0 || prepared.skipped[skippedResource] != 1 || prepared.diagnosticCode() == nil {
+		t.Fatalf("prepareEvents() events=%d skipped=%d, want the resource group skipped", len(prepared.events), prepared.skipped[skippedResource])
 	}
 }
 
@@ -472,7 +474,8 @@ func TestBuildPromptRollupMergesSkillSourcesAndCounts(t *testing.T) {
 	if skill.SkillName != "code-review" || skill.DetectedVia != ai.SkillDetectedViaActivation || skill.InvocationTrigger != "claude-proactive" || skill.SkillSource != "userSettings" || skill.SessionId != "sess-1" {
 		t.Fatalf("skill = %#v", skill)
 	}
-	if skill.Id != ai.PromptSkillID(aiProviderClaude, testOrganizationID, "p2", "code-review") || prompt.Id != ai.PromptID(aiProviderClaude, testOrganizationID, "p2") {
+	if skill.Id != (ai.CanonicalKey{Kind: ai.IDKindPromptSkill, Provider: aiProviderClaude, WorkspaceKey: testOrganizationID, Grain: []string{"p2", "code-review"}}).ID() ||
+		prompt.Id != (ai.CanonicalKey{Kind: ai.IDKindPrompt, Provider: aiProviderClaude, WorkspaceKey: testOrganizationID, Grain: []string{"p2"}}).ID() {
 		t.Fatalf("prompt or skill id is not canonical: %q %q", prompt.Id, skill.Id)
 	}
 
@@ -628,4 +631,79 @@ func findPreparedEvent(t *testing.T, prepared *preparedLogBatch, eventName, corr
 	}
 	t.Fatalf("no %s event with id %s", eventName, correlationID)
 	return nil
+}
+
+func TestTypedAttributeReaders(t *testing.T) {
+	str := func(v string) *commonv1.AnyValue {
+		return &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: v}}
+	}
+	num := func(v float64) *commonv1.AnyValue {
+		return &commonv1.AnyValue{Value: &commonv1.AnyValue_DoubleValue{DoubleValue: v}}
+	}
+	integer := func(v int64) *commonv1.AnyValue {
+		return &commonv1.AnyValue{Value: &commonv1.AnyValue_IntValue{IntValue: v}}
+	}
+	boolean := func(v bool) *commonv1.AnyValue {
+		return &commonv1.AnyValue{Value: &commonv1.AnyValue_BoolValue{BoolValue: v}}
+	}
+	show := func(value interface{}) string {
+		switch typed := value.(type) {
+		case *int64:
+			if typed != nil {
+				return fmt.Sprint(*typed)
+			}
+		case *bool:
+			if typed != nil {
+				return fmt.Sprint(*typed)
+			}
+		case *string:
+			if typed != nil {
+				return *typed
+			}
+		}
+		return "nil"
+	}
+	tests := []struct {
+		name  string
+		read  func([]*commonv1.KeyValue, string) interface{}
+		value *commonv1.AnyValue
+		want  string
+	}{
+		{"int keeps large ints exact", readInt, integer(math.MaxInt64), "9223372036854775807"},
+		{"int truncates a double", readInt, num(12.9), "12"},
+		{"int parses a numeric string", readInt, str(" 7.5 "), "7"},
+		{"int rejects NaN", readInt, num(math.NaN()), "nil"},
+		{"int rejects an out-of-range string", readInt, str("1e19"), "nil"},
+		{"int rejects a bool", readInt, boolean(true), "nil"},
+		{"bool reads a bool", readBool, boolean(false), "false"},
+		{"bool parses a string", readBool, str("true"), "true"},
+		{"bool rejects a number", readBool, integer(1), "nil"},
+		{"decimal formats an int", readDecimal, integer(3), "3.00000000"},
+		{"decimal parses a string", readDecimal, str("0.25"), "0.25000000"},
+		{"decimal rejects a negative", readDecimal, num(-1), "nil"},
+		{"decimal rejects infinity", readDecimal, num(math.Inf(1)), "nil"},
+		{"decimal rejects 1e12", readDecimal, num(1e12), "nil"},
+		{"missing attribute", readInt, nil, "nil"},
+	}
+	for _, test := range tests {
+		attributes := []*commonv1.KeyValue{{Key: "other", Value: integer(1)}}
+		if test.value != nil {
+			attributes = append(attributes, &commonv1.KeyValue{Key: "value", Value: test.value})
+		}
+		if got := show(test.read(attributes, "value")); got != test.want {
+			t.Errorf("%s: got %s, want %s", test.name, got, test.want)
+		}
+	}
+}
+
+func readInt(attributes []*commonv1.KeyValue, key string) interface{} {
+	return attributeInt(attributes, key)
+}
+
+func readBool(attributes []*commonv1.KeyValue, key string) interface{} {
+	return attributeBool(attributes, key)
+}
+
+func readDecimal(attributes []*commonv1.KeyValue, key string) interface{} {
+	return attributeDecimal(attributes, key, 8)
 }

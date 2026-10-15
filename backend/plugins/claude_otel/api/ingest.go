@@ -36,6 +36,12 @@ const (
 	otlpProtobufContentType = "application/x-protobuf"
 )
 
+// Messages of the failures postOtlp answers itself, rather than the ingest service.
+const (
+	exportRequestRequiredMessage    = "OTLP export request is required"
+	ingestServiceUnavailableMessage = "Claude Code OTel ingest service is unavailable"
+)
+
 // otlpStatusCodes maps classified HTTP failures to the google.rpc.Status code OTLP/HTTP
 // clients expect. The Collector decides retry from the HTTP status.
 var otlpStatusCodes = map[int]rpccode.Code{
@@ -61,7 +67,7 @@ func PostOtlpLogs(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, er
 // success and a google.rpc.Status otherwise.
 func postOtlp(input *plugin.ApiResourceInput, ingest otlpIngestFunc, ok proto.Message) (*plugin.ApiResourceOutput, errors.Error) {
 	if input == nil || input.Request == nil {
-		return otlpErrorOutput(errors.BadInput.New("OTLP export request is required"))
+		return otlpErrorOutput(errors.BadInput.New(exportRequestRequiredMessage))
 	}
 	if _, err := ingest(input.Request); err != nil {
 		return otlpErrorOutput(err)
@@ -75,7 +81,7 @@ func withDefaultIngestService(ingest func(*service.RawIngestService, *http.Reque
 	return func(request *http.Request) (*service.RawIngestResult, errors.Error) {
 		ingestService := service.DefaultRawIngestService()
 		if ingestService == nil {
-			return nil, errors.Unavailable.New("Claude Code OTel ingest service is unavailable")
+			return nil, errors.Unavailable.New(ingestServiceUnavailableMessage)
 		}
 		return ingest(ingestService, request)
 	}

@@ -18,8 +18,10 @@ limitations under the License.
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/apache/incubator-devlake/core/errors"
@@ -31,8 +33,39 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const (
+	pluginPathPrefix  = "/plugins/claude_otel/"
+	ingestUnavailable = "store is down"
+)
+
+// rpcMessage is the google.rpc.Status message for a classified failure: the DevLake
+// message followed by its HTTP code.
+func rpcMessage(message string, status int) string {
+	return fmt.Sprintf("%s (%d)", message, status)
+}
+
+func newOtlpLogsRequest() *http.Request {
+	return httptest.NewRequest(http.MethodPost, pluginPathPrefix+OtlpLogsResourcePath, nil)
+}
+
+// failures collects every failed check of a test so one run reports all of them.
+type failures []string
+
+func (f *failures) check(ok bool, format string, args ...interface{}) {
+	if !ok {
+		*f = append(*f, fmt.Sprintf(format, args...))
+	}
+}
+
+func (f failures) report(t *testing.T) {
+	t.Helper()
+	if len(f) > 0 {
+		t.Fatal(strings.Join(f, "\n"))
+	}
+}
+
 func TestPostOtlpAnswersExportResponseOnSuccess(t *testing.T) {
-	request := httptest.NewRequest(http.MethodPost, "/plugins/claude_otel/"+OtlpLogsResourcePath, nil)
+	request := newOtlpLogsRequest()
 	var ingested *http.Request
 	output, err := postOtlp(&plugin.ApiResourceInput{Request: request}, func(r *http.Request) (*service.RawIngestResult, errors.Error) {
 		ingested = r
@@ -41,20 +74,16 @@ func TestPostOtlpAnswersExportResponseOnSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("postOtlp() error = %v", err)
 	}
-	if ingested != request {
-		t.Fatalf("ingest received %p, want the input request %p", ingested, request)
-	}
-	if output.Status != http.StatusOK || output.ContentType != otlpProtobufContentType {
-		t.Fatalf("postOtlp() status %d content type %q, want 200 %q", output.Status, output.ContentType, otlpProtobufContentType)
-	}
-	if err := proto.Unmarshal(output.Body.([]byte), &collectorlogs.ExportLogsServiceResponse{}); err != nil {
-		t.Fatalf("body is not an ExportLogsServiceResponse: %v", err)
-	}
+	var problems failures
+	problems.check(ingested == request, "ingest received %p, want the input request %p", ingested, request)
+	problems.check(output.Status == http.StatusOK && output.ContentType == otlpProtobufContentType,
+		"postOtlp() status %d content type %q, want 200 %q", output.Status, output.ContentType, otlpProtobufContentType)
+	decodeErr := proto.Unmarshal(output.Body.([]byte), &collectorlogs.ExportLogsServiceResponse{})
+	problems.check(decodeErr == nil, "body is not an ExportLogsServiceResponse: %v", decodeErr)
+	problems.report(t)
 }
 
-// The rpc status message is the classified DevLake message, which ends with the HTTP code.
 func TestPostOtlpAnswersRpcStatusOnFailure(t *testing.T) {
-	request := httptest.NewRequest(http.MethodPost, "/plugins/claude_otel/"+OtlpLogsResourcePath, nil)
 	tests := []struct {
 		name      string
 		input     *plugin.ApiResourceInput
@@ -63,9 +92,9 @@ func TestPostOtlpAnswersRpcStatusOnFailure(t *testing.T) {
 		code      rpccode.Code
 		message   string
 	}{
-		{"nil input", nil, nil, http.StatusBadRequest, rpccode.Code_INVALID_ARGUMENT, "OTLP export request is required (400)"},
-		{"nil request", &plugin.ApiResourceInput{}, nil, http.StatusBadRequest, rpccode.Code_INVALID_ARGUMENT, "OTLP export request is required (400)"},
-		{"unavailable", &plugin.ApiResourceInput{Request: request}, errors.Unavailable.New("store is down"), http.StatusServiceUnavailable, rpccode.Code_UNAVAILABLE, "store is down (503)"},
+		{"nil input", nil, nil, http.StatusBadRequest, rpccode.Code_INVALID_ARGUMENT, exportRequestRequiredMessage},
+		{"nil request", &plugin.ApiResourceInput{}, nil, http.StatusBadRequest, rpccode.Code_INVALID_ARGUMENT, exportRequestRequiredMessage},
+		{"unavailable", &plugin.ApiResourceInput{Request: newOtlpLogsRequest()}, errors.Unavailable.New(ingestUnavailable), http.StatusServiceUnavailable, rpccode.Code_UNAVAILABLE, ingestUnavailable},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -77,33 +106,34 @@ func TestPostOtlpAnswersRpcStatusOnFailure(t *testing.T) {
 			if err != nil {
 				t.Fatalf("postOtlp() error = %v", err)
 			}
-			if called != (test.ingestErr != nil) {
-				t.Fatalf("ingest called = %t, want %t", called, test.ingestErr != nil)
-			}
-			assertOtlpStatus(t, output, test.status, test.code, test.message)
+			problems := otlpStatusFailures(output, test.status, test.code, rpcMessage(test.message, test.status))
+			problems.check(called == (test.ingestErr != nil), "ingest called = %t, want %t", called, test.ingestErr != nil)
+			problems.report(t)
 		})
 	}
 }
 
 func TestPostOtlpLogsWithoutIngestServiceIsUnavailable(t *testing.T) {
-	request := httptest.NewRequest(http.MethodPost, "/plugins/claude_otel/"+OtlpLogsResourcePath, nil)
-	output, err := PostOtlpLogs(&plugin.ApiResourceInput{Request: request})
+	output, err := PostOtlpLogs(&plugin.ApiResourceInput{Request: newOtlpLogsRequest()})
 	if err != nil {
 		t.Fatalf("PostOtlpLogs() error = %v", err)
 	}
-	assertOtlpStatus(t, output, http.StatusServiceUnavailable, rpccode.Code_UNAVAILABLE, "Claude Code OTel ingest service is unavailable (503)")
+	status := http.StatusServiceUnavailable
+	otlpStatusFailures(output, status, rpccode.Code_UNAVAILABLE, rpcMessage(ingestServiceUnavailableMessage, status)).report(t)
 }
 
-func assertOtlpStatus(t *testing.T, output *plugin.ApiResourceOutput, status int, code rpccode.Code, message string) {
-	t.Helper()
-	if output.Status != status || output.ContentType != otlpProtobufContentType {
-		t.Fatalf("status %d content type %q, want %d %q", output.Status, output.ContentType, status, otlpProtobufContentType)
-	}
+// otlpStatusFailures checks that output is a protobuf google.rpc.Status with the given HTTP
+// status, rpc code and message.
+func otlpStatusFailures(output *plugin.ApiResourceOutput, status int, code rpccode.Code, message string) failures {
+	var problems failures
+	problems.check(output.Status == status && output.ContentType == otlpProtobufContentType,
+		"status %d content type %q, want %d %q", output.Status, output.ContentType, status, otlpProtobufContentType)
 	body := &rpcstatus.Status{}
 	if err := proto.Unmarshal(output.Body.([]byte), body); err != nil {
-		t.Fatalf("body is not a google.rpc.Status: %v", err)
+		problems.check(false, "body is not a google.rpc.Status: %v", err)
+		return problems
 	}
-	if body.Code != int32(code) || body.Message != message {
-		t.Fatalf("rpc status = %v %q, want %v %q", rpccode.Code(body.Code), body.Message, code, message)
-	}
+	problems.check(body.Code == int32(code) && body.Message == message,
+		"rpc status = %v %q, want %v %q", rpccode.Code(body.Code), body.Message, code, message)
+	return problems
 }

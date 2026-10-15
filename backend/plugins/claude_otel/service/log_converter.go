@@ -30,13 +30,13 @@ import (
 // processNextLogBatch claims and converts the head of the raw log queue under the
 // converter lease. It returns true when a batch reached a new state.
 func (c *rawConverter) processNextLogBatch() (bool, errors.Error) {
-	batch, leaseOwner, err := c.claimNextLogBatch()
+	batch, lease, err := c.claimNextLogBatch()
 	if err != nil || batch == nil {
 		return false, err
 	}
-	prepared, conversionErr := c.convertLogBatch(batch, leaseOwner)
+	prepared, conversionErr := c.convertLogBatch(batch, lease)
 	if conversionErr != nil {
-		return true, c.recordBatchFailure(&models.OtelLogBatch{}, batch.ID, batch.AttemptCount, leaseOwner, conversionErr)
+		return true, c.recordBatchFailure(lease, conversionErr)
 	}
 	if message := prepared.diagnostic(); message != nil {
 		c.logWarn(nil, fmt.Sprintf("Claude Code OTel raw log batch %d %s", batch.ID, *message))
@@ -46,18 +46,18 @@ func (c *rawConverter) processNextLogBatch() (bool, errors.Error) {
 
 // claimNextLogBatch claims the earliest nonterminal log batch. Like metrics, a batch
 // waiting for retry holds the queue, so events of one session are applied in order.
-func (c *rawConverter) claimNextLogBatch() (*models.OtelLogBatch, string, errors.Error) {
+func (c *rawConverter) claimNextLogBatch() (*models.OtelLogBatch, *batchLease, errors.Error) {
 	batch := &models.OtelLogBatch{}
-	leaseOwner, err := c.claimNextBatch(batch)
-	if err != nil || leaseOwner == "" {
-		return nil, "", err
+	lease, err := c.claimNextBatch(batch, &models.OtelLogBatch{})
+	if err != nil || lease == nil {
+		return nil, nil, err
 	}
-	return batch, leaseOwner, nil
+	return batch, lease, nil
 }
 
 // convertLogBatch prepares events outside a transaction, then verifies the batch lease and
 // commits events, prompt rollups and raw completion atomically.
-func (c *rawConverter) convertLogBatch(batch *models.OtelLogBatch, leaseOwner string) (*preparedLogBatch, error) {
+func (c *rawConverter) convertLogBatch(batch *models.OtelLogBatch, lease *batchLease) (*preparedLogBatch, error) {
 	request, decodeErr := decodeOtelLogBatchRequest(batch)
 	if decodeErr != nil {
 		return nil, &conversionError{code: errorInvalidPayload, permanent: true, err: fmt.Errorf("decode raw OTLP logs payload: %w", decodeErr)}
@@ -66,7 +66,7 @@ func (c *rawConverter) convertLogBatch(batch *models.OtelLogBatch, leaseOwner st
 	if err != nil {
 		return nil, err
 	}
-	err = c.commitInLease(&models.OtelLogBatch{}, batch.ID, leaseOwner, &prepared.preparedBatch, func(tx dal.Transaction) error {
+	err = c.commitInLease(lease, &prepared.preparedBatch, func(tx dal.Transaction) error {
 		workspaceKeys, err := c.applyEvents(tx, prepared.events)
 		if err != nil {
 			return err

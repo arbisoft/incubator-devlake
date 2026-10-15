@@ -19,6 +19,7 @@ package service
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/apache/incubator-devlake/core/dal"
@@ -48,65 +49,77 @@ func rawBatchLabel(table dal.Tabler) string {
 	return "raw batch"
 }
 
-// claimNextBatch claims only the earliest nonterminal batch of batch's table and loads it
-// into batch, a new empty metric or log batch. A later batch never overtakes a batch that
-// is waiting for retry or held by another lease, because cumulative series state and
-// session event order depend on receipt order. It returns the lease owner, or "" when
-// nothing was claimed.
-func (c *rawConverter) claimNextBatch(batch dal.Tabler) (string, errors.Error) {
-	head, err := c.claimHead(batch)
-	if err != nil || head == nil {
-		return "", err
-	}
-	if !isBatchClaimable(head.Status, head.LeaseUntil, head.NextAttemptAt, c.now().UTC()) {
-		return "", nil
-	}
-	return c.claimBatch(batch, head)
+// batchLease is one claimed raw batch: its table, row and attempt, and the lease owner
+// this worker holds it under.
+type batchLease struct {
+	// table is a new empty batch of the batch's table, used to address its row.
+	table    dal.Tabler
+	id       uint64
+	attempts int
+	owner    string
 }
 
-// claimHead finds the earliest nonterminal batch across all nonterminalBatchStatuses by
-// querying once per status rather than a single WHERE status IN (...) ORDER BY received_at
-// query. MySQL cannot use a (status, received_at) claim index such as
-// idx_otel_metric_batch_claim or idx_otel_log_batch_claim to satisfy that ORDER BY once the
-// IN-list has more than one value, because a composite index only orders received_at within
-// one status value at a time. Depending on table statistics, the optimizer may instead scan
-// the plain received_at index in full, filtering by status row-by-row; once the table holds
-// a large processed history and the queue head is a contiguous recent block (for example,
-// after the converter was down for a while), that degrades to scanning every
-// already-processed row ahead of the first match, on every poll. Querying per status keeps
-// each query to a single-value index lookup, which MySQL always satisfies with the
-// composite index.
-func (c *rawConverter) claimHead(table dal.Tabler) (*rawBatchHead, errors.Error) {
-	var head *rawBatchHead
-	for _, status := range nonterminalBatchStatuses {
-		candidate := &rawBatchHead{}
-		err := c.db.First(candidate,
-			dal.From(table),
-			dal.Select("id, status, attempt_count, next_attempt_at, lease_until, received_at"),
-			dal.Where("status = ?", status),
-			dal.Orderby("received_at ASC, id ASC"),
-		)
-		if err != nil {
-			if c.db.IsErrorNotFound(err) {
-				continue
-			}
-			return nil, errors.Default.Wrap(err, fmt.Sprintf("failed to find the next Claude Code OTel %s", rawBatchLabel(table)))
-		}
-		if head == nil || candidate.ReceivedAt.Before(head.ReceivedAt) ||
-			(candidate.ReceivedAt.Equal(head.ReceivedAt) && candidate.ID < head.ID) {
-			head = candidate
-		}
+// claimNextBatch claims only the earliest nonterminal batch of batch's table and loads it
+// into batch, a new empty metric or log batch; table is another new empty batch of the same
+// table, which the lease keeps to address the row. A later batch never overtakes a batch that
+// is waiting for retry or held by another lease, because cumulative series state and
+// session event order depend on receipt order. It returns nil when nothing was claimed.
+func (c *rawConverter) claimNextBatch(batch dal.Tabler, table dal.Tabler) (*batchLease, errors.Error) {
+	head, err := c.claimHead(table)
+	if err != nil || head == nil {
+		return nil, err
 	}
-	return head, nil
+	if !isBatchClaimable(head.Status, head.LeaseUntil, head.NextAttemptAt, c.now().UTC()) {
+		return nil, nil
+	}
+	return c.claimBatch(batch, table, head)
+}
+
+// claimHeadQuery builds the derived table claimHead reads: a UNION ALL of one
+// single-status lookup per nonterminalBatchStatuses entry.
+//
+// It is not a single WHERE status IN (...) ORDER BY received_at query. MySQL cannot use a
+// (status, received_at) claim index such as idx_otel_metric_batch_claim or
+// idx_otel_log_batch_claim to satisfy that ORDER BY once the IN-list has more than one
+// value, because a composite index only orders received_at within one status value at a
+// time. The optimizer may then scan the plain received_at index in full, filtering by status
+// row by row; once the table holds a large processed history and the queue head is a recent
+// block (for example, after the converter was down for a while), that degrades to scanning
+// every processed row ahead of the first match, on every poll. Each branch of the union is a
+// single-value index lookup with LIMIT 1, which MySQL always satisfies with the composite
+// index, and the outer ORDER BY sorts at most one row per status.
+func claimHeadQuery(table dal.Tabler) (string, []interface{}) {
+	branches := make([]string, 0, len(nonterminalBatchStatuses))
+	params := make([]interface{}, 0, len(nonterminalBatchStatuses))
+	for _, status := range nonterminalBatchStatuses {
+		branches = append(branches, "(SELECT id, status, attempt_count, next_attempt_at, lease_until, received_at FROM "+
+			table.TableName()+" WHERE status = ? ORDER BY received_at ASC, id ASC LIMIT 1)")
+		params = append(params, status)
+	}
+	return "(" + strings.Join(branches, " UNION ALL ") + ") AS claim_heads", params
+}
+
+// claimHead finds the earliest nonterminal batch of table in one query, or nil when the
+// queue is empty.
+func (c *rawConverter) claimHead(table dal.Tabler) (*rawBatchHead, errors.Error) {
+	query, params := claimHeadQuery(table)
+	heads := make([]*rawBatchHead, 0, 1)
+	if err := c.db.All(&heads, dal.From(query, params...), dal.Orderby("received_at ASC, id ASC"), dal.Limit(1)); err != nil {
+		return nil, errors.Default.Wrap(err, fmt.Sprintf("failed to find the next Claude Code OTel %s", rawBatchLabel(table)))
+	}
+	if len(heads) == 0 {
+		return nil, nil
+	}
+	return heads[0], nil
 }
 
 // claimBatch leases head unless another worker changed it first, then loads the claimed
-// row into batch. It returns the lease owner, or "" when the claim was lost.
-func (c *rawConverter) claimBatch(batch dal.Tabler, head *rawBatchHead) (string, errors.Error) {
-	label := rawBatchLabel(batch)
+// row into batch. It returns nil when the claim was lost.
+func (c *rawConverter) claimBatch(batch dal.Tabler, table dal.Tabler, head *rawBatchHead) (*batchLease, errors.Error) {
+	label := rawBatchLabel(table)
 	leaseOwner := uuid.NewString()
 	if err := c.db.UpdateColumns(
-		batch,
+		table,
 		[]dal.DalSet{
 			{ColumnName: "status", Value: models.OtelBatchStatusProcessing},
 			{ColumnName: "lease_owner", Value: leaseOwner},
@@ -116,15 +129,15 @@ func (c *rawConverter) claimBatch(batch dal.Tabler, head *rawBatchHead) (string,
 		},
 		dal.Where("id = ? AND status = ? AND attempt_count = ?", head.ID, head.Status, head.AttemptCount),
 	); err != nil {
-		return "", errors.Default.Wrap(err, fmt.Sprintf("failed to claim Claude Code OTel %s", label))
+		return nil, errors.Default.Wrap(err, fmt.Sprintf("failed to claim Claude Code OTel %s", label))
 	}
 	if err := c.db.First(batch, dal.Where("id = ? AND lease_owner = ?", head.ID, leaseOwner)); err != nil {
 		if c.db.IsErrorNotFound(err) {
-			return "", nil
+			return nil, nil
 		}
-		return "", errors.Default.Wrap(err, fmt.Sprintf("failed to load claimed Claude Code OTel %s", label))
+		return nil, errors.Default.Wrap(err, fmt.Sprintf("failed to load claimed Claude Code OTel %s", label))
 	}
-	return leaseOwner, nil
+	return &batchLease{table: table, id: head.ID, attempts: head.AttemptCount + 1, owner: leaseOwner}, nil
 }
 
 // isBatchClaimable applies to metric and log batches, which share the status lifecycle.
@@ -140,14 +153,14 @@ func isBatchClaimable(status string, leaseUntil, nextAttemptAt *time.Time, now t
 }
 
 // commitInLease verifies the batch lease under lock, runs apply and marks the batch
-// processed in one transaction. table is a new empty batch of the batch's table; diag
-// carries the skip diagnostics recorded on the processed batch.
-func (c *rawConverter) commitInLease(table dal.Tabler, id uint64, leaseOwner string, diag *preparedBatch, apply func(dal.Transaction) error) error {
-	label := rawBatchLabel(table)
+// processed in one transaction. diag carries the skip diagnostics recorded on the
+// processed batch.
+func (c *rawConverter) commitInLease(lease *batchLease, diag *preparedBatch, apply func(dal.Transaction) error) error {
+	label := rawBatchLabel(lease.table)
 	tx := c.db.Begin()
-	if err := tx.First(table,
+	if err := tx.First(lease.table,
 		dal.Select("id"),
-		dal.Where("id = ? AND status = ? AND lease_owner = ? AND lease_until > ?", id, models.OtelBatchStatusProcessing, leaseOwner, c.now().UTC()),
+		dal.Where("id = ? AND status = ? AND lease_owner = ? AND lease_until > ?", lease.id, models.OtelBatchStatusProcessing, lease.owner, c.now().UTC()),
 		dal.Lock(true, false),
 	); err != nil {
 		c.rollback(tx)
@@ -158,7 +171,7 @@ func (c *rawConverter) commitInLease(table dal.Tabler, id uint64, leaseOwner str
 		return err
 	}
 	if err := tx.UpdateColumns(
-		table,
+		lease.table,
 		[]dal.DalSet{
 			{ColumnName: "status", Value: models.OtelBatchStatusProcessed},
 			{ColumnName: "lease_owner", Value: nil},
@@ -167,7 +180,7 @@ func (c *rawConverter) commitInLease(table dal.Tabler, id uint64, leaseOwner str
 			{ColumnName: "processing_error_message", Value: diag.diagnostic()},
 			{ColumnName: "processed_at", Value: c.now().UTC()},
 		},
-		dal.Where("id = ? AND status = ? AND lease_owner = ?", id, models.OtelBatchStatusProcessing, leaseOwner),
+		dal.Where("id = ? AND status = ? AND lease_owner = ?", lease.id, models.OtelBatchStatusProcessing, lease.owner),
 	); err != nil {
 		c.rollback(tx)
 		return classifyStorageError(fmt.Errorf("mark %s processed: %w", label, err))
@@ -178,43 +191,57 @@ func (c *rawConverter) commitInLease(table dal.Tabler, id uint64, leaseOwner str
 	return nil
 }
 
-// recordBatchFailure releases the batch lease with a classified retry or quarantine state.
-// A failure to persist that state is returned; lease expiry keeps the batch reclaimable.
-func (c *rawConverter) recordBatchFailure(table dal.Tabler, id uint64, attempts int, leaseOwner string, conversionErr error) errors.Error {
-	label := rawBatchLabel(table)
+// batchFailure is the state a failed batch moves to. A permanent failure quarantines the
+// batch; any other failure schedules a retry, until converterMaxAttempts makes it permanent.
+type batchFailure struct {
+	code      conversionErrorCode
+	permanent bool
+	message   string
+}
+
+func newBatchFailure(conversionErr error, attempts int) batchFailure {
 	code, permanent, message := classifyConversionError(conversionErr)
-	now := c.now().UTC()
-	if code == errorLeaseLost {
-		c.logWarn(conversionErr, fmt.Sprintf("Claude Code OTel %s %d lease was lost", label, id))
-		return nil
-	}
 	if !permanent && attempts >= converterMaxAttempts {
-		message = fmt.Sprintf("%s after %d attempts: %s", code, attempts, message)
-		code, permanent = errorRetryExhausted, true
+		return batchFailure{code: errorRetryExhausted, permanent: true, message: fmt.Sprintf("%s after %d attempts: %s", code, attempts, message)}
 	}
+	return batchFailure{code: code, permanent: permanent, message: message}
+}
+
+// columns are the batch columns that record the failure and release the lease.
+func (f batchFailure) columns(now time.Time, attempts int) []dal.DalSet {
 	sets := []dal.DalSet{
 		{ColumnName: "lease_owner", Value: nil},
 		{ColumnName: "lease_until", Value: nil},
-		{ColumnName: "processing_error_code", Value: string(code)},
-		{ColumnName: "processing_error_message", Value: message},
+		{ColumnName: "processing_error_code", Value: string(f.code)},
+		{ColumnName: "processing_error_message", Value: f.message},
 	}
-	if permanent {
-		sets = append(sets,
+	if f.permanent {
+		return append(sets,
 			dal.DalSet{ColumnName: "status", Value: models.OtelBatchStatusPermanentError},
 			dal.DalSet{ColumnName: "processed_at", Value: now},
 		)
-	} else {
-		sets = append(sets,
-			dal.DalSet{ColumnName: "status", Value: models.OtelBatchStatusRetryableError},
-			dal.DalSet{ColumnName: "next_attempt_at", Value: now.Add(converterBackoff(attempts))},
-		)
 	}
-	if err := c.db.UpdateColumns(table, sets,
-		dal.Where("id = ? AND status = ? AND lease_owner = ?", id, models.OtelBatchStatusProcessing, leaseOwner),
+	return append(sets,
+		dal.DalSet{ColumnName: "status", Value: models.OtelBatchStatusRetryableError},
+		dal.DalSet{ColumnName: "next_attempt_at", Value: now.Add(converterBackoff(attempts))},
+	)
+}
+
+// recordBatchFailure releases the batch lease with a classified retry or quarantine state.
+// A failure to persist that state is returned; lease expiry keeps the batch reclaimable.
+func (c *rawConverter) recordBatchFailure(lease *batchLease, conversionErr error) errors.Error {
+	label := rawBatchLabel(lease.table)
+	failure := newBatchFailure(conversionErr, lease.attempts)
+	if failure.code == errorLeaseLost {
+		c.logWarn(conversionErr, fmt.Sprintf("Claude Code OTel %s %d lease was lost", label, lease.id))
+		return nil
+	}
+	if err := c.db.UpdateColumns(lease.table, failure.columns(c.now().UTC(), lease.attempts),
+		dal.Where("id = ? AND status = ? AND lease_owner = ?", lease.id, models.OtelBatchStatusProcessing, lease.owner),
 	); err != nil {
-		return errors.Default.Wrap(err, fmt.Sprintf("failed to record Claude Code OTel %s %d failure", label, id))
+		return errors.Default.Wrap(err, fmt.Sprintf("failed to record Claude Code OTel %s %d failure", label, lease.id))
 	}
-	c.logWarn(nil, fmt.Sprintf("Claude Code OTel %s %d conversion failed: code=%s permanent=%t attempt=%d", label, id, code, permanent, attempts))
+	c.logWarn(nil, fmt.Sprintf("Claude Code OTel %s %d conversion failed: code=%s permanent=%t attempt=%d", label, lease.id, failure.code, failure.permanent, lease.attempts))
 	return nil
 }
 

@@ -20,6 +20,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -56,30 +57,57 @@ func otelEventWith(name, promptID string, at time.Time, sequence int64, attribut
 	return &models.OtelEvent{EventName: name, SessionId: "sess-1", PromptId: promptID, EventTimestamp: at, EventSequence: &sequence, Attributes: encoded}
 }
 
+// storedPrompt is an ai_prompts row an earlier batch wrote for session sess-1.
+func storedPrompt(promptID string, startedAt time.Time, mode string, inferred bool) *ai.AiPrompt {
+	return &ai.AiPrompt{
+		DomainEntity:           domainlayer.DomainEntity{Id: "prompt-" + promptID},
+		PromptId:               promptID,
+		StartedAt:              startedAt,
+		PermissionMode:         mode,
+		PermissionModeInferred: inferred,
+	}
+}
+
 // A mode change in a later batch reveals the mode of prompts an earlier batch stored, so
 // their stored mode must be re-derived even though this batch did not touch them.
 func TestRollupSessionRederivesEarlierPromptModesOnLaterModeChange(t *testing.T) {
 	at := func(minute int) time.Time { return time.Date(2026, 10, 14, 10, minute, 0, 0, time.UTC) }
+	// The session switches from plan to acceptEdits at minute 5, sequence 50.
+	modeChange := otelEventWith(eventPermissionModeChanged, "", at(5), 50, map[string]string{"from_mode": "plan", "to_mode": "acceptEdits"})
+	// prompts is the session's stored prompts and the mode each must end with. A prompt
+	// already stored with its right mode is not updated.
+	prompts := []struct {
+		id, storedMode, wantMode string
+		minute                   int
+		storedInferred           bool
+	}{
+		// Before the change, the prompt ran in its from_mode.
+		{id: "p1", minute: 1, storedMode: ai.PermissionModeDefault, storedInferred: true, wantMode: "plan"},
+		{id: "p2", minute: 6, storedMode: ai.PermissionModeDefault, storedInferred: true, wantMode: "acceptEdits"},
+		{id: "p3", minute: 7, storedMode: "acceptEdits", wantMode: "acceptEdits"},
+	}
+	promptEvents := make([]*models.OtelEvent, 0, len(prompts))
+	stored := make([]*ai.AiPrompt, 0, len(prompts))
+	wantUpdates := make(map[string]map[string]interface{})
+	for _, prompt := range prompts {
+		promptEvents = append(promptEvents, otelEventWith(eventUserPrompt, prompt.id, at(prompt.minute), int64(prompt.minute*10), nil))
+		row := storedPrompt(prompt.id, at(prompt.minute), prompt.storedMode, prompt.storedInferred)
+		stored = append(stored, row)
+		if prompt.storedMode != prompt.wantMode || prompt.storedInferred {
+			wantUpdates[row.Id] = map[string]interface{}{"permission_mode": prompt.wantMode, "permission_mode_inferred": false}
+		}
+	}
+
 	tx := dalmocks.NewTransaction(t)
 	tx.EXPECT().All(mock.Anything, mock.Anything, mock.Anything).Run(func(result interface{}, clauses ...dal.Clause) {
 		where := whereExpr(clauses, 1)
 		switch {
 		case strings.Contains(where, "command_name = ?"):
-			*result.(*[]*models.OtelEvent) = []*models.OtelEvent{
-				otelEventWith(eventPermissionModeChanged, "", at(5), 50, map[string]string{"from_mode": "plan", "to_mode": "acceptEdits"}),
-			}
+			*result.(*[]*models.OtelEvent) = []*models.OtelEvent{modeChange}
 		case strings.Contains(where, "event_name = ?"):
-			*result.(*[]*models.OtelEvent) = []*models.OtelEvent{
-				otelEventWith(eventUserPrompt, "p1", at(1), 10, nil),
-				otelEventWith(eventUserPrompt, "p2", at(6), 60, nil),
-				otelEventWith(eventUserPrompt, "p3", at(7), 70, nil),
-			}
+			*result.(*[]*models.OtelEvent) = promptEvents
 		case strings.Contains(where, "source_connection_id = ?"):
-			*result.(*[]*ai.AiPrompt) = []*ai.AiPrompt{
-				{DomainEntity: domainlayer.DomainEntity{Id: "prompt-1"}, PromptId: "p1", StartedAt: at(1), PermissionMode: ai.PermissionModeDefault, PermissionModeInferred: true},
-				{DomainEntity: domainlayer.DomainEntity{Id: "prompt-2"}, PromptId: "p2", StartedAt: at(6), PermissionMode: ai.PermissionModeDefault, PermissionModeInferred: true},
-				{DomainEntity: domainlayer.DomainEntity{Id: "prompt-3"}, PromptId: "p3", StartedAt: at(7), PermissionMode: "acceptEdits"},
-			}
+			*result.(*[]*ai.AiPrompt) = stored
 		default:
 			t.Fatalf("unexpected load %q", where)
 		}
@@ -94,20 +122,8 @@ func TestRollupSessionRederivesEarlierPromptModesOnLaterModeChange(t *testing.T)
 	if err := rollupSession(tx, testOrganizationID, target); err != nil {
 		t.Fatalf("rollupSession() error = %v", err)
 	}
-	want := map[string]map[string]interface{}{
-		// Before the change, the prompt ran in its from_mode.
-		"prompt-1": {"permission_mode": "plan", "permission_mode_inferred": false},
-		"prompt-2": {"permission_mode": "acceptEdits", "permission_mode_inferred": false},
-	}
-	if len(updated) != len(want) {
-		t.Fatalf("updated prompts = %v, want %v", updated, want)
-	}
-	for id, columns := range want {
-		for column, value := range columns {
-			if updated[id][column] != value {
-				t.Fatalf("%s %s = %v, want %v", id, column, updated[id][column], value)
-			}
-		}
+	if !reflect.DeepEqual(updated, wantUpdates) {
+		t.Fatalf("updated prompts = %v, want %v", updated, wantUpdates)
 	}
 }
 
@@ -238,7 +254,7 @@ func TestRecordLogBatchFailureStates(t *testing.T) {
 			converter := newRawConverter(database, nil)
 			converter.now = func() time.Time { return now }
 
-			if err := converter.recordBatchFailure(&models.OtelLogBatch{}, 3, test.attempts, "worker", test.err); err != nil {
+			if err := converter.recordBatchFailure(&batchLease{table: &models.OtelLogBatch{}, id: 3, attempts: test.attempts, owner: "worker"}, test.err); err != nil {
 				t.Fatalf("recordBatchFailure() error = %v", err)
 			}
 			if columns["status"] != test.status || columns["processing_error_code"] != string(test.code) || columns["lease_owner"] != nil {
@@ -255,7 +271,7 @@ func TestRecordLogBatchFailureStates(t *testing.T) {
 
 func TestRecordLogBatchFailureLeavesLostLeaseAlone(t *testing.T) {
 	converter := newRawConverter(dalmocks.NewDal(t), nil)
-	if err := converter.recordBatchFailure(&models.OtelLogBatch{}, 3, 1, "worker", &conversionError{code: errorLeaseLost, err: fmt.Errorf("lease taken")}); err != nil {
+	if err := converter.recordBatchFailure(&batchLease{table: &models.OtelLogBatch{}, id: 3, attempts: 1, owner: "worker"}, &conversionError{code: errorLeaseLost, err: fmt.Errorf("lease taken")}); err != nil {
 		t.Fatalf("recordBatchFailure() error = %v", err)
 	}
 }
@@ -264,9 +280,7 @@ func TestClaimNextLogBatchWaitsBehindRetryDelayedHead(t *testing.T) {
 	now := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
 	nextAttemptAt := now.Add(time.Minute)
 	database := dalmocks.NewDal(t)
-	database.EXPECT().First(mock.AnythingOfType("*service.rawBatchHead"), mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(head interface{}, _ ...dal.Clause) {
-		*head.(*rawBatchHead) = rawBatchHead{ID: 4, ReceivedAt: now.Add(-time.Hour), Status: models.OtelBatchStatusRetryableError, NextAttemptAt: &nextAttemptAt}
-	}).Return(nil)
+	expectClaimHead(database, &rawBatchHead{ID: 4, ReceivedAt: now.Add(-time.Hour), Status: models.OtelBatchStatusRetryableError, NextAttemptAt: &nextAttemptAt})
 	converter := newRawConverter(database, nil)
 	converter.now = func() time.Time { return now }
 
@@ -278,19 +292,8 @@ func TestClaimNextLogBatchWaitsBehindRetryDelayedHead(t *testing.T) {
 
 func TestClaimNextLogBatchClaimsEarliestPendingBatch(t *testing.T) {
 	now := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
-	notFound := errors.NotFound.New("no batch")
 	database := dalmocks.NewDal(t)
-	database.EXPECT().First(mock.AnythingOfType("*service.rawBatchHead"), mock.Anything, mock.Anything, mock.Anything, mock.Anything).RunAndReturn(func(head interface{}, clauses ...dal.Clause) errors.Error {
-		if _, fromLogBatches := clauses[0].Data.(*models.OtelLogBatch); !fromLogBatches {
-			t.Fatalf("claim head query reads from %T, want the log batch table", clauses[0].Data)
-		}
-		if whereParams(clauses, 2)[0] != models.OtelBatchStatusPending {
-			return notFound
-		}
-		*head.(*rawBatchHead) = rawBatchHead{ID: 5, ReceivedAt: now.Add(-time.Minute), Status: models.OtelBatchStatusPending, AttemptCount: 2}
-		return nil
-	}).Times(len(nonterminalBatchStatuses))
-	database.EXPECT().IsErrorNotFound(notFound).Return(true)
+	expectClaimHead(database, &rawBatchHead{ID: 5, ReceivedAt: now.Add(-time.Minute), Status: models.OtelBatchStatusPending, AttemptCount: 2}).Once()
 	var claim map[string]interface{}
 	database.EXPECT().UpdateColumns(mock.AnythingOfType("*models.OtelLogBatch"), mock.Anything, mock.Anything).Run(func(_ interface{}, sets []dal.DalSet, _ ...dal.Clause) {
 		claim = columnSets(sets)
@@ -301,12 +304,12 @@ func TestClaimNextLogBatchClaimsEarliestPendingBatch(t *testing.T) {
 	converter := newRawConverter(database, nil)
 	converter.now = func() time.Time { return now }
 
-	batch, leaseOwner, err := converter.claimNextLogBatch()
-	if err != nil || batch == nil || batch.ID != 5 || leaseOwner == "" {
-		t.Fatalf("claimNextLogBatch() = %#v, %q, %v; want batch 5 with a lease owner", batch, leaseOwner, err)
+	batch, lease, err := converter.claimNextLogBatch()
+	if err != nil || batch == nil || batch.ID != 5 || lease == nil || lease.owner == "" || lease.id != 5 || lease.attempts != 3 {
+		t.Fatalf("claimNextLogBatch() = %#v, %#v, %v; want batch 5 leased for attempt 3", batch, lease, err)
 	}
-	if claim["status"] != models.OtelBatchStatusProcessing || claim["attempt_count"] != 3 || claim["lease_owner"] != leaseOwner {
-		t.Fatalf("claim columns = %v, want processing, attempt 3 and lease owner %q", claim, leaseOwner)
+	if claim["status"] != models.OtelBatchStatusProcessing || claim["attempt_count"] != 3 || claim["lease_owner"] != lease.owner {
+		t.Fatalf("claim columns = %v, want processing, attempt 3 and lease owner %q", claim, lease.owner)
 	}
 }
 
@@ -345,12 +348,12 @@ func TestConvertLogBatchMarksProcessedWithRecordSkips(t *testing.T) {
 	}).Return(nil).Once()
 	tx.EXPECT().Commit().Return(nil).Once()
 
-	prepared, err := newRawConverter(database, nil).convertLogBatch(newSkippedRecordsLogBatch(t), "worker")
+	prepared, err := newRawConverter(database, nil).convertLogBatch(newSkippedRecordsLogBatch(t), &batchLease{table: &models.OtelLogBatch{}, id: 8, attempts: 1, owner: "worker"})
 	if err != nil {
 		t.Fatalf("convertLogBatch() error = %v", err)
 	}
-	if len(prepared.events) != 0 || prepared.skippedRecordCount != 13 {
-		t.Fatalf("convertLogBatch() events=%d skipped records=%d, want 0 and 13", len(prepared.events), prepared.skippedRecordCount)
+	if len(prepared.events) != 0 || prepared.skipped[skippedLogRecord] != 13 {
+		t.Fatalf("convertLogBatch() events=%d skipped records=%d, want 0 and 13", len(prepared.events), prepared.skipped[skippedLogRecord])
 	}
 	code, _ := columns["processing_error_code"].(*string)
 	message, _ := columns["processing_error_message"].(*string)
@@ -367,7 +370,7 @@ func TestConvertLogBatchReportsLostLease(t *testing.T) {
 	tx.EXPECT().First(mock.AnythingOfType("*models.OtelLogBatch"), mock.Anything, mock.Anything, mock.Anything).Return(errors.NotFound.New("lease taken")).Once()
 	tx.EXPECT().Rollback().Return(nil).Once()
 
-	_, err := newRawConverter(database, nil).convertLogBatch(newSkippedRecordsLogBatch(t), "worker")
+	_, err := newRawConverter(database, nil).convertLogBatch(newSkippedRecordsLogBatch(t), &batchLease{table: &models.OtelLogBatch{}, id: 8, attempts: 1, owner: "worker"})
 	if code, _, _ := classifyConversionError(err); code != errorLeaseLost {
 		t.Fatalf("convertLogBatch() error = %v, want %s", err, errorLeaseLost)
 	}

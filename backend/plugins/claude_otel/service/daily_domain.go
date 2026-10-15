@@ -183,7 +183,7 @@ func writeCanonicalActivity(tx dal.Transaction, target dailyTarget, accountID, e
 		updatedAt = latestTime(updatedAt, row.LastObservedAt)
 	}
 	activity := &ai.AiActivity{
-		DomainEntity:  domainlayer.NewDomainEntity(ai.CanonicalActivityID(aiProviderClaude, target.workspaceKey, target.userKey, target.date, aiActivityTypeCodeEdit, aiInterfaceTypeCLI)),
+		DomainEntity:  domainlayer.NewDomainEntity(ai.CanonicalKey{Kind: ai.IDKindActivity, Provider: aiProviderClaude, WorkspaceKey: target.workspaceKey, Grain: []string{target.userKey, ai.DayGrain(target.date), aiActivityTypeCodeEdit, aiInterfaceTypeCLI}}.ID()),
 		Provider:      aiProviderClaude,
 		AccountId:     accountID,
 		UserEmail:     email,
@@ -212,7 +212,7 @@ func writeCanonicalModelUsage(tx dal.Transaction, target dailyTarget, accountID,
 		usage := totals[row.Model]
 		if usage == nil {
 			usage = &ai.AiModelUsage{
-				DomainEntity: domainlayer.NewDomainEntity(ai.CanonicalModelUsageID(aiProviderClaude, target.workspaceKey, target.userKey, target.date, row.Model)),
+				DomainEntity: domainlayer.NewDomainEntity(ai.CanonicalKey{Kind: ai.IDKindModelUsage, Provider: aiProviderClaude, WorkspaceKey: target.workspaceKey, Grain: []string{target.userKey, ai.DayGrain(target.date), row.Model}}.ID()),
 				Provider:     aiProviderClaude, WorkspaceKey: target.workspaceKey, AccountId: accountID, UserKey: target.userKey, UserAccountId: target.userAccountID, UserEmail: email, Date: target.date, Model: row.Model,
 				EstimatedCostUsd: "0.00000000", SourceType: aiSourceOtel,
 			}
@@ -247,7 +247,7 @@ func writeCanonicalToolDecisions(tx dal.Transaction, target dailyTarget, account
 		decision := totals[row.ToolName]
 		if decision == nil {
 			decision = &ai.AiToolDecision{
-				DomainEntity: domainlayer.NewDomainEntity(ai.CanonicalToolDecisionID(aiProviderClaude, target.workspaceKey, target.userKey, target.date, row.ToolName)),
+				DomainEntity: domainlayer.NewDomainEntity(ai.CanonicalKey{Kind: ai.IDKindToolDecision, Provider: aiProviderClaude, WorkspaceKey: target.workspaceKey, Grain: []string{target.userKey, ai.DayGrain(target.date), row.ToolName}}.ID()),
 				Provider:     aiProviderClaude, WorkspaceKey: target.workspaceKey, AccountId: accountID, UserKey: target.userKey, UserAccountId: target.userAccountID, UserEmail: email, Date: target.date, ToolName: row.ToolName, SourceType: aiSourceOtel,
 			}
 			totals[row.ToolName] = decision

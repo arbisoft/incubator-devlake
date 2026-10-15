@@ -106,33 +106,60 @@ type sessionModes struct {
 	changes []modeChange
 }
 
-// isModeChangeEvent reports whether an event switches the session's permission mode.
-// Claude Code reports Shift+Tab and plan-mode exits as permission_mode_changed, but
-// entering plan mode with /plan only as the user_prompt of that command.
-func isModeChangeEvent(event *models.OtelEvent) bool {
-	if event.EventName == eventPermissionModeChanged {
-		return true
+// modeChangeSource reads a permission mode change from one kind of event that switches
+// the session's mode.
+type modeChangeSource struct {
+	matches func(event *models.OtelEvent) bool
+	read    func(attributes map[string]interface{}) (fromMode, toMode, trigger string)
+}
+
+// modeChangeSources are the events that switch a session's permission mode. Claude Code
+// reports Shift+Tab and plan-mode exits as permission_mode_changed, but entering plan mode
+// with /plan only as the user_prompt of that command.
+var modeChangeSources = []modeChangeSource{
+	{
+		matches: func(event *models.OtelEvent) bool { return event.EventName == eventPermissionModeChanged },
+		read: func(attributes map[string]interface{}) (string, string, string) {
+			return truncate(eventString(attributes, "from_mode"), maxAiLabelLength),
+				truncate(eventString(attributes, "to_mode"), maxAiLabelLength),
+				truncate(eventString(attributes, "trigger"), maxAiLabelLength)
+		},
+	},
+	{
+		matches: func(event *models.OtelEvent) bool {
+			return event.EventName == eventUserPrompt && event.CommandName == planCommand
+		},
+		// The mode before /plan is unknown; prompts before it fall back to the default.
+		read: func(map[string]interface{}) (string, string, string) {
+			return "", ai.PermissionModePlan, "plan_command"
+		},
+	},
+}
+
+// modeChangeSourceOf returns the source that reads event as a mode change, or nil when
+// event does not switch the mode.
+func modeChangeSourceOf(event *models.OtelEvent) *modeChangeSource {
+	for i := range modeChangeSources {
+		if modeChangeSources[i].matches(event) {
+			return &modeChangeSources[i]
+		}
 	}
-	return event.EventName == eventUserPrompt && event.CommandName == planCommand
+	return nil
+}
+
+func isModeChangeEvent(event *models.OtelEvent) bool {
+	return modeChangeSourceOf(event) != nil
 }
 
 func newSessionModes(events []*models.OtelEvent) sessionModes {
 	changes := make([]modeChange, 0)
 	for _, event := range events {
-		if !isModeChangeEvent(event) {
+		source := modeChangeSourceOf(event)
+		if source == nil {
 			continue
 		}
-		attributes := eventAttributes(event)
 		change := modeChange{at: event.EventTimestamp, sequence: int64Value(event.EventSequence)}
-		if event.EventName == eventPermissionModeChanged {
-			change.fromMode = truncate(eventString(attributes, "from_mode"), maxAiLabelLength)
-			change.toMode = truncate(eventString(attributes, "to_mode"), maxAiLabelLength)
-			change.trigger = truncate(eventString(attributes, "trigger"), maxAiLabelLength)
-		} else {
-			// The mode before /plan is unknown; prompts before it fall back to the default.
-			change.toMode = ai.PermissionModePlan
-			change.trigger = "plan_command"
-		}
+		change.fromMode, change.toMode, change.trigger = source.read(eventAttributes(event))
 		changes = append(changes, change)
 	}
 	sort.SliceStable(changes, func(i, j int) bool {
@@ -188,7 +215,7 @@ func buildPromptRollup(workspaceKey, promptID string, events []*models.OtelEvent
 	})
 	builder := &promptBuilder{
 		prompt: &ai.AiPrompt{
-			DomainEntity:     domainlayer.NewDomainEntity(ai.PromptID(aiProviderClaude, workspaceKey, promptID)),
+			DomainEntity:     domainlayer.NewDomainEntity(ai.CanonicalKey{Kind: ai.IDKindPrompt, Provider: aiProviderClaude, WorkspaceKey: workspaceKey, Grain: []string{promptID}}.ID()),
 			Provider:         aiProviderClaude,
 			WorkspaceKey:     workspaceKey,
 			PromptId:         promptID,
@@ -328,7 +355,7 @@ func (c *skillCollector) add(name, detectedVia, trigger, source, plugin string, 
 	skill := c.skills[name]
 	if skill == nil {
 		skill = &ai.AiPromptSkill{
-			DomainEntity: domainlayer.NewDomainEntity(ai.PromptSkillID(aiProviderClaude, c.workspaceKey, c.promptID, name)),
+			DomainEntity: domainlayer.NewDomainEntity(ai.CanonicalKey{Kind: ai.IDKindPromptSkill, Provider: aiProviderClaude, WorkspaceKey: c.workspaceKey, Grain: []string{c.promptID, name}}.ID()),
 			Provider:     aiProviderClaude,
 			WorkspaceKey: c.workspaceKey,
 			PromptId:     c.promptID,
@@ -474,7 +501,10 @@ func writeModeChanges(tx dal.Transaction, workspaceKey string, target *sessionTa
 	}
 	for _, change := range modes.changes {
 		row := &ai.AiPermissionModeChange{
-			DomainEntity: domainlayer.NewDomainEntity(ai.PermissionModeChangeID(aiProviderClaude, workspaceKey, target.sessionID, change.at, change.fromMode, change.toMode)),
+			DomainEntity: domainlayer.NewDomainEntity(ai.CanonicalKey{
+				Kind: ai.IDKindPermissionModeChange, Provider: aiProviderClaude, WorkspaceKey: workspaceKey,
+				Grain: []string{target.sessionID, ai.TimeGrain(change.at), change.fromMode, change.toMode},
+			}.ID()),
 			Provider:     aiProviderClaude,
 			WorkspaceKey: workspaceKey,
 			UserKey:      target.userKey,

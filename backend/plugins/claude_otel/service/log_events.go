@@ -91,28 +91,17 @@ func (c *rawConverter) prepareEvents(request *collectorlogs.ExportLogsServiceReq
 // is skipped on its own.
 func (p *batchPreparer) prepareLogResource(resourceLogs *logsv1.ResourceLogs, resourceBindings map[uint64]string, batchID uint64) ([]preparedEvent, error) {
 	resourceAttrs := resourceLogs.GetResource().GetAttributes()
-	if hasAttribute(resourceAttrs, devlakeTeamAttribute) || hasAttribute(resourceAttrs, devlakeProjectAttribute) {
-		return nil, permanentConversionError(errorInvalidAttribution, "OTLP logs resource must not include DevLake attribution")
+	records := resourceLogRecords(resourceLogs)
+	team, err := validateAttribution(logsSignal, resourceAttrs, records)
+	if err != nil {
+		return nil, err
 	}
 	events := make([]preparedEvent, 0)
-	teamSlug := ""
-	for _, record := range resourceLogRecords(resourceLogs) {
-		recordAttrs := record.GetAttributes()
-		if hasAttribute(recordAttrs, devlakeProjectAttribute) {
-			return nil, permanentConversionError(errorInvalidAttribution, "OTLP log record must not include devlake_project attribution")
-		}
-		team := attributeString(recordAttrs, devlakeTeamAttribute)
-		if team == "" {
-			return nil, permanentConversionError(errorMissingTeam, "OTLP log record is missing trusted devlake_team attribution")
-		}
-		if teamSlug != "" && team != teamSlug {
-			return nil, permanentConversionError(errorInvalidAttribution, "OTLP logs resource has inconsistent trusted devlake_team attribution")
-		}
-		teamSlug = team
+	for _, record := range records {
 		event, connection, err := p.prepareLogRecord(team, resourceAttrs, record, resourceBindings)
 		if err != nil {
 			if conversionErr, skip := conversionErrorIn(err, logRecordErrorCodes); skip {
-				p.recordRecordSkip(conversionErr)
+				p.recordSkip(skippedLogRecord, conversionErr)
 				continue
 			}
 			return nil, err
@@ -272,12 +261,8 @@ func logRecordTime(record *logsv1.LogRecord) (time.Time, error) {
 // stored parsed so it can be queried.
 func mergedAttributeMap(resourceAttrs, recordAttrs []*commonv1.KeyValue) map[string]interface{} {
 	values := make(map[string]interface{}, len(resourceAttrs)+len(recordAttrs))
-	for _, attribute := range resourceAttrs {
-		values[attribute.GetKey()] = anyValue(attribute.GetValue())
-	}
-	for _, attribute := range recordAttrs {
-		values[attribute.GetKey()] = anyValue(attribute.GetValue())
-	}
+	putAttributes(values, resourceAttrs)
+	putAttributes(values, recordAttrs)
 	if raw, ok := values["tool_parameters"].(string); ok {
 		var parsed interface{}
 		if json.Unmarshal([]byte(raw), &parsed) == nil {
@@ -287,6 +272,15 @@ func mergedAttributeMap(resourceAttrs, recordAttrs []*commonv1.KeyValue) map[str
 	return values
 }
 
+// putAttributes adds attributes to values as JSON-ready values, replacing existing keys.
+func putAttributes(values map[string]interface{}, attributes []*commonv1.KeyValue) {
+	for _, attribute := range attributes {
+		values[attribute.GetKey()] = anyValue(attribute.GetValue())
+	}
+}
+
+// anyValue converts one OTLP value to its JSON form. The switch covers each case of the
+// AnyValue oneof.
 func anyValue(value *commonv1.AnyValue) interface{} {
 	switch typed := value.GetValue().(type) {
 	case *commonv1.AnyValue_StringValue:
@@ -310,9 +304,7 @@ func anyValue(value *commonv1.AnyValue) interface{} {
 		return items
 	case *commonv1.AnyValue_KvlistValue:
 		values := make(map[string]interface{}, len(typed.KvlistValue.GetValues()))
-		for _, item := range typed.KvlistValue.GetValues() {
-			values[item.GetKey()] = anyValue(item.GetValue())
-		}
+		putAttributes(values, typed.KvlistValue.GetValues())
 		return values
 	default:
 		return nil
@@ -329,79 +321,72 @@ func toolParameter(attributes map[string]interface{}, key string) string {
 	return strings.TrimSpace(value)
 }
 
-// attributeInt reads an integer attribute that Claude Code may send as an int, a double
-// or a numeric string.
-func attributeInt(attributes []*commonv1.KeyValue, key string) *int64 {
+// attributeValue returns the value of the first attribute named key, or nil.
+func attributeValue(attributes []*commonv1.KeyValue, key string) *commonv1.AnyValue {
 	for _, attribute := range attributes {
-		if attribute.GetKey() != key {
-			continue
+		if attribute.GetKey() == key {
+			return attribute.GetValue()
 		}
-		switch typed := attribute.GetValue().GetValue().(type) {
-		case *commonv1.AnyValue_IntValue:
-			return &typed.IntValue
-		case *commonv1.AnyValue_DoubleValue:
-			if math.IsNaN(typed.DoubleValue) || math.IsInf(typed.DoubleValue, 0) || math.Abs(typed.DoubleValue) >= math.MaxInt64 {
-				return nil
-			}
-			value := int64(typed.DoubleValue)
-			return &value
-		case *commonv1.AnyValue_StringValue:
-			if value, err := strconv.ParseFloat(strings.TrimSpace(typed.StringValue), 64); err == nil && !math.IsInf(value, 0) && math.Abs(value) < math.MaxInt64 {
-				result := int64(value)
-				return &result
-			}
-		}
-		return nil
 	}
 	return nil
 }
 
-func attributeBool(attributes []*commonv1.KeyValue, key string) *bool {
-	for _, attribute := range attributes {
-		if attribute.GetKey() != key {
-			continue
+// numberValue reads a finite number that Claude Code may send as an int, a double or a
+// numeric string.
+func numberValue(value *commonv1.AnyValue) (float64, bool) {
+	var number float64
+	switch typed := value.GetValue().(type) {
+	case *commonv1.AnyValue_IntValue:
+		number = float64(typed.IntValue)
+	case *commonv1.AnyValue_DoubleValue:
+		number = typed.DoubleValue
+	case *commonv1.AnyValue_StringValue:
+		parsed, err := strconv.ParseFloat(strings.TrimSpace(typed.StringValue), 64)
+		if err != nil {
+			return 0, false
 		}
-		switch typed := attribute.GetValue().GetValue().(type) {
-		case *commonv1.AnyValue_BoolValue:
-			return &typed.BoolValue
-		case *commonv1.AnyValue_StringValue:
-			if value, err := strconv.ParseBool(strings.TrimSpace(typed.StringValue)); err == nil {
-				return &value
-			}
-		}
+		number = parsed
+	default:
+		return 0, false
+	}
+	return number, !math.IsNaN(number) && !math.IsInf(number, 0)
+}
+
+// attributeInt reads an integer attribute. An int is kept exact; any other number is
+// truncated toward zero.
+func attributeInt(attributes []*commonv1.KeyValue, key string) *int64 {
+	value := attributeValue(attributes, key)
+	if typed, isInt := value.GetValue().(*commonv1.AnyValue_IntValue); isInt {
+		return &typed.IntValue
+	}
+	number, ok := numberValue(value)
+	if !ok || math.Abs(number) >= math.MaxInt64 {
 		return nil
+	}
+	result := int64(number)
+	return &result
+}
+
+func attributeBool(attributes []*commonv1.KeyValue, key string) *bool {
+	switch typed := attributeValue(attributes, key).GetValue().(type) {
+	case *commonv1.AnyValue_BoolValue:
+		return &typed.BoolValue
+	case *commonv1.AnyValue_StringValue:
+		if value, err := strconv.ParseBool(strings.TrimSpace(typed.StringValue)); err == nil {
+			return &value
+		}
 	}
 	return nil
 }
 
 // attributeDecimal reads a non-negative number as a fixed-scale decimal string.
 func attributeDecimal(attributes []*commonv1.KeyValue, key string, scale int) *string {
-	for _, attribute := range attributes {
-		if attribute.GetKey() != key {
-			continue
-		}
-		var value float64
-		switch typed := attribute.GetValue().GetValue().(type) {
-		case *commonv1.AnyValue_DoubleValue:
-			value = typed.DoubleValue
-		case *commonv1.AnyValue_IntValue:
-			value = float64(typed.IntValue)
-		case *commonv1.AnyValue_StringValue:
-			parsed, err := strconv.ParseFloat(strings.TrimSpace(typed.StringValue), 64)
-			if err != nil {
-				return nil
-			}
-			value = parsed
-		default:
-			return nil
-		}
-		if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || value >= 1e12 {
-			return nil
-		}
-		formatted := fmt.Sprintf("%.*f", scale, value)
-		return &formatted
+	number, ok := numberValue(attributeValue(attributes, key))
+	if !ok || number < 0 || number >= 1e12 {
+		return nil
 	}
-	return nil
+	formatted := fmt.Sprintf("%.*f", scale, number)
+	return &formatted
 }
 
 func int64Value(value *int64) int64 {

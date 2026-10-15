@@ -48,22 +48,34 @@ const (
 	toolDimensionLength        = 100 // tool_name and language
 )
 
+// skipKind is the unit a batch skipped for bad data. A resource group is skipped for bad
+// attribution; a log record or data point is skipped on its own.
+type skipKind int
+
+const (
+	skippedResource skipKind = iota
+	skippedLogRecord
+	skippedDataPoint
+	skipKindCount
+)
+
+// skipNouns name each skip kind in diagnostics, in skipKind order.
+var skipNouns = [skipKindCount]string{"resource group(s)", "log record(s)", "data point(s)"}
+
 // preparedBatch holds a batch's fact updates plus bounded, operator-safe diagnostics.
 type preparedBatch struct {
-	updates            []factUpdate
-	skippedCount       int
-	skippedRecordCount int
-	skippedPointCount  int
-	skipMessages       []string
-	unknownMetrics     []string
+	updates        []factUpdate
+	skipped        [skipKindCount]int
+	skipMessages   []string
+	unknownMetrics []string
 }
 
 func (p *preparedBatch) diagnosticCode() *string {
 	var code string
 	switch {
-	case p.skippedCount > 0:
+	case p.skipped[skippedResource] > 0:
 		code = string(diagnosticResourcesSkipped)
-	case p.skippedRecordCount > 0 || p.skippedPointCount > 0:
+	case p.skipped[skippedLogRecord] > 0 || p.skipped[skippedDataPoint] > 0:
 		code = string(diagnosticRecordsSkipped)
 	default:
 		return nil
@@ -72,15 +84,11 @@ func (p *preparedBatch) diagnosticCode() *string {
 }
 
 func (p *preparedBatch) diagnostic() *string {
-	parts := make([]string, 0, 2)
-	if p.skippedCount > 0 {
-		parts = append(parts, fmt.Sprintf("%d resource group(s)", p.skippedCount))
-	}
-	if p.skippedRecordCount > 0 {
-		parts = append(parts, fmt.Sprintf("%d log record(s)", p.skippedRecordCount))
-	}
-	if p.skippedPointCount > 0 {
-		parts = append(parts, fmt.Sprintf("%d data point(s)", p.skippedPointCount))
+	parts := make([]string, 0, skipKindCount)
+	for kind, count := range p.skipped {
+		if count > 0 {
+			parts = append(parts, fmt.Sprintf("%d %s", count, skipNouns[kind]))
+		}
 	}
 	if len(parts) == 0 {
 		return nil
@@ -125,7 +133,7 @@ func (p *batchPreparer) prepareResources(n int, prepare func(i int, bindings map
 		if !attribution {
 			return err
 		}
-		p.recordSkip(conversionErr)
+		p.recordSkip(skippedResource, conversionErr)
 	}
 	return nil
 }
@@ -166,24 +174,9 @@ func conversionErrorIn(err error, codes map[conversionErrorCode]struct{}) (*conv
 	return conversionErr, found
 }
 
-func (p *batchPreparer) recordSkip(err *conversionError) {
-	p.result.skippedCount++
-	p.addSkipMessage(err)
-}
-
-// recordRecordSkip notes one log record skipped for bad data.
-func (p *batchPreparer) recordRecordSkip(err *conversionError) {
-	p.result.skippedRecordCount++
-	p.addSkipMessage(err)
-}
-
-// recordPointSkip notes one metric data point skipped for bad data.
-func (p *batchPreparer) recordPointSkip(err *conversionError) {
-	p.result.skippedPointCount++
-	p.addSkipMessage(err)
-}
-
-func (p *batchPreparer) addSkipMessage(err *conversionError) {
+// recordSkip notes one unit of kind skipped for err, keeping the first few messages.
+func (p *batchPreparer) recordSkip(kind skipKind, err *conversionError) {
+	p.result.skipped[kind]++
 	if len(p.result.skipMessages) < maxResourceSkipDiagnostics {
 		p.result.skipMessages = append(p.result.skipMessages, fmt.Sprintf("%s: %s", err.code, err.Error()))
 	}
@@ -192,7 +185,7 @@ func (p *batchPreparer) addSkipMessage(err *conversionError) {
 // prepareResource converts one resource group. Any attribution failure discards the whole
 // group rather than converting part of one client's export.
 func (p *batchPreparer) prepareResource(resourceMetrics *metricsv1.ResourceMetrics, resourceBindings map[uint64]string) ([]factUpdate, error) {
-	if err := validateResourceAttribution(resourceMetrics); err != nil {
+	if _, err := validateAttribution(metricsSignal, resourceMetrics.GetResource().GetAttributes(), resourceDatapoints(resourceMetrics)); err != nil {
 		return nil, err
 	}
 	updates := make([]factUpdate, 0)
@@ -212,7 +205,7 @@ func (p *batchPreparer) prepareResource(resourceMetrics *metricsv1.ResourceMetri
 				update, err := p.prepareDatapoint(metric, mapping, sum.GetAggregationTemporality(), scopeMetrics.GetScope(), resourceAttrs, point, resourceBindings)
 				if err != nil {
 					if conversionErr, skip := conversionErrorIn(err, metricPointErrorCodes); skip {
-						p.recordPointSkip(conversionErr)
+						p.recordSkip(skippedDataPoint, conversionErr)
 						continue
 					}
 					return nil, err
@@ -301,30 +294,72 @@ func (p *batchPreparer) prepareDatapoint(
 	return update, nil
 }
 
-// validateResourceAttribution ensures a Collector resource group contains only its
-// derived team attribution. It runs during conversion so an invalid group is retained
-// for diagnosis but cannot suppress other valid groups from the same OTLP request.
-func validateResourceAttribution(resourceMetrics *metricsv1.ResourceMetrics) error {
-	resourceAttributes := resourceMetrics.GetResource().GetAttributes()
-	if hasAttribute(resourceAttributes, devlakeTeamAttribute) || hasAttribute(resourceAttributes, devlakeProjectAttribute) {
-		return permanentConversionError(errorInvalidAttribution, "OTLP metrics resource must not include DevLake attribution")
+// otlpSignal names one OTLP signal's resource and record in attribution errors.
+type otlpSignal struct {
+	resource string
+	record   string
+}
+
+var (
+	metricsSignal = otlpSignal{resource: "OTLP metrics resource", record: "OTLP metrics datapoint"}
+	logsSignal    = otlpSignal{resource: "OTLP logs resource", record: "OTLP log record"}
+)
+
+// attributed is a metric datapoint or log record, which carry the trusted attribution.
+type attributed interface {
+	GetAttributes() []*commonv1.KeyValue
+}
+
+// attributionRule is one check of a record's trusted attribution. team is the record's
+// devlake_team and groupTeam the team of the group's earlier records. message takes the
+// record's name.
+type attributionRule struct {
+	violated func(attributes []*commonv1.KeyValue, team, groupTeam string) bool
+	code     conversionErrorCode
+	message  string
+}
+
+var recordAttributionRules = []attributionRule{
+	{
+		violated: func(attributes []*commonv1.KeyValue, _, _ string) bool {
+			return hasAttribute(attributes, devlakeProjectAttribute)
+		},
+		code:    errorInvalidAttribution,
+		message: "%s must not include devlake_project attribution",
+	},
+	{
+		violated: func(_ []*commonv1.KeyValue, team, _ string) bool { return team == "" },
+		code:     errorMissingTeam,
+		message:  "%s is missing trusted devlake_team attribution",
+	},
+	{
+		violated: func(_ []*commonv1.KeyValue, team, groupTeam string) bool { return groupTeam != "" && team != groupTeam },
+		code:     errorInvalidAttribution,
+		message:  "%s has a trusted devlake_team different from the rest of its resource",
+	},
+}
+
+// validateAttribution checks that a resource group carries only the attribution the
+// Collector derived for it, and returns the group's team. The resource has no DevLake
+// attribution and every record has the same devlake_team and no devlake_project. It runs
+// during conversion so an invalid group is kept for diagnosis but cannot suppress valid
+// groups of the same OTLP request.
+func validateAttribution[R attributed](signal otlpSignal, resourceAttrs []*commonv1.KeyValue, records []R) (string, error) {
+	if hasAttribute(resourceAttrs, devlakeTeamAttribute) || hasAttribute(resourceAttrs, devlakeProjectAttribute) {
+		return "", permanentConversionError(errorInvalidAttribution, "%s must not include DevLake attribution", signal.resource)
 	}
-	teamSlug := ""
-	for _, datapoint := range resourceDatapoints(resourceMetrics) {
-		attributes := datapoint.GetAttributes()
-		if hasAttribute(attributes, devlakeProjectAttribute) {
-			return permanentConversionError(errorInvalidAttribution, "OTLP metrics datapoint must not include devlake_project attribution")
-		}
+	groupTeam := ""
+	for _, record := range records {
+		attributes := record.GetAttributes()
 		team := attributeString(attributes, devlakeTeamAttribute)
-		if team == "" {
-			return permanentConversionError(errorMissingTeam, "OTLP metrics datapoint is missing trusted devlake_team attribution")
+		for _, rule := range recordAttributionRules {
+			if rule.violated(attributes, team, groupTeam) {
+				return "", permanentConversionError(rule.code, rule.message, signal.record)
+			}
 		}
-		if teamSlug != "" && team != teamSlug {
-			return permanentConversionError(errorInvalidAttribution, "OTLP metrics resource has inconsistent trusted devlake_team attribution")
-		}
-		teamSlug = team
+		groupTeam = team
 	}
-	return nil
+	return groupTeam, nil
 }
 
 func hasAttribute(attributes []*commonv1.KeyValue, key string) bool {

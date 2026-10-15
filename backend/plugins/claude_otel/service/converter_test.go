@@ -147,7 +147,7 @@ func TestRecordPermanentFailureMarksTerminalTime(t *testing.T) {
 		},
 	).Return(nil).Once()
 
-	err := converter.recordBatchFailure(&models.OtelMetricBatch{}, 12, 1, "worker", permanentConversionError(errorInvalidPayload, "invalid payload"))
+	err := converter.recordBatchFailure(&batchLease{table: &models.OtelMetricBatch{}, id: 12, attempts: 1, owner: "worker"}, permanentConversionError(errorInvalidPayload, "invalid payload"))
 	if err != nil {
 		t.Fatalf("recordBatchFailure() error = %v", err)
 	}
@@ -187,8 +187,8 @@ func TestPrepareUpdatesSkipsOnlyResourceGroupsWithAttributionFailures(t *testing
 	if err != nil {
 		t.Fatalf("prepareUpdates() error = %v", err)
 	}
-	if len(prepared.updates) != 3 || prepared.skippedCount != 1 {
-		t.Fatalf("prepareUpdates() updates=%d skipped=%d, want 3 valid updates and 1 skipped resource", len(prepared.updates), prepared.skippedCount)
+	if len(prepared.updates) != 3 || prepared.skipped[skippedResource] != 1 {
+		t.Fatalf("prepareUpdates() updates=%d skipped=%d, want 3 valid updates and 1 skipped resource", len(prepared.updates), prepared.skipped[skippedResource])
 	}
 	for _, update := range prepared.updates {
 		if update.connection.TeamSlug != "platform" {
@@ -215,8 +215,8 @@ func TestPrepareUpdatesSkipsUntrustedProjectAttributionWithoutDroppingOtherResou
 	if err != nil {
 		t.Fatalf("prepareUpdates() error = %v", err)
 	}
-	if len(prepared.updates) != 3 || prepared.skippedCount != 1 {
-		t.Fatalf("prepareUpdates() updates=%d skipped=%d, want 3 valid updates and 1 skipped resource", len(prepared.updates), prepared.skippedCount)
+	if len(prepared.updates) != 3 || prepared.skipped[skippedResource] != 1 {
+		t.Fatalf("prepareUpdates() updates=%d skipped=%d, want 3 valid updates and 1 skipped resource", len(prepared.updates), prepared.skipped[skippedResource])
 	}
 }
 
@@ -470,8 +470,8 @@ func TestRealShapedClaudeCodeExportIsAcceptedAndConverted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("prepareUpdates() error = %v", err)
 	}
-	if len(prepared.updates) != datapointCount || prepared.skippedCount != 0 {
-		t.Fatalf("prepareUpdates() updates=%d skipped=%d, want every supported datapoint (%d)", len(prepared.updates), prepared.skippedCount, datapointCount)
+	if len(prepared.updates) != datapointCount || prepared.skipped[skippedResource] != 0 {
+		t.Fatalf("prepareUpdates() updates=%d skipped=%d, want every supported datapoint (%d)", len(prepared.updates), prepared.skipped[skippedResource], datapointCount)
 	}
 	for _, update := range prepared.updates {
 		if update.temporality != metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_DELTA || update.organizationID != testOrganizationID {
@@ -690,11 +690,7 @@ func TestClaimNextWaitsBehindRetryDelayedHeadBatch(t *testing.T) {
 	now := time.Date(2026, 9, 14, 10, 0, 0, 0, time.UTC)
 	nextAttemptAt := now.Add(time.Minute)
 	database := dalmocks.NewDal(t)
-	database.EXPECT().First(mock.AnythingOfType("*service.rawBatchHead"), mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(
-		func(head interface{}, _ ...dal.Clause) {
-			*head.(*rawBatchHead) = rawBatchHead{Status: models.OtelBatchStatusRetryableError, NextAttemptAt: &nextAttemptAt}
-		},
-	).Return(nil)
+	expectClaimHead(database, &rawBatchHead{Status: models.OtelBatchStatusRetryableError, NextAttemptAt: &nextAttemptAt})
 	converter := newRawConverter(database, nil)
 	converter.now = func() time.Time { return now }
 
@@ -704,43 +700,44 @@ func TestClaimNextWaitsBehindRetryDelayedHeadBatch(t *testing.T) {
 	}
 }
 
-// TestClaimHeadPicksEarliestAcrossStatuses guards the per-status query merge in
-// claimHead: it must still pick the single earliest row across all nonterminal
-// statuses, exactly as the old combined "status IN (...)" query did, since a later batch
-// must never overtake an earlier one regardless of which status holds it.
-func TestClaimHeadPicksEarliestAcrossStatuses(t *testing.T) {
-	pendingReceivedAt := time.Date(2026, 9, 16, 10, 0, 0, 0, time.UTC)
-	processingReceivedAt := time.Date(2026, 9, 16, 11, 0, 0, 0, time.UTC)
-	retryableReceivedAt := time.Date(2026, 9, 16, 9, 0, 0, 0, time.UTC)
-	notFound := devlakeerrors.NotFound.New("not found")
-
-	database := dalmocks.NewDal(t)
-	database.EXPECT().First(mock.AnythingOfType("*service.rawBatchHead"), mock.Anything, mock.Anything, mock.Anything, mock.Anything).RunAndReturn(
-		func(dst interface{}, clauses ...dal.Clause) devlakeerrors.Error {
-			status := clauses[2].Data.(dal.DalClause).Params[0].(string)
-			head := dst.(*rawBatchHead)
-			switch status {
-			case models.OtelBatchStatusPending:
-				*head = rawBatchHead{ID: 2, Status: status, ReceivedAt: pendingReceivedAt}
-			case models.OtelBatchStatusProcessing:
-				*head = rawBatchHead{ID: 3, Status: status, ReceivedAt: processingReceivedAt}
-			case models.OtelBatchStatusRetryableError:
-				*head = rawBatchHead{ID: 1, Status: status, ReceivedAt: retryableReceivedAt}
-			default:
-				return notFound
+// expectClaimHead answers the claim head query with head, or with no row when head is nil.
+func expectClaimHead(database *dalmocks.Dal, head *rawBatchHead) *dalmocks.Dal_All_Call {
+	return database.EXPECT().All(mock.AnythingOfType("*[]*service.rawBatchHead"), mock.Anything, mock.Anything, mock.Anything).Run(
+		func(heads interface{}, _ ...dal.Clause) {
+			if head != nil {
+				*heads.(*[]*rawBatchHead) = []*rawBatchHead{head}
 			}
-			return nil
 		},
-	)
-	database.EXPECT().IsErrorNotFound(mock.Anything).RunAndReturn(func(err error) bool { return err == notFound }).Maybe()
+	).Return(nil)
+}
 
-	converter := newRawConverter(database, nil)
-	head, err := converter.claimHead(&models.OtelMetricBatch{})
-	if err != nil {
-		t.Fatalf("claimHead() error = %v", err)
+// The claim head query must look up each nonterminal status on its own, so MySQL can use
+// the (status, received_at) claim index, and must still pick the earliest batch across
+// all of them, since a later batch must never overtake an earlier one.
+func TestClaimHeadQueryLooksUpEachStatusThenPicksEarliest(t *testing.T) {
+	database := dalmocks.NewDal(t)
+	var clauses []dal.Clause
+	database.EXPECT().All(mock.AnythingOfType("*[]*service.rawBatchHead"), mock.Anything, mock.Anything, mock.Anything).Run(
+		func(_ interface{}, query ...dal.Clause) { clauses = query },
+	).Return(nil).Once()
+
+	head, err := newRawConverter(database, nil).claimHead(&models.OtelLogBatch{})
+	if err != nil || head != nil {
+		t.Fatalf("claimHead() = %#v, %v; want no head from an empty queue", head, err)
 	}
-	if head == nil || head.ID != 1 || head.Status != models.OtelBatchStatusRetryableError {
-		t.Fatalf("claimHead() = %#v, want the retryable_error batch (id=1), the earliest received_at across all three statuses", head)
+	from := clauses[0].Data.(dal.DalClause)
+	branch := "(SELECT id, status, attempt_count, next_attempt_at, lease_until, received_at FROM " + (&models.OtelLogBatch{}).TableName() +
+		" WHERE status = ? ORDER BY received_at ASC, id ASC LIMIT 1)"
+	if strings.Count(from.Expr, branch) != len(nonterminalBatchStatuses) || strings.Count(from.Expr, " UNION ALL ") != len(nonterminalBatchStatuses)-1 {
+		t.Fatalf("claim head query = %s, want one indexed lookup per nonterminal status", from.Expr)
+	}
+	for i, status := range nonterminalBatchStatuses {
+		if from.Params[i] != status {
+			t.Fatalf("claim head params = %v, want %v", from.Params, nonterminalBatchStatuses)
+		}
+	}
+	if clauses[1].Data != "received_at ASC, id ASC" || clauses[2].Data != 1 {
+		t.Fatalf("claim head order and limit = %v, %v; want the earliest received batch", clauses[1].Data, clauses[2].Data)
 	}
 }
 
@@ -784,8 +781,8 @@ func TestPrepareUpdatesSkipsOnlyPointsWithOversizedIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("prepareUpdates() error = %v, want only the oversized point skipped", err)
 	}
-	if len(prepared.updates) != 2 || prepared.skippedPointCount != 1 || prepared.skippedCount != 0 {
-		t.Fatalf("prepareUpdates() updates=%d skipped points=%d groups=%d, want 2, 1 and 0", len(prepared.updates), prepared.skippedPointCount, prepared.skippedCount)
+	if len(prepared.updates) != 2 || prepared.skipped[skippedDataPoint] != 1 || prepared.skipped[skippedResource] != 0 {
+		t.Fatalf("prepareUpdates() updates=%d skipped points=%d groups=%d, want 2, 1 and 0", len(prepared.updates), prepared.skipped[skippedDataPoint], prepared.skipped[skippedResource])
 	}
 	for _, update := range prepared.updates {
 		if update.fact == hourlyToolUsageFact {
@@ -813,7 +810,7 @@ func TestPrepareUpdatesTruncatesDimensionsToTheirColumns(t *testing.T) {
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: observedAt.Add(-time.Hour)}}})
 
 	prepared, err := newRawConverter(database, nil).prepareUpdates(request)
-	if err != nil || len(prepared.updates) != 3 || prepared.skippedPointCount != 0 {
+	if err != nil || len(prepared.updates) != 3 || prepared.skipped[skippedDataPoint] != 0 {
 		t.Fatalf("prepareUpdates() = %v, %v; want every point converted", prepared, err)
 	}
 	for _, update := range prepared.updates {
