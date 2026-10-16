@@ -35,7 +35,7 @@ var hourlyIdentityColumns = []string{
 }
 
 // applyHourlyUpdates writes one batch's prepared facts inside the conversion transaction.
-func (c *rawMetricConverter) applyHourlyUpdates(tx dal.Transaction, updates []factUpdate) error {
+func (c *rawConverter) applyHourlyUpdates(tx dal.Transaction, updates []factUpdate) error {
 	for _, update := range updates {
 		if err := bindConnectionOrganization(tx, update.connection, update.organizationID); err != nil {
 			return err
@@ -74,7 +74,7 @@ func bindConnectionOrganization(tx dal.Transaction, connection *models.OtelConne
 		var valid bool
 		boundOrganizationID, valid = normalizeOrganizationID(*connection.OrganizationId)
 		if !valid {
-			return permanentMetricError(errorInvalidOrganization, "OTel connection %d has an invalid stored organization", connection.ID)
+			return permanentConversionError(errorInvalidOrganization, "OTel connection %d has an invalid stored organization", connection.ID)
 		}
 	}
 	if boundOrganizationID != organizationID {
@@ -91,7 +91,7 @@ type seriesSample struct {
 
 // counterDelta returns the usage contributed by one sample and advances the persisted
 // state of its cumulative counter. DELTA samples are already usage.
-func (c *rawMetricConverter) counterDelta(tx dal.Transaction, update factUpdate) (metricNumber, error) {
+func (c *rawConverter) counterDelta(tx dal.Transaction, update factUpdate) (metricNumber, error) {
 	if update.temporality == metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_DELTA {
 		return update.value, nil
 	}
@@ -104,7 +104,7 @@ func (c *rawMetricConverter) counterDelta(tx dal.Transaction, update factUpdate)
 	if loadErr == nil && state.LastNumberValue != nil {
 		lastValue, ok := new(big.Rat).SetString(*state.LastNumberValue)
 		if !ok {
-			return metricNumber{}, permanentMetricError(errorInvalidSeriesState, "metric %s has invalid cumulative state", update.metric)
+			return metricNumber{}, permanentConversionError(errorInvalidSeriesState, "metric %s has invalid cumulative state", update.metric)
 		}
 		previous = &seriesSample{timeNanos: state.LastTimeUnixNano, value: lastValue}
 	}
@@ -136,7 +136,7 @@ func cumulativeIncrease(previous *seriesSample, update factUpdate) (metricNumber
 		return update.value, nil
 	}
 	if update.timeNanos <= previous.timeNanos {
-		return metricNumber{}, permanentMetricError(errorOutOfOrderCumulative, "metric %s has an out-of-order cumulative sample", update.metric)
+		return metricNumber{}, permanentConversionError(errorOutOfOrderCumulative, "metric %s has an out-of-order cumulative sample", update.metric)
 	}
 	if update.value.value.Cmp(previous.value) < 0 {
 		return update.value, nil

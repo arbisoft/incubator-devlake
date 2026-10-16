@@ -50,6 +50,7 @@ var publicPaths = map[string]struct{}{
 	PathLogout:              {},
 	PathUserInfo:            {},
 	PathClaudeOtelMetrics:   {},
+	PathClaudeOtelLogs:      {},
 }
 
 const sessionClaimsContextKey = "devlake_auth_session_claims"

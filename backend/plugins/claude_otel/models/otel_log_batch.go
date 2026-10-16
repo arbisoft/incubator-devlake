@@ -1,0 +1,53 @@
+/*
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package models
+
+import (
+	"time"
+
+	"github.com/apache/incubator-devlake/core/models/common"
+)
+
+const OtelLogBatchTable = "_raw_otel_claude_code_log_batches"
+
+// OtelLogBatch is the durable, replayable OTLP Logs request accepted from the
+// authenticated Collector. It shares the OtelMetricBatch status lifecycle; event rows are
+// derived asynchronously.
+type OtelLogBatch struct {
+	common.Model
+	ReceivedAt             time.Time  `gorm:"index;index:idx_otel_log_batch_claim,priority:2"`
+	PayloadSha256          []byte     `gorm:"type:binary(32);uniqueIndex"`
+	PayloadProto           []byte     `gorm:"type:mediumblob"`
+	PayloadSchemaVersion   int        `gorm:"not null"`
+	ResourceCount          int        `gorm:"not null"`
+	RecordCount            int        `gorm:"not null"`
+	MinObservedAt          *time.Time `gorm:"index"`
+	MaxObservedAt          *time.Time `gorm:"index"`
+	Status                 string     `gorm:"type:varchar(32);index;index:idx_otel_log_batch_claim,priority:1"`
+	AttemptCount           int        `gorm:"not null"`
+	NextAttemptAt          *time.Time `gorm:"index"`
+	LeaseUntil             *time.Time `gorm:"index"`
+	LeaseOwner             *string    `gorm:"type:char(36);index"`
+	ProcessingErrorCode    *string    `gorm:"type:varchar(64)"`
+	ProcessingErrorMessage *string    `gorm:"type:text"`
+	ProcessedAt            *time.Time `gorm:"index"`
+}
+
+func (OtelLogBatch) TableName() string {
+	return OtelLogBatchTable
+}

@@ -31,5 +31,7 @@ func GetTablesInfo() []dal.Tabler {
 		&OtelHourlyModelUsage{},
 		&OtelHourlyToolUsage{},
 		&OtelMetricSeriesState{},
+		&OtelLogBatch{},
+		&OtelEvent{},
 	}
 }

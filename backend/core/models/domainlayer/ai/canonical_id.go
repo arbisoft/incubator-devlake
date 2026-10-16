@@ -27,26 +27,49 @@ import (
 
 const CanonicalActivityRecordKind = "canonical_activity"
 
-// CanonicalActivityID is source-independent so a future API candidate updates the
-// same daily activity row currently written by the OTel candidate.
-func CanonicalActivityID(provider, workspaceKey, userKey string, date time.Time, activityType, interfaceType string) string {
-	return canonicalID("canonical_activity", provider, workspaceKey, userKey, date.UTC().Format("2006-01-02"), activityType, interfaceType)
+// IDKind is the fact type a canonical ID names. It is hashed into the ID and kept as its
+// readable prefix, so fact types never share an ID.
+type IDKind string
+
+const (
+	IDKindActivity             IDKind = CanonicalActivityRecordKind
+	IDKindModelUsage           IDKind = "model_usage"
+	IDKindToolDecision         IDKind = "tool_decision"
+	IDKindPrompt               IDKind = "prompt"
+	IDKindPromptSkill          IDKind = "prompt_skill"
+	IDKindPermissionModeChange IDKind = "permission_mode_change"
+)
+
+// CanonicalKey identifies one fact independently of the source that reported it, so a
+// future API source updates the same row the OTel source writes.
+type CanonicalKey struct {
+	Kind         IDKind
+	Provider     string
+	WorkspaceKey string
+	// Grain is the rest of the fact's identity in a fixed order per kind, such as the user
+	// key, day and model of a model usage. Times go through DayGrain or TimeGrain.
+	Grain []string
 }
 
-func CanonicalModelUsageID(provider, workspaceKey, userKey string, date time.Time, model string) string {
-	return canonicalID("model_usage", provider, workspaceKey, userKey, date.UTC().Format("2006-01-02"), model)
-}
-
-func CanonicalToolDecisionID(provider, workspaceKey, userKey string, date time.Time, toolName string) string {
-	return canonicalID("tool_decision", provider, workspaceKey, userKey, date.UTC().Format("2006-01-02"), toolName)
-}
-
-func canonicalID(kind string, components ...string) string {
+// ID returns the key's stable ID. Each component is length-prefixed before hashing, so
+// components cannot run into each other.
+func (k CanonicalKey) ID() string {
+	components := append([]string{k.Provider, k.WorkspaceKey}, k.Grain...)
 	encoded := make([]string, 0, len(components)+1)
-	encoded = append(encoded, kind)
+	encoded = append(encoded, string(k.Kind))
 	for _, component := range components {
 		encoded = append(encoded, strconv.Itoa(len(component))+":"+component)
 	}
 	digest := sha256.Sum256([]byte(strings.Join(encoded, "|")))
-	return "ai:" + kind + ":" + hex.EncodeToString(digest[:])
+	return "ai:" + string(k.Kind) + ":" + hex.EncodeToString(digest[:])
+}
+
+// DayGrain is the grain component of a daily fact's UTC day.
+func DayGrain(day time.Time) string {
+	return day.UTC().Format("2006-01-02")
+}
+
+// TimeGrain is the grain component of an instant, such as a mode change time.
+func TimeGrain(at time.Time) string {
+	return at.UTC().Format(time.RFC3339Nano)
 }

@@ -555,6 +555,25 @@ func TestLogoutPublicWhenNoSession(t *testing.T) {
 	}
 }
 
+// The Collector posts OTLP with its ingest token and no session, so both ingest paths
+// must pass the session and CSRF middleware; the plugin checks the token itself.
+func TestClaudeOtelIngestPathsPublicWithoutSession(t *testing.T) {
+	idp := newFakeIdP(t)
+	s, _ := newTestService(t, idp)
+	r := newTestRouter(s)
+	for _, path := range []string{PathClaudeOtelMetrics, PathClaudeOtelLogs} {
+		r.POST(path, func(c *gin.Context) { c.Status(http.StatusOK) })
+	}
+
+	for _, path := range []string{PathClaudeOtelMetrics, PathClaudeOtelLogs} {
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodPost, path, nil))
+		if w.Code != http.StatusOK {
+			t.Fatalf("POST %s without session = %d body=%s, want 200", path, w.Code, w.Body.String())
+		}
+	}
+}
+
 // Compile-time assertion that the testify mock satisfies the dal.Dal
 // interface so the tests catch any new method that gets added.
 var _ dal.Dal = (*mockdal.Dal)(nil)

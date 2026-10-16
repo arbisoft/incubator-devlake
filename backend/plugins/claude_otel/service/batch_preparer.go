@@ -23,6 +23,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
@@ -36,67 +37,120 @@ const (
 	maxResourceSkipDiagnostics = 5
 	maxUnknownMetricNames      = 10
 	maxDiagnosticNameLength    = 128
+
+	// identityColumnLength is the width of the user key, account id, account UUID and
+	// email columns in the hourly, event and ai_* tables.
+	identityColumnLength = 255
+	// Hourly fact dimension widths, from models.OtelHourlyModelUsage and
+	// OtelHourlyToolUsage. The ai_* columns they roll up into are as wide.
+	modelDimensionLength       = 255
+	querySourceDimensionLength = 64
+	toolDimensionLength        = 100 // tool_name and language
 )
+
+// skipKind is the unit a batch skipped for bad data. A resource group is skipped for bad
+// attribution; a log record or data point is skipped on its own.
+type skipKind int
+
+const (
+	skippedResource skipKind = iota
+	skippedLogRecord
+	skippedDataPoint
+	skipKindCount
+)
+
+// skipNouns name each skip kind in diagnostics, in skipKind order.
+var skipNouns = [skipKindCount]string{"resource group(s)", "log record(s)", "data point(s)"}
 
 // preparedBatch holds a batch's fact updates plus bounded, operator-safe diagnostics.
 type preparedBatch struct {
 	updates        []factUpdate
-	skippedCount   int
+	skipped        [skipKindCount]int
 	skipMessages   []string
 	unknownMetrics []string
 }
 
 func (p *preparedBatch) diagnosticCode() *string {
-	if p.skippedCount == 0 {
+	var code string
+	switch {
+	case p.skipped[skippedResource] > 0:
+		code = string(diagnosticResourcesSkipped)
+	case p.skipped[skippedLogRecord] > 0 || p.skipped[skippedDataPoint] > 0:
+		code = string(diagnosticRecordsSkipped)
+	default:
 		return nil
 	}
-	code := string(diagnosticResourcesSkipped)
 	return &code
 }
 
 func (p *preparedBatch) diagnostic() *string {
-	if p.skippedCount == 0 {
+	parts := make([]string, 0, skipKindCount)
+	for kind, count := range p.skipped {
+		if count > 0 {
+			parts = append(parts, fmt.Sprintf("%d %s", count, skipNouns[kind]))
+		}
+	}
+	if len(parts) == 0 {
 		return nil
 	}
-	message := fmt.Sprintf("skipped %d resource group(s): %s", p.skippedCount, strings.Join(p.skipMessages, "; "))
+	message := fmt.Sprintf("skipped %s: %s", strings.Join(parts, " and "), strings.Join(p.skipMessages, "; "))
 	return &message
 }
 
 // batchPreparer resolves connections once per team for one batch conversion attempt and
 // tracks organization bindings that will be applied in the conversion transaction.
 type batchPreparer struct {
-	converter        *rawMetricConverter
+	converter        *rawConverter
 	connections      map[string][]*models.OtelConnection
 	pendingBindings  map[uint64]string
 	unknownMetricSet map[string]struct{}
 	result           preparedBatch
 }
 
-func (c *rawMetricConverter) prepareUpdates(request *collectormetrics.ExportMetricsServiceRequest) (*preparedBatch, error) {
-	preparer := &batchPreparer{
+func (c *rawConverter) newBatchPreparer() *batchPreparer {
+	return &batchPreparer{
 		converter:        c,
 		connections:      make(map[string][]*models.OtelConnection),
 		pendingBindings:  make(map[uint64]string),
 		unknownMetricSet: make(map[string]struct{}),
 	}
-	for _, resourceMetrics := range request.GetResourceMetrics() {
+}
+
+// prepareResources runs prepare for each of a batch's n resource groups with that group's
+// own binding map. A group's bindings are kept only when it succeeds. An attribution
+// failure skips the group; any other error fails the batch.
+func (p *batchPreparer) prepareResources(n int, prepare func(i int, bindings map[uint64]string) error) error {
+	for i := 0; i < n; i++ {
 		resourceBindings := make(map[uint64]string)
-		updates, err := preparer.prepareResource(resourceMetrics, resourceBindings)
+		err := prepare(i, resourceBindings)
 		if err == nil {
-			preparer.result.updates = append(preparer.result.updates, updates...)
 			for connectionID, organizationID := range resourceBindings {
-				preparer.pendingBindings[connectionID] = organizationID
+				p.pendingBindings[connectionID] = organizationID
 			}
 			continue
 		}
-		var conversionErr *conversionError
-		if !stderrors.As(err, &conversionErr) {
-			return nil, err
+		conversionErr, attribution := attributionError(err)
+		if !attribution {
+			return err
 		}
-		if _, attribution := attributionErrorCodes[conversionErr.code]; !attribution {
-			return nil, err
+		p.recordSkip(skippedResource, conversionErr)
+	}
+	return nil
+}
+
+func (c *rawConverter) prepareUpdates(request *collectormetrics.ExportMetricsServiceRequest) (*preparedBatch, error) {
+	preparer := c.newBatchPreparer()
+	resources := request.GetResourceMetrics()
+	err := preparer.prepareResources(len(resources), func(i int, bindings map[uint64]string) error {
+		updates, err := preparer.prepareResource(resources[i], bindings)
+		if err != nil {
+			return err
 		}
-		preparer.recordSkip(conversionErr)
+		preparer.result.updates = append(preparer.result.updates, updates...)
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	sort.SliceStable(preparer.result.updates, func(i, j int) bool {
 		return lessSeriesSample(preparer.result.updates[i], preparer.result.updates[j])
@@ -104,8 +158,25 @@ func (c *rawMetricConverter) prepareUpdates(request *collectormetrics.ExportMetr
 	return &preparer.result, nil
 }
 
-func (p *batchPreparer) recordSkip(err *conversionError) {
-	p.result.skippedCount++
+// attributionError reports whether err is one resource group's attribution failure, which
+// skips that group instead of failing the batch.
+func attributionError(err error) (*conversionError, bool) {
+	return conversionErrorIn(err, attributionErrorCodes)
+}
+
+// conversionErrorIn reports whether err is a conversion error with one of codes.
+func conversionErrorIn(err error, codes map[conversionErrorCode]struct{}) (*conversionError, bool) {
+	var conversionErr *conversionError
+	if !stderrors.As(err, &conversionErr) {
+		return nil, false
+	}
+	_, found := codes[conversionErr.code]
+	return conversionErr, found
+}
+
+// recordSkip notes one unit of kind skipped for err, keeping the first few messages.
+func (p *batchPreparer) recordSkip(kind skipKind, err *conversionError) {
+	p.result.skipped[kind]++
 	if len(p.result.skipMessages) < maxResourceSkipDiagnostics {
 		p.result.skipMessages = append(p.result.skipMessages, fmt.Sprintf("%s: %s", err.code, err.Error()))
 	}
@@ -114,7 +185,7 @@ func (p *batchPreparer) recordSkip(err *conversionError) {
 // prepareResource converts one resource group. Any attribution failure discards the whole
 // group rather than converting part of one client's export.
 func (p *batchPreparer) prepareResource(resourceMetrics *metricsv1.ResourceMetrics, resourceBindings map[uint64]string) ([]factUpdate, error) {
-	if err := validateResourceAttribution(resourceMetrics); err != nil {
+	if _, err := validateAttribution(metricsSignal, resourceMetrics.GetResource().GetAttributes(), resourceDatapoints(resourceMetrics)); err != nil {
 		return nil, err
 	}
 	updates := make([]factUpdate, 0)
@@ -128,11 +199,15 @@ func (p *batchPreparer) prepareResource(resourceMetrics *metricsv1.ResourceMetri
 			}
 			sum := metric.GetSum()
 			if sum == nil {
-				return nil, permanentMetricError(errorUnsupportedMetricKind, "supported metric %s is not an OTLP sum", metric.GetName())
+				return nil, permanentConversionError(errorUnsupportedMetricKind, "supported metric %s is not an OTLP sum", metric.GetName())
 			}
 			for _, point := range sum.GetDataPoints() {
 				update, err := p.prepareDatapoint(metric, mapping, sum.GetAggregationTemporality(), scopeMetrics.GetScope(), resourceAttrs, point, resourceBindings)
 				if err != nil {
+					if conversionErr, skip := conversionErrorIn(err, metricPointErrorCodes); skip {
+						p.recordSkip(skippedDataPoint, conversionErr)
+						continue
+					}
 					return nil, err
 				}
 				updates = append(updates, update)
@@ -154,11 +229,11 @@ func (p *batchPreparer) prepareDatapoint(
 	pointAttrs := point.GetAttributes()
 	teamSlug := attributeString(pointAttrs, devlakeTeamAttribute)
 	if teamSlug == "" {
-		return factUpdate{}, permanentMetricError(errorMissingTeam, "supported metric %s is missing trusted devlake_team attribution", metric.GetName())
+		return factUpdate{}, permanentConversionError(errorMissingTeam, "supported metric %s is missing trusted devlake_team attribution", metric.GetName())
 	}
 	observedAt, err := unixNanoTime(point.GetTimeUnixNano())
 	if err != nil {
-		return factUpdate{}, permanentMetricError(errorInvalidTimestamp, "supported metric %s has an invalid timestamp", metric.GetName())
+		return factUpdate{}, permanentConversionError(errorInvalidTimestamp, "supported metric %s has an invalid timestamp", metric.GetName())
 	}
 	connection, err := p.resolveConnection(teamSlug, observedAt)
 	if err != nil {
@@ -175,20 +250,25 @@ func (p *batchPreparer) prepareDatapoint(
 	if err != nil {
 		return factUpdate{}, err
 	}
+	if err := checkIdentityLengths(identity); err != nil {
+		return factUpdate{}, err
+	}
 	if temporality != metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_DELTA && temporality != metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_CUMULATIVE {
-		return factUpdate{}, permanentMetricError(errorUnsupportedTemporality, "metric %s has unsupported aggregation temporality", metric.GetName())
+		return factUpdate{}, permanentConversionError(errorUnsupportedTemporality, "metric %s has unsupported aggregation temporality", metric.GetName())
 	}
 	value, err := metricNumberFromPoint(point)
 	if err != nil {
-		return factUpdate{}, permanentMetricError(errorInvalidValue, "supported metric %s has an invalid numeric value", metric.GetName())
+		return factUpdate{}, permanentConversionError(errorInvalidValue, "supported metric %s has an invalid numeric value", metric.GetName())
 	}
 	if !mapping.decimal && !value.isInteger() {
-		return factUpdate{}, permanentMetricError(errorInvalidValue, "metric %s must have an integer value", metric.GetName())
+		return factUpdate{}, permanentConversionError(errorInvalidValue, "metric %s must have an integer value", metric.GetName())
 	}
 	column, err := mapping.columnFor(metric.GetName(), pointAttrs)
 	if err != nil {
 		return factUpdate{}, err
 	}
+	// Dimensions are truncated to their column. Series state is keyed by the full
+	// attributes, so values that share a prefix only add into one fact row.
 	update := factUpdate{
 		connection:     connection,
 		organizationID: organizationID,
@@ -198,46 +278,88 @@ func (p *batchPreparer) prepareDatapoint(
 		metric:         metric.GetName(),
 		fact:           mapping.fact,
 		column:         column,
-		model:          attributeString(pointAttrs, "model"),
-		query:          defaultDimension(attributeString(pointAttrs, "query_source")),
-		tool:           defaultDimension(attributeString(pointAttrs, "tool_name")),
-		language:       defaultDimension(attributeString(pointAttrs, "language")),
+		model:          truncate(attributeString(pointAttrs, "model"), modelDimensionLength),
+		query:          defaultDimension(truncate(attributeString(pointAttrs, "query_source"), querySourceDimensionLength)),
+		tool:           defaultDimension(truncate(attributeString(pointAttrs, "tool_name"), toolDimensionLength)),
+		language:       defaultDimension(truncate(attributeString(pointAttrs, "language"), toolDimensionLength)),
 		value:          value,
 		temporality:    temporality,
 		startNanos:     point.GetStartTimeUnixNano(),
 		timeNanos:      point.GetTimeUnixNano(),
 	}
 	if mapping.fact == hourlyModelUsageFact && update.model == "" {
-		return factUpdate{}, permanentMetricError(errorInvalidDimension, "metric %s is missing model", metric.GetName())
+		return factUpdate{}, permanentConversionError(errorInvalidDimension, "metric %s is missing model", metric.GetName())
 	}
 	update.seriesHash = metricSeriesHash(connection.ID, scope, metric, resourceAttrs, point)
 	return update, nil
 }
 
-// validateResourceAttribution ensures a Collector resource group contains only its
-// derived team attribution. It runs during conversion so an invalid group is retained
-// for diagnosis but cannot suppress other valid groups from the same OTLP request.
-func validateResourceAttribution(resourceMetrics *metricsv1.ResourceMetrics) error {
-	resourceAttributes := resourceMetrics.GetResource().GetAttributes()
-	if hasAttribute(resourceAttributes, devlakeTeamAttribute) || hasAttribute(resourceAttributes, devlakeProjectAttribute) {
-		return permanentMetricError(errorInvalidAttribution, "OTLP metrics resource must not include DevLake attribution")
+// otlpSignal names one OTLP signal's resource and record in attribution errors.
+type otlpSignal struct {
+	resource string
+	record   string
+}
+
+var (
+	metricsSignal = otlpSignal{resource: "OTLP metrics resource", record: "OTLP metrics datapoint"}
+	logsSignal    = otlpSignal{resource: "OTLP logs resource", record: "OTLP log record"}
+)
+
+// attributed is a metric datapoint or log record, which carry the trusted attribution.
+type attributed interface {
+	GetAttributes() []*commonv1.KeyValue
+}
+
+// attributionRule is one check of a record's trusted attribution. team is the record's
+// devlake_team and groupTeam the team of the group's earlier records. message takes the
+// record's name.
+type attributionRule struct {
+	violated func(attributes []*commonv1.KeyValue, team, groupTeam string) bool
+	code     conversionErrorCode
+	message  string
+}
+
+var recordAttributionRules = []attributionRule{
+	{
+		violated: func(attributes []*commonv1.KeyValue, _, _ string) bool {
+			return hasAttribute(attributes, devlakeProjectAttribute)
+		},
+		code:    errorInvalidAttribution,
+		message: "%s must not include devlake_project attribution",
+	},
+	{
+		violated: func(_ []*commonv1.KeyValue, team, _ string) bool { return team == "" },
+		code:     errorMissingTeam,
+		message:  "%s is missing trusted devlake_team attribution",
+	},
+	{
+		violated: func(_ []*commonv1.KeyValue, team, groupTeam string) bool { return groupTeam != "" && team != groupTeam },
+		code:     errorInvalidAttribution,
+		message:  "%s has a trusted devlake_team different from the rest of its resource",
+	},
+}
+
+// validateAttribution checks that a resource group carries only the attribution the
+// Collector derived for it, and returns the group's team. The resource has no DevLake
+// attribution and every record has the same devlake_team and no devlake_project. It runs
+// during conversion so an invalid group is kept for diagnosis but cannot suppress valid
+// groups of the same OTLP request.
+func validateAttribution[R attributed](signal otlpSignal, resourceAttrs []*commonv1.KeyValue, records []R) (string, error) {
+	if hasAttribute(resourceAttrs, devlakeTeamAttribute) || hasAttribute(resourceAttrs, devlakeProjectAttribute) {
+		return "", permanentConversionError(errorInvalidAttribution, "%s must not include DevLake attribution", signal.resource)
 	}
-	teamSlug := ""
-	for _, datapoint := range resourceDatapoints(resourceMetrics) {
-		attributes := datapoint.GetAttributes()
-		if hasAttribute(attributes, devlakeProjectAttribute) {
-			return permanentMetricError(errorInvalidAttribution, "OTLP metrics datapoint must not include devlake_project attribution")
-		}
+	groupTeam := ""
+	for _, record := range records {
+		attributes := record.GetAttributes()
 		team := attributeString(attributes, devlakeTeamAttribute)
-		if team == "" {
-			return permanentMetricError(errorMissingTeam, "OTLP metrics datapoint is missing trusted devlake_team attribution")
+		for _, rule := range recordAttributionRules {
+			if rule.violated(attributes, team, groupTeam) {
+				return "", permanentConversionError(rule.code, rule.message, signal.record)
+			}
 		}
-		if teamSlug != "" && team != teamSlug {
-			return permanentMetricError(errorInvalidAttribution, "OTLP metrics resource has inconsistent trusted devlake_team attribution")
-		}
-		teamSlug = team
+		groupTeam = team
 	}
-	return nil
+	return groupTeam, nil
 }
 
 func hasAttribute(attributes []*commonv1.KeyValue, key string) bool {
@@ -274,12 +396,12 @@ func (p *batchPreparer) resolveConnection(teamSlug string, observedAt time.Time)
 			continue
 		}
 		if match != nil {
-			return nil, permanentMetricError(errorAmbiguousConnection, "telemetry for team %q has ambiguous connection history", teamSlug)
+			return nil, permanentConversionError(errorAmbiguousConnection, "telemetry for team %q has ambiguous connection history", teamSlug)
 		}
 		match = connection
 	}
 	if match == nil {
-		return nil, permanentMetricError(errorConnectionNotFound, "telemetry for team %q has no connection at observed time", teamSlug)
+		return nil, permanentConversionError(errorConnectionNotFound, "telemetry for team %q has no connection at observed time", teamSlug)
 	}
 	return match, nil
 }
@@ -296,7 +418,7 @@ func (p *batchPreparer) checkOrganizationBinding(connection *models.OtelConnecti
 		var valid bool
 		boundOrganizationID, valid = normalizeOrganizationID(*connection.OrganizationId)
 		if !valid {
-			return permanentMetricError(errorInvalidOrganization, "OTel connection %d has an invalid stored organization", connection.ID)
+			return permanentConversionError(errorInvalidOrganization, "OTel connection %d has an invalid stored organization", connection.ID)
 		}
 	}
 	if boundOrganizationID == "" {
@@ -304,7 +426,7 @@ func (p *batchPreparer) checkOrganizationBinding(connection *models.OtelConnecti
 		return nil
 	}
 	if boundOrganizationID != organizationID {
-		return permanentMetricError(errorOrganizationMismatch, "telemetry for team %q does not match its connection organization", connection.TeamSlug)
+		return permanentConversionError(errorOrganizationMismatch, "telemetry for team %q does not match its connection organization", connection.TeamSlug)
 	}
 	return nil
 }
@@ -316,15 +438,15 @@ func organizationIDFromAttributes(resourceAttrs, pointAttrs []*commonv1.KeyValue
 	pointValue := attributeString(pointAttrs, organizationIDAttribute)
 	resourceValue := attributeString(resourceAttrs, organizationIDAttribute)
 	if pointValue == "" && resourceValue == "" {
-		return "", permanentMetricError(errorMissingOrganization, "supported metric has no organization.id")
+		return "", permanentConversionError(errorMissingOrganization, "telemetry has no organization.id")
 	}
 	pointOrganizationID, pointValid := normalizeOrganizationID(pointValue)
 	resourceOrganizationID, resourceValid := normalizeOrganizationID(resourceValue)
 	if (pointValue != "" && !pointValid) || (resourceValue != "" && !resourceValid) {
-		return "", permanentMetricError(errorInvalidOrganization, "supported metric has an invalid organization.id")
+		return "", permanentConversionError(errorInvalidOrganization, "telemetry has an invalid organization.id")
 	}
 	if pointValue != "" && resourceValue != "" && pointOrganizationID != resourceOrganizationID {
-		return "", permanentMetricError(errorOrganizationMismatch, "resource and datapoint organization IDs differ")
+		return "", permanentConversionError(errorOrganizationMismatch, "resource and datapoint organization IDs differ")
 	}
 	if pointOrganizationID != "" {
 		return pointOrganizationID, nil
@@ -361,7 +483,27 @@ func identityFromAttributes(attributes []*commonv1.KeyValue) (developerIdentity,
 	case installID != "":
 		identity.key = "install:" + installID
 	default:
-		return developerIdentity{}, permanentMetricError(errorMissingUserIdentity, "supported metric has no stable user identity")
+		return developerIdentity{}, permanentConversionError(errorMissingUserIdentity, "supported metric has no stable user identity")
 	}
 	return identity, nil
+}
+
+// checkIdentityLengths rejects an identity whose values do not fit their columns, rather
+// than letting MySQL reject the whole batch. Truncating it could merge different users,
+// so the caller skips the log record or data point instead.
+func checkIdentityLengths(identity developerIdentity) error {
+	for _, field := range []struct {
+		name  string
+		value string
+	}{
+		{"user key", identity.key},
+		{"user.account_id", stringValue(identity.accountID)},
+		{"user.account_uuid", stringValue(identity.accountUUID)},
+		{"user.email", stringValue(identity.email)},
+	} {
+		if utf8.RuneCountInString(field.value) > identityColumnLength {
+			return permanentConversionError(errorValueTooLong, "%s is longer than %d characters", field.name, identityColumnLength)
+		}
+	}
+	return nil
 }

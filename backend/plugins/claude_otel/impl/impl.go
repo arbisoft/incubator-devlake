@@ -72,6 +72,9 @@ func (p ClaudeOtel) ApiResources() map[string]map[string]plugin.ApiResourceHandl
 		api.OtlpMetricsResourcePath: {
 			"POST": api.PostOtlpMetrics,
 		},
+		api.OtlpLogsResourcePath: {
+			"POST": api.PostOtlpLogs,
+		},
 		"connections": {
 			"GET":  api.ListConnections,
 			"POST": api.PostConnection,

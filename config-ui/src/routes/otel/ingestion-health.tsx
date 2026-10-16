@@ -78,6 +78,29 @@ export const OtelIngestionHealth = ({ loading, failed, status, onRetry }: OtelIn
       tone: getPermanentErrorTone(status.recentPermanentErrors),
     },
     { label: COPY.health.metrics.converter, value: getConverterLabel(status) },
+    ...(status.logs
+      ? [
+          { label: COPY.health.metrics.logPending, value: status.logs.batchCounts[OTEL_BATCH_STATUS.PENDING] ?? 0 },
+          {
+            label: COPY.health.metrics.logRetrying,
+            value: status.logs.batchCounts[OTEL_BATCH_STATUS.RETRYABLE_ERROR] ?? 0,
+          },
+          {
+            label: COPY.health.metrics.logReplaying,
+            value: status.logs.batchCounts[OTEL_BATCH_STATUS.REPLAY_PENDING] ?? 0,
+          },
+          {
+            label: COPY.health.metrics.logOldestBacklog,
+            value: formatAge(status.logs.oldestNonterminal?.ageSeconds),
+            tone: getBacklogTone(status.logs.oldestNonterminal?.ageSeconds),
+          },
+          {
+            label: COPY.health.metrics.logPermanentErrors,
+            value: status.logs.recentPermanentErrors,
+            tone: getPermanentErrorTone(status.logs.recentPermanentErrors),
+          },
+        ]
+      : []),
   ];
   const healthContent = () => {
     if (metrics) {
