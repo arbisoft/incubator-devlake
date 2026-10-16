@@ -18,6 +18,7 @@ limitations under the License.
 package ai
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -33,5 +34,22 @@ func TestCanonicalIDsAreSourceIndependentAndGrainSpecific(t *testing.T) {
 	}
 	if activityID == CanonicalActivityID("claude", "org", "acct:user_1", date, "CODE_EDIT", "web_ui") {
 		t.Fatal("different canonical activity grains must not share an ID")
+	}
+}
+
+func TestCanonicalPromptIDSeparatesPromptsSessionsAndProviders(t *testing.T) {
+	id := CanonicalPromptID("claude", "org", "acct:user_1", "session-a", "prompt-1")
+	if id != CanonicalPromptID("claude", "org", "acct:user_1", "session-a", "prompt-1") || !strings.HasPrefix(id, "ai:prompt:") {
+		t.Fatalf("CanonicalPromptID() = %q, want a stable ai:prompt: ID", id)
+	}
+	for _, other := range []string{
+		CanonicalPromptID("claude", "org", "acct:user_1", "session-a", "prompt-2"),
+		CanonicalPromptID("claude", "org", "acct:user_1", "session-b", "prompt-1"),
+		CanonicalPromptID("claude", "org", "acct:user_2", "session-a", "prompt-1"),
+		CanonicalPromptID("cursor", "org", "acct:user_1", "session-a", "prompt-1"),
+	} {
+		if other == id {
+			t.Fatal("prompts differing in prompt, session, user or provider must not share an ID")
+		}
 	}
 }

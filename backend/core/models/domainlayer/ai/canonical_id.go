@@ -41,6 +41,10 @@ func CanonicalToolDecisionID(provider, workspaceKey, userKey string, date time.T
 	return canonicalID("tool_decision", provider, workspaceKey, userKey, date.UTC().Format("2006-01-02"), toolName)
 }
 
+func CanonicalPromptID(provider, workspaceKey, userKey, sessionID, promptID string) string {
+	return canonicalID("prompt", provider, workspaceKey, userKey, sessionID, promptID)
+}
+
 func canonicalID(kind string, components ...string) string {
 	encoded := make([]string, 0, len(components)+1)
 	encoded = append(encoded, kind)

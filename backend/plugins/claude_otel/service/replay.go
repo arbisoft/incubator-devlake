@@ -49,14 +49,14 @@ func (c *rawMetricConverter) processNextReplay() (bool, errors.Error) {
 	if err != nil || !found {
 		return false, err
 	}
-	replayed, skipped, replayErr := c.replay(request, leaseOwner)
+	counts, replayErr := c.replay(request, leaseOwner)
 	if replayErr != nil {
 		if stdErrors.Is(replayErr, errReplayLeaseLost) {
 			return false, nil
 		}
 		c.logWarn(replayErr, fmt.Sprintf("Claude Code OTel replay request %d failed", request.ID))
 		message := boundedReplayErrorMessage(replayErr)
-		return true, c.finishReplay(request.ID, leaseOwner, models.OtelReplayRequestStatusFailed, replayed, skipped, message)
+		return true, c.finishReplay(request.ID, leaseOwner, models.OtelReplayRequestStatusFailed, counts, message)
 	}
 	return true, nil
 }
@@ -155,13 +155,22 @@ func (c *rawMetricConverter) verifyConverterLease(tx dal.Transaction) error {
 	return nil
 }
 
-func (c *rawMetricConverter) finishReplay(requestID uint64, leaseOwner, status string, replayed, skipped int, message *string) errors.Error {
+// replayCounts are the batches a replay request rebuilt or skipped, metric and log batches
+// counted apart.
+type replayCounts struct {
+	replayed, skipped       int
+	logReplayed, logSkipped int
+}
+
+func (c *rawMetricConverter) finishReplay(requestID uint64, leaseOwner, status string, counts replayCounts, message *string) errors.Error {
 	err := c.db.UpdateColumns(&models.OtelReplayRequest{}, []dal.DalSet{
 		{ColumnName: "status", Value: status},
 		{ColumnName: "lease_owner", Value: nil},
 		{ColumnName: "lease_until", Value: nil},
-		{ColumnName: "replayed_batches", Value: replayed},
-		{ColumnName: "skipped_batches", Value: skipped},
+		{ColumnName: "replayed_batches", Value: counts.replayed},
+		{ColumnName: "skipped_batches", Value: counts.skipped},
+		{ColumnName: "replayed_log_batches", Value: counts.logReplayed},
+		{ColumnName: "skipped_log_batches", Value: counts.logSkipped},
 		{ColumnName: "error_message", Value: message},
 		{ColumnName: "completed_at", Value: c.now().UTC()},
 	}, dal.Where("id = ? AND status = ? AND lease_owner = ?", requestID, models.OtelReplayRequestStatusProcessing, leaseOwner))
@@ -198,28 +207,33 @@ type hourlyAggregate struct {
 // replay rebuilds one completed UTC day at a time. Every completed day is independently
 // replace-idempotent; a later failure leaves earlier days correct and a rerun replaces them.
 // Persisted live series state is intentionally left untouched because replay accepts DELTA only.
-func (c *rawMetricConverter) replay(request *models.OtelReplayRequest, leaseOwner string) (int, int, error) {
+func (c *rawMetricConverter) replay(request *models.OtelReplayRequest, leaseOwner string) (replayCounts, error) {
+	counts := replayCounts{}
 	if err := c.validateReplayRange(request); err != nil {
-		return 0, 0, err
+		return counts, err
 	}
-	replayed, skipped := 0, 0
 	diagnostics := replayDiagnostics{}
 	var lastRenewal time.Time
 	for dayStart := request.RangeStart.UTC(); dayStart.Before(request.RangeEnd.UTC()); dayStart = dayStart.AddDate(0, 0, 1) {
 		dayReplayed, daySkipped, aggregates, err := c.prepareReplayDay(request.ID, leaseOwner, dayStart, &lastRenewal, &diagnostics)
 		if err != nil {
-			return replayed, skipped, err
+			return counts, err
 		}
 		if err := c.renewReplayLeaseIfDue(request.ID, leaseOwner, &lastRenewal, true); err != nil {
-			return replayed, skipped, err
+			return counts, err
 		}
-		if err := c.commitReplayDay(request.ID, leaseOwner, dayStart, aggregates, replayed+dayReplayed, skipped+daySkipped, diagnostics.message()); err != nil {
-			return replayed, skipped, err
+		if err := c.commitReplayDay(request.ID, leaseOwner, dayStart, aggregates, counts.replayed+dayReplayed, counts.skipped+daySkipped, diagnostics.message()); err != nil {
+			return counts, err
 		}
-		replayed += dayReplayed
-		skipped += daySkipped
+		counts.replayed += dayReplayed
+		counts.skipped += daySkipped
 	}
-	return replayed, skipped, c.finishReplay(request.ID, leaseOwner, models.OtelReplayRequestStatusCompleted, replayed, skipped, diagnostics.message())
+	var err error
+	counts.logReplayed, counts.logSkipped, err = c.replayLogBatches(request, leaseOwner, &lastRenewal, &diagnostics)
+	if err != nil {
+		return counts, err
+	}
+	return counts, c.finishReplay(request.ID, leaseOwner, models.OtelReplayRequestStatusCompleted, counts, diagnostics.message())
 }
 
 type replayDiagnostics struct {

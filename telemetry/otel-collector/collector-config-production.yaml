@@ -40,6 +40,34 @@ processors:
     limit_percentage: 80
     spike_limit_percentage: 25
 
+  # Claude Code events reach DevLake without prompt text or response, tool or error
+  # content, even when a developer enables OTEL_LOG_USER_PROMPTS or OTEL_LOG_TOOL_DETAILS.
+  # DevLake strips them too.
+  attributes/drop_content:
+    actions:
+      - key: prompt
+        action: delete
+      - key: prompt_text
+        action: delete
+      - key: response
+        action: delete
+      - key: body
+        action: delete
+      - key: tool_input
+        action: delete
+      - key: tool_parameters
+        action: delete
+      - key: error
+        action: delete
+  # DevLake stores session.id; Prometheus drops it so per-session series never become labels.
+  attributes/drop_session:
+    actions:
+      - key: session.id
+        action: delete
+  resource/drop_session:
+    attributes:
+      - key: session.id
+        action: delete
   delta_to_cumulative: {}
 
   batch/prometheus:
@@ -117,10 +145,17 @@ service:
       receivers: [otlp]
       processors: [memory_limiter, resource/attribution, attributes/team]
       exporters: [forward/claude_raw, forward/prometheus]
+    # No batch processor: otlphttp/claude_raw batches in its persistent sending_queue, so
+    # client exports are merged before DevLake sees them, and an in-memory batch here
+    # would lose data the queue would otherwise keep across a restart.
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource/attribution, attributes/team, attributes/drop_content]
+      exporters: [otlphttp/claude_raw]
     metrics/claude_raw:
       receivers: [forward/claude_raw]
       exporters: [otlphttp/claude_raw]
     metrics/prometheus:
       receivers: [forward/prometheus]
-      processors: [delta_to_cumulative, batch/prometheus]
+      processors: [resource/drop_session, attributes/drop_session, delta_to_cumulative, batch/prometheus]
       exporters: [prometheus]

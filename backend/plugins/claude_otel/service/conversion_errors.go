@@ -51,6 +51,7 @@ const (
 	errorRetryExhausted         conversionErrorCode = "retry_exhausted"
 	errorConversionFailure      conversionErrorCode = "conversion_failure"
 	diagnosticResourcesSkipped  conversionErrorCode = "resources_skipped"
+	diagnosticEventsSkipped     conversionErrorCode = "events_skipped"
 )
 
 // attributionErrorCodes identify one resource group's trusted-attribution failure. They

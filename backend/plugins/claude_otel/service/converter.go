@@ -113,7 +113,13 @@ func (c *rawMetricConverter) pollOnce() (bool, errors.Error) {
 	if replayed, err := c.processNextReplay(); err != nil || replayed {
 		return replayed, err
 	}
-	return c.processNext()
+	if processed, err := c.processNext(); err != nil || processed {
+		return processed, err
+	}
+	// Log batches convert only once no metric batch is waiting. Metrics arrive once a
+	// minute per client and convert quickly, so the backlog drains between exports; a
+	// sustained metric backlog would delay prompt events but never lose them.
+	return c.processNextLogBatch()
 }
 
 // acquireLease takes or renews the singleton converter lease. The conditional update
@@ -302,14 +308,19 @@ func (c *rawMetricConverter) convert(batch *models.OtelMetricBatch, leaseOwner s
 // recordFailure releases the batch lease with a classified retry or quarantine state. A
 // failure to persist that state is returned; lease expiry keeps the batch reclaimable.
 func (c *rawMetricConverter) recordFailure(batch *models.OtelMetricBatch, leaseOwner string, conversionErr error) errors.Error {
+	return c.recordBatchFailure(&models.OtelMetricBatch{}, batch.ID, batch.AttemptCount, leaseOwner, conversionErr)
+}
+
+// recordBatchFailure is recordFailure for any raw batch table; model selects the table.
+func (c *rawMetricConverter) recordBatchFailure(model interface{}, batchID uint64, attemptCount int, leaseOwner string, conversionErr error) errors.Error {
 	code, permanent, message := classifyConversionError(conversionErr)
 	now := c.now().UTC()
 	if code == errorLeaseLost {
-		c.logWarn(conversionErr, fmt.Sprintf("Claude Code OTel raw batch %d lease was lost", batch.ID))
+		c.logWarn(conversionErr, fmt.Sprintf("Claude Code OTel raw batch %d lease was lost", batchID))
 		return nil
 	}
-	if !permanent && batch.AttemptCount >= converterMaxAttempts {
-		message = fmt.Sprintf("%s after %d attempts: %s", code, batch.AttemptCount, message)
+	if !permanent && attemptCount >= converterMaxAttempts {
+		message = fmt.Sprintf("%s after %d attempts: %s", code, attemptCount, message)
 		code, permanent = errorRetryExhausted, true
 	}
 	sets := []dal.DalSet{
@@ -326,15 +337,15 @@ func (c *rawMetricConverter) recordFailure(batch *models.OtelMetricBatch, leaseO
 	} else {
 		sets = append(sets,
 			dal.DalSet{ColumnName: "status", Value: models.OtelMetricBatchStatusRetryableError},
-			dal.DalSet{ColumnName: "next_attempt_at", Value: now.Add(converterBackoff(batch.AttemptCount))},
+			dal.DalSet{ColumnName: "next_attempt_at", Value: now.Add(converterBackoff(attemptCount))},
 		)
 	}
-	if err := c.db.UpdateColumns(&models.OtelMetricBatch{}, sets,
-		dal.Where("id = ? AND status = ? AND lease_owner = ?", batch.ID, models.OtelMetricBatchStatusProcessing, leaseOwner),
+	if err := c.db.UpdateColumns(model, sets,
+		dal.Where("id = ? AND status = ? AND lease_owner = ?", batchID, models.OtelMetricBatchStatusProcessing, leaseOwner),
 	); err != nil {
-		return errors.Default.Wrap(err, fmt.Sprintf("failed to record Claude Code OTel raw batch %d failure", batch.ID))
+		return errors.Default.Wrap(err, fmt.Sprintf("failed to record Claude Code OTel raw batch %d failure", batchID))
 	}
-	c.logWarn(nil, fmt.Sprintf("Claude Code OTel raw batch %d conversion failed: code=%s permanent=%t attempt=%d", batch.ID, code, permanent, batch.AttemptCount))
+	c.logWarn(nil, fmt.Sprintf("Claude Code OTel raw batch %d conversion failed: code=%s permanent=%t attempt=%d", batchID, code, permanent, attemptCount))
 	return nil
 }
 

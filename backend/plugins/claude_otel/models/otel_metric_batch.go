@@ -83,18 +83,21 @@ func (OtelConverterLease) TableName() string {
 
 // OtelReplayRequest asks the elected converter to rebuild hourly and canonical daily
 // facts for whole UTC days from retained raw batches. Operators insert requests directly;
-// there is intentionally no API or UI trigger.
+// there is intentionally no API or UI trigger. ReplayedBatches and SkippedBatches count
+// metric batches; log batches are counted in ReplayedLogBatches and SkippedLogBatches.
 type OtelReplayRequest struct {
 	common.Model
-	RangeStart      time.Time  `gorm:"type:datetime(3)"`
-	RangeEnd        time.Time  `gorm:"type:datetime(3)"`
-	Status          string     `gorm:"type:varchar(32);index"`
-	LeaseUntil      *time.Time `gorm:"type:datetime(3);index"`
-	LeaseOwner      *string    `gorm:"type:char(36);index"`
-	ReplayedBatches int        `gorm:"not null;default:0"`
-	SkippedBatches  int        `gorm:"not null;default:0"`
-	ErrorMessage    *string    `gorm:"type:text"`
-	CompletedAt     *time.Time `gorm:"type:datetime(3)"`
+	RangeStart         time.Time  `gorm:"type:datetime(3)"`
+	RangeEnd           time.Time  `gorm:"type:datetime(3)"`
+	Status             string     `gorm:"type:varchar(32);index"`
+	LeaseUntil         *time.Time `gorm:"type:datetime(3);index"`
+	LeaseOwner         *string    `gorm:"type:char(36);index"`
+	ReplayedBatches    int        `gorm:"not null;default:0"`
+	SkippedBatches     int        `gorm:"not null;default:0"`
+	ReplayedLogBatches int        `gorm:"not null;default:0"`
+	SkippedLogBatches  int        `gorm:"not null;default:0"`
+	ErrorMessage       *string    `gorm:"type:text"`
+	CompletedAt        *time.Time `gorm:"type:datetime(3)"`
 }
 
 func (OtelReplayRequest) TableName() string {

@@ -137,6 +137,53 @@ type AiToolDecision struct {
 
 func (AiToolDecision) TableName() string { return "ai_tool_decisions" }
 
+// AiPrompt stores what one developer prompt cost and how it went: wall time, API and tool
+// time, tokens and cost, and the effectiveness signals (tool success, edit decisions, API
+// errors and refusals). PromptId is the provider's own prompt id. The prompt's text is not
+// stored.
+type AiPrompt struct {
+	domainlayer.DomainEntity
+	Provider     string `gorm:"type:varchar(100);index" json:"provider"`
+	WorkspaceKey string `gorm:"type:varchar(255);index" json:"workspaceKey"`
+	AccountId    string `gorm:"type:varchar(255);index" json:"accountId"`
+	UserKey      string `gorm:"type:varchar(255);index" json:"userKey"`
+	// UserAccountId is absent for valid typed fallback identities (uuid:, email:, install:).
+	UserAccountId *string `gorm:"type:varchar(255);index" json:"userAccountId,omitempty"`
+	UserEmail     string  `gorm:"type:varchar(255);index" json:"userEmail"`
+	SessionId     string  `gorm:"type:varchar(64);index" json:"sessionId"`
+	PromptId      string  `gorm:"type:varchar(64);index" json:"promptId"`
+	// CommandName is the slash command the prompt ran, empty for typed prompts.
+	CommandName  string `gorm:"type:varchar(255)" json:"commandName"`
+	PromptLength int64  `json:"promptLength"`
+	// StartedAt to EndedAt spans the prompt's first and last event; the API and tool
+	// durations are the summed time of its API requests and tool runs.
+	StartedAt      time.Time `gorm:"type:datetime(3);index" json:"startedAt"`
+	EndedAt        time.Time `gorm:"type:datetime(3)" json:"endedAt"`
+	WallDurationMs int64     `json:"wallDurationMs"`
+	ApiDurationMs  int64     `json:"apiDurationMs"`
+	ToolDurationMs int64     `json:"toolDurationMs"`
+	ApiRequests    int64     `json:"apiRequests"`
+	// Model is the model that served most of the prompt's API requests.
+	Model               string    `gorm:"type:varchar(255)" json:"model"`
+	InputTokens         int64     `json:"inputTokens"`
+	OutputTokens        int64     `json:"outputTokens"`
+	CacheReadTokens     int64     `json:"cacheReadTokens"`
+	CacheCreationTokens int64     `json:"cacheCreationTokens"`
+	EstimatedCostUsd    string    `gorm:"type:decimal(20,8);not null" json:"estimatedCostUsd"`
+	ToolCalls           int64     `json:"toolCalls"`
+	ToolSuccesses       int64     `json:"toolSuccesses"`
+	ToolFailures        int64     `json:"toolFailures"`
+	EditsAccepted       int64     `json:"editsAccepted"`
+	EditsRejected       int64     `json:"editsRejected"`
+	ApiErrors           int64     `json:"apiErrors"`
+	ApiRefusals         int64     `json:"apiRefusals"`
+	SourceType          string    `gorm:"type:varchar(64)" json:"sourceType"`
+	SourceConnectionId  *uint64   `json:"sourceConnectionId,omitempty"`
+	SourceUpdatedAt     time.Time `gorm:"type:datetime(3)" json:"sourceUpdatedAt"`
+}
+
+func (AiPrompt) TableName() string { return "ai_prompts" }
+
 // AiSourcePreference records an explicit per-workspace source policy. API source
 // values are retained for the deferred Enterprise integration but are not selectable
 // until its completeness contract is implemented.
