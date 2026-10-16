@@ -522,7 +522,7 @@
               }
             ]
           },
-          "unit": "suffix:lines",
+          "unit": "short",
           "noValue": "—"
         },
         "overrides": []
@@ -559,7 +559,7 @@
           "refId": "A"
         }
       ],
-      "title": "Code Churn in Closed, Unmerged PRs",
+      "title": "Code Churn (Lines) in Closed, Unmerged PRs",
       "type": "stat",
       "transformations": [
         {
@@ -658,7 +658,7 @@
               }
             ]
           },
-          "unit": "suffix:lines",
+          "unit": "short",
           "noValue": "—"
         },
         "overrides": []
@@ -695,7 +695,7 @@
           "refId": "A"
         }
       ],
-      "title": "Code Churn Without Recorded PRs",
+      "title": "Code Churn (Lines) Without Recorded PRs",
       "type": "stat",
       "transformations": [
         {
