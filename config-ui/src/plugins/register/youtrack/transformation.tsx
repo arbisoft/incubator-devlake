@@ -16,9 +16,9 @@
  *
  */
 
-import { useEffect, useMemo, useState } from 'react';
-import { uniqBy } from 'lodash';
 import { Alert } from 'antd';
+import { uniqBy } from 'lodash';
+import { useEffect, useMemo, useState } from 'react';
 
 import API from '@/api';
 import type { YoutrackProjectCustomField } from '@/api/plugin/youtrack';

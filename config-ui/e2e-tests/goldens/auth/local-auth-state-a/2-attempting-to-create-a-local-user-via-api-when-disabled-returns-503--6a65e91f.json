@@ -1,0 +1,7 @@
+{
+  "titlePath": [
+    "Phase 1-3 Verification: State A (Local Auth Disabled / Default)",
+    "2. Attempting to create a local user via API when disabled returns 503"
+  ],
+  "writes": []
+}

@@ -20,5 +20,7 @@ export type ICheck = {
   count: number;
   projects: Array<{
     name: string;
+    blueprintId: ID;
+    scopes?: Array<{ scopeName: string }>;
   }>;
 };

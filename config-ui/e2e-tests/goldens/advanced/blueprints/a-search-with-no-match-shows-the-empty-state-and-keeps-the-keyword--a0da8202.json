@@ -1,0 +1,7 @@
+{
+  "titlePath": [
+    "Blueprints list search, status filter and create",
+    "a search with no match shows the empty state and keeps the keyword"
+  ],
+  "writes": []
+}

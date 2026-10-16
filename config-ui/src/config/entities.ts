@@ -16,7 +16,7 @@
  *
  */
 
-export const EntitiesLabel: Record<string, string> = {
+const EntitiesLabel: Record<string, string> = {
   CODE: 'Source Code Management',
   TICKET: 'Issue Tracking',
   CODEREVIEW: 'Code Review',

@@ -72,10 +72,21 @@ var pluginOptionSanitizers = map[string]func(map[string]interface{}){
 // PipelineQuery is a query for GetPipelines
 type PipelineQuery struct {
 	Pagination
+	SortQuery
 	Status      string `form:"status"`
 	Pending     int    `form:"pending"`
 	BlueprintId uint64 `uri:"blueprintId" form:"blueprint_id"`
 	Label       string `form:"label"`
+}
+
+var pipelineSortSpec = sortSpec{
+	columns: map[string]string{
+		"id":         "_devlake_pipelines.id",
+		"beganAt":    "_devlake_pipelines.began_at",
+		"finishedAt": "_devlake_pipelines.finished_at",
+	},
+	defaultColumn: "_devlake_pipelines.id",
+	tieBreaker:    "_devlake_pipelines.id",
 }
 
 func pipelineServiceInit() {

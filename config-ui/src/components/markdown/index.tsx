@@ -17,8 +17,8 @@
  */
 
 import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
 import Zoom from 'react-medium-image-zoom';
+import rehypeRaw from 'rehype-raw';
 import 'react-medium-image-zoom/dist/styles.css';
 
 interface Props {

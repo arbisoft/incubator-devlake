@@ -17,11 +17,13 @@
  */
 import { APIRequestContext } from '@playwright/test';
 
-import { test, expect } from '../fixtures';
 import { loginAsAdmin } from '../auth-helpers';
-import { adminApi, deleteApiKeysByPrefix, listApiKeys, uniqueName } from '../support/api';
+import { test, expect } from '../fixtures';
+import { adminApi, createApiKey, deleteApiKeysByPrefix, listApiKeys, uniqueName } from '../support/api';
 import { API_URL } from '../support/env';
-import { modalByTitle, selectBox, selectOption, tableRow, textInputs } from '../support/selectors';
+import { ApiKeysPage } from '../support/pages/api-keys';
+
+test.use({ trace: 'off', video: 'off', screenshot: 'off' });
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -48,29 +50,31 @@ test('an API key created in the UI authenticates REST calls until it is revoked'
   const keyName = uniqueName('key');
   const allowedPath = '^/projects$';
 
-  await page.goto('/keys');
-  await page.getByRole('button', { name: 'New API Key' }).click();
-  const form = modalByTitle(page, 'Generate a New API Key');
-  await form.getByPlaceholder('My API Key').fill(keyName);
-  await selectBox(form).click();
-  await selectOption(page, '7 days').click();
-  await textInputs(form).nth(1).fill(allowedPath);
+  const keys = new ApiKeysPage(page);
+  await keys.open();
+  await keys.fillNewKeyForm(keyName, '7 days', allowedPath);
 
-  const created = page.waitForResponse((res) => res.url().endsWith('/api-keys') && res.request().method() === 'POST');
   const before = Date.now();
-  await form.getByRole('button', { name: 'Generate' }).click();
-  const apiKey = ((await (await created).json()) as { apiKey: string }).apiKey;
+  const apiKey = await keys.generate();
 
-  const shown = modalByTitle(page, 'Your API key has been generated!');
+  const shown = keys.generatedKeyDialog;
   await expect(shown).toBeVisible();
   expect((await shown.innerText()).includes(apiKey), 'the one-time key is displayed').toBe(true);
-  await shown.getByRole('button', { name: 'Close' }).click();
+  const shownKey = await keys.generatedKeyText.innerText();
+  await keys.clickGeneratedKeyMask();
+  await expect(shown).toBeVisible();
+  expect((await keys.generatedKeyText.innerText()) === shownKey, 'the shown key is unchanged after a mask click').toBe(
+    true,
+  );
+  await expect(keys.generatedKeyCloseIcon).toHaveCount(0);
+  await keys.closeGeneratedKeyDialog();
+  await expect(shown).toBeHidden();
 
   const stored = (await listApiKeys(api)).find((k) => k.name === keyName);
   expect(stored).toMatchObject({ name: keyName, allowedPath });
   expect(Math.abs(new Date(stored?.expiredAt as string).getTime() - (before + 7 * DAY_MS))).toBeLessThan(DAY_MS);
-  expect(JSON.stringify(stored)).not.toContain(apiKey);
-  await expect(tableRow(page, keyName)).toBeVisible();
+  expect(JSON.stringify(stored).includes(apiKey)).toBe(false);
+  await expect(keys.keyRow(keyName)).toBeVisible();
 
   const bare = await playwright.request.newContext({ extraHTTPHeaders: { Authorization: `Bearer ${apiKey}` } });
   const allowed = await bare.get(`${API_URL}/rest/projects`, { params: { pageSize: 1 } });
@@ -79,16 +83,44 @@ test('an API key created in the UI authenticates REST calls until it is revoked'
   const outOfScope = await bare.get(`${API_URL}/rest/plugins/github/connections`);
   expect(outOfScope.status()).toBe(403);
 
-  await tableRow(page, keyName).getByRole('button', { name: 'Revoke' }).click();
-  await modalByTitle(page, 'Are you sure you want to revoke this API key?')
-    .getByRole('button', { name: 'Confirm' })
-    .click();
-  await expect(tableRow(page, keyName)).toHaveCount(0);
+  await keys.revokeKey(keyName);
+  await expect(keys.keyRow(keyName)).toHaveCount(0);
   expect((await listApiKeys(api)).find((k) => k.name === keyName)).toBeUndefined();
 
   const revoked = await bare.get(`${API_URL}/rest/projects`, { params: { pageSize: 1 } });
   expect(revoked.status()).toBe(403);
   expect((await revoked.json()).message).toBe('api key is invalid');
   await bare.dispose();
+  expect(browserErrors).toEqual([]);
+});
+
+test('keyword search and expiration sort survive a reload', async ({ page, browserErrors }) => {
+  const prefix = uniqueName('sortkey');
+  const expiries = { soon: 10, middle: 20, late: 30 };
+  const names = Object.fromEntries(Object.keys(expiries).map((label) => [label, `${prefix}-${label}`]));
+  for (const [label, days] of Object.entries(expiries)) {
+    await createApiKey(api, names[label], new Date(Date.now() + days * DAY_MS).toISOString());
+  }
+  const ascending = [names.soon, names.middle, names.late];
+
+  const keys = new ApiKeysPage(page);
+  await keys.open();
+  await keys.search(prefix);
+  await expect.poll(async () => (await keys.keyNames()).length).toBe(ascending.length);
+  expect(keys.urlParams.get('keyword')).toBe(prefix);
+
+  await keys.sortByExpiration();
+  await expect.poll(() => keys.urlParams.get('sortOrder')).toBe('asc');
+  expect(keys.urlParams.get('sortBy')).toBe('expiredAt');
+  await expect.poll(() => keys.keyNames()).toEqual(ascending);
+
+  await keys.reload();
+  expect(keys.urlParams.get('keyword')).toBe(prefix);
+  expect(keys.urlParams.get('sortBy')).toBe('expiredAt');
+  await expect.poll(() => keys.keyNames()).toEqual(ascending);
+
+  await keys.sortByExpiration();
+  await expect.poll(() => keys.urlParams.get('sortOrder')).toBe('desc');
+  await expect.poll(() => keys.keyNames()).toEqual([...ascending].reverse());
   expect(browserErrors).toEqual([]);
 });

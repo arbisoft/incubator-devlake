@@ -33,8 +33,8 @@
  *
  */
 
-import { useEffect } from 'react';
 import { Input } from 'antd';
+import { useEffect } from 'react';
 
 import { Block } from '@/components';
 
@@ -58,12 +58,7 @@ export const ConnectionProxy = ({ name, initialValue, value, setValue }: Props) 
 
   return (
     <Block title="Proxy" description={`Add a proxy if you cannot access ${name} directly.`}>
-      <Input
-        style={{ width: 386 }}
-        placeholder="e.g. http://proxy.localhost:8080"
-        value={value}
-        onChange={handleChange}
-      />
+      <Input placeholder="e.g. http://proxy.localhost:8080" value={value} onChange={handleChange} />
     </Block>
   );
 };

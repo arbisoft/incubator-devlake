@@ -21,8 +21,8 @@ import { request } from '@/utils';
 
 export const list = (plugin: string): Promise<IConnectionAPI[]> => request(`/plugins/${plugin}/connections`);
 
-export const get = (plugin: string, connectionId: ID): Promise<IConnectionAPI> =>
-  request(`/plugins/${plugin}/connections/${connectionId}`);
+export const get = (plugin: string, connectionId: ID, signal?: AbortSignal): Promise<IConnectionAPI> =>
+  request(`/plugins/${plugin}/connections/${connectionId}`, { signal });
 
 export const create = (plugin: string, payload: Omit<IConnectionAPI, 'id'>): Promise<IConnectionAPI> =>
   request(`/plugins/${plugin}/connections`, { method: 'post', data: payload });
@@ -70,8 +70,9 @@ export const test = (
       | 'customHeaders'
     >
   >,
+  timeout?: number,
 ): Promise<IConnectionTestResult> =>
-  request(`/plugins/${plugin}/connections/${connectionId}/test`, { method: 'post', data: payload });
+  request(`/plugins/${plugin}/connections/${connectionId}/test`, { method: 'post', data: payload, timeout });
 
 export const testOld = (
   plugin: string,

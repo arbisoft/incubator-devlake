@@ -34,7 +34,12 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
-  reporter: [['list'], ['html', { open: 'never' }]],
+  // The JSON report feeds `yarn e2e:census`; override the path per auth state with PLAYWRIGHT_JSON_OUTPUT_NAME.
+  reporter: [
+    ['list'],
+    ['html', { open: 'never' }],
+    ['json', { outputFile: process.env.PLAYWRIGHT_JSON_OUTPUT_NAME ?? 'test-results/results.json' }],
+  ],
   projects: [
     {
       name: 'chromium',

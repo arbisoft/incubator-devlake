@@ -1,0 +1,43 @@
+{
+  "titlePath": [
+    "Project, blueprint, pipeline and webhook flows",
+    "add the connection and scope to the project blueprint"
+  ],
+  "writes": [
+    {
+      "method": "PATCH",
+      "path": "/api/blueprints/:id",
+      "body": {
+        "afterPlan": null,
+        "beforePlan": null,
+        "connections": [
+          {
+            "connectionId": "<masked>",
+            "pluginName": "github",
+            "scopes": [
+              {
+                "scopeId": "<masked>"
+              }
+            ]
+          }
+        ],
+        "createdAt": "<masked>",
+        "cronConfig": "0 0 * * *",
+        "enable": true,
+        "fullSync": false,
+        "id": "<masked>",
+        "isManual": false,
+        "labels": [],
+        "mode": "NORMAL",
+        "name": "e2e-*-Blueprint",
+        "plan": null,
+        "priority": 0,
+        "projectName": "e2e-*",
+        "skipCollectors": false,
+        "skipOnFail": false,
+        "timeAfter": "<masked>",
+        "updatedAt": "<masked>"
+      }
+    }
+  ]
+}

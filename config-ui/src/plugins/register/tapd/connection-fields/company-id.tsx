@@ -16,8 +16,8 @@
  *
  */
 
-import { ChangeEvent, useEffect } from 'react';
 import { Input } from 'antd';
+import { ChangeEvent, useEffect } from 'react';
 
 import { Block } from '@/components';
 
@@ -56,7 +56,7 @@ export const CompanyId = ({ initialValue, value, setValue, setError }: Props) =>
 
   return (
     <Block title="Company ID" description="" required>
-      <Input style={{ width: 386 }} placeholder="Company ID" value={value} onChange={handleChange} />
+      <Input placeholder="Company ID" value={value} onChange={handleChange} />
     </Block>
   );
 };

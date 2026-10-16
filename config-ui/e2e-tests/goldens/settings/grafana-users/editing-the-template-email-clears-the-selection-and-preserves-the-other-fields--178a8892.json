@@ -1,0 +1,19 @@
+{
+  "titlePath": [
+    "Grafana user management ordinary flows",
+    "editing the template email clears the selection and preserves the other fields"
+  ],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/access/grafana/users",
+      "body": {
+        "email": "e2e-*@example.com",
+        "name": "Completed template account",
+        "password": "<masked>",
+        "projectNames": ["e2e-*"],
+        "role": "Editor"
+      }
+    }
+  ]
+}

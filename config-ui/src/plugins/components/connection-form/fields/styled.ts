@@ -18,25 +18,12 @@
 
 import styled from 'styled-components';
 
-export const Label = styled.label`
-  font-size: 16px;
-  font-weight: 600;
-`;
-
-export const LabelInfo = styled.i`
-  color: ${({ theme }) => theme.colors.secondary};
-`;
-
-export const LabelDescription = styled.p`
-  margin: 0;
-`;
-
 export const RateLimit = styled.div`
   display: flex;
   align-items: center;
 
   & > span {
-    margin-left: 8px;
+    margin-left: ${({ theme }) => theme.space.xs}px;
   }
 `;
 

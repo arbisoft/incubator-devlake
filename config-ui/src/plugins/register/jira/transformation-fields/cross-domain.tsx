@@ -16,15 +16,15 @@
  *
  */
 
-import { useEffect, useState } from 'react';
 import { Radio, Button, Collapse } from 'antd';
+import { useEffect, useState } from 'react';
 
 import { ExternalLink } from '@/components';
 import JiraIssueTipsImg from '@/images/jira-issue-tips.png';
 import { DOC_URL } from '@/release';
 
-import { RemoteLink } from './remote-link';
 import { DevPanel } from './dev-panel';
+import { RemoteLink } from './remote-link';
 import * as S from './styled';
 
 interface Props {

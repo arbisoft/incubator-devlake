@@ -16,8 +16,8 @@
  *
  */
 
-import { redirect } from 'react-router-dom';
 import { intersection } from 'lodash';
+import { redirect } from 'react-router-dom';
 
 import API from '@/api';
 import { PATHS } from '@/config';
@@ -37,7 +37,7 @@ export const layoutLoader = async ({ request }: Props) => {
   const onboard = await API.store.get('onboard');
 
   if (!onboard) {
-    return redirect('/onboard');
+    return redirect(PATHS.ONBOARD());
   }
 
   let fePlugins = getRegisterPlugins();

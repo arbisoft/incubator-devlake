@@ -1,0 +1,33 @@
+{
+  "titlePath": [
+    "Blueprint detail views and pipeline panel",
+    "the enabled switch on the Status view is saved to the API and kept after a reload"
+  ],
+  "writes": [
+    {
+      "method": "PATCH",
+      "path": "/api/blueprints/:id",
+      "body": {
+        "afterPlan": null,
+        "beforePlan": null,
+        "connections": [],
+        "createdAt": "<masked>",
+        "cronConfig": "0 0 * * *",
+        "enable": false,
+        "fullSync": false,
+        "id": "<masked>",
+        "isManual": false,
+        "labels": [],
+        "mode": "NORMAL",
+        "name": "e2e-*-toggle",
+        "plan": [],
+        "priority": 0,
+        "projectName": "",
+        "skipCollectors": false,
+        "skipOnFail": true,
+        "timeAfter": "<masked>",
+        "updatedAt": "<masked>"
+      }
+    }
+  ]
+}

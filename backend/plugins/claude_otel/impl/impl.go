@@ -35,12 +35,17 @@ var _ interface {
 	plugin.PluginModel
 	plugin.PluginMigration
 	plugin.ProjectDeleteHook
+	plugin.ProjectRenameHook
 } = (*ClaudeOtel)(nil)
 
 type ClaudeOtel struct{}
 
 func (p ClaudeOtel) BeforeDeleteProject(tx dal.Transaction, projectName string) errors.Error {
 	return service.DeleteProjectPlacementsInTransaction(tx, projectName)
+}
+
+func (p ClaudeOtel) BeforeRenameProject(tx dal.Transaction, oldName string, newName string) errors.Error {
+	return service.RenameProjectPlacementsInTransaction(tx, oldName, newName)
 }
 
 func (p ClaudeOtel) Name() string { return "claude_otel" }

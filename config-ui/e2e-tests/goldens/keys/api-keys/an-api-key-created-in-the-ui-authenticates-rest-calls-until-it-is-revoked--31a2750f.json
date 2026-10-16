@@ -1,0 +1,20 @@
+{
+  "titlePath": ["an API key created in the UI authenticates REST calls until it is revoked"],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/api-keys",
+      "body": {
+        "allowedPath": "^/projects$",
+        "expiredAt": "<masked>",
+        "name": "e2e-*",
+        "type": "devlake"
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/api-keys/:id",
+      "body": null
+    }
+  ]
+}

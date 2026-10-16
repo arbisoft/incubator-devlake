@@ -16,8 +16,8 @@
  *
  */
 
-import { useState, useEffect } from 'react';
 import { Switch, InputNumber } from 'antd';
+import { useState, useEffect } from 'react';
 
 import { Block, ExternalLink } from '@/components';
 

@@ -1,0 +1,88 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+import { WEBHOOK_PLUGIN } from '@/features/connections';
+import type { IConnection } from '@/types';
+import type { BlueprintConnectionPayload } from '@/types/blueprint';
+
+import { COPY, NEW_CONNECTION_VALUE, PLAN_INDENT } from './constants';
+import type { ConnectionCardData, ConnectionOption, PipelinePlan, PipelineTask } from './types';
+
+export const toConnectionKey = (plugin: string, connectionId: ID) => `${plugin}-${connectionId}`;
+
+export const toConnectionCards = (connections: BlueprintConnectionPayload[]): ConnectionCardData[] =>
+  connections
+    .filter(({ pluginName }) => pluginName !== WEBHOOK_PLUGIN)
+    .map(({ pluginName, connectionId, scopes }) => ({
+      key: toConnectionKey(pluginName, connectionId),
+      plugin: pluginName,
+      connectionId,
+      scopeCount: scopes?.length ?? 0,
+    }));
+
+export const buildConnectionOptions = (connections: IConnection[], disabled: string[]): ConnectionOption[] => [
+  { value: NEW_CONNECTION_VALUE, label: COPY.addConnection.createNew, plugin: '' },
+  ...connections
+    .filter(({ unique }) => !disabled.includes(unique))
+    .map(({ unique, name, plugin }) => ({ value: unique, label: name, plugin })),
+];
+
+export const stringifyPlan = (plan: unknown) => JSON.stringify(plan, null, PLAN_INDENT);
+
+const isPipelineTask = (value: unknown): value is PipelineTask => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const { plugin } = value as { plugin?: unknown };
+  return typeof plugin === 'string' && plugin.trim().length > 0;
+};
+
+const isPipelinePlan = (value: unknown): value is PipelinePlan => {
+  if (!Array.isArray(value)) return false;
+  let taskCount = 0;
+  for (const stage of value) {
+    if (!Array.isArray(stage)) return false;
+    for (const task of stage) {
+      if (!isPipelineTask(task)) return false;
+      taskCount += 1;
+    }
+  }
+  return taskCount > 0;
+};
+
+const parsePlanText = (raw: string): unknown => {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+};
+
+export const isEmptyPlanText = (raw: string): boolean => {
+  const parsed = parsePlanText(raw);
+  return Array.isArray(parsed) && parsed.every((stage) => Array.isArray(stage) && stage.length === 0);
+};
+
+export const toPlanPayload = (rawPlan: string): PipelinePlan | undefined => {
+  const parsed = parsePlanText(rawPlan);
+  return isPipelinePlan(parsed) ? parsed : undefined;
+};
+
+export const toScopeConnection = ({ plugin, id }: IConnection, scopeIds: ID[]): BlueprintConnectionPayload => ({
+  pluginName: plugin,
+  connectionId: id,
+  scopes: scopeIds.map((scopeId) => ({ scopeId })),
+});

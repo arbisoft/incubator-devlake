@@ -20,9 +20,8 @@ import { CopyOutlined } from '@ant-design/icons';
 import { Button, Checkbox, Input, Space, message } from 'antd';
 
 import { Block } from '@/components/block';
-import { IPluginConfig } from '@/types';
-
 import Icon from '@/images/plugin-icon.svg?react';
+import { IPluginConfig } from '@/types';
 
 export const NotionConfig: IPluginConfig = {
   plugin: 'notion',
