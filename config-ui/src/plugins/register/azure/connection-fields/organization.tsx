@@ -16,8 +16,8 @@
  *
  */
 
-import React, { useEffect, useState } from 'react';
 import { Input, Radio, type RadioChangeEvent } from 'antd';
+import React, { useEffect, useState } from 'react';
 
 import { Block, ExternalLink } from '@/components';
 import { DOC_URL } from '@/release';
@@ -76,13 +76,7 @@ export const ConnectionOrganization = ({ label, initialValue, value, setValue }:
         </Radio.Group>
       </Block>
       <Block>
-        <Input
-          style={{ width: 386 }}
-          placeholder="Your organization"
-          value={value}
-          onChange={handleChangeValue}
-          disabled={!settings.scoped}
-        />
+        <Input placeholder="Your organization" value={value} onChange={handleChangeValue} disabled={!settings.scoped} />
       </Block>
     </>
   );

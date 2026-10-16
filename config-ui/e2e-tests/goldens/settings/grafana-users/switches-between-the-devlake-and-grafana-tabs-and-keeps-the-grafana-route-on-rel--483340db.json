@@ -1,0 +1,7 @@
+{
+  "titlePath": [
+    "Grafana user management ordinary flows",
+    "switches between the DevLake and Grafana tabs and keeps the Grafana route on reload"
+  ],
+  "writes": []
+}

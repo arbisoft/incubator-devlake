@@ -199,7 +199,7 @@ func (f *fakeGrafana) handleWrite(w http.ResponseWriter, r *http.Request, body m
 		}
 		f.nextID++
 		created := fakeUser{grafanaUser: grafanaUser{ID: f.nextID, Login: str(body, "login"), Email: str(body, "email"), Name: str(body, "name")}}
-		if !f.noAutoJoin {
+		if orgID, _ := body["OrgId"].(float64); orgID == 7 && !f.noAutoJoin {
 			created.role = roleViewer
 		}
 		f.put(created)
@@ -878,5 +878,68 @@ func TestListUsersOmitsPlaceholderLastSeenAt(t *testing.T) {
 		if got[email] != w {
 			t.Errorf("%s lastSeenAt = %q, want %q", email, got[email], w)
 		}
+	}
+}
+
+func TestManagementIdentityConfiguredByEmailIsHiddenAndProtected(t *testing.T) {
+	const configured = "svc@example.com"
+	newEmailService := func(f *fakeGrafana, mappings mappingStore) *Service {
+		client, err := newGrafanaClient(f.server.URL, configured, fakeManagementPassword, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return newServiceWithDependencies(client, configured, mappings, nil)
+	}
+	list := func(s *Service, query string, page, size int) *ListResponse {
+		result, err := s.ListUsers(t.Context(), customerAdmin(), ListQuery{Query: query, Page: page, PageSize: size})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return result
+	}
+
+	f := newFakeGrafana(t)
+	seedDirectory(f)
+	service := newEmailService(f, &fakeMappings{})
+	result := list(service, "", 1, 20)
+	if result.Count != 3 || len(result.Users) != 3 || result.Users[0].ID == 1 {
+		t.Fatalf("result = %#v", result)
+	}
+	if result = list(service, "", 2, 2); result.Count != 3 || len(result.Users) != 2 {
+		t.Fatalf("off-page result = %#v", result)
+	}
+	if result = list(service, fakeManagementUser, 2, 1); result.Count != 0 || len(result.Users) != 0 {
+		t.Fatalf("real-login query result = %#v", result)
+	}
+	if n := len(f.requestsTo("/api/user")); n != 1 {
+		t.Fatalf("/api/user requests = %d, want 1", n)
+	}
+
+	fx := newFixture(t)
+	fx.s = newEmailService(fx.f, fx.m)
+	_, err := fx.s.SetUserProjects(t.Context(), customerAdmin(), "a", 1, ProjectsInput{ProjectNames: []string{"beta"}})
+	wantCode(t, err, errors.Forbidden, ErrCodeUserProtected)
+	if len(fx.writes()) != 0 || len(fx.m.calls) != 0 {
+		t.Fatalf("writes = %d, mapping calls = %d, want 0", len(fx.writes()), len(fx.m.calls))
+	}
+	if _, err = fx.s.SetUserProjects(t.Context(), customerAdmin(), "a", 4, ProjectsInput{ProjectNames: []string{"beta"}}); err != nil {
+		t.Fatalf("another server admin: %v", err)
+	}
+}
+
+func TestIsManagementUserFallsBackToLoginUntilTheIDIsKnown(t *testing.T) {
+	f := newFakeGrafana(t)
+	service := f.service(t, nil, &fakeMappings{})
+	if !service.isManagementUser(99, strings.ToUpper(fakeManagementUser)) {
+		t.Fatal("configured login not recognized before the id is known")
+	}
+	if _, err := service.managedOrgID(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if service.isManagementUser(99, fakeManagementUser) {
+		t.Fatal("a different account with the configured login was treated as the management identity")
+	}
+	if !service.isManagementUser(1, "other") {
+		t.Fatal("the management id was not recognized")
 	}
 }

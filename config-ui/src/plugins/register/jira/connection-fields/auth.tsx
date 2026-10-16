@@ -16,9 +16,9 @@
  *
  */
 
-import { useState, useEffect } from 'react';
 import type { RadioChangeEvent } from 'antd';
 import { Radio, Input } from 'antd';
+import { useState, useEffect } from 'react';
 
 import { Block, ExternalLink } from '@/components';
 import { DOC_URL } from '@/release';
@@ -205,12 +205,7 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
             }
             required
           >
-            <Input
-              style={{ width: 386 }}
-              placeholder="Your Endpoint URL"
-              value={values.endpoint}
-              onChange={handleChangeEndpoint}
-            />
+            <Input placeholder="Your Endpoint URL" value={values.endpoint} onChange={handleChangeEndpoint} />
           </Block>
         )}
       </Block>
@@ -223,7 +218,6 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
             required
           >
             <Input
-              style={{ width: 386 }}
               placeholder="e.g. a1b2c3d4-e5f6-7890-abcd-ef1234567890"
               value={cloudId}
               onChange={handleChangeCloudId}
@@ -242,7 +236,6 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
               required
             >
               <Input.Password
-                style={{ width: 386 }}
                 placeholder={type === 'update' ? '********' : 'Your Scoped API Token'}
                 value={values.token}
                 onChange={handleChangeToken}
@@ -256,16 +249,10 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
                 description="OAuth 2.0 client ID from an Atlassian app (client-credentials / 2LO)."
                 required
               >
-                <Input
-                  style={{ width: 386 }}
-                  placeholder="OAuth 2.0 Client ID"
-                  value={values.clientId}
-                  onChange={handleChangeClientId}
-                />
+                <Input placeholder="OAuth 2.0 Client ID" value={values.clientId} onChange={handleChangeClientId} />
               </Block>
               <Block title="Client Secret" required>
                 <Input.Password
-                  style={{ width: 386 }}
                   placeholder={type === 'update' ? '********' : 'OAuth 2.0 Client Secret'}
                   value={values.clientSecret}
                   onChange={handleChangeClientSecret}
@@ -279,12 +266,7 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
       {version === 'cloud' && (
         <>
           <Block title="E-Mail" required>
-            <Input
-              style={{ width: 386 }}
-              placeholder="Your E-Mail"
-              value={values.username}
-              onChange={handleChangeUsername}
-            />
+            <Input placeholder="Your E-Mail" value={values.username} onChange={handleChangeUsername} />
           </Block>
           <Block
             title="API Token"
@@ -294,7 +276,6 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
             required
           >
             <Input
-              style={{ width: 386 }}
               placeholder={type === 'update' ? '********' : 'Your PAT'}
               value={values.password}
               onChange={handleChangePassword}
@@ -314,16 +295,10 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
           {values.authMethod === 'BasicAuth' && (
             <>
               <Block title="Username" required>
-                <Input
-                  style={{ width: 386 }}
-                  placeholder="Your Username"
-                  value={values.username}
-                  onChange={handleChangeUsername}
-                />
+                <Input placeholder="Your Username" value={values.username} onChange={handleChangeUsername} />
               </Block>
               <Block title="Password" required>
                 <Input.Password
-                  style={{ width: 386 }}
                   placeholder={type === 'update' ? '********' : 'Your Password'}
                   value={values.password}
                   onChange={handleChangePassword}
@@ -342,7 +317,6 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
               required
             >
               <Input.Password
-                style={{ width: 386 }}
                 placeholder={type === 'update' ? '********' : 'Your Password'}
                 value={values.token}
                 onChange={handleChangeToken}

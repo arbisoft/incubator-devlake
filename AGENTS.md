@@ -124,6 +124,19 @@ helper.ConnectLocalServer(t, &helper.LocalClientConfig{
 })
 ```
 
+### Config UI Quality Checks
+Run from `config-ui/` before a config-ui PR (all read-only; see `config-ui/LINT_TOOLING_SETUP.md`):
+```bash
+yarn lint:quality      # ESLint quality rules (eslint.quality.config.mjs)
+yarn find:dead-code    # knip
+yarn find:duplicates   # jscpd
+yarn quality:baseline  # fails if any count grows past quality.baseline.json
+```
+- The tools have false positives: triage each finding, and never run a blind `--fix`.
+- Files you substantively edit must have 0 `lint:quality` errors.
+- Counts may not exceed `quality.baseline.json`; lower it with `yarn quality:baseline --write`.
+- Remove dead code you find, upstream-owned files included.
+
 ## Python Plugins
 Located in `backend/python/plugins/`. Use Poetry for dependencies. See [backend/python/README.md](backend/python/README.md).
 

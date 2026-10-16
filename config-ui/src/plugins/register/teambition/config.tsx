@@ -17,7 +17,6 @@
  */
 
 import { DOC_URL } from '@/release';
-
 import { IPluginConfig } from '@/types';
 
 import Icon from './assets/icon.svg?react';

@@ -1,0 +1,40 @@
+{
+  "titlePath": [
+    "GitHub data scope and scope config on a connection",
+    "create a scope config from the UI and associate it with the scope"
+  ],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/plugins/github/connections/:id/scope-configs",
+      "body": {
+        "deploymentPattern": "",
+        "entities": ["CODE", "TICKET", "CODEREVIEW", "CROSS", "CICD"],
+        "envNamePattern": "(?i)prod(.*)",
+        "issueComponent": "component(.*)",
+        "issuePriority": "(highest|high|medium|low|p0|p1|p2|p3)",
+        "issueSeverity": "severity(.*)",
+        "issueTypeBug": "(bug|broken)",
+        "issueTypeIncident": "(incident|failure)",
+        "issueTypeRequirement": "(feat|feature|proposal|requirement)",
+        "name": "e2e-*",
+        "prBodyClosePattern": "(?mi)(fix|close|resolve|fixes|closes|resolves|fixed|closed|resolved)[\\s]*.*(((and )?(#|https:\\/\\/github.com\\/%s\\/issues\\/)\\d+[ ]*)+)",
+        "prComponent": "component(.*)",
+        "prSizeExcludedFileExtensions": [],
+        "prType": "type(.*)",
+        "productionPattern": "",
+        "refdiff": {
+          "tagsLimit": 10,
+          "tagsPattern": "/v\\d+\\.\\d+(\\.\\d+(-rc)*\\d*)*$/"
+        }
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/plugins/github/connections/:id/scopes/:id",
+      "body": {
+        "scopeConfigId": "<masked>"
+      }
+    }
+  ]
+}

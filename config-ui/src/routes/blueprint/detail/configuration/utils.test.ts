@@ -1,0 +1,120 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+import { describe, expect, it } from 'vitest';
+
+import type { IConnection } from '@/types';
+
+import { COPY, NEW_CONNECTION_VALUE } from './constants';
+import {
+  buildConnectionOptions,
+  isEmptyPlanText,
+  stringifyPlan,
+  toConnectionCards,
+  toConnectionKey,
+  toPlanPayload,
+  toScopeConnection,
+} from './utils';
+
+const connection = (plugin: string, id: number, name: string) =>
+  ({ unique: toConnectionKey(plugin, id), plugin, id, name }) as IConnection;
+
+describe('connection cards', () => {
+  it('maps each connection with its scope count and leaves webhooks out', () => {
+    expect(
+      toConnectionCards([
+        { pluginName: 'github', connectionId: 1, scopes: [{ scopeId: 'a' }, { scopeId: 'b' }] },
+        { pluginName: 'webhook', connectionId: 9, scopes: [] },
+        { pluginName: 'jira', connectionId: 2 },
+      ]),
+    ).toEqual([
+      { key: 'github-1', plugin: 'github', connectionId: 1, scopeCount: 2 },
+      { key: 'jira-2', plugin: 'jira', connectionId: 2, scopeCount: 0 },
+    ]);
+  });
+});
+
+describe('add connection options', () => {
+  const connections = [connection('github', 1, 'gh'), connection('jira', 2, 'jr')];
+
+  it('starts with the create-new option', () => {
+    expect(buildConnectionOptions(connections, [])[0]).toEqual({
+      value: NEW_CONNECTION_VALUE,
+      label: COPY.addConnection.createNew,
+      plugin: '',
+    });
+  });
+
+  it('lists the connections that are not added yet', () => {
+    expect(buildConnectionOptions(connections, ['github-1']).slice(1)).toEqual([
+      { value: 'jira-2', label: 'jr', plugin: 'jira' },
+    ]);
+  });
+});
+
+describe('connection payload', () => {
+  it('names the plugin, the connection and each chosen scope', () => {
+    expect(toScopeConnection(connection('github', 1, 'gh'), ['a', 7])).toEqual({
+      pluginName: 'github',
+      connectionId: 1,
+      scopes: [{ scopeId: 'a' }, { scopeId: 7 }],
+    });
+  });
+});
+
+describe('advanced plan', () => {
+  it('saves a valid plan as parsed JSON', () => {
+    expect(toPlanPayload('[[{"plugin":"github"}]]')).toEqual([[{ plugin: 'github' }]]);
+  });
+
+  it('preserves arbitrary task fields and permits empty stages beside tasks', () => {
+    const raw =
+      '[[{"plugin":"github","options":{"include":["issues"]},"custom":true}],[{"plugin":"jira","subtasks":[{"name":"issues"}]}]]';
+    expect(toPlanPayload(raw)).toEqual([
+      [{ plugin: 'github', options: { include: ['issues'] }, custom: true }],
+      [{ plugin: 'jira', subtasks: [{ name: 'issues' }] }],
+    ]);
+    expect(toPlanPayload('[[],[{"plugin":"github"}],[]]')).toEqual([[], [{ plugin: 'github' }], []]);
+  });
+
+  it('preserves valid plugin text while rejecting whitespace-only plugin names', () => {
+    expect(toPlanPayload('[[{"plugin":" github "}]]')).toEqual([[{ plugin: ' github ' }]]);
+    expect(toPlanPayload('[[{"plugin":"   "}]]')).toBeUndefined();
+  });
+
+  it.each(['[[]]', '[]', '{ not json', '{}', 'null', '[{}]', '[[{}]]', '[[null]]', '[[[]]]', '[[{"plugin":""}]]'])(
+    'rejects empty or malformed plans',
+    (raw) => {
+      expect(toPlanPayload(raw)).toBeUndefined();
+    },
+  );
+
+  it('does not constrain arbitrary values used by plan stringification', () => {
+    expect(stringifyPlan([[1]])).toBe('[\n  [\n    1\n  ]\n]');
+  });
+});
+
+describe('empty plan text', () => {
+  it.each(['[]', '[[]]', '[[],[]]', '[\n  []\n]', '[\n  [],\n  []\n]', '[\n  [\n  ]\n]'])('accepts %j', (raw) => {
+    expect(isEmptyPlanText(raw)).toBe(true);
+  });
+
+  it.each(['[[{"plugin":"x"}]]', '{}', '[1]', '[[], [{"plugin":"x"}]]', '[[', ''])('rejects %j', (raw) => {
+    expect(isEmptyPlanText(raw)).toBe(false);
+  });
+});

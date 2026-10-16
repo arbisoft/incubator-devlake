@@ -16,9 +16,9 @@
  *
  */
 
-import { configureStore, ThunkAction, Action } from '@reduxjs/toolkit';
+import { configureStore } from '@reduxjs/toolkit';
 
-import { connectionsSlice, themeSlice } from '@/features';
+import { connectionsSlice, themeSlice, writeStoredHealth } from '@/features';
 
 export const store = configureStore({
   reducer: {
@@ -27,6 +27,13 @@ export const store = configureStore({
   },
 });
 
+let persistedHealth = store.getState().connections.health;
+store.subscribe(() => {
+  const { health } = store.getState().connections;
+  if (health === persistedHealth) return;
+  persistedHealth = health;
+  writeStoredHealth(health);
+});
+
 export type AppDispatch = typeof store.dispatch;
 export type RootState = ReturnType<typeof store.getState>;
-export type AppThunk<ReturnType = void> = ThunkAction<ReturnType, RootState, unknown, Action<string>>;

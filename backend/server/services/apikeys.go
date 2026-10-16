@@ -18,6 +18,8 @@ limitations under the License.
 package services
 
 import (
+	"strings"
+
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/models"
@@ -28,6 +30,18 @@ import (
 // ApiKeysQuery used to query api keys as the api key input
 type ApiKeysQuery struct {
 	Pagination
+	SortQuery
+	Keyword string `form:"keyword"`
+}
+
+var apiKeysSortSpec = sortSpec{
+	columns: map[string]string{
+		"name":      "_devlake_api_keys.name",
+		"expiredAt": "_devlake_api_keys.expired_at",
+		"createdAt": "_devlake_api_keys.created_at",
+	},
+	defaultColumn: "_devlake_api_keys.created_at",
+	tieBreaker:    "_devlake_api_keys.id",
 }
 
 // GetApiKeys returns a paginated list of api keys based on `query`
@@ -36,9 +50,16 @@ func GetApiKeys(query *ApiKeysQuery) ([]*models.ApiKey, int64, errors.Error) {
 	if err := VerifyStruct(query); err != nil {
 		return nil, 0, err
 	}
+	orderBy, err := query.orderBy(apiKeysSortSpec)
+	if err != nil {
+		return nil, 0, err
+	}
 	clauses := []dal.Clause{
 		dal.From(&models.ApiKey{}),
 		dal.Where("type = ?", "devlake"),
+	}
+	if keyword := strings.ToLower(query.Keyword); keyword != "" {
+		clauses = append(clauses, dal.Where("LOWER(name) LIKE ?", "%"+keyword+"%"))
 	}
 
 	logger.Info("query: %+v", query)
@@ -48,7 +69,7 @@ func GetApiKeys(query *ApiKeysQuery) ([]*models.ApiKey, int64, errors.Error) {
 	}
 
 	clauses = append(clauses,
-		dal.Orderby("created_at DESC"),
+		dal.Orderby(orderBy),
 		dal.Offset(query.GetSkip()),
 		dal.Limit(query.GetPageSize()),
 	)

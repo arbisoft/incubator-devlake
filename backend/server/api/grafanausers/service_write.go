@@ -171,10 +171,26 @@ func (s *Service) resolveTarget(ctx context.Context, id int64) (*grafanaUser, er
 }
 
 func (s *Service) refuseManagement(target *grafanaUser) errors.Error {
-	if s.isManagementLogin(target.Login) {
+	if s.isManagementUser(target.ID, target.Login) {
 		return userProtectedError()
 	}
 	return nil
+}
+
+// resolveManagedTarget returns the account and its managed-org role, treating non-members as not found.
+func (s *Service) resolveManagedTarget(ctx context.Context, orgID, id int64) (*grafanaUser, string, errors.Error) {
+	target, err := s.resolveTarget(ctx, id)
+	if err != nil {
+		return nil, "", err
+	}
+	role, err := s.orgRole(ctx, orgID, id)
+	if err != nil {
+		return nil, "", err
+	}
+	if role == "" {
+		return nil, "", userNotFoundError()
+	}
+	return target, role, nil
 }
 
 // refuseProtected blocks every write on the management identity and any other server admin.
@@ -202,7 +218,7 @@ func (s *Service) orgRole(ctx context.Context, orgID, userID int64) (string, err
 	return "", nil
 }
 
-// guardLastAdmin refuses a change that would leave the org without an enabled Admin.
+// guardLastAdmin refuses a change that would leave the org without another enabled visible Admin.
 func (s *Service) guardLastAdmin(ctx context.Context, orgID int64, target *grafanaUser, role string) errors.Error {
 	if role != roleAdmin || target.IsDisabled {
 		return nil
@@ -225,7 +241,7 @@ func (s *Service) enabledAdminsOtherThan(ctx context.Context, orgID, userID int6
 			return 0, unavailableError()
 		}
 		for _, user := range result.OrgUsers {
-			if user.UserID != userID && user.Role == roleAdmin && !user.IsDisabled {
+			if user.UserID != userID && !s.isManagementUser(user.UserID, user.Login) && user.Role == roleAdmin && !user.IsDisabled {
 				count++
 			}
 		}
@@ -304,7 +320,7 @@ func (s *Service) CreateUser(ctx context.Context, admin *access.Principal, actor
 	if err != nil {
 		return nil, err
 	}
-	id, clientErr := s.client.createUser(ctx, name, email, email, input.Password)
+	id, clientErr := s.client.createUser(ctx, orgID, name, email, email, input.Password)
 	if clientErr != nil {
 		return nil, classify(clientErr, statusMap{
 			http.StatusPreconditionFailed: userExistsError,
@@ -371,7 +387,7 @@ func (s *Service) PatchUser(ctx context.Context, admin *access.Principal, actor 
 	if err != nil {
 		return nil, err
 	}
-	target, err := s.resolveTarget(ctx, id)
+	target, currentRole, err := s.resolveManagedTarget(ctx, orgID, id)
 	if err != nil {
 		return nil, err
 	}
@@ -382,12 +398,6 @@ func (s *Service) PatchUser(ctx context.Context, admin *access.Principal, actor 
 	profileChange := (input.Name != nil && name != target.Name) ||
 		(input.Email != nil && (email != target.Email || email != target.Login))
 	roleChange, disableChange := false, false
-	currentRole := ""
-	if input.Role != nil || input.Disabled != nil {
-		if currentRole, err = s.orgRole(ctx, orgID, id); err != nil {
-			return nil, err
-		}
-	}
 	if input.Role != nil && *input.Role != currentRole {
 		roleChange = true
 	}
@@ -474,20 +484,10 @@ func (s *Service) applyProfile(ctx context.Context, actor string, target *grafan
 }
 
 func (s *Service) applyRole(ctx context.Context, actor string, orgID int64, target *grafanaUser, current, role string) errors.Error {
-	var clientErr error
-	if current == "" {
-		clientErr = s.client.addOrgUser(ctx, orgID, target.Login, role)
-	} else {
-		clientErr = s.client.setOrgRole(ctx, orgID, target.ID, role)
-	}
-	if clientErr != nil {
+	if clientErr := s.client.setOrgRole(ctx, orgID, target.ID, role); clientErr != nil {
 		return classify(clientErr, statusMap{http.StatusNotFound: userNotFoundError})
 	}
-	before := current
-	if before == "" {
-		before = "None"
-	}
-	s.record(actor, auditRole, target.Email, auditDetail(target, fmt.Sprintf("role=%s->%s", before, role)))
+	s.record(actor, auditRole, target.Email, auditDetail(target, fmt.Sprintf("role=%s->%s", current, role)))
 	return nil
 }
 
@@ -522,7 +522,7 @@ func (s *Service) SetUserProjects(ctx context.Context, admin *access.Principal, 
 	if err != nil {
 		return nil, err
 	}
-	target, err := s.resolveTarget(ctx, id)
+	target, _, err := s.resolveManagedTarget(ctx, orgID, id)
 	if err != nil {
 		return nil, err
 	}
@@ -572,7 +572,11 @@ func (s *Service) SetUserPassword(ctx context.Context, admin *access.Principal, 
 	if err := s.configured(); err != nil {
 		return err
 	}
-	target, err := s.resolveTarget(ctx, id)
+	orgID, err := s.managedOrgID(ctx)
+	if err != nil {
+		return err
+	}
+	target, _, err := s.resolveManagedTarget(ctx, orgID, id)
 	if err != nil {
 		return err
 	}
@@ -607,15 +611,11 @@ func (s *Service) DeleteUser(ctx context.Context, admin *access.Principal, actor
 	if err != nil {
 		return err
 	}
-	target, err := s.resolveTarget(ctx, id)
+	target, role, err := s.resolveManagedTarget(ctx, orgID, id)
 	if err != nil {
 		return err
 	}
 	if err = s.refuseProtected(target); err != nil {
-		return err
-	}
-	role, err := s.orgRole(ctx, orgID, id)
-	if err != nil {
 		return err
 	}
 	if err = s.guardLastAdmin(ctx, orgID, target, role); err != nil {

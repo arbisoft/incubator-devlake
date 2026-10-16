@@ -18,7 +18,12 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { buildConnectionSavePayload } from './payload';
+import {
+  buildChangedTestPayload,
+  buildConnectionSavePayload,
+  buildNewTestPayload,
+  sanitizeCustomHeaders,
+} from './payload';
 
 describe('plugins/components/connection-form/payload', () => {
   it('preserves plugin defaults when save values only include touched fields', () => {
@@ -209,6 +214,62 @@ describe('plugins/components/connection-form/payload', () => {
       endpoint: 'https://api.anthropic.com/v1/',
       customHeaders: [{ key: 'X-Middleware-Auth', value: 'secret' }],
       name: 'Claude Code',
+    });
+  });
+});
+
+describe('plugins/components/connection-form/payload test payloads', () => {
+  it('drops blank custom headers and trims header names', () => {
+    expect(
+      sanitizeCustomHeaders([{ key: ' X-Trace ', value: 'a' }, { key: '  ', value: '' }, { value: 'orphan' }]),
+    ).toStrictEqual([
+      { key: 'X-Trace', value: 'a' },
+      { key: '', value: 'orphan' },
+    ]);
+  });
+
+  it('keeps an absent header list absent', () => {
+    expect(sanitizeCustomHeaders(undefined)).toBeUndefined();
+  });
+
+  it('sends only the fields an edit changed', () => {
+    const payload = buildChangedTestPayload(
+      { endpoint: 'https://api.github.com/', token: '***', enterprise: false, cloudId: 'cloud-1' },
+      { endpoint: 'https://api.github.com/', token: 'new-token', enterprise: true, cloudId: 'cloud-1' },
+      undefined,
+    );
+
+    expect(JSON.parse(JSON.stringify(payload))).toStrictEqual({ token: 'new-token', enterprise: true });
+  });
+
+  it('compares custom headers in their sanitized form', () => {
+    const saved = { customHeaders: [{ key: 'X-Trace', value: 'a' }] };
+
+    expect(buildChangedTestPayload(saved, {}, [{ key: 'X-Trace', value: 'a' }]).customHeaders).toBeUndefined();
+    expect(buildChangedTestPayload(saved, {}, [{ key: 'X-Trace', value: 'b' }]).customHeaders).toStrictEqual([
+      { key: 'X-Trace', value: 'b' },
+    ]);
+  });
+
+  it('sends nothing for an edit with no changes', () => {
+    const payload = buildChangedTestPayload({ endpoint: 'e' }, { endpoint: 'e' }, undefined);
+
+    expect(JSON.parse(JSON.stringify(payload))).toStrictEqual({});
+  });
+
+  it('builds the test of a new connection from defaults, form values and headers', () => {
+    const payload = buildNewTestPayload(
+      { endpoint: 'https://api.github.com/', enterprise: false, notSent: 'x' },
+      { name: 'gh', token: 't' },
+      [{ key: 'X-Trace', value: 'a' }],
+    );
+
+    expect(payload).toStrictEqual({
+      endpoint: 'https://api.github.com/',
+      enterprise: false,
+      name: 'gh',
+      token: 't',
+      customHeaders: [{ key: 'X-Trace', value: 'a' }],
     });
   });
 });

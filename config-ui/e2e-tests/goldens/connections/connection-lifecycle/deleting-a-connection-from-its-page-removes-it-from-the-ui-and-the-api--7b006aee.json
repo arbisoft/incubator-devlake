@@ -1,0 +1,10 @@
+{
+  "titlePath": ["deleting a connection from its page removes it from the UI and the API"],
+  "writes": [
+    {
+      "method": "DELETE",
+      "path": "/api/plugins/github/connections/:id",
+      "body": null
+    }
+  ]
+}

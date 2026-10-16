@@ -121,6 +121,9 @@ func TestCreateUserWhenTheOrgAlreadyHasTheAccountAsViewer(t *testing.T) {
 		created[0].body["name"] != "New User" || created[0].body["password"] != testPassword || created[0].user != fakeManagementUser {
 		t.Fatalf("create request = %#v", created)
 	}
+	if created[0].body["OrgId"] != float64(7) {
+		t.Fatalf("create OrgId = %#v, want 7", created[0].body["OrgId"])
+	}
 	if len(fx.writes()) != 1 {
 		t.Fatalf("writes = %#v, want only the create", fx.writes())
 	}
@@ -212,6 +215,20 @@ func TestCreateUserPartialAfterRoleFailureKeepsTheAccount(t *testing.T) {
 	}
 	if event := fx.a.last(t); event.action != "grafana_user.create" || !strings.Contains(event.detail, "partial=true") {
 		t.Fatalf("event = %#v", event)
+	}
+}
+
+func TestCreateUserPartialThenRetryThroughPatchUserSucceeds(t *testing.T) {
+	fx := newFixture(t)
+	fx.f.forced["PATCH /api/orgs/7/users/101"] = http.StatusInternalServerError
+	_, err := fx.s.CreateUser(t.Context(), customerAdmin(), "a", CreateUserInput{Email: "n@example.com", Name: "N", Role: "Editor", Password: testPassword})
+	wantPartial(t, err, 101)
+	delete(fx.f.forced, "PATCH /api/orgs/7/users/101")
+	if _, err = fx.s.PatchUser(t.Context(), customerAdmin(), "a", 101, PatchUserInput{Role: str2("Editor")}); err != nil {
+		t.Fatal(err)
+	}
+	if got := fx.f.users[101].role; got != "Editor" {
+		t.Fatalf("role after retry = %q, want Editor", got)
 	}
 }
 
@@ -366,14 +383,57 @@ func TestPatchUserRoleAndDisabled(t *testing.T) {
 	}
 }
 
-func TestPatchUserAddsAnAccountOutsideTheOrgWhenGivenARole(t *testing.T) {
+func TestPatchUserRefusesAnAccountOutsideTheOrgEvenWhenGivenARole(t *testing.T) {
 	fx := newFixture(t)
 	fx.f.users[2].role = ""
-	if _, err := fx.s.PatchUser(t.Context(), customerAdmin(), "a", 2, PatchUserInput{Role: str2("Editor")}); err != nil {
-		t.Fatal(err)
+	_, err := fx.s.PatchUser(t.Context(), customerAdmin(), "a", 2, PatchUserInput{Role: str2("Editor")})
+	wantCode(t, err, errors.NotFound, ErrCodeUserNotFound)
+	if len(fx.requestsMatching(http.MethodPost, "/api/orgs/7/users")) != 0 || len(fx.writes()) != 0 || len(fx.m.calls) != 0 || len(fx.a.events) != 0 {
+		t.Fatalf("writes = %d, mapping calls = %d, events = %d", len(fx.writes()), len(fx.m.calls), len(fx.a.events))
 	}
-	if len(fx.requestsMatching(http.MethodPost, "/api/orgs/7/users")) != 1 {
-		t.Fatalf("writes = %#v", fx.writes())
+}
+
+func TestWritesRefuseAccountsOutsideTheManagedOrg(t *testing.T) {
+	writes := map[string]func(fx *fixture) errors.Error{
+		"patch name": func(fx *fixture) errors.Error {
+			_, err := fx.s.PatchUser(t.Context(), customerAdmin(), "a", 2, PatchUserInput{Name: str2("Other")})
+			return err
+		},
+		"patch email": func(fx *fixture) errors.Error {
+			_, err := fx.s.PatchUser(t.Context(), customerAdmin(), "a", 2, PatchUserInput{Email: str2("x@example.com")})
+			return err
+		},
+		"patch role": func(fx *fixture) errors.Error {
+			_, err := fx.s.PatchUser(t.Context(), customerAdmin(), "a", 2, PatchUserInput{Role: str2("Viewer")})
+			return err
+		},
+		"patch disabled": func(fx *fixture) errors.Error {
+			_, err := fx.s.PatchUser(t.Context(), customerAdmin(), "a", 2, PatchUserInput{Disabled: flag(true)})
+			return err
+		},
+		"set password": func(fx *fixture) errors.Error {
+			return fx.s.SetUserPassword(t.Context(), customerAdmin(), "a", 2, PasswordInput{Password: testPassword})
+		},
+		"delete": func(fx *fixture) errors.Error {
+			return fx.s.DeleteUser(t.Context(), customerAdmin(), "a", 2)
+		},
+		"set projects": func(fx *fixture) errors.Error {
+			_, err := fx.s.SetUserProjects(t.Context(), customerAdmin(), "a", 2, ProjectsInput{ProjectNames: []string{"beta"}})
+			return err
+		},
+	}
+	for name, write := range writes {
+		t.Run(name, func(t *testing.T) {
+			fx := newFixture(t)
+			fx.f.users[2].role = ""
+			wantCode(t, write(fx), errors.NotFound, ErrCodeUserNotFound)
+			if n := len(fx.writes()); n != 0 {
+				t.Fatalf("%d non-GET Grafana requests, want 0", n)
+			}
+			if len(fx.m.calls) != 0 || len(fx.a.events) != 0 {
+				t.Fatalf("mapping calls = %d, audit events = %d, want 0", len(fx.m.calls), len(fx.a.events))
+			}
+		})
 	}
 }
 
@@ -776,11 +836,14 @@ func TestEveryWriteFailsClosedOnGrafanaErrors(t *testing.T) {
 			_, err := fx.s.PatchUser(t.Context(), customerAdmin(), "a", 2, PatchUserInput{Name: str2("x")})
 			return err
 		}, errors.Conflict, ErrCodeUserSSOManaged},
-		{"org add 500", "POST /api/orgs/7/users", 500, func(fx *fixture) errors.Error {
+		{"org add 500 for a non-member", "POST /api/orgs/7/users", 500, func(fx *fixture) errors.Error {
 			fx.f.users[2].role = ""
 			_, err := fx.s.PatchUser(t.Context(), customerAdmin(), "a", 2, PatchUserInput{Role: str2("Admin")})
+			if len(fx.requestsMatching(http.MethodPost, "/api/orgs/7/users")) != 0 {
+				t.Error("an org-add POST was sent for a non-member")
+			}
 			return err
-		}, errors.Unavailable, ErrCodeUnavailable},
+		}, errors.NotFound, ErrCodeUserNotFound},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -815,5 +878,54 @@ func TestNoAuditEventCarriesThePassword(t *testing.T) {
 	}
 	if strings.Join(actions, ",") != "grafana_user.create,grafana_user.password,grafana_user.projects,grafana_user.delete" {
 		t.Fatalf("actions = %v", actions)
+	}
+}
+
+func TestLastVisibleAdminExcludesManagementIdentity(t *testing.T) {
+	attempts := map[string]func(fx *fixture) errors.Error{
+		"demote": func(fx *fixture) errors.Error {
+			_, err := fx.s.PatchUser(t.Context(), customerAdmin(), "a", 5, PatchUserInput{Role: str2("Viewer")})
+			return err
+		},
+		"disable": func(fx *fixture) errors.Error {
+			_, err := fx.s.PatchUser(t.Context(), customerAdmin(), "a", 5, PatchUserInput{Disabled: flag(true)})
+			return err
+		},
+		"delete": func(fx *fixture) errors.Error {
+			return fx.s.DeleteUser(t.Context(), customerAdmin(), "a", 5)
+		},
+	}
+	setup := func(fx *fixture) {
+		fx.f.users[1].role = roleAdmin
+		fx.f.setOrgUser(fx.f.users[1])
+		fx.f.users[4].role = roleViewer
+		fx.f.setOrgUser(fx.f.users[4])
+	}
+	for name, attempt := range attempts {
+		t.Run(name+" refused with only the management identity left", func(t *testing.T) {
+			fx := newFixture(t)
+			setup(fx)
+			wantCode(t, attempt(fx), errors.Conflict, ErrCodeLastAdmin)
+			if len(fx.writes()) != 0 || len(fx.m.calls) != 0 || len(fx.a.events) != 0 {
+				t.Fatalf("writes = %d, mapping calls = %d, events = %d", len(fx.writes()), len(fx.m.calls), len(fx.a.events))
+			}
+		})
+		t.Run(name+" allowed with another visible admin", func(t *testing.T) {
+			fx := newFixture(t)
+			setup(fx)
+			fx.f.put(fakeUser{grafanaUser: grafanaUser{ID: 6, Login: "dana@example.com", Email: "dana@example.com", Name: "Dana"}, role: roleAdmin})
+			if err := attempt(fx); err != nil {
+				t.Fatal(err)
+			}
+		})
+		t.Run(name+" allowed with a visible server admin", func(t *testing.T) {
+			fx := newFixture(t)
+			setup(fx)
+			fx.f.users[4].role = roleAdmin
+			fx.f.setOrgUser(fx.f.users[4])
+			if err := attempt(fx); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }

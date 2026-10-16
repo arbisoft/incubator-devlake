@@ -22,7 +22,7 @@ export interface ICustomHeader {
 }
 
 export interface IConnectionAPI {
-  [key: string]: any;
+  [key: string]: unknown;
   id: ID;
   name: string;
   endpoint: string;
@@ -64,6 +64,7 @@ export interface IConnectionTestResult {
     success: boolean;
     login: string;
     warning: boolean;
+    message?: string;
   }>;
 }
 
@@ -77,7 +78,7 @@ export interface IConnectionOldTestResult {
       login: string;
     };
   }>;
-  warning?: string;
+  warning?: boolean;
 }
 
 export enum IConnectionStatus {
@@ -88,7 +89,7 @@ export enum IConnectionStatus {
 }
 
 export interface IConnection {
-  [key: string]: any;
+  [key: string]: unknown;
   unique: string;
   plugin: string;
   pluginName: string;

@@ -18,15 +18,34 @@
 
 import styled from 'styled-components';
 
-export const Label = styled.label`
-  font-size: 16px;
-  font-weight: 600;
+import { textStyle } from '@/ui/style-helpers';
+
+export const Wrapper = styled.div`
+  & > h4 {
+    ${textStyle('h3')}
+    display: flex;
+    margin: 0;
+    color: ${({ theme }) => theme.colors.text};
+  }
+
+  & > p {
+    ${textStyle('body')}
+    margin: ${({ theme }) => theme.space.xxs}px 0 0;
+    color: ${({ theme }) => theme.colors.textSecondary};
+  }
+
+  & > h4 + *,
+  & > p + * {
+    margin-top: ${({ theme }) => theme.space.xs}px;
+  }
+
+  & + & {
+    margin-top: ${({ theme }) => theme.space.lg}px;
+  }
 `;
 
-export const LabelInfo = styled.i`
-  color: ${({ theme }) => theme.colors.secondary};
-`;
-
-export const subLabel = styled.p`
-  margin: 0;
+export const Required = styled.i`
+  margin-left: ${({ theme }) => theme.space.xxs}px;
+  font-style: normal;
+  color: ${({ theme }) => theme.colors.error};
 `;

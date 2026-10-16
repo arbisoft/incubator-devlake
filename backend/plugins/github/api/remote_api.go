@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/plugin"
@@ -50,12 +51,13 @@ func listGithubRemoteScopes(
 		return listGithubAppInstalledRepos(apiClient, groupId, page)
 	}
 	if groupId == "" {
-		return listGithubUserOrgs(apiClient, page)
+		return listGithubUserOrgs(connection, apiClient, page)
 	}
 	return listGithubOwnerRepos(apiClient, groupId, page)
 }
 
 func listGithubUserOrgs(
+	connection *models.GithubConnection,
 	apiClient plugin.ApiClient,
 	page GithubRemotePagination,
 ) (
@@ -108,8 +110,60 @@ func listGithubUserOrgs(
 			Page:    page.Page + 1,
 			PerPage: page.PerPage,
 		}
+		return children, nextPage, nil
 	}
-	return children, nextPage, nil
+	// owners reachable only through repo access, e.g. fine-grained tokens or direct collaborators
+	owners, err := listGithubRepoOwners(connection, apiClient)
+	if err != nil {
+		return nil, nil, err
+	}
+	seen := map[string]bool{}
+	for _, c := range children {
+		seen[strings.ToLower(c.Id)] = true
+	}
+	for _, owner := range owners {
+		if seen[strings.ToLower(owner)] {
+			continue
+		}
+		seen[strings.ToLower(owner)] = true
+		children = append(children, dsmodels.DsRemoteApiScopeListEntry[models.GithubRepo]{
+			Type:     api.RAS_ENTRY_TYPE_GROUP,
+			Id:       owner,
+			Name:     owner,
+			FullName: owner,
+		})
+	}
+	return children, nil, nil
+}
+
+// listGithubRepoOwners returns the owners of the 100 most recently pushed repos the token can reach.
+func listGithubRepoOwners(connection *models.GithubConnection, apiClient plugin.ApiClient) ([]string, errors.Error) {
+	// /user/orgs is empty for fine-grained tokens, so they need org repos too
+	affiliation := "collaborator"
+	if strings.Contains(connection.Token, "github_pat_") {
+		affiliation = "owner,collaborator,organization_member"
+	}
+	reposBody, err := apiClient.Get(
+		"user/repos",
+		url.Values{
+			"affiliation": []string{affiliation},
+			"sort":        []string{"pushed"},
+			"per_page":    []string{"100"},
+		},
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+	var repos []repo
+	if err := api.UnmarshalResponse(reposBody, &repos); err != nil {
+		return nil, err
+	}
+	var owners []string
+	for _, r := range repos {
+		owners = append(owners, r.Owner.Login)
+	}
+	return owners, nil
 }
 
 // getOwnerInfo fetches the owner's type and ID from the GitHub API.
@@ -143,7 +197,7 @@ func getAuthenticatedUserID(apiClient plugin.ApiClient) (int, errors.Error) {
 // It determines the owner type via the GitHub API and uses the appropriate endpoint:
 // - For organizations: /orgs/{owner}/repos
 // - For the authenticated user: /user/repos (includes private repos)
-// - For other users: /users/{owner}/repos (public repos only)
+// - For other users: /user/repos filtered to that owner (repos shared with the authenticated user)
 func listGithubOwnerRepos(
 	apiClient plugin.ApiClient,
 	owner string,
@@ -175,11 +229,13 @@ func listGithubOwnerRepos(
 			return
 		}
 		if authUserID == ownerID {
-			// Authenticated user's own account - includes private repos
+			// Authenticated user's own account - includes private repos; other owners are listed separately
+			query.Del("type")
+			query.Set("affiliation", "owner")
 			reposBody, err = apiClient.Get("user/repos", query, nil)
 		} else {
-			// Another user's account - public repos only
-			reposBody, err = apiClient.Get(fmt.Sprintf("users/%s/repos", owner), query, nil)
+			// Another user's account - only repos shared with the authenticated user
+			return listSharedOwnerRepos(apiClient, owner, page)
 		}
 	default:
 		// Fallback for unknown types
@@ -195,13 +251,55 @@ func listGithubOwnerRepos(
 		children = append(children, toRepoModel(&repo))
 	}
 	// there may be more repos
-	if len(children) == page.PerPage {
+	if len(repos) == page.PerPage {
 		nextPage = &GithubRemotePagination{
 			Page:    page.Page + 1,
 			PerPage: page.PerPage,
 		}
 	}
 	return
+}
+
+// maxSharedRepoPagesPerRequest caps the raw collaborator pages fetched for one scope-picker page.
+const maxSharedRepoPagesPerRequest = 10
+
+// listSharedOwnerRepos fills one picker page with the owner's repos from the token's collaborator repos.
+func listSharedOwnerRepos(
+	apiClient plugin.ApiClient,
+	owner string,
+	page GithubRemotePagination,
+) (
+	children []dsmodels.DsRemoteApiScopeListEntry[models.GithubRepo],
+	nextPage *GithubRemotePagination,
+	err errors.Error,
+) {
+	for fetched, rawPage := 0, page.Page; fetched < maxSharedRepoPagesPerRequest; fetched, rawPage = fetched+1, rawPage+1 {
+		query := url.Values{
+			"page":        []string{fmt.Sprintf("%v", rawPage)},
+			"per_page":    []string{fmt.Sprintf("%v", page.PerPage)},
+			"affiliation": []string{"collaborator"},
+		}
+		var res *http.Response
+		res, err = apiClient.Get("user/repos", query, nil)
+		if err != nil {
+			return nil, nil, err
+		}
+		var repos []repo
+		errors.Must(api.UnmarshalResponse(res, &repos))
+		for _, repo := range repos {
+			if strings.EqualFold(repo.Owner.Login, owner) {
+				children = append(children, toRepoModel(&repo))
+			}
+		}
+		if len(repos) < page.PerPage {
+			return children, nil, nil
+		}
+		nextPage = &GithubRemotePagination{Page: rawPage + 1, PerPage: page.PerPage}
+		if len(children) >= page.PerPage {
+			break
+		}
+	}
+	return children, nextPage, nil
 }
 
 func listGithubAppInstalledRepos(

@@ -16,49 +16,53 @@
  *
  */
 
-import type { AxiosRequestConfig } from 'axios';
-import axios from 'axios';
+import axios, { isAxiosError, type AxiosRequestConfig } from 'axios';
 
-import { DEVLAKE_ENDPOINT } from '@/config';
+import { DEVLAKE_ENDPOINT, PATHS } from '@/config';
+
+import {
+  ACCESS_TOKEN_STORAGE_KEY,
+  AUTHORIZATION_HEADER,
+  AUTH_USERINFO_PATH,
+  CSRF_COOKIE_NAME,
+  CSRF_HEADER_NAME,
+  DEFAULT_REQUEST_METHOD,
+  GET_METHODS,
+  HTTP_STATUS,
+  LOGIN_ROUTE_SUFFIX,
+  PATH_SEPARATOR,
+  PLUGIN_CONNECTION_TEST_ROUTE,
+} from './request.constants';
+import type { RequestConfig, SessionStatus } from './request.types';
+
+export type { RequestConfig } from './request.types';
 
 const instance = axios.create({
   baseURL: DEVLAKE_ENDPOINT,
   withCredentials: true,
-  // Double-submit CSRF: axios reads `devlake_csrf` and echoes it as
-  // `X-CSRF-Token` on unsafe methods. The cookie is set by /auth/callback.
-  xsrfCookieName: 'devlake_csrf',
-  xsrfHeaderName: 'X-CSRF-Token',
+  // Axios echoes the CSRF cookie as a header on unsafe methods.
+  xsrfCookieName: CSRF_COOKIE_NAME,
+  xsrfHeaderName: CSRF_HEADER_NAME,
 });
 
-export type RequestConfig = {
-  baseURL?: string;
-  method?: AxiosRequestConfig['method'];
-  data?: unknown;
-  timeout?: number;
-  signal?: AbortSignal;
-  headers?: Record<string, string>;
+const isLoginRoute = () => {
+  let { pathname } = window.location;
+  while (pathname.endsWith(PATH_SEPARATOR)) {
+    pathname = pathname.slice(0, -PATH_SEPARATOR.length);
+  }
+  return pathname.endsWith(LOGIN_ROUTE_SUFFIX);
 };
-
-const isLoginRoute = () => window.location.pathname.replace(/\/+$/, '').endsWith('/login');
-
-type SessionStatus = { authenticated?: boolean };
 
 let verifyingSession = false;
 
-// A 401 on one request does not by itself prove the session is dead: it can
-// also be a bug local to that one endpoint (a wrong identity check, or a
-// transient error re-authorizing an otherwise valid session), which is
-// otherwise indistinguishable from a real logout here. Confirm against the
-// session's own source of truth - /auth/userinfo, which always answers
-// gracefully instead of 401ing - before forcing a full redirect, so one
-// endpoint's bug can no longer sign an otherwise-authenticated user out.
+// Confirm 401 responses against session status before redirecting on endpoint-specific failures.
 const redirectToLoginIfSessionIsReallyGone = async () => {
   if (verifyingSession || isLoginRoute()) {
     return;
   }
   verifyingSession = true;
   try {
-    const status = await instance.get<SessionStatus>('/auth/userinfo').then((res) => res.data);
+    const status = await instance.get<SessionStatus>(AUTH_USERINFO_PATH).then((res) => res.data);
     if (status?.authenticated !== false) {
       return;
     }
@@ -69,24 +73,25 @@ const redirectToLoginIfSessionIsReallyGone = async () => {
     verifyingSession = false;
   }
   const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
-  window.location.replace(`/login?return_url=${returnUrl}`);
+  window.location.replace(`${PATHS.LOGIN()}?return_url=${returnUrl}`);
 };
 
-// A 401 from a plugin connection test is the remote credential failing, not a DevLake session expiry.
-const isPluginConnectionTest = (url?: string) =>
-  !!url && /\/plugins\/[^/]+(?:\/connections\/[^/]+)?\/test\/?$/.test(url);
+const isPluginConnectionTest = (url?: string) => !!url && PLUGIN_CONNECTION_TEST_ROUTE.test(url);
 
 instance.interceptors.response.use(
   (response) => response,
   (error) => {
-    const status = error.response?.status;
-    const requestUrl = error.config?.url as string | undefined;
+    // Request bodies can hold credentials; keep them out of error logs.
+    if (isAxiosError(error) && error.config) delete error.config.data;
 
-    if (status === 428) {
-      window.location.replace('/db-migrate');
+    const status = error.response?.status;
+    const requestUrl = typeof error.config?.url === 'string' ? error.config.url : undefined;
+
+    if (status === HTTP_STATUS.PRECONDITION_REQUIRED) {
+      window.location.replace(PATHS.DB_MIGRATE());
     }
 
-    if (status === 401 && !isLoginRoute() && !isPluginConnectionTest(requestUrl)) {
+    if (status === HTTP_STATUS.UNAUTHORIZED && !isLoginRoute() && !isPluginConnectionTest(requestUrl)) {
       void redirectToLoginIfSessionIsReallyGone();
     }
 
@@ -95,37 +100,29 @@ instance.interceptors.response.use(
 );
 
 export const request = (path: string, config?: RequestConfig) => {
-  const { method = 'get', data, timeout, headers, signal } = config || {};
+  const { method = DEFAULT_REQUEST_METHOD, data, timeout, headers, signal } = config || {};
 
-  const cancelTokenSource = axios.CancelToken.source();
-  const token = localStorage.getItem('accessToken');
+  const token = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
   const h = { ...headers };
   if (token) {
-    h.Authorization = `Bearer ${token}`;
+    h[AUTHORIZATION_HEADER] = `Bearer ${token}`;
   }
 
-  const params: any = {
+  const params: AxiosRequestConfig = {
     baseURL: config?.baseURL,
     url: path,
     method,
     timeout,
     headers: h,
-    cancelToken: cancelTokenSource?.token,
+    signal,
+    responseType: config?.responseType,
   };
 
-  if (['GET', 'get'].includes(method)) {
+  if (GET_METHODS.includes(method)) {
     params.params = data;
   } else {
     params.data = data;
   }
 
-  const promise = instance.request(params).then((resp) => resp.data);
-
-  if (signal) {
-    signal.addEventListener('abort', () => {
-      cancelTokenSource?.cancel();
-    });
-  }
-
-  return promise;
+  return instance.request(params).then((resp) => resp.data);
 };

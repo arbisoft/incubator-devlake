@@ -16,7 +16,38 @@
  *
  */
 
+import type { ReactNode } from 'react';
+
+import type { IWebhook } from '@/types';
+
+import type { COMMAND_KEY, WEBHOOK_DIALOG } from './constants';
+
 export type WebhookItemType = {
   id: ID;
   name: string;
+};
+
+export type WebhookCommands = Record<(typeof COMMAND_KEY)[keyof typeof COMMAND_KEY], string>;
+
+export type CreateDialogProps = {
+  open: boolean;
+  onCancel: () => void;
+  onSubmitAfter?: (id: ID) => void;
+};
+
+export type WebhookDialogProps = {
+  open: boolean;
+  webhook: IWebhook;
+  onCancel: () => void;
+  afterClose: () => void;
+};
+
+export type WebhookDialogKind = (typeof WEBHOOK_DIALOG)[keyof typeof WEBHOOK_DIALOG];
+
+export type WebHookConnectionProps = {
+  filterIds?: ID[];
+  extraActions?: ReactNode;
+  addDisabledReason?: string;
+  onCreateAfter?: (id: ID) => void;
+  onDeleteAfter?: (id: ID) => void;
 };

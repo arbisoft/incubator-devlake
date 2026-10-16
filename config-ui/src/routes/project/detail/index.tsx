@@ -16,108 +16,115 @@
  *
  */
 
-import { useEffect, useRef, useState } from 'react';
-import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-
-import { Helmet } from 'react-helmet';
-import { Tabs, message } from 'antd';
+import { Alert, Button, message } from 'antd';
+import axios, { HttpStatusCode } from 'axios';
+import { useEffect, useMemo } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import API from '@/api';
-import { PageHeader, PageLoading } from '@/components';
-import { PATHS } from '@/config';
+import { PageLoading } from '@/components';
+import { PATHS, PROJECT_TAB } from '@/config';
 import { useRefreshData } from '@/hooks';
-import { BlueprintDetail, FromEnum } from '@/routes';
+import { BLUEPRINT_CONTEXT, BlueprintDetail, getProjectBlueprintViews, useBlueprintView } from '@/routes';
+import {
+  EmptyState,
+  EMPTY_ILLUSTRATION,
+  EMPTY_STATE_SIZE,
+  ListPage,
+  PageHeader,
+  RouteTabs,
+  ROUTE_TABS_VARIANT,
+  useLastLoaded,
+  useRefreshVersion,
+  COMMON_COPY,
+} from '@/ui';
+import { useRouteTab } from '@/ui/hooks';
 
-import { WebhooksPanel } from './webhooks-panel';
-import { SettingsPanel } from './settings-panel';
 import { ClaudeCodeOtelPanel } from './claude-code-otel-panel';
-import * as S from './styled';
+import { COPY } from './constants';
+import { SettingsPanel } from './settings-panel';
+import { getProjectTabs, toProjectTab } from './utils';
+import { WebhooksPanel } from './webhooks-panel';
 
-const brandName = import.meta.env.DEVLAKE_BRAND_NAME ?? 'DevLake';
+const NOT_FOUND_REDIRECT_DELAY_MS = 100;
 
 export const ProjectDetailPage = () => {
-  const [version, setVersion] = useState(1);
-  const [tabId, setTabId] = useState('blueprint');
-
-  const { pname } = useParams() as { pname: string };
-  const { state } = useLocation();
+  const { pname = '' } = useParams();
   const navigate = useNavigate();
+  const { version, refresh } = useRefreshVersion();
+
+  const tabs = useMemo(() => getProjectTabs(pname), [pname]);
+  const activeTab = toProjectTab(useRouteTab(tabs));
+  const views = useMemo(() => getProjectBlueprintViews(pname), [pname]);
+  const view = useBlueprintView(views);
+
+  const { ready, data, error } = useRefreshData((signal) => API.project.get(pname, signal), [pname, version]);
+  const loaded = useLastLoaded(data, pname);
+  const project = loaded;
 
   useEffect(() => {
-    setTabId(state?.tabId ?? 'blueprint');
-  }, [state]);
-
-  const { ready, data, error } = useRefreshData(() => API.project.get(pname), [pname, version]);
-
-  // Keep the loaded project on screen during refreshes so open panels and dialogs are not unmounted.
-  const lastLoaded = useRef<{ pname: string; project: NonNullable<typeof data> } | null>(null);
-  if (data) {
-    lastLoaded.current = { pname, project: data };
-  }
-  const project = data ?? (!error && lastLoaded.current?.pname === pname ? lastLoaded.current.project : undefined);
-
-  useEffect(() => {
-    if (axios.isAxiosError(error) && error.response?.status === 404) {
-      message.error(`Project not found with project name: ${pname}`);
-      setTimeout(() => {
-        navigate(PATHS.PROJECTS(), { replace: true });
-      }, 100);
+    if (axios.isAxiosError(error) && error.response?.status === HttpStatusCode.NotFound) {
+      message.error(COPY.notFound(pname));
+      const timer = setTimeout(() => navigate(PATHS.PROJECTS(), { replace: true }), NOT_FOUND_REDIRECT_DELAY_MS);
+      return () => clearTimeout(timer);
     }
   }, [error, navigate, pname]);
 
-  const handleChangeTabId = (tabId: string) => {
-    setTabId(tabId);
-  };
-
-  const handleRefresh = () => {
-    setVersion((v) => v + 1);
-  };
-
   if (!project) {
-    return !ready && !error ? <PageLoading /> : null;
+    if (!ready && error === undefined) return <PageLoading />;
+    if (error !== undefined) {
+      return (
+        <ListPage>
+          <EmptyState
+            illustration={EMPTY_ILLUSTRATION.ERROR}
+            size={EMPTY_STATE_SIZE.SECTION}
+            title={COPY.loadFailed}
+            action={<Button onClick={refresh}>{COMMON_COPY.retry}</Button>}
+          />
+        </ListPage>
+      );
+    }
+    return null;
   }
 
+  const panels = {
+    [PROJECT_TAB.BLUEPRINT]: project.blueprint ? (
+      <>
+        <RouteTabs items={views} variant={ROUTE_TABS_VARIANT.SEGMENTED} />
+        <BlueprintDetail blueprintId={project.blueprint.id} context={BLUEPRINT_CONTEXT.PROJECT} view={view} />
+      </>
+    ) : (
+      <EmptyState
+        size={EMPTY_STATE_SIZE.SECTION}
+        title={COPY.noBlueprint.title}
+        description={COPY.noBlueprint.description}
+      />
+    ),
+    [PROJECT_TAB.WEBHOOKS]: <WebhooksPanel project={project} onRefresh={refresh} />,
+    [PROJECT_TAB.CLAUDE_CODE_OTEL]: <ClaudeCodeOtelPanel projectName={project.name} />,
+    [PROJECT_TAB.SETTINGS]: <SettingsPanel project={project} onRefresh={refresh} />,
+  };
+
   return (
-    <PageHeader
-      breadcrumbs={[
-        { name: 'Projects', path: PATHS.PROJECTS() },
-        { name: project.name, path: PATHS.PROJECT(pname) },
-      ]}
-    >
-      <Helmet>
-        <title>
-          {project.name} - {brandName}
-        </title>
-      </Helmet>
-      <S.Wrapper>
-        <Tabs
-          items={[
-            {
-              key: 'blueprint',
-              label: 'Blueprint',
-              children: <BlueprintDetail id={project.blueprint.id} from={FromEnum.project} />,
-            },
-            {
-              key: 'webhook',
-              label: 'Webhooks',
-              children: <WebhooksPanel project={project} onRefresh={handleRefresh} />,
-            },
-            {
-              key: 'claude-code-otel',
-              label: 'Claude Code OTel',
-              children: <ClaudeCodeOtelPanel projectName={project.name} />,
-            },
-            {
-              key: 'settings',
-              label: 'Settings',
-              children: <SettingsPanel project={project} onRefresh={handleRefresh} />,
-            },
-          ]}
-          activeKey={tabId}
-          onChange={handleChangeTabId}
+    <ListPage>
+      {error !== undefined && (
+        <Alert
+          type="error"
+          showIcon
+          title={COPY.loadFailed}
+          action={<Button onClick={refresh}>{COMMON_COPY.retry}</Button>}
         />
-      </S.Wrapper>
-    </PageHeader>
+      )}
+      <PageHeader
+        title={project.name}
+        showTitle={false}
+        breadcrumbs={[
+          { label: COPY.breadcrumbProjects, path: PATHS.PROJECTS() },
+          { label: project.name, path: PATHS.PROJECT_TAB(pname, PROJECT_TAB.BLUEPRINT) },
+        ]}
+      />
+      <RouteTabs items={tabs} variant={ROUTE_TABS_VARIANT.TABS} />
+      {panels[activeTab]}
+    </ListPage>
   );
 };

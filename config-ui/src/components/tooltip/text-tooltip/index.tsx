@@ -17,7 +17,6 @@
  */
 
 import { Tooltip } from 'antd';
-
 import styled from 'styled-components';
 
 const Wrapper = styled.div`

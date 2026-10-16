@@ -1,0 +1,22 @@
+{
+  "titlePath": [
+    "Grafana user management ordinary flows",
+    "disables and re-enables an account with a named confirmation"
+  ],
+  "writes": [
+    {
+      "method": "PATCH",
+      "path": "/api/access/grafana/users/:id",
+      "body": {
+        "disabled": true
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/access/grafana/users/:id",
+      "body": {
+        "disabled": false
+      }
+    }
+  ]
+}

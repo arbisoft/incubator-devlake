@@ -1,0 +1,10 @@
+{
+  "titlePath": ["deleting a connection from its page logs no render error"],
+  "writes": [
+    {
+      "method": "DELETE",
+      "path": "/api/plugins/github/connections/:id",
+      "body": null
+    }
+  ]
+}

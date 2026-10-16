@@ -1,0 +1,15 @@
+{
+  "titlePath": ["bulk deleting two selected scopes removes them from the UI and the API and keeps the third"],
+  "writes": [
+    {
+      "method": "DELETE",
+      "path": "/api/plugins/github/connections/:id/scopes/:id?delete_data_only=false",
+      "body": null
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/plugins/github/connections/:id/scopes/:id?delete_data_only=false",
+      "body": null
+    }
+  ]
+}

@@ -23,8 +23,8 @@ import { RouterProvider } from 'react-router-dom';
 import { PageLoading } from '@/components';
 import { ThemeProvider } from '@/theme';
 
-import { store } from './app/store';
 import { router } from './app/router';
+import { store } from './app/store';
 import './index.css';
 
 createRoot(document.getElementById('root') as HTMLElement).render(

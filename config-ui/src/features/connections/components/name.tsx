@@ -17,55 +17,27 @@
  */
 
 import { theme } from 'antd';
-import styled from 'styled-components';
 
 import { useAppSelector } from '@/hooks';
 import { getPluginConfig } from '@/plugins';
 
+import { COPY, WEBHOOK_PLUGIN } from '../constants';
 import { selectConnection, selectWebhook } from '../slice';
 
-const Wrapper = styled.div`
-  display: flex;
-  align-items: center;
+import { Wrapper } from './styled';
+import type { ConnectionNameProps } from './types';
 
-  span + span {
-    margin-left: 4px;
-  }
-
-  .icon {
-    display: inline-block;
-    width: 24px;
-    height: 24px;
-
-    & > svg {
-      width: 100%;
-      height: 100%;
-    }
-  }
-
-  .name {
-    max-width: 240px;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    overflow: hidden;
-  }
-`;
-
-interface Props {
-  plugin: string;
-  connectionId: ID;
-}
-
-export const ConnectionName = ({ plugin, connectionId }: Props) => {
+export const ConnectionName = ({ plugin, connectionId }: ConnectionNameProps) => {
   const {
     token: { colorPrimary },
   } = theme.useToken();
 
   const connection = useAppSelector((state) => selectConnection(state, `${plugin}-${connectionId}`));
-  const webhook = useAppSelector((state) => selectWebhook(state, connectionId));
+  const webhook = useAppSelector((state) =>
+    plugin === WEBHOOK_PLUGIN ? selectWebhook(state, connectionId) : undefined,
+  );
   const config = getPluginConfig(plugin);
-
-  const name = connection ? connection.name : webhook ? webhook.name : `${plugin}/connection/${connectionId}`;
+  const name = connection?.name ?? webhook?.name ?? COPY.connectionNameFallback(plugin, connectionId);
 
   return (
     <Wrapper>

@@ -16,17 +16,41 @@
  *
  */
 
+import { PROVIDER_RULES } from './constants';
+import { PROVIDER_LOGOS } from './logos';
+import type { ProviderLogoEntry, ProviderRule } from './types';
+
 const encodedBackslash = /%5c/i;
 
-// Keep browser-side navigation consistent with the backend's safeReturnURL
-// policy and prevent a deployment path prefix from being discarded after login.
+// Mirrors the backend's safeReturnURL policy and keeps a deployment path prefix after login.
 export const normalizeLoginReturnPath = (returnPath: string | null, fallbackPath: string) => {
   if (!returnPath || !returnPath.startsWith('/') || returnPath.startsWith('//')) return fallbackPath;
   if (returnPath.includes('\\') || encodedBackslash.test(returnPath)) return fallbackPath;
 
-  const pathPrefix = fallbackPath === '/' ? '' : fallbackPath.replace(/\/$/, '');
-  const pathname = returnPath.split(/[?#]/, 1)[0];
-  if (pathPrefix && pathname !== pathPrefix && !pathname.startsWith(`${pathPrefix}/`)) return fallbackPath;
+  try {
+    const url = new URL(returnPath, window.location.origin);
+    if (url.origin !== window.location.origin) return fallbackPath;
 
-  return returnPath;
+    const pathPrefix = fallbackPath === '/' ? '' : fallbackPath.replace(/\/$/, '');
+    if (pathPrefix && url.pathname !== pathPrefix && !url.pathname.startsWith(`${pathPrefix}/`)) return fallbackPath;
+
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return fallbackPath;
+  }
+};
+
+const hostOnly = (issuerHost: string) => issuerHost.trim().toLowerCase().replace(/:\d+$/, '').replace(/\.$/, '');
+
+const ruleMatches = ({ hosts, suffixes, contains }: ProviderRule, host: string) =>
+  Boolean(
+    hosts?.includes(host) ||
+    suffixes?.some((suffix) => host.endsWith(suffix)) ||
+    contains?.some((part) => host.includes(part)),
+  );
+
+export const matchProviderLogo = (issuerHost?: string): ProviderLogoEntry | undefined => {
+  const host = issuerHost ? hostOnly(issuerHost) : '';
+  const rule = host ? PROVIDER_RULES.find((candidate) => ruleMatches(candidate, host)) : undefined;
+  return rule ? PROVIDER_LOGOS[rule.id] : undefined;
 };

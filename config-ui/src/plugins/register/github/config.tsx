@@ -23,6 +23,7 @@ import { IPluginConfig } from '@/types';
 
 import Icon from './assets/icon.svg?react';
 import { Token, GithubApp, Authentication } from './connection-fields';
+import { COPY } from './constants';
 
 export const GitHubConfig: IPluginConfig = {
   plugin: 'github',
@@ -92,6 +93,7 @@ export const GitHubConfig: IPluginConfig = {
     ],
   },
   dataScope: {
+    searchPlaceholder: COPY.searchPlaceholder,
     title: 'Repositories',
     millerColumn: {
       columnCount: 2,

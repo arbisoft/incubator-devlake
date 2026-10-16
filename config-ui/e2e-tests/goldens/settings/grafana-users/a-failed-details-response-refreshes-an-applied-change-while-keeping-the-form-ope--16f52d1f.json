@@ -1,0 +1,22 @@
+{
+  "titlePath": [
+    "Grafana user management ordinary flows",
+    "a failed details response refreshes an applied change while keeping the form open"
+  ],
+  "writes": [
+    {
+      "method": "PATCH",
+      "path": "/api/access/grafana/users/:id",
+      "body": {
+        "name": "After failure"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/access/grafana/users/:id",
+      "body": {
+        "name": "After failure"
+      }
+    }
+  ]
+}

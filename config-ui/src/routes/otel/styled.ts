@@ -16,16 +16,65 @@
  *
  */
 
+import { Alert } from 'antd';
 import styled from 'styled-components';
 
-export const ManagedSettings = styled.pre`
-  min-height: 320px;
-  max-height: 520px;
-  overflow: auto;
+import { textStyle } from '@/ui/style-helpers';
+
+export const Fields = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.lg}px;
+
+  .ant-select {
+    width: 100%;
+  }
+`;
+
+export const Notes = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.sm}px;
+`;
+
+export const Stack = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.md}px;
+`;
+
+export const MetricGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(${({ theme }) => theme.layout.metricTileMinWidth}px, 1fr));
+  gap: ${({ theme }) => theme.space.md}px;
+`;
+
+export const Hint = styled.p`
+  ${textStyle('body')}
   margin: 0;
-  padding: 16px;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  background: #f7f8fa;
-  white-space: pre;
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
+
+export const TagRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.xs}px;
+`;
+
+export const ActionRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: ${({ theme }) => theme.space.xxs}px;
+`;
+
+export const AttentionRegion = styled.div`
+  &:not(:last-child) {
+    margin-bottom: ${({ theme }) => theme.space.lg}px;
+  }
+`;
+
+export const AttentionAlert = styled(Alert)`
+  border-radius: ${({ theme }) => theme.radius.lg}px;
 `;

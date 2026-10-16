@@ -1,0 +1,19 @@
+{
+  "titlePath": [
+    "Grafana user management ordinary flows",
+    "uses a DevLake user as a template, then clear restores every default field"
+  ],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/access/grafana/users",
+      "body": {
+        "email": "e2e-*@example.com",
+        "name": "Cleared Template User",
+        "password": "<masked>",
+        "projectNames": [],
+        "role": "Viewer"
+      }
+    }
+  ]
+}

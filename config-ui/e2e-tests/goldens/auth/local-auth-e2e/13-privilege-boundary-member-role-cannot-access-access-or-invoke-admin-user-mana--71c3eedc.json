@@ -1,0 +1,24 @@
+{
+  "titlePath": [
+    "Local Password Authentication - Phases 1-4 Full E2E Suite",
+    "13. Privilege Boundary: Member role cannot access /access or invoke admin user management endpoints"
+  ],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/access/local-users",
+      "body": {
+        "displayName": "Member e2e_*",
+        "loginName": "e2e_*",
+        "role": "member"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/local/change-password",
+      "body": {
+        "password": "<masked>"
+      }
+    }
+  ]
+}

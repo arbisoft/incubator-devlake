@@ -19,9 +19,9 @@
 import React from 'react';
 
 import PluginIcon from '@/images/plugin-icon.svg?react';
+import { IPluginConfig } from '@/types';
 
 import { pluginConfigs } from './register';
-import { IPluginConfig } from '@/types';
 export { getPluginScopeId } from './scope-id';
 
 export const getPluginScopeName = (plugin: string, scope: any) => {

@@ -1,0 +1,10 @@
+{
+  "titlePath": ["Grafana user management ordinary flows", "deletes an account after a confirmation naming the user"],
+  "writes": [
+    {
+      "method": "DELETE",
+      "path": "/api/access/grafana/users/:id",
+      "body": null
+    }
+  ]
+}
