@@ -78,6 +78,29 @@ export const OtelIngestionHealth = ({ loading, failed, status, onRetry }: OtelIn
       tone: getPermanentErrorTone(status.recentPermanentErrors),
     },
     { label: COPY.health.metrics.converter, value: getConverterLabel(status) },
+    ...(status.logs
+      ? [
+          { label: COPY.health.metrics.logPending, value: status.logs.batchCounts[OTEL_BATCH_STATUS.PENDING] ?? 0 },
+          {
+            label: COPY.health.metrics.logRetrying,
+            value: status.logs.batchCounts[OTEL_BATCH_STATUS.RETRYABLE_ERROR] ?? 0,
+          },
+          {
+            label: COPY.health.metrics.logReplaying,
+            value: status.logs.batchCounts[OTEL_BATCH_STATUS.REPLAY_PENDING] ?? 0,
+          },
+          {
+            label: COPY.health.metrics.logOldestBacklog,
+            value: formatAge(status.logs.oldestNonterminal?.ageSeconds),
+            tone: getBacklogTone(status.logs.oldestNonterminal?.ageSeconds),
+          },
+          {
+            label: COPY.health.metrics.logPermanentErrors,
+            value: status.logs.recentPermanentErrors,
+            tone: getPermanentErrorTone(status.logs.recentPermanentErrors),
+          },
+        ]
+      : []),
   ];
   const healthContent = () => {
     if (metrics) {
@@ -104,67 +127,18 @@ export const OtelIngestionHealth = ({ loading, failed, status, onRetry }: OtelIn
   };
 
   return (
-    <Flex vertical gap={12} style={{ marginBottom: 16 }}>
-      <Flex justify="space-between" align="center">
-        <Typography.Title level={5} style={{ margin: 0 }}>
-          Telemetry ingestion
-        </Typography.Title>
-        {status && <Tag color={stateColor[status.state]}>{status.state}</Tag>}
-      </Flex>
-      {status ? (
-        <Descriptions bordered size="small" column={{ xs: 1, sm: 2, lg: 4 }}>
-          <Descriptions.Item label="Pending">{status.batchCounts.pending ?? 0}</Descriptions.Item>
-          <Descriptions.Item label="Retrying">{status.batchCounts.retryable_error ?? 0}</Descriptions.Item>
-          <Descriptions.Item label="Oldest backlog">
-            {formatAge(status.oldestNonterminal?.ageSeconds)}
-          </Descriptions.Item>
-          <Descriptions.Item label="Permanent errors (24h)">{status.recentPermanentErrors}</Descriptions.Item>
-          <Descriptions.Item label="Converter">{converterState(status)}</Descriptions.Item>
-          {status.logs && (
-            <>
-              <Descriptions.Item label="Log batches pending">{status.logs.batchCounts.pending ?? 0}</Descriptions.Item>
-              <Descriptions.Item label="Log batches retrying">
-                {status.logs.batchCounts.retryable_error ?? 0}
-              </Descriptions.Item>
-              <Descriptions.Item label="Log batches replaying">
-                {status.logs.batchCounts.replay_pending ?? 0}
-              </Descriptions.Item>
-              <Descriptions.Item label="Oldest log backlog">
-                {formatAge(status.logs.oldestNonterminal?.ageSeconds)}
-              </Descriptions.Item>
-              <Descriptions.Item label="Log permanent errors (24h)">
-                {status.logs.recentPermanentErrors}
-              </Descriptions.Item>
-            </>
-          )}
-        </Descriptions>
-      ) : (
-        <Typography.Text type="secondary">
-          {loading ? 'Loading ingestion status...' : 'Ingestion status is unavailable.'}
-        </Typography.Text>
-      )}
-      {status?.reasons.length ? <Typography.Text type="warning">{status.reasons.join('; ')}</Typography.Text> : null}
-      <Table<OtelMetricBatchSummary>
-        size="small"
-        rowKey="id"
-        pagination={{
-          defaultPageSize: 10,
-          pageSizeOptions: [10, 20, 50, 100],
-          showSizeChanger: true,
-        }}
-        loading={loading}
-        dataSource={status?.recentBatches ?? []}
-        columns={columns}
-      />
-      <Modal
-        title="OTLP payload"
-        open={payloadOpen}
-        footer={null}
-        width={900}
-        onCancel={() => {
-          setPayloadOpen(false);
-          setPayload(undefined);
-        }}
+    <>
+      <SectionCard
+        title={COPY.health.title}
+        actions={
+          status && (
+            <StatusBadge
+              tone={INGESTION_STATE_TONE[status.state]}
+              label={COPY.health.state[status.state]}
+              variant={STATUS_BADGE_VARIANT.DOT}
+            />
+          )
+        }
       >
         <Stack>
           {healthContent()}
