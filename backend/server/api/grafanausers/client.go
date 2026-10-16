@@ -206,11 +206,11 @@ func adminUserPath(id int64) string {
 	return "/api/admin/users/" + strconv.FormatInt(id, 10)
 }
 
-func (c *grafanaClient) createUser(ctx context.Context, name, email, login, password string) (int64, error) {
+func (c *grafanaClient) createUser(ctx context.Context, orgID int64, name, email, login, password string) (int64, error) {
 	created := &struct {
 		ID int64 `json:"id"`
 	}{}
-	payload := map[string]string{"name": name, "email": email, "login": login, "password": password}
+	payload := map[string]any{"name": name, "email": email, "login": login, "password": password, "OrgId": orgID}
 	if err := c.do(ctx, http.MethodPost, "/api/admin/users", nil, payload, created); err != nil {
 		return 0, err
 	}

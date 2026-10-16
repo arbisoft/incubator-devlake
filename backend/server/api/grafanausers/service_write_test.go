@@ -121,6 +121,9 @@ func TestCreateUserWhenTheOrgAlreadyHasTheAccountAsViewer(t *testing.T) {
 		created[0].body["name"] != "New User" || created[0].body["password"] != testPassword || created[0].user != fakeManagementUser {
 		t.Fatalf("create request = %#v", created)
 	}
+	if created[0].body["OrgId"] != float64(7) {
+		t.Fatalf("create OrgId = %#v, want 7", created[0].body["OrgId"])
+	}
 	if len(fx.writes()) != 1 {
 		t.Fatalf("writes = %#v, want only the create", fx.writes())
 	}
@@ -212,6 +215,20 @@ func TestCreateUserPartialAfterRoleFailureKeepsTheAccount(t *testing.T) {
 	}
 	if event := fx.a.last(t); event.action != "grafana_user.create" || !strings.Contains(event.detail, "partial=true") {
 		t.Fatalf("event = %#v", event)
+	}
+}
+
+func TestCreateUserPartialThenRetryThroughPatchUserSucceeds(t *testing.T) {
+	fx := newFixture(t)
+	fx.f.forced["PATCH /api/orgs/7/users/101"] = http.StatusInternalServerError
+	_, err := fx.s.CreateUser(t.Context(), customerAdmin(), "a", CreateUserInput{Email: "n@example.com", Name: "N", Role: "Editor", Password: testPassword})
+	wantPartial(t, err, 101)
+	delete(fx.f.forced, "PATCH /api/orgs/7/users/101")
+	if _, err = fx.s.PatchUser(t.Context(), customerAdmin(), "a", 101, PatchUserInput{Role: str2("Editor")}); err != nil {
+		t.Fatal(err)
+	}
+	if got := fx.f.users[101].role; got != "Editor" {
+		t.Fatalf("role after retry = %q, want Editor", got)
 	}
 }
 

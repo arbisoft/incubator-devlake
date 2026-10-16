@@ -220,7 +220,6 @@ func listGithubOwnerRepos(
 
 	var reposBody *http.Response
 	var authUserID int
-	sharedOnly := false
 	switch ownerType {
 	case "Organization":
 		reposBody, err = apiClient.Get(fmt.Sprintf("orgs/%s/repos", owner), query, nil)
@@ -236,10 +235,7 @@ func listGithubOwnerRepos(
 			reposBody, err = apiClient.Get("user/repos", query, nil)
 		} else {
 			// Another user's account - only repos shared with the authenticated user
-			query.Del("type")
-			query.Set("affiliation", "collaborator")
-			sharedOnly = true
-			reposBody, err = apiClient.Get("user/repos", query, nil)
+			return listSharedOwnerRepos(apiClient, owner, page)
 		}
 	default:
 		// Fallback for unknown types
@@ -252,9 +248,6 @@ func listGithubOwnerRepos(
 	var repos []repo
 	errors.Must(api.UnmarshalResponse(reposBody, &repos))
 	for _, repo := range repos {
-		if sharedOnly && !strings.EqualFold(repo.Owner.Login, owner) {
-			continue
-		}
 		children = append(children, toRepoModel(&repo))
 	}
 	// there may be more repos
@@ -265,6 +258,48 @@ func listGithubOwnerRepos(
 		}
 	}
 	return
+}
+
+// maxSharedRepoPagesPerRequest caps the raw collaborator pages fetched for one scope-picker page.
+const maxSharedRepoPagesPerRequest = 10
+
+// listSharedOwnerRepos fills one picker page with the owner's repos from the token's collaborator repos.
+func listSharedOwnerRepos(
+	apiClient plugin.ApiClient,
+	owner string,
+	page GithubRemotePagination,
+) (
+	children []dsmodels.DsRemoteApiScopeListEntry[models.GithubRepo],
+	nextPage *GithubRemotePagination,
+	err errors.Error,
+) {
+	for fetched, rawPage := 0, page.Page; fetched < maxSharedRepoPagesPerRequest; fetched, rawPage = fetched+1, rawPage+1 {
+		query := url.Values{
+			"page":        []string{fmt.Sprintf("%v", rawPage)},
+			"per_page":    []string{fmt.Sprintf("%v", page.PerPage)},
+			"affiliation": []string{"collaborator"},
+		}
+		var res *http.Response
+		res, err = apiClient.Get("user/repos", query, nil)
+		if err != nil {
+			return nil, nil, err
+		}
+		var repos []repo
+		errors.Must(api.UnmarshalResponse(res, &repos))
+		for _, repo := range repos {
+			if strings.EqualFold(repo.Owner.Login, owner) {
+				children = append(children, toRepoModel(&repo))
+			}
+		}
+		if len(repos) < page.PerPage {
+			return children, nil, nil
+		}
+		nextPage = &GithubRemotePagination{Page: rawPage + 1, PerPage: page.PerPage}
+		if len(children) >= page.PerPage {
+			break
+		}
+	}
+	return children, nextPage, nil
 }
 
 func listGithubAppInstalledRepos(

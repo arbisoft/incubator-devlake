@@ -199,7 +199,7 @@ func (f *fakeGrafana) handleWrite(w http.ResponseWriter, r *http.Request, body m
 		}
 		f.nextID++
 		created := fakeUser{grafanaUser: grafanaUser{ID: f.nextID, Login: str(body, "login"), Email: str(body, "email"), Name: str(body, "name")}}
-		if !f.noAutoJoin {
+		if orgID, _ := body["OrgId"].(float64); orgID == 7 && !f.noAutoJoin {
 			created.role = roleViewer
 		}
 		f.put(created)

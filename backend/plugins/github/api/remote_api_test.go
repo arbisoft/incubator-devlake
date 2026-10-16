@@ -102,22 +102,73 @@ func mockOwnerLookup(client *mockplugin.ApiClient, owner string, ownerType strin
 		Return(jsonResponse(fmt.Sprintf(`{"id":%d,"type":%q}`, ownerID, ownerType)), nil).Once()
 }
 
-func TestListGithubOwnerReposListsOnlyReposSharedByAnotherUser(t *testing.T) {
+// mockSharedRepoPages serves user/repos by page number (the last body repeats) and records each request's query.
+func mockSharedRepoPages(t *testing.T, bodies ...string) (*mockplugin.ApiClient, *[]url.Values) {
 	client := mockplugin.NewApiClient(t)
 	mockOwnerLookup(client, "friend", "User", 2)
 	client.On("Get", "user", mock.Anything, mock.Anything).Return(jsonResponse(`{"id":1}`), nil).Once()
-	repoQuery := &url.Values{}
-	client.On("Get", "user/repos", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		*repoQuery = args.Get(1).(url.Values)
-	}).Return(jsonResponse(reposJSON("Friend", "other")), nil).Once()
+	queries := &[]url.Values{}
+	client.On("Get", "user/repos", mock.Anything, mock.Anything).Return(func(_ string, query url.Values, _ http.Header) *http.Response {
+		*queries = append(*queries, query)
+		i := len(*queries) - 1
+		if i >= len(bodies) {
+			i = len(bodies) - 1
+		}
+		return jsonResponse(bodies[i])
+	}, nil)
+	return client, queries
+}
+
+func requestedPages(queries []url.Values) []string {
+	var pages []string
+	for _, q := range queries {
+		pages = append(pages, q.Get("page"))
+	}
+	return pages
+}
+
+func TestListGithubOwnerReposListsOnlyReposSharedByAnotherUser(t *testing.T) {
+	client, queries := mockSharedRepoPages(t, reposJSON("Friend", "other"), reposJSON("Friend"))
 
 	children, nextPage, err := listGithubOwnerRepos(client, "friend", GithubRemotePagination{Page: 1, PerPage: 2})
 	require.NoError(t, err)
-	require.Len(t, children, 1)
-	assert.Equal(t, "r1", children[0].Name)
+	require.Len(t, children, 2)
+	assert.Nil(t, nextPage)
+	require.Len(t, *queries, 2)
+	for _, q := range *queries {
+		assert.Equal(t, "collaborator", q.Get("affiliation"))
+		assert.Empty(t, q.Get("type"))
+	}
+}
+
+func TestListGithubOwnerReposSharedFillsPageAcrossRawPages(t *testing.T) {
+	client, queries := mockSharedRepoPages(t, reposJSON("Friend", "other"), reposJSON("other", "other"), reposJSON("Friend"))
+
+	children, nextPage, err := listGithubOwnerRepos(client, "friend", GithubRemotePagination{Page: 1, PerPage: 2})
+	require.NoError(t, err)
+	assert.Len(t, children, 2)
+	assert.Nil(t, nextPage)
+	assert.Equal(t, []string{"1", "2", "3"}, requestedPages(*queries))
+}
+
+func TestListGithubOwnerReposSharedStopsAtThePageCap(t *testing.T) {
+	client, queries := mockSharedRepoPages(t, reposJSON("other", "other"))
+
+	children, nextPage, err := listGithubOwnerRepos(client, "friend", GithubRemotePagination{Page: 1, PerPage: 2})
+	require.NoError(t, err)
+	assert.Empty(t, children)
+	assert.Len(t, *queries, maxSharedRepoPagesPerRequest)
+	assert.Equal(t, &GithubRemotePagination{Page: maxSharedRepoPagesPerRequest + 1, PerPage: 2}, nextPage)
+}
+
+func TestListGithubOwnerReposSharedStopsOnceThePageIsFull(t *testing.T) {
+	client, queries := mockSharedRepoPages(t, reposJSON("Friend", "Friend"), reposJSON("Friend", "Friend"))
+
+	children, nextPage, err := listGithubOwnerRepos(client, "friend", GithubRemotePagination{Page: 1, PerPage: 2})
+	require.NoError(t, err)
+	assert.Len(t, children, 2)
 	assert.Equal(t, &GithubRemotePagination{Page: 2, PerPage: 2}, nextPage)
-	assert.Equal(t, "collaborator", repoQuery.Get("affiliation"))
-	assert.Empty(t, repoQuery.Get("type"))
+	assert.Equal(t, []string{"1"}, requestedPages(*queries))
 }
 
 func TestListGithubOwnerReposListsAllOrgRepos(t *testing.T) {

@@ -320,7 +320,7 @@ func (s *Service) CreateUser(ctx context.Context, admin *access.Principal, actor
 	if err != nil {
 		return nil, err
 	}
-	id, clientErr := s.client.createUser(ctx, name, email, email, input.Password)
+	id, clientErr := s.client.createUser(ctx, orgID, name, email, email, input.Password)
 	if clientErr != nil {
 		return nil, classify(clientErr, statusMap{
 			http.StatusPreconditionFailed: userExistsError,
@@ -484,20 +484,10 @@ func (s *Service) applyProfile(ctx context.Context, actor string, target *grafan
 }
 
 func (s *Service) applyRole(ctx context.Context, actor string, orgID int64, target *grafanaUser, current, role string) errors.Error {
-	var clientErr error
-	if current == "" {
-		clientErr = s.client.addOrgUser(ctx, orgID, target.Login, role)
-	} else {
-		clientErr = s.client.setOrgRole(ctx, orgID, target.ID, role)
-	}
-	if clientErr != nil {
+	if clientErr := s.client.setOrgRole(ctx, orgID, target.ID, role); clientErr != nil {
 		return classify(clientErr, statusMap{http.StatusNotFound: userNotFoundError})
 	}
-	before := current
-	if before == "" {
-		before = "None"
-	}
-	s.record(actor, auditRole, target.Email, auditDetail(target, fmt.Sprintf("role=%s->%s", before, role)))
+	s.record(actor, auditRole, target.Email, auditDetail(target, fmt.Sprintf("role=%s->%s", current, role)))
 	return nil
 }
 
