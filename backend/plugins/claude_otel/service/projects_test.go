@@ -183,6 +183,16 @@ func hasWriteLock(clauses []dal.Clause) bool {
 	return false
 }
 
+// clauseArgs collects the clauses a mocked call received from argument from on. The dal
+// mocks pass variadic clauses one argument at a time, not as a []dal.Clause.
+func clauseArgs(args mock.Arguments, from int) []dal.Clause {
+	clauses := make([]dal.Clause, 0, len(args)-from)
+	for _, arg := range args[from:] {
+		clauses = append(clauses, arg.(dal.Clause))
+	}
+	return clauses
+}
+
 func whereOf(clauses []dal.Clause) dal.DalClause {
 	for _, clause := range clauses {
 		if clause.Type == dal.WhereClause {
@@ -194,9 +204,9 @@ func whereOf(clauses []dal.Clause) dal.DalClause {
 
 // expectOtelPlacementQueries serves the project's placements unlocked and each connection's placements only with a write lock.
 func expectOtelPlacementQueries(t *testing.T, tx *dalmocks.Transaction, projectPlacements []*models.OtelConnectionProject, connectionPlacements map[uint64][]string) {
-	tx.On("All", mock.AnythingOfType("*[]*models.OtelConnectionProject"), mock.Anything).Run(func(args mock.Arguments) {
+	serve := func(args mock.Arguments) {
 		placements := args.Get(0).(*[]*models.OtelConnectionProject)
-		clauses := args.Get(1).([]dal.Clause)
+		clauses := clauseArgs(args, 1)
 		where := whereOf(clauses)
 		switch where.Expr {
 		case "project_name = ?":
@@ -211,13 +221,18 @@ func expectOtelPlacementQueries(t *testing.T, tx *dalmocks.Transaction, projectP
 		default:
 			t.Fatalf("unexpected placement query %q", where.Expr)
 		}
-	}).Return(nil)
+	}
+	// The project's placements are read with Where; each connection's with Where, Orderby and
+	// Lock, and only when the project has placements.
+	tx.On("All", mock.AnythingOfType("*[]*models.OtelConnectionProject"), mock.Anything).Run(serve).Return(nil)
+	tx.On("All", mock.AnythingOfType("*[]*models.OtelConnectionProject"), mock.Anything, mock.Anything, mock.Anything).Run(serve).Return(nil).Maybe()
 }
 
 func expectOtelConnectionLock(t *testing.T, tx *dalmocks.Transaction, connections ...models.OtelConnection) {
-	tx.On("All", mock.AnythingOfType("*[]*models.OtelConnection"), mock.Anything).Run(func(args mock.Arguments) {
-		if !hasWriteLock(args.Get(1).([]dal.Clause)) {
-			t.Fatalf("connections read without a write lock: %#v", args.Get(1))
+	// lockOtelConnections passes Where, Orderby and Lock.
+	tx.On("All", mock.AnythingOfType("*[]*models.OtelConnection"), mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		if clauses := clauseArgs(args, 1); !hasWriteLock(clauses) {
+			t.Fatalf("connections read without a write lock: %#v", clauses)
 		}
 		locked := args.Get(0).(*[]*models.OtelConnection)
 		for index := range connections {
@@ -262,26 +277,13 @@ func TestDeleteProjectPlacementsInTransaction(t *testing.T) {
 			connection := testCase.connection
 			connection.Model = common.Model{ID: 7}
 			tx := dalmocks.NewTransaction(t)
-			tx.On("All", mock.AnythingOfType("*[]*models.OtelConnectionProject"), mock.Anything).Run(func(args mock.Arguments) {
-				placements := args.Get(0).(*[]*models.OtelConnectionProject)
-				where := args.Get(1).(dal.Clause).Data.(dal.DalClause)
-				switch where.Expr {
-				case "project_name = ?":
-					*placements = []*models.OtelConnectionProject{{ConnectionId: 7, ProjectName: "Core"}}
-				case "connection_id = ?":
-					*placements = make([]*models.OtelConnectionProject, testCase.connectionPlacements)
-				default:
-					t.Fatalf("unexpected placement query %q", where.Expr)
-				}
-			}).Return(nil)
-			tx.On("First", mock.AnythingOfType("*models.OtelConnection"), mock.Anything).Run(func(args mock.Arguments) {
-				*args.Get(0).(*models.OtelConnection) = connection
-			}).Return(nil).Once()
+			expectOtelPlacementQueries(t, tx, []*models.OtelConnectionProject{{ConnectionId: 7, ProjectName: "Core"}}, map[uint64][]string{7: testCase.connectionPlacements})
+			expectOtelConnectionLock(t, tx, connection)
 
-			var deleteWhere dal.Clause
+			var deleteClauses []dal.Clause
 			if !testCase.wantErr {
 				tx.On("Delete", mock.AnythingOfType("*models.OtelConnectionProject"), mock.Anything).Run(func(args mock.Arguments) {
-					deleteWhere = args.Get(1).(dal.Clause)
+					deleteClauses = clauseArgs(args, 1)
 				}).Return(nil).Once()
 			}
 
@@ -298,7 +300,7 @@ func TestDeleteProjectPlacementsInTransaction(t *testing.T) {
 			if err != nil {
 				t.Fatalf("DeleteProjectPlacementsInTransaction() error = %v, want nil", err)
 			}
-			where := deleteWhere.Data.(dal.DalClause)
+			where := whereOf(deleteClauses)
 			if where.Expr != "project_name = ?" || len(where.Params) != 1 || where.Params[0] != "Core" {
 				t.Fatalf("placement delete filter = (%q, %#v), want project_name = ? with Core", where.Expr, where.Params)
 			}
@@ -313,7 +315,7 @@ func TestDeleteProjectPlacementsInTransaction(t *testing.T) {
 		if err := DeleteProjectPlacementsInTransaction(tx, "Core"); err != nil {
 			t.Fatalf("DeleteProjectPlacementsInTransaction() error = %v, want nil", err)
 		}
-		tx.AssertNotCalled(t, "All", mock.AnythingOfType("*[]*models.OtelConnection"), mock.Anything)
+		tx.AssertNotCalled(t, "All", mock.AnythingOfType("*[]*models.OtelConnection"), mock.Anything, mock.Anything, mock.Anything)
 	})
 }
 
@@ -337,8 +339,8 @@ func TestLockOtelConnections(t *testing.T) {
 	t.Run("locks the connections in id order", func(t *testing.T) {
 		tx := dalmocks.NewTransaction(t)
 		var clauses []dal.Clause
-		tx.On("All", mock.AnythingOfType("*[]*models.OtelConnection"), mock.Anything).Run(func(args mock.Arguments) {
-			clauses = args.Get(1).([]dal.Clause)
+		tx.On("All", mock.AnythingOfType("*[]*models.OtelConnection"), mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+			clauses = clauseArgs(args, 1)
 		}).Return(nil).Once()
 
 		input := []uint64{9, 3, 5}
@@ -407,7 +409,7 @@ func TestRenameProjectPlacementsInTransaction(t *testing.T) {
 		tx.On("UpdateColumn", mock.AnythingOfType("*models.OtelConnectionProject"), mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 			column = args.Get(1).(string)
 			value = args.Get(2).(string)
-			clauses = args.Get(3).([]dal.Clause)
+			clauses = clauseArgs(args, 3)
 		}).Return(nil).Once()
 
 		if err := RenameProjectPlacementsInTransaction(tx, "Core", "Platform"); err != nil {
@@ -437,8 +439,8 @@ func TestLockOtelProjects(t *testing.T) {
 	t.Run("reads the named projects with a write lock", func(t *testing.T) {
 		tx := dalmocks.NewTransaction(t)
 		var clauses []dal.Clause
-		tx.On("All", mock.AnythingOfType("*[]*models.Project"), mock.Anything).Run(func(args mock.Arguments) {
-			clauses = args.Get(1).([]dal.Clause)
+		tx.On("All", mock.AnythingOfType("*[]*models.Project"), mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+			clauses = clauseArgs(args, 1)
 			*args.Get(0).(*[]*coremodels.Project) = []*coremodels.Project{
 				{BaseProject: coremodels.BaseProject{Name: "Core"}},
 				{BaseProject: coremodels.BaseProject{Name: "Mobile"}},
@@ -461,7 +463,7 @@ func TestLockOtelProjects(t *testing.T) {
 
 	t.Run("rejects a project that no longer exists", func(t *testing.T) {
 		tx := dalmocks.NewTransaction(t)
-		tx.On("All", mock.AnythingOfType("*[]*models.Project"), mock.Anything).Run(func(args mock.Arguments) {
+		tx.On("All", mock.AnythingOfType("*[]*models.Project"), mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 			*args.Get(0).(*[]*coremodels.Project) = []*coremodels.Project{{BaseProject: coremodels.BaseProject{Name: "Core"}}}
 		}).Return(nil).Once()
 
