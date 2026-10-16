@@ -5,7 +5,7 @@
   "specs": {
     "advanced/blueprint-detail.spec.ts": {
       "tests": 11,
-      "expects": 69,
+      "expects": 73,
       "backend": 9,
       "skips": 0,
       "fixmes": 0
