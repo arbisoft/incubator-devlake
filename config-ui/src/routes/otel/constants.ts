@@ -18,9 +18,11 @@
 
 import { HttpStatusCode } from 'axios';
 
-import { OTEL_BATCH_STATUS, OTEL_INGESTION_STATE, OTEL_STATUS } from '@/api/otel/constants';
+import { OTEL_STATUS } from '@/api/otel/constants';
 import { CONFIRM_TONE } from '@/ui/confirm-modal/constants';
 import type { ConfirmConfig } from '@/ui/types';
+
+import { HEALTH_COPY } from './health-copy';
 
 export const OTEL_ATTENTION_CHANGED_EVENT = 'devlake:otel-attention-changed';
 export const OTEL_REFRESH_INTERVAL_MS = 30_000;
@@ -183,55 +185,7 @@ export const COPY = {
     },
     columns: { workspace: 'Workspace', family: 'Metric family', source: 'Preferred source' },
   },
-  health: {
-    title: 'Telemetry ingestion',
-    tableLabel: 'Recent telemetry batches',
-    batchesTitle: 'Recent batches',
-    loading: 'Loading ingestion status...',
-    unavailable: 'Ingestion status is unavailable.',
-    batchesUnavailable: 'Telemetry batches could not be loaded.',
-    retry: 'Retry',
-    state: {
-      [OTEL_INGESTION_STATE.HEALTHY]: 'Healthy',
-      [OTEL_INGESTION_STATE.DEGRADED]: 'Degraded',
-      [OTEL_INGESTION_STATE.UNHEALTHY]: 'Unhealthy',
-    },
-    metrics: {
-      pending: 'Pending',
-      retrying: 'Retrying',
-      oldestBacklog: 'Oldest backlog',
-      permanentErrors: 'Permanent errors (24h)',
-      converter: 'Converter',
-      logPending: 'Log batches pending',
-      logRetrying: 'Log batches retrying',
-      logReplaying: 'Log batches replaying',
-      logOldestBacklog: 'Oldest log backlog',
-      logPermanentErrors: 'Log permanent errors (24h)',
-    },
-    converter: { unavailable: 'Unavailable', active: 'Active', expired: 'Lease expired' },
-    none: 'None',
-    seconds: (value: number) => `${value}s`,
-    minutes: (value: number) => `${value}m`,
-    batchStatus: {
-      [OTEL_BATCH_STATUS.PENDING]: 'Pending',
-      [OTEL_BATCH_STATUS.PROCESSING]: 'Processing',
-      [OTEL_BATCH_STATUS.PROCESSED]: 'Processed',
-      [OTEL_BATCH_STATUS.RETRYABLE_ERROR]: 'Retrying',
-      [OTEL_BATCH_STATUS.PERMANENT_ERROR]: 'Permanent error',
-      [OTEL_BATCH_STATUS.REPLAY_PENDING]: 'Replaying',
-    },
-    columns: { received: 'Received', status: 'Status', datapoints: 'Datapoints', actions: 'Actions' },
-    emptyBatches: {
-      title: 'No telemetry batches yet',
-      description: 'Batches appear here as Claude Code sends telemetry.',
-    },
-    viewPayload: 'View payload',
-    viewPayloadFor: (time: string) => `View payload for the batch received ${time}`,
-    payloadTitle: 'OTLP payload',
-    payloadCopy: 'Copy payload',
-    payloadError: 'Unable to load the telemetry payload.',
-    payloadRetry: 'Retry loading payload',
-  },
+  health: HEALTH_COPY,
   attention: {
     region: 'Claude Code telemetry attention',
     title: 'Claude Code telemetry needs attention.',
