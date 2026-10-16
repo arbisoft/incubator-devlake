@@ -22,9 +22,13 @@ import { useMemo, useState } from 'react';
 
 import API from '@/api';
 import { addConnection, updateConnection } from '@/features';
-import { selectConnection, toConnectionActionErrorMessage } from '@/features/connections';
-import { COPY as CONNECTION_COPY, HTTP_STATUS as CONNECTION_HTTP_STATUS } from '@/features/connections/constants';
-import { getErrorResponse } from '@/features/connections/utils';
+import {
+  CONNECTION_COPY,
+  CONNECTION_HTTP_STATUS,
+  getErrorResponse,
+  selectConnection,
+  toConnectionActionErrorMessage,
+} from '@/features/connections';
 import { useAppDispatch, useAppSelector, useRefreshData } from '@/hooks';
 import { getPluginConfig } from '@/plugins/utils';
 import type { IConnectionAPI } from '@/types';

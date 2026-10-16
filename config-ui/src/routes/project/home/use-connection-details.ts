@@ -16,7 +16,7 @@
  *
  */
 
-import { selectAllConnections, selectWebhooks } from '@/features/connections/slice';
+import { selectAllConnections, selectWebhooks } from '@/features/connections';
 import { useAppSelector } from '@/hooks';
 
 import type { ConnectionDetail, ConnectionEntry } from './types';

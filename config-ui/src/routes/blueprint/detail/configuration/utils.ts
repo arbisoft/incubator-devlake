@@ -16,7 +16,7 @@
  *
  */
 
-import { WEBHOOK_PLUGIN } from '@/features/connections/constants';
+import { WEBHOOK_PLUGIN } from '@/features/connections';
 import type { IConnection } from '@/types';
 import type { BlueprintConnectionPayload } from '@/types/blueprint';
 
@@ -63,13 +63,22 @@ const isPipelinePlan = (value: unknown): value is PipelinePlan => {
   return taskCount > 0;
 };
 
-export const toPlanPayload = (rawPlan: string): PipelinePlan | undefined => {
+const parsePlanText = (raw: string): unknown => {
   try {
-    const parsed: unknown = JSON.parse(rawPlan);
-    return isPipelinePlan(parsed) ? parsed : undefined;
+    return JSON.parse(raw);
   } catch {
     return undefined;
   }
+};
+
+export const isEmptyPlanText = (raw: string): boolean => {
+  const parsed = parsePlanText(raw);
+  return Array.isArray(parsed) && parsed.every((stage) => Array.isArray(stage) && stage.length === 0);
+};
+
+export const toPlanPayload = (rawPlan: string): PipelinePlan | undefined => {
+  const parsed = parsePlanText(rawPlan);
+  return isPipelinePlan(parsed) ? parsed : undefined;
 };
 
 export const toScopeConnection = ({ plugin, id }: IConnection, scopeIds: ID[]): BlueprintConnectionPayload => ({

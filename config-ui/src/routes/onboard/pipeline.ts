@@ -17,7 +17,7 @@
  */
 
 import API from '@/api';
-import { getErrorResponse } from '@/features/connections/utils';
+import { getErrorResponse } from '@/features/connections';
 
 import { COPY } from './constants';
 

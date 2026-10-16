@@ -179,28 +179,34 @@ describe('Step4 collection progress and actions', () => {
     },
   );
 
-  it('keeps the old record on persistence failure and retries with storage before context update', async () => {
-    const { record, value } = setup(TASK_STATUS.FAILED);
+  it('shows the new pipeline and warns when saving progress fails after a successful trigger', async () => {
+    const { value } = setup(TASK_STATUS.FAILED);
     const setRecords = vi.mocked(value.setRecords);
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    storeSet.mockRejectedValueOnce(new Error('safe persistence failure')).mockResolvedValue(undefined);
+    storeSet.mockRejectedValueOnce(new Error('safe persistence failure'));
 
     const recollect = recollectButton();
     fireEvent.click(recollect);
-    await waitForOnboardActionSettled(recollect);
+    await waitFor(() => expect(message.warning).toHaveBeenCalledWith(COPY.result.progressNotSaved));
 
-    expect(storeSet).toHaveBeenCalledTimes(1);
-    expect(setRecords).not.toHaveBeenCalled();
-    expect(value.records).toEqual([record]);
-    expect(recollectButton().disabled).toBe(false);
-
-    fireEvent.click(recollectButton());
-    await waitFor(() => expect(setRecords).toHaveBeenCalledTimes(1));
-
-    expect(storeSet).toHaveBeenCalledTimes(2);
-    expect(storeSet.mock.invocationCallOrder[1]).toBeLessThan(setRecords.mock.invocationCallOrder[0]);
-    expect(storeSet.mock.calls[1]?.[1]).toMatchObject({ records: [expect.objectContaining({ pipelineId: 91 })] });
+    expect(setRecords).toHaveBeenCalledTimes(1);
     expect(setRecords.mock.calls[0]?.[0][0]?.pipelineId).toBe(91);
+    expect(setRecords.mock.invocationCallOrder[0]).toBeLessThan(storeSet.mock.invocationCallOrder[0]);
+    expect(message.error).not.toHaveBeenCalled();
+    await waitForOnboardActionSettled(recollect);
+  });
+
+  it('persists the new records after a successful recollection', async () => {
+    const { value } = setup(TASK_STATUS.FAILED);
+
+    const recollect = recollectButton();
+    fireEvent.click(recollect);
+    await waitFor(() => expect(storeSet).toHaveBeenCalledTimes(1));
+
+    expect(storeSet.mock.calls[0]?.[1]).toMatchObject({ records: [expect.objectContaining({ pipelineId: 91 })] });
+    expect(value.setRecords).toHaveBeenCalledTimes(1);
+    expect(message.warning).not.toHaveBeenCalled();
+    await waitForOnboardActionSettled(recollect);
   });
 
   it('opens the dashboard with explicit safe new-window settings', () => {

@@ -107,6 +107,8 @@ export const COPY = {
     collected: (scope: string) => `${scope} is successfully collected !`,
     partial: (scope: string) => `Data from ${scope} has been partially collected!`,
     failed: 'Something went wrong with the collection process.',
+    progressNotSaved:
+      'Collection restarted, but your onboarding progress could not be saved. If you reload, the previous run may show.',
     failedHint:
       "Please verify your network connection and ensure your token's rate limits have not been exceeded, then attempt to collect the data again. Alternatively, you may report the issue by filing a bug on",
     github: 'GitHub',

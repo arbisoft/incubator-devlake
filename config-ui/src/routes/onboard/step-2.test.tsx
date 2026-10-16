@@ -17,7 +17,7 @@
  */
 
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
-import { message } from 'antd';
+import { Input, message } from 'antd';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import API from '@/api';
@@ -43,9 +43,12 @@ vi.mock('@/plugins', async () => {
 
 vi.mock('@/plugins/components/connection-form/fields/token', () => ({
   ConnectionToken: ({ setValue }: { setValue: (value?: string) => void }) => (
-    <button type="button" onClick={() => setValue('present')}>
-      Provide credential
-    </button>
+    <>
+      <Input aria-label="Token input" />
+      <button type="button" onClick={() => setValue('present')}>
+        Provide credential
+      </button>
+    </>
   ),
 }));
 
@@ -58,12 +61,15 @@ const CONNECTION_ID = 41;
 const NEXT_BUTTON = COPY.next;
 const CONNECT_BUTTON = COPY.connection.connect;
 const CREDENTIAL_BUTTON = 'Provide credential';
+const TOKEN_INPUT = 'Token input';
+const BITBUCKET_USERNAME = 'user@example.com';
+const BITBUCKET_PASSWORD = 'Your API Token';
 const SUCCESSFUL_TEST_MESSAGE = 'safe connection success';
 const LOADING_CLASS = 'ant-btn-loading';
 type ConnectionTestResponse = Awaited<ReturnType<typeof API.connection.testOld>>;
 type DeferredConnectionTest = ReturnType<typeof createDeferred<ConnectionTestResponse>>;
 
-const setup = (plugin = ONBOARD_PLUGIN.GITHUB) => {
+const setup = (plugin: string = ONBOARD_PLUGIN.GITHUB) => {
   const value = makeOnboardContext({ plugin, step: WIZARD_STEP.CONNECTION });
   const view = renderOnboard(<Step2 />, value);
   return { value, ...view };
@@ -142,6 +148,54 @@ describe('Step2 connection tests', () => {
     expect(createConnection).toHaveBeenCalledTimes(1);
     expect(Boolean(createConnection.mock.calls[0]?.[1].token)).toBe(true);
     expect(storeSet).toHaveBeenCalledTimes(1);
+  });
+
+  it('locks the token input while a credential test runs and unlocks it afterwards', async () => {
+    const pendingTest = createDeferred<ConnectionTestResponse>();
+    testOld.mockReturnValueOnce(pendingTest.promise);
+    setup();
+    fireEvent.click(screen.getByRole('button', { name: CREDENTIAL_BUTTON }));
+    fireEvent.click(getConnectButton());
+    await waitForPending();
+    expect(screen.getByLabelText(TOKEN_INPUT).hasAttribute('disabled')).toBe(true);
+
+    await resolveSuccessfulConnectionTest(pendingTest);
+    expect(screen.getByLabelText(TOKEN_INPUT).hasAttribute('disabled')).toBe(false);
+    expect(next().hasAttribute('disabled')).toBe(false);
+  });
+
+  it('locks the token input while the connection is being created', async () => {
+    const pendingCreate = createDeferred<Awaited<ReturnType<typeof API.connection.create>>>();
+    testOld.mockResolvedValueOnce({ success: true, message: SUCCESSFUL_TEST_MESSAGE });
+    createConnection.mockReturnValueOnce(pendingCreate.promise);
+    const { value } = setup();
+    fireEvent.click(screen.getByRole('button', { name: CREDENTIAL_BUTTON }));
+    fireEvent.click(getConnectButton());
+    await waitFor(() => expect(next().hasAttribute('disabled')).toBe(false));
+
+    fireEvent.click(next());
+    await waitFor(() => expect(screen.getByLabelText(TOKEN_INPUT).hasAttribute('disabled')).toBe(true));
+    await act(async () => {
+      pendingCreate.resolve({ id: CONNECTION_ID, name: 'github-connection', endpoint: '', proxy: '' });
+      await pendingCreate.promise;
+    });
+    await waitFor(() => expect(value.setStep).toHaveBeenCalledWith(WIZARD_STEP.SCOPE));
+    expect(screen.getByLabelText(TOKEN_INPUT).hasAttribute('disabled')).toBe(false);
+  });
+
+  it('locks the Bitbucket credential inputs while a test runs', async () => {
+    const pendingTest = createDeferred<ConnectionTestResponse>();
+    testOld.mockReturnValueOnce(pendingTest.promise);
+    setup(ONBOARD_PLUGIN.BITBUCKET);
+    fireEvent.change(await screen.findByPlaceholderText(BITBUCKET_USERNAME), { target: { value: 'dev@example.com' } });
+    fireEvent.change(screen.getByPlaceholderText(BITBUCKET_PASSWORD), { target: { value: 'secret' } });
+    fireEvent.click(getConnectButton());
+    await waitForPending();
+    expect(screen.getByPlaceholderText(BITBUCKET_USERNAME).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByPlaceholderText(BITBUCKET_PASSWORD).hasAttribute('disabled')).toBe(true);
+
+    await resolveSuccessfulConnectionTest(pendingTest);
+    expect(screen.getByPlaceholderText(BITBUCKET_USERNAME).hasAttribute('disabled')).toBe(false);
   });
 
   it('reuses the created connection when retrying a failed progress save', async () => {

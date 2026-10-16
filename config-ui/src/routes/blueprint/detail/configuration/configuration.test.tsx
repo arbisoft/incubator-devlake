@@ -47,12 +47,12 @@ const Wrapper = ({ children }: PropsWithChildren) => (
   </Provider>
 );
 
-const setup = () => {
+const setup = (current = blueprint) => {
   const { onRefresh, onShowStatus } = callbacks();
   renderWithTheme(
     <Wrapper>
       <BlueprintConfiguration
-        blueprint={blueprint}
+        blueprint={current}
         connectionPath={(plugin, id) => `/connections/${plugin}/${id}`}
         onRefresh={onRefresh}
         onShowStatus={onShowStatus}
@@ -100,6 +100,19 @@ describe('BlueprintConfiguration advanced plan editor', () => {
         plan: [[{ plugin: 'github' }]],
       }),
     );
+  });
+
+  it('shows no alert for an empty plan and keeps save disabled', () => {
+    setup({ ...blueprint, plan: [[]] });
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(save().disabled).toBeTruthy();
+  });
+
+  it('shows no alert after reset', () => {
+    setup();
+    fireEvent.click(screen.getByText(COPY.json.editor.reset));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(save().disabled).toBeTruthy();
   });
 
   it('keeps valid text after a failed save and retries it successfully', async () => {

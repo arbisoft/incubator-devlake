@@ -18,10 +18,11 @@
 
 import type { IPipeline, ITask } from '@/types';
 
-import type { PipelineRowAction } from './components/types';
-import type { FILTER_PARAM, PIPELINE_COLUMN, STAGE_STATE, TASK_CELL } from './constants';
+import type { FILTER_PARAM, PIPELINE_COLUMN, PIPELINE_ROW_ACTION, STAGE_STATE, TASK_CELL } from './constants';
 
 export type PipelineSortKey = typeof PIPELINE_COLUMN.STARTED_AT | typeof PIPELINE_COLUMN.COMPLETED_AT;
+
+export type PipelineRowAction = (typeof PIPELINE_ROW_ACTION)[keyof typeof PIPELINE_ROW_ACTION];
 
 export type PipelineColumnOptions = {
   sortable: boolean;

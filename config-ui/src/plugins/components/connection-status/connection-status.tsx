@@ -16,8 +16,15 @@
  *
  */
 
-import { selectHealth, testConnection, toConnectionActionErrorMessage, toHealthView } from '@/features/connections';
-import { COPY, HEALTH_FAILURE_REASON, HTTP_STATUS } from '@/features/connections/constants';
+import {
+  CONNECTION_COPY as COPY,
+  CONNECTION_HTTP_STATUS as HTTP_STATUS,
+  HEALTH_FAILURE_REASON,
+  selectHealth,
+  testConnection,
+  toConnectionActionErrorMessage,
+  toHealthView,
+} from '@/features/connections';
 import { useAppDispatch, useAppSelector } from '@/hooks';
 import { IConnectionStatus } from '@/types';
 import { ConnectionHealth } from '@/ui';

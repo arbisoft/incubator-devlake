@@ -16,7 +16,7 @@
  *
  */
 
-import { Button, Tooltip } from 'antd';
+import { Button, ConfigProvider, Tooltip } from 'antd';
 import { useState, useContext, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -134,51 +134,57 @@ export const Step2 = () => {
     </S.Connect>
   );
 
+  const busy = testing || operating;
+
   return (
     <>
       <S.StepContent>
         {PLATFORM_NAME[plugin] && (
           <S.Form>
-            <ConnectionToken
-              type="create"
-              label={COPY.connection.tokenLabel}
-              subLabel={
-                <>
-                  {COPY.connection.tokenDescription(PLATFORM_NAME[plugin], config.name)}{' '}
-                  <Link to={PATHS.CONNECTIONS()}>{COPY.dataConnections}</Link>.
-                </>
-              }
-              initialValue=""
-              value={payload.token ?? ''}
-              setValue={(token) => {
-                setPayload((current) => ({ ...current, token }));
-                setTestStatus(false);
-                setCreatedConnectionId(undefined);
-              }}
-              error=""
-              setError={() => {}}
-            />
+            <ConfigProvider componentDisabled={busy}>
+              <ConnectionToken
+                type="create"
+                label={COPY.connection.tokenLabel}
+                subLabel={
+                  <>
+                    {COPY.connection.tokenDescription(PLATFORM_NAME[plugin], config.name)}{' '}
+                    <Link to={PATHS.CONNECTIONS()}>{COPY.dataConnections}</Link>.
+                  </>
+                }
+                initialValue=""
+                value={payload.token ?? ''}
+                setValue={(token) => {
+                  setPayload((current) => ({ ...current, token }));
+                  setTestStatus(false);
+                  setCreatedConnectionId(undefined);
+                }}
+                error=""
+                setError={() => {}}
+              />
+            </ConfigProvider>
             {connectButton(!payload.token)}
           </S.Form>
         )}
         {plugin === ONBOARD_PLUGIN.BITBUCKET && (
           <S.Form>
-            <BitbucketAuthField
-              type="create"
-              initialValues={{
-                ...CONNECTION_DEFAULTS[ONBOARD_PLUGIN.BITBUCKET],
-                username: '',
-                password: '',
-              }}
-              values={payload}
-              errors={{}}
-              setValues={(values: ConnectionDraft) => {
-                setPayload((current) => ({ ...current, ...values }));
-                setTestStatus(false);
-                setCreatedConnectionId(undefined);
-              }}
-              setErrors={() => {}}
-            />
+            <ConfigProvider componentDisabled={busy}>
+              <BitbucketAuthField
+                type="create"
+                initialValues={{
+                  ...CONNECTION_DEFAULTS[ONBOARD_PLUGIN.BITBUCKET],
+                  username: '',
+                  password: '',
+                }}
+                values={payload}
+                errors={{}}
+                setValues={(values: ConnectionDraft) => {
+                  setPayload((current) => ({ ...current, ...values }));
+                  setTestStatus(false);
+                  setCreatedConnectionId(undefined);
+                }}
+                setErrors={() => {}}
+              />
+            </ConfigProvider>
             {connectButton(!payload.username || !payload.password)}
           </S.Form>
         )}

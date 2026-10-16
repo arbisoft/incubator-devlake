@@ -19,10 +19,9 @@
 import type { IPipeline, IPipelineStatus, ITask } from '@/types';
 import type { DataTableProps } from '@/ui';
 
-import type { PIPELINE_ROW_ACTION } from '../constants';
-import type { PipelineSortKey, PipelineStage } from '../types';
+import type { PipelineRowAction, PipelineSortKey, PipelineStage } from '../types';
 
-export type PipelineRowAction = (typeof PIPELINE_ROW_ACTION)[keyof typeof PIPELINE_ROW_ACTION];
+export type { PipelineRowAction } from '../types';
 
 export type PipelineStatusCellProps = { status: IPipelineStatus; finished: number; total: number };
 

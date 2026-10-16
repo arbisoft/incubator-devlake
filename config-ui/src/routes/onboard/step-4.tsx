@@ -17,7 +17,7 @@
  */
 
 import { CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
-import { Progress, Button } from 'antd';
+import { Progress, Button, message } from 'antd';
 import { useState, useContext, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from 'styled-components';
@@ -99,34 +99,20 @@ export const Step4 = () => {
     pending.current = true;
 
     try {
-      await operator(
-        async () => {
-          const pipelineId = await triggerOnboardPipeline(record.blueprintId);
+      const [triggered, pipelineId] = await operator(() => triggerOnboardPipeline(record.blueprintId), {
+        setOperating,
+        formatReason: toOnboardCollectionErrorMessage,
+      });
+      if (!triggered) return;
 
-          const newRecords = records.map((it) =>
-            it.plugin !== plugin
-              ? it
-              : {
-                  ...it,
-                  pipelineId,
-                },
-          );
+      const newRecords = records.map((it) => (it.plugin !== plugin ? it : { ...it, pipelineId }));
+      setRecords(newRecords);
 
-          await API.store.set(STORE_KEY, {
-            step: WIZARD_STEP.RESULT,
-            records: newRecords,
-            done,
-            projectName,
-            plugin,
-          });
-
-          setRecords(newRecords);
-        },
-        {
-          setOperating,
-          formatReason: toOnboardCollectionErrorMessage,
-        },
+      const [saved] = await operator(
+        () => API.store.set(STORE_KEY, { step: WIZARD_STEP.RESULT, records: newRecords, done, projectName, plugin }),
+        { setOperating, hideToast: true },
       );
+      if (!saved) message.warning(COPY.result.progressNotSaved);
     } finally {
       pending.current = false;
     }

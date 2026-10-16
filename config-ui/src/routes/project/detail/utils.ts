@@ -21,7 +21,7 @@ import { HttpStatusCode } from 'axios';
 import { OTEL_STATUS, type OtelConnectionResponse } from '@/api/otel';
 import { PATHS, PROJECT_TAB, type ProjectTab } from '@/config';
 import { WEBHOOK_PLUGIN } from '@/features';
-import { getErrorResponse } from '@/features/connections/utils';
+import { getErrorResponse } from '@/features/connections';
 import type { IBlueprint, IProject } from '@/types';
 import { toUserMessage } from '@/ui';
 

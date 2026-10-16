@@ -124,7 +124,7 @@ export const BlueprintConfiguration = ({ blueprint, connectionPath, onRefresh, o
       {blueprint.mode === IBPMode.ADVANCED && (
         <SectionCard title={COPY.json.title}>
           <AdvancedEditor value={config.rawPlan} onChange={config.setRawPlan} />
-          {config.invalidPlan && <Alert type="error" showIcon title={COPY.json.invalidPlan} />}
+          {config.showPlanError && <Alert type="error" showIcon title={COPY.json.invalidPlan} />}
           <Footer>
             <Button type="primary" loading={config.saving} disabled={config.invalidPlan} onClick={config.savePlan}>
               {COPY.json.save}
