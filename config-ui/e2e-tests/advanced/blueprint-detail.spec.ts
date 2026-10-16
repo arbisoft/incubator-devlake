@@ -233,10 +233,19 @@ test.describe.serial('Blueprint detail views and pipeline panel', () => {
     await detail.open(BLUEPRINT_VIEW.CONFIGURATION);
     await expect(detail.planEditor).toBeVisible();
 
-    for (const invalid of ['[[{', '[]', '{"plan":1}']) {
+    for (const invalid of ['[[{', '{"plan":1}']) {
       await detail.fillPlan(invalid);
       await expect(detail.planEditor).toHaveValue(invalid);
       await expect(detail.invalidPlanNotice).toBeVisible();
+      await expect(detail.planSaveButton).toBeDisabled();
+      expect(patchCount()).toBe(0);
+    }
+
+    // An empty plan can't be saved but isn't flagged as an error.
+    for (const empty of ['[]', '[[]]']) {
+      await detail.fillPlan(empty);
+      await expect(detail.planEditor).toHaveValue(empty);
+      await expect(detail.invalidPlanNotice).toBeHidden();
       await expect(detail.planSaveButton).toBeDisabled();
       expect(patchCount()).toBe(0);
     }
