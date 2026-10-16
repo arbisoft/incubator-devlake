@@ -62,6 +62,7 @@ import { UseInViewDemo } from './use-in-view.demo';
 import { UseLastLoadedDemo } from './use-last-loaded.demo';
 import { UseListStateDemo } from './use-list-state.demo';
 import { UseModalFormDemo } from './use-modal-form.demo';
+import { UsePendingKeysDemo } from './use-pending-keys.demo';
 import { UseRefreshVersionDemo } from './use-refresh-version.demo';
 import { UseRouteTabDemo } from './use-route-tab.demo';
 import { UseSidebarCollapsedDemo } from './use-sidebar-collapsed.demo';
@@ -110,6 +111,7 @@ export const SECTIONS: SectionDefinition[] = [
   { id: SECTION.USE_REFRESH_VERSION, Demo: UseRefreshVersionDemo },
   { id: SECTION.USE_LAST_LOADED, Demo: UseLastLoadedDemo },
   { id: SECTION.USE_MODAL_FORM, Demo: UseModalFormDemo },
+  { id: SECTION.USE_PENDING_KEYS, Demo: UsePendingKeysDemo },
   { id: SECTION.USE_DOCUMENT_TITLE, Demo: UseDocumentTitleDemo },
   { id: SECTION.USE_IN_VIEW, Demo: UseInViewDemo },
   { id: SECTION.USE_SIDEBAR_COLLAPSED, Demo: UseSidebarCollapsedDemo },

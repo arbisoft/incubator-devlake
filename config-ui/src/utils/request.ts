@@ -16,7 +16,7 @@
  *
  */
 
-import axios, { type AxiosRequestConfig } from 'axios';
+import axios, { isAxiosError, type AxiosRequestConfig } from 'axios';
 
 import { DEVLAKE_ENDPOINT, PATHS } from '@/config';
 
@@ -81,6 +81,9 @@ const isPluginConnectionTest = (url?: string) => !!url && PLUGIN_CONNECTION_TEST
 instance.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Request bodies can hold credentials; keep them out of error logs.
+    if (isAxiosError(error) && error.config) delete error.config.data;
+
     const status = error.response?.status;
     const requestUrl = typeof error.config?.url === 'string' ? error.config.url : undefined;
 

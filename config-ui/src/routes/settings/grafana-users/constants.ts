@@ -107,6 +107,10 @@ export const GRAFANA_FLOW_ERRORS = {
       'This account signs in with SSO, so its password is managed by the identity provider.',
   }),
   CREATE: withErrors({}),
+  CREATE_RETRY: withErrors({
+    [GRAFANA_ERROR_CODE.USER_NOT_FOUND]:
+      'The partly created account no longer exists in Grafana. Submit again to create it.',
+  }),
   PROJECTS: withErrors({}),
   ORPHAN: withErrors({}),
 };

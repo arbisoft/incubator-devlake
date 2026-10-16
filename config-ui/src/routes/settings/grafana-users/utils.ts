@@ -16,8 +16,6 @@
  *
  */
 
-import axios from 'axios';
-
 import type { AccessUser } from '@/api/access';
 import { ACCESS_STATUS, type AccessStatus } from '@/api/access/constants';
 import { GRAFANA_ERROR_CODE } from '@/api/grafana-users/constants';
@@ -60,11 +58,6 @@ export const getUnavailableMessage = (source: unknown) =>
   toUserMessage(source, GRAFANA_ERROR_MAP, GRAFANA_ERROR_MAP[GRAFANA_ERROR_CODE.UNAVAILABLE]);
 
 export const getFlowError = (map: Record<string, string>) => (error: unknown) => toUserMessage(error, map);
-
-export const stripPasswordRequestBody = (error: unknown): never => {
-  if (axios.isAxiosError(error) && error.config) delete error.config.data;
-  throw error;
-};
 
 const UINT32_RANGE = 2 ** 32;
 
@@ -126,16 +119,22 @@ export const toDevlakeUserOption = ({ id, email, displayName }: AccessUser): Dev
   name: displayName,
 });
 
-export const getPartialUserId = (error: unknown): ID | undefined => {
+const getResponseData = (error: unknown): { code?: unknown; userId?: unknown } | undefined => {
   const response =
     typeof error === 'object' && error !== null ? (error as { response?: { data?: unknown } }).response : undefined;
   const data = response?.data;
-  if (typeof data !== 'object' || data === null) return undefined;
-  const { code, userId } = data as { code?: unknown; userId?: unknown };
+  return typeof data === 'object' && data !== null ? data : undefined;
+};
+
+export const getPartialUserId = (error: unknown): ID | undefined => {
+  const { code, userId } = getResponseData(error) ?? {};
   return code === GRAFANA_ERROR_CODE.PARTIAL && (typeof userId === 'number' || typeof userId === 'string')
     ? userId
     : undefined;
 };
+
+export const isUserNotFoundError = (error: unknown): boolean =>
+  getResponseData(error)?.code === GRAFANA_ERROR_CODE.USER_NOT_FOUND;
 
 export const getMenuActions = (user: GrafanaUser): GrafanaMenuAction[] => {
   if (user.protected) return [];

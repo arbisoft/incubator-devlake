@@ -25,7 +25,6 @@ import API from '@/api';
 import { GRAFANA_ROLE } from '@/api/grafana-users/constants';
 import type { GrafanaRole, GrafanaUser } from '@/api/grafana-users/types';
 import { FormField, FormModal, useModalForm } from '@/ui';
-import { operator } from '@/utils';
 
 import { Fields, TextField } from '../../components';
 import { isValidEmail } from '../../utils';
@@ -36,9 +35,9 @@ import {
   generatePassword,
   getFlowError,
   getPartialUserId,
+  isUserNotFoundError,
   isValidNewUser,
   normalizeEmail,
-  stripPasswordRequestBody,
 } from '../utils';
 
 import { DevlakeUserSelect } from './devlake-user-select';
@@ -89,8 +88,9 @@ export const AddUserModal = ({ open, onClose, onChanged, onPassword }: AddUserMo
     setPicked(undefined);
     onClose();
   }, [onClose]);
-  const { values, setField, reset, setSaving, modalProps } = useModalForm<AddForm>(INITIAL_FORM, {
+  const { values, setField, reset, submit, modalProps } = useModalForm<AddForm>(INITIAL_FORM, {
     onClose: close,
+    onSettled: onChanged,
     required: [],
     disabledReason: copy.disabledReason,
   });
@@ -113,23 +113,21 @@ export const AddUserModal = ({ open, onClose, onChanged, onPassword }: AddUserMo
   };
 
   const handleSubmit = async () => {
-    const [success, result] = await operator(
+    const [success, result] = await submit(
       async (): Promise<void> => {
         if (partialId === undefined) {
-          await API.grafanaUsers.createUser(buildCreateBody(values)).catch(stripPasswordRequestBody);
+          await API.grafanaUsers.createUser(buildCreateBody(values));
         } else await finishPartial(partialId, values);
       },
-      { setOperating: setSaving, formatReason: getFlowError(GRAFANA_FLOW_ERRORS.CREATE) },
+      {
+        formatReason: getFlowError(retrying ? GRAFANA_FLOW_ERRORS.CREATE_RETRY : GRAFANA_FLOW_ERRORS.CREATE),
+        onSuccess: () => onPassword({ email: normalizeEmail(values.email), password: values.password }),
+      },
     );
-    onChanged();
-    if (!success) {
-      const userId = getPartialUserId(result);
-      if (userId !== undefined) setPartialId(userId);
-      return;
-    }
-    onPassword({ email: normalizeEmail(values.email), password: values.password });
-    reset();
-    close();
+    if (success) return;
+    const userId = getPartialUserId(result);
+    if (userId !== undefined) setPartialId(userId);
+    else if (isUserNotFoundError(result)) setPartialId(undefined);
   };
 
   return (

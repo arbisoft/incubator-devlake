@@ -17,8 +17,9 @@
  */
 
 import { message } from 'antd';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback } from 'react';
 
+import { usePendingKeys } from '@/ui/hooks';
 import { toUserMessage } from '@/ui/utils';
 import { operator } from '@/utils';
 
@@ -26,32 +27,26 @@ import { COPY, LOG_DOWNLOAD_ERROR_MAP } from './constants';
 import { downloadPipelineLogs } from './download-logs';
 
 export const useLogDownload = () => {
-  const pendingIdsRef = useRef(new Set<string>());
-  const [pendingIds, setPendingIds] = useState(new Set<string>());
+  const { begin, end, isPending } = usePendingKeys();
 
-  const download = useCallback(async (id: ID): Promise<void> => {
-    const key = String(id);
-    if (pendingIdsRef.current.has(key)) return;
+  const download = useCallback(
+    async (id: ID): Promise<void> => {
+      const key = String(id);
+      if (!begin(key)) return;
 
-    pendingIdsRef.current.add(key);
-    setPendingIds(new Set(pendingIdsRef.current));
-
-    try {
-      const [success, error] = await operator(() => downloadPipelineLogs(id), { hideToast: true });
-      if (!success) {
-        message.error(toUserMessage(error, LOG_DOWNLOAD_ERROR_MAP, COPY.actions.downloadFailed));
+      try {
+        const [success, error] = await operator(() => downloadPipelineLogs(id), { hideToast: true });
+        if (!success) {
+          message.error(toUserMessage(error, LOG_DOWNLOAD_ERROR_MAP, COPY.actions.downloadFailed));
+        }
+      } finally {
+        end(key);
       }
-    } finally {
-      pendingIdsRef.current.delete(key);
-      setPendingIds((current) => {
-        const next = new Set(current);
-        next.delete(key);
-        return next;
-      });
-    }
-  }, []);
+    },
+    [begin, end],
+  );
 
-  const isDownloading = useCallback((id: ID) => pendingIds.has(String(id)), [pendingIds]);
+  const isDownloading = useCallback((id: ID) => isPending(String(id)), [isPending]);
 
   return { download, isDownloading };
 };

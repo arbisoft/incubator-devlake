@@ -136,7 +136,7 @@ describe('useLifecycleAction', () => {
     act(() => result.current.start(LIFECYCLE_ACTION.HIDE, DOMAIN_TARGET));
     await act(async () => result.current.confirmProps.onConfirm());
     expect(result.current.confirmProps.open).toBe(true);
-    expect(onDone).not.toHaveBeenCalled();
+    expect(onDone).toHaveBeenCalledOnce();
   });
 
   it('hands the new one-time password to the caller after a reset', async () => {
@@ -253,11 +253,11 @@ describe('useLifecycleAction', () => {
       const { result, onDone } = setup();
       await act(async () => result.current.changeRole(USER_TARGET, ACCESS_ROLE.CUSTOMER_ADMIN));
       expect(result.current.isUserRolePending(USER.id)).toBe(false);
-      expect(onDone).not.toHaveBeenCalled();
+      expect(onDone).toHaveBeenCalledOnce();
 
       await act(async () => result.current.changeRole(USER_TARGET, ACCESS_ROLE.CUSTOMER_ADMIN));
       expect(access.updateUser).toHaveBeenCalledTimes(2);
-      expect(onDone).toHaveBeenCalledOnce();
+      expect(onDone).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -276,7 +276,7 @@ describe('useLifecycleAction', () => {
       access.updateUser.mockRejectedValue(lastAdminError());
       await act(async () => result.current.changeRole(USER_TARGET, ACCESS_ROLE.MEMBER));
       expect(message.error).toHaveBeenCalledWith(ACCESS_ERROR.LAST_ADMIN);
-      expect(onDone).not.toHaveBeenCalled();
+      expect(onDone).toHaveBeenCalledOnce();
     });
 
     it('shows safe copy when disabling a user or a domain fails, never the raw error', async () => {

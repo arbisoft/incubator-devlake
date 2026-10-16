@@ -37,12 +37,7 @@ import {
   setup,
   submit,
 } from './__tests__/add-user-modal-helpers';
-import {
-  captureLoggedRequestBody,
-  expectPasswordErrorSafe,
-  makePasswordError,
-  waitForPasswordFormReady,
-} from './__tests__/password-error';
+import { expectPasswordRetained, makePasswordError, waitForPasswordFormReady } from './__tests__/password-error';
 
 import './__tests__/add-user-modal-basic-cases';
 import './__tests__/add-user-modal-picker-cases';
@@ -67,10 +62,9 @@ describe('AddUserModal initial form', () => {
     await waitFor(() => expect(projectList).toHaveBeenCalled());
   });
 
-  it('keeps the failed form ready for retry without reporting its request body', async () => {
+  it('keeps the failed form ready for retry', async () => {
     const error = makePasswordError(PASSWORD, 409, GRAFANA_ERROR_CODE.USER_EXISTS);
     grafana.createUser.mockRejectedValueOnce(error);
-    const loggedRequestBody = captureLoggedRequestBody();
 
     const props = setup();
     fillAdd();
@@ -79,7 +73,7 @@ describe('AddUserModal initial form', () => {
 
     const email = screen.getByLabelText(new RegExp(`^${COPY.add.email.label}`)) as HTMLInputElement;
     const password = screen.getByLabelText(new RegExp(`^${COPY.password.label}`)) as HTMLInputElement;
-    expectPasswordErrorSafe(error, loggedRequestBody, password, PASSWORD);
+    expectPasswordRetained(password, PASSWORD);
     expect(email.value === EMAIL).toBeTruthy();
     expect(props.onClose).not.toHaveBeenCalled();
     await waitForPasswordFormReady(submit(COPY.add.submit));

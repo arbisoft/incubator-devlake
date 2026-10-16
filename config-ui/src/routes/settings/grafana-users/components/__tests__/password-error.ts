@@ -17,8 +17,8 @@
  */
 
 import { waitFor } from '@testing-library/react';
-import { AxiosError, AxiosHeaders, isAxiosError, type InternalAxiosRequestConfig } from 'axios';
-import { expect, vi } from 'vitest';
+import { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from 'axios';
+import { expect } from 'vitest';
 
 export const makePasswordError = (
   password: string,
@@ -41,22 +41,7 @@ export const makePasswordError = (
   return error;
 };
 
-export const captureLoggedRequestBody = () => {
-  let loggedRequestBody = false;
-  vi.spyOn(console, 'error').mockImplementation((_message, source) => {
-    loggedRequestBody = Boolean(isAxiosError(source) && source.config?.data);
-  });
-  return () => loggedRequestBody;
-};
-
-export const expectPasswordErrorSafe = (
-  error: AxiosError,
-  loggedBodyReader: () => boolean,
-  input: HTMLInputElement,
-  expectedPassword: string,
-) => {
-  expect(loggedBodyReader()).toBeFalsy();
-  expect(error.config?.data === undefined).toBeTruthy();
+export const expectPasswordRetained = (input: HTMLInputElement, expectedPassword: string) => {
   expect(input.value === expectedPassword).toBeTruthy();
 };
 

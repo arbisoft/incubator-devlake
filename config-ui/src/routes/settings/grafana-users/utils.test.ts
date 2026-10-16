@@ -22,7 +22,6 @@ import { ACCESS_ROLE, ACCESS_STATUS, type AccessUser } from '@/api/access';
 import { GRAFANA_ERROR_CODE, GRAFANA_ROLE } from '@/api/grafana-users/constants';
 import type { GrafanaUser } from '@/api/grafana-users/types';
 
-import { makePasswordError } from './components/__tests__/password-error';
 import {
   COPY,
   GENERATED_PASSWORD_LENGTH,
@@ -40,8 +39,8 @@ import {
   getUnavailableMessage,
   getUserIdentity,
   hasPatchChanges,
+  isUserNotFoundError,
   isValidNewUser,
-  stripPasswordRequestBody,
   toDevlakeUserOption,
   toGrafanaListParams,
   toUserStatus,
@@ -177,38 +176,6 @@ describe('buildDetailsPatch', () => {
   });
 });
 
-describe('stripPasswordRequestBody', () => {
-  it('removes request data while preserving the error response and rethrowing the same error', () => {
-    const error = makePasswordError('test-only-value', 409, GRAFANA_ERROR_CODE.PARTIAL, { userId: 12 });
-
-    let caught: unknown;
-    try {
-      stripPasswordRequestBody(error);
-    } catch (source) {
-      caught = source;
-    }
-
-    expect(caught === error).toBeTruthy();
-    expect(error.config?.data === undefined).toBeTruthy();
-    expect(error.code === 'ERR_BAD_REQUEST').toBeTruthy();
-    expect(error.response?.status === 409).toBeTruthy();
-    const responseData = error.response?.data as { code?: unknown; userId?: unknown } | undefined;
-    expect(responseData?.code === GRAFANA_ERROR_CODE.PARTIAL).toBeTruthy();
-    expect(responseData?.userId === 12).toBeTruthy();
-  });
-
-  it('rethrows an ordinary non-Axios error unchanged', () => {
-    const error = new Error('request failed');
-    let caught: unknown;
-    try {
-      stripPasswordRequestBody(error);
-    } catch (source) {
-      caught = source;
-    }
-    expect(caught === error).toBeTruthy();
-  });
-});
-
 describe('buildCreateBody', () => {
   it('normalises the email and trims the name', () => {
     expect(
@@ -237,6 +204,20 @@ describe('getPartialUserId', () => {
     expect(getPartialUserId(failed('text'))).toBeUndefined();
     expect(getPartialUserId(undefined)).toBeUndefined();
     expect(getPartialUserId(new Error('x'))).toBeUndefined();
+  });
+});
+
+describe('isUserNotFoundError', () => {
+  it('is true only for the not-found code in the response data', () => {
+    expect(isUserNotFoundError({ response: { data: { code: GRAFANA_ERROR_CODE.USER_NOT_FOUND } } })).toBe(true);
+    expect(isUserNotFoundError({ response: { data: { code: GRAFANA_ERROR_CODE.PARTIAL } } })).toBe(false);
+  });
+
+  it('is false for a missing code, odd data and non-error values', () => {
+    expect(isUserNotFoundError({ response: { data: {} } })).toBe(false);
+    expect(isUserNotFoundError({ response: { data: 'text' } })).toBe(false);
+    expect(isUserNotFoundError(undefined)).toBe(false);
+    expect(isUserNotFoundError(new Error('x'))).toBe(false);
   });
 });
 

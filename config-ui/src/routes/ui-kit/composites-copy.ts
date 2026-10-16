@@ -94,6 +94,12 @@ export const COMPOSITES_COPY = {
     state: (value: string, shown: string) => `Loaded: ${value}, shown: ${shown}`,
     pending: 'pending',
   },
+  usePendingKeys: {
+    keys: ['alpha', 'beta'],
+    run: (key: string) => `Run ${key}`,
+    state: (pending: string, started: number) => `Pending: ${pending}, started: ${started}`,
+    none: 'none',
+  },
   useRefreshVersion: { refresh: 'Refresh', version: (count: number) => `Refresh count: ${count}` },
   overflowList: {
     more: (count: number) => `+${count} more`,

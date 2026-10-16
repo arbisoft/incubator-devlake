@@ -21,7 +21,6 @@ import { useState } from 'react';
 
 import API from '@/api';
 import { ConfirmModal, FormModal, useModalForm } from '@/ui';
-import { operator } from '@/utils';
 
 import { Fields, FormNote, TextField } from '../../components';
 import { isValidEmail } from '../../utils';
@@ -35,8 +34,9 @@ const copy = COPY.details;
 export const EditDetailsModal = ({ open, user, onClose, onChanged }: UserDialogProps) => {
   const initial = { name: user?.name ?? '', email: user?.email ?? '' };
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const { values, setField, reset, setSaving, modalProps } = useModalForm(initial, {
+  const { values, setField, submit, modalProps } = useModalForm(initial, {
     onClose,
+    onSettled: onChanged,
     required: ['name', 'email'],
     disabledReason: copy.disabledReason,
   });
@@ -45,15 +45,10 @@ export const EditDetailsModal = ({ open, user, onClose, onChanged }: UserDialogP
 
   const save = async () => {
     if (!user) return;
-    const [success] = await operator(() => API.grafanaUsers.updateUser(user.id, patch), {
-      setOperating: setSaving,
+    await submit(() => API.grafanaUsers.updateUser(user.id, patch), {
       formatReason: getFlowError(GRAFANA_FLOW_ERRORS.DETAILS),
     });
     setConfirmOpen(false);
-    onChanged();
-    if (!success) return;
-    reset();
-    onClose();
   };
 
   const handleSubmit = () => {

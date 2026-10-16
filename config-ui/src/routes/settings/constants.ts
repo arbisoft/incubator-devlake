@@ -95,7 +95,7 @@ export const ACCESS_ERROR = {
   LOCAL_INVALID_USER: 'Enter a valid username, then try again.',
   INVALID_UPDATE: 'Choose a valid role and status, then try again.',
   LAST_ADMIN: 'Keep at least one active customer administrator.',
-  ENTRY_NOT_FOUND: 'This entry no longer exists. Refresh the page and try again.',
+  ENTRY_NOT_FOUND: 'This entry no longer exists. The list has been refreshed.',
 } as const;
 
 export const CREATE_USER_ERROR_MAP: Record<string, string> = {

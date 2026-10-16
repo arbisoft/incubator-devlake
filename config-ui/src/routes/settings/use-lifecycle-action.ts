@@ -20,7 +20,7 @@ import { useCallback } from 'react';
 
 import API from '@/api';
 import { ACCESS_STATUS, type AccessRole } from '@/api/access';
-import { useConfirmFlow } from '@/ui/hooks';
+import { useConfirmFlow, usePendingKeys } from '@/ui/hooks';
 import { operator } from '@/utils';
 
 import { LIFECYCLE_ACTION, LIFECYCLE_CONFIRM, LIFECYCLE_SUBJECT } from './constants';
@@ -31,7 +31,6 @@ import type {
   LifecyclePending,
   LifecycleTarget,
 } from './types';
-import { usePendingRoles } from './use-pending-roles';
 import { getDomainLabel, getLocalCredentialError, getUpdateAccessError, getUserLabel } from './utils';
 
 export type { LifecycleTarget } from './types';
@@ -85,10 +84,8 @@ export const useLifecycleAction = ({ onDone, onCredential }: LifecycleActionOpti
         setOperating: setLoading,
         formatReason: CREDENTIAL_ACTIONS.includes(next.action) ? getLocalCredentialError : getUpdateAccessError,
       });
-      if (success) {
-        if (next.action === LIFECYCLE_ACTION.RESET_PASSWORD && response) onCredential?.(response);
-        onDone();
-      }
+      if (success && next.action === LIFECYCLE_ACTION.RESET_PASSWORD && response) onCredential?.(response);
+      onDone();
       return success;
     },
     [onCredential, onDone],
@@ -101,14 +98,14 @@ export const useLifecycleAction = ({ onDone, onCredential }: LifecycleActionOpti
     [request],
   );
 
-  const { beginRoleChange, endRoleChange, isRolePending } = usePendingRoles();
+  const { begin: beginRoleChange, end: endRoleChange, isPending: isRolePending } = usePendingKeys();
 
   const changeRole = useCallback(
     async (target: LifecycleTarget, role: AccessRole) => {
       const key = toRoleKey(target.subject, target.item.id);
       if (!beginRoleChange(key)) return;
       try {
-        const [success] = await operator(
+        await operator(
           async () => {
             if (target.subject === LIFECYCLE_SUBJECT.USER) {
               await API.access.updateUser(target.item.id, { role, status: target.item.status });
@@ -118,7 +115,7 @@ export const useLifecycleAction = ({ onDone, onCredential }: LifecycleActionOpti
           },
           { formatReason: getUpdateAccessError },
         );
-        if (success) onDone();
+        onDone();
       } finally {
         endRoleChange(key);
       }

@@ -28,12 +28,7 @@ import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 import { COPY } from '../../constants';
 import { SetPasswordModal } from '../set-password-modal';
 
-import {
-  captureLoggedRequestBody,
-  expectPasswordErrorSafe,
-  makePasswordError,
-  waitForPasswordFormReady,
-} from './password-error';
+import { expectPasswordRetained, makePasswordError, waitForPasswordFormReady } from './password-error';
 
 const EMAIL = 'ann@example.com';
 const PASSWORD = 'a-long-enough-password';
@@ -85,15 +80,14 @@ describe('SetPasswordModal', () => {
     expect((screen.getByLabelText(new RegExp(`^${COPY.password.label}`)) as HTMLInputElement).value).toHaveLength(24);
   });
 
-  it('keeps a failed password update ready for retry without reporting its request body', async () => {
+  it('keeps a failed password update ready for retry', async () => {
     const error = makePasswordError(PASSWORD, 403, GRAFANA_ERROR_CODE.PASSWORD_REJECTED);
     grafana.setPassword.mockRejectedValueOnce(error).mockResolvedValueOnce(undefined);
-    const loggedRequestBody = captureLoggedRequestBody();
     const props = submitPassword(PASSWORD);
     await waitFor(() => expect(message.error).toHaveBeenCalledWith(COPY.errors[GRAFANA_ERROR_CODE.PASSWORD_REJECTED]));
 
     const password = screen.getByLabelText(new RegExp(`^${COPY.password.label}`)) as HTMLInputElement;
-    expectPasswordErrorSafe(error, loggedRequestBody, password, PASSWORD);
+    expectPasswordRetained(password, PASSWORD);
     expect(props.onClose).not.toHaveBeenCalled();
 
     await waitFor(() => expect(submit().getAttribute('aria-disabled')).not.toBe(ARIA_TRUE));

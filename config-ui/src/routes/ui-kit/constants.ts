@@ -68,6 +68,7 @@ export const COPY = {
     useRefreshVersion: 'useRefreshVersion',
     useLastLoaded: 'useLastLoaded',
     useModalForm: 'useModalForm',
+    usePendingKeys: 'usePendingKeys',
     useDocumentTitle: 'useDocumentTitle',
     useInView: 'useInView',
     useSidebarCollapsed: 'useSidebarCollapsed',

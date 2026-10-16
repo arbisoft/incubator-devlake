@@ -30,6 +30,7 @@ const axiosState = vi.hoisted(() => {
 
 vi.mock('axios', () => ({
   default: { create: axiosState.create },
+  isAxiosError: (error: unknown) => typeof error === 'object' && error !== null && 'isAxiosError' in error,
 }));
 
 import { PATHS } from '@/config';
@@ -39,7 +40,11 @@ import { request } from './request';
 const initialInstanceConfig = axiosState.create.mock.calls[0]?.[0];
 const initialResponseErrorHandler = axiosState.responseUse.mock.calls[0]?.[1];
 
-type RequestError = { response?: { status?: number }; config?: { url?: unknown } };
+type RequestError = {
+  isAxiosError?: boolean;
+  response?: { status?: number; data?: unknown };
+  config?: { url?: unknown; data?: unknown };
+};
 type ResponseHandler = (error: RequestError) => Promise<never>;
 type CapturedRequestConfig = {
   method?: unknown;
@@ -222,6 +227,26 @@ describe('request', () => {
 
     expect(axiosState.get).toHaveBeenCalledExactlyOnceWith('/auth/userinfo');
     expect(location.replace).not.toHaveBeenCalled();
+  });
+
+  it('removes the request body from a rejected response error and keeps the response', async () => {
+    const error = {
+      isAxiosError: true,
+      response: { status: 400, data: { code: 'BAD' } },
+      config: { url: '/users', data: '{"password":"x"}' },
+    };
+    await rejectResponse(error);
+
+    expect(error.config.data).toBeUndefined();
+    expect(error.response.status).toBe(400);
+    expect(error.response.data).toEqual({ code: 'BAD' });
+  });
+
+  it('removes the request body from a network error without a response', async () => {
+    const error: RequestError = { isAxiosError: true, config: { url: '/users', data: '{"password":"x"}' } };
+    await rejectResponse(error);
+
+    expect(error.config?.data).toBeUndefined();
   });
 
   it('redirects only after the session endpoint confirms an unauthenticated user', async () => {

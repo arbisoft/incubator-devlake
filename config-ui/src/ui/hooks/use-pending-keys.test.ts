@@ -19,54 +19,54 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { usePendingRoles } from './use-pending-roles';
+import { usePendingKeys } from './use-pending-keys';
 
 const KEY = 'user:7';
 const OTHER_KEY = 'domain:7';
 
-describe('usePendingRoles', () => {
+describe('usePendingKeys', () => {
   it('lets only the first of two same-tick acquisitions through and reports the key as pending', () => {
-    const { result } = renderHook(() => usePendingRoles());
-    const { beginRoleChange } = result.current;
+    const { result } = renderHook(() => usePendingKeys());
+    const { begin } = result.current;
     let acquired: boolean[] = [];
     act(() => {
-      acquired = [beginRoleChange(KEY), beginRoleChange(KEY)];
+      acquired = [begin(KEY), begin(KEY)];
     });
     expect(acquired).toEqual([true, false]);
-    expect(result.current.isRolePending(KEY)).toBe(true);
+    expect(result.current.isPending(KEY)).toBe(true);
   });
 
   it('allows a new change for the key once it is released', () => {
-    const { result } = renderHook(() => usePendingRoles());
+    const { result } = renderHook(() => usePendingKeys());
     act(() => {
-      result.current.beginRoleChange(KEY);
+      result.current.begin(KEY);
     });
-    act(() => result.current.endRoleChange(KEY));
-    expect(result.current.isRolePending(KEY)).toBe(false);
+    act(() => result.current.end(KEY));
+    expect(result.current.isPending(KEY)).toBe(false);
     let again = false;
     act(() => {
-      again = result.current.beginRoleChange(KEY);
+      again = result.current.begin(KEY);
     });
     expect(again).toBe(true);
-    expect(result.current.isRolePending(KEY)).toBe(true);
+    expect(result.current.isPending(KEY)).toBe(true);
   });
 
   it('keeps different keys independent', () => {
-    const { result } = renderHook(() => usePendingRoles());
+    const { result } = renderHook(() => usePendingKeys());
     let both: boolean[] = [];
     act(() => {
-      both = [result.current.beginRoleChange(KEY), result.current.beginRoleChange(OTHER_KEY)];
+      both = [result.current.begin(KEY), result.current.begin(OTHER_KEY)];
     });
     expect(both).toEqual([true, true]);
-    act(() => result.current.endRoleChange(KEY));
-    expect(result.current.isRolePending(KEY)).toBe(false);
-    expect(result.current.isRolePending(OTHER_KEY)).toBe(true);
+    act(() => result.current.end(KEY));
+    expect(result.current.isPending(KEY)).toBe(false);
+    expect(result.current.isPending(OTHER_KEY)).toBe(true);
   });
 
   it('reports nothing pending before any change and ignores releasing an unknown key', () => {
-    const { result } = renderHook(() => usePendingRoles());
-    expect(result.current.isRolePending(KEY)).toBe(false);
-    act(() => result.current.endRoleChange(KEY));
-    expect(result.current.isRolePending(KEY)).toBe(false);
+    const { result } = renderHook(() => usePendingKeys());
+    expect(result.current.isPending(KEY)).toBe(false);
+    act(() => result.current.end(KEY));
+    expect(result.current.isPending(KEY)).toBe(false);
   });
 });

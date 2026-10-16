@@ -23,7 +23,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { GRAFANA_ERROR_CODE, GRAFANA_ROLE } from '@/api/grafana-users/constants';
 import type { GrafanaRole } from '@/api/grafana-users/types';
 
-import { COPY } from '../../constants';
+import { COPY, GRAFANA_FLOW_ERRORS } from '../../constants';
 
 import {
   cleanupAddUserMocks,
@@ -72,6 +72,12 @@ const createPartial = async ({
   fireEvent.click(submit(COPY.add.submit));
   expect(await screen.findByText(COPY.add.partial)).toBeTruthy();
   return props;
+};
+
+const resubmitCreate = async (props: ReturnType<typeof setup>) => {
+  await waitForPasswordFormReady(submit(COPY.add.submit));
+  fireEvent.click(submit(COPY.add.submit));
+  await waitFor(() => expect(props.onPassword).toHaveBeenCalledTimes(1));
 };
 
 const retrySuccessfully = async (props: ReturnType<typeof setup>) => {
@@ -238,6 +244,23 @@ describe('AddUserModal partial retry', () => {
     expect(props.onPassword).not.toHaveBeenCalled();
     expect(props.onClose).not.toHaveBeenCalled();
   });
+
+  it('leaves retry mode when the partial account is gone and creates it again on the next submit', async () => {
+    const props = await createPartial();
+    grafana.updateUser.mockRejectedValueOnce(USER_NOT_FOUND_ERROR);
+
+    fireEvent.click(submit(COPY.add.retry));
+    await waitFor(() =>
+      expect(message.error).toHaveBeenCalledWith(GRAFANA_FLOW_ERRORS.CREATE_RETRY[GRAFANA_ERROR_CODE.USER_NOT_FOUND]),
+    );
+    await waitFor(() => expect(screen.queryByText(COPY.add.partial)).toBeNull());
+    expect((screen.getByLabelText(new RegExp(`^${COPY.add.email.label}`)) as HTMLInputElement).value).toBe(EMAIL);
+    expect(props.onClose).not.toHaveBeenCalled();
+
+    await resubmitCreate(props);
+    expect(grafana.createUser).toHaveBeenCalledTimes(2);
+    expect(grafana.updateUser).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('AddUserModal rejected create', () => {
@@ -252,9 +275,7 @@ describe('AddUserModal rejected create', () => {
     await expectRejectedAndKept(props);
     expect((screen.getByLabelText(new RegExp(`^${COPY.add.email.label}`)) as HTMLInputElement).value).toBe(EMAIL);
 
-    await waitForPasswordFormReady(submit(COPY.add.submit));
-    fireEvent.click(submit(COPY.add.submit));
-    await waitFor(() => expect(props.onPassword).toHaveBeenCalledTimes(1));
+    await resubmitCreate(props);
     expect(props.onChanged).toHaveBeenCalledTimes(2);
     expect(props.onClose).toHaveBeenCalledTimes(1);
     expect(grafana.createUser).toHaveBeenCalledTimes(2);

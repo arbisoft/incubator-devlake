@@ -20,10 +20,8 @@ import { useCallback, useState } from 'react';
 
 import API from '@/api';
 import type { GrafanaRole, GrafanaUser } from '@/api/grafana-users/types';
-import { useConfirmFlow } from '@/ui/hooks';
+import { useConfirmFlow, usePendingKeys } from '@/ui/hooks';
 import { operator } from '@/utils';
-
-import { usePendingRoles } from '../use-pending-roles';
 
 import { COPY, GRAFANA_FLOW_ERRORS, GRAFANA_ROW_ACTION } from './constants';
 import type { GrafanaDialog, GrafanaDialogState, GrafanaPending, GrafanaRowAction } from './types';
@@ -59,7 +57,7 @@ export const useGrafanaRowActions = (onDone: () => void) => {
     [request],
   );
 
-  const { beginRoleChange, endRoleChange, isRolePending } = usePendingRoles();
+  const { begin: beginRoleChange, end: endRoleChange, isPending: isRolePending } = usePendingKeys();
 
   const changeRole = useCallback(
     async (user: GrafanaUser, role: GrafanaRole) => {
