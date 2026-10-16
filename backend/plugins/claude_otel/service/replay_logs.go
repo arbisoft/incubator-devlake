@@ -36,16 +36,19 @@ const logReplayPage = 1000
 // quarantined batches get a fresh retry budget. Batches are chosen by received_at, which
 // the server sets, so batches without valid record timestamps or from a client whose clock
 // is ahead are included too. They are requeued as replay_pending, behind live batches. The
-// request completes once the batches are queued; the queue converts them afterwards. It
-// returns the number of requeued batches.
+// request completes once the batches are queued; the queue converts them afterwards.
+// Batches still queued as replay_pending and not leased are requeued again, so a rerun of
+// a request that lost its lease part way counts every batch it covers. It returns the
+// number of requeued batches.
 func (c *rawConverter) requeueLogBatches(request *models.OtelReplayRequest, leaseOwner string) (int, error) {
 	if err := c.validateLogReplayRange(request); err != nil {
 		return 0, err
 	}
 	requeued := 0
 	var lastBatchID uint64
-	// The request lease was renewed when the request was claimed.
-	lastRenewal := c.now().UTC()
+	// A zero lastRenewal renews both leases before the first page, as metrics replay does:
+	// the converter lease was taken at the start of the poll, before retention ran.
+	var lastRenewal time.Time
 	for {
 		if err := c.renewReplayLeaseIfDue(request.ID, leaseOwner, &lastRenewal, false); err != nil {
 			return requeued, err
@@ -83,11 +86,12 @@ func (c *rawConverter) requeueLogBatchPage(request *models.OtelReplayRequest, le
 		c.rollback(tx)
 		return nil, err
 	}
+	requeueable := requeueableLogBatches(c.now().UTC())
 	batchIDs := make([]uint64, 0, logReplayPage)
 	if err := tx.Pluck("id", &batchIDs,
 		dal.From(&models.OtelLogBatch{}),
-		dal.Where("id > ? AND status IN ? AND received_at >= ? AND received_at < ?",
-			afterID, replayableBatchStatuses, request.RangeStart.UTC(), request.RangeEnd.UTC()),
+		dal.Where("id > ? AND received_at >= ? AND received_at < ?", afterID, request.RangeStart.UTC(), request.RangeEnd.UTC()),
+		requeueable,
 		dal.Orderby("id ASC"),
 		dal.Limit(logReplayPage),
 	); err != nil {
@@ -103,8 +107,8 @@ func (c *rawConverter) requeueLogBatchPage(request *models.OtelReplayRequest, le
 			{ColumnName: "lease_until", Value: nil},
 			{ColumnName: "processing_error_code", Value: nil},
 			{ColumnName: "processing_error_message", Value: nil},
-			{ColumnName: "processed_at", Value: nil},
-		}, dal.Where("id IN ? AND status IN ?", batchIDs, replayableBatchStatuses)); err != nil {
+			// processed_at is kept until the replayed conversion records a new terminal state.
+		}, dal.Where("id IN ?", batchIDs), requeueable); err != nil {
 			c.rollback(tx)
 			return nil, fmt.Errorf("requeue raw log batches for replay: %w", err)
 		}
@@ -113,4 +117,11 @@ func (c *rawConverter) requeueLogBatchPage(request *models.OtelReplayRequest, le
 		return nil, fmt.Errorf("commit Claude Code OTel log replay: %w", err)
 	}
 	return batchIDs, nil
+}
+
+// requeueableLogBatches selects the batches a logs replay requeues: terminal batches, and
+// batches already queued for replay that are not being converted at now.
+func requeueableLogBatches(now time.Time) dal.Clause {
+	return dal.Where("(status IN ? OR (status = ? AND (lease_until IS NULL OR lease_until < ?)))",
+		replayableBatchStatuses, models.OtelBatchStatusReplayPending, now)
 }

@@ -255,8 +255,12 @@ cumulative samples older than live state are rejected as out of order.
 To convert log events again, insert a request with `kind = 'logs'`. It requeues the
 processed and quarantined log batches received in the range, which may include the
 current UTC day, as `replay_pending`. The log queue converts them only while no live
-batch is waiting, so a large replay does not delay new events. The ingestion status
-reports them under `logs.batchCounts.replay_pending`.
+batch is waiting, so a large replay does not delay new events. A replayed batch keeps
+`replay_pending` while it is converted and while it waits to retry, so a replayed batch
+that fails again never blocks live batches or counts as live backlog. It is quarantined
+after the usual retry budget and then counts as a recent permanent error, even when it
+converted before the replay. The ingestion status reports
+replayed batches under `logs.batchCounts.replay_pending`.
 
 ```sql
 INSERT INTO _tool_claude_code_otel_replay_requests (kind, range_start, range_end, status, created_at, updated_at)

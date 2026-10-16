@@ -80,12 +80,29 @@ func expectFinishReplay(database *dalmocks.Dal) map[string]interface{} {
 	return finished
 }
 
+// expectRenewReplayLease makes the replay renew its request lease and the converter lease
+// once, as it does before its first page.
+func expectRenewReplayLease(t *testing.T, database *dalmocks.Dal) {
+	database.EXPECT().UpdateColumn(mock.AnythingOfType("*models.OtelReplayRequest"), "lease_until", mock.Anything, mock.Anything).Return(nil).Once()
+	database.EXPECT().First(mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything).Return(nil).Once()
+	leaseTransaction := dalmocks.NewTransaction(t)
+	database.EXPECT().Begin().Return(leaseTransaction).Once()
+	leaseTransaction.EXPECT().CreateIfNotExist(mock.AnythingOfType("*models.OtelConverterLease")).Return(nil)
+	leaseTransaction.EXPECT().UpdateColumns(mock.AnythingOfType("*models.OtelConverterLease"), mock.Anything, mock.Anything).Return(nil)
+	leaseTransaction.EXPECT().First(mock.AnythingOfType("*models.OtelConverterLease"), mock.Anything, mock.Anything).Run(
+		func(lease interface{}, _ ...dal.Clause) {
+			lease.(*models.OtelConverterLease).Owner = testReplayWorkerID
+		},
+	).Return(nil)
+	leaseTransaction.EXPECT().Commit().Return(nil)
+}
+
 // expectRequeuePage makes one requeue transaction find batchIDs and returns the columns and
 // clauses it writes.
 func expectRequeuePage(transaction *dalmocks.Transaction, batchIDs []uint64) (map[string]interface{}, *[]dal.Clause) {
 	expectReplayLeases(transaction, testReplayWorkerID)
 	var selection []dal.Clause
-	transaction.EXPECT().Pluck("id", mock.AnythingOfType("*[]uint64"), mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(
+	transaction.EXPECT().Pluck("id", mock.AnythingOfType("*[]uint64"), mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(
 		func(_ string, dest interface{}, clauses ...dal.Clause) {
 			*dest.(*[]uint64) = batchIDs
 			selection = clauses
@@ -93,7 +110,7 @@ func expectRequeuePage(transaction *dalmocks.Transaction, batchIDs []uint64) (ma
 	).Return(nil).Once()
 	requeued := make(map[string]interface{})
 	if len(batchIDs) > 0 {
-		transaction.EXPECT().UpdateColumns(mock.AnythingOfType("*models.OtelLogBatch"), mock.Anything, mock.Anything).Run(
+		transaction.EXPECT().UpdateColumns(mock.AnythingOfType("*models.OtelLogBatch"), mock.Anything, mock.Anything, mock.Anything).Run(
 			func(_ interface{}, sets []dal.DalSet, _ ...dal.Clause) {
 				for _, set := range sets {
 					requeued[set.ColumnName] = set.Value
@@ -108,6 +125,7 @@ func expectRequeuePage(transaction *dalmocks.Transaction, batchIDs []uint64) (ma
 func TestRequeueLogBatchesQueuesReceivedBatchesBehindLiveOnes(t *testing.T) {
 	database := dalmocks.NewDal(t)
 	transaction := dalmocks.NewTransaction(t)
+	expectRenewReplayLease(t, database)
 	database.EXPECT().Begin().Return(transaction).Once()
 	requeued, selection := expectRequeuePage(transaction, []uint64{4, 7})
 	finished := expectFinishReplay(database)
@@ -121,16 +139,27 @@ func TestRequeueLogBatchesQueuesReceivedBatchesBehindLiveOnes(t *testing.T) {
 	// timestamps or from a client whose clock is ahead are included.
 	where := (*selection)[1].Data.(dal.DalClause)
 	if !strings.Contains(where.Expr, "received_at >= ? AND received_at < ?") || strings.Contains(where.Expr, "observed_at") ||
-		where.Params[2] != request.RangeStart || where.Params[3] != request.RangeEnd {
+		where.Params[1] != request.RangeStart || where.Params[2] != request.RangeEnd {
 		t.Fatalf("requeue selection = %s %v; want batches received in the range", where.Expr, where.Params)
+	}
+	// A rerun after a lost lease requeues the batches an earlier run queued, unless one is
+	// being converted, so its count covers the whole range.
+	requeueable := (*selection)[2].Data.(dal.DalClause)
+	if !strings.Contains(requeueable.Expr, "status = ? AND (lease_until IS NULL OR lease_until < ?)") ||
+		requeueable.Params[1] != models.OtelBatchStatusReplayPending || requeueable.Params[2] != testReplayNow {
+		t.Fatalf("requeueable filter = %s %v; want terminal batches and unleased replay_pending batches", requeueable.Expr, requeueable.Params)
 	}
 	if requeued["status"] != models.OtelBatchStatusReplayPending || requeued["attempt_count"] != 0 {
 		t.Fatalf("requeued status/attempts = %v/%v; want replay_pending with a fresh retry budget", requeued["status"], requeued["attempt_count"])
 	}
-	for _, column := range []string{"next_attempt_at", "lease_owner", "lease_until", "processing_error_code", "processing_error_message", "processed_at"} {
+	for _, column := range []string{"next_attempt_at", "lease_owner", "lease_until", "processing_error_code", "processing_error_message"} {
 		if value, set := requeued[column]; !set || value != nil {
 			t.Fatalf("requeued %s = %v (set %t); want cleared", column, value, set)
 		}
+	}
+	// processed_at is kept until the replayed conversion records a new terminal state.
+	if _, set := requeued["processed_at"]; set {
+		t.Fatalf("requeued columns = %v; want processed_at kept", requeued)
 	}
 	if finished["status"] != models.OtelReplayRequestStatusCompleted || finished["replayed_batches"] != 2 {
 		t.Fatalf("finished request = %v; want completed with 2 replayed batches", finished)
@@ -140,6 +169,7 @@ func TestRequeueLogBatchesQueuesReceivedBatchesBehindLiveOnes(t *testing.T) {
 func TestRequeueLogBatchesPagesByBatchID(t *testing.T) {
 	database := dalmocks.NewDal(t)
 	transaction := dalmocks.NewTransaction(t)
+	expectRenewReplayLease(t, database)
 	database.EXPECT().Begin().Return(transaction).Times(2)
 	fullPage := make([]uint64, logReplayPage)
 	for i := range fullPage {
@@ -167,6 +197,30 @@ func TestRequeueLogBatchesPagesByBatchID(t *testing.T) {
 	}
 }
 
+// The converter lease was taken at the start of the poll, before retention ran, so the
+// requeue renews both leases before its first page instead of trusting them.
+func TestRequeueLogBatchesAbortsWhenFirstRenewalFindsAnotherLeader(t *testing.T) {
+	database := dalmocks.NewDal(t)
+	database.EXPECT().UpdateColumn(mock.AnythingOfType("*models.OtelReplayRequest"), "lease_until", mock.Anything, mock.Anything).Return(nil).Once()
+	database.EXPECT().First(mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything).Return(nil).Once()
+	leaseTransaction := dalmocks.NewTransaction(t)
+	database.EXPECT().Begin().Return(leaseTransaction).Once()
+	leaseTransaction.EXPECT().CreateIfNotExist(mock.AnythingOfType("*models.OtelConverterLease")).Return(nil)
+	leaseTransaction.EXPECT().UpdateColumns(mock.AnythingOfType("*models.OtelConverterLease"), mock.Anything, mock.Anything).Return(nil)
+	leaseTransaction.EXPECT().First(mock.AnythingOfType("*models.OtelConverterLease"), mock.Anything, mock.Anything).Run(
+		func(lease interface{}, _ ...dal.Clause) {
+			lease.(*models.OtelConverterLease).Owner = "second-converter"
+		},
+	).Return(nil)
+	leaseTransaction.EXPECT().Commit().Return(nil)
+	// No page transaction: no batch is requeued once another converter leads.
+
+	_, err := newLogReplayConverter(database).requeueLogBatches(newLogReplayRequest(models.OtelReplayKindLogs), testReplayLeaseOwner)
+	if !stdErrors.Is(err, errReplayLeaseLost) {
+		t.Fatalf("requeueLogBatches() error = %v; want errReplayLeaseLost", err)
+	}
+}
+
 func TestRequeueLogBatchesRejectsInvalidRangeWithoutTouchingBatches(t *testing.T) {
 	request := newLogReplayRequest(models.OtelReplayKindLogs)
 	request.RangeEnd = testReplayNow.Truncate(24*time.Hour).AddDate(0, 0, 2)
@@ -180,6 +234,7 @@ func TestRequeueLogBatchesRejectsInvalidRangeWithoutTouchingBatches(t *testing.T
 func TestRequeueLogBatchesAbortsWhenConverterLeaseWasTakenOver(t *testing.T) {
 	database := dalmocks.NewDal(t)
 	transaction := dalmocks.NewTransaction(t)
+	expectRenewReplayLease(t, database)
 	database.EXPECT().Begin().Return(transaction)
 	expectReplayLeases(transaction, "second-converter")
 	transaction.EXPECT().Rollback().Return(nil)
@@ -237,6 +292,7 @@ func TestProcessNextReplayRequeuesLogKind(t *testing.T) {
 	database := dalmocks.NewDal(t)
 	transaction := dalmocks.NewTransaction(t)
 	expectClaimReplay(database, newLogReplayRequest(models.OtelReplayKindLogs))
+	expectRenewReplayLease(t, database)
 	database.EXPECT().Begin().Return(transaction)
 	expectRequeuePage(transaction, []uint64{1, 2, 3})
 	finished := expectFinishReplay(database)

@@ -45,9 +45,11 @@ func (c *rawConverter) processNextLogBatch() (bool, errors.Error) {
 }
 
 // claimNextLogBatch claims the earliest live log batch, or when none is claimable, the
-// earliest batch requeued by a replay. Like metrics, a live batch waiting for retry holds
-// the live queue. Log conversion does not depend on receipt order, so a replay backlog is
-// converted only while the live queue is empty or waiting, and never delays new events.
+// earliest claimable batch requeued by a replay. Like metrics, a live batch waiting for
+// retry holds the live queue. Log conversion does not depend on receipt order, so a replay
+// backlog is converted only while the live queue is empty or waiting. A replayed batch
+// stays replay_pending while it is converted, retried or abandoned by a stopped worker, so
+// it never holds the live queue.
 func (c *rawConverter) claimNextLogBatch() (*models.OtelLogBatch, *batchLease, errors.Error) {
 	for _, statuses := range [][]string{nonterminalBatchStatuses, {models.OtelBatchStatusReplayPending}} {
 		batch := &models.OtelLogBatch{}

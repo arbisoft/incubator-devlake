@@ -122,11 +122,11 @@ export const OtelIngestionHealth = ({ loading, failed, status, onRetry }: OtelIn
           <Descriptions.Item label="Converter">{converterState(status)}</Descriptions.Item>
           {status.logs && (
             <>
-              <Descriptions.Item label="Log events pending">{status.logs.batchCounts.pending ?? 0}</Descriptions.Item>
-              <Descriptions.Item label="Log events retrying">
+              <Descriptions.Item label="Log batches pending">{status.logs.batchCounts.pending ?? 0}</Descriptions.Item>
+              <Descriptions.Item label="Log batches retrying">
                 {status.logs.batchCounts.retryable_error ?? 0}
               </Descriptions.Item>
-              <Descriptions.Item label="Log events replaying">
+              <Descriptions.Item label="Log batches replaying">
                 {status.logs.batchCounts.replay_pending ?? 0}
               </Descriptions.Item>
               <Descriptions.Item label="Oldest log backlog">

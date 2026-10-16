@@ -38,9 +38,10 @@ const (
 	OtelBatchStatusProcessed      = "processed"
 	OtelBatchStatusRetryableError = "retryable_error"
 	OtelBatchStatusPermanentError = "permanent_error"
-	// OtelBatchStatusReplayPending marks a log batch requeued by a replay request. The log
-	// queue claims these only when no live batch is claimable, so a replay cannot delay
-	// new events.
+	// OtelBatchStatusReplayPending marks a log batch requeued by a replay request. It keeps
+	// this status while it is converted and between retries; the lease and retry columns
+	// tell those apart. The log queue claims these only when no live batch is claimable, so
+	// a replay never delays new events nor shows as live backlog.
 	OtelBatchStatusReplayPending = "replay_pending"
 )
 
