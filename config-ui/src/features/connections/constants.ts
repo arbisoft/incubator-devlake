@@ -29,6 +29,7 @@ export const HEALTH_FAILURE_REASON = {
 } as const;
 
 export const COPY = {
+  connectionNameFallback: (plugin: string, id: ID) => `${plugin}/connection/${id}`,
   failure: {
     [HEALTH_FAILURE_REASON.CREDENTIALS]: 'Credentials rejected',
     [HEALTH_FAILURE_REASON.UNREACHABLE]: 'Unreachable',
@@ -44,6 +45,7 @@ export const COPY = {
 export const HTTP_STATUS = {
   OK: 200,
   BAD_REQUEST: 400,
+  CONFLICT: 409,
   UNAUTHORIZED: 401,
   FORBIDDEN: 403,
   REQUEST_TIMEOUT: 408,

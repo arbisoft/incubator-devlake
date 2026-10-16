@@ -189,6 +189,7 @@ export const COPY = {
     batchesTitle: 'Recent batches',
     loading: 'Loading ingestion status...',
     unavailable: 'Ingestion status is unavailable.',
+    batchesUnavailable: 'Telemetry batches could not be loaded.',
     retry: 'Retry',
     state: {
       [OTEL_INGESTION_STATE.HEALTHY]: 'Healthy',

@@ -19,10 +19,11 @@
 import type { MenuProps } from 'antd';
 import { describe, expect, it, vi } from 'vitest';
 
+import { THEME_MODE, THEME_MODES } from '@/theme/constants';
 import type { ThemeMode } from '@/theme/tokens';
 
 import { getAccountMenuItems } from './account-menu-items';
-import { ACCOUNT_MENU_KEY, COPY, THEME_LABEL, THEME_MODE, THEME_MODES } from './constants';
+import { ACCOUNT_MENU_KEY, COPY, THEME_LABEL } from './constants';
 import type { AccountMenuHandlers, AccountMenuState, LayoutUser } from './types';
 
 type Item = NonNullable<MenuProps['items']>[number];

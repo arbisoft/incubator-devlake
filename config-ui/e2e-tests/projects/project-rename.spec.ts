@@ -29,6 +29,7 @@ import {
   retireOtelConnections,
   uniqueName,
 } from '../support/api';
+import { PROJECT_DETAIL_COPY } from '../support/app-copy';
 import { deleteOtelConnectionsOfTeam } from '../support/db';
 import { ProjectPage } from '../support/pages/projects';
 
@@ -72,5 +73,34 @@ test.describe('Project rename with Claude Code OTel placements', () => {
     const after = await findOtelConnection(api, teamName);
     expect(after?.projects).toEqual([{ name: newName }]);
     expect(browserErrors).toEqual([]);
+  });
+
+  test('saving and renaming preserves the project description', async ({ page, browserErrors }) => {
+    const descOldName = uniqueName('desc-old');
+    const descNewName = uniqueName('desc-new');
+    const description = 'e2e description that must survive save and rename';
+    try {
+      await createProject(api, descOldName, { description });
+
+      const projectPage = new ProjectPage(page, descOldName);
+      await projectPage.openAtTab('settings');
+      await expect(projectPage.nameInput).toBeEnabled();
+      await projectPage.saveSettings();
+      await expect(projectPage.toast(PROJECT_DETAIL_COPY.settings.saved)).toBeVisible();
+      await expect.poll(async () => (await getProject(api, descOldName))?.description).toBe(description);
+
+      await projectPage.renameProject(descNewName);
+      await expect(page).toHaveURL(new ProjectPage(page, descNewName).tabUrlPattern('settings'));
+      await expect.poll(async () => (await getProject(api, descNewName))?.name).toBe(descNewName);
+      expect(await getProject(api, descOldName)).toBeUndefined();
+      expect((await getProject(api, descNewName))?.description).toBe(description);
+
+      await new ProjectPage(page, descNewName).reload();
+      expect((await getProject(api, descNewName))?.description).toBe(description);
+      expect(browserErrors).toEqual([]);
+    } finally {
+      await deleteProject(api, descNewName);
+      await deleteProject(api, descOldName);
+    }
   });
 });

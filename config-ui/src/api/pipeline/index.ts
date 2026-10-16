@@ -16,14 +16,12 @@
  *
  */
 
-import { IPipeline } from '@/types';
+import type { IPipeline } from '@/types';
 import { request } from '@/utils';
 
-import type { SortParams } from '../types';
+import type { ListParams, SubTasksRes } from './types';
 
-import { SubTasksRes } from './types';
-
-export type ListParams = Pagination & SortParams<'id' | 'beganAt' | 'finishedAt'> & { blueprint_id?: ID };
+export type { ListParams } from './types';
 
 export const list = (params: ListParams, signal?: AbortSignal): Promise<{ count: number; pipelines: IPipeline[] }> =>
   request('/pipelines', { data: params, signal });
@@ -41,6 +39,8 @@ export const rerun = (id: ID) =>
   });
 
 export const log = (id: ID) => request(`/pipelines/${id}/logging.tar.gz`);
+
+export const logBlob = (id: ID): Promise<Blob> => request(`/pipelines/${id}/logging.tar.gz`, { responseType: 'blob' });
 
 export const tasks = (id: ID, signal?: AbortSignal) => request(`/pipelines/${id}/tasks`, { signal });
 

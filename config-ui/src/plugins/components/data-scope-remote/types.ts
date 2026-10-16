@@ -68,6 +68,9 @@ export type DataScopeRemoteModalProps = {
   connectionId: ID;
   title: string;
   disabledScope?: DisabledScope[];
+  loadingScopes?: boolean;
+  scopesLoadFailed?: boolean;
+  onRetryScopes?: () => void;
   onCancel: () => void;
   onSubmit: () => void;
 };

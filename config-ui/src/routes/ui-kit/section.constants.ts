@@ -59,6 +59,7 @@ export const SECTION = {
   USE_REFRESH_VERSION: 'useRefreshVersion',
   USE_LAST_LOADED: 'useLastLoaded',
   USE_MODAL_FORM: 'useModalForm',
+  USE_PENDING_KEYS: 'usePendingKeys',
   USE_DOCUMENT_TITLE: 'useDocumentTitle',
   USE_IN_VIEW: 'useInView',
   USE_SIDEBAR_COLLAPSED: 'useSidebarCollapsed',

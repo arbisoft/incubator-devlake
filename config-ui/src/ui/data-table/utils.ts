@@ -23,11 +23,10 @@ import { SORT_ORDER } from '@/ui/constants';
 import type { SortState } from '@/ui/types';
 
 import { ANTD_SORT_ORDER } from './constants';
+const normaliseSortKey = (key: unknown): string | undefined => (key === undefined ? undefined : String(key));
 
-const columnKey = <T extends object>(column: TableColumnsType<T>[number]): string | undefined => {
-  if (column.key !== undefined) return String(column.key);
-  return 'dataIndex' in column && column.dataIndex !== undefined ? String(column.dataIndex) : undefined;
-};
+const columnKey = <T extends object>(column: TableColumnsType<T>[number]): string | undefined =>
+  normaliseSortKey(column.key ?? ('dataIndex' in column ? column.dataIndex : undefined));
 
 export const withSortOrder = <T extends object>(columns: TableColumnsType<T>, sort?: SortState<string>) =>
   columns.map((column) => {
@@ -53,9 +52,11 @@ export const toSortState = <T extends object, S extends string = string>(
   sorter: SorterResult<T> | SorterResult<T>[],
 ): SortState<S> | undefined => {
   const [first] = Array.isArray(sorter) ? sorter : [sorter];
-  if (!first?.order || first.columnKey === undefined) return undefined;
+  if (!first?.order) return undefined;
+  const sortBy = normaliseSortKey(first.columnKey ?? first.field ?? first.column?.dataIndex);
+  if (sortBy === undefined) return undefined;
   return {
-    sortBy: String(first.columnKey) as S,
+    sortBy: sortBy as S,
     sortOrder: first.order === ANTD_SORT_ORDER.ASC ? SORT_ORDER.ASC : SORT_ORDER.DESC,
   };
 };

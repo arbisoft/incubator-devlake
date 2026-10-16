@@ -17,8 +17,14 @@
  */
 
 export * from './components';
-export { WEBHOOK_PLUGIN } from './constants';
+export {
+  COPY as CONNECTION_COPY,
+  HTTP_STATUS as CONNECTION_HTTP_STATUS,
+  HEALTH_FAILURE_REASON,
+  WEBHOOK_PLUGIN,
+} from './constants';
 export * from './health';
 export * from './slice';
 export type * from './types';
+export { getErrorResponse } from './utils';
 export * from './use-health-checks';

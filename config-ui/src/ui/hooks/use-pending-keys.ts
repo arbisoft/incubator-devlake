@@ -15,11 +15,25 @@
  * limitations under the License.
  *
  */
+import { useCallback, useRef, useState } from 'react';
 
-export const validRawPlan = (rp: string) => {
-  try {
-    return JSON.parse(rp).flat().length === 0;
-  } catch {
+export const usePendingKeys = () => {
+  const active = useRef(new Set<string>());
+  const [pending, setPending] = useState<ReadonlySet<string>>(new Set());
+
+  const begin = useCallback((key: string): boolean => {
+    if (active.current.has(key)) return false;
+    active.current.add(key);
+    setPending(new Set(active.current));
     return true;
-  }
+  }, []);
+
+  const end = useCallback((key: string) => {
+    active.current.delete(key);
+    setPending(new Set(active.current));
+  }, []);
+
+  const isPending = useCallback((key: string): boolean => pending.has(key), [pending]);
+
+  return { begin, end, isPending };
 };

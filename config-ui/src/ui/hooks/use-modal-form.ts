@@ -18,15 +18,22 @@
 
 import { useCallback, useRef, useState } from 'react';
 
+import { operator, type OperateConfig } from '@/utils';
+
 type ModalFormOptions<T> = {
   onClose: () => void;
   required: (keyof T)[];
   disabledReason: string;
+  onSettled?: () => void;
+};
+
+type ModalSubmitOptions<R> = Pick<OperateConfig, 'formatMessage' | 'formatReason' | 'hideToast'> & {
+  onSuccess?: (result: R) => void;
 };
 
 export const useModalForm = <T extends object>(
   initial: T,
-  { onClose, required, disabledReason }: ModalFormOptions<T>,
+  { onClose, required, disabledReason, onSettled }: ModalFormOptions<T>,
 ) => {
   const initialValues = useRef(initial);
   const [values, setValues] = useState(initial);
@@ -41,11 +48,28 @@ export const useModalForm = <T extends object>(
     setValues(initialValues.current);
     onClose();
   }, [onClose]);
+  const submit = useCallback(
+    async <R>(
+      request: () => Promise<R>,
+      { onSuccess, ...config }: ModalSubmitOptions<R> = {},
+    ): Promise<[boolean, unknown]> => {
+      const [success, result] = await operator(request, { ...config, setOperating: setSaving });
+      onSettled?.();
+      if (success) {
+        onSuccess?.(result as R);
+        setValues(initialValues.current);
+        onClose();
+      }
+      return [success, result];
+    },
+    [onClose, onSettled],
+  );
 
   return {
     values,
     setField,
     reset,
+    submit,
     setSaving,
     modalProps: {
       loading: saving,

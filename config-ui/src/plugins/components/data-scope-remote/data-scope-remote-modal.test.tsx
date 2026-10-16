@@ -50,7 +50,9 @@ vi.mock('./data-scope-remote', () => ({
 const batch = vi.mocked(API.scope.batch);
 const TITLE = 'Add Data Scope: conn';
 
-const setup = () => {
+const setup = (
+  membershipProps: { loadingScopes?: boolean; scopesLoadFailed?: boolean; onRetryScopes?: () => void } = {},
+) => {
   const onSubmit = vi.fn();
   const onCancel = vi.fn();
   renderWithTheme(
@@ -59,6 +61,7 @@ const setup = () => {
       plugin="github"
       connectionId={1}
       title={TITLE}
+      {...membershipProps}
       onCancel={onCancel}
       onSubmit={onSubmit}
     />,
@@ -93,5 +96,56 @@ describe('DataScopeRemoteModal', () => {
     fireEvent.click(screen.getByRole('button', { name: COPY.submit }));
     await waitFor(() => expect(batch).toHaveBeenCalledOnce());
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('blocks selection and save while the existing membership loads', () => {
+    const { onSubmit } = setup({ loadingScopes: true });
+
+    expect(screen.queryByRole('button', { name: 'pick' })).toBeNull();
+    expect(screen.getByRole('button', { name: COPY.submit }).getAttribute('aria-disabled')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: COPY.submit }));
+    expect(batch).not.toHaveBeenCalled();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('shows retry after membership fails and resumes the normal save flow', async () => {
+    const onRetryScopes = vi.fn();
+    const onSubmit = vi.fn();
+    const onCancel = vi.fn();
+    const { rerender } = renderWithTheme(
+      <DataScopeRemoteModal
+        open
+        plugin="github"
+        connectionId={1}
+        title={TITLE}
+        scopesLoadFailed
+        onRetryScopes={onRetryScopes}
+        onCancel={onCancel}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    expect(screen.getByText('Existing data scopes could not be loaded. Retry before adding scopes.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: COPY.submit }).getAttribute('aria-disabled')).toBe('true');
+    expect(screen.queryByRole('button', { name: 'pick' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(onRetryScopes).toHaveBeenCalledOnce();
+
+    rerender(
+      <DataScopeRemoteModal
+        open
+        plugin="github"
+        connectionId={1}
+        title={TITLE}
+        loadingScopes={false}
+        scopesLoadFailed={false}
+        onCancel={onCancel}
+        onSubmit={onSubmit}
+      />,
+    );
+    batch.mockResolvedValue({});
+    fireEvent.click(screen.getByRole('button', { name: 'pick' }));
+    fireEvent.click(screen.getByRole('button', { name: COPY.submit }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
   });
 });

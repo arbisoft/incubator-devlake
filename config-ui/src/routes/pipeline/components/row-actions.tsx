@@ -24,11 +24,16 @@ import { COPY, PIPELINE_ROW_ACTION } from '../constants';
 
 import type { PipelineRowAction, PipelineRowActionsProps } from './types';
 
-export const PipelineRowActions = ({ id, onSelect }: PipelineRowActionsProps) => {
+export const PipelineRowActions = ({ id, onSelect, downloading = false }: PipelineRowActionsProps) => {
   const trigger = useRef<HTMLButtonElement>(null);
   const items: MenuProps['items'] = [
     { key: PIPELINE_ROW_ACTION.CONFIGURATION, icon: <CodeOutlined />, label: COPY.rowActions.configuration },
-    { key: PIPELINE_ROW_ACTION.DOWNLOAD_LOGS, icon: <FileZipOutlined />, label: COPY.rowActions.downloadLogs },
+    {
+      key: PIPELINE_ROW_ACTION.DOWNLOAD_LOGS,
+      icon: <FileZipOutlined />,
+      label: COPY.rowActions.downloadLogs,
+      disabled: downloading,
+    },
     { key: PIPELINE_ROW_ACTION.DETAIL, icon: <RightOutlined />, label: COPY.rowActions.detail },
   ];
 

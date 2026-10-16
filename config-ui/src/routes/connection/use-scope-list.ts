@@ -30,7 +30,13 @@ export const useScopeList = (plugin: string, connectionId: ID) => {
   const { version, refresh } = useRefreshVersion();
 
   const { data, ready, error } = useRefreshData(
-    () => API.scope.list(plugin, connectionId, { page, pageSize, searchTerm: keyword || undefined, blueprints: true }),
+    (signal) =>
+      API.scope.list(
+        plugin,
+        connectionId,
+        { page, pageSize, searchTerm: keyword || undefined, blueprints: true },
+        signal,
+      ),
     [plugin, connectionId, version, page, pageSize, keyword],
   );
   const rows = useMemo(() => toScopeRows(plugin, data?.scopes as ScopeListItem[] | undefined), [plugin, data]);

@@ -24,6 +24,8 @@ import API from '@/api';
 import { GRAFANA_ERROR_CODE, GRAFANA_ROLE } from '@/api/grafana-users/constants';
 import type { GrafanaUser } from '@/api/grafana-users/types';
 
+import { createDeferred } from '../__tests__/test-utils';
+
 import { COPY, GRAFANA_DIALOG, GRAFANA_FLOW_ERRORS } from './constants';
 import { useDialogState, useGrafanaRowActions } from './hooks';
 
@@ -71,6 +73,45 @@ describe('useGrafanaRowActions', () => {
     await act(() => result.current.changeRole(USER, GRAFANA_ROLE.ADMIN));
     expect(message.error).toHaveBeenCalledWith(GRAFANA_FLOW_ERRORS.ROLE[GRAFANA_ERROR_CODE.USER_PROTECTED]);
     expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it('writes once for two same-tick role changes and marks only that account pending until it settles', async () => {
+    const deferred = createDeferred<GrafanaUser>();
+    grafana.updateUser.mockReturnValueOnce(deferred.promise);
+    const onDone = vi.fn();
+    const { result } = renderHook(() => useGrafanaRowActions(onDone));
+    const { changeRole } = result.current;
+    let calls: Promise<void>[] = [];
+    act(() => {
+      calls = [changeRole(USER, GRAFANA_ROLE.EDITOR), changeRole(USER, GRAFANA_ROLE.ADMIN)];
+    });
+    expect(grafana.updateUser).toHaveBeenCalledTimes(1);
+    expect(result.current.isRolePending(USER)).toBe(true);
+    expect(result.current.isRolePending({ ...USER, id: 4 })).toBe(false);
+
+    await act(async () => {
+      deferred.resolve(USER);
+      await Promise.all(calls);
+    });
+    expect(result.current.isRolePending(USER)).toBe(false);
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps another account independent and allows a retry after a failed role change', async () => {
+    grafana.updateUser.mockRejectedValueOnce(new Error('boom')).mockResolvedValue(USER);
+    const { result } = renderHook(() => useGrafanaRowActions(vi.fn()));
+    const other = { ...USER, id: 4 };
+    await act(async () => {
+      await Promise.all([
+        result.current.changeRole(USER, GRAFANA_ROLE.EDITOR),
+        result.current.changeRole(other, GRAFANA_ROLE.EDITOR),
+      ]);
+    });
+    expect(grafana.updateUser).toHaveBeenCalledTimes(2);
+    expect(result.current.isRolePending(USER)).toBe(false);
+
+    await act(() => result.current.changeRole(USER, GRAFANA_ROLE.EDITOR));
+    expect(grafana.updateUser).toHaveBeenCalledTimes(3);
   });
 
   it('asks before disabling, then sends the disabled flag and refreshes', async () => {

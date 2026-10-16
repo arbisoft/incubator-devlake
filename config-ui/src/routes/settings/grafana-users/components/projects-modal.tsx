@@ -20,7 +20,6 @@ import { ProjectOutlined } from '@ant-design/icons';
 
 import API from '@/api';
 import { FormModal, useModalForm } from '@/ui';
-import { operator } from '@/utils';
 
 import { Fields, Hint } from '../../components';
 import { COPY, GRAFANA_FLOW_ERRORS } from '../constants';
@@ -32,21 +31,16 @@ import type { UserDialogProps } from './types';
 const copy = COPY.projects;
 
 export const ProjectsModal = ({ open, user, onClose, onChanged }: UserDialogProps) => {
-  const { values, setField, reset, setSaving, modalProps } = useModalForm(
+  const { values, setField, submit, modalProps } = useModalForm(
     { projects: user?.projects ?? [] },
-    { onClose, required: [], disabledReason: '' },
+    { onClose, required: [], disabledReason: '', onSettled: onChanged },
   );
 
   const handleSubmit = async () => {
     if (!user) return;
-    const [success] = await operator(() => API.grafanaUsers.setProjects(user.id, values.projects), {
-      setOperating: setSaving,
+    await submit(() => API.grafanaUsers.setProjects(user.id, values.projects), {
       formatReason: getFlowError(GRAFANA_FLOW_ERRORS.PROJECTS),
     });
-    if (!success) return;
-    onChanged();
-    reset();
-    onClose();
   };
 
   return (

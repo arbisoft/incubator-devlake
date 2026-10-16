@@ -119,6 +119,8 @@ export const COPY = {
   tableLabel: 'OIDC providers',
   addProvider: 'Add provider',
   stateTooltip: 'Review the OIDC configuration managed in Users.',
+  stateLoading: 'Loading authentication state',
+  stateUnavailable: 'Authentication state unavailable',
   loadFailed: 'Authentication settings could not be loaded. Refresh the page and try again.',
   empty: {
     title: 'No OIDC providers yet',

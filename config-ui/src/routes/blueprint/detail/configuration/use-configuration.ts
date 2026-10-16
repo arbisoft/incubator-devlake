@@ -32,7 +32,14 @@ import { useBlueprintActions } from '../hooks';
 
 import { ADD_CONNECTION_STEP, CONFIG_MODAL, NEW_CONNECTION_VALUE } from './constants';
 import type { AddConnectionState, ConfigModal, ConfigurationProps } from './types';
-import { buildConnectionOptions, stringifyPlan, toConnectionCards, toPlanPayload, toScopeConnection } from './utils';
+import {
+  buildConnectionOptions,
+  isEmptyPlanText,
+  stringifyPlan,
+  toConnectionCards,
+  toPlanPayload,
+  toScopeConnection,
+} from './utils';
 
 const CLOSED: AddConnectionState = { step: ADD_CONNECTION_STEP.CLOSED };
 
@@ -83,6 +90,9 @@ export const useBlueprintConfiguration = ({
 
   const savedPlan = useMemo(() => stringifyPlan(blueprint.plan), [blueprint.plan]);
   const rawPlan = planEdit?.base === savedPlan ? planEdit.text : savedPlan;
+  const parsedPlan = useMemo(() => toPlanPayload(rawPlan), [rawPlan]);
+  const invalidPlan = parsedPlan === undefined;
+  const showPlanError = invalidPlan && !isEmptyPlanText(rawPlan);
 
   const update = async (payload: Partial<IBlueprint>) => {
     const [success] = await operator(() => API.blueprint.update(blueprint.id, { ...blueprint, ...payload }), {
@@ -115,10 +125,15 @@ export const useBlueprintConfiguration = ({
     openModal: setModal,
     closeModal: () => setModal(undefined),
     rawPlan,
+    invalidPlan,
+    showPlanError,
     setRawPlan: (text: string) => setPlanEdit({ base: savedPlan, text }),
     saveName: (name: string) => update({ name }),
     savePolicy: (policy: Partial<IBlueprint>) => update(policy),
-    savePlan: () => update({ plan: toPlanPayload(rawPlan) }),
+    savePlan: async () => {
+      if (invalidPlan || !parsedPlan) return false;
+      return update({ plan: parsedPlan });
+    },
     collect,
     addConnection: { ...addConnection, submit: addScopes },
     isNameOpen: modal === CONFIG_MODAL.NAME,

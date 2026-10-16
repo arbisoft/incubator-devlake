@@ -17,14 +17,17 @@
  */
 
 import { act, renderHook, waitFor } from '@testing-library/react';
+import { StrictMode, type ReactNode } from 'react';
+import { BrowserRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Load the routes barrel first so the config/routes import cycle resolves as it does in the app.
 import '@/routes';
 
 import { ACCESS_ROLE } from '@/api/access';
+import { THEME_MODE } from '@/theme/constants';
 
-import { ACCOUNT_MENU_KEY, COPY, FAILURE_COOLDOWN_MS, LINK_IDENTITY, THEME_MODE } from './constants';
+import { ACCOUNT_MENU_KEY, COPY, FAILURE_COOLDOWN_MS, LINK_IDENTITY } from './constants';
 import type { LayoutUser } from './types';
 import { useAccountMenu, useIdentityLinkNotification } from './use-account-menu';
 
@@ -51,6 +54,11 @@ vi.mock('antd', async (importOriginal) => ({
 
 const USER: LayoutUser = { authenticated: true, name: 'Ada', email: 'ada@example.com', authenticationMethod: 'oidc' };
 const ACCESS = { enabled: true, role: ACCESS_ROLE.MEMBER };
+const StrictBrowserRouter = ({ children }: { children: ReactNode }) => (
+  <StrictMode>
+    <BrowserRouter>{children}</BrowserRouter>
+  </StrictMode>
+);
 
 const setup = (props: { user?: LayoutUser | null; access?: { enabled: boolean } | null } = {}) =>
   renderHook(() =>
@@ -107,6 +115,7 @@ describe('useAccountMenu', () => {
 });
 
 describe('useIdentityLinkNotification', () => {
+  beforeEach(() => vi.clearAllMocks());
   afterEach(() => window.history.replaceState(null, '', '/'));
 
   it.each([
@@ -114,8 +123,41 @@ describe('useIdentityLinkNotification', () => {
     ['denied', 'error', COPY.identityLink.failed],
   ] as const)('shows the %s result once and removes it from the URL', (result, kind, text) => {
     window.history.replaceState(null, '', `/projects?keep=1&${LINK_IDENTITY.RESULT_PARAM}=${result}`);
-    renderHook(() => useIdentityLinkNotification());
+    renderHook(() => useIdentityLinkNotification(), { wrapper: StrictBrowserRouter });
     expect(messageMock[kind]).toHaveBeenCalledWith(text);
+    expect(messageMock[kind]).toHaveBeenCalledTimes(1);
     expect(window.location.search).toBe('?keep=1');
+  });
+
+  it('preserves router state and hash, then follows browser back navigation', async () => {
+    const previousState = { source: 'previous' };
+    const callbackState = { source: 'callback' };
+    window.history.replaceState({ usr: previousState, key: 'previous' }, '', '/previous?step=before#anchor');
+    window.history.pushState(
+      { usr: callbackState, key: 'callback' },
+      '',
+      `/projects?keep=1&${LINK_IDENTITY.RESULT_PARAM}=linked#settings`,
+    );
+
+    const { result } = renderHook(
+      () => {
+        useIdentityLinkNotification();
+        return useLocation();
+      },
+      { wrapper: StrictBrowserRouter },
+    );
+
+    await waitFor(() => expect(result.current.search).toBe('?keep=1'));
+    expect(result.current.pathname).toBe('/projects');
+    expect(result.current.hash).toBe('#settings');
+    expect(result.current.state).toEqual(callbackState);
+    expect(messageMock.success).toHaveBeenCalledTimes(1);
+
+    await act(async () => window.history.back());
+    await waitFor(() => expect(result.current.pathname).toBe('/previous'));
+    expect(result.current.search).toBe('?step=before');
+    expect(result.current.hash).toBe('#anchor');
+    expect(result.current.state).toEqual(previousState);
+    expect(messageMock.success).toHaveBeenCalledTimes(1);
   });
 });

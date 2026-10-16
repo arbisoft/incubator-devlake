@@ -65,12 +65,13 @@ export const GrafanaUsersCard = () => {
   const { open: openDialog, close: closeDialog } = dialog;
   const [oneTime, setOneTime] = useState<OneTimePassword>();
   const [oneTimeOpen, setOneTimeOpen] = useState(false);
-  const { requestAction, changeRole, confirmProps } = useGrafanaRowActions(refresh);
+  const { requestAction, changeRole, isRolePending, confirmProps } = useGrafanaRowActions(refresh);
   const orphans = loaded?.orphans ?? [];
 
   const columns = useMemo(() => {
     const actions: GrafanaColumnActions = {
       onRoleChange: changeRole,
+      isRolePending,
       onToggle: requestAction,
       onRemove: (user) => requestAction(GRAFANA_ROW_ACTION.DELETE, user),
       onEditProjects: (user) => openDialog(GRAFANA_DIALOG.PROJECTS, user),
@@ -78,7 +79,7 @@ export const GrafanaUsersCard = () => {
         openDialog(action === GRAFANA_MENU_ACTION.PASSWORD ? GRAFANA_DIALOG.PASSWORD : GRAFANA_DIALOG.DETAILS, user),
     };
     return getGrafanaUserColumns(actions);
-  }, [changeRole, openDialog, requestAction]);
+  }, [changeRole, isRolePending, openDialog, requestAction]);
 
   const showPassword = (credential: OneTimePassword) => {
     setOneTime(credential);

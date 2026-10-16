@@ -23,6 +23,7 @@ export * from './use-in-view';
 export * from './use-last-loaded';
 export * from './use-list-state';
 export * from './use-modal-form';
+export * from './use-pending-keys';
 export * from './use-refresh-version';
 export * from './use-route-tab';
 export * from './use-sidebar-collapsed';

@@ -20,6 +20,7 @@ import { APIRequestContext } from '@playwright/test';
 import { loginAsAdmin } from '../auth-helpers';
 import { test, expect } from '../fixtures';
 import { adminApi, createGithubConnection, deleteConnection, listScopes, uniqueName } from '../support/api';
+import { GITHUB_COPY } from '../support/app-copy';
 import { ConnectionDetailPage, PLUGINS } from '../support/pages/connections';
 
 const GITHUB_TOKEN = process.env.E2E_GITHUB_TOKEN;
@@ -53,7 +54,7 @@ test.describe.serial('GitHub data scope and scope config on a connection', () =>
     const detail = new ConnectionDetailPage(page, PLUGINS.github);
     await detail.open(connectionId);
     await detail.openAddScope();
-    await detail.searchRemoteScope(repo.split('/')[1]);
+    await detail.searchRemoteScope(repo.split('/')[1], GITHUB_COPY.searchPlaceholder);
     await detail.pickRemoteScope(repo);
     await expect(detail.pickedScopeTag(repo)).toBeVisible();
     await detail.saveAddScope();
@@ -72,11 +73,13 @@ test.describe.serial('GitHub data scope and scope config on a connection', () =>
   test('create a scope config from the UI and associate it with the scope', async ({ page }) => {
     const detail = new ConnectionDetailPage(page, PLUGINS.github);
     await detail.open(connectionId);
+    await expect(detail.scopeAssociateButton(repo)).toBeVisible();
     await detail.openAssociateScopeConfig(repo);
     await detail.createScopeConfig(scopeConfigName);
     await expect(detail.associateScopeConfigRow(scopeConfigName)).toBeVisible();
     await detail.saveAssociateScopeConfig();
     await expect(detail.scopeConfigCell(repo, scopeConfigName)).toBeVisible();
+    await expect(detail.scopeEditButton(repo)).toBeVisible();
 
     const configsRes = await api.get(`/plugins/github/connections/${connectionId}/scope-configs`);
     const configs: { id: number; name: string; entities: string[] }[] = await configsRes.json();
@@ -89,6 +92,7 @@ test.describe.serial('GitHub data scope and scope config on a connection', () =>
     expect(scopes[0].scopeConfig?.name).toBe(scopeConfigName);
     await detail.reload();
     await expect(detail.scopeConfigCell(repo, scopeConfigName)).toBeVisible();
+    await expect(detail.scopeEditButton(repo)).toBeVisible();
   });
 
   test('remove the data scope from the UI', async ({ page }) => {

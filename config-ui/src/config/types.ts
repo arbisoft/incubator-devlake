@@ -18,6 +18,13 @@
 
 import type { BLUEPRINT_VIEW, PROJECT_TAB, USER_MANAGEMENT_VIEW } from './route-keys';
 
+export type BrandEnv = {
+  DEVLAKE_BRAND_NAME?: string;
+  DEVLAKE_TITLE_CUSTOM?: string;
+  DEVLAKE_COLOR_CUSTOM?: string;
+  DEVLAKE_COPYRIGHT_HIDE?: boolean | string;
+};
+
 export type ProjectTab = (typeof PROJECT_TAB)[keyof typeof PROJECT_TAB];
 export type BlueprintView = (typeof BLUEPRINT_VIEW)[keyof typeof BLUEPRINT_VIEW];
 export type UserManagementView = (typeof USER_MANAGEMENT_VIEW)[keyof typeof USER_MANAGEMENT_VIEW];

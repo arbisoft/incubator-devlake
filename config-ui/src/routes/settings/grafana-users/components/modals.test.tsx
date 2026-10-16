@@ -22,8 +22,6 @@ import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import API from '@/api';
-import { GRAFANA_ERROR_CODE, GRAFANA_ROLE } from '@/api/grafana-users/constants';
-import type { GrafanaUser } from '@/api/grafana-users/types';
 import type { IProject } from '@/types';
 import { COMMON_COPY } from '@/ui';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
@@ -33,10 +31,14 @@ import type { TemporaryCredential } from '../../components/types';
 import { COPY as SETTINGS_COPY } from '../../constants';
 import { COPY } from '../constants';
 
+import { callbacks, EMAIL, submit, type, user } from './__tests__/dialog-helpers';
 import { EditDetailsModal } from './edit-details-modal';
 import { OrphansModal } from './orphans-modal';
 import { ProjectsModal } from './projects-modal';
-import { SetPasswordModal } from './set-password-modal';
+
+import './__tests__/failure-refresh-cases';
+import './__tests__/orphans-modal-cases';
+import './__tests__/set-password-modal-cases';
 
 vi.mock('antd', async (importOriginal) => {
   const { withMockedAntdMessage } = await import('../../__tests__/test-utils');
@@ -50,30 +52,10 @@ vi.mock('@/api', async () => {
 
 const grafana = vi.mocked(API.grafanaUsers);
 const projectList = vi.mocked(API.project.list);
-const EMAIL = 'ann@example.com';
 const ORPHAN_EMAIL = 'gone@example.com';
 const MODAL_SELECTOR = '.ant-modal';
-const ARIA_TRUE = 'true';
 const project = (name: string): IProject => ({ name, description: '', blueprint: null, metrics: [] });
 const PASSWORD = 'a-long-enough-password';
-
-const user = (patch: Partial<GrafanaUser> = {}): GrafanaUser => ({
-  id: 5,
-  email: EMAIL,
-  name: 'Ann Lee',
-  role: GRAFANA_ROLE.VIEWER,
-  disabled: false,
-  sso: false,
-  protected: false,
-  projects: [],
-  ...patch,
-});
-
-const callbacks = () => ({ onClose: vi.fn(), onChanged: vi.fn(), onPassword: vi.fn() });
-
-const submit = (name: string) => screen.getByRole('button', { name: new RegExp(`${name}$`) });
-const type = (label: string, value: string) =>
-  fireEvent.change(screen.getByLabelText(new RegExp(`^${label}`)), { target: { value } });
 
 const TemporaryPasswordHarness = () => {
   const [open, setOpen] = useState(true);
@@ -99,6 +81,7 @@ const TemporaryPasswordHarness = () => {
 beforeEach(() => {
   vi.resetAllMocks();
   projectList.mockResolvedValue({ projects: [project('alpha'), project('beta')], count: 2 });
+  grafana.setPassword.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -116,6 +99,16 @@ describe('EditDetailsModal', () => {
     await waitFor(() => expect(props.onChanged).toHaveBeenCalled());
     expect(grafana.updateUser).toHaveBeenCalledWith(5, { name: 'Anna Lee', email: undefined });
     expect(props.onClose).toHaveBeenCalled();
+  });
+
+  it('does not confirm a name-only edit when the saved email uses different casing', async () => {
+    const props = callbacks();
+    renderWithTheme(<EditDetailsModal open user={user({ email: 'Ann@Example.com' })} {...props} />);
+    type(COPY.add.name.label, 'Anna Lee');
+    fireEvent.click(submit(COPY.details.submit));
+    await waitFor(() => expect(props.onChanged).toHaveBeenCalled());
+    expect(screen.queryByText(COPY.details.confirm.title())).toBeNull();
+    expect(grafana.updateUser).toHaveBeenCalledWith(5, { name: 'Anna Lee', email: undefined });
   });
 
   it('closes without a request when nothing changed', () => {
@@ -157,19 +150,6 @@ describe('EditDetailsModal', () => {
     expect(props.onClose).toHaveBeenCalled();
     expect(grafana.updateUser).not.toHaveBeenCalled();
   });
-
-  it('keeps the dialog and values when the save fails', async () => {
-    grafana.updateUser.mockRejectedValueOnce({
-      response: { status: 403, data: { code: GRAFANA_ERROR_CODE.USER_SSO_MANAGED } },
-    });
-    const props = callbacks();
-    renderWithTheme(<EditDetailsModal open user={user()} {...props} />);
-    type(COPY.add.name.label, 'Anna');
-    fireEvent.click(submit(COPY.details.submit));
-    await waitFor(() => expect(message.error).toHaveBeenCalled());
-    expect(props.onClose).not.toHaveBeenCalled();
-    expect((screen.getByLabelText(new RegExp(`^${COPY.add.name.label}`)) as HTMLInputElement).value).toBe('Anna');
-  });
 });
 
 describe('ProjectsModal', () => {
@@ -197,50 +177,15 @@ describe('ProjectsModal', () => {
     await waitFor(() => expect(grafana.setProjects).toHaveBeenCalledWith(5, []));
   });
 
-  it('keeps the dialog open when the save fails', async () => {
+  it('keeps the dialog and selection open and refreshes the list once when the save fails', async () => {
     grafana.setProjects.mockRejectedValueOnce(new Error('boom'));
     const props = callbacks();
-    renderWithTheme(<ProjectsModal open user={user()} {...props} />);
+    renderWithTheme(<ProjectsModal open user={user({ projects: ['alpha'] })} {...props} />);
     fireEvent.click(submit(COPY.projects.submit));
     await waitFor(() => expect(message.error).toHaveBeenCalled());
     expect(props.onClose).not.toHaveBeenCalled();
-    expect(props.onChanged).not.toHaveBeenCalled();
-  });
-});
-
-describe('SetPasswordModal', () => {
-  it('needs a long enough password, then sets it and hands it to the one-time dialog', async () => {
-    const props = callbacks();
-    renderWithTheme(<SetPasswordModal open user={user()} {...props} />);
-    type(COPY.password.label, 'short');
-    expect(submit(COPY.setPassword.submit).getAttribute('aria-disabled')).toBe(ARIA_TRUE);
-    fireEvent.click(submit(COPY.setPassword.submit));
-    expect(grafana.setPassword).not.toHaveBeenCalled();
-
-    type(COPY.password.label, PASSWORD);
-    fireEvent.click(submit(COPY.setPassword.submit));
-    await waitFor(() => expect(props.onPassword).toHaveBeenCalled());
-    expect(grafana.setPassword).toHaveBeenCalledWith(5, PASSWORD);
-    expect(props.onPassword).toHaveBeenCalledWith({ email: EMAIL, password: PASSWORD });
-    expect(props.onClose).toHaveBeenCalled();
-    expect((screen.getByLabelText(new RegExp(`^${COPY.password.label}`)) as HTMLInputElement).value).toBe('');
-  });
-
-  it('generates a password of 24 characters', () => {
-    renderWithTheme(<SetPasswordModal open user={user()} {...callbacks()} />);
-    fireEvent.click(screen.getByRole('button', { name: new RegExp(COPY.password.generate) }));
-    expect((screen.getByLabelText(new RegExp(`^${COPY.password.label}`)) as HTMLInputElement).value).toHaveLength(24);
-  });
-
-  it('keeps the password and shows no one-time dialog when the request fails', async () => {
-    grafana.setPassword.mockRejectedValueOnce(new Error('boom'));
-    const props = callbacks();
-    renderWithTheme(<SetPasswordModal open user={user()} {...props} />);
-    type(COPY.password.label, PASSWORD);
-    fireEvent.click(submit(COPY.setPassword.submit));
-    await waitFor(() => expect(message.error).toHaveBeenCalled());
-    expect(props.onPassword).not.toHaveBeenCalled();
-    expect((screen.getByLabelText(new RegExp(`^${COPY.password.label}`)) as HTMLInputElement).value).toBe(PASSWORD);
+    expect(props.onChanged).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('alpha')).toBeTruthy();
   });
 });
 
@@ -283,10 +228,5 @@ describe('OrphansModal', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: COPY.orphansDialog.confirm.confirm }));
     await waitFor(() => expect(props.onChanged).toHaveBeenCalled());
     expect(grafana.clearOrphan).toHaveBeenCalledWith(ORPHAN_EMAIL);
-  });
-
-  it('stays closed when no orphan is left', () => {
-    renderWithTheme(<OrphansModal open orphans={[]} onClose={vi.fn()} onChanged={vi.fn()} />);
-    expect(screen.queryByText(COPY.orphansDialog.title)).toBeNull();
   });
 });

@@ -27,11 +27,17 @@ export const normalizeLoginReturnPath = (returnPath: string | null, fallbackPath
   if (!returnPath || !returnPath.startsWith('/') || returnPath.startsWith('//')) return fallbackPath;
   if (returnPath.includes('\\') || encodedBackslash.test(returnPath)) return fallbackPath;
 
-  const pathPrefix = fallbackPath === '/' ? '' : fallbackPath.replace(/\/$/, '');
-  const [pathname] = returnPath.split(/[?#]/, 1);
-  if (pathPrefix && pathname !== pathPrefix && !pathname.startsWith(`${pathPrefix}/`)) return fallbackPath;
+  try {
+    const url = new URL(returnPath, window.location.origin);
+    if (url.origin !== window.location.origin) return fallbackPath;
 
-  return returnPath;
+    const pathPrefix = fallbackPath === '/' ? '' : fallbackPath.replace(/\/$/, '');
+    if (pathPrefix && url.pathname !== pathPrefix && !url.pathname.startsWith(`${pathPrefix}/`)) return fallbackPath;
+
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return fallbackPath;
+  }
 };
 
 const hostOnly = (issuerHost: string) => issuerHost.trim().toLowerCase().replace(/:\d+$/, '').replace(/\.$/, '');

@@ -23,10 +23,8 @@ import { useConcurrencyQueue } from '@/ui';
 
 import { COPY, SECTION } from './constants';
 import { DemoCase, DemoSection } from './demo-section';
-import { QUEUE_JOB_COUNT, QUEUE_JOB_MS, QUEUE_LIMIT } from './fixtures';
+import { QUEUE_JOB_COUNT, QUEUE_JOB_MS, QUEUE_LIMIT, delay } from './fixtures';
 import { Mono } from './styled';
-
-const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export const UseConcurrencyQueueDemo = () => {
   const { enqueue } = useConcurrencyQueue(QUEUE_LIMIT);
@@ -38,7 +36,7 @@ export const UseConcurrencyQueueDemo = () => {
     const key = text.job(n);
     void enqueue(key, async () => {
       setRunning((current) => [...current, key]);
-      await wait(QUEUE_JOB_MS);
+      await delay(QUEUE_JOB_MS);
       setRunning((current) => current.filter((item) => item !== key));
       setDone((current) => [...current, key]);
     });

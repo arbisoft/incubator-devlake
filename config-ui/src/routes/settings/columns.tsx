@@ -32,6 +32,7 @@ export const buildRoleColumn = <T extends object, R extends string = AccessRole>
   getRole,
   getLabel,
   getLockedReason,
+  isPending = () => false,
   onChange,
 }: RoleColumnOptions<T, R>): TableColumnType<T> => ({
   key,
@@ -40,6 +41,7 @@ export const buildRoleColumn = <T extends object, R extends string = AccessRole>
     const role = getRole(record);
     if (!options.some((option) => option.value === role)) return role;
     const lockedReason = getLockedReason?.(record);
+    const pending = isPending(record);
     return (
       <Tooltip title={lockedReason}>
         <Select<R>
@@ -47,7 +49,8 @@ export const buildRoleColumn = <T extends object, R extends string = AccessRole>
           aria-label={getLabel(record)}
           value={role as R}
           options={options}
-          disabled={lockedReason !== undefined}
+          loading={pending}
+          disabled={lockedReason !== undefined || pending}
           onChange={(next) => onChange(record, next)}
         />
       </Tooltip>

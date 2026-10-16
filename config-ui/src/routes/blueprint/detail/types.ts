@@ -28,6 +28,8 @@ export type BlueprintViewPaths = Record<BlueprintView, string>;
 
 export type RunPolicy = { skipCollectors?: boolean; fullSync?: boolean };
 
+export type ActionsOptions = { blueprint: IBlueprint; onRefresh: () => void };
+
 export type BlueprintDetailProps = {
   blueprintId: ID;
   context: BlueprintContext;

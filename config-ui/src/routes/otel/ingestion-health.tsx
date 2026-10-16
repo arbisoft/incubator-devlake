@@ -20,7 +20,7 @@ import { Alert, Button, Skeleton } from 'antd';
 import { useMemo, useState } from 'react';
 
 import API from '@/api';
-import { OTEL_INGESTION_STATE } from '@/api/otel';
+import { OTEL_BATCH_STATUS, OTEL_INGESTION_STATE } from '@/api/otel';
 import { useRefreshData } from '@/hooks';
 import {
   CODE_LANGUAGE,
@@ -32,6 +32,7 @@ import {
   SectionCard,
   STATUS_BADGE_VARIANT,
   StatusBadge,
+  buildListEmpty,
 } from '@/ui';
 
 import { COPY } from './constants';
@@ -53,10 +54,19 @@ export const OtelIngestionHealth = ({ loading, failed, status, onRetry }: OtelIn
   const batches = useMemo(() => status?.recentBatches ?? [], [status]);
   const { rows, pagination } = useClientPagination(batches);
   const columns = useMemo(() => getBatchColumns((batch) => setBatchId(batch.id)), []);
+  const failedBeforeStatus = failed && !status;
+  const batchesEmpty = buildListEmpty({
+    failed: failedBeforeStatus,
+    onRetry,
+    filtered: false,
+    empty: COPY.health.emptyBatches,
+    noResults: COPY.health.emptyBatches,
+  });
+  const batchEmpty = failedBeforeStatus ? { ...batchesEmpty, title: COPY.health.batchesUnavailable } : batchesEmpty;
 
   const metrics = status && [
-    { label: COPY.health.metrics.pending, value: status.batchCounts.pending ?? 0 },
-    { label: COPY.health.metrics.retrying, value: status.batchCounts.retryable_error ?? 0 },
+    { label: COPY.health.metrics.pending, value: status.batchCounts[OTEL_BATCH_STATUS.PENDING] ?? 0 },
+    { label: COPY.health.metrics.retrying, value: status.batchCounts[OTEL_BATCH_STATUS.RETRYABLE_ERROR] ?? 0 },
     {
       label: COPY.health.metrics.oldestBacklog,
       value: formatAge(status.oldestNonterminal?.ageSeconds),
@@ -122,10 +132,10 @@ export const OtelIngestionHealth = ({ loading, failed, status, onRetry }: OtelIn
         <DataTable
           rowKey="id"
           ariaLabel={COPY.health.tableLabel}
-          loading={loading}
+          loading={loading && !failed}
           columns={columns}
           dataSource={rows}
-          empty={{ ...COPY.health.emptyBatches, size: EMPTY_STATE_SIZE.SECTION }}
+          empty={{ ...batchEmpty, size: EMPTY_STATE_SIZE.SECTION }}
           pagination={pagination}
         />
       </SectionCard>

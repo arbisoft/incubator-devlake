@@ -48,10 +48,10 @@ export const CreateModal = ({ open, presetProject, projectOptions, onClose, onCr
   }, [open, presetProject, setField]);
 
   const submit = async () => {
-    const [success, response] = await operator(
-      () => API.otel.create({ teamName: values.teamName, projectNames: values.projectNames }),
-      { setOperating: setSaving, hideToast: true },
-    );
+    const [success, response] = await operator(() => API.otel.create({ teamName, projectNames: values.projectNames }), {
+      setOperating: setSaving,
+      hideToast: true,
+    });
     if (!success) {
       message.error(getOtelCreateError(response));
       return;

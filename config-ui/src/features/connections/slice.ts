@@ -69,21 +69,38 @@ export const init = createAsyncThunk('connections/init', async (plugins: string[
   };
 });
 
+const toSaveRejection = (err: unknown) => {
+  const response = getErrorResponse(err);
+  if (!response) throw err;
+  return { response };
+};
+
 type ConnectionPayload = Omit<IConnectionAPI, 'id'>;
 
 export const addConnection = createAsyncThunk(
   'connections/addConnection',
-  async ({ plugin, ...payload }: ConnectionPayload & { plugin: string }) => {
-    const connection = await API.connection.create(plugin, payload);
-    return transformConnection(plugin, connection);
+  async ({ plugin, ...payload }: ConnectionPayload & { plugin: string }, { rejectWithValue }) => {
+    try {
+      const connection = await API.connection.create(plugin, payload);
+      return transformConnection(plugin, connection);
+    } catch (err: unknown) {
+      return rejectWithValue(toSaveRejection(err));
+    }
   },
 );
 
 export const updateConnection = createAsyncThunk(
   'connections/updateConnection',
-  async ({ plugin, connectionId, ...payload }: ConnectionPayload & { plugin: string; connectionId: ID }) => {
-    const connection = await API.connection.update(plugin, connectionId, payload);
-    return transformConnection(plugin, connection);
+  async (
+    { plugin, connectionId, ...payload }: ConnectionPayload & { plugin: string; connectionId: ID },
+    { rejectWithValue },
+  ) => {
+    try {
+      const connection = await API.connection.update(plugin, connectionId, payload);
+      return transformConnection(plugin, connection);
+    } catch (err: unknown) {
+      return rejectWithValue(toSaveRejection(err));
+    }
   },
 );
 
@@ -238,8 +255,6 @@ export const connectionsSlice = createSlice({
 });
 
 export const selectStatus = (state: RootState) => state.connections.status;
-
-export const selectError = (state: RootState) => state.connections.error;
 
 export const selectPlugins = (state: RootState) => state.connections.plugins;
 

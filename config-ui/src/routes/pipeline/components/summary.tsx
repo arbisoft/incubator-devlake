@@ -24,7 +24,8 @@ import { IconButton } from '@/ui';
 import { formatTime } from '@/utils';
 
 import { COPY } from '../constants';
-import { downloadPipelineLogs, usePipelineActions } from '../use-pipeline-actions';
+import { useLogDownload } from '../use-log-download';
+import { usePipelineActions } from '../use-pipeline-actions';
 import { getPipelineActions, pickConfig } from '../utils';
 
 import { PipelineConfigDrawer } from './config-drawer';
@@ -36,6 +37,7 @@ import type { PipelineSummaryProps } from './types';
 export const PipelineSummary = ({ pipeline, onChanged }: PipelineSummaryProps) => {
   const { id, status, beganAt, finishedAt, stage, finishedTasks, totalTasks } = pipeline;
   const { operating, cancel, rerun } = usePipelineActions(id, onChanged);
+  const { download, isDownloading } = useLogDownload();
   const actions = getPipelineActions(status);
   const [configOpen, setConfigOpen] = useState(false);
 
@@ -68,7 +70,8 @@ export const PipelineSummary = ({ pipeline, onChanged }: PipelineSummaryProps) =
           <IconButton
             icon={<FileZipOutlined />}
             label={COPY.rowActions.downloadLogs}
-            onClick={() => downloadPipelineLogs(id)}
+            loading={isDownloading(id)}
+            onClick={() => download(id)}
           />
           {actions.cancel && (
             <IconButton icon={<StopOutlined />} label={COPY.summary.cancel} loading={operating} onClick={cancel} />

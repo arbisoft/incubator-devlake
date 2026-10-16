@@ -44,3 +44,7 @@ jobs:
       run: cd config-ui; yarn lint:check
     - name: Run Tests
       run: cd config-ui; yarn test
+    - name: Check E2E census
+      run: cd config-ui; yarn e2e:census
+    - name: Check quality baseline
+      run: cd config-ui; yarn quality:baseline

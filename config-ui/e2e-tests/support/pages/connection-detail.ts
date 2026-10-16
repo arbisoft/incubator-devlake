@@ -115,6 +115,14 @@ export class ConnectionDetailPage extends BasePage {
     return this.scopeRow(fullName).getByText(configName);
   }
 
+  scopeAssociateButton(fullName: string): Locator {
+    return this.scopeRow(fullName).getByRole('button', { name: SCOPE_CONFIG_COPY.associate, exact: true });
+  }
+
+  scopeEditButton(fullName: string): Locator {
+    return this.scopeRow(fullName).getByRole('button', { name: SCOPE_CONFIG_COPY.edit, exact: true });
+  }
+
   get addScopeDialog(): Locator {
     return this.dialog('Add Data Scope');
   }
@@ -124,8 +132,8 @@ export class ConnectionDetailPage extends BasePage {
     await this.page.getByRole('button', { name: DETAIL_COPY.addScope }).first().click();
   }
 
-  async searchRemoteScope(text: string): Promise<void> {
-    await this.addScopeDialog.getByPlaceholder(DATA_SCOPE_REMOTE_COPY.searchFallback).fill(text);
+  async searchRemoteScope(text: string, placeholder: string = DATA_SCOPE_REMOTE_COPY.searchFallback): Promise<void> {
+    await this.addScopeDialog.getByPlaceholder(placeholder).fill(text);
   }
 
   async pickRemoteScope(fullName: string): Promise<void> {

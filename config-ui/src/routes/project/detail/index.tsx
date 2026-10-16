@@ -16,8 +16,8 @@
  *
  */
 
-import { message } from 'antd';
-import axios from 'axios';
+import { Alert, Button, message } from 'antd';
+import axios, { HttpStatusCode } from 'axios';
 import { useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -28,6 +28,7 @@ import { useRefreshData } from '@/hooks';
 import { BLUEPRINT_CONTEXT, BlueprintDetail, getProjectBlueprintViews, useBlueprintView } from '@/routes';
 import {
   EmptyState,
+  EMPTY_ILLUSTRATION,
   EMPTY_STATE_SIZE,
   ListPage,
   PageHeader,
@@ -35,6 +36,7 @@ import {
   ROUTE_TABS_VARIANT,
   useLastLoaded,
   useRefreshVersion,
+  COMMON_COPY,
 } from '@/ui';
 import { useRouteTab } from '@/ui/hooks';
 
@@ -58,10 +60,10 @@ export const ProjectDetailPage = () => {
 
   const { ready, data, error } = useRefreshData((signal) => API.project.get(pname, signal), [pname, version]);
   const loaded = useLastLoaded(data, pname);
-  const project = error ? undefined : loaded;
+  const project = loaded;
 
   useEffect(() => {
-    if (axios.isAxiosError(error) && error.response?.status === 404) {
+    if (axios.isAxiosError(error) && error.response?.status === HttpStatusCode.NotFound) {
       message.error(COPY.notFound(pname));
       const timer = setTimeout(() => navigate(PATHS.PROJECTS(), { replace: true }), NOT_FOUND_REDIRECT_DELAY_MS);
       return () => clearTimeout(timer);
@@ -69,7 +71,20 @@ export const ProjectDetailPage = () => {
   }, [error, navigate, pname]);
 
   if (!project) {
-    return !ready && !error ? <PageLoading /> : null;
+    if (!ready && error === undefined) return <PageLoading />;
+    if (error !== undefined) {
+      return (
+        <ListPage>
+          <EmptyState
+            illustration={EMPTY_ILLUSTRATION.ERROR}
+            size={EMPTY_STATE_SIZE.SECTION}
+            title={COPY.loadFailed}
+            action={<Button onClick={refresh}>{COMMON_COPY.retry}</Button>}
+          />
+        </ListPage>
+      );
+    }
+    return null;
   }
 
   const panels = {
@@ -92,6 +107,14 @@ export const ProjectDetailPage = () => {
 
   return (
     <ListPage>
+      {error !== undefined && (
+        <Alert
+          type="error"
+          showIcon
+          title={COPY.loadFailed}
+          action={<Button onClick={refresh}>{COMMON_COPY.retry}</Button>}
+        />
+      )}
       <PageHeader
         title={project.name}
         showTitle={false}

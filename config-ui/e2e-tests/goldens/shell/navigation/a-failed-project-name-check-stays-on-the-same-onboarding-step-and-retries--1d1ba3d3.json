@@ -1,0 +1,20 @@
+{
+  "titlePath": [
+    "authenticated shell",
+    "onboarding",
+    "a failed project name check stays on the same onboarding step and retries"
+  ],
+  "writes": [
+    {
+      "method": "PUT",
+      "path": "/api/store/onboard",
+      "body": {
+        "done": false,
+        "plugin": "github",
+        "projectName": "e2e-*",
+        "records": [],
+        "step": 2
+      }
+    }
+  ]
+}

@@ -21,6 +21,7 @@ import type { ProjectTab } from '@/config/types';
 
 export const COPY = {
   breadcrumbProjects: 'Projects',
+  loadFailed: 'The project could not be loaded.',
   notFound: (name: string) => `Project not found with project name: ${name}`,
   tabsLabel: 'Project sections',
   noBlueprint: {
@@ -103,6 +104,7 @@ export const COPY = {
         'Claude Code OTel placements will be removed from this project. Shared credentials remain active for their other projects.',
       otelFinalActive:
         'This project is the final placement for an active Claude Code OTel connection. Revoke that connection before deleting the project.',
+      placementsFailed: 'OpenTelemetry placements could not be checked. Retry before deleting this project.',
     },
   },
   readiness: {
@@ -122,6 +124,9 @@ export const COPY = {
     [PROJECT_TAB.SETTINGS]: 'Settings',
   } satisfies Record<ProjectTab, string>,
 } as const;
+
+export const OTEL_FINAL_PLACEMENT_MARKER =
+  'revoke the active Claude Code OTel connection before deleting its final project placement';
 
 export const PROJECT_PLUGIN = {
   DORA: 'dora',

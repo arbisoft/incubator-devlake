@@ -16,6 +16,7 @@
  *
  */
 import type { IConnectionStatus } from '@/types';
+import type { ConnectionHealthProps } from '@/ui';
 
 import type { HEALTH_FAILURE_REASON } from './constants';
 
@@ -31,3 +32,5 @@ export type ConnectionHealthEntry = {
 export type ConnectionHealthMap = Record<string, ConnectionHealthEntry>;
 
 export type TestFailureInput = { status?: number; message?: string };
+
+export type HealthView = Pick<ConnectionHealthProps, 'state' | 'testedAt' | 'label' | 'message'>;

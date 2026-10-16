@@ -16,7 +16,7 @@
  *
  */
 
-import { APIRequestContext } from '@playwright/test';
+import { APIRequestContext, Page } from '@playwright/test';
 
 import { loginAsAdmin } from '../auth-helpers';
 import { test, expect } from '../fixtures';
@@ -34,6 +34,17 @@ import { deletePipelinesNamedLike } from '../support/db';
 import { PipelinesPage } from '../support/pages/pipelines';
 
 const SMALLEST_PAGE_SIZE = 10;
+
+const logsPath = (id: number) => `/pipelines/${id}/logging.tar.gz`;
+
+// Counts GET requests for a pipeline's log archive from now on.
+const countLogRequests = (page: Page, id: number) => {
+  let count = 0;
+  page.on('request', (req) => {
+    if (req.method() === 'GET' && new URL(req.url()).pathname.endsWith(logsPath(id))) count += 1;
+  });
+  return () => count;
+};
 
 test.describe.serial('Pipelines list blueprint filter, sort and configuration drawer', () => {
   let api: APIRequestContext;
@@ -136,9 +147,30 @@ test.describe.serial('Pipelines list blueprint filter, sort and configuration dr
   test('Download Logs starts a download of the pipeline log archive', async ({ page }) => {
     const [pipelineId] = pipelineIdsA;
     const pipelines = new PipelinesPage(page);
+    const logRequests = countLogRequests(page, pipelineId);
     await pipelines.openWithQuery(`blueprintId=${blueprintA.id}`);
     const download = await pipelines.downloadLogs(pipelineId);
     expect(download.suggestedFilename()).toBe(PIPELINE_LOGS_FILE_NAME);
+    expect(logRequests()).toBe(1);
+  });
+
+  test('a denied log download reports an error and a retry downloads once', async ({ page }) => {
+    const [pipelineId] = pipelineIdsA;
+    const pipelines = new PipelinesPage(page);
+    const logRequests = countLogRequests(page, pipelineId);
+    const isLogs = (url: URL) => url.pathname.endsWith(logsPath(pipelineId));
+    await page.route(isLogs, (route) => route.fulfill({ status: 403, json: { success: false } }), { times: 1 });
+    await pipelines.openWithQuery(`blueprintId=${blueprintA.id}`);
+
+    await pipelines.startDownloadLogs(pipelineId);
+    await expect(pipelines.downloadFailedToast).toBeVisible();
+    await expect(await pipelines.openDownloadLogsItem(pipelineId)).toBeEnabled();
+    await pipelines.pressEscape();
+
+    await page.unroute(isLogs);
+    const download = await pipelines.downloadLogs(pipelineId);
+    expect(download.suggestedFilename()).toBe(PIPELINE_LOGS_FILE_NAME);
+    expect(logRequests()).toBe(2);
   });
 
   test('a pipeline URL opened directly shows its panel', async ({ page }) => {

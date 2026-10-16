@@ -16,19 +16,19 @@
  *
  */
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Outlet, useLoaderData, useLocation } from 'react-router-dom';
 
 import API from '@/api';
 import { PageLoading } from '@/components';
 import { COPYRIGHT_HIDE, PATHS } from '@/config';
-import { init, selectError, selectStatus, selectThemeMode, setMode } from '@/features';
+import { init, selectStatus, selectThemeMode, setMode } from '@/features';
 import { useAppDispatch, useAppSelector } from '@/hooks';
 import { OnboardCard } from '@/routes/onboard/components';
 import { OtelAttention } from '@/routes/otel/attention';
 import { AccountBlock, AppShell, BrandBlock, PoweredByRow, SidebarNav, useSidebarCollapsed } from '@/ui';
 
-import { COPY } from './constants';
+import { COPY, INIT_STATUS } from './constants';
 import { getNavItems } from './nav';
 import { Version } from './styled';
 import type { LayoutData } from './types';
@@ -42,8 +42,8 @@ export const Layout = () => {
 
   const dispatch = useAppDispatch();
   const status = useAppSelector(selectStatus);
-  const error = useAppSelector(selectError);
   const themeMode = useAppSelector(selectThemeMode);
+  const initializedRef = useRef(false);
 
   const navItems = useMemo(() => getNavItems({ access, copyrightHide: COPYRIGHT_HIDE }), [access]);
   const { name, secondary } = getAccountLabels(user, access);
@@ -72,16 +72,17 @@ export const Layout = () => {
   useIdentityLinkNotification();
 
   useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
     dispatch(init(plugins));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the loader re-runs on search changes, but plugins init once per mount
-  }, []);
+  }, [dispatch, plugins]);
 
-  if (['idle', 'loading'].includes(status)) {
+  if (status === INIT_STATUS.IDLE || status === INIT_STATUS.LOADING) {
     return <PageLoading />;
   }
 
-  if (status === 'failed') {
-    throw error?.message;
+  if (status === INIT_STATUS.FAILED) {
+    throw new Error(COPY.initializationFailed);
   }
 
   return (

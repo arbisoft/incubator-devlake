@@ -16,8 +16,21 @@
  *
  */
 
+import type { AccessDomain, AccessUser, LocalCredentialResponse } from '@/api/access';
+
 import type { ACCESS_MODAL, LIFECYCLE_ACTION, LIFECYCLE_SUBJECT } from './constants';
 
 export type AccessModal = (typeof ACCESS_MODAL)[keyof typeof ACCESS_MODAL];
 export type LifecycleSubject = (typeof LIFECYCLE_SUBJECT)[keyof typeof LIFECYCLE_SUBJECT];
 export type LifecycleAction = (typeof LIFECYCLE_ACTION)[keyof typeof LIFECYCLE_ACTION];
+
+export type LifecycleTarget =
+  | { subject: Extract<LifecycleSubject, 'user'>; item: AccessUser }
+  | { subject: Extract<LifecycleSubject, 'domain'>; item: AccessDomain };
+
+export type LifecycleActionOptions = {
+  onDone: () => void;
+  onCredential?: (credential: LocalCredentialResponse) => void;
+};
+
+export type LifecyclePending = { action: LifecycleAction; target: LifecycleTarget };

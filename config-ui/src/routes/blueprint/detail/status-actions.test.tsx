@@ -16,7 +16,8 @@
  *
  */
 
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, renderHook, screen, waitFor, within } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -25,11 +26,12 @@ import type { IBlueprint } from '@/types';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
 import { BLUEPRINT_CONTEXT, COPY } from './constants';
+import { useBlueprintActions } from './hooks';
 import { StatusActions } from './status-actions';
 import type { BlueprintContext } from './types';
 
 vi.mock('antd', async (importOriginal) =>
-  (await import('@/ui/__tests__/antd-message-mock')).withMockedMessage(await importOriginal<typeof import('antd')>()),
+  (await import('@/ui/__tests__/antd-message-mock')).loadMockedMessage(importOriginal),
 );
 
 vi.mock('@/api', () => ({
@@ -46,6 +48,9 @@ const BLUEPRINT = {
   isManual: true,
   cronConfig: '0 0 * * *',
 } as IBlueprint;
+const SECOND_BLUEPRINT_ID = 8;
+
+const hookWrapper = ({ children }: { children: ReactNode }) => <MemoryRouter>{children}</MemoryRouter>;
 
 const setup = (context: BlueprintContext, blueprint: Partial<IBlueprint> = {}) => {
   const onRefresh = vi.fn();
@@ -128,6 +133,68 @@ describe('StatusActions', () => {
       fireEvent.click(screen.getByRole('switch'));
       await waitFor(() => expect(onRefresh).toHaveBeenCalled());
       expect(api.update).toHaveBeenCalledWith(7, expect.objectContaining({ id: 7, enable: false }));
+    });
+
+    it('sends one update when the enabled callback fires twice before rerender', async () => {
+      const onRefresh = vi.fn();
+      const { result } = renderHook(() => useBlueprintActions({ blueprint: BLUEPRINT, onRefresh }), {
+        wrapper: hookWrapper,
+      });
+
+      await act(async () => {
+        await Promise.all([result.current.setEnabled(false), result.current.setEnabled(false)]);
+      });
+
+      expect(api.update).toHaveBeenCalledOnce();
+    });
+
+    it('disables only the pending blueprint switch and allows another blueprint to stay active', async () => {
+      let resolveUpdate: (() => void) | undefined;
+      const onRefresh = vi.fn();
+      api.update.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveUpdate = () => resolve({});
+          }),
+      );
+      renderWithTheme(
+        <MemoryRouter>
+          <StatusActions context={BLUEPRINT_CONTEXT.ADVANCED} blueprint={BLUEPRINT} onRefresh={onRefresh} />
+          <StatusActions
+            context={BLUEPRINT_CONTEXT.ADVANCED}
+            blueprint={{ ...BLUEPRINT, id: SECOND_BLUEPRINT_ID, name: 'hourly' }}
+            onRefresh={onRefresh}
+          />
+        </MemoryRouter>,
+      );
+
+      const [pendingSwitch, otherSwitch] = screen.getAllByRole('switch');
+      fireEvent.click(pendingSwitch);
+      await waitFor(() => expect(api.update).toHaveBeenCalledOnce());
+
+      try {
+        expect(resolveUpdate).toBeDefined();
+        expect((pendingSwitch as HTMLButtonElement).disabled).toBe(true);
+        expect((otherSwitch as HTMLButtonElement).disabled).toBe(false);
+      } finally {
+        await act(async () => {
+          resolveUpdate?.();
+          await Promise.resolve();
+        });
+      }
+    });
+
+    it('allows a failed enabled update to be retried', async () => {
+      const { onRefresh } = setup(BLUEPRINT_CONTEXT.ADVANCED);
+      api.update.mockRejectedValueOnce(new Error('offline')).mockResolvedValue({});
+      const enabled = screen.getByRole('switch');
+
+      fireEvent.click(enabled);
+      await waitFor(() => expect(api.update).toHaveBeenCalledOnce());
+      await waitFor(() => expect((enabled as HTMLButtonElement).disabled).toBe(false));
+      fireEvent.click(enabled);
+      await waitFor(() => expect(api.update).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(onRefresh).toHaveBeenCalledOnce());
     });
 
     it('names the blueprint in the delete confirm and deletes only after confirming', async () => {

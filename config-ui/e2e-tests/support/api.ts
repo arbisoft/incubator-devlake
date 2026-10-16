@@ -237,10 +237,18 @@ export interface ApiBlueprint {
   [key: string]: unknown;
 }
 
-export async function createProject(api: APIRequestContext, name: string): Promise<ApiProject> {
+export async function createProject(
+  api: APIRequestContext,
+  name: string,
+  options: { description?: string } = {},
+): Promise<ApiProject> {
   return json(
     await api.post('/projects', {
-      data: { name, description: '', metrics: [{ pluginName: 'dora', pluginOption: '', enable: true }] },
+      data: {
+        name,
+        description: options.description ?? '',
+        metrics: [{ pluginName: 'dora', pluginOption: '', enable: true }],
+      },
     }),
     'create project',
   );
@@ -276,18 +284,25 @@ export async function deleteProject(api: APIRequestContext, name: string): Promi
 export async function createBlueprint(
   api: APIRequestContext,
   name: string,
-  options: { enable?: boolean; connections?: ApiBlueprint['connections'] } = {},
+  options: {
+    enable?: boolean;
+    connections?: ApiBlueprint['connections'];
+    mode?: string;
+    plan?: unknown;
+    isManual?: boolean;
+  } = {},
 ): Promise<ApiBlueprint> {
   return json(
     await api.post('/blueprints', {
       data: {
         name,
-        mode: 'NORMAL',
+        mode: options.mode ?? 'NORMAL',
         enable: options.enable ?? true,
         cronConfig: '0 0 * * *',
-        isManual: false,
+        isManual: options.isManual ?? false,
         skipOnFail: true,
         connections: options.connections ?? [],
+        ...(options.plan === undefined ? {} : { plan: options.plan }),
       },
     }),
     `create blueprint ${name}`,
@@ -559,3 +574,19 @@ export async function retireOtelConnections(api: APIRequestContext, teamName: st
 // Credential statuses of a connection, sorted so a spec can compare them with toEqual.
 export const otelCredentialStatuses = (entry: ApiOtelConnection | undefined): string[] =>
   (entry?.credentials ?? []).map((c) => c.status).sort();
+
+export interface ApiOnboardStore {
+  step: number;
+  records: unknown[];
+  done: boolean;
+  projectName?: string;
+  plugin?: string;
+}
+
+export async function getOnboardStore(api: APIRequestContext): Promise<ApiOnboardStore> {
+  return json<ApiOnboardStore>(await api.get('/store/onboard'), 'reading the onboard store');
+}
+
+export async function setOnboardStore(api: APIRequestContext, value: ApiOnboardStore): Promise<void> {
+  expect((await api.put('/store/onboard', { data: value })).ok(), 'seeding the onboard store').toBe(true);
+}

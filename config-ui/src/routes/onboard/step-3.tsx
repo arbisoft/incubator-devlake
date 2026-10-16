@@ -26,6 +26,7 @@ import { operator } from '@/utils';
 import { STORE_KEY } from './components/constants';
 import { COPY, GUIDE_STEP, WIZARD_STEP } from './constants';
 import { Context } from './context';
+import { toOnboardCollectionErrorMessage, triggerOnboardPipeline } from './pipeline';
 import { StepActions } from './step-actions';
 import * as S from './styled';
 import { useGuide } from './use-guide';
@@ -67,9 +68,7 @@ export const Step3 = () => {
 
         await API.blueprint.update(blueprint.id, buildOnboardBlueprintUpdatePayload(plugin, connectionId, scopes));
 
-        await API.blueprint.trigger(blueprint.id, { skipCollectors: false, fullSync: false });
-
-        const pipeline = await API.blueprint.pipelines(blueprint.id);
+        const pipelineId = await triggerOnboardPipeline(blueprint.id);
 
         const newRecords = records.map((it) =>
           it.plugin !== plugin
@@ -77,7 +76,7 @@ export const Step3 = () => {
             : {
                 ...it,
                 blueprintId: blueprint.id,
-                pipelineId: pipeline.pipelines[0].id,
+                pipelineId,
                 scopeName: getPluginScopeName(plugin, scopes[0]) || scopes[0]?.fullName || scopes[0]?.name,
               },
         );
@@ -95,6 +94,7 @@ export const Step3 = () => {
       {
         setOperating,
         formatMessage: () => COPY.scope.congratulations,
+        formatReason: toOnboardCollectionErrorMessage,
       },
     );
 

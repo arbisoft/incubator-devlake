@@ -19,6 +19,7 @@
 export const COPY = {
   title: 'Error',
   unknown: 'Unknown Error',
+  requestFailed: (status: number) => `The request failed with HTTP status ${status}.`,
   description:
     'Please try again, if the problem persists include the above error message when filing a bug report on GitHub. You can also message us on Slack to engage with community members for solutions to common issues.',
   continue: 'Continue',

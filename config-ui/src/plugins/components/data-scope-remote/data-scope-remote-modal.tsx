@@ -16,11 +16,12 @@
  *
  */
 
+import { Alert, Button, Skeleton } from 'antd';
 import { useState } from 'react';
 
 import API from '@/api';
 import { getPluginConfig } from '@/plugins/utils';
-import { FormModal, MODAL_WIDTH, PluginIcon, toUserMessage } from '@/ui';
+import { COMMON_COPY, FormModal, MODAL_WIDTH, PluginIcon, toUserMessage } from '@/ui';
 import { operator } from '@/utils';
 
 import { COPY, SAVE_ERROR_MAP } from './constants';
@@ -33,14 +34,45 @@ export const DataScopeRemoteModal = ({
   connectionId,
   title,
   disabledScope,
+  loadingScopes = false,
+  scopesLoadFailed = false,
+  onRetryScopes,
   onCancel,
   onSubmit,
 }: DataScopeRemoteModalProps) => {
   const [selectedScope, setSelectedScope] = useState<ScopeItem[]>([]);
   const [operating, setOperating] = useState(false);
   const { icon } = getPluginConfig(plugin);
+  const membershipContent = () => {
+    if (loadingScopes) return <Skeleton active />;
+    if (scopesLoadFailed) {
+      return (
+        <Alert
+          title={COPY.membershipLoadFailed}
+          action={
+            onRetryScopes && (
+              <Button type="link" onClick={onRetryScopes}>
+                {COMMON_COPY.retry}
+              </Button>
+            )
+          }
+        />
+      );
+    }
+    return (
+      <DataScopeRemote
+        plugin={plugin}
+        connectionId={connectionId}
+        disabledScope={disabledScope}
+        selectedScope={selectedScope}
+        onChangeSelectedScope={setSelectedScope}
+      />
+    );
+  };
 
   const handleSubmit = async () => {
+    if (loadingScopes || scopesLoadFailed) return;
+
     const [success] = await operator(
       () => API.scope.batch(plugin, connectionId, { data: selectedScope.map((it) => it.data) }),
       {
@@ -63,19 +95,13 @@ export const DataScopeRemoteModal = ({
       width={MODAL_WIDTH.LG}
       submitLabel={COPY.submit}
       loading={operating}
-      submitDisabled={!selectedScope.length}
+      submitDisabled={!selectedScope.length || loadingScopes || scopesLoadFailed}
       disabledReason={COPY.disabledReason}
       onSubmit={handleSubmit}
       onCancel={onCancel}
       afterClose={() => setSelectedScope([])}
     >
-      <DataScopeRemote
-        plugin={plugin}
-        connectionId={connectionId}
-        disabledScope={disabledScope}
-        selectedScope={selectedScope}
-        onChangeSelectedScope={setSelectedScope}
-      />
+      {membershipContent()}
     </FormModal>
   );
 };

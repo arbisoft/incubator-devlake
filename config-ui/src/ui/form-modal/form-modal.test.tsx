@@ -31,6 +31,9 @@ const TITLE = 'Add a new webhook';
 const SUBMIT = 'Save';
 const FIELD = 'Webhook name';
 const REASON = 'Enter a name first';
+const MODAL_SELECTOR = '.ant-modal';
+const MODAL_WRAP_SELECTOR = '.ant-modal-wrap';
+const MODAL_CLOSE_SELECTOR = '.ant-modal-close';
 
 const normaliseColor = (value: string) => {
   const probe = document.createElement('span');
@@ -94,19 +97,75 @@ describe('FormModal', () => {
 
   it('uses the width token for the chosen size', () => {
     setup({ width: MODAL_WIDTH.LG });
-    const modal = screen.getByRole('dialog', { name: TITLE }).closest<HTMLElement>('.ant-modal');
+    const modal = screen.getByRole('dialog', { name: TITLE }).closest<HTMLElement>(MODAL_SELECTOR);
     expect(modal?.style.width).toBe(`${getTheme('light').layout.modalWidth.lg}px`);
   });
 
   it('defaults to the medium width', () => {
     setup({ width: undefined });
-    const modal = screen.getByRole('dialog', { name: TITLE }).closest<HTMLElement>('.ant-modal');
+    const modal = screen.getByRole('dialog', { name: TITLE }).closest<HTMLElement>(MODAL_SELECTOR);
     expect(modal?.style.width).toBe(`${getTheme('light').layout.modalWidth.md}px`);
   });
 
   it('shows the busy state on submit', () => {
     setup({ loading: true });
     expect(screen.getByRole('button', { name: new RegExp(SUBMIT) }).className).toContain('ant-btn-loading');
+  });
+
+  it('blocks cancel, header, Escape, and submit while loading', () => {
+    const { onSubmit, onCancel } = setup({ loading: true });
+    const dialog = screen.getByRole('dialog', { name: TITLE });
+    expect(dialog.closest(MODAL_SELECTOR)?.querySelector(MODAL_CLOSE_SELECTOR)).toBeNull();
+    const modalWrap = dialog.closest(MODAL_WRAP_SELECTOR);
+    expect(modalWrap).not.toBeNull();
+    fireEvent.mouseDown(modalWrap as HTMLElement);
+    fireEvent.click(modalWrap as HTMLElement);
+    fireEvent.click(screen.getByRole('button', { name: COMMON_COPY.cancel }));
+    pressEscape(screen.getByRole('textbox', { name: FIELD }));
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(SUBMIT) }));
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('resumes submit and cancel after loading ends', () => {
+    const onSubmit = vi.fn();
+    const onCancel = vi.fn();
+    const { rerender } = renderWithTheme(
+      <FormModal open title={TITLE} submitLabel={SUBMIT} onSubmit={onSubmit} onCancel={onCancel} loading>
+        <input aria-label={FIELD} />
+      </FormModal>,
+    );
+    rerender(
+      <FormModal open title={TITLE} submitLabel={SUBMIT} onSubmit={onSubmit} onCancel={onCancel} loading={false}>
+        <input aria-label={FIELD} />
+      </FormModal>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(SUBMIT) }));
+    fireEvent.click(screen.getByRole('button', { name: COMMON_COPY.cancel }));
+    expect(onSubmit).toHaveBeenCalledOnce();
+    expect(onCancel).toHaveBeenCalledOnce();
+  });
+
+  it('closes from the mask when normal dismissal is enabled', () => {
+    const { onCancel } = setup();
+    const dialog = screen.getByRole('dialog', { name: TITLE });
+    const modalWrap = dialog.closest(MODAL_WRAP_SELECTOR) as HTMLElement;
+    fireEvent.mouseDown(modalWrap);
+    fireEvent.click(modalWrap);
+    expect(onCancel).toHaveBeenCalledOnce();
+  });
+
+  it('keeps an acknowledgement modal open until its explicit submit', () => {
+    const { onSubmit, onCancel } = setup({ dismissible: false, showCancel: false });
+    const dialog = screen.getByRole('dialog', { name: TITLE });
+    expect(dialog.closest(MODAL_SELECTOR)?.querySelector(MODAL_CLOSE_SELECTOR)).toBeNull();
+    const modalWrap = dialog.closest(MODAL_WRAP_SELECTOR) as HTMLElement;
+    fireEvent.mouseDown(modalWrap);
+    fireEvent.click(modalWrap);
+    pressEscape(screen.getByRole('textbox', { name: FIELD }));
+    expect(onCancel).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: SUBMIT }));
+    expect(onSubmit).toHaveBeenCalledOnce();
   });
 
   it('can leave out the cancel button and still closes from the header', () => {

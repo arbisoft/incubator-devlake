@@ -20,19 +20,17 @@ import { useCallback, useState } from 'react';
 
 import API from '@/api';
 import type { GrafanaRole, GrafanaUser } from '@/api/grafana-users/types';
-import { useConfirmFlow } from '@/ui/hooks';
+import { useConfirmFlow, usePendingKeys } from '@/ui/hooks';
 import { operator } from '@/utils';
 
 import { COPY, GRAFANA_FLOW_ERRORS, GRAFANA_ROW_ACTION } from './constants';
-import type { GrafanaDialog, GrafanaRowAction } from './types';
+import type { GrafanaDialog, GrafanaDialogState, GrafanaPending, GrafanaRowAction } from './types';
 import { getFlowError } from './utils';
 
-type Pending = { action: GrafanaRowAction; user: GrafanaUser };
-
-const resolve = ({ action, user }: Pending) => ({ config: COPY.confirm[action], name: user.email });
+const resolve = ({ action, user }: GrafanaPending) => ({ config: COPY.confirm[action], name: user.email });
 
 const toRequest =
-  ({ action, user }: Pending) =>
+  ({ action, user }: GrafanaPending) =>
   async (): Promise<void> => {
     if (action === GRAFANA_ROW_ACTION.DELETE) return API.grafanaUsers.deleteUser(user.id);
     await API.grafanaUsers.updateUser(user.id, { disabled: action === GRAFANA_ROW_ACTION.DISABLE });
@@ -40,7 +38,7 @@ const toRequest =
 
 export const useGrafanaRowActions = (onDone: () => void) => {
   const run = useCallback(
-    async (pending: Pending, setLoading: (loading: boolean) => void) => {
+    async (pending: GrafanaPending, setLoading: (loading: boolean) => void) => {
       const errors =
         pending.action === GRAFANA_ROW_ACTION.DELETE ? GRAFANA_FLOW_ERRORS.DELETE : GRAFANA_FLOW_ERRORS.STATUS;
       const [success] = await operator(toRequest(pending), {
@@ -59,23 +57,31 @@ export const useGrafanaRowActions = (onDone: () => void) => {
     [request],
   );
 
+  const { begin: beginRoleChange, end: endRoleChange, isPending: isRolePending } = usePendingKeys();
+
   const changeRole = useCallback(
     async (user: GrafanaUser, role: GrafanaRole) => {
-      await operator(() => API.grafanaUsers.updateUser(user.id, { role }), {
-        formatReason: getFlowError(GRAFANA_FLOW_ERRORS.ROLE),
-      });
-      onDone();
+      const key = String(user.id);
+      if (!beginRoleChange(key)) return;
+      try {
+        await operator(() => API.grafanaUsers.updateUser(user.id, { role }), {
+          formatReason: getFlowError(GRAFANA_FLOW_ERRORS.ROLE),
+        });
+        onDone();
+      } finally {
+        endRoleChange(key);
+      }
     },
-    [onDone],
+    [beginRoleChange, endRoleChange, onDone],
   );
 
-  return { requestAction, changeRole, confirmProps };
+  const isAccountRolePending = useCallback((user: GrafanaUser) => isRolePending(String(user.id)), [isRolePending]);
+
+  return { requestAction, changeRole, isRolePending: isAccountRolePending, confirmProps };
 };
 
-type DialogState = { kind?: GrafanaDialog; user?: GrafanaUser; session: number };
-
 export const useDialogState = () => {
-  const [state, setState] = useState<DialogState>({ session: 0 });
+  const [state, setState] = useState<GrafanaDialogState>({ session: 0 });
   const open = useCallback(
     (kind: GrafanaDialog, user?: GrafanaUser) => setState((current) => ({ kind, user, session: current.session + 1 })),
     [],

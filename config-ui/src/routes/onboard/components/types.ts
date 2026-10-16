@@ -32,6 +32,10 @@ export type OnboardStore = {
   records: OnboardRecord[];
 };
 
+export type ExitControlProps = {
+  onExit: () => Promise<boolean>;
+};
+
 export type BannerModel = {
   title: string;
   message: string;

@@ -17,9 +17,14 @@
  */
 
 import { act, renderHook } from '@testing-library/react';
+import { message } from 'antd';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useModalForm } from './use-modal-form';
+
+vi.mock('antd', async (importOriginal) =>
+  (await import('../__tests__/antd-message-mock')).loadMockedMessage(importOriginal),
+);
 
 const INITIAL = { name: '', mode: 'normal' };
 const onClose = vi.fn();
@@ -67,5 +72,69 @@ describe('useModalForm', () => {
     expect(result.current.modalProps).toMatchObject({ submitDisabled: true, disabledReason: REASON });
     act(() => result.current.setField('name', 'alpha'));
     expect(result.current.modalProps.submitDisabled).toBe(false);
+  });
+
+  describe('submit', () => {
+    const onSettled = vi.fn();
+    const setup = () => renderHook(() => useModalForm(INITIAL, { ...OPTIONS, onSettled }));
+
+    beforeEach(() => {
+      onSettled.mockClear();
+      vi.mocked(message.error).mockClear();
+    });
+
+    it('settles, runs onSuccess before the reset and close, then resets and closes', async () => {
+      const { result } = setup();
+      act(() => result.current.setField('name', 'alpha'));
+      const order: string[] = [];
+      onClose.mockImplementationOnce(() => order.push('close'));
+      const onSuccess = vi.fn((value: string) => order.push(`success:${value}:${result.current.values.name}`));
+      let outcome: [boolean, unknown] = [false, undefined];
+      await act(async () => {
+        outcome = await result.current.submit(() => Promise.resolve('done'), { onSuccess });
+      });
+      expect(outcome).toEqual([true, 'done']);
+      expect(order).toEqual(['success:done:alpha', 'close']);
+      expect(onSettled).toHaveBeenCalledOnce();
+      expect(result.current.values).toEqual(INITIAL);
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+
+    it('settles, keeps the values and stays open when the request fails', async () => {
+      const { result } = setup();
+      act(() => result.current.setField('name', 'alpha'));
+      const failure = new Error('boom');
+      const onSuccess = vi.fn();
+      let outcome: [boolean, unknown] = [true, undefined];
+      await act(async () => {
+        outcome = await result.current.submit(() => Promise.reject(failure), { onSuccess, hideToast: true });
+      });
+      expect(outcome).toEqual([false, failure]);
+      expect(onSettled).toHaveBeenCalledOnce();
+      expect(onSuccess).not.toHaveBeenCalled();
+      expect(result.current.values.name).toBe('alpha');
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('turns saving on while the request runs and off after it settles', async () => {
+      const { result } = setup();
+      let finish: (() => void) | undefined;
+      let pending: Promise<unknown> = Promise.resolve();
+      act(() => {
+        pending = result.current.submit(
+          () =>
+            new Promise<void>((resolve) => {
+              finish = resolve;
+            }),
+          { hideToast: true },
+        );
+      });
+      expect(result.current.modalProps.loading).toBe(true);
+      await act(async () => {
+        finish?.();
+        await pending;
+      });
+      expect(result.current.modalProps.loading).toBe(false);
+    });
   });
 });

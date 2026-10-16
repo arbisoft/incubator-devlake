@@ -34,7 +34,13 @@ import {
   setGrafanaAdmin,
   uniqueName,
 } from '../support/api';
-import { GRAFANA_ROLE, GRAFANA_USERS_COPY, USER_MANAGEMENT_COPY, type GrafanaRole } from '../support/app-copy';
+import {
+  COMMON_COPY,
+  GRAFANA_ROLE,
+  GRAFANA_USERS_COPY,
+  USER_MANAGEMENT_COPY,
+  type GrafanaRole,
+} from '../support/app-copy';
 import { deleteEmailUsersNamedLike, readGrafanaProjectMappings } from '../support/db';
 import { passwordMatches } from '../support/grafana-safety';
 import { PATHS } from '../support/pages/paths';
@@ -625,10 +631,50 @@ test.describe('Grafana user management ordinary flows', () => {
     await expect(dialog.project(project)).toBeVisible();
     await dialog.clear(email);
     await users.confirmOrphanClear(email);
+    if (originalOrphans.length === 0) await expect(dialog.dialog).toBeHidden();
+    else {
+      await expect(dialog.dialog).toBeVisible();
+      await expect(dialog.account(email)).toBeHidden();
+    }
     await expect.poll(() => readGrafanaProjectMappings(email)).toEqual([]);
     await expect.poll(() => listGrafanaUsers(api)).toMatchObject({ orphans: originalOrphans });
     if (originalOrphans.length === 0) await expect(users.orphanNotice(0)).toBeHidden();
     else await expect(users.orphanNotice(originalOrphans.length)).toBeVisible();
     await expect.poll(() => visibleUser(email)).toBeUndefined();
+  });
+
+  test('a failed details response refreshes an applied change while keeping the form open', async ({ page }) => {
+    const email = `${uniqueName('details-fail')}@example.com`;
+    const seeded = await seedUser(email, { name: 'Before failure' });
+    const newName = 'After failure';
+    const users = new SettingsGrafanaUsersPage(page);
+    await users.open();
+    const form = await users.openDetails(email);
+    await form.fillField(GRAFANA_USERS_COPY.add.name.label, newName);
+
+    const detailsUrl = new RegExp(`/access/grafana/users/${seeded.id}$`);
+    await page.route(
+      detailsUrl,
+      async (route) => {
+        const response = await route.fetch();
+        expect(response.ok()).toBe(true);
+        await route.fulfill({ status: 500, json: { message: 'e2e' } });
+      },
+      { times: 1 },
+    );
+    const failed = page.waitForResponse((r) => detailsUrl.test(r.url()) && r.request().method() === 'PATCH');
+    await form.submit();
+    expect((await failed).status()).toBe(500);
+
+    await expect(users.toast(COMMON_COPY.genericError)).toBeVisible();
+    await expect(form.dialog).toBeVisible();
+    expect(await form.fieldValue(GRAFANA_USERS_COPY.add.name.label)).toBe(newName);
+    await expect.poll(() => visibleUser(email)).toMatchObject({ id: seeded.id, name: newName });
+    await expect(users.userRow(email).root).toContainText(newName);
+
+    await page.unroute(detailsUrl);
+    await form.submit();
+    await expect(form.dialog).toBeHidden();
+    await expect(users.userRow(email).root).toContainText(newName);
   });
 });

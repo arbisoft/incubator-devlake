@@ -18,6 +18,7 @@
 
 import { EditOutlined, LinkOutlined } from '@ant-design/icons';
 
+import { getPluginConfig } from '@/plugins/utils';
 import { MODAL_WIDTH, IconButton } from '@/ui';
 
 import { ConnectionModal } from '../connection-modal';
@@ -41,12 +42,21 @@ export const ScopeConfig = ({
   onSuccess,
 }: ScopeConfigProps) => {
   const flow = useScopeConfigFlow({ plugin, connectionId, scopeId, scopeName, scopeConfigId, onSuccess });
+  const displayName = scopeConfigId ? scopeConfigName : COPY.empty;
+  if (!getPluginConfig(plugin).scopeConfig) {
+    return (
+      <Cell>
+        <span>{displayName}</span>
+      </Cell>
+    );
+  }
+
   const { dialog } = flow;
   const isTapd = plugin === TAPD_PLUGIN;
 
   return (
     <Cell>
-      <span>{scopeConfigId ? scopeConfigName : COPY.empty}</span>
+      <span>{displayName}</span>
       <IconButton icon={<LinkOutlined />} label={COPY.associate} onClick={flow.openAssociate} />
       {scopeConfigId && <IconButton icon={<EditOutlined />} label={COPY.edit} onClick={flow.openUpdate} />}
       {isTapd ? (

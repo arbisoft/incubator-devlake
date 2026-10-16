@@ -30,6 +30,7 @@ export { COPY as DATA_SCOPE_REMOTE_COPY } from '../../src/plugins/components/dat
 export { COPY as SCOPE_CONFIG_COPY } from '../../src/plugins/components/scope-config/constants';
 export { COPY as SCOPE_CONFIG_FORM_COPY } from '../../src/plugins/components/scope-config-form/constants';
 export { COPY as SCOPE_CONFIG_SELECT_COPY } from '../../src/plugins/components/scope-config-select/constants';
+export { COPY as GITHUB_COPY } from '../../src/plugins/register/github/constants';
 export { COPY as WEBHOOK_COPY } from '../../src/plugins/register/webhook/constants';
 export { COPY as CONNECTION_LIST_COPY } from '../../src/plugins/components/connection-list/constants';
 export { COPY as CONNECTION_FORM_COPY } from '../../src/plugins/components/connection-form/constants';

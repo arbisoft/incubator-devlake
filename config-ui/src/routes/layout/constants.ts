@@ -16,6 +16,7 @@
  *
  */
 
+import { THEME_MODE } from '@/theme/constants';
 import type { ThemeMode } from '@/theme/tokens';
 
 export const NAV_KEY = {
@@ -42,13 +43,6 @@ export const ACCESS_NAV_KEYS: string[] = [NAV_KEY.SETTINGS, NAV_KEY.USERS, NAV_K
 
 export const COPYRIGHT_HIDDEN_NAV_KEYS: string[] = [NAV_KEY.DASHBOARDS, NAV_KEY.GITHUB, NAV_KEY.SLACK];
 
-export const THEME_MODE = { LIGHT: 'light', DARK: 'dark', SYSTEM: 'system' } as const satisfies Record<
-  string,
-  ThemeMode
->;
-
-export const THEME_MODES: ThemeMode[] = [THEME_MODE.LIGHT, THEME_MODE.DARK, THEME_MODE.SYSTEM];
-
 export const ACCOUNT_MENU_KEY = {
   VERSION: 'version',
   VERSION_DIVIDER: 'version-divider',
@@ -65,6 +59,8 @@ export const ACCOUNT_MENU_KEY = {
 
 export const FAILURE_COOLDOWN_MS = 10_000;
 
+export const INIT_STATUS = { IDLE: 'idle', LOADING: 'loading', FAILED: 'failed' } as const;
+
 export const LINK_IDENTITY = {
   PATH: '/auth/link-identity',
   PROVIDER_PARAM: 'provider',
@@ -74,6 +70,7 @@ export const LINK_IDENTITY = {
 } as const;
 
 export const COPY = {
+  initializationFailed: 'The application could not be initialized. Reload and try again.',
   nav: {
     projects: 'Projects',
     connections: 'Connections',

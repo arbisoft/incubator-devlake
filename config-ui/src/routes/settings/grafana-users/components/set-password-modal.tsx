@@ -20,7 +20,6 @@ import { LockOutlined } from '@ant-design/icons';
 
 import API from '@/api';
 import { FormModal, useModalForm } from '@/ui';
-import { operator } from '@/utils';
 
 import { Fields, Hint } from '../../components';
 import { COPY, GRAFANA_FLOW_ERRORS } from '../constants';
@@ -32,22 +31,17 @@ import type { SetPasswordModalProps } from './types';
 const copy = COPY.setPassword;
 
 export const SetPasswordModal = ({ open, user, onClose, onChanged, onPassword }: SetPasswordModalProps) => {
-  const { values, setField, reset, setSaving, modalProps } = useModalForm(
+  const { values, setField, submit, modalProps } = useModalForm(
     { password: '' },
-    { onClose, required: ['password'], disabledReason: copy.disabledReason },
+    { onClose, required: ['password'], disabledReason: copy.disabledReason, onSettled: onChanged },
   );
 
   const handleSubmit = async () => {
     if (!user) return;
-    const [success] = await operator(() => API.grafanaUsers.setPassword(user.id, values.password), {
-      setOperating: setSaving,
+    await submit(() => API.grafanaUsers.setPassword(user.id, values.password), {
       formatReason: getFlowError(GRAFANA_FLOW_ERRORS.PASSWORD),
+      onSuccess: () => onPassword({ email: user.email, password: values.password }),
     });
-    if (!success) return;
-    onChanged();
-    onPassword({ email: user.email, password: values.password });
-    reset();
-    onClose();
   };
 
   return (

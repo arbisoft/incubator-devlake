@@ -16,6 +16,8 @@
  *
  */
 
+import type API from '@/api';
+
 import type { LOG_STATUS } from './constants';
 
 export type LogStatus = (typeof LOG_STATUS)[keyof typeof LOG_STATUS];
@@ -48,6 +50,8 @@ export type ConnectionDraft = {
   username?: string;
   password?: string;
 };
+
+export type ConnectionTestPayload = Parameters<typeof API.connection.testOld>[1];
 
 export type SyncLogTask = {
   step: number;

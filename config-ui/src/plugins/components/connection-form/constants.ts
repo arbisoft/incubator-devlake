@@ -22,6 +22,10 @@ export const COPY = {
   docHint: (name: string) => `If you run into any problems while creating a new connection for ${name},`,
   docLink: 'check out this doc',
   test: { label: 'Test Connection', success: 'Test Connection Successfully.' },
+  details: {
+    loading: 'Loading saved connection details…',
+    failed: 'Saved connection details could not be loaded. Retry before saving or testing.',
+  },
   save: {
     label: 'Save Connection',
     created: 'Create a New Connection Successful.',

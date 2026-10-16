@@ -90,8 +90,9 @@ type Service struct {
 	mappings       mappingStore
 	audit          auditRecorder
 
-	orgMu sync.Mutex
-	orgID int64
+	orgMu        sync.Mutex
+	orgID        int64
+	managementID int64
 }
 
 var (
@@ -191,7 +192,7 @@ func (s *Service) ListUsers(ctx context.Context, admin *access.Principal, query 
 		user := &global[i]
 		logins[user.Login] = true
 		admins[user.Login] = user.IsAdmin
-		if s.isManagementLogin(user.Login) {
+		if s.isManagementUser(user.ID, user.Login) {
 			management = user
 		}
 	}
@@ -200,7 +201,7 @@ func (s *Service) ListUsers(ctx context.Context, admin *access.Principal, query 
 	pageUsers := make([]grafanaOrgUser, 0, len(orgPage.OrgUsers))
 	droppedManagement := false
 	for _, user := range orgPage.OrgUsers {
-		if s.isManagementLogin(user.Login) {
+		if s.isManagementUser(user.UserID, user.Login) {
 			droppedManagement = true
 			continue
 		}
@@ -262,6 +263,7 @@ func (s *Service) managedOrgID(ctx context.Context) (int64, errors.Error) {
 		return 0, unavailableError()
 	}
 	s.orgID = current.OrgID
+	s.managementID = current.ID
 	return s.orgID, nil
 }
 
@@ -280,7 +282,14 @@ func (s *Service) allGlobalUsers(ctx context.Context) ([]grafanaGlobalUser, erro
 	return all, nil
 }
 
-func (s *Service) isManagementLogin(login string) bool {
+// isManagementUser matches by id once the management account is known, else by the configured login.
+func (s *Service) isManagementUser(id int64, login string) bool {
+	s.orgMu.Lock()
+	managementID := s.managementID
+	s.orgMu.Unlock()
+	if managementID != 0 {
+		return id == managementID
+	}
 	return s.managementUser != "" && strings.EqualFold(login, s.managementUser)
 }
 
@@ -289,7 +298,7 @@ func (s *Service) managementMatchesQuery(management *grafanaGlobalUser, query st
 	needle := strings.ToLower(query)
 	candidates := []string{s.managementUser}
 	if management != nil {
-		candidates = append(candidates, management.Email, management.Name)
+		candidates = append(candidates, management.Login, management.Email, management.Name)
 	}
 	for _, candidate := range candidates {
 		if strings.Contains(strings.ToLower(candidate), needle) {

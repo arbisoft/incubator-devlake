@@ -17,8 +17,8 @@
  */
 
 import { CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
-import { Progress, Button } from 'antd';
-import { useState, useContext, useMemo } from 'react';
+import { Progress, Button, message } from 'antd';
+import { useState, useContext, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from 'styled-components';
 
@@ -31,14 +31,16 @@ import { operator } from '@/utils';
 import { Logs } from './components';
 import { FINAL_TASK_STATUSES, ONBOARD_DONE_STEP, ONBOARD_STATUS, STORE_KEY } from './components/constants';
 import { getOnboardStatus } from './components/utils';
-import { COPY, ONBOARD_PLUGIN, WIZARD_STEP } from './constants';
+import { COPY, DASHBOARD_WINDOW_FEATURES, DASHBOARD_WINDOW_TARGET, ONBOARD_PLUGIN, WIZARD_STEP } from './constants';
 import { Context } from './context';
 import { DASHBOARD_URL } from './dashboard-url';
+import { toOnboardCollectionErrorMessage, triggerOnboardPipeline } from './pipeline';
 import * as S from './styled';
 import { getCompletionPercent, toSyncLog } from './utils';
 
 export const Step4 = () => {
   const [operating, setOperating] = useState(false);
+  const pending = useRef(false);
 
   const navigate = useNavigate();
   const { layout } = useTheme();
@@ -62,10 +64,14 @@ export const Step4 = () => {
 
   const status = getOnboardStatus(ONBOARD_DONE_STEP, data?.status);
   const percent = getCompletionPercent(data?.completionRate);
-  const collector = useMemo(() => toSyncLog(data?.subtasks[0], COPY.result.collectNonGit), [data]);
-  const extractor = useMemo(() => toSyncLog(data?.subtasks[1], COPY.result.collectGit), [data]);
+  const collector = useMemo(() => toSyncLog(data?.subtasks?.[0], COPY.result.collectNonGit), [data]);
+  const extractor = useMemo(() => toSyncLog(data?.subtasks?.[1], COPY.result.collectGit), [data]);
 
   const handleFinish = async () => {
+    if (pending.current || operating) {
+      return;
+    }
+
     const [success] = await operator(
       () =>
         API.store.set(STORE_KEY, {
@@ -86,39 +92,30 @@ export const Step4 = () => {
   };
 
   const handleRecollectData = async () => {
-    if (!record) {
+    if (!record || pending.current) {
       return;
     }
 
-    await operator(
-      async () => {
-        await API.blueprint.trigger(record.blueprintId, { skipCollectors: false, fullSync: false });
+    pending.current = true;
 
-        const pipeline = await API.blueprint.pipelines(record.blueprintId);
-
-        const newRecords = records.map((it) =>
-          it.plugin !== plugin
-            ? it
-            : {
-                ...it,
-                pipelineId: pipeline.pipelines[0].id,
-              },
-        );
-
-        setRecords(newRecords);
-
-        await API.store.set(STORE_KEY, {
-          step: WIZARD_STEP.RESULT,
-          records: newRecords,
-          done,
-          projectName,
-          plugin,
-        });
-      },
-      {
+    try {
+      const [triggered, pipelineId] = await operator(() => triggerOnboardPipeline(record.blueprintId), {
         setOperating,
-      },
-    );
+        formatReason: toOnboardCollectionErrorMessage,
+      });
+      if (!triggered) return;
+
+      const newRecords = records.map((it) => (it.plugin !== plugin ? it : { ...it, pipelineId }));
+      setRecords(newRecords);
+
+      const [saved] = await operator(
+        () => API.store.set(STORE_KEY, { step: WIZARD_STEP.RESULT, records: newRecords, done, projectName, plugin }),
+        { setOperating, hideToast: true },
+      );
+      if (!saved) message.warning(COPY.result.progressNotSaved);
+    } finally {
+      pending.current = false;
+    }
   };
 
   if (!plugin || !record) {
@@ -127,7 +124,12 @@ export const Step4 = () => {
 
   const { scopeName } = record;
   const syncTip = plugin === ONBOARD_PLUGIN.GITHUB ? COPY.result.syncTip[plugin] : COPY.result.syncTip.other;
-  const openDashboard = () => window.open(DASHBOARD_URL[plugin]);
+  const openDashboard = () => window.open(DASHBOARD_URL[plugin], DASHBOARD_WINDOW_TARGET, DASHBOARD_WINDOW_FEATURES);
+  const recollectAction = (
+    <Button type="primary" disabled={operating} loading={operating} onClick={handleRecollectData}>
+      {COPY.result.recollect}
+    </Button>
+  );
 
   return (
     <S.Result>
@@ -148,7 +150,7 @@ export const Step4 = () => {
             <Button type="primary" onClick={openDashboard}>
               {COPY.result.dashboard}
             </Button>
-            <Button loading={operating} onClick={handleFinish}>
+            <Button disabled={operating} loading={operating} onClick={handleFinish}>
               {COPY.result.finish}
             </Button>
           </S.ResultActions>
@@ -161,9 +163,7 @@ export const Step4 = () => {
             <CheckCircleOutlined />
           </S.ResultIcon>
           <S.ResultActions>
-            <Button type="primary" onClick={handleRecollectData}>
-              {COPY.result.recollect}
-            </Button>
+            {recollectAction}
             <Button type="primary" onClick={openDashboard}>
               {COPY.result.dashboard}
             </Button>
@@ -179,11 +179,7 @@ export const Step4 = () => {
           <S.ResultIcon $tone={STATUS_TONE.ERROR}>
             <CloseCircleOutlined />
           </S.ResultIcon>
-          <S.ResultActions>
-            <Button type="primary" onClick={handleRecollectData}>
-              {COPY.result.recollect}
-            </Button>
-          </S.ResultActions>
+          <S.ResultActions>{recollectAction}</S.ResultActions>
         </S.ResultTop>
       )}
       <S.LogsTitle>{COPY.result.progress}</S.LogsTitle>

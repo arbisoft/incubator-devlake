@@ -219,4 +219,52 @@ test.describe.serial('Blueprint detail views and pipeline panel', () => {
     await expect(list.noResults()).toBeVisible();
     expect(await listBlueprintsByKeyword(api, doomed.name)).toEqual([]);
   });
+
+  test('invalid advanced plans stay editable and a corrected plan is persisted', async ({ page, browserErrors }) => {
+    const plan = [[{ plugin: 'gitextractor', options: { url: 'https://example.invalid/e2e.git', repoId: 'e2e' } }]];
+    const seeded = await createBlueprint(api, `${prefix}-plan`, {
+      mode: 'ADVANCED',
+      plan,
+      isManual: true,
+      enable: false,
+    });
+    const detail = new BlueprintDetailPage(page, seeded.id);
+    const patchCount = detail.countBlueprintPatches(seeded.id);
+    await detail.open(BLUEPRINT_VIEW.CONFIGURATION);
+    await expect(detail.planEditor).toBeVisible();
+
+    for (const invalid of ['[[{', '{"plan":1}']) {
+      await detail.fillPlan(invalid);
+      await expect(detail.planEditor).toHaveValue(invalid);
+      await expect(detail.invalidPlanNotice).toBeVisible();
+      await expect(detail.planSaveButton).toBeDisabled();
+      expect(patchCount()).toBe(0);
+    }
+
+    // An empty plan can't be saved but isn't flagged as an error.
+    for (const empty of ['[]', '[[]]']) {
+      await detail.fillPlan(empty);
+      await expect(detail.planEditor).toHaveValue(empty);
+      await expect(detail.invalidPlanNotice).toBeHidden();
+      await expect(detail.planSaveButton).toBeDisabled();
+      expect(patchCount()).toBe(0);
+    }
+
+    const corrected = [
+      [{ plugin: 'gitextractor', options: { url: 'https://example.invalid/e2e-fixed.git', repoId: 'e2e-fixed' } }],
+    ];
+    // The server normalizes each task with a null subtasks list.
+    const stored = corrected.map((stage) => stage.map((task) => ({ ...task, subtasks: null })));
+    await detail.fillPlan(JSON.stringify(corrected));
+    await expect(detail.invalidPlanNotice).toBeHidden();
+    await expect(detail.planSaveButton).toBeEnabled();
+    await detail.savePlan();
+    await expect.poll(patchCount).toBe(1);
+    await expect.poll(async () => (await getBlueprint(api, seeded.id)).plan).toEqual(stored);
+
+    await detail.reload();
+    await expect(detail.planEditor).toBeVisible();
+    expect(JSON.parse(await detail.planText())).toEqual(stored);
+    expect(browserErrors).toEqual([]);
+  });
 });

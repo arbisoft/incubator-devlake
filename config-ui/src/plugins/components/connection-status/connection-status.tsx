@@ -16,20 +16,25 @@
  *
  */
 
-import { selectHealth, testConnection, toHealthView, toTestErrorMessage } from '@/features/connections';
-import { HEALTH_FAILURE_REASON, HTTP_STATUS } from '@/features/connections/constants';
+import {
+  CONNECTION_COPY as COPY,
+  CONNECTION_HTTP_STATUS as HTTP_STATUS,
+  HEALTH_FAILURE_REASON,
+  selectHealth,
+  testConnection,
+  toConnectionActionErrorMessage,
+  toHealthView,
+} from '@/features/connections';
 import { useAppDispatch, useAppSelector } from '@/hooks';
-import { IConnectionStatus, type IConnection } from '@/types';
+import { IConnectionStatus } from '@/types';
 import { ConnectionHealth } from '@/ui';
 import { operator } from '@/utils';
 
-type ConnectionStatusProps = {
-  connection: IConnection;
-};
+import type { ConnectionStatusProps } from './types';
 
 export const ConnectionStatus = ({ connection }: ConnectionStatusProps) => {
   const dispatch = useAppDispatch();
-  const entry = useAppSelector(selectHealth)[connection.unique];
+  const entry = useAppSelector((state) => selectHealth(state)[connection.unique]);
 
   const retest = () =>
     operator(
@@ -41,13 +46,13 @@ export const ConnectionStatus = ({ connection }: ConnectionStatusProps) => {
           else if (result.health.reason === HEALTH_FAILURE_REASON.UNREACHABLE) {
             status = HTTP_STATUS.SERVICE_UNAVAILABLE;
           }
-          throw Object.assign(new Error('Connection test failed'), {
+          throw Object.assign(new Error(COPY.testFailed.fallback), {
             response: { status, data: { message: result.health.message } },
           });
         }
         return result;
       },
-      { formatReason: toTestErrorMessage },
+      { formatReason: toConnectionActionErrorMessage },
     );
 
   return (

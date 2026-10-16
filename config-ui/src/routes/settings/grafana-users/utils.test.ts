@@ -39,6 +39,7 @@ import {
   getUnavailableMessage,
   getUserIdentity,
   hasPatchChanges,
+  isUserNotFoundError,
   isValidNewUser,
   toDevlakeUserOption,
   toGrafanaListParams,
@@ -46,6 +47,7 @@ import {
 } from './utils';
 
 const EMAIL = 'ann@example.com';
+const MIXED_CASE_EMAIL = 'Ann@Example.com';
 
 const user: GrafanaUser = {
   id: 1,
@@ -114,7 +116,7 @@ describe('generatePassword', () => {
     const password = generatePassword();
     expect(password).toHaveLength(GENERATED_PASSWORD_LENGTH);
     expect(GENERATED_PASSWORD_LENGTH).toBe(24);
-    expect([...password].every((char) => PASSWORD_ALPHABET.includes(char))).toBe(true);
+    expect([...password].every((char) => PASSWORD_ALPHABET.includes(char)) === true).toBeTruthy();
     expect(PASSWORD_ALPHABET).not.toMatch(/[0O1lI]/);
   });
 
@@ -144,10 +146,10 @@ describe('isValidNewUser', () => {
   const valid = { email: EMAIL, name: 'Ann', password: 'x'.repeat(PASSWORD_MIN_LENGTH) };
 
   it('needs a valid email, a name and a long enough password', () => {
-    expect(isValidNewUser(valid)).toBe(true);
-    expect(isValidNewUser({ ...valid, email: 'ann' })).toBe(false);
-    expect(isValidNewUser({ ...valid, name: '  ' })).toBe(false);
-    expect(isValidNewUser({ ...valid, password: 'x'.repeat(PASSWORD_MIN_LENGTH - 1) })).toBe(false);
+    expect(isValidNewUser(valid) === true).toBeTruthy();
+    expect(isValidNewUser({ ...valid, email: 'ann' }) === false).toBeTruthy();
+    expect(isValidNewUser({ ...valid, name: '  ' }) === false).toBeTruthy();
+    expect(isValidNewUser({ ...valid, password: 'x'.repeat(PASSWORD_MIN_LENGTH - 1) }) === false).toBeTruthy();
   });
 });
 
@@ -162,8 +164,15 @@ describe('buildDetailsPatch', () => {
   });
 
   it('reports whether anything changed', () => {
-    expect(hasPatchChanges({ name: undefined, email: undefined })).toBe(false);
-    expect(hasPatchChanges({ name: 'Anna' })).toBe(true);
+    expect(hasPatchChanges({ name: undefined, email: undefined }) === false).toBeTruthy();
+    expect(hasPatchChanges({ name: 'Anna' }) === true).toBeTruthy();
+  });
+
+  it('normalises the current address before comparing a name-only edit', () => {
+    const mixedCaseUser = { ...user, email: MIXED_CASE_EMAIL };
+    const patch = buildDetailsPatch(mixedCaseUser, { name: 'Anna', email: ` ${MIXED_CASE_EMAIL} ` });
+    expect(patch.name).toBe('Anna');
+    expect(patch.email).toBeUndefined();
   });
 });
 
@@ -195,6 +204,20 @@ describe('getPartialUserId', () => {
     expect(getPartialUserId(failed('text'))).toBeUndefined();
     expect(getPartialUserId(undefined)).toBeUndefined();
     expect(getPartialUserId(new Error('x'))).toBeUndefined();
+  });
+});
+
+describe('isUserNotFoundError', () => {
+  it('is true only for the not-found code in the response data', () => {
+    expect(isUserNotFoundError({ response: { data: { code: GRAFANA_ERROR_CODE.USER_NOT_FOUND } } })).toBe(true);
+    expect(isUserNotFoundError({ response: { data: { code: GRAFANA_ERROR_CODE.PARTIAL } } })).toBe(false);
+  });
+
+  it('is false for a missing code, odd data and non-error values', () => {
+    expect(isUserNotFoundError({ response: { data: {} } })).toBe(false);
+    expect(isUserNotFoundError({ response: { data: 'text' } })).toBe(false);
+    expect(isUserNotFoundError(undefined)).toBe(false);
+    expect(isUserNotFoundError(new Error('x'))).toBe(false);
   });
 });
 

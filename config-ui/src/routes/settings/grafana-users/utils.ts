@@ -86,7 +86,10 @@ export const getUserDisplayName = ({ name, email }: GrafanaUser) => name || emai
 export const buildDetailsPatch = (user: GrafanaUser, values: { name: string; email: string }): GrafanaPatchUserBody => {
   const name = values.name.trim();
   const email = normalizeEmail(values.email);
-  return { name: name === user.name ? undefined : name, email: email === user.email ? undefined : email };
+  return {
+    name: name === user.name ? undefined : name,
+    email: email === normalizeEmail(user.email) ? undefined : email,
+  };
 };
 
 export const hasPatchChanges = (patch: GrafanaPatchUserBody) =>
@@ -116,16 +119,22 @@ export const toDevlakeUserOption = ({ id, email, displayName }: AccessUser): Dev
   name: displayName,
 });
 
-export const getPartialUserId = (error: unknown): ID | undefined => {
+const getResponseData = (error: unknown): { code?: unknown; userId?: unknown } | undefined => {
   const response =
     typeof error === 'object' && error !== null ? (error as { response?: { data?: unknown } }).response : undefined;
   const data = response?.data;
-  if (typeof data !== 'object' || data === null) return undefined;
-  const { code, userId } = data as { code?: unknown; userId?: unknown };
+  return typeof data === 'object' && data !== null ? data : undefined;
+};
+
+export const getPartialUserId = (error: unknown): ID | undefined => {
+  const { code, userId } = getResponseData(error) ?? {};
   return code === GRAFANA_ERROR_CODE.PARTIAL && (typeof userId === 'number' || typeof userId === 'string')
     ? userId
     : undefined;
 };
+
+export const isUserNotFoundError = (error: unknown): boolean =>
+  getResponseData(error)?.code === GRAFANA_ERROR_CODE.USER_NOT_FOUND;
 
 export const getMenuActions = (user: GrafanaUser): GrafanaMenuAction[] => {
   if (user.protected) return [];

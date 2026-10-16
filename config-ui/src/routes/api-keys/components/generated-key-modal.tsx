@@ -16,39 +16,47 @@
  *
  */
 
-import { ApiOutlined } from '@ant-design/icons';
-import { useTheme } from 'styled-components';
+import { ApiOutlined, CopyOutlined } from '@ant-design/icons';
+import { Button, message, Tooltip } from 'antd';
+import { CopyToClipboard } from 'react-copy-to-clipboard';
 
-import { CODE_LANGUAGE, CodeBlock, MODAL_WIDTH } from '@/ui';
+import { FormModal } from '@/ui';
 
 import { COPY } from '../constants';
-import { Dialog, DialogTitle, GeneratedBody, Hint } from '../styled';
+import { GeneratedBody, Hint } from '../styled';
 
+import { GeneratedKeyText } from './styled';
 import type { GeneratedKeyModalProps } from './types';
 
 export const GeneratedKeyModal = ({ open, apiKey, onClose, onClosed }: GeneratedKeyModalProps) => {
-  const { layout } = useTheme();
-
   return (
-    <Dialog
+    <FormModal
       open={open}
-      centered
-      destroyOnHidden
-      footer={null}
-      width={layout.modalWidth[MODAL_WIDTH.MD]}
-      title={
-        <DialogTitle>
-          <ApiOutlined aria-hidden />
-          {COPY.generated.title}
-        </DialogTitle>
-      }
+      title={COPY.generated.title}
+      icon={<ApiOutlined aria-hidden />}
+      submitLabel={COPY.generated.done}
+      showCancel={false}
+      dismissible={false}
+      onSubmit={onClose}
       onCancel={onClose}
       afterClose={onClosed}
     >
       <GeneratedBody>
         <Hint>{COPY.generated.description}</Hint>
-        <CodeBlock value={apiKey} language={CODE_LANGUAGE.JSON} copyLabel={COPY.generated.copy} />
+        <GeneratedKeyText aria-label={COPY.generated.keyLabel} tabIndex={0}>
+          {apiKey}
+        </GeneratedKeyText>
+        <CopyToClipboard
+          text={apiKey ?? ''}
+          onCopy={(_value, success) => {
+            if (success) message.success(COPY.generated.copied);
+          }}
+        >
+          <Tooltip title={COPY.generated.copy}>
+            <Button aria-label={COPY.generated.copy} icon={<CopyOutlined />} />
+          </Tooltip>
+        </CopyToClipboard>
       </GeneratedBody>
-    </Dialog>
+    </FormModal>
   );
 };

@@ -20,6 +20,9 @@ import type { IBlueprint, IConnection } from '@/types';
 
 import type { ADD_CONNECTION_STEP, CONFIG_MODAL } from './constants';
 
+export type PipelineTask = { plugin: string; [key: string]: unknown };
+export type PipelinePlan = PipelineTask[][];
+
 export type ConfigModal = (typeof CONFIG_MODAL)[keyof typeof CONFIG_MODAL];
 type AddConnectionStep = (typeof ADD_CONNECTION_STEP)[keyof typeof ADD_CONNECTION_STEP];
 

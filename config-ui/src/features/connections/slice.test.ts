@@ -15,13 +15,42 @@
  * limitations under the License.
  *
  */
-import { describe, expect, it } from 'vitest';
+import { configureStore } from '@reduxjs/toolkit';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import API from '@/api';
 import { IConnectionStatus, type IConnection } from '@/types';
 
 import { HEALTH_FAILURE_REASON } from './constants';
-import { checkConnectionHealth, connectionsSlice, removeConnection, testConnection, updateConnection } from './slice';
+import {
+  addConnection,
+  checkConnectionHealth,
+  connectionsSlice,
+  removeConnection,
+  testConnection,
+  updateConnection,
+} from './slice';
 import type { ConnectionHealthEntry } from './types';
+import { getErrorResponse } from './utils';
+
+vi.mock('@/api', () => ({ default: { connection: { create: vi.fn(), update: vi.fn() } } }));
+
+const createMock = vi.mocked(API.connection.create);
+const updateMock = vi.mocked(API.connection.update);
+const CONFLICT = 409;
+const SERVER_MESSAGE = 'connection name already exists';
+const createPayload = { plugin: 'github', name: 'gh', endpoint: 'https://api.github.com' };
+const updatePayload = { ...createPayload, connectionId: 1 };
+const axiosConflict = { response: { status: CONFLICT, data: { message: SERVER_MESSAGE } } };
+const makeStore = () => configureStore({ reducer: connectionsSlice.reducer });
+const caughtFrom = async (run: () => Promise<unknown>) => {
+  try {
+    await run();
+  } catch (err) {
+    return err;
+  }
+  return undefined;
+};
 
 const NOW = 1_700_000_000_000;
 const UNIQUE = 'github-1';
@@ -94,5 +123,30 @@ describe('connections health state', () => {
     const edited = { ...connection, name: 'renamed' };
     const next = reduce(state, updateConnection.fulfilled(edited, REQUEST_ID, { plugin: 'github', connectionId: 1 }));
     expect(next.health).toEqual({});
+  });
+});
+
+describe('connection save failures', () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it('keeps the server response when creating a connection fails', async () => {
+    createMock.mockRejectedValue(axiosConflict);
+    const caught = await caughtFrom(() => makeStore().dispatch(addConnection(createPayload)).unwrap());
+    expect(getErrorResponse(caught)?.status).toBe(CONFLICT);
+    expect(getErrorResponse(caught)?.data.message).toBe(SERVER_MESSAGE);
+  });
+
+  it('keeps the server response when updating a connection fails', async () => {
+    updateMock.mockRejectedValue(axiosConflict);
+    const caught = await caughtFrom(() => makeStore().dispatch(updateConnection(updatePayload)).unwrap());
+    expect(getErrorResponse(caught)?.status).toBe(CONFLICT);
+    expect(getErrorResponse(caught)?.data.message).toBe(SERVER_MESSAGE);
+  });
+
+  it('still rejects without a response when the failure has none', async () => {
+    createMock.mockRejectedValue(new Error('network down'));
+    const caught = await caughtFrom(() => makeStore().dispatch(addConnection(createPayload)).unwrap());
+    expect(caught).toBeDefined();
+    expect(getErrorResponse(caught)).toBeUndefined();
   });
 });

@@ -16,7 +16,7 @@
  *
  */
 
-import { Button, Tooltip } from 'antd';
+import { Button, ConfigProvider, Tooltip } from 'antd';
 import { useState, useContext, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -24,6 +24,7 @@ import API from '@/api';
 import { PATHS } from '@/config';
 import { getPluginConfig } from '@/plugins';
 import { ConnectionToken } from '@/plugins/components/connection-form/fields/token';
+import { Auth as BitbucketAuthField } from '@/plugins/register/bitbucket/connection-fields';
 import { operator } from '@/utils';
 
 import { STORE_KEY } from './components/constants';
@@ -31,10 +32,8 @@ import { CONNECTION_DEFAULTS, COPY, GUIDE_STEP, ONBOARD_PLUGIN, PLATFORM_NAME, W
 import { Context } from './context';
 import { StepActions } from './step-actions';
 import * as S from './styled';
-import type { ConnectionDraft } from './types';
+import type { ConnectionDraft, ConnectionTestPayload } from './types';
 import { useGuide } from './use-guide';
-
-type TestPayload = Parameters<typeof API.connection.testOld>[1];
 
 const getDefaults = (plugin: string): ConnectionDraft =>
   plugin in CONNECTION_DEFAULTS ? CONNECTION_DEFAULTS[plugin as keyof typeof CONNECTION_DEFAULTS] : {};
@@ -44,18 +43,11 @@ export const Step2 = () => {
   const [testing, setTesting] = useState(false);
   const [testStatus, setTestStatus] = useState(false);
   const [payload, setPayload] = useState<ConnectionDraft>({});
+  const [createdConnectionId, setCreatedConnectionId] = useState<ID>();
 
   const { step, records, done, projectName, plugin, setStep, setRecords } = useContext(Context);
 
   const config = useMemo(() => getPluginConfig(plugin as string), [plugin]);
-
-  // Get the auth field component for Bitbucket
-  const BitbucketAuthField = useMemo(() => {
-    if (plugin === ONBOARD_PLUGIN.BITBUCKET && config?.connection?.fields) {
-      return config.connection.fields[1];
-    }
-    return null;
-  }, [plugin, config]);
 
   const guide = useGuide(GUIDE_STEP.CONNECTION, plugin);
 
@@ -64,8 +56,18 @@ export const Step2 = () => {
       return;
     }
 
+    setTestStatus(false);
     const [success] = await operator(
-      async () => await API.connection.testOld(plugin, { ...getDefaults(plugin), ...payload } as TestPayload),
+      async () => {
+        const result = await API.connection.testOld(plugin, {
+          ...getDefaults(plugin),
+          ...payload,
+        } as ConnectionTestPayload);
+        if (result.success === false) {
+          throw new Error(COPY.connection.connectFailed);
+        }
+        return result;
+      },
       {
         setOperating: setTesting,
         formatMessage: () => COPY.connection.connectSuccess,
@@ -73,30 +75,29 @@ export const Step2 = () => {
       },
     );
 
-    if (success) {
-      setTestStatus(true);
-    }
+    setTestStatus(success);
   };
 
   const handleSubmit = async () => {
-    if (!plugin) {
+    if (!plugin || !testStatus || testing || operating) {
       return;
     }
 
     const [success] = await operator(
       async () => {
-        const connection = await API.connection.create(plugin, {
-          name: `${plugin}-${Date.now()}`,
-          ...getDefaults(plugin),
-          ...payload,
-        } as Parameters<typeof API.connection.create>[1]);
+        // Reuse the connection from a failed save so a retry does not create a duplicate.
+        let connectionId = createdConnectionId;
+        if (connectionId === undefined) {
+          const connection = await API.connection.create(plugin, {
+            name: `${plugin}-${Date.now()}`,
+            ...getDefaults(plugin),
+            ...payload,
+          } as Parameters<typeof API.connection.create>[1]);
+          connectionId = connection.id;
+          setCreatedConnectionId(connectionId);
+        }
 
-        const newRecords = [
-          ...records,
-          { plugin, connectionId: connection.id, blueprintId: '', pipelineId: '', scopeName: '' },
-        ];
-
-        setRecords(newRecords);
+        const newRecords = [...records, { plugin, connectionId, blueprintId: '', pipelineId: '', scopeName: '' }];
 
         await API.store.set(STORE_KEY, {
           step: WIZARD_STEP.SCOPE,
@@ -105,6 +106,8 @@ export const Step2 = () => {
           projectName,
           plugin,
         });
+
+        setRecords(newRecords);
       },
       {
         setOperating,
@@ -131,49 +134,57 @@ export const Step2 = () => {
     </S.Connect>
   );
 
+  const busy = testing || operating;
+
   return (
     <>
       <S.StepContent>
         {PLATFORM_NAME[plugin] && (
           <S.Form>
-            <ConnectionToken
-              type="create"
-              label={COPY.connection.tokenLabel}
-              subLabel={
-                <>
-                  {COPY.connection.tokenDescription(PLATFORM_NAME[plugin], config.name)}{' '}
-                  <Link to={PATHS.CONNECTIONS()}>{COPY.dataConnections}</Link>.
-                </>
-              }
-              initialValue=""
-              value={payload.token ?? ''}
-              setValue={(token) => {
-                setPayload({ ...payload, token });
-                setTestStatus(false);
-              }}
-              error=""
-              setError={() => {}}
-            />
+            <ConfigProvider componentDisabled={busy}>
+              <ConnectionToken
+                type="create"
+                label={COPY.connection.tokenLabel}
+                subLabel={
+                  <>
+                    {COPY.connection.tokenDescription(PLATFORM_NAME[plugin], config.name)}{' '}
+                    <Link to={PATHS.CONNECTIONS()}>{COPY.dataConnections}</Link>.
+                  </>
+                }
+                initialValue=""
+                value={payload.token ?? ''}
+                setValue={(token) => {
+                  setPayload((current) => ({ ...current, token }));
+                  setTestStatus(false);
+                  setCreatedConnectionId(undefined);
+                }}
+                error=""
+                setError={() => {}}
+              />
+            </ConfigProvider>
             {connectButton(!payload.token)}
           </S.Form>
         )}
-        {plugin === ONBOARD_PLUGIN.BITBUCKET && BitbucketAuthField && (
+        {plugin === ONBOARD_PLUGIN.BITBUCKET && (
           <S.Form>
-            {BitbucketAuthField({
-              type: 'create',
-              initialValues: {
-                ...CONNECTION_DEFAULTS[ONBOARD_PLUGIN.BITBUCKET],
-                username: '',
-                password: '',
-              },
-              values: payload,
-              errors: {},
-              setValues: (values: ConnectionDraft) => {
-                setPayload({ ...payload, ...values });
-                setTestStatus(false);
-              },
-              setErrors: () => {},
-            })}
+            <ConfigProvider componentDisabled={busy}>
+              <BitbucketAuthField
+                type="create"
+                initialValues={{
+                  ...CONNECTION_DEFAULTS[ONBOARD_PLUGIN.BITBUCKET],
+                  username: '',
+                  password: '',
+                }}
+                values={payload}
+                errors={{}}
+                setValues={(values: ConnectionDraft) => {
+                  setPayload((current) => ({ ...current, ...values }));
+                  setTestStatus(false);
+                  setCreatedConnectionId(undefined);
+                }}
+                setErrors={() => {}}
+              />
+            </ConfigProvider>
             {connectButton(!payload.username || !payload.password)}
           </S.Form>
         )}
@@ -181,7 +192,7 @@ export const Step2 = () => {
       </S.StepContent>
       <StepActions
         loading={operating}
-        nextDisabled={!testStatus}
+        nextDisabled={!testStatus || testing}
         onPrevious={() => setStep(step - 1)}
         onNext={handleSubmit}
       />

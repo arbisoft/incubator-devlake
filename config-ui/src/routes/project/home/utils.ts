@@ -19,7 +19,7 @@
 import { createElement } from 'react';
 
 import type { OtelConnectionResponse } from '@/api/otel';
-import { WEBHOOK_PLUGIN } from '@/features/connections/constants';
+import { WEBHOOK_PLUGIN } from '@/features/connections';
 import { getPluginConfig } from '@/plugins';
 import { INTEGRATION_CATEGORY, getCatalogEntry } from '@/plugins/catalog';
 import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?react';

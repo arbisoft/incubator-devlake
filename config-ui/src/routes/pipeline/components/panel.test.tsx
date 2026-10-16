@@ -16,7 +16,10 @@
  *
  */
 
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import '../__tests__/log-action.test-utils';
+
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { saveAs } from 'file-saver';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import API from '@/api';
@@ -24,15 +27,13 @@ import { WEIGHT } from '@/theme/scales';
 import { IPipelineStatus, type IPipeline, type ITask } from '@/types';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
-import { COPY } from '../constants';
+import { COPY, LOGS_FILE_NAME } from '../constants';
 
 import { PipelinePanel } from './panel';
 
 vi.mock('antd', async (importOriginal) =>
-  (await import('@/ui/__tests__/antd-message-mock')).withMockedMessage(await importOriginal<typeof import('antd')>()),
+  (await import('@/ui/__tests__/antd-message-mock')).loadMockedMessage(importOriginal),
 );
-
-vi.mock('file-saver', () => ({ saveAs: vi.fn() }));
 
 vi.mock('@/plugins', () => ({
   getPluginConfig: (plugin: string) => ({ plugin, name: plugin.toUpperCase(), icon: '' }),
@@ -40,7 +41,7 @@ vi.mock('@/plugins', () => ({
 
 vi.mock('@/api', () => ({
   default: {
-    pipeline: { get: vi.fn(), tasks: vi.fn(), remove: vi.fn(), rerun: vi.fn(), log: vi.fn() },
+    pipeline: { get: vi.fn(), tasks: vi.fn(), remove: vi.fn(), rerun: vi.fn(), log: vi.fn(), logBlob: vi.fn() },
     task: { rertun: vi.fn() },
   },
 }));
@@ -49,6 +50,31 @@ const pipelines = vi.mocked(API.pipeline);
 const tasksApi = vi.mocked(API.task);
 
 const LONG_NAME = 'github_graphql:a-very-long-organisation-name/an-even-longer-repository-name-that-needs-truncating';
+const TASKS_LOADING = 'Loading pipeline tasks';
+const TASKS_LOAD_FAILED = 'Pipeline tasks could not be loaded.';
+const NEXT_PIPELINE_ID = 10;
+
+const deferredResponse = <T,>() => {
+  let complete: ((value: T) => void) | undefined;
+  const promise = new Promise<T>((resolve) => {
+    complete = resolve;
+  });
+  const resolve = (value: T) => {
+    complete?.(value);
+    complete = undefined;
+  };
+  return { promise, resolve };
+};
+
+const deferredTaskResponse = () => deferredResponse<{ tasks: ITask[] | null }>();
+
+const renderWithTasksLoading = async (response: ReturnType<typeof deferredTaskResponse>) => {
+  pipelines.get.mockResolvedValue(pipeline(IPipelineStatus.RUNNING));
+  pipelines.tasks.mockImplementationOnce(() => response.promise);
+  renderWithTheme(<PipelinePanel id={9} />);
+  expect(await screen.findByText(COPY.summary.tasksValue(1, 3))).toBeTruthy();
+  expect(screen.getByText(TASKS_LOADING)).toBeTruthy();
+};
 
 const pipeline = (status: IPipelineStatus): IPipeline => ({
   id: 9,
@@ -114,13 +140,89 @@ describe('PipelinePanel', () => {
     expect(await screen.findByRole('heading', { name: COPY.stage.label(1) }, { timeout: 3000 })).toBeTruthy();
   });
 
+  it('keeps the pipeline summary visible while the initial task request loads', async () => {
+    const taskResponse = deferredTaskResponse();
+
+    try {
+      await renderWithTasksLoading(taskResponse);
+      await act(async () => taskResponse.resolve({ tasks: [task({})] }));
+      expect(await screen.findByRole('heading', { name: COPY.stage.label(1) })).toBeTruthy();
+    } finally {
+      await act(async () => taskResponse.resolve({ tasks: [task({})] }));
+    }
+  });
+
+  it('keeps the summary and skips stages when the task response is null', async () => {
+    const taskResponse = deferredTaskResponse();
+
+    try {
+      await renderWithTasksLoading(taskResponse);
+      await act(async () => taskResponse.resolve({ tasks: null }));
+      expect(screen.getByText(COPY.summary.tasksValue(1, 3))).toBeTruthy();
+      expect(screen.queryByRole('heading', { name: COPY.stage.label(1) })).toBeNull();
+      expect(screen.queryByText(TASKS_LOADING)).toBeNull();
+    } finally {
+      await act(async () => taskResponse.resolve({ tasks: null }));
+    }
+  });
+
+  it('shows task-specific failure beside the summary and retries into stages', async () => {
+    pipelines.get.mockResolvedValue(pipeline(IPipelineStatus.RUNNING));
+    pipelines.tasks.mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ tasks: [task({})] });
+    renderWithTheme(<PipelinePanel id={9} />);
+
+    expect(await screen.findByText(TASKS_LOAD_FAILED)).toBeTruthy();
+    expect(screen.getByText(COPY.summary.tasksValue(1, 3))).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByRole('heading', { name: COPY.stage.label(1) })).toBeTruthy();
+  });
+
+  it('retains task stages and the pipeline summary when refreshing tasks fails', async () => {
+    pipelines.tasks.mockResolvedValueOnce({ tasks: [task({})] });
+    load(IPipelineStatus.FAILED, [task({})]);
+    pipelines.tasks.mockRejectedValue(new Error('offline'));
+
+    expect(await screen.findByRole('heading', { name: COPY.stage.label(1) })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: COPY.summary.rerun }));
+    await waitFor(() => expect(pipelines.rerun).toHaveBeenCalledWith(9));
+
+    expect(await screen.findByText(TASKS_LOAD_FAILED)).toBeTruthy();
+    expect(screen.getByRole('heading', { name: COPY.stage.label(1) })).toBeTruthy();
+    expect(screen.getByText(COPY.summary.tasksValue(1, 3))).toBeTruthy();
+    expect(screen.getByText(COPY.summary.failed)).toBeTruthy();
+  });
+
+  it('aborts the previous task request when the pipeline id changes', async () => {
+    let firstSignal: AbortSignal | undefined;
+    let resolveFirst: ((response: { tasks: ITask[] }) => void) | undefined;
+    pipelines.get.mockResolvedValue(pipeline(IPipelineStatus.RUNNING));
+    pipelines.tasks.mockImplementationOnce(
+      (_id, signal) =>
+        new Promise<{ tasks: ITask[] }>((resolve) => {
+          firstSignal = signal;
+          resolveFirst = resolve;
+        }),
+    );
+    const view = renderWithTheme(<PipelinePanel id={9} />);
+    await waitFor(() => expect(pipelines.tasks).toHaveBeenCalledOnce());
+    view.rerender(<PipelinePanel id={NEXT_PIPELINE_ID} />);
+    await waitFor(() => expect(pipelines.tasks).toHaveBeenCalledTimes(2));
+    expect(firstSignal?.aborted).toBe(true);
+
+    if (!resolveFirst) throw new Error('The first task request did not start.');
+    resolveFirst({ tasks: [task({})] });
+    await waitFor(() => expect(firstSignal?.aborted).toBe(true));
+  });
+
   it('opens the JSON configuration and downloads the logs from the page', async () => {
-    pipelines.log.mockResolvedValue(true);
+    const archive = new Blob(['archive']);
+    pipelines.logBlob.mockResolvedValue(archive);
     load(IPipelineStatus.COMPLETED, [task({})]);
     fireEvent.click(await screen.findByRole('button', { name: COPY.rowActions.configuration }));
     expect(await screen.findByText(COPY.drawer.heading)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: COPY.rowActions.downloadLogs }));
-    await waitFor(() => expect(pipelines.log).toHaveBeenCalledWith(9));
+    await waitFor(() => expect(pipelines.logBlob).toHaveBeenCalledWith(9));
+    await waitFor(() => expect(saveAs).toHaveBeenCalledExactlyOnceWith(archive, LOGS_FILE_NAME));
   });
 
   it('offers cancel, and not rerun, while the pipeline runs', async () => {

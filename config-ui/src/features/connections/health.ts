@@ -16,7 +16,7 @@
  *
  */
 import { IConnectionStatus, type IConnection } from '@/types';
-import { CONNECTION_HEALTH_STATE, toUserMessage, type ConnectionHealthProps } from '@/ui';
+import { CONNECTION_HEALTH_STATE, toUserMessage } from '@/ui';
 
 import {
   CREDENTIAL_MESSAGE,
@@ -34,7 +34,13 @@ import {
   COPY,
   HTTP_STATUS,
 } from './constants';
-import type { ConnectionHealthEntry, ConnectionHealthMap, HealthFailureReason, TestFailureInput } from './types';
+import type {
+  ConnectionHealthEntry,
+  ConnectionHealthMap,
+  HealthFailureReason,
+  HealthView,
+  TestFailureInput,
+} from './types';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 
@@ -134,8 +140,6 @@ export const writeStoredHealth = (health: ConnectionHealthMap) => {
 export const countFailed = (connections: IConnection[], health: ConnectionHealthMap) =>
   connections.filter((connection) => health[connection.unique]?.status === IConnectionStatus.OFFLINE).length;
 
-type HealthView = Pick<ConnectionHealthProps, 'state' | 'testedAt' | 'label' | 'message'>;
-
 export const toHealthView = (entry: ConnectionHealthEntry | undefined): HealthView => {
   if (!entry) return { state: CONNECTION_HEALTH_STATE.UNKNOWN };
   const { status, reason, message, testedAt } = entry;
@@ -149,3 +153,11 @@ export const toHealthView = (entry: ConnectionHealthEntry | undefined): HealthVi
 };
 
 export const toTestErrorMessage = (error: unknown) => toUserMessage(error, TEST_ERROR_MAP, COPY.testFailed.fallback);
+
+export const toConnectionActionErrorMessage = (
+  error: unknown,
+  fallback: (error: unknown) => string = toTestErrorMessage,
+) => {
+  const message = isRecord(error) ? toTestFailureInput({ response: error.response }).message : undefined;
+  return cleanTestMessage(message) ?? fallback(error);
+};

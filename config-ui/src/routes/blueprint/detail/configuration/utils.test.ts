@@ -23,6 +23,7 @@ import type { IConnection } from '@/types';
 import { COPY, NEW_CONNECTION_VALUE } from './constants';
 import {
   buildConnectionOptions,
+  isEmptyPlanText,
   stringifyPlan,
   toConnectionCards,
   toConnectionKey,
@@ -77,19 +78,43 @@ describe('connection payload', () => {
 });
 
 describe('advanced plan', () => {
-  const EMPTY = stringifyPlan([[]]);
-
   it('saves a valid plan as parsed JSON', () => {
     expect(toPlanPayload('[[{"plugin":"github"}]]')).toEqual([[{ plugin: 'github' }]]);
   });
 
-  it('falls back to the serialised empty plan for an empty or broken one', () => {
-    expect(toPlanPayload('[[]]')).toBe(EMPTY);
-    expect(toPlanPayload('[]')).toBe(EMPTY);
-    expect(toPlanPayload('{ not json')).toBe(EMPTY);
+  it('preserves arbitrary task fields and permits empty stages beside tasks', () => {
+    const raw =
+      '[[{"plugin":"github","options":{"include":["issues"]},"custom":true}],[{"plugin":"jira","subtasks":[{"name":"issues"}]}]]';
+    expect(toPlanPayload(raw)).toEqual([
+      [{ plugin: 'github', options: { include: ['issues'] }, custom: true }],
+      [{ plugin: 'jira', subtasks: [{ name: 'issues' }] }],
+    ]);
+    expect(toPlanPayload('[[],[{"plugin":"github"}],[]]')).toEqual([[], [{ plugin: 'github' }], []]);
   });
 
-  it('indents the plan by two spaces', () => {
+  it('preserves valid plugin text while rejecting whitespace-only plugin names', () => {
+    expect(toPlanPayload('[[{"plugin":" github "}]]')).toEqual([[{ plugin: ' github ' }]]);
+    expect(toPlanPayload('[[{"plugin":"   "}]]')).toBeUndefined();
+  });
+
+  it.each(['[[]]', '[]', '{ not json', '{}', 'null', '[{}]', '[[{}]]', '[[null]]', '[[[]]]', '[[{"plugin":""}]]'])(
+    'rejects empty or malformed plans',
+    (raw) => {
+      expect(toPlanPayload(raw)).toBeUndefined();
+    },
+  );
+
+  it('does not constrain arbitrary values used by plan stringification', () => {
     expect(stringifyPlan([[1]])).toBe('[\n  [\n    1\n  ]\n]');
+  });
+});
+
+describe('empty plan text', () => {
+  it.each(['[]', '[[]]', '[[],[]]', '[\n  []\n]', '[\n  [],\n  []\n]', '[\n  [\n  ]\n]'])('accepts %j', (raw) => {
+    expect(isEmptyPlanText(raw)).toBe(true);
+  });
+
+  it.each(['[[{"plugin":"x"}]]', '{}', '[1]', '[[], [{"plugin":"x"}]]', '[[', ''])('rejects %j', (raw) => {
+    expect(isEmptyPlanText(raw)).toBe(false);
   });
 });

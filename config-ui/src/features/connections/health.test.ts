@@ -17,15 +17,12 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { IConnectionStatus, type IConnection } from '@/types';
-import { CONNECTION_HEALTH_STATE } from '@/ui';
+import { IConnectionStatus } from '@/types';
+import { CONNECTION_HEALTH_STATE, toUserMessage } from '@/ui';
 
-import { COPY, HEALTH_FAILURE_REASON, HEALTH_STORAGE_KEY, HEALTH_TTL_MS, MESSAGE_MAX_LENGTH } from './constants';
+import { COPY, HEALTH_FAILURE_REASON, HEALTH_STORAGE_KEY, HEALTH_TTL_MS } from './constants';
 import {
-  classifyTestFailure,
-  cleanTestMessage,
   countFailed,
-  failureLabel,
   findStaleConnections,
   healthFromTestError,
   healthFromTestResult,
@@ -33,121 +30,23 @@ import {
   isHealthFresh,
   readStoredHealth,
   toHealthView,
+  toConnectionActionErrorMessage,
   toTestErrorMessage,
-  toTestFailureInput,
   writeStoredHealth,
 } from './health';
+import {
+  CLEANED_GITHUB_MESSAGE,
+  GITHUB_DUMP,
+  IGNORED_REQUEST_TEXT,
+  MINUTE_MS,
+  NOW,
+  SECRET_FREE_MESSAGE,
+  axiosLike,
+  connection,
+  offline,
+  online,
+} from './health.test-utils';
 import type { ConnectionHealthEntry, ConnectionHealthMap } from './types';
-
-const NOW = 1_700_000_000_000;
-const MINUTE_MS = 60_000;
-const SECRET_FREE_MESSAGE = 'StatusUnauthorized error when testing connection';
-
-const connection = (unique: string) => ({ unique }) as IConnection;
-const online = (testedAt: number): ConnectionHealthEntry => ({ status: IConnectionStatus.ONLINE, testedAt });
-const offline = (testedAt: number): ConnectionHealthEntry => ({
-  status: IConnectionStatus.OFFLINE,
-  reason: HEALTH_FAILURE_REASON.FAILED,
-  testedAt,
-});
-const GITHUB_DUMP = [
-  'attached stack trace',
-  '  -- stack trace:',
-  '  | github.com/apache/incubator-devlake/plugins/github/api.testGithubConnAccessTokenAuth',
-  '  | \t/app/plugins/github/api/connection_api.go:212',
-  'Wraps: (2) StatusUnauthorized error when testing connection (400)',
-  'Error types: (1) *withstack.withStack (2) *errutil.leafError',
-].join('\n');
-const CONNECT_DUMP = [
-  'attached stack trace',
-  '  | github.com/apache/incubator-devlake/core/utils.CheckNetwork',
-  'Wraps: (2) Failed to connect',
-  'Wraps: (3) attached stack trace',
-  'Wraps: (4) dial tcp 127.0.0.1:9: connect: connection refused',
-].join('\n');
-const axiosLike = (status: number | undefined, message?: string) => ({
-  message: 'Request failed',
-  response: status === undefined ? undefined : { status, data: message ? { message } : undefined },
-});
-
-describe('classifyTestFailure', () => {
-  it.each([
-    [{ status: 401 }, HEALTH_FAILURE_REASON.CREDENTIALS],
-    [{ status: 403 }, HEALTH_FAILURE_REASON.CREDENTIALS],
-    [{ status: 400, message: SECRET_FREE_MESSAGE }, HEALTH_FAILURE_REASON.CREDENTIALS],
-    [{ status: 400, message: 'verify token failed' }, HEALTH_FAILURE_REASON.CREDENTIALS],
-    [{ status: 400, message: 'invalid token' }, HEALTH_FAILURE_REASON.CREDENTIALS],
-    [{ status: 400, message: 'Bad credentials' }, HEALTH_FAILURE_REASON.CREDENTIALS],
-    [{}, HEALTH_FAILURE_REASON.UNREACHABLE],
-    [{ message: 'Network Error' }, HEALTH_FAILURE_REASON.UNREACHABLE],
-    [{ status: 408 }, HEALTH_FAILURE_REASON.UNREACHABLE],
-    [{ status: 502 }, HEALTH_FAILURE_REASON.UNREACHABLE],
-    [{ status: 504 }, HEALTH_FAILURE_REASON.UNREACHABLE],
-    [{ status: 200, message: GITHUB_DUMP }, HEALTH_FAILURE_REASON.CREDENTIALS],
-    [
-      { status: 200, message: 'authentication failed (HTTP 401): verify your API credentials' },
-      HEALTH_FAILURE_REASON.CREDENTIALS,
-    ],
-    [{ status: 401, message: 'Invalid token. You may need to edit your token' }, HEALTH_FAILURE_REASON.CREDENTIALS],
-    [{ status: 200, message: CONNECT_DUMP }, HEALTH_FAILURE_REASON.UNREACHABLE],
-    [{ status: 502, message: 'Failed to resolve DNS' }, HEALTH_FAILURE_REASON.UNREACHABLE],
-    [{ status: 400, message: 'dial tcp: i/o timeout' }, HEALTH_FAILURE_REASON.UNREACHABLE],
-    [{ status: 400, message: 'endpoint is required' }, HEALTH_FAILURE_REASON.FAILED],
-    [{ status: 200, message: 'missing scope read:org' }, HEALTH_FAILURE_REASON.FAILED],
-    [{ status: 400 }, HEALTH_FAILURE_REASON.FAILED],
-    [{ status: 500, message: 'boom' }, HEALTH_FAILURE_REASON.FAILED],
-  ])('maps %j to %s', (input, reason) => {
-    expect(classifyTestFailure(input)).toBe(reason);
-  });
-
-  it('words each reason from the copy', () => {
-    expect(failureLabel(HEALTH_FAILURE_REASON.CREDENTIALS)).toBe(COPY.failure.credentials);
-    expect(failureLabel(HEALTH_FAILURE_REASON.UNREACHABLE)).toBe(COPY.failure.unreachable);
-    expect(failureLabel(HEALTH_FAILURE_REASON.FAILED)).toBe(COPY.failure.failed);
-  });
-});
-
-describe('cleanTestMessage', () => {
-  it('reduces a Go error dump to its first readable line', () => {
-    expect(cleanTestMessage(GITHUB_DUMP)).toBe('StatusUnauthorized error when testing connection (400)');
-    expect(cleanTestMessage(CONNECT_DUMP)).toBe('Failed to connect');
-  });
-
-  it('leaves a plain message alone and keeps only its first line', () => {
-    expect(cleanTestMessage('Invalid token. You may need to edit your token')).toBe(
-      'Invalid token. You may need to edit your token',
-    );
-    expect(cleanTestMessage('first line\nsecond line')).toBe('first line');
-  });
-
-  it('has nothing to show for an empty message or a dump with no summary', () => {
-    expect(cleanTestMessage(undefined)).toBeUndefined();
-    expect(cleanTestMessage('')).toBeUndefined();
-    expect(cleanTestMessage('attached stack trace\n  | frame')).toBeUndefined();
-  });
-
-  it('caps a long message', () => {
-    expect(cleanTestMessage('x'.repeat(MESSAGE_MAX_LENGTH + 50))).toHaveLength(MESSAGE_MAX_LENGTH);
-  });
-});
-
-describe('toTestFailureInput', () => {
-  it('reads the status and the server message from an axios-style error', () => {
-    expect(toTestFailureInput(axiosLike(400, SECRET_FREE_MESSAGE))).toEqual({
-      status: 400,
-      message: SECRET_FREE_MESSAGE,
-    });
-  });
-
-  it('falls back to the error message when there is no response', () => {
-    expect(toTestFailureInput(axiosLike(undefined))).toEqual({ status: undefined, message: 'Request failed' });
-  });
-
-  it('copes with values that are not errors', () => {
-    expect(toTestFailureInput(undefined)).toEqual({});
-    expect(toTestFailureInput('nope')).toEqual({});
-  });
-});
 
 describe('health entries', () => {
   it('records a passing test as online', () => {
@@ -162,7 +61,7 @@ describe('health entries', () => {
     expect(healthFromTestResult({ success: false, message: GITHUB_DUMP }, NOW)).toEqual({
       status: IConnectionStatus.OFFLINE,
       reason: HEALTH_FAILURE_REASON.CREDENTIALS,
-      message: 'StatusUnauthorized error when testing connection (400)',
+      message: CLEANED_GITHUB_MESSAGE,
       testedAt: NOW,
     });
   });
@@ -246,7 +145,33 @@ describe('test error message', () => {
   });
 });
 
+describe('connection action error message', () => {
+  it('uses a cleaned server message when the test request returns a response', () => {
+    expect(toConnectionActionErrorMessage(axiosLike(400, GITHUB_DUMP))).toBe(CLEANED_GITHUB_MESSAGE);
+  });
+
+  it.each([
+    [{ response: { status: 400, data: {} }, message: IGNORED_REQUEST_TEXT }, COPY.testFailed.fallback],
+    [{ response: { status: 400, data: { message: 42 } }, message: IGNORED_REQUEST_TEXT }, COPY.testFailed.fallback],
+    [{ response: { status: 400, data: { message: '  ' } }, message: IGNORED_REQUEST_TEXT }, COPY.testFailed.fallback],
+    [new Error(IGNORED_REQUEST_TEXT), COPY.testFailed.fallback],
+  ])('uses safe mapped copy when there is no usable response message', (error, expected) => {
+    expect(toConnectionActionErrorMessage(error)).toBe(expected);
+  });
+
+  it('honors the caller fallback when the response has no usable reason', () => {
+    const fallback = (error: unknown) => toUserMessage(error, { '409': 'Duplicate connection.' }, 'Save failed.');
+    expect(toConnectionActionErrorMessage({ response: { status: 409, data: { message: '' } } }, fallback)).toBe(
+      'Duplicate connection.',
+    );
+  });
+});
+
 describe('storage', () => {
+  const storageFailure = () => {
+    throw new Error('blocked');
+  };
+
   afterEach(() => {
     window.sessionStorage.clear();
     vi.restoreAllMocks();
@@ -274,12 +199,8 @@ describe('storage', () => {
   });
 
   it('survives storage that throws', () => {
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
-      throw new Error('blocked');
-    });
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('blocked');
-    });
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(storageFailure);
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(storageFailure);
     expect(readStoredHealth()).toEqual({});
     expect(() => writeStoredHealth({})).not.toThrow();
   });

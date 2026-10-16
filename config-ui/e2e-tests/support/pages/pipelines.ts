@@ -86,6 +86,21 @@ export class PipelinesPage extends BasePage implements Screen {
     return download;
   }
 
+  // Starts Download Logs without waiting for a download, for flows where the request fails.
+  async startDownloadLogs(id: number): Promise<void> {
+    await this.rowActionsButton(id).click();
+    await this.page.getByRole('menuitem', { name: COPY.rowActions.downloadLogs }).click();
+  }
+
+  async openDownloadLogsItem(id: number): Promise<Locator> {
+    await this.rowActionsButton(id).click();
+    return this.page.getByRole('menuitem', { name: COPY.rowActions.downloadLogs });
+  }
+
+  get downloadFailedToast(): Locator {
+    return this.toast(COPY.actions.downloadFailed);
+  }
+
   rowActionsButton(id: number): Locator {
     return pipelineRowMenuButton(this.page, id);
   }

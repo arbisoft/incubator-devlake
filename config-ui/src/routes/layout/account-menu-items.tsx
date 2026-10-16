@@ -27,9 +27,10 @@ import {
 import type { MenuProps } from 'antd';
 import type { ReactNode } from 'react';
 
+import { THEME_MODE, THEME_MODES } from '@/theme/constants';
 import type { ThemeMode } from '@/theme/tokens';
 
-import { ACCOUNT_MENU_KEY, COPY, THEME_LABEL, THEME_MODE, THEME_MODES } from './constants';
+import { ACCOUNT_MENU_KEY, COPY, THEME_LABEL } from './constants';
 import type { AccountMenuHandlers, AccountMenuState } from './types';
 
 type MenuItems = NonNullable<MenuProps['items']>;

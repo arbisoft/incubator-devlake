@@ -1,0 +1,43 @@
+{
+  "titlePath": [
+    "Blueprint detail views and pipeline panel",
+    "invalid advanced plans stay editable and a corrected plan is persisted"
+  ],
+  "writes": [
+    {
+      "method": "PATCH",
+      "path": "/api/blueprints/:id",
+      "body": {
+        "afterPlan": null,
+        "beforePlan": null,
+        "connections": [],
+        "createdAt": "<masked>",
+        "cronConfig": "0 0 * * *",
+        "enable": false,
+        "fullSync": false,
+        "id": "<masked>",
+        "isManual": true,
+        "labels": [],
+        "mode": "ADVANCED",
+        "name": "e2e-*-plan",
+        "plan": [
+          [
+            {
+              "options": {
+                "repoId": "<masked>",
+                "url": "https://example.invalid/e2e-fixed.git"
+              },
+              "plugin": "gitextractor"
+            }
+          ]
+        ],
+        "priority": 0,
+        "projectName": "",
+        "skipCollectors": false,
+        "skipOnFail": true,
+        "timeAfter": "<masked>",
+        "updatedAt": "<masked>"
+      }
+    }
+  ]
+}

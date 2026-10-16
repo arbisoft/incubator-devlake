@@ -62,6 +62,7 @@ export const COPY = {
   json: {
     title: 'JSON configuration',
     save: 'Save',
+    invalidPlan: 'Enter a non-empty JSON array of task stages with a plugin for each task.',
     editor: {
       title: 'Task editor',
       hint: 'Enter JSON configuration or preload from a template.',

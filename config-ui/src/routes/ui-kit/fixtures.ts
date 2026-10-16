@@ -155,6 +155,9 @@ export const TABLE_LIST_DEFAULTS = {
 export const TABLE_SELECTED_ROWS = [1, 3];
 
 export const HEALTH_RETEST_MS = 1200;
+export const PENDING_KEY_ACTION_MS = 1500;
+
+export const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 export const HEALTH_TESTED_AT_OFFSET_MS = 5 * 60_000;
 
 export const SHELL_SAMPLE =

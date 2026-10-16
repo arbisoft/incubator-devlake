@@ -23,7 +23,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { GRAFANA_ERROR_CODE, GRAFANA_ROLE } from '@/api/grafana-users/constants';
 import type { GrafanaRole } from '@/api/grafana-users/types';
 
-import { COPY } from '../../constants';
+import { COPY, GRAFANA_FLOW_ERRORS } from '../../constants';
 
 import {
   cleanupAddUserMocks,
@@ -39,6 +39,8 @@ import {
   submit,
   USER_NAME,
 } from './add-user-modal-helpers';
+import { expectRejectedAndKept, USER_NOT_FOUND_ERROR } from './dialog-helpers';
+import { waitForPasswordFormReady } from './password-error';
 
 const selectRole = async (role: GrafanaRole) => {
   fireEvent.mouseDown(screen.getByRole('combobox', { name: new RegExp(COPY.add.role.label) }));
@@ -72,6 +74,12 @@ const createPartial = async ({
   return props;
 };
 
+const resubmitCreate = async (props: ReturnType<typeof setup>) => {
+  await waitForPasswordFormReady(submit(COPY.add.submit));
+  fireEvent.click(submit(COPY.add.submit));
+  await waitFor(() => expect(props.onPassword).toHaveBeenCalledTimes(1));
+};
+
 const retrySuccessfully = async (props: ReturnType<typeof setup>) => {
   fireEvent.click(submit(COPY.add.retry));
   await waitFor(() => expect(props.onPassword).toHaveBeenCalledTimes(1));
@@ -80,6 +88,13 @@ const retrySuccessfully = async (props: ReturnType<typeof setup>) => {
 describe('AddUserModal partial retry', () => {
   beforeEach(resetAddUserMocks);
   afterEach(cleanupAddUserMocks);
+
+  it('refreshes the list once when the create is partial', async () => {
+    const props = await createPartial();
+    expect(props.onChanged).toHaveBeenCalledTimes(1);
+    await retrySuccessfully(props);
+    expect(props.onChanged).toHaveBeenCalledTimes(2);
+  });
 
   it.each([GRAFANA_ROLE.EDITOR, GRAFANA_ROLE.VIEWER])(
     'writes both desired values when the user is not in the org (%s)',
@@ -228,5 +243,41 @@ describe('AddUserModal partial retry', () => {
     expect(grafana.createUser).toHaveBeenCalledTimes(1);
     expect(props.onPassword).not.toHaveBeenCalled();
     expect(props.onClose).not.toHaveBeenCalled();
+  });
+
+  it('leaves retry mode when the partial account is gone and creates it again on the next submit', async () => {
+    const props = await createPartial();
+    grafana.updateUser.mockRejectedValueOnce(USER_NOT_FOUND_ERROR);
+
+    fireEvent.click(submit(COPY.add.retry));
+    await waitFor(() =>
+      expect(message.error).toHaveBeenCalledWith(GRAFANA_FLOW_ERRORS.CREATE_RETRY[GRAFANA_ERROR_CODE.USER_NOT_FOUND]),
+    );
+    await waitFor(() => expect(screen.queryByText(COPY.add.partial)).toBeNull());
+    expect((screen.getByLabelText(new RegExp(`^${COPY.add.email.label}`)) as HTMLInputElement).value).toBe(EMAIL);
+    expect(props.onClose).not.toHaveBeenCalled();
+
+    await resubmitCreate(props);
+    expect(grafana.createUser).toHaveBeenCalledTimes(2);
+    expect(grafana.updateUser).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('AddUserModal rejected create', () => {
+  beforeEach(resetAddUserMocks);
+  afterEach(cleanupAddUserMocks);
+
+  it('refreshes the list once, keeps the form open, and refreshes and closes only on a successful retry', async () => {
+    grafana.createUser.mockRejectedValueOnce(USER_NOT_FOUND_ERROR);
+    const props = setup();
+    fillAdd();
+    fireEvent.click(submit(COPY.add.submit));
+    await expectRejectedAndKept(props);
+    expect((screen.getByLabelText(new RegExp(`^${COPY.add.email.label}`)) as HTMLInputElement).value).toBe(EMAIL);
+
+    await resubmitCreate(props);
+    expect(props.onChanged).toHaveBeenCalledTimes(2);
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+    expect(grafana.createUser).toHaveBeenCalledTimes(2);
   });
 });
