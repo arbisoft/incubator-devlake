@@ -86,6 +86,7 @@ Create a Claude Code OTel connection through the DevLake Config UI. The one-time
     "OTEL_METRIC_EXPORT_INTERVAL": "60000",
     "OTEL_METRICS_INCLUDE_SESSION_ID": "true",
     "OTEL_METRICS_INCLUDE_ACCOUNT_UUID": "true",
+    "OTEL_METRICS_INCLUDE_REPOSITORY": "true",
     "OTEL_LOG_TOOL_DETAILS": "1",
     "OTEL_LOG_USER_PROMPTS": "1",
     "OTEL_LOG_ASSISTANT_RESPONSES": "0",
@@ -98,6 +99,15 @@ Create a Claude Code OTel connection through the DevLake Config UI. The one-time
 Claude Code sends metrics and log events. Events (prompts, API requests, tool results, skill activations, permission mode changes and others) are stored per event in `_tool_claude_code_otel_events` and rolled up into `ai_prompts`, `ai_prompt_skills` and `ai_permission_mode_changes`. `OTEL_LOG_TOOL_DETAILS=1` makes Claude Code send skill, MCP, plugin and command names and tool parameters. DevLake keeps only `skill_name`, `mcp_server_name` and `mcp_tool_name` from `tool_parameters` and drops the rest at ingest, including Bash command lines and file paths.
 
 Prompt text is stored only in the raw log batches and in `_tool_claude_code_otel_events.prompt_text`, and is cleared from events after 90 days, when the raw batches are deleted. It is never written to `ai_*` tables. Responses, tool input and raw API bodies are never stored: managed settings keep those gates off, the Collector deletes the attributes, and DevLake deletes them again at ingest. Session ids are stored on events but removed from Prometheus labels.
+
+Each prompt records the repository it ran in as `ai_prompts.repository_url`, from the `vcs.repository.url.full` attribute that `OTEL_METRICS_INCLUDE_REPOSITORY` adds (Claude Code v2.1.269+). It is the session's `origin` remote. DevLake normalizes it at ingest rather than relying on the client: it drops any credentials, query and fragment, removes a trailing `/` and `.git`, rewrites SSH and scp-like remotes (`git@github.com:org/repo.git`) as `https://github.com/org/repo`, and lowercases the result. A value that is not a remote URL is blanked. It is NULL when the session has no `origin` remote, when the URL is longer than 255 characters, or for older clients. The Collector removes the `vcs.*` attributes before Prometheus. To find a prompt's DevLake project, join it to `repos` and `project_mapping`. Compare against `LOWER(repos.url)`, because DevLake keeps the URL's case and the tables use a case-sensitive collation. A repository can belong to more than one project:
+
+```sql
+SELECT p.prompt_id, p.repository_url, pm.project_name
+FROM ai_prompts p
+LEFT JOIN repos r ON LOWER(r.url) = p.repository_url
+LEFT JOIN project_mapping pm ON pm.`table` = 'repos' AND pm.row_id = r.id;
+```
 
 Claude Code reports only permission mode changes, not the mode a session starts in. A prompt before a session's first change takes that change's `from_mode`. Prompts in a session with no change are recorded as `default` with `permission_mode_inferred` set.
 

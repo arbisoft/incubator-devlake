@@ -283,6 +283,9 @@ var storedEventAttributes = map[string]struct{}{
 	"user.id": {}, "user.account_id": {}, "user.account_uuid": {}, "user.email": {},
 	"prompt.id": {}, "event.name": {}, "event.timestamp": {}, "event.sequence": {},
 	devlakeTeamAttribute: {},
+	// Repository identity under OTEL_METRICS_INCLUDE_REPOSITORY, from the origin remote with
+	// credentials stripped.
+	repositoryURLAttribute: {}, "vcs.owner.name": {}, "vcs.repository.name": {}, "vcs.provider.name": {},
 	// user_prompt.
 	"prompt_length": {}, "command_name": {}, "command_source": {},
 	// api_request and api_error. On api_error, error is a service message; ingest drops

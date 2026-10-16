@@ -38,6 +38,7 @@ const (
 	envMetricExportInterval      = "OTEL_METRIC_EXPORT_INTERVAL"
 	envMetricsIncludeSessionID   = "OTEL_METRICS_INCLUDE_SESSION_ID"
 	envMetricsIncludeAccountUUID = "OTEL_METRICS_INCLUDE_ACCOUNT_UUID"
+	envMetricsIncludeRepository  = "OTEL_METRICS_INCLUDE_REPOSITORY"
 	envLogToolDetails            = "OTEL_LOG_TOOL_DETAILS"
 	envLogUserPrompts            = "OTEL_LOG_USER_PROMPTS"
 	envLogAssistantResponses     = "OTEL_LOG_ASSISTANT_RESPONSES"
@@ -78,6 +79,10 @@ func responseWithSettings(connection *models.OtelConnection, credentials []*mode
 			// derived per session. The Collector keeps it out of Prometheus labels.
 			envMetricsIncludeSessionID:   envBoolTrue,
 			envMetricsIncludeAccountUUID: envBoolTrue,
+			// Events carry the session's repository (origin remote, credentials stripped), so
+			// each prompt records the repository it ran in. Needs Claude Code v2.1.269+. The
+			// Collector keeps it out of Prometheus labels.
+			envMetricsIncludeRepository: envBoolTrue,
 			// Skill, MCP, plugin and command names, and tool parameters. Ingest keeps only the
 			// skill and MCP names from tool parameters; command lines and paths are dropped.
 			envLogToolDetails: envFlagOn,

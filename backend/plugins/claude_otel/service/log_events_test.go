@@ -533,6 +533,37 @@ func TestBuildPromptRollupMergesSkillSourcesAndCounts(t *testing.T) {
 	}
 }
 
+// The repository URL comes from the prompt's events. A prompt without one, or with one that
+// does not fit its column, stores NULL instead of failing or truncating.
+func TestPromptRollupRecordsRepositoryURL(t *testing.T) {
+	const repository = "https://github.com/example-org/example-repo"
+	request := loadLogEventsFixture(t)
+	stripContentAttributes(request)
+	records := resourceLogRecords(request.GetResourceLogs()[0])
+	for _, index := range []int{3, 4, 5, 6, 7, 8, 9} { // p2, sent with credentials and mixed case
+		setStringAttribute(records[index], repositoryURLAttribute, "https://user:ghp_secret@GitHub.com/Example-Org/example-repo.git")
+	}
+	setStringAttribute(records[0], repositoryURLAttribute, "https://github.com/"+strings.Repeat("r", maxRepositoryURLLength)) // p1
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 1)
+	if err != nil {
+		t.Fatalf("prepareEvents() error = %v", err)
+	}
+	byPrompt := make(map[string][]*models.OtelEvent)
+	for _, item := range prepared.events {
+		byPrompt[item.event.PromptId] = append(byPrompt[item.event.PromptId], item.event)
+	}
+
+	if got := buildPromptRollup(testOrganizationID, "p2", byPrompt["p2"]).prompt.RepositoryUrl; got == nil || *got != repository {
+		t.Fatalf("p2 repository = %v, want %q", got, repository)
+	}
+	for _, promptID := range []string{"p1", "p3"} {
+		if got := buildPromptRollup(testOrganizationID, promptID, byPrompt[promptID]).prompt.RepositoryUrl; got != nil {
+			t.Fatalf("%s repository = %q, want nil", promptID, *got)
+		}
+	}
+}
+
 func TestPromptRollupNeverCarriesPromptText(t *testing.T) {
 	for _, promptID := range []string{"p1", "p2"} {
 		rollup := buildPromptRollup(testOrganizationID, promptID, fixturePromptEvents(t, promptID))

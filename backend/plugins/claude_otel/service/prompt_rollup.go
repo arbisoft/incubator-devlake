@@ -23,6 +23,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/models/domainlayer"
@@ -48,6 +49,9 @@ const (
 	// would otherwise fail every later batch that touches its prompt or session.
 	maxCommandSourceLength = 32 // ai_prompts.command_source
 	maxAiLabelLength       = 64 // skill invocation_trigger and skill_source, permission modes and trigger
+	// maxRepositoryURLLength is the width of ai_prompts.repository_url. A longer URL is left
+	// out rather than truncated, because a truncated URL would name a different repository.
+	maxRepositoryURLLength = 255
 )
 
 // subagentToolNames launch a subagent; Task is the legacy name of Agent.
@@ -233,8 +237,12 @@ func buildPromptRollup(workspaceKey, promptID string, events []*models.OtelEvent
 			fillPromptIdentity(prompt, event)
 		}
 		prompt.EndedAt = latestTime(prompt.EndedAt, event.EventTimestamp)
+		attributes := eventAttributes(event)
+		if prompt.RepositoryUrl == nil {
+			prompt.RepositoryUrl = repositoryURL(attributes)
+		}
 		if apply, handled := promptEventAppliers[event.EventName]; handled {
-			apply(builder, event, eventAttributes(event))
+			apply(builder, event, attributes)
 		}
 	}
 	prompt.ModelsUsed = truncate(strings.Join(builder.modelNames, ","), maxModelsUsedLength)
@@ -320,6 +328,19 @@ func (b *promptBuilder) applyToolDecision(_ *models.OtelEvent, attributes map[st
 func (b *promptBuilder) applySkillActivated(event *models.OtelEvent, attributes map[string]interface{}) {
 	b.skills.add(event.SkillName, ai.SkillDetectedViaActivation, truncate(eventString(attributes, "invocation_trigger"), maxAiLabelLength),
 		truncate(eventString(attributes, "skill.source"), maxAiLabelLength), event.PluginName, event.EventTimestamp)
+}
+
+// repositoryURL returns an event's normalized repository URL, or nil when it has none, it
+// is not a remote repository URL, or it does not fit ai_prompts.repository_url. Ingest
+// already normalized it; normalizing again keeps the column clean for events stored from
+// earlier raw batches. Claude Code derives it once per session, so every event of a prompt
+// carries the same value.
+func repositoryURL(attributes map[string]interface{}) *string {
+	url, ok := normalizeRepositoryURL(eventString(attributes, repositoryURLAttribute))
+	if !ok || utf8.RuneCountInString(url) > maxRepositoryURLLength {
+		return nil
+	}
+	return &url
 }
 
 func fillPromptIdentity(prompt *ai.AiPrompt, event *models.OtelEvent) {

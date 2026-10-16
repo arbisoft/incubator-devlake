@@ -54,6 +54,12 @@ type AiPrompt struct {
 	StartedAt          time.Time `gorm:"type:datetime(3);index" json:"startedAt"`
 	EndedAt            time.Time `gorm:"type:datetime(3)" json:"endedAt"`
 	PromptLength       int64     `json:"promptLength"`
+	// RepositoryUrl is the origin remote of the repository the prompt ran in, from Claude
+	// Code's vcs.repository.url.full. DevLake lowercases it, drops credentials and the .git
+	// suffix, and rewrites SSH remotes as https. It is nil when the session had no origin remote or the client did not
+	// report one. Compare it with LOWER(repos.url), then join project_mapping, for the DevLake
+	// project.
+	RepositoryUrl *string `gorm:"type:varchar(255);index" json:"repositoryUrl,omitempty"`
 	// CommandName is the slash command the prompt invoked, if any.
 	CommandName   string `gorm:"type:varchar(255);index" json:"commandName"`
 	CommandSource string `gorm:"type:varchar(32)" json:"commandSource"`

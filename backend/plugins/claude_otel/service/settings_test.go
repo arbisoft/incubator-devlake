@@ -34,13 +34,14 @@ func TestManagedSettingsExportEventsWithPromptTextOnly(t *testing.T) {
 	env := responseWithSettings(connection, nil, credential, password).ManagedSettings.Env
 
 	want := map[string]string{
-		envLogsExporter:            otlpExporter,
-		envLogToolDetails:          envFlagOn,
-		envMetricsIncludeSessionID: envBoolTrue,
-		envLogUserPrompts:          envFlagOn,
-		envLogAssistantResponses:   envFlagOff,
-		envLogToolContent:          envFlagOff,
-		envLogRawAPIBodies:         envFlagOff,
+		envLogsExporter:             otlpExporter,
+		envLogToolDetails:           envFlagOn,
+		envMetricsIncludeSessionID:  envBoolTrue,
+		envMetricsIncludeRepository: envBoolTrue,
+		envLogUserPrompts:           envFlagOn,
+		envLogAssistantResponses:    envFlagOff,
+		envLogToolContent:           envFlagOff,
+		envLogRawAPIBodies:          envFlagOff,
 	}
 	for key, value := range want {
 		if env[key] != value {
