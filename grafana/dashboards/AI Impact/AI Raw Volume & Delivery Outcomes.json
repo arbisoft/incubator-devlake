@@ -40,7 +40,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "**Scope & caveats:**\n\n- **AI usage/activity figures on this dashboard come from Claude Code OTel** and are scoped through the connection-to-project mapping and the Project/Claude Code OTel Teams filters above. Activity totals use `canonical_activity` rows; model-usage totals come from `ai_model_usages`. Legacy Claude Admin-API and Cursor activity are excluded — neither carries a reliable per-project mapping, so mixing them in made the “Company-wide” figures uncomparable to the project-scoped delivery panels below.\n- **Active Hours** is queried directly from Claude Code's OTel telemetry, not the shared `ai_activities` table — session duration isn't rolled up into the domain layer for any provider.\n- **Commits/code churn in closed, unmerged PRs** require at least one closed PR and no merged or open PR association for the same commit SHA in the same base repository. All commit/PR checks use the PR base repository; PRs in another repository do not affect qualification. Closed-PR commit counts come directly from recorded PR associations without requiring repository history or commit metadata; closed-PR churn requires commit metadata, so it can cover fewer commits. Each SHA is counted once per panel if any selected accessible repository qualifies. A SHA shared across repositories can therefore qualify in both categories; these totals should not be added as disjoint sets.\n- **Commits/code churn without recorded PRs** have no recorded PR association of any status in a qualifying repository, and are not a merged PR's merge commit there. This includes branches without PRs and direct-to-default-branch commits; it does not prove the commits never reached main or bypassed review. Counts depend on complete commit/PR ingestion, and historical associations may remain after branch history changes. Equivalent code can ship under another SHA (for example, through squashing or cherry-picking). Known overcounts: rebase-merged PRs (every rewritten commit except the merge result), GitLab MRs that are squashed and also get a merge commit (DevLake stores only the merge commit, so the squash commit looks unassociated; a backend fix is tracked separately), and merges of PRs that DevLake never collected.\n- **Reporting periods and line counts:** PRs Closed, Never Merged and the closed-PR commit/churn panels use PR closure dates; commits may have been created before the selected period. The merged-PR exclusion checks all dates. Panels without recorded PRs use commit dates and check PR associations across all dates, so their reporting periods differ from the closed-PR panels. Code churn is shown in lines (additions + deletions), counted once per SHA, and only covers commits with additions/deletions metadata; it shows no data when none of the qualifying commits have it. Repeated edits are counted; this is not unique abandoned code.\n- **PR Abandonment Rate** is the delivery-outcome view of the same problem: no field links an AI session to the branch or PR it produced, so a dollar/token cost can't be attached to abandoned work directly. This table measures it a different way instead — PR-level: (PRs authored that closed without merging) ÷ (all PRs authored) — as an outcome-based proxy for wasted effort, not an AI-cost-denominated one.",
+        "content": "**Scope & caveats:**\n\n- **AI usage/activity figures on this dashboard come from Claude Code OTel** and are scoped through the connection-to-project mapping and the Project/Claude Code OTel Teams filters above. Activity totals use `canonical_activity` rows; model-usage totals come from `ai_model_usages`. Legacy Claude Admin-API and Cursor activity are excluded — neither carries a reliable per-project mapping, so mixing them in made the “Company-wide” figures uncomparable to the project-scoped delivery panels below.\n- **Active Hours** is queried directly from Claude Code's OTel telemetry, not the shared `ai_activities` table — session duration isn't rolled up into the domain layer for any provider.\n- **Commits/code churn in closed, unmerged PRs** require at least one closed PR and no merged or open PR association for the same commit SHA in the same base repository. All commit/PR checks use the PR base repository; PRs in another repository do not affect qualification. Closed-PR commit counts come directly from recorded PR associations without requiring repository history or commit metadata; closed-PR churn requires commit metadata, so it can cover fewer commits. Each SHA is counted once per panel if any selected accessible repository qualifies. A SHA shared across repositories can therefore qualify in both categories; these totals should not be added as disjoint sets.\n- **Commits/code churn without recorded PRs** have no recorded PR association of any status in a qualifying repository, and are not a merged PR's merge commit there. This includes branches without PRs and direct-to-default-branch commits; it does not prove the commits never reached main or bypassed review. Counts depend on complete commit/PR ingestion, and historical associations may remain after branch history changes. Equivalent code can ship under another SHA (for example, through squashing or cherry-picking). Known overcounts: rebase-merged PRs (every rewritten commit except the merge result), GitLab MRs that are squashed and also get a merge commit (DevLake stores only the merge commit, so the squash commit looks unassociated; a backend fix is tracked separately), and merges of PRs that DevLake never collected.\n- **Reporting periods and line counts:** PRs Closed, Never Merged and the closed-PR commit/churn panels use PR closure dates; commits may have been created before the selected period. The merged-PR exclusion checks all dates. Panels without recorded PRs use commit dates and check PR associations across all dates, so their reporting periods differ from the closed-PR panels. Code churn is shown in lines (additions + deletions), counted once per SHA, and only covers commits with additions/deletions metadata; it shows no data when none of the qualifying commits have it. Repeated edits are counted; this is not unique abandoned code.\n- **PR Abandonment Rate** is the delivery-outcome view of the same problem: no field links an AI session to the branch or PR it produced, so a dollar/token cost can't be attached to abandoned work directly. This table measures it a different way instead — PR-level: (PRs authored that closed without merging) ÷ (all PRs authored) — as an outcome-based proxy for wasted effort, not an AI-cost-denominated one.\n- **Developer filter:** AI figures match the developer's OTel email. PR and closed-PR figures match the PR author's GitHub account, and commit figures match the commit email, using the GitHub account that GitHub itself links to the developer's OTel email through their commits. Developers marked *no GitHub link* have no commits under their OTel email in the collected GitHub repos, so their PR and commit figures are empty rather than zero output; *no AI data* marks PR authors without OTel activity. An email that GitHub links to more than one account counts as *no GitHub link*. Account IDs are assumed to come from a single GitHub host (github.com).",
         "mode": "markdown"
       },
       "pluginVersion": "11.0.0",
@@ -62,7 +62,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "noValue": "—"
         },
         "overrides": []
       },
@@ -93,7 +94,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT SUM(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens) AS \"Tokens Burned\"\nFROM ai_model_usages\nWHERE source_connection_id IN (\n  SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n  INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n  WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n)\nAND $__timeFilter(date)",
+          "rawSql": "SELECT SUM(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens) AS \"Tokens Burned\"\nFROM ai_model_usages\nWHERE source_connection_id IN (\n  SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n  INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n  WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n)\nAND $__timeFilter(date) AND ('__all' IN ($developer_emails) OR user_email IN ($developer_emails))",
           "refId": "A"
         }
       ],
@@ -115,7 +116,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "noValue": "—"
         },
         "overrides": []
       },
@@ -146,7 +148,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT SUM(num_sessions) AS \"Sessions\"\nFROM ai_activities\nWHERE record_kind = 'canonical_activity'\n  AND source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  )\n  AND $__timeFilter(date)",
+          "rawSql": "SELECT SUM(num_sessions) AS \"Sessions\"\nFROM ai_activities\nWHERE record_kind = 'canonical_activity'\n  AND source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  )\n  AND $__timeFilter(date) AND ('__all' IN ($developer_emails) OR user_email IN ($developer_emails))",
           "refId": "A"
         }
       ],
@@ -168,7 +170,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "noValue": "—"
         },
         "overrides": []
       },
@@ -199,7 +202,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT ROUND(SUM(ha.active_time_seconds) / 3600.0, 1) AS \"Active Hours\"\nFROM _tool_claude_code_otel_hourly_activity ha\nWHERE ha.connection_id IN (\n  SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n  INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n  WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n)\nAND $__timeFilter(ha.hour_start)",
+          "rawSql": "SELECT ROUND(SUM(ha.active_time_seconds) / 3600.0, 1) AS \"Active Hours\"\nFROM _tool_claude_code_otel_hourly_activity ha\nWHERE ha.connection_id IN (\n  SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n  INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n  WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n)\nAND $__timeFilter(ha.hour_start) AND ('__all' IN ($developer_emails) OR ha.user_email IN ($developer_emails))",
           "refId": "A"
         }
       ],
@@ -221,7 +224,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "noValue": "—"
         },
         "overrides": []
       },
@@ -252,7 +256,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT SUM(lines_added) AS \"Lines Added\"\nFROM ai_activities\nWHERE record_kind = 'canonical_activity'\n  AND source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  )\n  AND $__timeFilter(date)",
+          "rawSql": "SELECT SUM(lines_added) AS \"Lines Added\"\nFROM ai_activities\nWHERE record_kind = 'canonical_activity'\n  AND source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  )\n  AND $__timeFilter(date) AND ('__all' IN ($developer_emails) OR user_email IN ($developer_emails))",
           "refId": "A"
         }
       ],
@@ -274,7 +278,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "noValue": "—"
         },
         "overrides": []
       },
@@ -305,7 +310,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT SUM(lines_removed) AS \"Lines Removed\"\nFROM ai_activities\nWHERE record_kind = 'canonical_activity'\n  AND source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  )\n  AND $__timeFilter(date)",
+          "rawSql": "SELECT SUM(lines_removed) AS \"Lines Removed\"\nFROM ai_activities\nWHERE record_kind = 'canonical_activity'\n  AND source_connection_id IN (\n    SELECT cp.connection_id FROM _tool_claude_code_otel_connection_projects cp\n    INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n    WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND (c.team_slug REGEXP '^(${otel_teams:regex})$' AND c.team_slug IN (SELECT c_g.team_slug FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring}))\n  )\n  AND $__timeFilter(date) AND ('__all' IN ($developer_emails) OR user_email IN ($developer_emails))",
           "refId": "A"
         }
       ],
@@ -327,7 +332,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "noValue": "—"
         },
         "overrides": []
       },
@@ -358,7 +364,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) AS \"PRs Merged\"\nFROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\nWHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(pr.merged_date)",
+          "rawSql": "SELECT COUNT(*) AS \"PRs Merged\"\nFROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\nWHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer) OR (pr.author_id LIKE 'github:GithubAccount:%' AND CONCAT('gh:', SUBSTRING_INDEX(pr.author_id, ':', -1)) IN ($developer)))",
           "refId": "A"
         }
       ],
@@ -393,7 +399,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "noValue": "—"
         },
         "overrides": []
       },
@@ -424,7 +431,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(DISTINCT pr.id) AS \"PRs Closed, Never Merged\"\nFROM pull_requests pr\nJOIN project_mapping pm ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\nWHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status = 'CLOSED' AND $__timeFilter(pr.closed_date)",
+          "rawSql": "SELECT COUNT(DISTINCT pr.id) AS \"PRs Closed, Never Merged\"\nFROM pull_requests pr\nJOIN project_mapping pm ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\nWHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status = 'CLOSED' AND $__timeFilter(pr.closed_date) AND ('__all' IN ($developer) OR (pr.author_id LIKE 'github:GithubAccount:%' AND CONCAT('gh:', SUBSTRING_INDEX(pr.author_id, ':', -1)) IN ($developer)))",
           "refId": "A"
         }
       ],
@@ -446,7 +453,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "noValue": "—"
         },
         "overrides": []
       },
@@ -477,7 +485,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH scoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nactive_shas AS (\n  SELECT DISTINCT pr.base_repo_id AS repo_id, prc.commit_sha AS sha\n  FROM pull_requests pr\n  JOIN pull_request_commits prc ON prc.pull_request_id = pr.id\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND pr.status IN ('MERGED', 'OPEN')\n),\nclosed_shas AS (\n  SELECT DISTINCT prc.commit_sha AS sha\n  FROM pull_requests pr\n  JOIN pull_request_commits prc ON prc.pull_request_id = pr.id\n  LEFT JOIN active_shas act ON act.repo_id = pr.base_repo_id AND act.sha = prc.commit_sha\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND pr.status = 'CLOSED'\n    AND $__timeFilter(pr.closed_date)\n    AND act.sha IS NULL\n)\nSELECT\n  COUNT(*) AS \"Commits in Closed, Unmerged PRs\",\n  CASE WHEN COUNT(*) > 0 AND COUNT(c.additions) = 0 THEN NULL\n    ELSE COALESCE(SUM(COALESCE(c.additions, 0) + COALESCE(c.deletions, 0)), 0)\n  END AS \"Code Churn in Closed, Unmerged PRs\"\nFROM closed_shas s\nLEFT JOIN commits c ON c.sha = s.sha",
+          "rawSql": "WITH scoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nactive_shas AS (\n  SELECT DISTINCT pr.base_repo_id AS repo_id, prc.commit_sha AS sha\n  FROM pull_requests pr\n  JOIN pull_request_commits prc ON prc.pull_request_id = pr.id\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND pr.status IN ('MERGED', 'OPEN')\n),\nclosed_shas AS (\n  SELECT DISTINCT prc.commit_sha AS sha\n  FROM pull_requests pr\n  JOIN pull_request_commits prc ON prc.pull_request_id = pr.id\n  LEFT JOIN active_shas act ON act.repo_id = pr.base_repo_id AND act.sha = prc.commit_sha\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND pr.status = 'CLOSED'\n    AND $__timeFilter(pr.closed_date) AND ('__all' IN ($developer) OR (pr.author_id LIKE 'github:GithubAccount:%' AND CONCAT('gh:', SUBSTRING_INDEX(pr.author_id, ':', -1)) IN ($developer)))\n    AND act.sha IS NULL\n)\nSELECT\n  COUNT(*) AS \"Commits in Closed, Unmerged PRs\",\n  CASE WHEN COUNT(*) > 0 AND COUNT(c.additions) = 0 THEN NULL\n    ELSE COALESCE(SUM(COALESCE(c.additions, 0) + COALESCE(c.deletions, 0)), 0)\n  END AS \"Code Churn in Closed, Unmerged PRs\"\nFROM closed_shas s\nLEFT JOIN commits c ON c.sha = s.sha",
           "refId": "A"
         }
       ],
@@ -514,7 +522,8 @@
               }
             ]
           },
-          "unit": "suffix:lines"
+          "unit": "suffix:lines",
+          "noValue": "—"
         },
         "overrides": []
       },
@@ -580,7 +589,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "noValue": "—"
         },
         "overrides": []
       },
@@ -611,7 +621,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH scoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\npr_shas AS (\n  SELECT pr.base_repo_id AS repo_id, prc.commit_sha AS sha\n  FROM pull_requests pr\n  JOIN pull_request_commits prc ON prc.pull_request_id = pr.id\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n  UNION\n  SELECT mpr.base_repo_id, mpr.merge_commit_sha\n  FROM pull_requests mpr\n  WHERE mpr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND mpr.status = 'MERGED' AND mpr.merge_commit_sha <> ''\n),\nno_pr AS (\n  SELECT DISTINCT c.sha, c.additions, c.deletions\n  FROM commits c\n  JOIN repo_commits rc ON rc.commit_sha = c.sha\n  JOIN scoped_repos s ON s.repo_id = rc.repo_id\n  LEFT JOIN pr_shas p ON p.repo_id = rc.repo_id AND p.sha = c.sha\n  WHERE p.sha IS NULL AND $__timeFilter(c.committed_date)\n)\nSELECT\n  COUNT(*) AS \"Commits Without PRs\",\n  CASE WHEN COUNT(*) > 0 AND COUNT(additions) = 0 THEN NULL\n    ELSE COALESCE(SUM(COALESCE(additions, 0) + COALESCE(deletions, 0)), 0)\n  END AS \"Code Churn Without Recorded PRs\"\nFROM no_pr",
+          "rawSql": "WITH scoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\npr_shas AS (\n  SELECT pr.base_repo_id AS repo_id, prc.commit_sha AS sha\n  FROM pull_requests pr\n  JOIN pull_request_commits prc ON prc.pull_request_id = pr.id\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n  UNION\n  SELECT mpr.base_repo_id, mpr.merge_commit_sha\n  FROM pull_requests mpr\n  WHERE mpr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND mpr.status = 'MERGED' AND mpr.merge_commit_sha <> ''\n),\nno_pr AS (\n  SELECT DISTINCT c.sha, c.additions, c.deletions\n  FROM commits c\n  JOIN repo_commits rc ON rc.commit_sha = c.sha\n  JOIN scoped_repos s ON s.repo_id = rc.repo_id\n  LEFT JOIN pr_shas p ON p.repo_id = rc.repo_id AND p.sha = c.sha\n  WHERE p.sha IS NULL AND $__timeFilter(c.committed_date) AND ('__all' IN ($developer_emails) OR c.author_email IN ($developer_emails))\n)\nSELECT\n  COUNT(*) AS \"Commits Without PRs\",\n  CASE WHEN COUNT(*) > 0 AND COUNT(additions) = 0 THEN NULL\n    ELSE COALESCE(SUM(COALESCE(additions, 0) + COALESCE(deletions, 0)), 0)\n  END AS \"Code Churn Without Recorded PRs\"\nFROM no_pr",
           "refId": "A"
         }
       ],
@@ -648,7 +658,8 @@
               }
             ]
           },
-          "unit": "suffix:lines"
+          "unit": "suffix:lines",
+          "noValue": "—"
         },
         "overrides": []
       },
@@ -700,12 +711,207 @@
       ]
     },
     {
+      "datasource": "mysql",
+      "description": "Neutral bars: PRs merged that week. Orange bars: PRs closed that week without being merged. Both are PR counts on one shared axis. Hover for the abandonment rate: closed ÷ (merged + closed). Completed weeks only; weeks begin Monday, and weeks with no data show as zero. Uses the Project filter and follows the Developer filter; the OTel Teams filter does not apply.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 70,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 0,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Abandonment rate"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": false
+                }
+              },
+              {
+                "id": "noValue",
+                "value": "N/A"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "text",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "PRs merged"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "text",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 80
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "PRs"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "displayName",
+                "value": "PRs merged"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "PRs closed, never merged"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 80
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "displayName",
+                "value": "PRs closed, never merged"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 25
+      },
+      "id": 16,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.9,
+        "fullHighlight": false,
+        "groupWidth": 0.8,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "never",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xField": "Week",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH RECURSIVE merged AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY), '%Y-%m-%d') AS week, COUNT(DISTINCT pr.id) AS n\n  FROM project_pr_metrics ppm JOIN pull_requests pr ON pr.id = ppm.id\n  WHERE ppm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date) AND ('__all' IN ($developer) OR (pr.author_id LIKE 'github:GithubAccount:%' AND CONCAT('gh:', SUBSTRING_INDEX(pr.author_id, ':', -1)) IN ($developer)))\n  GROUP BY 1\n),\nclosed AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(pr.closed_date), INTERVAL WEEKDAY(pr.closed_date) DAY), '%Y-%m-%d') AS week, COUNT(DISTINCT pr.id) AS n\n  FROM pull_requests pr\n  JOIN project_mapping pm ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\n  WHERE pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)) AND pr.status = 'CLOSED' AND $__timeFilter(pr.closed_date) AND ('__all' IN ($developer) OR (pr.author_id LIKE 'github:GithubAccount:%' AND CONCAT('gh:', SUBSTRING_INDEX(pr.author_id, ':', -1)) IN ($developer)))\n  GROUP BY 1\n),\nwk AS (\n  SELECT DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY) AS d\n  UNION ALL\n  SELECT DATE_ADD(d, INTERVAL 7 DAY) FROM wk WHERE DATE_ADD(d, INTERVAL 7 DAY) < $__timeTo()\n),\nweeks AS (\n  SELECT DATE_FORMAT(d, '%Y-%m-%d') AS week FROM wk\n  WHERE TIMESTAMP(d) >= $__timeFrom() AND TIMESTAMP(DATE_ADD(d, INTERVAL 7 DAY)) <= DATE_ADD($__timeTo(), INTERVAL 1 SECOND)\n)\nSELECT DATE_FORMAT(w.week, '%b %e') AS \"Week\",\n  ROUND(100.0 * COALESCE(c.n, 0) / NULLIF(COALESCE(m.n, 0) + COALESCE(c.n, 0), 0), 1) AS \"Abandonment rate\",\n  COALESCE(m.n, 0) AS \"PRs merged\",\n  COALESCE(c.n, 0) AS \"PRs closed, never merged\"\nFROM weeks w\nLEFT JOIN merged m ON m.week = w.week\nLEFT JOIN closed c ON c.week = w.week\nORDER BY w.week",
+          "refId": "A"
+        }
+      ],
+      "title": "PRs Merged and Closed Without Merging (Weekly)",
+      "type": "barchart"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 25
+        "y": 35
       },
       "id": 12,
       "panels": [],
@@ -735,7 +941,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 26
+        "y": 36
       },
       "id": 13,
       "options": {
@@ -755,7 +961,7 @@
           "datasource": "mysql",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(NULLIF(a.full_name,''), pr.author_name) AS \"Contributor\",\n  COUNT(*) AS \"Total PRs\",\n  SUM(pr.status = 'CLOSED') AS \"Abandoned (Closed, Never Merged)\",\n  ROUND(100.0 * SUM(pr.status = 'CLOSED') / COUNT(*), 1) AS \"Abandonment Rate %\"\nFROM pull_requests pr\nLEFT JOIN accounts a ON a.id = pr.author_id\nWHERE pr.base_repo_id IN (SELECT pm.row_id FROM project_mapping pm WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))) AND pr.status IN ('CLOSED', 'MERGED') AND COALESCE(pr.merged_date, pr.closed_date) BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY COALESCE(NULLIF(a.full_name,''), pr.author_name)\nHAVING COUNT(*) >= 5\nORDER BY 4 DESC\nLIMIT 25",
+          "rawSql": "SELECT COALESCE(NULLIF(a.full_name,''), pr.author_name) AS \"Contributor\",\n  COUNT(*) AS \"Total PRs\",\n  SUM(pr.status = 'CLOSED') AS \"Abandoned (Closed, Never Merged)\",\n  ROUND(100.0 * SUM(pr.status = 'CLOSED') / COUNT(*), 1) AS \"Abandonment Rate %\"\nFROM pull_requests pr\nLEFT JOIN accounts a ON a.id = pr.author_id\nWHERE pr.base_repo_id IN (SELECT pm.row_id FROM project_mapping pm WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))) AND pr.status IN ('CLOSED', 'MERGED') AND COALESCE(pr.merged_date, pr.closed_date) BETWEEN $__timeFrom() AND $__timeTo() AND ('__all' IN ($developer) OR (pr.author_id LIKE 'github:GithubAccount:%' AND CONCAT('gh:', SUBSTRING_INDEX(pr.author_id, ':', -1)) IN ($developer)))\nGROUP BY COALESCE(NULLIF(a.full_name,''), pr.author_name)\nHAVING COUNT(*) >= 5\nORDER BY 4 DESC\nLIMIT 25",
           "refId": "A"
         }
       ],
@@ -822,6 +1028,58 @@
         "skipUrlSync": false,
         "sort": 1,
         "type": "query"
+      },
+      {
+        "allValue": "'__all'",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "WITH scoped_conn AS (\n  SELECT cp.connection_id\n  FROM _tool_claude_code_otel_connection_projects cp\n  INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n  WHERE c.status = 'active'\n    AND cp.project_name REGEXP '^(${project:regex})$' AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring})\n    AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n),\notel AS (\n  SELECT user_email AS email FROM ai_activities\n  WHERE record_kind = 'canonical_activity' AND user_email <> '' AND source_connection_id IN (SELECT connection_id FROM scoped_conn) AND $__timeFilter(date)\n  UNION\n  SELECT user_email FROM ai_model_usages\n  WHERE user_email <> '' AND source_connection_id IN (SELECT connection_id FROM scoped_conn) AND $__timeFilter(date)\n),\nlinked AS (\n  SELECT o.email, MIN(g.author_id) AS gid\n  FROM otel o\n  JOIN _tool_github_commits g ON g.author_email = o.email AND g.author_id > 0\n  GROUP BY o.email\n  HAVING COUNT(DISTINCT g.author_id) = 1\n),\npr_authors AS (\n  SELECT CAST(SUBSTRING_INDEX(pr.author_id, ':', -1) AS UNSIGNED) AS gid, MAX(pr.author_name) AS login\n  FROM pull_requests pr\n  JOIN project_mapping pm ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\n  WHERE pm.project_name REGEXP '^(${project:regex})$' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring})\n    AND pr.author_id LIKE 'github:GithubAccount:%' AND pr.author_name NOT LIKE '%[bot]'\n    AND ($__timeFilter(pr.created_date) OR $__timeFilter(pr.merged_date) OR $__timeFilter(pr.closed_date))\n  GROUP BY 1\n),\npeople AS (\n  SELECT CONCAT('gh:', l.gid) AS k, l.gid, MIN(l.email) AS email, NULL AS login, 1 AS has_ai FROM linked l GROUP BY l.gid\n  UNION ALL\n  SELECT CONCAT('em:', o.email), NULL, o.email, NULL, 1 FROM otel o WHERE o.email NOT IN (SELECT email FROM linked)\n  UNION ALL\n  SELECT CONCAT('gh:', p.gid), p.gid, NULL, p.login, 0 FROM pr_authors p WHERE p.gid NOT IN (SELECT gid FROM linked)\n),\nnamed AS (\n  SELECT p.k, p.has_ai, COALESCE(ga.login, p.login, p.email) AS handle,\n    COALESCE(NULLIF(ga.name, ''), ga.login, p.login, p.email) AS name\n  FROM people p\n  LEFT JOIN (SELECT id, MAX(login) AS login, MAX(name) AS name FROM _tool_github_accounts GROUP BY id) ga ON ga.id = p.gid\n)\nSELECT CONCAT(\n    name,\n    CASE WHEN COUNT(*) OVER (PARTITION BY name) > 1 AND handle <> name THEN CONCAT(' (', handle, ')') ELSE '' END,\n    CASE WHEN k LIKE 'em:%' THEN ' · no GitHub link' WHEN has_ai = 0 THEN ' · no AI data' ELSE '' END\n  ) AS __text,\n  k AS __value\nFROM named\nORDER BY has_ai DESC, __text;",
+        "description": "OTel developers in the selected projects and teams, plus GitHub authors of PRs in the selected projects. AI data matches on OTel email; PRs match on the GitHub account that GitHub links to that email through commits. Task and defect panels ignore this filter.",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Developer",
+        "multi": true,
+        "name": "developer",
+        "options": [],
+        "query": "WITH scoped_conn AS (\n  SELECT cp.connection_id\n  FROM _tool_claude_code_otel_connection_projects cp\n  INNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\n  WHERE c.status = 'active'\n    AND cp.project_name REGEXP '^(${project:regex})$' AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring})\n    AND c.team_slug REGEXP '^(${otel_teams:regex})$'\n),\notel AS (\n  SELECT user_email AS email FROM ai_activities\n  WHERE record_kind = 'canonical_activity' AND user_email <> '' AND source_connection_id IN (SELECT connection_id FROM scoped_conn) AND $__timeFilter(date)\n  UNION\n  SELECT user_email FROM ai_model_usages\n  WHERE user_email <> '' AND source_connection_id IN (SELECT connection_id FROM scoped_conn) AND $__timeFilter(date)\n),\nlinked AS (\n  SELECT o.email, MIN(g.author_id) AS gid\n  FROM otel o\n  JOIN _tool_github_commits g ON g.author_email = o.email AND g.author_id > 0\n  GROUP BY o.email\n  HAVING COUNT(DISTINCT g.author_id) = 1\n),\npr_authors AS (\n  SELECT CAST(SUBSTRING_INDEX(pr.author_id, ':', -1) AS UNSIGNED) AS gid, MAX(pr.author_name) AS login\n  FROM pull_requests pr\n  JOIN project_mapping pm ON pm.row_id = pr.base_repo_id AND pm.`table` = 'repos'\n  WHERE pm.project_name REGEXP '^(${project:regex})$' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring})\n    AND pr.author_id LIKE 'github:GithubAccount:%' AND pr.author_name NOT LIKE '%[bot]'\n    AND ($__timeFilter(pr.created_date) OR $__timeFilter(pr.merged_date) OR $__timeFilter(pr.closed_date))\n  GROUP BY 1\n),\npeople AS (\n  SELECT CONCAT('gh:', l.gid) AS k, l.gid, MIN(l.email) AS email, NULL AS login, 1 AS has_ai FROM linked l GROUP BY l.gid\n  UNION ALL\n  SELECT CONCAT('em:', o.email), NULL, o.email, NULL, 1 FROM otel o WHERE o.email NOT IN (SELECT email FROM linked)\n  UNION ALL\n  SELECT CONCAT('gh:', p.gid), p.gid, NULL, p.login, 0 FROM pr_authors p WHERE p.gid NOT IN (SELECT gid FROM linked)\n),\nnamed AS (\n  SELECT p.k, p.has_ai, COALESCE(ga.login, p.login, p.email) AS handle,\n    COALESCE(NULLIF(ga.name, ''), ga.login, p.login, p.email) AS name\n  FROM people p\n  LEFT JOIN (SELECT id, MAX(login) AS login, MAX(name) AS name FROM _tool_github_accounts GROUP BY id) ga ON ga.id = p.gid\n)\nSELECT CONCAT(\n    name,\n    CASE WHEN COUNT(*) OVER (PARTITION BY name) > 1 AND handle <> name THEN CONCAT(' (', handle, ')') ELSE '' END,\n    CASE WHEN k LIKE 'em:%' THEN ' · no GitHub link' WHEN has_ai = 0 THEN ' · no AI data' ELSE '' END\n  ) AS __text,\n  k AS __value\nFROM named\nORDER BY has_ai DESC, __text;",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "SELECT '__none' AS __value\nUNION SELECT '__all' FROM DUAL WHERE '__all' IN ($developer)\nUNION SELECT user_email FROM ai_activities WHERE '__all' NOT IN ($developer) AND CONCAT('em:', user_email) IN ($developer)\nUNION SELECT user_email FROM ai_model_usages WHERE '__all' NOT IN ($developer) AND CONCAT('em:', user_email) IN ($developer)\nUNION SELECT g.author_email FROM _tool_github_commits g\n  WHERE '__all' NOT IN ($developer) AND g.author_id > 0 AND CONCAT('gh:', g.author_id) IN ($developer)\n    AND g.author_email IN (SELECT author_email FROM _tool_github_commits WHERE author_id > 0 GROUP BY author_email HAVING COUNT(DISTINCT author_id) = 1)",
+        "description": "Emails behind the Developer selection, resolved once for every panel.",
+        "hide": 2,
+        "includeAll": true,
+        "multi": true,
+        "name": "developer_emails",
+        "options": [],
+        "query": "SELECT '__none' AS __value\nUNION SELECT '__all' FROM DUAL WHERE '__all' IN ($developer)\nUNION SELECT user_email FROM ai_activities WHERE '__all' NOT IN ($developer) AND CONCAT('em:', user_email) IN ($developer)\nUNION SELECT user_email FROM ai_model_usages WHERE '__all' NOT IN ($developer) AND CONCAT('em:', user_email) IN ($developer)\nUNION SELECT g.author_email FROM _tool_github_commits g\n  WHERE '__all' NOT IN ($developer) AND g.author_id > 0 AND CONCAT('gh:', g.author_id) IN ($developer)\n    AND g.author_email IN (SELECT author_email FROM _tool_github_commits WHERE author_id > 0 GROUP BY author_email HAVING COUNT(DISTINCT author_id) = 1)",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": true,
+        "sort": 0,
+        "type": "query"
       }
     ]
   },
@@ -834,5 +1092,5 @@
   "title": "AI Raw Volume & Delivery Outcomes",
   "uid": "ai_raw_volume",
   "version": 2,
-  "weekStart": ""
+  "weekStart": "monday"
 }
