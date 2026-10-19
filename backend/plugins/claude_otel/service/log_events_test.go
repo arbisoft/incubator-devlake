@@ -431,6 +431,72 @@ func TestPrepareEventsStoresOnlyAllowlistedAttributes(t *testing.T) {
 	}
 }
 
+// A raw batch stored before ingest normalized the repository URL is converted again on
+// replay, so conversion normalizes it too, the same way ingest does.
+func TestStoredAttributesNormalizesTheRepositoryURL(t *testing.T) {
+	tests := []struct {
+		name  string
+		value interface{}
+		want  string
+	}{
+		{"credentials, case and .git", "https://user:secret@GitHub.com/Org/Repo.git", "https://github.com/org/repo"},
+		{"already normalized", "https://github.com/org/repo", "https://github.com/org/repo"},
+		{"local drive path", "C:/Users/dev/repos/origin.git", ""},
+		{"not a string", int64(42), ""},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			stored := storedAttributes(map[string]interface{}{
+				repositoryURLAttribute: test.value,
+				"vcs.repository.name":  "Repo",
+				"vcs.owner.name":       "Org",
+				"assistant_draft":      "content from a future release",
+			})
+			if got := stored[repositoryURLAttribute]; got != test.want {
+				t.Fatalf("repository url = %#v, want %q", got, test.want)
+			}
+			if stored["vcs.repository.name"] != "Repo" || stored["vcs.owner.name"] != "Org" {
+				t.Fatalf("stored = %v, want the other vcs attributes untouched", stored)
+			}
+			if _, kept := stored["assistant_draft"]; kept {
+				t.Fatalf("stored = %v, want attributes outside the allowlist dropped", stored)
+			}
+		})
+	}
+
+	stored := storedAttributes(map[string]interface{}{"vcs.repository.name": "Repo"})
+	if _, added := stored[repositoryURLAttribute]; added || len(stored) != 1 {
+		t.Fatalf("stored = %v, want no repository url added", stored)
+	}
+}
+
+func TestPrepareEventsNormalizesTheStoredRepositoryURL(t *testing.T) {
+	const secret = "ghp_replaysecret"
+	request := loadLogEventsFixture(t)
+	stripContentAttributes(request)
+	for _, record := range resourceLogRecords(request.GetResourceLogs()[0]) {
+		setStringAttribute(record, repositoryURLAttribute, "https://user:"+secret+"@GitHub.com/Example-Org/Example-Repo.git")
+	}
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
+
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 9)
+	if err != nil || len(prepared.events) == 0 {
+		t.Fatalf("prepareEvents() = %v, %v; want events", prepared, err)
+	}
+	for _, item := range prepared.events {
+		if bytes.Contains(item.event.Attributes, []byte(secret)) {
+			t.Fatalf("%s attributes kept the credential: %s", item.event.EventName, item.event.Attributes)
+		}
+		var attributes map[string]interface{}
+		if err := json.Unmarshal(item.event.Attributes, &attributes); err != nil {
+			t.Fatalf("attributes are not JSON: %v", err)
+		}
+		if got := attributes[repositoryURLAttribute]; got != "https://github.com/example-org/example-repo" {
+			t.Fatalf("%s repository url = %v, want it normalized", item.event.EventName, got)
+		}
+	}
+}
+
 func setStringAttribute(record *logsv1.LogRecord, key, value string) {
 	attribute := &commonv1.KeyValue{Key: key, Value: &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: value}}}
 	record.Attributes = append(withoutAttributes(record.GetAttributes(), map[string]struct{}{key: {}}), attribute)

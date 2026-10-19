@@ -304,13 +304,20 @@ var storedEventAttributes = map[string]struct{}{
 	"from_mode": {}, "to_mode": {}, "trigger": {},
 }
 
-// storedAttributes returns the allowlisted subset of attributes.
+// storedAttributes returns the allowlisted subset of attributes, with the repository URL
+// normalized and blanked as ingest does. A raw batch stored before ingest normalized the URL,
+// or before a later normalization fix, is cleaned when it is replayed.
 func storedAttributes(attributes map[string]interface{}) map[string]interface{} {
 	stored := make(map[string]interface{}, len(attributes))
 	for key, value := range attributes {
 		if _, keep := storedEventAttributes[key]; keep {
 			stored[key] = value
 		}
+	}
+	if value, found := stored[repositoryURLAttribute]; found {
+		raw, _ := value.(string)
+		normalized, _ := normalizeRepositoryURL(raw)
+		stored[repositoryURLAttribute] = normalized
 	}
 	return stored
 }
