@@ -185,12 +185,17 @@ func unixNanoTime(value uint64) (time.Time, error) {
 	return time.Unix(0, int64(value)).UTC(), nil
 }
 
+// seriesHashSkippedPrefix marks the repository attributes metricSeriesHash leaves out. The
+// repository is read once per session, so it cannot tell two counters apart, and leaving
+// it out keeps a change to URL normalization from re-keying running cumulative series.
+const seriesHashSkippedPrefix = "vcs."
+
 // metricSeriesHash identifies one SDK counter for CUMULATIVE state; Claude Code exports
-// DELTA by default, which needs no state. Every resource and datapoint attribute is part of
-// OTLP stream identity: attributes such as effort or terminal.type distinguish separate
-// counters. Managed settings send session.id (for events), so cumulative state is one row
-// per session and counter. The counter start time already split it per CLI process, and
-// state idle for seriesStateRetention is deleted, so the table stays bounded.
+// DELTA by default, which needs no state. Every resource and datapoint attribute except
+// vcs.* is part of the identity: attributes such as effort or terminal.type distinguish
+// separate counters. Managed settings send session.id (for events), so cumulative state is
+// one row per session and counter. The counter start time already split it per CLI process,
+// and state idle for seriesStateRetention is deleted, so the table stays bounded.
 func metricSeriesHash(connectionID uint64, scope *commonv1.InstrumentationScope, metric *metricsv1.Metric, resourceAttrs []*commonv1.KeyValue, point *metricsv1.NumberDataPoint) []byte {
 	scopeIdentity, _ := proto.MarshalOptions{Deterministic: true}.Marshal(scope)
 	identity := []string{strconv.FormatUint(connectionID, 10), string(scopeIdentity), metric.GetName(), metric.GetUnit(), strconv.FormatUint(point.GetStartTimeUnixNano(), 10)}
@@ -203,6 +208,9 @@ func metricSeriesHash(connectionID uint64, scope *commonv1.InstrumentationScope,
 func prefixedAttributes(prefix string, attributes []*commonv1.KeyValue) []string {
 	values := make([]string, 0, len(attributes))
 	for _, attribute := range attributes {
+		if strings.HasPrefix(attribute.GetKey(), seriesHashSkippedPrefix) {
+			continue
+		}
 		value, err := proto.MarshalOptions{Deterministic: true}.Marshal(attribute.GetValue())
 		if err != nil {
 			continue

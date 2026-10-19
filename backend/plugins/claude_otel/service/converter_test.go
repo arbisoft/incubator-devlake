@@ -231,6 +231,31 @@ func TestMetricSeriesHashIncludesInstrumentationScope(t *testing.T) {
 	}
 }
 
+func TestMetricSeriesHashIgnoresRepositoryAttributes(t *testing.T) {
+	scope := &commonv1.InstrumentationScope{Name: "claude-code", Version: "1"}
+	metric := &metricsv1.Metric{Name: metricTokenUsage}
+	hash := func(repositoryURL, repositoryName, terminal string) []byte {
+		point := &metricsv1.NumberDataPoint{StartTimeUnixNano: 1, Attributes: []*commonv1.KeyValue{
+			stringAttribute("model", "claude-sonnet"),
+			stringAttribute("terminal.type", terminal),
+			stringAttribute(repositoryURLAttribute, repositoryURL),
+			stringAttribute("vcs.repository.name", repositoryName),
+		}}
+		resourceAttributes := []*commonv1.KeyValue{
+			stringAttribute("service.name", "claude-code"),
+			stringAttribute(repositoryURLAttribute, repositoryURL),
+		}
+		return metricSeriesHash(1, scope, metric, resourceAttributes, point)
+	}
+	first := hash("https://github.com/org/repo", "repo", "vscode")
+	if string(first) != string(hash("git@github.com:org/repo.git", "Repo", "vscode")) {
+		t.Fatal("metricSeriesHash() re-keyed a series when only vcs.* attributes changed")
+	}
+	if string(first) == string(hash("https://github.com/org/repo", "repo", "iTerm.app")) {
+		t.Fatal("metricSeriesHash() merged counters with different terminal.type")
+	}
+}
+
 func TestReplayRejectsCumulativeTelemetryWithoutMutatingDay(t *testing.T) {
 	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
 	request := newConverterRequest(observedAt, testOrganizationID)
