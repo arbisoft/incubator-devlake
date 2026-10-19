@@ -71,7 +71,7 @@ Follow the standards by rule ID. The rules that are most often missed:
   - Every dependency that is external, has side effects or isn't deterministic comes through the constructor, as a consumer-side interface.
   - No `time.Now()`, `http.DefaultClient`, `os.Getenv`, global vars or `init()` side effects in logic (DI-M, DI-H).
   - Constructors validate their required dependencies and do no I/O (DI-C2, DI-C4).
-  - Existing globals are wrapped once in an adapter at the boundary (DI-B1). Framework globals set at init (e.g. a plugin's `basicRes`) are read **only in the handler or task entry point**, which passes `GetDal()`, `GetLogger()` and config into constructor-injected services (DI-B3, DI-B4). Never read them from services or helpers.
+  - Existing globals are wrapped once in an adapter at the boundary (DI-B1). Framework globals set at init (e.g. a plugin's `basicRes`) are read **only in the handler or task entry point**, which passes `GetDal()`, `GetLogger()` and config into constructor-injected services (DI-B3, DI-B4). Never read them from services or helpers. Passing `taskCtx` into framework subtask helpers (`api.RawDataSubTaskArgs{Ctx: taskCtx}`, collectors, extractors, converters) and task-local helpers in the `tasks` package is fine (DI-B4).
 - **SOLID**:
   - Separate pure decision logic from I/O (SRP-2).
   - No growing switches on kind (OCP-1).
