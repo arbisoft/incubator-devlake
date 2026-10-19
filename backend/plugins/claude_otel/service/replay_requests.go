@@ -49,6 +49,12 @@ const (
 	replayDay                 = 24 * time.Hour
 )
 
+// Error codes the Config UI maps to its own copy.
+const (
+	OtelErrorAlreadyBound = "OTEL_ALREADY_BOUND"
+	OtelErrorReplayRange  = "OTEL_REPLAY_RANGE"
+)
+
 // OtelReplayRange is a pair of UTC calendar days, inclusive.
 type OtelReplayRange struct {
 	StartDate string `json:"startDate"`
@@ -132,7 +138,7 @@ func planReplayRanges(dates OtelReplayRange, createdAt *time.Time, now time.Time
 		return nil, errors.BadInput.New("The first day must be on or before the last day.")
 	}
 	if start.Before(earliest) || end.After(today) {
-		return nil, errors.BadInput.New(fmt.Sprintf("Pick days from %s to %s (UTC).", earliest.Format(replayDateLayout), today.Format(replayDateLayout)))
+		return nil, errors.BadInput.New(fmt.Sprintf("Pick days from %s to %s (UTC).", earliest.Format(replayDateLayout), today.Format(replayDateLayout)), errors.WithData(OtelErrorReplayRange))
 	}
 	chunks := make([]replayChunk, 0)
 	limit := end.AddDate(0, 0, 1)
@@ -183,14 +189,19 @@ func queueReplays(tx dal.Transaction, user *common.User, requestedFor *models.Ot
 		requestedForId = &requestedFor.ID
 	}
 	detail := replayAuditDetail{Queued: make([]uint64, 0), Reused: make([]uint64, 0), Ranges: make([]OtelReplayRange, 0, len(chunks))}
+	today := now.UTC().Truncate(replayDay)
 	for _, chunk := range chunks {
 		detail.Ranges = append(detail.Ranges, OtelReplayRange{StartDate: chunk.start.Format(replayDateLayout), EndDate: chunk.end.AddDate(0, 0, -1).Format(replayDateLayout)})
 		for _, kind := range replayKinds {
 			request := &models.OtelReplayRequest{}
-			err := tx.First(request,
+			lookup := []dal.Clause{
 				dal.Where("status = ? AND range_start <= ? AND range_end >= ? AND kind = ?", models.OtelReplayRequestStatusPending, chunk.start, chunk.end, kind),
 				dal.Orderby("id ASC"),
-			)
+			}
+			if kind == models.OtelReplayKindMetrics && !chunk.end.After(today) {
+				lookup = append(lookup, dal.Where("range_end <= ?", today))
+			}
+			err := tx.First(request, lookup...)
 			if err == nil {
 				detail.Reused = append(detail.Reused, request.ID)
 				queue.Reused = append(queue.Reused, replayView(request, now))
@@ -251,6 +262,9 @@ func replayView(request *models.OtelReplayRequest, now time.Time) OtelReplayView
 
 // CreateOtelReplay queues an all-teams rebuild for the chosen UTC days.
 func CreateOtelReplay(user *common.User, input *OtelReplayInput) (queue *OtelReplayQueue, result errors.Error) {
+	lifecycleMu.Lock()
+	defer lifecycleMu.Unlock()
+
 	var requestedFor *models.OtelConnection
 	var createdAt *time.Time
 	if input.RequestedForConnectionId != nil {
@@ -301,7 +315,7 @@ func RebindOtelOrganization(user *common.User, id uint64, input *OtelRebindInput
 	}
 	if connection.OrganizationId != nil {
 		if stored, ok := normalizeOrganizationID(*connection.OrganizationId); ok && stored == organizationId {
-			return nil, errors.BadInput.New("This connection is already bound to this organization.")
+			return nil, errors.BadInput.New("This connection is already bound to this organization.", errors.WithData(OtelErrorAlreadyBound))
 		}
 	}
 	oldValue := connection.OrganizationId

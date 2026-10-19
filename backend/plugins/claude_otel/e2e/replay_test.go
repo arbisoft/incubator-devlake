@@ -52,15 +52,17 @@ var e2eUser = &common.User{Name: "E2E", Email: "e2e@example.com"}
 
 // world is one test's database, clock anchors and service wiring.
 type world struct {
-	t      *testing.T
-	tester *e2ehelper.DataFlowTester
-	today  time.Time
-	now    time.Time
+	t       *testing.T
+	tester  *e2ehelper.DataFlowTester
+	drainer *service.ConverterDrainer
+	today   time.Time
+	now     time.Time
 }
 
 func newWorld(t *testing.T) *world {
 	tester := e2ehelper.NewDataFlowTester(t, "claude_otel", impl.ClaudeOtel{})
 	service.Init(contextimpl.NewDefaultBasicRes(tester.Cfg, tester.Log, tester.Dal))
+	drainer := service.NewConverterDrainer()
 	for _, table := range models.GetTablesInfo() {
 		tester.FlushTabler(table)
 	}
@@ -68,13 +70,13 @@ func newWorld(t *testing.T) *world {
 		tester.FlushTabler(table)
 	}
 	now := time.Now().UTC()
-	return &world{t: t, tester: tester, today: now.Truncate(24 * time.Hour), now: now}
+	return &world{t: t, tester: tester, drainer: drainer, today: now.Truncate(24 * time.Hour), now: now}
 }
 
 func (w *world) day(offset int) time.Time { return w.today.AddDate(0, 0, offset) }
 
 func (w *world) drain(at time.Time) {
-	require.NoError(w.t, service.DrainConverter(func() time.Time { return at }))
+	require.NoError(w.t, w.drainer.Drain(at))
 }
 
 func (w *world) drainNow()           { w.drain(time.Now().UTC()) }

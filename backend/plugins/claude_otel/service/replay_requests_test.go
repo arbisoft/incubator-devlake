@@ -101,6 +101,9 @@ func TestPlanReplayRangesEnforcesRetentionAndToday(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			_, err := planReplayRanges(dates, nil, replayTestNow)
 			requireHttpCode(t, err, http.StatusBadRequest)
+			if err.GetData() != OtelErrorReplayRange {
+				t.Fatalf("error code = %v, want %s", err.GetData(), OtelErrorReplayRange)
+			}
 			if !strings.Contains(err.Error(), replayTestDay(-89)) || !strings.Contains(err.Error(), replayTestDay(0)) {
 				t.Fatalf("error %q does not name both bounds", err.Error())
 			}
@@ -142,7 +145,7 @@ func replayTestChunks() []replayChunk {
 func TestQueueReplaysReusesPerKind(t *testing.T) {
 	tx := dalmocks.NewTransaction(t)
 	var lookups []dal.DalClause
-	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		lookups = append(lookups, whereOf(clauseArgs(args, 1)))
 		if len(lookups) == 1 {
 			*args.Get(0).(*models.OtelReplayRequest) = models.OtelReplayRequest{Model: common.Model{ID: 9}, Kind: models.OtelReplayKindMetrics, Status: models.OtelReplayRequestStatusPending}
@@ -177,11 +180,59 @@ func TestQueueReplaysReusesPerKind(t *testing.T) {
 	}
 }
 
+func TestQueueReplaysDoesNotReuseAWaitingMetricsRequestForPastDays(t *testing.T) {
+	tx := dalmocks.NewTransaction(t)
+	lookups := map[string][]dal.Clause{}
+	record := func(args mock.Arguments) {
+		clauses := clauseArgs(args, 1)
+		params := whereOf(clauses).Params
+		lookups[params[len(params)-1].(string)] = clauses
+	}
+	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything, mock.Anything).Run(record).Return(devlakeerrors.NotFound.New("none")).Once()
+	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Run(record).Return(devlakeerrors.NotFound.New("none")).Once()
+	tx.On("IsErrorNotFound", mock.Anything).Return(true).Twice()
+	tx.On("Create", mock.Anything).Return(nil).Times(3)
+
+	if _, err := queueReplays(tx, nil, nil, replayTestChunks(), replayTestNow); err != nil {
+		t.Fatalf("queueReplays() error = %v", err)
+	}
+	metrics := lookups[models.OtelReplayKindMetrics]
+	if len(metrics) != 3 || metrics[2].Type != dal.WhereClause {
+		t.Fatalf("metrics lookup = %#v; want a third where clause", metrics)
+	}
+	bound := metrics[2].Data.(dal.DalClause)
+	if bound.Expr != "range_end <= ?" || !bound.Params[0].(time.Time).Equal(replayTestToday()) {
+		t.Fatalf("metrics bound = %q %v; want range_end <= today", bound.Expr, bound.Params)
+	}
+	if len(lookups[models.OtelReplayKindLogs]) != 2 {
+		t.Fatalf("logs lookup = %#v; want no range bound", lookups[models.OtelReplayKindLogs])
+	}
+}
+
+func TestQueueReplaysKeepsThePlainLookupForAChunkIncludingToday(t *testing.T) {
+	tx := dalmocks.NewTransaction(t)
+	chunks := []replayChunk{{start: replayTestToday().AddDate(0, 0, -1), end: replayTestToday().AddDate(0, 0, 1)}}
+	var counts []int
+	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		counts = append(counts, len(clauseArgs(args, 1)))
+	}).Return(devlakeerrors.NotFound.New("none")).Twice()
+	tx.On("IsErrorNotFound", mock.Anything).Return(true).Twice()
+	tx.On("Create", mock.Anything).Return(nil).Times(3)
+
+	if _, err := queueReplays(tx, nil, nil, chunks, replayTestNow); err != nil {
+		t.Fatalf("queueReplays() error = %v", err)
+	}
+	if len(counts) != 2 || counts[0] != 2 || counts[1] != 2 {
+		t.Fatalf("lookup clause counts = %v; want the plain lookup for both kinds", counts)
+	}
+}
+
 func TestQueueReplaysInsertsWhenNoPendingCovers(t *testing.T) {
 	connection := &models.OtelConnection{Model: common.Model{ID: 4}, TeamName: "Platform"}
 	user := &common.User{Name: "Ada", Email: "ada@example.com"}
 	tx := dalmocks.NewTransaction(t)
-	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Return(devlakeerrors.NotFound.New("none")).Twice()
+	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything, mock.Anything).Return(devlakeerrors.NotFound.New("none")).Once()
+	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Return(devlakeerrors.NotFound.New("none")).Once()
 	tx.On("IsErrorNotFound", mock.Anything).Return(true).Twice()
 	var createdAll []*models.OtelReplayRequest
 	tx.On("Create", mock.AnythingOfType("*models.OtelReplayRequest")).Run(func(args mock.Arguments) {
@@ -221,7 +272,8 @@ func TestQueueReplaysInsertsWhenNoPendingCovers(t *testing.T) {
 
 func TestQueueReplaysStoresNullRequesterWithoutUser(t *testing.T) {
 	tx := dalmocks.NewTransaction(t)
-	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Return(devlakeerrors.NotFound.New("none")).Twice()
+	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything, mock.Anything).Return(devlakeerrors.NotFound.New("none")).Once()
+	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Return(devlakeerrors.NotFound.New("none")).Once()
 	tx.On("IsErrorNotFound", mock.Anything).Return(true).Twice()
 	var created *models.OtelReplayRequest
 	tx.On("Create", mock.AnythingOfType("*models.OtelReplayRequest")).Run(func(args mock.Arguments) {
@@ -312,6 +364,9 @@ func TestRebindOtelOrganizationRejectsSameOrganizationInAnyCase(t *testing.T) {
 
 	_, err := RebindOtelOrganization(nil, 4, &OtelRebindInput{OrganizationId: " " + strings.ToUpper(rebindOldOrganization) + " "})
 	requireHttpCode(t, err, http.StatusBadRequest)
+	if err.GetData() != OtelErrorAlreadyBound {
+		t.Fatalf("error code = %v, want %s", err.GetData(), OtelErrorAlreadyBound)
+	}
 }
 
 func expectRebindWrites(tx *dalmocks.Transaction, updated **models.OtelConnection, audit **models.OtelAuditEvent) {
@@ -374,7 +429,8 @@ func TestRebindOtelOrganizationQueuesReplayInSameTransaction(t *testing.T) {
 	var updated *models.OtelConnection
 	var audit *models.OtelAuditEvent
 	expectRebindWrites(tx, &updated, &audit)
-	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Return(devlakeerrors.NotFound.New("none")).Twice()
+	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything, mock.Anything).Return(devlakeerrors.NotFound.New("none")).Once()
+	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Return(devlakeerrors.NotFound.New("none")).Once()
 	tx.On("IsErrorNotFound", mock.Anything).Return(true).Twice()
 	var queuedAll []*models.OtelReplayRequest
 	tx.On("Create", mock.AnythingOfType("*models.OtelReplayRequest")).Run(func(args mock.Arguments) {

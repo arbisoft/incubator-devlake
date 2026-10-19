@@ -448,11 +448,17 @@ func (c *rawConverter) replaceReplayRange(tx dal.Transaction, rangeStart, rangeE
 			return fmt.Errorf("delete canonical facts for replay: %w", err)
 		}
 	}
-	updates := make([]factUpdate, 0, len(aggregates))
+	expected := make(map[uint64]string)
 	for _, aggregate := range aggregates {
-		if err := bindConnectionOrganization(tx, aggregate.update.connection, aggregate.update.organizationID); err != nil {
+		if err := expectOrganization(expected, aggregate.update.connection.ID, aggregate.update.organizationID); err != nil {
 			return err
 		}
+	}
+	if err := bindConnectionOrganizations(tx, expected); err != nil {
+		return err
+	}
+	updates := make([]factUpdate, 0, len(aggregates))
+	for _, aggregate := range aggregates {
 		if err := upsertHourlyFact(tx, aggregate.update, metricNumber{value: aggregate.value}, aggregate.lastObservedAt); err != nil {
 			return fmt.Errorf("write replayed hourly facts: %w", err)
 		}

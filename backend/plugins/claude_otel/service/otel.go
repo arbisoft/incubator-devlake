@@ -57,7 +57,7 @@ var (
 	db        dal.Dal
 	logger    log.Logger
 	rawIngest *RawIngestService
-	// lifecycleMu serializes htpasswd writes, Collector restarts and whole-row connection saves; take it before any transaction.
+	// lifecycleMu serializes htpasswd writes, Collector restarts and whole-row connection saves and replay queueing; take it before any transaction.
 	lifecycleMu sync.Mutex
 )
 

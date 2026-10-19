@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/service"
@@ -74,5 +75,22 @@ func TestReplayBodyDecodesFlatDates(t *testing.T) {
 	}
 	if body.StartDate != "2026-10-18" || body.EndDate != "2026-10-19" || body.RequestedForConnectionId == nil || *body.RequestedForConnectionId != 8 {
 		t.Fatalf("Decode() = %+v; want the flat dates and connection decoded", body)
+	}
+}
+
+func TestCodedErrorKeepsTheCodeInTheBody(t *testing.T) {
+	err := errors.BadInput.New("Pick days from a to b (UTC).", errors.WithData(service.OtelErrorReplayRange))
+	output, got := codedError(err)
+	body, ok := output.Body.(*otelErrorBody)
+	if got != err || !ok || body.Code != service.OtelErrorReplayRange || body.Success || body.Message == "" {
+		t.Fatalf("codedError() = %+v, %v; want a body with code %s and the original error", output, got, service.OtelErrorReplayRange)
+	}
+}
+
+func TestCodedErrorLeavesAnUncodedErrorAlone(t *testing.T) {
+	err := errors.BadInput.New("bad input")
+	output, got := codedError(err)
+	if output != nil || got != err {
+		t.Fatalf("codedError() = %+v, %v; want a nil output and the original error", output, got)
 	}
 }

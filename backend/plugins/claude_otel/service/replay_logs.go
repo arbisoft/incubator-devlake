@@ -29,7 +29,7 @@ import (
 // converter lease row is held briefly.
 const logReplayPage = 1000
 
-// requeueLogBatches requeues batches observed in the range (received_at when bounds are unusable), keeping pending retry state.
+// requeueLogBatches requeues batches observed in the range, as metrics replay does (received_at when bounds are unusable, so a clock-ahead batch waits for its day), keeping pending retry state.
 func (c *rawConverter) requeueLogBatches(request *models.OtelReplayRequest, leaseOwner string) (int, error) {
 	if err := c.validateLogReplayRange(request); err != nil {
 		return 0, err

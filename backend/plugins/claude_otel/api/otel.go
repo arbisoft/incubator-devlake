@@ -26,6 +26,7 @@ import (
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/helpers/pluginhelper/api"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/service"
+	"github.com/apache/incubator-devlake/server/api/shared"
 )
 
 func ListConnections(_ *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
@@ -163,6 +164,22 @@ func ApplyConnection(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput,
 	return &plugin.ApiResourceOutput{Body: connection, Status: http.StatusOK}, nil
 }
 
+// otelErrorBody keeps a service error's code so the Config UI can map it to its own copy.
+type otelErrorBody struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Code    string `json:"code"`
+}
+
+// codedError returns the error with a body carrying its code, or the error alone when it has none.
+func codedError(err errors.Error) (*plugin.ApiResourceOutput, errors.Error) {
+	code, _ := err.GetData().(string)
+	if code == "" {
+		return nil, err
+	}
+	return &plugin.ApiResourceOutput{Body: &otelErrorBody{Message: shared.SafeErrorMessage(err), Code: code}}, err
+}
+
 func RebindConnectionOrganization(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
 	id, err := parseId(input.Params["connectionId"])
 	if err != nil {
@@ -174,7 +191,7 @@ func RebindConnectionOrganization(input *plugin.ApiResourceInput) (*plugin.ApiRe
 	}
 	result, err := service.RebindOtelOrganization(input.User, id, body)
 	if err != nil {
-		return nil, err
+		return codedError(err)
 	}
 	return &plugin.ApiResourceOutput{Body: result, Status: http.StatusOK}, nil
 }
@@ -186,7 +203,7 @@ func PostReplay(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, erro
 	}
 	queue, err := service.CreateOtelReplay(input.User, body)
 	if err != nil {
-		return nil, err
+		return codedError(err)
 	}
 	return &plugin.ApiResourceOutput{Body: queue, Status: http.StatusCreated}, nil
 }
