@@ -78,7 +78,7 @@ Follow the standards by rule ID. The rules that are most often missed:
   - Small interfaces (ISP-1).
   - Domain code never imports infrastructure (DIP-2).
 - **Go idioms**:
-  - `ctx` first and passed through all I/O (GO-C1, GO-C3).
+  - `ctx` first and passed through all I/O, where something downstream accepts one. No unused `ctx` param for form, e.g. in services that only call `dal.Dal`, whose methods take no ctx (GO-C1, GO-C3).
   - Errors wrapped with a context message using the project's error package (GO-X1), otherwise `fmt.Errorf` with `%w`, and handled once (GO-E2, GO-E6).
   - Every goroutine owned and stoppable (GO-G1).
   - `defer` cleanup right after acquiring (GO-R1).
