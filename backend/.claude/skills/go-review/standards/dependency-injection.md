@@ -62,7 +62,7 @@ The following are always dependencies. Business logic never creates, looks up or
 ## DI-T — Testability
 
 - **DI-T1 Unit tests build the unit with fakes.** If a test of business logic needs a real DB, network, wall clock or env var, that's a DI defect in the code under test, not a test problem.
-- **DI-T2 Fakes are small structs or func types** in the test file (or a `…test` package). Prefer a hand-written fake for a 1–3 method interface over a generated mock. Use generated mocks only where the package already does.
+- **DI-T2 Use the generated mocks in `backend/mocks/`** (e.g. `mockdal.Dal`, `mockcontext.BasicRes`) for the interfaces they cover, per AGENTS.md. Don't flag their use, and don't hand-write a fake that duplicates one. A new consumer-side 1–3 method interface with no generated mock may use a small struct or func-type fake in the test file (or a `…test` package). The mocks are mockery output (`make mock`, git-ignored): regenerate them, never hand-edit `mocks/`.
 - **DI-T3 No test-only hooks in production code** (`var nowFunc = time.Now` overridden by tests, `if testing …`). Inject instead.
 
 ## DI-B — Existing code that doesn't follow these rules

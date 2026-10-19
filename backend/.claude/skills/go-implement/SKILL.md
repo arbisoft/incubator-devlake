@@ -99,7 +99,7 @@ Follow the standards by rule ID. The rules that are most often missed:
 - **Scope**: change only what the task needs, plus the boundary adapters DI-B1 requires. No unrelated refactors. Don't edit generated files. Regenerate them with the repo's generator if their source changed.
 
 ### 4. Test
-- Write table-driven tests (GO-T1) that build the unit with **hand-written fakes** injected through its interfaces (DI-T1, DI-T2). Use the repo's generated mocks only where the package already uses them.
+- Write table-driven tests (GO-T1) that build the unit with fakes injected through its interfaces (DI-T1, DI-T2). Per AGENTS.md, use the generated mocks in `backend/mocks/` (e.g. `mockdal.Dal`, `mockcontext.BasicRes`) wherever they cover the interface. Hand-write a small fake only for a new 1–3 method interface that has no generated mock. If a new `core/` or `helpers/` interface needs a mock, regenerate with `make mock`. Don't hand-edit `mocks/`.
 - For each new or changed route, write tests in the project's handler-test style (API-H3), with a fake service: a direct call with a constructed input for framework handlers (e.g. `&plugin.ApiResourceInput{Params: …, Body: …}`), or `httptest` for `net/http`. Cover the success status and body, a validation failure that names the field, not found, and the error kind/status (`err.GetType().GetHttpCode()` or the response code).
 - Cover the happy path, error paths, edge cases (empty, nil, boundaries) and cancellation. Use a fixed injected clock for any time logic (GO-T4). A bug fix gets a regression test that fails without the fix (GO-T6).
 - Run these from the module root (the directory with `go.mod`), for the changed packages:
