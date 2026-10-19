@@ -65,7 +65,7 @@ The rules below give Go's default *form* for some things (`fmt.Errorf`, `error`,
 ## context.Context
 
 - **GO-C1 First parameter, named `ctx`.** `func (s *Svc) Load(ctx context.Context, id int) …`. Only when the function, or something it calls, does ctx-aware I/O or blocking work. Don't add an unused `ctx` for form (e.g. a service that only calls `dal.Dal`, whose methods take no ctx): its absence there is no finding, and an unused `ctx` param is itself noise.
-- **GO-C2 Never store a context in a struct.** Pass it per call. (A struct whose whole purpose is to carry request-scoped state is the only exception, and it needs a comment.)
+- **GO-C2 Never store a context in a struct.** Pass it per call. Two exceptions: a framework args struct that carries the task context the framework requires (`api.RawDataSubTaskArgs{Ctx: taskCtx}`, `SubTaskContext: subtaskCtx`; see DI-B4), and a struct whose whole purpose is to carry request-scoped state, which needs a comment.
 - **GO-C3 Pass it through every I/O path.** DB, HTTP (`http.NewRequestWithContext`), RPC, and anything that blocks. `context.Background()` / `context.TODO()` only at the top (main, tests, the composition root). If nothing downstream accepts a context, there's no finding.
 - **GO-C4 Respect cancellation.** Long loops and blocking selects check `ctx.Done()`. Goroutines started for a request stop when its context is cancelled.
 - **GO-C5 Context values** are only for request-scoped data that crosses API boundaries (trace IDs, auth). Never for optional parameters or dependencies (see DI-H3). Keys use an unexported type.

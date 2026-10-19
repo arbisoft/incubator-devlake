@@ -131,7 +131,7 @@ These rules apply to every new or changed HTTP route. They don't depend on the s
 
   | Concern | net/http form | Framework equivalent (example: this repo) |
   |---|---|---|
-  | Request context | `r.Context()` | a nil-guarded helper (API-H2). `input.Request` is set only for `multipart/form-data` and `application/x-protobuf` bodies (`server/api/router.go:168-170`) and is nil for JSON and GET requests |
+  | Request context | `r.Context()` | a nil-guarded helper (API-H2). `input.Request` is set only for `multipart/form-data` and `application/x-protobuf` bodies (`handlePluginCall` in `server/api/router.go`) and is nil for JSON and GET requests |
   | Status | `w.WriteHeader(…)` | `output.Status`, or the returned error kind's HTTP code |
   | Error body | the shared mapper writes it | the adapter writes it from the returned error (`shared.ApiOutputError`) |
   | Input | `r.Body`, `r.URL.Query()`, path vars | `input.Body`, `input.Query`, `input.Params` |
