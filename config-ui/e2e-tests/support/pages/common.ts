@@ -32,6 +32,14 @@ export const tableRow = (scope: Page | Locator, text: string | RegExp): Locator 
 
 export const tableRows = (scope: Page | Locator): Locator => scope.locator('tbody tr.ant-table-row');
 
+export const columnIndex = (table: Locator, column: string): Promise<number> =>
+  table
+    .getByRole('columnheader', { name: column, exact: true })
+    .evaluate((element) => (element as HTMLTableCellElement).cellIndex);
+
+export const columnCell = async (table: Locator, row: Locator, column: string): Promise<Locator> =>
+  row.getByRole('cell').nth(await columnIndex(table, column));
+
 export const firstCellTexts = (scope: Page | Locator): Promise<string[]> =>
   tableRows(scope).locator('td:first-child').allInnerTexts();
 
