@@ -58,6 +58,48 @@ describe('useBulkDelete', () => {
     expect(result.current.state.outcomes[0].error).toBe(DETAIL_COPY.errors.failed);
   });
 
+  it('runs scope deletions one at a time until every scope completes', async () => {
+    const gates = Array.from({ length: 3 }, () => {
+      let resolve: () => void = () => undefined;
+      const promise = new Promise<void>((done) => {
+        resolve = done;
+      });
+      return { promise, resolve };
+    });
+    remove.mockImplementation((_plugin, _connection, id) => gates[Number(id) - 1].promise);
+    const onFinished = vi.fn();
+    const { result } = renderHook(() => useBulkDelete({ plugin: 'github', connectionId: 1, onFinished }));
+    let pending: Promise<void> | undefined;
+
+    try {
+      act(() => {
+        pending = result.current.start([scope('1'), scope('2'), scope('3')]);
+      });
+      expect(remove).toHaveBeenCalledTimes(1);
+      expect(remove).toHaveBeenCalledWith('github', 1, '1', false);
+
+      await act(async () => gates[0].resolve());
+      expect(remove).toHaveBeenCalledTimes(2);
+      expect(remove).toHaveBeenNthCalledWith(2, 'github', 1, '2', false);
+
+      await act(async () => gates[1].resolve());
+      expect(remove).toHaveBeenCalledTimes(3);
+      expect(remove).toHaveBeenNthCalledWith(3, 'github', 1, '3', false);
+
+      await act(async () => {
+        gates[2].resolve();
+        await pending;
+      });
+      expect(result.current.state).toMatchObject({ completed: 3, total: 3, running: false });
+      expect(onFinished).toHaveBeenCalledOnce();
+    } finally {
+      await act(async () => {
+        gates.forEach(({ resolve }) => resolve());
+        if (pending) await pending;
+      });
+    }
+  });
+
   it('closes and resets once finished', async () => {
     remove.mockResolvedValue(undefined);
     const { result } = renderHook(() => useBulkDelete({ plugin: 'github', connectionId: 1, onFinished: vi.fn() }));

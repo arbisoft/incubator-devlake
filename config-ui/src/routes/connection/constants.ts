@@ -69,7 +69,7 @@ export const CONFLICT_KIND = { CONNECTION: 'connection', SCOPE: 'scope' } as con
 
 export const HTTP_STATUS = { FORBIDDEN: 403, NOT_FOUND: 404, CONFLICT: 409 } as const;
 
-export const BULK_DELETE_CONCURRENCY = 3;
+export const BULK_DELETE_CONCURRENCY = 1;
 export const MAX_LISTED_SCOPES = 5;
 export const SCOPE_MEMBERSHIP_PAGE_SIZE = 100;
 export const NO_SCOPE_CONFIG = 'None';
