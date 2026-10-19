@@ -898,15 +898,15 @@ func claimNextReplayBounds(t *testing.T, now time.Time) (find, update []interfac
 		return params[len(params)-2:]
 	}
 	database := dalmocks.NewDal(t)
-	database.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything).Run(func(args mock.Arguments) {
-		clauses := args.Get(1).([]dal.Clause)
+	database.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		clauses := clauseArgs(args, 1)
 		if strings.Contains(whereOf(clauses).Expr, "range_end <= ?") {
 			find = lastTwo(clauses)
 		}
 		args.Get(0).(*models.OtelReplayRequest).ID = 5
 	}).Return(nil).Once()
 	database.On("UpdateColumns", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		update = lastTwo(args.Get(2).([]dal.Clause))
+		update = lastTwo(clauseArgs(args, 2))
 	}).Return(nil).Once()
 	database.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything).Return(devlakeerrors.NotFound.New("none")).Once()
 	database.On("IsErrorNotFound", mock.Anything).Return(true).Once()
@@ -934,8 +934,8 @@ func TestClaimNextReplayClaimsLogRequestsBeforeMidnight(t *testing.T) {
 	database := dalmocks.NewDal(t)
 	var findExpr string
 	var findParams []interface{}
-	database.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything).Run(func(args mock.Arguments) {
-		clause := whereOf(args.Get(1).([]dal.Clause))
+	onFirst := func(args mock.Arguments) {
+		clause := whereOf(clauseArgs(args, 1))
 		if strings.Contains(clause.Expr, "range_end <= ?") {
 			findExpr, findParams = clause.Expr, clause.Params
 			*args.Get(0).(*models.OtelReplayRequest) = models.OtelReplayRequest{Model: common.Model{ID: 6}, Kind: models.OtelReplayKindLogs, RangeEnd: now.Add(24 * time.Hour)}
@@ -943,7 +943,9 @@ func TestClaimNextReplayClaimsLogRequestsBeforeMidnight(t *testing.T) {
 		}
 		request := args.Get(0).(*models.OtelReplayRequest)
 		request.Status = models.OtelReplayRequestStatusProcessing
-	}).Return(nil).Twice()
+	}
+	database.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Run(onFirst).Return(nil).Once()
+	database.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything).Run(onFirst).Return(nil).Once()
 	database.On("UpdateColumns", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Return(nil).Once()
 	converter := newRawConverter(database, nil)
 	converter.now = func() time.Time { return now }

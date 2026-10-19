@@ -142,14 +142,14 @@ func replayTestChunks() []replayChunk {
 func TestQueueReplaysReusesPerKind(t *testing.T) {
 	tx := dalmocks.NewTransaction(t)
 	var lookups []dal.DalClause
-	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything).Run(func(args mock.Arguments) {
-		lookups = append(lookups, whereOf(args.Get(1).([]dal.Clause)))
+	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		lookups = append(lookups, whereOf(clauseArgs(args, 1)))
 		if len(lookups) == 1 {
 			*args.Get(0).(*models.OtelReplayRequest) = models.OtelReplayRequest{Model: common.Model{ID: 9}, Kind: models.OtelReplayKindMetrics, Status: models.OtelReplayRequestStatusPending}
 		}
 	}).Return(nil).Once()
-	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything).Run(func(args mock.Arguments) {
-		lookups = append(lookups, whereOf(args.Get(1).([]dal.Clause)))
+	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		lookups = append(lookups, whereOf(clauseArgs(args, 1)))
 	}).Return(devlakeerrors.NotFound.New("none")).Once()
 	tx.On("IsErrorNotFound", mock.Anything).Return(true).Once()
 	var created *models.OtelReplayRequest
@@ -180,7 +180,7 @@ func TestQueueReplaysReusesPerKind(t *testing.T) {
 func TestQueueReplaysNamesReusedTeamOnlyForTheSameConnection(t *testing.T) {
 	otherConnection := uint64(4)
 	tx := dalmocks.NewTransaction(t)
-	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything).Run(func(args mock.Arguments) {
+	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		*args.Get(0).(*models.OtelReplayRequest) = models.OtelReplayRequest{Model: common.Model{ID: 9}, Status: models.OtelReplayRequestStatusPending, RequestedForConnectionId: &otherConnection}
 	}).Return(nil).Twice()
 	tx.On("Create", mock.AnythingOfType("*models.OtelAuditEvent")).Return(nil).Once()
@@ -196,7 +196,7 @@ func TestQueueReplaysInsertsWhenNoPendingCovers(t *testing.T) {
 	connection := &models.OtelConnection{Model: common.Model{ID: 4}, TeamName: "Platform"}
 	user := &common.User{Name: "Ada", Email: "ada@example.com"}
 	tx := dalmocks.NewTransaction(t)
-	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything).Return(devlakeerrors.NotFound.New("none")).Twice()
+	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Return(devlakeerrors.NotFound.New("none")).Twice()
 	tx.On("IsErrorNotFound", mock.Anything).Return(true).Twice()
 	var createdAll []*models.OtelReplayRequest
 	tx.On("Create", mock.AnythingOfType("*models.OtelReplayRequest")).Run(func(args mock.Arguments) {
@@ -240,7 +240,7 @@ func TestQueueReplaysInsertsWhenNoPendingCovers(t *testing.T) {
 
 func TestQueueReplaysStoresNullRequesterWithoutUser(t *testing.T) {
 	tx := dalmocks.NewTransaction(t)
-	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything).Return(devlakeerrors.NotFound.New("none")).Twice()
+	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Return(devlakeerrors.NotFound.New("none")).Twice()
 	tx.On("IsErrorNotFound", mock.Anything).Return(true).Twice()
 	var created *models.OtelReplayRequest
 	tx.On("Create", mock.AnythingOfType("*models.OtelReplayRequest")).Run(func(args mock.Arguments) {
@@ -299,8 +299,8 @@ func newRebindTestDal(t *testing.T, tx *dalmocks.Transaction) *dalmocks.Dal {
 	t.Helper()
 	database := dalmocks.NewDal(t)
 	database.EXPECT().Begin().Return(tx).Maybe()
-	database.On("All", mock.AnythingOfType("*[]*models.OtelCredential"), mock.Anything).Return(nil).Maybe()
-	database.On("All", mock.AnythingOfType("*[]*models.OtelConnectionProject"), mock.Anything).Return(nil).Maybe()
+	database.On("All", mock.AnythingOfType("*[]*models.OtelCredential"), mock.Anything, mock.Anything).Return(nil).Maybe()
+	database.On("All", mock.AnythingOfType("*[]*models.OtelConnectionProject"), mock.Anything, mock.Anything).Return(nil).Maybe()
 	useReplayTestDal(t, database)
 	return database
 }
@@ -393,7 +393,7 @@ func TestRebindOtelOrganizationQueuesReplayInSameTransaction(t *testing.T) {
 	var updated *models.OtelConnection
 	var audit *models.OtelAuditEvent
 	expectRebindWrites(tx, &updated, &audit)
-	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything).Return(devlakeerrors.NotFound.New("none")).Twice()
+	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Return(devlakeerrors.NotFound.New("none")).Twice()
 	tx.On("IsErrorNotFound", mock.Anything).Return(true).Twice()
 	var queuedAll []*models.OtelReplayRequest
 	tx.On("Create", mock.AnythingOfType("*models.OtelReplayRequest")).Run(func(args mock.Arguments) {
@@ -439,7 +439,7 @@ func TestListOtelReplaysValidatesPagingAndResolvesTeams(t *testing.T) {
 	connectionId := uint64(4)
 	database := dalmocks.NewDal(t)
 	database.EXPECT().Count(mock.Anything).Return(int64(3), nil)
-	database.On("All", mock.AnythingOfType("*[]*models.OtelReplayRequest"), mock.Anything).Run(func(args mock.Arguments) {
+	database.On("All", mock.AnythingOfType("*[]*models.OtelReplayRequest"), mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		*args.Get(0).(*[]*models.OtelReplayRequest) = []*models.OtelReplayRequest{
 			{Model: common.Model{ID: 3}, Status: models.OtelReplayRequestStatusCompleted, RequestedForConnectionId: &connectionId},
 			{Model: common.Model{ID: 2}, Status: models.OtelReplayRequestStatusFailed, RequestedForConnectionId: &connectionId},
@@ -464,7 +464,7 @@ func TestListOtelReplaysValidatesPagingAndResolvesTeams(t *testing.T) {
 
 func TestActiveOtelReplayReturnsKind(t *testing.T) {
 	database := dalmocks.NewDal(t)
-	database.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything).Run(func(args mock.Arguments) {
+	database.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		*args.Get(0).(*models.OtelReplayRequest) = models.OtelReplayRequest{Model: common.Model{ID: 6}, Kind: models.OtelReplayKindLogs, Status: models.OtelReplayRequestStatusProcessing}
 	}).Return(nil).Once()
 	useReplayTestDal(t, database)
