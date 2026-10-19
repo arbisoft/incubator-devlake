@@ -131,7 +131,7 @@ These rules apply to every new or changed HTTP route. They don't depend on the s
 
   | Concern | net/http form | Framework equivalent (example: this repo) |
   |---|---|---|
-  | Request context | `r.Context()` | the context the framework exposes: `input.Request.Context()` |
+  | Request context | `r.Context()` | a nil-guarded helper (API-H2). `input.Request` is set only for `multipart/form-data` and `application/x-protobuf` bodies (`server/api/router.go:168-170`) and is nil for JSON and GET requests |
   | Status | `w.WriteHeader(…)` | `output.Status`, or the returned error kind's HTTP code |
   | Error body | the shared mapper writes it | the adapter writes it from the returned error (`shared.ApiOutputError`) |
   | Input | `r.Body`, `r.URL.Query()`, path vars | `input.Body`, `input.Query`, `input.Params` |
@@ -139,5 +139,14 @@ These rules apply to every new or changed HTTP route. They don't depend on the s
 
   The framework's own generic types (`Body map[string]interface{}`, `Output.Body interface{}`) are never findings in themselves. What matters is what the handler does with them (API-B1, API-D5, SEC-I6).
 - **API-H1 Handlers are thin.** They do four things: parse and validate input (API-B1), call an injected service (DI-B3), map the result to a DTO (API-B2), and map errors to a status (API-E4). Business logic, DB queries and outbound calls in a handler violate SRP-3.
-- **API-H2 Handlers pass the request context** to every downstream call that accepts one (GO-C3), so client disconnects cancel the work. Get it the framework's way (`r.Context()`, `input.Request.Context()`, …). If nothing downstream accepts a context (e.g. a DAL whose methods take no ctx), there's no finding. A new ctx-aware call made without passing it is a finding.
+- **API-H2 Handlers pass the request context** to every downstream call that accepts one (GO-C3), so client disconnects cancel the work. Get it the framework's way (`r.Context()`, …). Where the framework's request can be nil, get it through a nil-guarded helper. Here, `input.Request` is nil for every JSON or GET request (API-H0), so use the guard in `plugins/plane/api/connection_api.go` (`apiRequestContext`), which also lets direct-call tests (API-H3) leave `Request` unset:
+  ```go
+  func apiRequestContext(input *plugin.ApiResourceInput) context.Context {
+  	if input != nil && input.Request != nil {
+  		return input.Request.Context()
+  	}
+  	return context.TODO()
+  }
+  ```
+  An unguarded `input.Request.Context()` (or any other `input.Request` dereference) in a handler whose route accepts JSON or GET is a nil-panic on every normal request: a finding (blocking). If nothing downstream accepts a context (e.g. a DAL whose methods take no ctx), there's no finding. A new ctx-aware call made without passing it is a finding.
 - **API-H3 Every new or changed route has tests in the project's handler-test style**, with a fake service (DI-T1): `httptest` for `net/http` handlers, or a direct call with a constructed input for framework handlers (e.g. `GetX(&plugin.ApiResourceInput{Params: …, Body: …})`, asserting `output.Status`/`output.Body` and `err.GetType().GetHttpCode()`). Either way, the tests cover the success status and body, a validation failure that names the field, not found, and the error kind/status. A router-level test is only needed when the change touches routing or middleware.
