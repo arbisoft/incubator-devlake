@@ -110,7 +110,7 @@ func expectRequeuePage(transaction *dalmocks.Transaction, batchIDs []uint64) (ma
 	).Return(nil).Once()
 	requeued := make(map[string]interface{})
 	if len(batchIDs) > 0 {
-		transaction.EXPECT().UpdateColumns(mock.AnythingOfType("*models.OtelLogBatch"), mock.Anything, mock.Anything, mock.Anything).Run(
+		transaction.EXPECT().UpdateColumns(mock.AnythingOfType("*models.OtelLogBatch"), mock.Anything, mock.Anything).Run(
 			func(_ interface{}, sets []dal.DalSet, _ ...dal.Clause) {
 				for _, set := range sets {
 					requeued[set.ColumnName] = set.Value
@@ -142,7 +142,7 @@ func TestRequeueLogBatchesQueuesReceivedBatchesBehindLiveOnes(t *testing.T) {
 		where.Params[1] != request.RangeStart || where.Params[2] != request.RangeEnd {
 		t.Fatalf("requeue selection = %s %v; want batches received in the range", where.Expr, where.Params)
 	}
-	// A rerun after a lost lease requeues the batches an earlier run queued, unless one is
+	// A rerun after a lost lease counts the batches an earlier run queued, unless one is
 	// being converted, so its count covers the whole range.
 	requeueable := (*selection)[2].Data.(dal.DalClause)
 	if !strings.Contains(requeueable.Expr, "status = ? AND (lease_until IS NULL OR lease_until < ?)") ||
@@ -163,6 +163,101 @@ func TestRequeueLogBatchesQueuesReceivedBatchesBehindLiveOnes(t *testing.T) {
 	}
 	if finished["status"] != models.OtelReplayRequestStatusCompleted || finished["replayed_batches"] != 2 {
 		t.Fatalf("finished request = %v; want completed with 2 replayed batches", finished)
+	}
+}
+
+// applyRequeueUpdate applies the requeue's column sets to the rows its id and status
+// filter matches, as the database would.
+func applyRequeueUpdate(t *testing.T, rows []*models.OtelLogBatch, sets []dal.DalSet, clauses []dal.Clause) {
+	if len(clauses) != 1 {
+		t.Fatalf("requeue update clauses = %v; want one id and status filter", clauses)
+	}
+	where := clauses[0].Data.(dal.DalClause)
+	if where.Expr != "id IN ? AND status IN ?" {
+		t.Fatalf("requeue update filter = %s; want id IN ? AND status IN ?", where.Expr)
+	}
+	ids, statuses := where.Params[0].([]uint64), where.Params[1].([]string)
+	for _, row := range rows {
+		if !containsValue(ids, row.ID) || !containsValue(statuses, row.Status) {
+			continue
+		}
+		for _, set := range sets {
+			switch set.ColumnName {
+			case "status":
+				row.Status = set.Value.(string)
+			case "attempt_count":
+				row.AttemptCount = set.Value.(int)
+			case "next_attempt_at":
+				row.NextAttemptAt = nil
+			case "lease_owner":
+				row.LeaseOwner = nil
+			case "lease_until":
+				row.LeaseUntil = nil
+			case "processing_error_code":
+				row.ProcessingErrorCode = nil
+			case "processing_error_message":
+				row.ProcessingErrorMessage = nil
+			default:
+				t.Fatalf("requeue update sets unexpected column %s", set.ColumnName)
+			}
+		}
+	}
+}
+
+func containsValue[T comparable](values []T, value T) bool {
+	for _, candidate := range values {
+		if candidate == value {
+			return true
+		}
+	}
+	return false
+}
+
+// An overlapping or repeated replay counts a batch an earlier replay already queued, but
+// must not reset its retry budget or erase the error that explains why it keeps failing.
+func TestRequeueLogBatchesKeepsRetryStateOfBatchesAlreadyQueuedForReplay(t *testing.T) {
+	database := dalmocks.NewDal(t)
+	transaction := dalmocks.NewTransaction(t)
+	expectRenewReplayLease(t, database)
+	database.EXPECT().Begin().Return(transaction).Once()
+	expectReplayLeases(transaction, testReplayWorkerID)
+	nextAttemptAt := testReplayNow.Add(10 * time.Minute)
+	pendingCode, pendingMessage := "conversion_failed", "connection not found"
+	quarantinedCode, quarantinedMessage := "retry_exhausted", "conversion failed after 12 attempts"
+	backingOff := &models.OtelLogBatch{Model: common.Model{ID: 4}, Status: models.OtelBatchStatusReplayPending, AttemptCount: 5,
+		NextAttemptAt: &nextAttemptAt, ProcessingErrorCode: &pendingCode, ProcessingErrorMessage: &pendingMessage}
+	quarantined := &models.OtelLogBatch{Model: common.Model{ID: 7}, Status: models.OtelBatchStatusPermanentError, AttemptCount: 12,
+		ProcessingErrorCode: &quarantinedCode, ProcessingErrorMessage: &quarantinedMessage}
+	rows := []*models.OtelLogBatch{backingOff, quarantined}
+	transaction.EXPECT().Pluck("id", mock.AnythingOfType("*[]uint64"), mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(
+		func(_ string, dest interface{}, _ ...dal.Clause) {
+			*dest.(*[]uint64) = []uint64{4, 7}
+		},
+	).Return(nil).Once()
+	transaction.EXPECT().UpdateColumns(mock.AnythingOfType("*models.OtelLogBatch"), mock.Anything, mock.Anything).Run(
+		func(_ interface{}, sets []dal.DalSet, clauses ...dal.Clause) {
+			applyRequeueUpdate(t, rows, sets, clauses)
+		},
+	).Return(nil).Once()
+	transaction.EXPECT().Commit().Return(nil).Once()
+	finished := expectFinishReplay(database)
+
+	replayed, err := newLogReplayConverter(database).requeueLogBatches(newLogReplayRequest(models.OtelReplayKindLogs), testReplayLeaseOwner)
+	if err != nil || replayed != 2 {
+		t.Fatalf("requeueLogBatches() = %d, %v; want both batches counted", replayed, err)
+	}
+	if finished["replayed_batches"] != 2 {
+		t.Fatalf("finished request = %v; want 2 replayed batches", finished)
+	}
+	if quarantined.Status != models.OtelBatchStatusReplayPending || quarantined.AttemptCount != 0 ||
+		quarantined.ProcessingErrorCode != nil || quarantined.ProcessingErrorMessage != nil {
+		t.Fatalf("quarantined batch = %+v; want replay_pending with a fresh retry budget and no error", quarantined)
+	}
+	if backingOff.Status != models.OtelBatchStatusReplayPending || backingOff.AttemptCount != 5 ||
+		backingOff.NextAttemptAt == nil || !backingOff.NextAttemptAt.Equal(nextAttemptAt) ||
+		backingOff.ProcessingErrorCode == nil || *backingOff.ProcessingErrorCode != pendingCode ||
+		backingOff.ProcessingErrorMessage == nil || *backingOff.ProcessingErrorMessage != pendingMessage {
+		t.Fatalf("batch already queued for replay = %+v; want its attempts, backoff and error kept", backingOff)
 	}
 }
 
