@@ -123,7 +123,7 @@ The rules below give Go's default *form* for some things (`fmt.Errorf`, `error`,
 - **GO-T4 No `time.Sleep` for synchronization.** Use channels, `WaitGroup`s or an injected clock. A sleep-based test is flaky.
 - **GO-T5 Test behavior through the public API**, not private fields or call order, unless the call order is the contract.
 - **GO-T6 Every bug fix has a regression test** that fails without the fix.
-- **GO-T7 New behavior has tests**, including the error paths and edge cases (empty input, nil, boundaries, cancellation).
+- **GO-T7 New behavior has tests**, including the error paths and edge cases (empty input, nil, boundaries, cancellation). For a plugin extractor or converter, an e2e data-flow test (`e2ehelper.DataFlowTester` with a raw-table CSV fixture and an expected snapshot CSV under the plugin's `e2e/`) counts as coverage. A new or changed extractor or converter with neither a unit test nor an updated e2e fixture test is a finding.
 - **GO-T8 Useful failure messages:** `t.Errorf("Parse(%q) = %v, want %v", in, got, want)`, got before want. Compare structs with `reflect.DeepEqual` or `cmp.Diff` / `assert.Equal`, whichever the package already uses.
 - **GO-T9 `t.Parallel()`** for independent tests that don't share mutable state.
 - **GO-T10 Tests clean up** with `t.Cleanup` and `t.TempDir()`, and leave no files, goroutines or global state behind.

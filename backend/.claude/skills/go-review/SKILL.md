@@ -91,7 +91,7 @@ If nothing is left to review, say so and stop.
 4. **Investigate, don't guess.** Before claiming a violation, read the surrounding code, the callers, the dependency's definition, the route registration and the API's existing conventions. For example:
    - a "missing injection" may already be injected one level up;
    - a `switch` may be over a closed set (see the OCP note);
-   - a "missing test" may exist in another `_test.go` file;
+   - a "missing test" may exist in another `_test.go` file, or in the plugin's `e2e/` data-flow test and its CSV fixtures (GO-T7);
    - a "non-standard" status code may be the API's existing convention (see the openapi.md consistency note);
    - a "missing timeout" may be set on a shared client;
    - a handler that reads a package-level framework var (`basicRes`, `vld`, `dsHelper`) may be the composition root for its request (DI-B4). Check whether the logic below it receives its dependencies;
