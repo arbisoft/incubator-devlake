@@ -15,32 +15,24 @@
  * limitations under the License.
  *
  */
-import { Page } from '@playwright/test';
-
-import { test, expect } from '../fixtures';
+import { PALETTE } from '../../src/theme/palette';
 import { loginAsAdmin } from '../auth-helpers';
+import { test, expect } from '../fixtures';
+import { hexToRgb } from '../support/colour';
+import { PATHS } from '../support/pages/paths';
+import { ProjectsPage } from '../support/pages/projects';
+import { ShellPage } from '../support/pages/shell';
 
-const STORAGE_KEY = 'devlake.theme';
-
-const themeButton = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
-
-const readStoredMode = (page: Page) => page.evaluate((key) => window.localStorage.getItem(key), STORAGE_KEY);
-
-// Perceived brightness (0-255) of the rendered page background.
-const backgroundBrightness = async (page: Page): Promise<number> => {
-  const colour = await page.locator('body').evaluate((el) => getComputedStyle(el).backgroundColor);
-  const [r, g, b] = (colour.match(/[\d.]+/g) ?? []).map(Number);
-  return 0.299 * r + 0.587 * g + 0.114 * b;
+const expectDark = async (shell: ShellPage) => {
+  await expect.poll(() => shell.backgroundBrightness()).toBeLessThan(80);
+  await expect(shell.html).toHaveAttribute('data-theme', 'dark');
+  await expect.poll(() => shell.backgroundColour()).toBe(hexToRgb(PALETTE.dark.colors.bgContainer));
 };
 
-const expectDark = async (page: Page) => {
-  await expect.poll(() => backgroundBrightness(page)).toBeLessThan(80);
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-};
-
-const expectLight = async (page: Page) => {
-  await expect.poll(() => backgroundBrightness(page)).toBeGreaterThan(180);
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+const expectLight = async (shell: ShellPage) => {
+  await expect.poll(() => shell.backgroundBrightness()).toBeGreaterThan(180);
+  await expect(shell.html).toHaveAttribute('data-theme', 'light');
+  await expect.poll(() => shell.backgroundColour()).toBe(hexToRgb(PALETTE.light.colors.bgContainer));
 };
 
 test.describe('theme toggle', () => {
@@ -52,77 +44,87 @@ test.describe('theme toggle', () => {
 
   test.afterEach(async ({ page }) => {
     // Put the stored mode back so other specs are unaffected.
-    await page.evaluate(
-      ([key, value]) => {
-        if (value === null) {
-          window.localStorage.removeItem(key as string);
-        } else {
-          window.localStorage.setItem(key as string, value);
-        }
-      },
-      [STORAGE_KEY, originalMode],
-    );
+    await new ShellPage(page).writeStoredTheme(originalMode);
   });
 
   test('cycles light, dark, system and the mode and background persist across reload', async ({
     page,
     browserErrors,
   }) => {
-    await page.goto('/projects');
-    await expect(page.getByRole('button', { name: 'New Project' })).toBeVisible();
-    originalMode = await readStoredMode(page);
+    const shell = new ShellPage(page);
+    const projects = new ProjectsPage(page);
+    await projects.open();
+    await expect(projects.ready).toBeVisible();
+    originalMode = await shell.readStoredTheme();
 
     // Start from a known mode, then reload so the app picks it up.
-    await page.evaluate((key) => window.localStorage.setItem(key, 'light'), STORAGE_KEY);
-    await page.reload();
-    await expect(themeButton(page, 'Light theme')).toBeVisible();
-    await expectLight(page);
+    await shell.writeStoredTheme('light');
+    await shell.reload();
+    await shell.openThemeMenu();
+    await expect(shell.themeCheck('light')).toBeVisible();
+    await shell.closeAccountMenu();
+    await expectLight(shell);
 
-    await themeButton(page, 'Light theme').click();
-    await expect(themeButton(page, 'Dark theme')).toBeVisible();
-    expect(await readStoredMode(page)).toBe('dark');
-    await expectDark(page);
+    await shell.switchTheme('dark');
+    await shell.openThemeMenu();
+    await expect(shell.themeCheck('dark')).toBeVisible();
+    await shell.closeAccountMenu();
+    expect(await shell.readStoredTheme()).toBe('dark');
+    await expectDark(shell);
 
-    await page.reload();
-    await expect(themeButton(page, 'Dark theme')).toBeVisible();
-    expect(await readStoredMode(page)).toBe('dark');
-    await expectDark(page);
+    await shell.reload();
+    await shell.openThemeMenu();
+    await expect(shell.themeCheck('dark')).toBeVisible();
+    await shell.closeAccountMenu();
+    expect(await shell.readStoredTheme()).toBe('dark');
+    await expectDark(shell);
 
-    await themeButton(page, 'Dark theme').click();
-    await expect(themeButton(page, 'Follow system')).toBeVisible();
-    expect(await readStoredMode(page)).toBe('system');
+    await shell.switchTheme('system');
+    await shell.openThemeMenu();
+    await expect(shell.themeCheck('system')).toBeVisible();
+    await shell.closeAccountMenu();
+    expect(await shell.readStoredTheme()).toBe('system');
 
-    await themeButton(page, 'Follow system').click();
-    await expect(themeButton(page, 'Light theme')).toBeVisible();
-    expect(await readStoredMode(page)).toBe('light');
-    await expectLight(page);
+    await shell.switchTheme('light');
+    await shell.openThemeMenu();
+    await expect(shell.themeCheck('light')).toBeVisible();
+    await shell.closeAccountMenu();
+    expect(await shell.readStoredTheme()).toBe('light');
+    await expectLight(shell);
 
-    await page.reload();
-    await expect(themeButton(page, 'Light theme')).toBeVisible();
-    expect(await readStoredMode(page)).toBe('light');
-    await expectLight(page);
+    await shell.reload();
+    await shell.openThemeMenu();
+    await expect(shell.themeCheck('light')).toBeVisible();
+    await shell.closeAccountMenu();
+    expect(await shell.readStoredTheme()).toBe('light');
+    await expectLight(shell);
     expect(browserErrors).toEqual([]);
   });
 
   test('system mode follows the OS colour scheme and persists across reload', async ({ page, browserErrors }) => {
-    await page.emulateMedia({ colorScheme: 'dark' });
-    await page.goto('/projects');
-    originalMode = await readStoredMode(page);
-    await page.evaluate((key) => window.localStorage.setItem(key, 'system'), STORAGE_KEY);
-    await page.reload();
-    await expect(themeButton(page, 'Follow system')).toBeVisible();
-    await expectDark(page);
+    const shell = new ShellPage(page);
+    await shell.emulateColorScheme('dark');
+    await shell.visit(PATHS.projects);
+    originalMode = await shell.readStoredTheme();
+    await shell.writeStoredTheme('system');
+    await shell.reload();
+    await shell.openThemeMenu();
+    await expect(shell.themeCheck('system')).toBeVisible();
+    await shell.closeAccountMenu();
+    await expectDark(shell);
 
-    await page.emulateMedia({ colorScheme: 'light' });
-    await expectLight(page);
+    await shell.emulateColorScheme('light');
+    await expectLight(shell);
 
-    await page.reload();
-    await expect(themeButton(page, 'Follow system')).toBeVisible();
-    expect(await readStoredMode(page)).toBe('system');
-    await expectLight(page);
+    await shell.reload();
+    await shell.openThemeMenu();
+    await expect(shell.themeCheck('system')).toBeVisible();
+    await shell.closeAccountMenu();
+    expect(await shell.readStoredTheme()).toBe('system');
+    await expectLight(shell);
 
-    await page.emulateMedia({ colorScheme: 'dark' });
-    await expectDark(page);
+    await shell.emulateColorScheme('dark');
+    await expectDark(shell);
     expect(browserErrors).toEqual([]);
   });
 });

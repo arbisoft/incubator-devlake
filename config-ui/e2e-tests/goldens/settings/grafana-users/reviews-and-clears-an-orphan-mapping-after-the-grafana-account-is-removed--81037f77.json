@@ -1,0 +1,13 @@
+{
+  "titlePath": [
+    "Grafana user management ordinary flows",
+    "reviews and clears an orphan mapping after the Grafana account is removed"
+  ],
+  "writes": [
+    {
+      "method": "DELETE",
+      "path": "/api/access/grafana/orphans/e2e-*@example.com",
+      "body": null
+    }
+  ]
+}

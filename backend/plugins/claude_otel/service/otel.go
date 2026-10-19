@@ -57,7 +57,7 @@ var (
 	db        dal.Dal
 	logger    log.Logger
 	rawIngest *RawIngestService
-	// lifecycleMu serializes file and collector updates for a single backend instance.
+	// lifecycleMu serializes htpasswd writes, Collector restarts and whole-row connection saves; take it before any transaction.
 	lifecycleMu sync.Mutex
 )
 
@@ -141,20 +141,9 @@ func HideOtelConnection(user *common.User, id uint64) (*models.OtelConnectionWit
 	lifecycleMu.Lock()
 	defer lifecycleMu.Unlock()
 
-	connection, err := getOtelConnection(id)
+	connection, err := hideOtelConnectionRecord(user, id)
 	if err != nil {
 		return nil, err
-	}
-	if connection.Status != models.OtelConnectionStatusRevoked {
-		return nil, errors.Conflict.New("only revoked Claude Code OTel connections can be removed")
-	}
-	if connection.HiddenAt == nil {
-		now := time.Now()
-		connection.HiddenAt = &now
-		setOtelActor(user, connection, false)
-		if err := db.Update(connection); err != nil {
-			return nil, errors.Default.Wrap(err, "error hiding revoked otel connection")
-		}
 	}
 
 	credentials, err := getOtelCredentials(connection.ID)
@@ -168,6 +157,40 @@ func HideOtelConnection(user *common.User, id uint64) (*models.OtelConnectionWit
 	return response, nil
 }
 
+// hideOtelConnectionRecord checks the revoked status and writes the hide under the connection row lock.
+func hideOtelConnectionRecord(user *common.User, id uint64) (connection *models.OtelConnection, result errors.Error) {
+	tx := db.Begin()
+	defer rollbackOtelTransactionOnError(tx, &result)
+	connection, err := lockOtelConnection(tx, id)
+	if err != nil {
+		return nil, err
+	}
+	if connection.Status != models.OtelConnectionStatusRevoked {
+		return nil, errors.Conflict.New("only revoked Claude Code OTel connections can be removed")
+	}
+	if connection.HiddenAt == nil {
+		now := time.Now()
+		connection.HiddenAt = &now
+		setOtelActor(user, connection, false)
+		if err := tx.Update(connection); err != nil {
+			return nil, errors.Default.Wrap(err, "error hiding revoked otel connection")
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, errors.Default.Wrap(err, "error committing hidden otel connection")
+	}
+	return connection, nil
+}
+
+func rollbackOtelTransactionOnError(tx dal.Transaction, result *errors.Error) {
+	if *result == nil {
+		return
+	}
+	if rollbackErr := tx.Rollback(); rollbackErr != nil && logger != nil {
+		logger.Warn(rollbackErr, "failed to roll back Claude Code OTel connection transaction")
+	}
+}
+
 func CreateOtelConnection(user *common.User, input *OtelConnectionInput) (*models.OtelConnectionWithCredentials, errors.Error) {
 	lifecycleMu.Lock()
 	defer lifecycleMu.Unlock()
@@ -175,7 +198,7 @@ func CreateOtelConnection(user *common.User, input *OtelConnectionInput) (*model
 	if input == nil {
 		input = &OtelConnectionInput{}
 	}
-	projectNames, err := validateOtelProjectNames(input.ProjectNames)
+	projectNames, err := normalizeOtelProjectNames(input.ProjectNames)
 	if err != nil {
 		return nil, err
 	}
@@ -209,6 +232,10 @@ func CreateOtelConnection(user *common.User, input *OtelConnectionInput) (*model
 	setOtelActor(user, connection, true)
 
 	tx := db.Begin()
+	if err := lockOtelProjects(tx, projectNames); err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
 	if err := tx.Create(connection); err != nil {
 		_ = tx.Rollback()
 		return nil, errors.Default.Wrap(err, "error creating otel connection")
@@ -415,7 +442,7 @@ func RotateOtelConnection(user *common.User, id uint64) (*models.OtelConnectionW
 		return nil, err
 	}
 	affectedCredentials := append(activeCredentials, newCredential)
-	if err := persistOtelRotation(activeCredentials, newCredential); err != nil {
+	if err := persistOtelRotation(id, activeCredentials, newCredential); err != nil {
 		return nil, err
 	}
 	if err := writeHtpasswd(map[string]string{newCredential.Username: password}); err != nil {
@@ -452,16 +479,16 @@ func RotateOtelConnection(user *common.User, id uint64) (*models.OtelConnectionW
 
 // persistOtelRotation makes the retiring-state update and replacement credential creation atomic.
 // The auth file is not touched unless this desired database state is fully committed.
-func persistOtelRotation(activeCredentials []*models.OtelCredential, newCredential *models.OtelCredential) (result errors.Error) {
+func persistOtelRotation(connectionID uint64, activeCredentials []*models.OtelCredential, newCredential *models.OtelCredential) (result errors.Error) {
 	tx := db.Begin()
-	defer func() {
-		if result == nil {
-			return
-		}
-		if rollbackErr := tx.Rollback(); rollbackErr != nil && logger != nil {
-			logger.Warn(rollbackErr, "failed to roll back OTel credential rotation transaction")
-		}
-	}()
+	defer rollbackOtelTransactionOnError(tx, &result)
+	connection, err := lockOtelConnection(tx, connectionID)
+	if err != nil {
+		return err
+	}
+	if connection.Status != models.OtelConnectionStatusActive {
+		return errors.Conflict.New("otel connection is not active")
+	}
 	for _, credential := range activeCredentials {
 		if err := tx.Update(credential); err != nil {
 			return errors.Default.Wrap(err, "error updating retiring otel credential")
@@ -487,28 +514,42 @@ func RevokeOtelConnection(user *common.User, id uint64) (*models.OtelConnectionW
 	lifecycleMu.Lock()
 	defer lifecycleMu.Unlock()
 
-	connection, err := getOtelConnection(id)
+	connection, credentials, err := revokeOtelConnectionRecords(user, id)
 	if err != nil {
 		return nil, err
 	}
-	now := time.Now()
-	credentials, err := getOtelCredentialsByStatuses(id, models.OtelCredentialStatusActive, models.OtelCredentialStatusRetiring)
+	return applyOtelLifecycleUpdate(connection, credentials, "error recording otel credential revocation")
+}
+
+// revokeOtelConnectionRecords writes the revoked credentials and status in one transaction under the connection row lock.
+func revokeOtelConnectionRecords(user *common.User, id uint64) (connection *models.OtelConnection, credentials []*models.OtelCredential, result errors.Error) {
+	tx := db.Begin()
+	defer rollbackOtelTransactionOnError(tx, &result)
+	connection, err := lockOtelConnection(tx, id)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	now := time.Now()
+	credentials, err = getOtelCredentialsByStatuses(id, models.OtelCredentialStatusActive, models.OtelCredentialStatusRetiring)
+	if err != nil {
+		return nil, nil, err
 	}
 	for _, credential := range credentials {
 		markOtelCredentialRevoked(credential, now)
 	}
-	if err := updateOtelCredentials(credentials, "error revoking otel credential"); err != nil {
-		return nil, err
+	if err := updateOtelCredentials(tx, credentials, "error revoking otel credential"); err != nil {
+		return nil, nil, err
 	}
 	connection.Status = models.OtelConnectionStatusRevoked
 	connection.RevokedAt = &now
 	setOtelActor(user, connection, false)
-	if err := db.Update(connection); err != nil {
-		return nil, errors.Default.Wrap(err, "error revoking otel connection")
+	if err := tx.Update(connection); err != nil {
+		return nil, nil, errors.Default.Wrap(err, "error revoking otel connection")
 	}
-	return applyOtelLifecycleUpdate(connection, credentials, "error recording otel credential revocation")
+	if err := tx.Commit(); err != nil {
+		return nil, nil, errors.Default.Wrap(err, "error committing otel connection revocation")
+	}
+	return connection, credentials, nil
 }
 
 func FinalizeOtelRotation(user *common.User, id uint64) (*models.OtelConnectionWithCredentials, errors.Error) {
@@ -529,7 +570,7 @@ func FinalizeOtelRotation(user *common.User, id uint64) (*models.OtelConnectionW
 			markOtelCredentialRevoked(credential, now)
 		}
 	}
-	if err := updateOtelCredentials(credentials, "error finalizing otel rotation"); err != nil {
+	if err := updateOtelCredentials(db, credentials, "error finalizing otel rotation"); err != nil {
 		return nil, err
 	}
 	setOtelActor(user, connection, false)

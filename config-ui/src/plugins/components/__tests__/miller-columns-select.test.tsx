@@ -16,10 +16,10 @@
  *
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import type { McsItem } from 'miller-columns-select';
 import { MillerColumnsSelect } from 'miller-columns-select';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 type Item = { name: string };
 

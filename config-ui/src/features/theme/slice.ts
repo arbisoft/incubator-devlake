@@ -19,27 +19,23 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 import { RootState } from '@/app/store';
+import { THEME_MODE, THEME_STORAGE_KEY } from '@/theme/constants';
 import type { ThemeMode, ResolvedTheme } from '@/theme/tokens';
 
-export const THEME_STORAGE_KEY = 'devlake.theme';
+import type { ThemeState } from './types';
 
-const NEXT_MODE: Record<ThemeMode, ThemeMode> = {
-  light: 'dark',
-  dark: 'system',
-  system: 'light',
-};
-
-const isThemeMode = (value: unknown): value is ThemeMode => value === 'light' || value === 'dark' || value === 'system';
+const isThemeMode = (value: unknown): value is ThemeMode =>
+  value === THEME_MODE.LIGHT || value === THEME_MODE.DARK || value === THEME_MODE.SYSTEM;
 
 const loadInitialMode = (): ThemeMode => {
-  if (typeof window === 'undefined') return 'system';
+  if (typeof window === 'undefined') return THEME_MODE.SYSTEM;
   try {
     const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
     if (isThemeMode(stored)) return stored;
   } catch {
     // localStorage may be unavailable (e.g., SSR / privacy mode)
   }
-  return 'system';
+  return THEME_MODE.SYSTEM;
 };
 
 const persistMode = (mode: ThemeMode): void => {
@@ -50,10 +46,6 @@ const persistMode = (mode: ThemeMode): void => {
     // localStorage may be unavailable (e.g., SSR / privacy mode)
   }
 };
-
-interface ThemeState {
-  mode: ThemeMode;
-}
 
 const initialState: ThemeState = {
   mode: loadInitialMode(),
@@ -67,21 +59,15 @@ export const themeSlice = createSlice({
       state.mode = action.payload;
       persistMode(action.payload);
     },
-    cycleMode(state) {
-      state.mode = NEXT_MODE[state.mode];
-      persistMode(state.mode);
-    },
   },
 });
 
-export const { setMode, cycleMode } = themeSlice.actions;
-
-export default themeSlice.reducer;
+export const { setMode } = themeSlice.actions;
 
 export const selectThemeMode = (state: RootState): ThemeMode => state.theme.mode;
 
 export const resolveThemeMode = (mode: ThemeMode): ResolvedTheme => {
-  if (mode !== 'system') return mode;
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return 'light';
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  if (mode !== THEME_MODE.SYSTEM) return mode;
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return THEME_MODE.LIGHT;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? THEME_MODE.DARK : THEME_MODE.LIGHT;
 };

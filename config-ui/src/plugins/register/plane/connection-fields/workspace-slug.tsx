@@ -16,8 +16,8 @@
  *
  */
 
-import { useEffect } from 'react';
 import { Input } from 'antd';
+import { useEffect } from 'react';
 
 import { Block } from '@/components';
 
@@ -52,12 +52,7 @@ export const WorkspaceSlug = ({ initialValues, values, setValues, setErrors }: P
       description="The workspace slug from your Plane URL, for example `acme-team` in `/workspaces/acme-team/`."
       required
     >
-      <Input
-        style={{ width: 386 }}
-        placeholder="e.g. acme-team"
-        value={values.workspaceSlug ?? ''}
-        onChange={handleChange}
-      />
+      <Input placeholder="e.g. acme-team" value={values.workspaceSlug ?? ''} onChange={handleChange} />
     </Block>
   );
 };

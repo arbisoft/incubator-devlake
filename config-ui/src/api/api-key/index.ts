@@ -19,19 +19,24 @@
 import type { IApiKey } from '@/types';
 import { request } from '@/utils';
 
+import type { KeywordParams, SortParams } from '../types';
+
 type ListRes = {
   count: number;
   apikeys: IApiKey[];
 };
 
-export const list = (data?: Pagination): Promise<ListRes> =>
+export type ListParams = Pagination & KeywordParams & SortParams<'name' | 'expiredAt' | 'createdAt'>;
+
+export const list = (data?: ListParams, signal?: AbortSignal): Promise<ListRes> =>
   request('/api-keys', {
     data,
+    signal,
   });
 
 type CreateForm = Pick<IApiKey, 'name' | 'expiredAt' | 'allowedPath'>;
 
-export const create = (data: CreateForm): Promise<IApiKey> =>
+export const create = (data: CreateForm): Promise<IApiKey & { apiKey: string }> =>
   request('/api-keys', {
     method: 'POST',
     data: {

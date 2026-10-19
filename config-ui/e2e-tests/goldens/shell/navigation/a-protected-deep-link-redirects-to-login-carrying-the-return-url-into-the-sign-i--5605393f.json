@@ -1,0 +1,7 @@
+{
+  "titlePath": [
+    "unauthenticated deep link",
+    "a protected deep link redirects to /login carrying the return_url into the sign-in flow"
+  ],
+  "writes": []
+}

@@ -16,20 +16,11 @@
  *
  */
 
-export const OTEL_CONNECTION_STATUS = {
-  ACTIVE: 'active',
-  REVOKED: 'revoked',
-} as const;
+import type { AI_METRIC_FAMILY, OTEL_INGESTION_STATE, OTEL_STATUS } from './constants';
 
-export type OtelConnectionStatus = (typeof OTEL_CONNECTION_STATUS)[keyof typeof OTEL_CONNECTION_STATUS];
-
-export const OTEL_CREDENTIAL_STATUS = {
-  ACTIVE: 'active',
-  RETIRING: 'retiring',
-  REVOKED: 'revoked',
-} as const;
-
-export type OtelCredentialStatus = (typeof OTEL_CREDENTIAL_STATUS)[keyof typeof OTEL_CREDENTIAL_STATUS];
+export type OtelStatus = (typeof OTEL_STATUS)[keyof typeof OTEL_STATUS];
+export type AiMetricFamily = (typeof AI_METRIC_FAMILY)[keyof typeof AI_METRIC_FAMILY];
+export type OtelIngestionState = (typeof OTEL_INGESTION_STATE)[keyof typeof OTEL_INGESTION_STATE];
 
 export type OtelConnection = {
   id: ID;
@@ -38,7 +29,7 @@ export type OtelConnection = {
   teamSlug: string;
   collectorEndpoint: string;
   protocol: string;
-  status: OtelConnectionStatus;
+  status: OtelStatus;
   organizationId: string | null;
   revokedAt: string | null;
   createdAt: string;
@@ -53,7 +44,7 @@ export type OtelCredential = {
   id: ID;
   connectionId: ID;
   username: string;
-  status: OtelCredentialStatus;
+  status: OtelStatus;
   createdAt: string;
   updatedAt: string;
   rotatedAt?: string;
@@ -75,14 +66,6 @@ export type OtelConnectionResponse = {
   projects: OtelProject[];
 };
 
-export const AI_METRIC_FAMILY = {
-  CORE_ACTIVITY: 'core_activity',
-  MODEL_USAGE: 'model_usage',
-  TOOL_USAGE: 'tool_usage',
-} as const;
-
-export type AiMetricFamily = (typeof AI_METRIC_FAMILY)[keyof typeof AI_METRIC_FAMILY];
-
 export type AiSourcePreference = {
   provider: string;
   workspaceKey: string;
@@ -92,14 +75,6 @@ export type AiSourcePreference = {
   createdAt: string;
   updatedAt: string;
 };
-
-export const OTEL_INGESTION_STATE = {
-  HEALTHY: 'healthy',
-  DEGRADED: 'degraded',
-  UNHEALTHY: 'unhealthy',
-} as const;
-
-export type OtelIngestionState = (typeof OTEL_INGESTION_STATE)[keyof typeof OTEL_INGESTION_STATE];
 
 export type OtelMetricBatchSummary = {
   id: ID;

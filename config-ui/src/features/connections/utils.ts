@@ -17,7 +17,6 @@
  */
 
 import { getPluginConfig } from '@/plugins';
-
 import { IConnectionAPI, IConnection, IConnectionStatus, IWebhookAPI, IWebhook } from '@/types';
 
 export const transformConnection = (plugin: string, connection: IConnectionAPI): IConnection => {
@@ -55,4 +54,12 @@ export const transformWebhook = (connection: IWebhookAPI): IWebhook => {
     postPullRequestsEndpoint: connection.postPullRequestsEndpoint,
     apiKeyId: connection.apiKey?.id,
   };
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
+
+export const getErrorResponse = (error: unknown): { status?: number; data: Record<string, unknown> } | undefined => {
+  if (!isRecord(error) || !isRecord(error.response)) return undefined;
+  const { status, data } = error.response;
+  return { status: typeof status === 'number' ? status : undefined, data: isRecord(data) ? data : {} };
 };

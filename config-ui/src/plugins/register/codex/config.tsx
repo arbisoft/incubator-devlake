@@ -17,8 +17,10 @@
  */
 
 import { Input } from 'antd';
+
 import { Block } from '@/components/block';
 import { IPluginConfig } from '@/types';
+
 import Icon from './assets/icon.svg?react';
 
 export const CodexConfig: IPluginConfig = {

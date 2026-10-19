@@ -1,0 +1,89 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+import type { IWebhook } from '@/types';
+
+import { API_KEY_PLACEHOLDER } from './constants';
+import type { WebhookCommands } from './types';
+
+const wrapBody = (fields: string[]) => ['{', ...fields.map((field) => `      ${field}`), '    }'].join('\n');
+
+const INCIDENT_BODY = wrapBody([
+  '"issueKey":"DLK-1234",',
+  '"title":"an incident from DLK",',
+  '"type":"INCIDENT",',
+  '"originalStatus":"TODO",',
+  '"status":"TODO",',
+  '"createdDate":"2020-01-01T12:00:00+00:00",',
+  '"updatedDate":"2020-01-01T12:00:00+00:00"',
+]);
+
+const DEPLOYMENT_BODY = wrapBody([
+  '"id": "Required. This will be the unique ID of the deployment",',
+  '"startedDate": "2023-01-01T12:00:00+00:00",',
+  '"finishedDate": "2023-01-01T12:00:00+00:00",',
+  '"result": "SUCCESS",',
+  '"deploymentCommits":[',
+  '  {',
+  '    "repoUrl": "your-git-url",',
+  '    "refName": "your-branch-name",',
+  '    "startedDate": "2023-01-01T12:00:00+00:00",',
+  '    "finishedDate": "2023-01-01T12:00:00+00:00",',
+  '    "commitSha": "e.g. 015e3d3b480e417aede5a1293bd61de9b0fd051d",',
+  '    "commitMsg": "optional-commit-message"',
+  '  }',
+  ']',
+]);
+
+const PULL_REQUEST_BODY = wrapBody([
+  '"id": "Required. This will be the unique ID of the pull request",',
+  '"baseRepoId": "your-repo-id",',
+  '"headRepoId": "your-repo-id",',
+  '"status": "MERGED",',
+  '"originalStatus": "OPEN",',
+  '"displayTitle": "Feature: Add new functionality",',
+  '"description": "This PR adds new features",',
+  '"url": "https://github.com/org/repo/pull/1",',
+  '"pullRequestKey": 1,',
+  '"createdDate": "2025-02-20T16:17:36Z",',
+  '"mergedDate": "2025-02-20T17:17:36Z",',
+  '"closedDate": null,',
+  '"mergeCommitSha": "bf0a79c57dff8f5f1f393de315ee5105a535e059",',
+  '"headRef": "your-branch-name",',
+  '"baseRef": "main",',
+  '"baseCommitSha": "e73325c2c9863f42ea25871cbfaeebcb8edcf604",',
+  '"headCommitSha": "b22f772f1197edfafd4cc5fe679a2d299ec12837",',
+  '"isDraft": false',
+]);
+
+const curlCommand = (url: string, apiKey: string, body?: string) => {
+  const data = body ? ` -d '${body}'` : '';
+  return `curl ${url} -X 'POST' -H 'Authorization: Bearer ${apiKey}'${data}`;
+};
+
+export const buildCommands = (prefix: string, webhook: IWebhook, apiKey?: string): WebhookCommands => {
+  const key = apiKey || API_KEY_PLACEHOLDER;
+  return {
+    postIssuesEndpoint: curlCommand(`${prefix}${webhook.postIssuesEndpoint}`, key, INCIDENT_BODY),
+    closeIssuesEndpoint: curlCommand(`${prefix}${webhook.closeIssuesEndpoint}`, key),
+    postDeploymentsCurl: curlCommand(`${prefix}${webhook.postPipelineDeployTaskEndpoint}`, key, DEPLOYMENT_BODY),
+    postPullRequestsEndpoint: curlCommand(`${prefix}${webhook.postPullRequestsEndpoint}`, key, PULL_REQUEST_BODY),
+  };
+};
+
+export const getApiPrefix = (origin: string) => `${origin}/api`;

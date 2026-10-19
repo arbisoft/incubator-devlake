@@ -16,8 +16,8 @@
  *
  */
 
-import { useEffect } from 'react';
 import { Input } from 'antd';
+import { useEffect } from 'react';
 
 import { Block } from '@/components';
 
@@ -58,7 +58,6 @@ export const ConnectionPassword = ({
   return (
     <Block title={label ?? 'Password'} description={subLabel ? subLabel : null} required>
       <Input.Password
-        style={{ width: 386 }}
         placeholder={type === 'update' ? '********' : placeholder ? placeholder : 'Your Password'}
         value={value}
         onChange={handleChange}

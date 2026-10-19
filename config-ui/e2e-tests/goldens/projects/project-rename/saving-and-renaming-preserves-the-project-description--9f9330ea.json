@@ -1,0 +1,62 @@
+{
+  "titlePath": [
+    "Project rename with Claude Code OTel placements",
+    "saving and renaming preserves the project description"
+  ],
+  "writes": [
+    {
+      "method": "PATCH",
+      "path": "/api/projects/e2e-*",
+      "body": {
+        "description": "e2e description that must survive save and rename",
+        "metrics": [
+          {
+            "enable": true,
+            "pluginName": "dora",
+            "pluginOption": {}
+          },
+          {
+            "enable": false,
+            "pluginName": "linker",
+            "pluginOption": {
+              "prToIssueRegexp": "(?mi)(Closes)[\\s]*.*(((and )?#\\d+[ ]*)+)"
+            }
+          },
+          {
+            "enable": false,
+            "pluginName": "issue_trace",
+            "pluginOption": {}
+          }
+        ],
+        "name": "e2e-*"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/projects/e2e-*",
+      "body": {
+        "description": "e2e description that must survive save and rename",
+        "metrics": [
+          {
+            "enable": true,
+            "pluginName": "dora",
+            "pluginOption": {}
+          },
+          {
+            "enable": false,
+            "pluginName": "linker",
+            "pluginOption": {
+              "prToIssueRegexp": "(?mi)(Closes)[\\s]*.*(((and )?#\\d+[ ]*)+)"
+            }
+          },
+          {
+            "enable": false,
+            "pluginName": "issue_trace",
+            "pluginOption": {}
+          }
+        ],
+        "name": "e2e-*"
+      }
+    }
+  ]
+}

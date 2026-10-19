@@ -17,3 +17,9 @@
  */
 
 export const isMaskedGithubToken = (token?: string) => !!token && token.includes('*');
+
+export type GithubTokenType = 'classic' | 'fine-grained';
+
+// Unknown and legacy prefixes keep the form's existing classic-token guidance.
+export const getGithubTokenType = (token?: string): GithubTokenType =>
+  token?.startsWith('github_pat_') ? 'fine-grained' : 'classic';

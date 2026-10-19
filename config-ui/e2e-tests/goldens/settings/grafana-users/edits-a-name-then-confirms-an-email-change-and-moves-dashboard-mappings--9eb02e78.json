@@ -1,0 +1,22 @@
+{
+  "titlePath": [
+    "Grafana user management ordinary flows",
+    "edits a name then confirms an email change and moves dashboard mappings"
+  ],
+  "writes": [
+    {
+      "method": "PATCH",
+      "path": "/api/access/grafana/users/:id",
+      "body": {
+        "name": "Updated name"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/access/grafana/users/:id",
+      "body": {
+        "email": "e2e-*@example.com"
+      }
+    }
+  ]
+}

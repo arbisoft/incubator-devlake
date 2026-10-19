@@ -1,0 +1,24 @@
+{
+  "titlePath": [
+    "Local Password Authentication - Phases 1-4 Full E2E Suite",
+    "18. Identity Link Initiation for Local User: Local session can initiate OIDC provider link without 401"
+  ],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/access/local-users",
+      "body": {
+        "displayName": "",
+        "loginName": "e2e_*",
+        "role": "member"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/local/change-password",
+      "body": {
+        "password": "<masked>"
+      }
+    }
+  ]
+}

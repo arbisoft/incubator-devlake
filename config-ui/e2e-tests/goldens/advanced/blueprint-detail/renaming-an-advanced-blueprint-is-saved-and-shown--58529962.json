@@ -1,0 +1,30 @@
+{
+  "titlePath": ["Blueprint detail views and pipeline panel", "renaming an advanced blueprint is saved and shown"],
+  "writes": [
+    {
+      "method": "PATCH",
+      "path": "/api/blueprints/:id",
+      "body": {
+        "afterPlan": null,
+        "beforePlan": null,
+        "connections": [],
+        "createdAt": "<masked>",
+        "cronConfig": "45 6 * * *",
+        "enable": true,
+        "fullSync": false,
+        "id": "<masked>",
+        "isManual": false,
+        "labels": [],
+        "mode": "NORMAL",
+        "name": "e2e-*-renamed",
+        "plan": [],
+        "priority": 0,
+        "projectName": "",
+        "skipCollectors": false,
+        "skipOnFail": true,
+        "timeAfter": "<masked>",
+        "updatedAt": "<masked>"
+      }
+    }
+  ]
+}

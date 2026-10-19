@@ -38,9 +38,20 @@ var (
 	ErrEmptyPlan = errors.Default.New("empty plan")
 )
 
+var blueprintSortSpec = sortSpec{
+	columns: map[string]string{
+		"name":      "_devlake_blueprints.name",
+		"createdAt": "_devlake_blueprints.created_at",
+	},
+	defaultColumn: "_devlake_blueprints.id",
+	tieBreaker:    "_devlake_blueprints.id",
+}
+
 // BlueprintQuery is a query for GetBlueprints
 type BlueprintQuery struct {
 	Pagination
+	SortQuery
+	Keyword  string `form:"keyword"`
 	Enable   *bool  `form:"enable,omitempty"`
 	IsManual *bool  `form:"isManual"`
 	Label    string `form:"label"`
@@ -74,7 +85,13 @@ func CreateBlueprint(blueprint *models.Blueprint) errors.Error {
 
 // GetBlueprints returns a paginated list of Blueprints based on `query`
 func GetBlueprints(query *BlueprintQuery, shouldSanitize bool) ([]*models.Blueprint, int64, errors.Error) {
+	orderBy, err := query.orderBy(blueprintSortSpec)
+	if err != nil {
+		return nil, 0, err
+	}
 	blueprints, count, err := bpManager.GetDbBlueprints(&services.GetBlueprintQuery{
+		Keyword:     query.Keyword,
+		OrderBy:     orderBy,
 		Enable:      query.Enable,
 		IsManual:    query.IsManual,
 		Label:       query.Label,
