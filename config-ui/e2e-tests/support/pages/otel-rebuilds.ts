@@ -176,8 +176,20 @@ export class OtelReplayDialog {
     await this.picker.setRange(start, end);
   }
 
+  get submitButton(): Locator {
+    return this.dialog.getByRole('button', { name: OTEL_MODAL_COPY.replayModal.submit, exact: true });
+  }
+
+  get disabledReasonTooltip(): Locator {
+    return this.page.getByRole('tooltip');
+  }
+
   async submit(): Promise<void> {
-    await this.dialog.getByRole('button', { name: OTEL_MODAL_COPY.replayModal.submit, exact: true }).click();
+    await this.submitButton.click();
+  }
+
+  async showDisabledReason(): Promise<void> {
+    await this.submitButton.hover();
   }
 
   async confirm(): Promise<void> {
