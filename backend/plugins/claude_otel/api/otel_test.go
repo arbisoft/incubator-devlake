@@ -23,6 +23,8 @@ import (
 	"testing"
 
 	"github.com/apache/incubator-devlake/core/plugin"
+	"github.com/apache/incubator-devlake/helpers/pluginhelper/api"
+	"github.com/apache/incubator-devlake/plugins/claude_otel/service"
 )
 
 func TestGetMetricBatchPayloadRequiresCustomerAdministrator(t *testing.T) {
@@ -62,5 +64,15 @@ func TestParsePositiveQuery(t *testing.T) {
 				t.Fatalf("parsePositiveQuery() = %d, %v; want %d", got, err, tc.want)
 			}
 		})
+	}
+}
+
+func TestReplayBodyDecodesFlatDates(t *testing.T) {
+	body := &service.OtelReplayInput{}
+	if err := api.Decode(map[string]interface{}{"requestedForConnectionId": 8, "startDate": "2026-10-18", "endDate": "2026-10-19"}, body, nil); err != nil {
+		t.Fatalf("Decode() error = %v", err)
+	}
+	if body.StartDate != "2026-10-18" || body.EndDate != "2026-10-19" || body.RequestedForConnectionId == nil || *body.RequestedForConnectionId != 8 {
+		t.Fatalf("Decode() = %+v; want the flat dates and connection decoded", body)
 	}
 }

@@ -57,7 +57,7 @@ type OtelReplayRange struct {
 
 type OtelReplayInput struct {
 	RequestedForConnectionId *uint64 `json:"requestedForConnectionId"`
-	OtelReplayRange
+	OtelReplayRange          `mapstructure:",squash"`
 }
 
 type OtelReplayView struct {
