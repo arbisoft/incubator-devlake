@@ -19,6 +19,7 @@ package service
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/crossdomain"
@@ -99,13 +100,15 @@ func sameClaudeAccount(stored, merged crossdomain.Account) bool {
 
 // fullNameForEmail returns the name on another DevLake account (Jira, GitHub, git, ...) with
 // this email, or "" when there is none. Lowest ID wins when several sources have a name.
+// The match ignores case: accounts.email is utf8mb4_bin, and other plugins store the
+// email as their source sent it, while Claude emails are lowercased.
 func fullNameForEmail(tx dal.Transaction, email string) (string, error) {
 	if email == "" {
 		return "", nil
 	}
 	account := &crossdomain.Account{}
 	err := tx.First(account,
-		dal.Where("email = ? AND id NOT LIKE ? AND full_name IS NOT NULL AND full_name <> ''", email, "claude:%"),
+		dal.Where("LOWER(email) = ? AND id NOT LIKE ? AND full_name IS NOT NULL AND full_name <> ''", strings.ToLower(email), "claude:%"),
 		dal.Orderby("id ASC"),
 	)
 	if err != nil {

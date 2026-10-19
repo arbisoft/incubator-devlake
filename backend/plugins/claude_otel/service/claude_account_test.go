@@ -249,7 +249,7 @@ func TestFullNameForEmailSkipsClaudeAndUnnamedAccounts(t *testing.T) {
 		mock.MatchedBy(func(clause dal.Clause) bool {
 			where, ok := clause.Data.(dal.DalClause)
 			return ok && clause.Type == dal.WhereClause &&
-				strings.Contains(where.Expr, "email = ?") && strings.Contains(where.Expr, "id NOT LIKE ?") &&
+				strings.Contains(where.Expr, "LOWER(email) = ?") && strings.Contains(where.Expr, "id NOT LIKE ?") &&
 				strings.Contains(where.Expr, "full_name IS NOT NULL") && strings.Contains(where.Expr, "full_name <> ''") &&
 				len(where.Params) == 2 && where.Params[0] == "dev@example.com" && where.Params[1] == "claude:%"
 		}),
@@ -258,7 +258,9 @@ func TestFullNameForEmailSkipsClaudeAndUnnamedAccounts(t *testing.T) {
 		args.Get(0).(*crossdomain.Account).FullName = "Dev Name"
 	}).Return(nil).Once()
 
-	if got, err := fullNameForEmail(transaction, "dev@example.com"); err != nil || got != "Dev Name" {
+	// accounts.email is case-sensitive, so both sides are lowercased to match mixed-case
+	// emails stored by other plugins.
+	if got, err := fullNameForEmail(transaction, "Dev@Example.com"); err != nil || got != "Dev Name" {
 		t.Fatalf("fullNameForEmail() = %q, %v", got, err)
 	}
 }
