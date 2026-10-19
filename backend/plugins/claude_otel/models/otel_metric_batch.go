@@ -29,6 +29,10 @@ const (
 	OtelMetricBatchTable    = "_raw_otel_claude_code_metric_batches"
 	OtelConverterLeaseTable = "_tool_claude_code_otel_converter_leases"
 	OtelReplayRequestTable  = "_tool_claude_code_otel_replay_requests"
+	OtelAuditEventTable     = "_tool_claude_code_otel_audit_events"
+
+	OtelAuditActionOrganizationRebind = "organization_rebind"
+	OtelAuditActionReplayRequested    = "replay_requested"
 )
 
 // The status lifecycle shared by the raw metric and log batch tables.
@@ -102,8 +106,8 @@ func (OtelConverterLease) TableName() string {
 // OtelReplayRequest asks the elected converter to replay whole UTC days of retained raw
 // batches. Kind metrics rebuilds hourly and canonical daily facts of completed days; kind
 // logs requeues the log batches received in the range, which may include the current day,
-// so their events and prompts are converted again. Operators insert requests directly;
-// there is intentionally no API or UI trigger.
+// so their events and prompts are converted again. Requests are queued through the replays
+// API or a connection rebind.
 type OtelReplayRequest struct {
 	common.Model
 	Kind            string     `gorm:"type:varchar(16);not null;default:'metrics'"`
@@ -116,8 +120,27 @@ type OtelReplayRequest struct {
 	SkippedBatches  int        `gorm:"not null;default:0"`
 	ErrorMessage    *string    `gorm:"type:text"`
 	CompletedAt     *time.Time `gorm:"type:datetime(3)"`
+
+	RequestedForConnectionId *uint64 `gorm:"index"`
+	RequestedBy              *string `gorm:"type:varchar(255)"`
 }
 
 func (OtelReplayRequest) TableName() string {
 	return OtelReplayRequestTable
+}
+
+// OtelAuditEvent records an operator action on the Claude Code OTel integration.
+type OtelAuditEvent struct {
+	common.Model
+	ActorName    *string `gorm:"type:varchar(255)"`
+	ActorEmail   *string `gorm:"type:varchar(255);index"`
+	Action       string  `gorm:"type:varchar(64);index"`
+	ConnectionId *uint64 `gorm:"index"`
+	OldValue     *string `gorm:"type:varchar(255)"`
+	NewValue     *string `gorm:"type:varchar(255)"`
+	Detail       *string `gorm:"type:text"`
+}
+
+func (OtelAuditEvent) TableName() string {
+	return OtelAuditEventTable
 }

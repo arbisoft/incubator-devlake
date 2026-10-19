@@ -19,6 +19,7 @@ package api
 
 import (
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/apache/incubator-devlake/core/errors"
@@ -160,6 +161,66 @@ func ApplyConnection(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput,
 		return nil, err
 	}
 	return &plugin.ApiResourceOutput{Body: connection, Status: http.StatusOK}, nil
+}
+
+func RebindConnectionOrganization(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	id, err := parseId(input.Params["connectionId"])
+	if err != nil {
+		return nil, err
+	}
+	body := &service.OtelRebindInput{}
+	if err := api.Decode(input.Body, body, nil); err != nil {
+		return nil, err
+	}
+	result, err := service.RebindOtelOrganization(input.User, id, body)
+	if err != nil {
+		return nil, err
+	}
+	return &plugin.ApiResourceOutput{Body: result, Status: http.StatusOK}, nil
+}
+
+func PostReplay(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	body := &service.OtelReplayInput{}
+	if err := api.Decode(input.Body, body, nil); err != nil {
+		return nil, err
+	}
+	queue, err := service.CreateOtelReplay(input.User, body)
+	if err != nil {
+		return nil, err
+	}
+	return &plugin.ApiResourceOutput{Body: queue, Status: http.StatusCreated}, nil
+}
+
+func ListReplays(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {
+	page, err := parsePositiveQuery(input.Query, "page", 1)
+	if err != nil {
+		return nil, err
+	}
+	pageSize, err := parsePositiveQuery(input.Query, "pageSize", service.OtelReplayDefaultPageSize)
+	if err != nil {
+		return nil, err
+	}
+	replays, err := service.ListOtelReplays(page, pageSize)
+	if err != nil {
+		return nil, err
+	}
+	return &plugin.ApiResourceOutput{Body: replays, Status: http.StatusOK}, nil
+}
+
+func parsePositiveQuery(query url.Values, key string, fallback int) (int, errors.Error) {
+	values, present := query[key]
+	if !present {
+		return fallback, nil
+	}
+	raw := ""
+	if len(values) > 0 {
+		raw = values[0]
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 1 {
+		return 0, errors.BadInput.New("page and pageSize must be positive integers")
+	}
+	return value, nil
 }
 
 func PutConnectionProjects(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, errors.Error) {

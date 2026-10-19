@@ -63,6 +63,34 @@ type rawConverter struct {
 
 var converterStartOnce sync.Once
 
+var drainConverter *rawConverter
+
+// StartConverter starts the background raw batch converter.
+func StartConverter() {
+	startRawConverter(db, logger)
+}
+
+// DrainConverter converts until idle under the given clock; DB tests use it in place of the background loop.
+func DrainConverter(now func() time.Time) errors.Error {
+	if drainConverter == nil {
+		drainConverter = newRawConverter(db, logger)
+	}
+	drainConverter.now = now
+	leader, err := drainConverter.acquireLease()
+	if err != nil {
+		return err
+	}
+	if !leader {
+		return errors.Default.New("Claude Code OTel converter lease is held by another worker")
+	}
+	for {
+		processed, err := drainConverter.pollOnce()
+		if err != nil || !processed {
+			return err
+		}
+	}
+}
+
 func newRawConverter(db dal.Dal, logger log.Logger) *rawConverter {
 	return &rawConverter{db: db, logger: logger, now: time.Now, workerID: uuid.NewString()}
 }

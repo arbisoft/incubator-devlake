@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -887,4 +888,71 @@ func newConverterRequest(observedAt time.Time, organizationID string) *collector
 			sum(metricToolDecision, point(2)),
 		}}},
 	}}}
+}
+
+// claimNextReplayBounds runs one claim attempt and returns the last two params (kind, midnight) of the find and update clauses.
+func claimNextReplayBounds(t *testing.T, now time.Time) (find, update []interface{}) {
+	t.Helper()
+	lastTwo := func(clauses []dal.Clause) []interface{} {
+		params := whereOf(clauses).Params
+		return params[len(params)-2:]
+	}
+	database := dalmocks.NewDal(t)
+	database.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything).Run(func(args mock.Arguments) {
+		clauses := args.Get(1).([]dal.Clause)
+		if strings.Contains(whereOf(clauses).Expr, "range_end <= ?") {
+			find = lastTwo(clauses)
+		}
+		args.Get(0).(*models.OtelReplayRequest).ID = 5
+	}).Return(nil).Once()
+	database.On("UpdateColumns", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		update = lastTwo(args.Get(2).([]dal.Clause))
+	}).Return(nil).Once()
+	database.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything).Return(devlakeerrors.NotFound.New("none")).Once()
+	database.On("IsErrorNotFound", mock.Anything).Return(true).Once()
+	converter := newRawConverter(database, nil)
+	converter.now = func() time.Time { return now }
+
+	if _, _, found, err := converter.claimNextReplay(); err != nil || found {
+		t.Fatalf("claimNextReplay() = %v, %v; want no claim after the verify miss", found, err)
+	}
+	return find, update
+}
+
+func TestClaimNextReplaySkipsRequestsEndingAfterMidnight(t *testing.T) {
+	now := time.Date(2026, 10, 19, 10, 30, 0, 0, time.UTC)
+	midnight := now.Truncate(24 * time.Hour)
+	find, update := claimNextReplayBounds(t, now)
+	want := []interface{}{models.OtelReplayKindLogs, midnight}
+	if !reflect.DeepEqual(find, want) || !reflect.DeepEqual(update, want) {
+		t.Fatalf("kind and range_end bounds = find %v, update %v; want %v on both", find, update, want)
+	}
+}
+
+func TestClaimNextReplayClaimsLogRequestsBeforeMidnight(t *testing.T) {
+	now := time.Date(2026, 10, 19, 10, 30, 0, 0, time.UTC)
+	database := dalmocks.NewDal(t)
+	var findExpr string
+	var findParams []interface{}
+	database.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything).Run(func(args mock.Arguments) {
+		clause := whereOf(args.Get(1).([]dal.Clause))
+		if strings.Contains(clause.Expr, "range_end <= ?") {
+			findExpr, findParams = clause.Expr, clause.Params
+			*args.Get(0).(*models.OtelReplayRequest) = models.OtelReplayRequest{Model: common.Model{ID: 6}, Kind: models.OtelReplayKindLogs, RangeEnd: now.Add(24 * time.Hour)}
+			return
+		}
+		request := args.Get(0).(*models.OtelReplayRequest)
+		request.Status = models.OtelReplayRequestStatusProcessing
+	}).Return(nil).Twice()
+	database.On("UpdateColumns", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Return(nil).Once()
+	converter := newRawConverter(database, nil)
+	converter.now = func() time.Time { return now }
+
+	request, _, found, err := converter.claimNextReplay()
+	if err != nil || !found || request.ID != 6 {
+		t.Fatalf("claimNextReplay() = %+v, %v, %v; want the logs request 6 claimed", request, found, err)
+	}
+	if !strings.Contains(findExpr, "(kind = ? OR range_end <= ?)") || findParams[len(findParams)-2] != models.OtelReplayKindLogs {
+		t.Fatalf("find clause = %q %v; want the midnight bound waived for logs", findExpr, findParams)
+	}
 }
