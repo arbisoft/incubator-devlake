@@ -24,6 +24,7 @@ import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
 import { COPY } from './constants';
 import { OtelIngestionHealth } from './ingestion-health';
+import { REPLAY_COPY } from './replay-constants';
 import type { OtelIngestionHealthProps } from './types';
 
 const status: OtelIngestionStatus = {
@@ -103,5 +104,22 @@ describe('OtelIngestionHealth', () => {
     renderHealth({ loading: false, failed: false, status, onRetry: vi.fn() });
 
     expect(screen.queryByText(COPY.health.metrics.logPending)).toBeNull();
+  });
+
+  it('shows the rebuilding notice only while a rebuild is active', () => {
+    const activeReplay = {
+      id: 9,
+      requestedForTeamName: 'Platform',
+      rangeStart: '2026-10-18T00:00:00Z',
+      rangeEnd: '2026-10-20T00:00:00Z',
+    };
+    const { rerender } = renderHealth({ loading: false, failed: false, status, onRetry: vi.fn() });
+    expect(screen.queryByText(/Rebuilding/)).toBeNull();
+
+    rerender(
+      <OtelIngestionHealth loading={false} failed={false} status={{ ...status, activeReplay }} onRetry={vi.fn()} />,
+    );
+
+    expect(screen.getByText(REPLAY_COPY.rebuilding('2026-10-18 – 2026-10-19', 'Platform'))).toBeTruthy();
   });
 });

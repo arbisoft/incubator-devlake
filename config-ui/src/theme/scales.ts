@@ -79,6 +79,8 @@ export type LayoutTokens = {
   connectionLabelMaxWidth: number;
   sortSelectWidth: number;
   datePickerWidth: number;
+  otelReplayRangeWidth: number;
+  otelReplayColumnWidth: Record<'requested' | 'requestedFor' | 'days' | 'status' | 'batches' | 'error', number>;
   statusDotSize: number;
   chipMaxWidth: number;
   stageDotSize: number;
@@ -188,6 +190,15 @@ export const LAYOUT: LayoutTokens = {
   connectionLabelMaxWidth: 240,
   sortSelectWidth: 168,
   datePickerWidth: 224,
+  otelReplayRangeWidth: 280,
+  otelReplayColumnWidth: {
+    requested: 180,
+    requestedFor: 140,
+    days: 210,
+    status: 190,
+    batches: 160,
+    error: 200,
+  },
   statusDotSize: 6,
   chipMaxWidth: 120,
   stageDotSize: 10,
@@ -213,7 +224,7 @@ export const LAYOUT: LayoutTokens = {
   otelStatusColumnWidth: 110,
   otelCredentialsColumnWidth: 110,
   otelUpdatedColumnWidth: 90,
-  otelActionsColumnWidth: 250,
+  otelActionsColumnWidth: 290,
   meterSegment: { sm: { width: 13, height: 6, gap: 3 }, md: { width: 22, height: 8, gap: 4 } },
   readinessPopoverWidth: 380,
   popoverListMaxHeight: 456,

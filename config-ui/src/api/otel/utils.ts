@@ -23,6 +23,7 @@ import type { OtelConnectionResponse } from './types';
 
 export const OTEL_BASE_PATH = '/plugins/claude_otel';
 export const CONNECTIONS_PATH = `${OTEL_BASE_PATH}/connections`;
+export const REPLAYS_PATH = `${OTEL_BASE_PATH}/replays`;
 
 export const otelAction =
   (action: (typeof OTEL_ACTION_PATH)[keyof typeof OTEL_ACTION_PATH]) =>

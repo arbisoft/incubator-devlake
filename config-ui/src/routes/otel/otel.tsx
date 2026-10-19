@@ -38,9 +38,10 @@ import {
 import { EMPTY_ILLUSTRATION } from '@/ui/empty-state';
 
 import { getConnectionColumns } from './columns';
-import { CreateModal, ProjectsModal, SnippetModal } from './components';
-import { COPY, LIFECYCLE_ACTION, OTEL_MODAL, OTEL_REFRESH_INTERVAL_MS } from './constants';
+import { CreateModal, ProjectsModal, RebindModal, SnippetModal } from './components';
+import { COPY, LIFECYCLE_ACTION, OTEL_MODAL, OTEL_POLL } from './constants';
 import { OtelIngestionHealth } from './ingestion-health';
+import { OtelReplays } from './replays';
 import { OtelSourcePolicy } from './source-policy';
 import { Hint } from './styled';
 import type { LifecycleAction, OtelModal, PendingCredentialFocus } from './types';
@@ -49,7 +50,6 @@ import { useOtelAction } from './use-otel-action';
 import { getCreateIntent, hasRecoveryRequired, hasStorageNeedsApplying, notifyOtelAttentionChanged } from './utils';
 
 const BREADCRUMBS = [{ label: COPY.breadcrumbConnections, path: PATHS.CONNECTIONS() }, { label: COPY.title }];
-const POLL = { interval: OTEL_REFRESH_INTERVAL_MS };
 
 export const Otel = () => {
   const { version, refresh } = useRefreshVersion();
@@ -57,16 +57,16 @@ export const Otel = () => {
   const [intent] = useState(() => getCreateIntent(searchParams));
   const [modal, setModal] = useState<OtelModal | undefined>(intent ? OTEL_MODAL.CREATE : undefined);
   const [presetProject, setPresetProject] = useState(intent);
-  const [placementTarget, setPlacementTarget] = useState<OtelConnectionResponse>();
+  const [target, setTarget] = useState<OtelConnectionResponse>();
   const [credential, setCredential] = useState<OtelConnectionResponse>();
   const [credentialOpen, setCredentialOpen] = useState(false);
   const generateButtonRef = useRef<HTMLButtonElement>(null);
-  const actionButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+  const [actionButtons] = useState(() => new Map<string, HTMLButtonElement>());
   const pendingCredentialFocus = useRef<PendingCredentialFocus | undefined>(undefined);
 
-  const connections = useAutoRefresh((signal) => API.otel.list(signal), [version], POLL);
-  const ingestion = useAutoRefresh((signal) => API.otel.ingestionStatus(signal), [version], POLL);
-  const preferences = useAutoRefresh((signal) => API.otel.listSourcePreferences(signal), [version], POLL);
+  const connections = useAutoRefresh((signal) => API.otel.list(signal), [version], OTEL_POLL);
+  const ingestion = useAutoRefresh((signal) => API.otel.ingestionStatus(signal), [version], OTEL_POLL);
+  const preferences = useAutoRefresh((signal) => API.otel.listSourcePreferences(signal), [version], OTEL_POLL);
   const projectOptionsQuery = useRefreshData((signal) => API.otel.listProjects(signal), [version]);
   const projectOptions = projectOptionsQuery.data;
 
@@ -100,32 +100,36 @@ export const Otel = () => {
   const registerActionButton = useCallback(
     (connectionId: string | number, action: LifecycleAction, button: HTMLButtonElement | null) => {
       const key = `${connectionId}:${action}`;
-      if (button) actionButtonRefs.current.set(key, button);
-      else actionButtonRefs.current.delete(key);
+      if (button) actionButtons.set(key, button);
+      else actionButtons.delete(key);
     },
-    [],
+    [actionButtons],
   );
 
   useEffect(() => {
     const pending = pendingCredentialFocus.current;
     if (credentialOpen || credential || !pending) return;
 
-    const target =
+    const button =
       pending.action && pending.connectionId !== undefined
-        ? actionButtonRefs.current.get(`${pending.connectionId}:${pending.action}`)
+        ? actionButtons.get(`${pending.connectionId}:${pending.action}`)
         : generateButtonRef.current;
-    if (!target || target.disabled) return;
+    if (!button || button.disabled) return;
 
-    target.focus();
+    button.focus();
     pendingCredentialFocus.current = undefined;
-  }, [credential, credentialOpen, rows]);
+  }, [actionButtons, credential, credentialOpen, rows]);
 
   const columns = useMemo(
     () =>
       getConnectionColumns({
         onManageProjects: (connection) => {
-          setPlacementTarget(connection);
+          setTarget(connection);
           setModal(OTEL_MODAL.PROJECTS);
+        },
+        onRebind: (connection) => {
+          setTarget(connection);
+          setModal(OTEL_MODAL.REBIND);
         },
         onAction: start,
         onActionButtonRef: registerActionButton,
@@ -176,6 +180,7 @@ export const Otel = () => {
         status={ingestion.data}
         onRetry={refresh}
       />
+      <OtelReplays version={version} />
       <OtelSourcePolicy
         loading={preferences.data === undefined && preferences.error === undefined}
         failed={preferences.data === undefined && preferences.error !== undefined}
@@ -204,12 +209,22 @@ export const Otel = () => {
       />
       <ProjectsModal
         open={modal === OTEL_MODAL.PROJECTS}
-        connection={placementTarget}
+        connection={target}
         projectOptions={projectOptions ?? []}
         onClose={closeModal}
         onSaved={() => {
           closeModal();
           refresh();
+        }}
+      />
+      <RebindModal
+        open={modal === OTEL_MODAL.REBIND}
+        connection={target}
+        onClose={closeModal}
+        onRebound={() => {
+          closeModal();
+          refresh();
+          notifyOtelAttentionChanged();
         }}
       />
       <SnippetModal

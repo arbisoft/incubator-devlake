@@ -50,3 +50,16 @@ export const OTEL_ACTION_PATH = {
   FINALIZE_ROTATION: 'finalize-rotation',
   APPLY: 'apply',
 } as const;
+
+export const OTEL_REPLAY_STATE = {
+  PENDING: 'pending',
+  WAITING: 'waiting',
+  PROCESSING: 'processing',
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+} as const;
+
+export const OTEL_REPLAY_KIND = {
+  METRICS: 'metrics',
+  LOGS: 'logs',
+} as const;

@@ -16,11 +16,19 @@
  *
  */
 
-import type { AI_METRIC_FAMILY, OTEL_INGESTION_STATE, OTEL_STATUS } from './constants';
+import type {
+  AI_METRIC_FAMILY,
+  OTEL_INGESTION_STATE,
+  OTEL_REPLAY_KIND,
+  OTEL_REPLAY_STATE,
+  OTEL_STATUS,
+} from './constants';
 
 export type OtelStatus = (typeof OTEL_STATUS)[keyof typeof OTEL_STATUS];
 export type AiMetricFamily = (typeof AI_METRIC_FAMILY)[keyof typeof AI_METRIC_FAMILY];
 export type OtelIngestionState = (typeof OTEL_INGESTION_STATE)[keyof typeof OTEL_INGESTION_STATE];
+export type OtelReplayKind = (typeof OTEL_REPLAY_KIND)[keyof typeof OTEL_REPLAY_KIND];
+export type OtelReplayState = (typeof OTEL_REPLAY_STATE)[keyof typeof OTEL_REPLAY_STATE];
 
 export type OtelConnection = {
   id: ID;
@@ -115,4 +123,40 @@ export type OtelIngestionStatus = {
   permanentErrorReasons: Array<{ code: string; count: number }>;
   recentBatches: OtelMetricBatchSummary[];
   logs?: OtelQueueStatus;
+  activeReplay?: OtelActiveReplay;
 };
+
+export type OtelActiveReplay = {
+  id: ID;
+  requestedForTeamName: string | null;
+  rangeStart: string;
+  rangeEnd: string;
+};
+
+export type OtelReplayRange = { startDate: string; endDate: string };
+
+export type OtelReplayInput = OtelReplayRange & { requestedForConnectionId?: ID };
+
+export type OtelReplay = {
+  id: ID;
+  requestedForConnectionId: ID | null;
+  requestedForTeamName: string | null;
+  kind: OtelReplayKind;
+  rangeStart: string;
+  rangeEnd: string;
+  state: OtelReplayState;
+  replayedBatches: number;
+  skippedBatches: number;
+  errorMessage: string | null;
+  requestedBy: string | null;
+  createdAt: string;
+  completedAt: string | null;
+};
+
+export type OtelReplayPage = { replays: OtelReplay[]; count: number };
+
+export type OtelReplayQueue = { queued: OtelReplay[]; reused: OtelReplay[] };
+
+export type OtelRebindInput = { organizationId: string; replay?: OtelReplayRange };
+
+export type OtelRebindResponse = { connection: OtelConnectionResponse; replays?: OtelReplayQueue };

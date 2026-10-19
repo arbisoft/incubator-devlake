@@ -37,11 +37,12 @@ import {
 
 import { COPY } from './constants';
 import { getBatchColumns } from './ingestion-columns';
+import { REPLAY_COPY } from './replay-constants';
 import { Hint, MetricGrid, Stack } from './styled';
 import { INGESTION_STATE_TONE } from './tones';
 import type { OtelIngestionHealthProps } from './types';
 import { useClientPagination } from './use-client-pagination';
-import { formatAge, getBacklogTone, getConverterLabel, getPermanentErrorTone } from './utils';
+import { formatAge, formatReplayDays, getBacklogTone, getConverterLabel, getPermanentErrorTone } from './utils';
 
 export const OtelIngestionHealth = ({ loading, failed, status, onRetry }: OtelIngestionHealthProps) => {
   const [batchId, setBatchId] = useState<ID>();
@@ -142,6 +143,16 @@ export const OtelIngestionHealth = ({ loading, failed, status, onRetry }: OtelIn
       >
         <Stack>
           {healthContent()}
+          {status?.activeReplay && (
+            <Alert
+              type="info"
+              showIcon
+              title={REPLAY_COPY.rebuilding(
+                formatReplayDays(status.activeReplay.rangeStart, status.activeReplay.rangeEnd),
+                status.activeReplay.requestedForTeamName,
+              )}
+            />
+          )}
           {status && status.reasons.length > 0 && (
             <Alert
               type={status.state === OTEL_INGESTION_STATE.UNHEALTHY ? 'error' : 'warning'}
