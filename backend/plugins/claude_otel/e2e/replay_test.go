@@ -487,6 +487,7 @@ func TestRebindRequeuesLogBatchesForTheReboundTeam(t *testing.T) {
 
 	require.Zero(t, w.count(&models.OtelEvent{}, "connection_id = ? AND organization_id = ?", fixture.a.ID, orgR))
 	require.Positive(t, w.count(&models.OtelEvent{}, "connection_id = ? AND user_key = ?", fixture.a.ID, stray.logUserKey()))
+	require.Zero(t, w.count(&ai.AiPrompt{}, "workspace_key = ?", orgR))
 	beforeB, beforeC := w.logFactsOf(fixture.b.ID, orgB), w.logFactsOf(fixture.c.ID, orgC)
 	for _, set := range []logFacts{beforeB, beforeC} {
 		require.NotEmpty(t, set.Events)
@@ -501,6 +502,7 @@ func TestRebindRequeuesLogBatchesForTheReboundTeam(t *testing.T) {
 		for offset := -2; offset <= 0; offset++ {
 			day := w.day(offset)
 			require.Positive(t, w.count(&models.OtelEvent{}, "connection_id = ? AND organization_id = ? AND user_key = ? AND event_timestamp >= ? AND event_timestamp < ?", fixture.a.ID, orgR, who.logUserKey(), day, day.AddDate(0, 0, 1)), "%s %s", who.name, day.Format(dateLayout))
+			require.Positive(t, w.count(&ai.AiPrompt{}, "workspace_key = ? AND user_key = ? AND started_at >= ? AND started_at < ?", orgR, who.logUserKey(), day, day.AddDate(0, 0, 1)), "%s %s", who.name, day.Format(dateLayout))
 		}
 	}
 	require.Equal(t, int64(120), w.count(&models.OtelEvent{}, "connection_id = ? AND organization_id = ?", fixture.a.ID, orgR))

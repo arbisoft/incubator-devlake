@@ -280,7 +280,6 @@ func (a actor) logResource(at time.Time, seed int) *logsv1.ResourceLogs {
 		base := []*commonv1.KeyValue{
 			strAttr("devlake_team", a.team),
 			strAttr("event.name", name),
-			strAttr("event.timestamp", at.Add(time.Duration(sequence)*time.Second).UTC().Format("2006-01-02T15:04:05.000Z")),
 			intAttr("event.sequence", sequence),
 			strAttr("session.id", session),
 			strAttr("organization.id", a.org),
@@ -289,6 +288,7 @@ func (a actor) logResource(at time.Time, seed int) *logsv1.ResourceLogs {
 			strAttr("user.id", "install-"+a.name),
 			strAttr("terminal.type", fxTerminal[seed%len(fxTerminal)]),
 			strAttr("prompt.id", prompt),
+			strAttr("event.timestamp", at.Add(time.Duration(sequence)*time.Second).UTC().Format("2006-01-02T15:04:05.000Z")),
 		}
 		return &logsv1.LogRecord{Body: &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "claude_code." + name}}, Attributes: withAttrs(base, extra...)}
 	}
@@ -324,7 +324,15 @@ func (w *world) insertLogBatch(specs []resourceSpec) *models.OtelLogBatch {
 	for _, resource := range request.ResourceLogs {
 		for _, record := range resource.ScopeLogs[0].LogRecords {
 			records++
-			observed, err := time.Parse(time.RFC3339Nano, record.Attributes[2].GetValue().GetStringValue())
+			timestamp := ""
+			for _, attribute := range record.GetAttributes() {
+				if attribute.GetKey() == "event.timestamp" {
+					timestamp = attribute.GetValue().GetStringValue()
+					break
+				}
+			}
+			require.NotEmpty(w.t, timestamp)
+			observed, err := time.Parse(time.RFC3339Nano, timestamp)
 			require.NoError(w.t, err)
 			if minAt.IsZero() || observed.Before(minAt) {
 				minAt = observed
