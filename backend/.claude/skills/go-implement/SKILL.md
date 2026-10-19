@@ -1,6 +1,6 @@
 ---
 name: go-implement
-description: Implement, add or refactor Go code to strict standards — Go idioms (Effective Go, Go Code Review Comments, Google Go Style Guide), SOLID, constructor dependency injection, GoF design patterns, OpenAPI/REST API design with accurate spec annotations, and good practices (security, observability, config and reliability, code hygiene) — with a design note first, table-driven tests with injected fakes, and a self-review using the go-review standard. Use when asked to implement, build, add, write or refactor Go code.
+description: Implement, add or refactor Go code to strict standards — Go idioms (Effective Go, Go Code Review Comments, Google Go Style Guide), SOLID, constructor dependency injection, GoF design patterns, OpenAPI/REST API design with accurate spec annotations, and good practices (security, observability, config and reliability, code hygiene) — with a design note first, table-driven tests with injected fakes, and a self-review using the go-review standard. Use when the user runs /go-implement, or asks to implement a new feature, endpoint, service or plugin subtask, or to do a non-trivial refactor of Go code in this backend. Not for small fixes, one-line or few-line edits, typo, comment or config changes, dependency bumps, or answering questions about Go code — make those changes directly.
 argument-hint: "<what to implement>"
 ---
 <!--
