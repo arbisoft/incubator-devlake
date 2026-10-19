@@ -38,18 +38,27 @@ const (
 	replayErrorMessageLimit     = 1024
 )
 
-var replayableBatchStatuses = []string{models.OtelMetricBatchStatusProcessed, models.OtelMetricBatchStatusPermanentError}
+var replayableBatchStatuses = []string{models.OtelBatchStatusProcessed, models.OtelBatchStatusPermanentError}
 
 var errReplayLeaseLost = stdErrors.New("Claude Code OTel replay lease was lost")
 
 // processNextReplay claims the oldest pending or expired replay request. A request-level
 // lease keeps a long rebuild owned even when the converter's short global lease turns over.
-func (c *rawMetricConverter) processNextReplay() (bool, errors.Error) {
+func (c *rawConverter) processNextReplay() (bool, errors.Error) {
 	request, leaseOwner, found, err := c.claimNextReplay()
 	if err != nil || !found {
 		return false, err
 	}
-	replayed, skipped, replayErr := c.replay(request, leaseOwner)
+	var replayed, skipped int
+	var replayErr error
+	switch request.Kind {
+	case models.OtelReplayKindMetrics, "":
+		replayed, skipped, replayErr = c.replay(request, leaseOwner)
+	case models.OtelReplayKindLogs:
+		replayed, replayErr = c.requeueLogBatches(request, leaseOwner)
+	default:
+		replayErr = fmt.Errorf("unknown replay kind %q", request.Kind)
+	}
 	if replayErr != nil {
 		if stdErrors.Is(replayErr, errReplayLeaseLost) {
 			return false, nil
@@ -61,7 +70,7 @@ func (c *rawMetricConverter) processNextReplay() (bool, errors.Error) {
 	return true, nil
 }
 
-func (c *rawMetricConverter) claimNextReplay() (*models.OtelReplayRequest, string, bool, errors.Error) {
+func (c *rawConverter) claimNextReplay() (*models.OtelReplayRequest, string, bool, errors.Error) {
 	now := c.now().UTC()
 	request := &models.OtelReplayRequest{}
 	err := c.db.First(request,
@@ -99,7 +108,7 @@ func (c *rawMetricConverter) claimNextReplay() (*models.OtelReplayRequest, strin
 // and start live-converting the same date range while the original replay was still running.
 // Requiring both here makes a replay abort as soon as leadership actually changes, instead of
 // only failing (or, before this fix, not failing at all) once it reaches commitReplay.
-func (c *rawMetricConverter) renewReplayLease(requestID uint64, leaseOwner string) error {
+func (c *rawConverter) renewReplayLease(requestID uint64, leaseOwner string) error {
 	now := c.now().UTC()
 	if err := c.db.UpdateColumn(&models.OtelReplayRequest{}, "lease_until", now.Add(converterLeaseDuration),
 		dal.Where("id = ? AND status = ? AND lease_owner = ? AND lease_until > ?", requestID, models.OtelReplayRequestStatusProcessing, leaseOwner, now)); err != nil {
@@ -124,7 +133,7 @@ func (c *rawMetricConverter) renewReplayLease(requestID uint64, leaseOwner strin
 
 // renewReplayLeaseIfDue avoids a request/global lease round trip for every raw batch while
 // still renewing often enough for a long replay. force is used immediately before a day commit.
-func (c *rawMetricConverter) renewReplayLeaseIfDue(requestID uint64, leaseOwner string, lastRenewal *time.Time, force bool) error {
+func (c *rawConverter) renewReplayLeaseIfDue(requestID uint64, leaseOwner string, lastRenewal *time.Time, force bool) error {
 	now := c.now().UTC()
 	if !force && !lastRenewal.IsZero() && now.Sub(*lastRenewal) < converterLeaseDuration/3 {
 		return nil
@@ -144,7 +153,7 @@ func (c *rawMetricConverter) renewReplayLeaseIfDue(requestID uint64, leaseOwner 
 // leader had already written live facts into it. Locking the row (rather than only reading
 // it) also blocks a concurrent acquireLease() from taking over for the short window this
 // transaction is writing, so the two can never interleave.
-func (c *rawMetricConverter) verifyConverterLease(tx dal.Transaction) error {
+func (c *rawConverter) verifyConverterLease(tx dal.Transaction) error {
 	lease := &models.OtelConverterLease{}
 	if err := tx.First(lease, dal.Where("name = ?", converterLeaseName), dal.Lock(true, false)); err != nil {
 		return fmt.Errorf("verify Claude Code OTel converter lease before replay commit: %w", err)
@@ -155,7 +164,7 @@ func (c *rawMetricConverter) verifyConverterLease(tx dal.Transaction) error {
 	return nil
 }
 
-func (c *rawMetricConverter) finishReplay(requestID uint64, leaseOwner, status string, replayed, skipped int, message *string) errors.Error {
+func (c *rawConverter) finishReplay(requestID uint64, leaseOwner, status string, replayed, skipped int, message *string) errors.Error {
 	err := c.db.UpdateColumns(&models.OtelReplayRequest{}, []dal.DalSet{
 		{ColumnName: "status", Value: status},
 		{ColumnName: "lease_owner", Value: nil},
@@ -171,16 +180,27 @@ func (c *rawMetricConverter) finishReplay(requestID uint64, leaseOwner, status s
 	return nil
 }
 
-func (c *rawMetricConverter) validateReplayRange(request *models.OtelReplayRequest) error {
+// validateReplayRange checks a metrics replay range, which must hold completed UTC days
+// only because replay replaces whole days of facts.
+func (c *rawConverter) validateReplayRange(request *models.OtelReplayRequest) error {
+	if err := c.validateReplayDays(request); err != nil {
+		return err
+	}
+	if request.RangeEnd.UTC().After(c.now().UTC().Truncate(24 * time.Hour)) {
+		return fmt.Errorf("replay range must contain completed UTC days only")
+	}
+	return nil
+}
+
+// validateReplayDays checks the rules shared by metrics and logs replay: whole UTC days, at
+// most replayMaxRange long, within raw batch retention.
+func (c *rawConverter) validateReplayDays(request *models.OtelReplayRequest) error {
 	start, end := request.RangeStart.UTC(), request.RangeEnd.UTC()
 	if !start.Equal(start.Truncate(24*time.Hour)) || !end.Equal(end.Truncate(24*time.Hour)) {
 		return fmt.Errorf("replay range must start and end at UTC midnight")
 	}
 	if !start.Before(end) || end.Sub(start) > replayMaxRange {
 		return fmt.Errorf("replay range must be between one and %d days", int(replayMaxRange.Hours()/24))
-	}
-	if end.After(c.now().UTC().Truncate(24 * time.Hour)) {
-		return fmt.Errorf("replay range must contain completed UTC days only")
 	}
 	if start.Before(c.now().UTC().Add(-rawBatchRetention)) {
 		return fmt.Errorf("replay range starts before retained raw telemetry")
@@ -198,7 +218,7 @@ type hourlyAggregate struct {
 // replay rebuilds one completed UTC day at a time. Every completed day is independently
 // replace-idempotent; a later failure leaves earlier days correct and a rerun replaces them.
 // Persisted live series state is intentionally left untouched because replay accepts DELTA only.
-func (c *rawMetricConverter) replay(request *models.OtelReplayRequest, leaseOwner string) (int, int, error) {
+func (c *rawConverter) replay(request *models.OtelReplayRequest, leaseOwner string) (int, int, error) {
 	if err := c.validateReplayRange(request); err != nil {
 		return 0, 0, err
 	}
@@ -274,7 +294,7 @@ func boundedReplayErrorMessage(err error) *string {
 }
 
 // prepareReplayDay fully prepares one day before any existing fact for that day is removed.
-func (c *rawMetricConverter) prepareReplayDay(requestID uint64, leaseOwner string, dayStart time.Time, lastRenewal *time.Time, diagnostics *replayDiagnostics) (int, int, map[string]*hourlyAggregate, error) {
+func (c *rawConverter) prepareReplayDay(requestID uint64, leaseOwner string, dayStart time.Time, lastRenewal *time.Time, diagnostics *replayDiagnostics) (int, int, map[string]*hourlyAggregate, error) {
 	dayEnd := dayStart.AddDate(0, 0, 1)
 	aggregates := make(map[string]*hourlyAggregate)
 	replayed, skipped := 0, 0
@@ -315,10 +335,10 @@ func (c *rawMetricConverter) prepareReplayDay(requestID uint64, leaseOwner strin
 // replayBatch adds one raw batch's DELTA increases to one day's aggregates. A permanently
 // quarantined raw batch never contributed facts and can be skipped; every failure for a
 // processed batch aborts before the caller deletes its existing day.
-func (c *rawMetricConverter) replayBatch(batch *models.OtelMetricBatch, rangeStart, rangeEnd time.Time, aggregates map[string]*hourlyAggregate) (bool, error, error) {
+func (c *rawConverter) replayBatch(batch *models.OtelMetricBatch, rangeStart, rangeEnd time.Time, aggregates map[string]*hourlyAggregate) (bool, error, error) {
 	request, decodeErr := decodeOtelMetricBatchRequest(batch)
 	if decodeErr != nil {
-		return c.replayBatchFailure(batch, permanentMetricError(errorInvalidPayload, "decode replay batch %d: %v", batch.ID, decodeErr))
+		return c.replayBatchFailure(batch, permanentConversionError(errorInvalidPayload, "decode replay batch %d: %v", batch.ID, decodeErr))
 	}
 	prepared, err := c.prepareUpdates(request)
 	if err != nil {
@@ -332,7 +352,7 @@ func (c *rawMetricConverter) replayBatch(batch *models.OtelMetricBatch, rangeSta
 	// cannot be replayed safely without predecessor state, and must leave the day untouched.
 	for _, update := range prepared.updates {
 		if update.temporality == metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_CUMULATIVE {
-			return c.replayBatchFailure(batch, permanentMetricError(errorUnsupportedTemporality, "replay batch %d contains cumulative telemetry; a predecessor checkpoint is required", batch.ID))
+			return c.replayBatchFailure(batch, permanentConversionError(errorUnsupportedTemporality, "replay batch %d contains cumulative telemetry; a predecessor checkpoint is required", batch.ID))
 		}
 	}
 	for _, update := range prepared.updates {
@@ -356,8 +376,8 @@ func (c *rawMetricConverter) replayBatch(batch *models.OtelMetricBatch, rangeSta
 	return true, nil, nil
 }
 
-func (c *rawMetricConverter) replayBatchFailure(batch *models.OtelMetricBatch, err error) (bool, error, error) {
-	if batch.Status == models.OtelMetricBatchStatusPermanentError {
+func (c *rawConverter) replayBatchFailure(batch *models.OtelMetricBatch, err error) (bool, error, error) {
+	if batch.Status == models.OtelBatchStatusPermanentError {
 		return false, err, nil
 	}
 	return false, nil, fmt.Errorf("cannot safely replay processed batch %d: %w", batch.ID, err)
@@ -370,21 +390,10 @@ func hourlyAggregateKey(update factUpdate) string {
 
 // commitReplayDay fences both leases and replaces one completed UTC day atomically. The
 // request stays processing until all requested days have committed successfully.
-func (c *rawMetricConverter) commitReplayDay(requestID uint64, leaseOwner string, dayStart time.Time, aggregates map[string]*hourlyAggregate, replayed, skipped int, diagnostic *string) error {
+func (c *rawConverter) commitReplayDay(requestID uint64, leaseOwner string, dayStart time.Time, aggregates map[string]*hourlyAggregate, replayed, skipped int, diagnostic *string) error {
 	dayEnd := dayStart.AddDate(0, 0, 1)
 	tx := c.db.Begin()
-	request := &models.OtelReplayRequest{}
-	if err := tx.First(request,
-		dal.Where("id = ? AND status = ? AND lease_owner = ? AND lease_until > ?", requestID, models.OtelReplayRequestStatusProcessing, leaseOwner, c.now().UTC()),
-		dal.Lock(true, false),
-	); err != nil {
-		c.rollback(tx)
-		if tx.IsErrorNotFound(err) {
-			return errReplayLeaseLost
-		}
-		return fmt.Errorf("verify replay request lease before commit: %w", err)
-	}
-	if err := c.verifyConverterLease(tx); err != nil {
+	if err := c.lockReplayLeases(tx, requestID, leaseOwner); err != nil {
 		c.rollback(tx)
 		return err
 	}
@@ -406,7 +415,23 @@ func (c *rawMetricConverter) commitReplayDay(requestID uint64, leaseOwner string
 	return nil
 }
 
-func (c *rawMetricConverter) replaceReplayRange(tx dal.Transaction, rangeStart, rangeEnd time.Time, aggregates map[string]*hourlyAggregate) error {
+// lockReplayLeases locks the replay request row inside tx and verifies that this worker
+// still holds both the request lease and the converter lease. The caller rolls back on error.
+func (c *rawConverter) lockReplayLeases(tx dal.Transaction, requestID uint64, leaseOwner string) error {
+	request := &models.OtelReplayRequest{}
+	if err := tx.First(request,
+		dal.Where("id = ? AND status = ? AND lease_owner = ? AND lease_until > ?", requestID, models.OtelReplayRequestStatusProcessing, leaseOwner, c.now().UTC()),
+		dal.Lock(true, false),
+	); err != nil {
+		if tx.IsErrorNotFound(err) {
+			return errReplayLeaseLost
+		}
+		return fmt.Errorf("verify replay request lease before commit: %w", err)
+	}
+	return c.verifyConverterLease(tx)
+}
+
+func (c *rawConverter) replaceReplayRange(tx dal.Transaction, rangeStart, rangeEnd time.Time, aggregates map[string]*hourlyAggregate) error {
 	hourRange := dal.Where("hour_start >= ? AND hour_start < ?", rangeStart, rangeEnd)
 	for _, fact := range []interface{}{&models.OtelHourlyActivity{}, &models.OtelHourlyModelUsage{}, &models.OtelHourlyToolUsage{}} {
 		if err := tx.Delete(fact, hourRange); err != nil {

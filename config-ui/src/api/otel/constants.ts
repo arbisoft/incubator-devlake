@@ -40,6 +40,7 @@ export const OTEL_BATCH_STATUS = {
   PROCESSED: 'processed',
   RETRYABLE_ERROR: 'retryable_error',
   PERMANENT_ERROR: 'permanent_error',
+  REPLAY_PENDING: 'replay_pending',
 } as const;
 
 export const OTEL_ACTION_PATH = {

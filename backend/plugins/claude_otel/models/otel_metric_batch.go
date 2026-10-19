@@ -29,17 +29,35 @@ const (
 	OtelMetricBatchTable    = "_raw_otel_claude_code_metric_batches"
 	OtelConverterLeaseTable = "_tool_claude_code_otel_converter_leases"
 	OtelReplayRequestTable  = "_tool_claude_code_otel_replay_requests"
+)
 
-	OtelMetricBatchStatusPending        = "pending"
-	OtelMetricBatchStatusProcessing     = "processing"
-	OtelMetricBatchStatusProcessed      = "processed"
-	OtelMetricBatchStatusRetryableError = "retryable_error"
-	OtelMetricBatchStatusPermanentError = "permanent_error"
+// The status lifecycle shared by the raw metric and log batch tables.
+const (
+	OtelBatchStatusPending        = "pending"
+	OtelBatchStatusProcessing     = "processing"
+	OtelBatchStatusProcessed      = "processed"
+	OtelBatchStatusRetryableError = "retryable_error"
+	OtelBatchStatusPermanentError = "permanent_error"
+	// OtelBatchStatusReplayPending marks a log batch requeued by a replay request. It keeps
+	// this status while it is converted and between retries; the lease and retry columns
+	// tell those apart. The log queue claims these only when no live batch is claimable, so
+	// a replay never delays new events nor shows as live backlog.
+	OtelBatchStatusReplayPending = "replay_pending"
+)
 
+const (
 	OtelReplayRequestStatusPending    = "pending"
 	OtelReplayRequestStatusProcessing = "processing"
 	OtelReplayRequestStatusCompleted  = "completed"
 	OtelReplayRequestStatusFailed     = "failed"
+)
+
+// Replay request kinds. A metrics request rebuilds hourly and canonical daily facts by day;
+// a logs request returns the range's log batches to the log queue, whose conversion is
+// idempotent.
+const (
+	OtelReplayKindMetrics = "metrics"
+	OtelReplayKindLogs    = "logs"
 )
 
 // OtelMetricBatch is the durable, replayable OTLP Metrics request accepted from
@@ -81,11 +99,14 @@ func (OtelConverterLease) TableName() string {
 	return OtelConverterLeaseTable
 }
 
-// OtelReplayRequest asks the elected converter to rebuild hourly and canonical daily
-// facts for whole UTC days from retained raw batches. Operators insert requests directly;
+// OtelReplayRequest asks the elected converter to replay whole UTC days of retained raw
+// batches. Kind metrics rebuilds hourly and canonical daily facts of completed days; kind
+// logs requeues the log batches received in the range, which may include the current day,
+// so their events and prompts are converted again. Operators insert requests directly;
 // there is intentionally no API or UI trigger.
 type OtelReplayRequest struct {
 	common.Model
+	Kind            string     `gorm:"type:varchar(16);not null;default:'metrics'"`
 	RangeStart      time.Time  `gorm:"type:datetime(3)"`
 	RangeEnd        time.Time  `gorm:"type:datetime(3)"`
 	Status          string     `gorm:"type:varchar(32);index"`

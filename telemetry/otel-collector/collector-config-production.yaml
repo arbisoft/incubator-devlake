@@ -13,7 +13,7 @@ receivers:
 processors:
   resource/attribution:
     attributes:
-      # The attributes processor below edits datapoints only. Remove spoofable resource-level
+      # The attributes processor below edits datapoints and log records only. Remove spoofable resource-level
       # attribution so it cannot reach Prometheus labels or DevLake raw storage.
       - key: devlake_team
         action: delete
@@ -35,6 +35,31 @@ processors:
         action: extract
       - key: devlake_auth_username
         action: delete
+  transform/strip_content:
+    error_mode: ignore
+    log_statements:
+      # Response, tool input and raw API body content is never forwarded. DevLake strips the
+      # same attributes again at ingest. Prompt text is forwarded and kept out of ai_* tables.
+      # DevLake also keeps only skill and MCP names from tool_parameters at ingest.
+      - delete_matching_keys(log.attributes, "^(response|tool_input|body|body_ref)$")
+      - delete_matching_keys(resource.attributes, "^(response|tool_input|body|body_ref)$")
+      # A tool_result error message can echo file contents; api_error messages are kept.
+      # Claude Code may send the name with or without the claude_code. prefix.
+      - delete_key(log.attributes, "error") where log.attributes["event.name"] == "tool_result" or log.attributes["event.name"] == "claude_code.tool_result"
+  attributes/drop_session:
+    actions:
+      # Session ids are needed on events, but would make every session a Prometheus series.
+      - key: session.id
+        action: delete
+      - key: ccr.session.id
+        action: delete
+  transform/drop_repository:
+    error_mode: ignore
+    metric_statements:
+      # Repository identity is needed on events, but would add a series per repository to every
+      # Prometheus metric. Claude Code sends it under OTEL_METRICS_INCLUDE_REPOSITORY.
+      - delete_matching_keys(datapoint.attributes, "^vcs[.]")
+      - delete_matching_keys(resource.attributes, "^vcs[.]")
   memory_limiter:
     check_interval: 1s
     limit_percentage: 80
@@ -120,7 +145,14 @@ service:
     metrics/claude_raw:
       receivers: [forward/claude_raw]
       exporters: [otlphttp/claude_raw]
+    # Claude Code events go only to DevLake, at /plugins/claude_otel/otlp/v1/logs.
+    # The otlphttp/claude_raw sending_queue batches them (256 KiB to 1 MiB, 10s flush), so no
+    # batch processor is needed.
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource/attribution, attributes/team, transform/strip_content]
+      exporters: [otlphttp/claude_raw]
     metrics/prometheus:
       receivers: [forward/prometheus]
-      processors: [delta_to_cumulative, batch/prometheus]
+      processors: [attributes/drop_session, transform/drop_repository, delta_to_cumulative, batch/prometheus]
       exporters: [prometheus]

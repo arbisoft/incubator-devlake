@@ -79,4 +79,29 @@ describe('OtelIngestionHealth', () => {
     expect(screen.getByText(COPY.health.batchStatus[OTEL_BATCH_STATUS.PROCESSED])).toBeTruthy();
     expect(screen.getByText('2')).toBeTruthy();
   });
+
+  it('shows the log queue metrics when the status reports them', () => {
+    renderHealth({
+      loading: false,
+      failed: false,
+      status: {
+        ...status,
+        logs: {
+          batchCounts: { [OTEL_BATCH_STATUS.REPLAY_PENDING]: 7 },
+          recentPermanentErrors: 0,
+          permanentErrorReasons: [],
+        },
+      },
+      onRetry: vi.fn(),
+    });
+
+    expect(screen.getByText(COPY.health.metrics.logReplaying)).toBeTruthy();
+    expect(screen.getByText('7')).toBeTruthy();
+  });
+
+  it('hides the log queue metrics when the status has none', () => {
+    renderHealth({ loading: false, failed: false, status, onRetry: vi.fn() });
+
+    expect(screen.queryByText(COPY.health.metrics.logPending)).toBeNull();
+  });
 });
