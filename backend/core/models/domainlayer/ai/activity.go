@@ -33,8 +33,8 @@ type AiActivity struct {
 	// Provider identifies the AI tool (e.g. "claude", "gh-copilot", "cursor", "codex").
 	Provider string `gorm:"type:varchar(100);index" json:"provider"`
 
-	// AccountId is the global DevLake account resolved from UserEmail.
-	// May be empty if no matching account was found.
+	// AccountId is the user's DevLake account. How it is resolved is provider-specific:
+	// Claude OTel always links its own claude:ClaudeAccount: row.
 	AccountId string `gorm:"type:varchar(255);index" json:"accountId"`
 
 	// UserEmail is the raw email (or login) as returned by the provider.

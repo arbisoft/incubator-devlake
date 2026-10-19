@@ -26,7 +26,6 @@ import (
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/models/domainlayer"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/ai"
-	"github.com/apache/incubator-devlake/core/models/domainlayer/crossdomain"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
 )
 
@@ -118,7 +117,7 @@ func reconcileOtelDailyTarget(tx dal.Transaction, target dailyTarget) error {
 		return fmt.Errorf("load hourly Claude OTel tool facts: %w", err)
 	}
 
-	accountID, email, err := resolveDomainAccount(tx, activityRows, modelRows, toolRows)
+	accountID, email, err := resolveDomainAccount(tx, target, activityRows, modelRows, toolRows)
 	if err != nil {
 		return err
 	}
@@ -133,21 +132,15 @@ func reconcileOtelDailyTarget(tx dal.Transaction, target dailyTarget) error {
 	return writeCanonicalToolDecisions(tx, target, accountID, email, toolRows)
 }
 
-// resolveDomainAccount links the canonical row to a DevLake account by email when one
-// exists. A missing account is normal; a lookup failure aborts the conversion.
-func resolveDomainAccount(tx dal.Transaction, activityRows []*models.OtelHourlyActivity, modelRows []*models.OtelHourlyModelUsage, toolRows []*models.OtelHourlyToolUsage) (string, string, error) {
+// resolveDomainAccount links the canonical row to the Claude user's own DevLake account,
+// creating it on first sight. A lookup or write failure aborts the conversion.
+func resolveDomainAccount(tx dal.Transaction, target dailyTarget, activityRows []*models.OtelHourlyActivity, modelRows []*models.OtelHourlyModelUsage, toolRows []*models.OtelHourlyToolUsage) (string, string, error) {
 	email := firstEmail(activityRows, modelRows, toolRows)
-	if email == "" {
-		return "", "", nil
+	accountID, err := ensureClaudeAccount(tx, target.workspaceKey, target.userKey, target.userAccountID, email)
+	if err != nil {
+		return "", "", err
 	}
-	account := &crossdomain.Account{}
-	if err := tx.First(account, dal.Where("email = ?", email), dal.Orderby("id ASC")); err != nil {
-		if tx.IsErrorNotFound(err) {
-			return "", email, nil
-		}
-		return "", "", fmt.Errorf("resolve Claude OTel domain account: %w", err)
-	}
-	return account.Id, email, nil
+	return accountID, email, nil
 }
 
 func firstEmail(activityRows []*models.OtelHourlyActivity, modelRows []*models.OtelHourlyModelUsage, toolRows []*models.OtelHourlyToolUsage) string {

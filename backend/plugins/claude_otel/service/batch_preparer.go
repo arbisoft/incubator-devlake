@@ -490,19 +490,21 @@ func identityFromAttributes(attributes []*commonv1.KeyValue) (developerIdentity,
 
 // checkIdentityLengths rejects an identity whose values do not fit their columns, rather
 // than letting MySQL reject the whole batch. Truncating it could merge different users,
-// so the caller skips the log record or data point instead.
+// so the caller skips the log record or data point instead. The user key is also part of
+// the Claude account ID, so its limit is shorter than the column.
 func checkIdentityLengths(identity developerIdentity) error {
 	for _, field := range []struct {
 		name  string
 		value string
+		width int
 	}{
-		{"user key", identity.key},
-		{"user.account_id", stringValue(identity.accountID)},
-		{"user.account_uuid", stringValue(identity.accountUUID)},
-		{"user.email", stringValue(identity.email)},
+		{"user key", identity.key, userKeyLength},
+		{"user.account_id", stringValue(identity.accountID), identityColumnLength},
+		{"user.account_uuid", stringValue(identity.accountUUID), identityColumnLength},
+		{"user.email", stringValue(identity.email), identityColumnLength},
 	} {
-		if utf8.RuneCountInString(field.value) > identityColumnLength {
-			return permanentConversionError(errorValueTooLong, "%s is longer than %d characters", field.name, identityColumnLength)
+		if utf8.RuneCountInString(field.value) > field.width {
+			return permanentConversionError(errorValueTooLong, "%s is longer than %d characters", field.name, field.width)
 		}
 	}
 	return nil

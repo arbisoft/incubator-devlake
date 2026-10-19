@@ -28,7 +28,6 @@ import (
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/models/domainlayer"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/ai"
-	"github.com/apache/incubator-devlake/core/models/domainlayer/crossdomain"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
 )
 
@@ -462,7 +461,7 @@ func rollupSession(tx dal.Transaction, workspaceKey string, target *sessionTarge
 		}
 		rollup := buildPromptRollup(workspaceKey, promptID, events)
 		rollup.prompt.PermissionMode, rollup.prompt.PermissionModeInferred = modes.modeAt(rollup.prompt.StartedAt, promptSequence(events))
-		accountID, err := domainAccountID(tx, accounts, rollup.prompt.UserEmail)
+		accountID, err := domainAccountID(tx, accounts, workspaceKey, rollup.prompt.UserKey, rollup.prompt.UserAccountId, rollup.prompt.UserEmail)
 		if err != nil {
 			return err
 		}
@@ -574,23 +573,22 @@ func refreshSessionModes(tx dal.Transaction, workspaceKey string, target *sessio
 	return nil
 }
 
-// domainAccountID links prompts to a DevLake account by email, caching per session.
-func domainAccountID(tx dal.Transaction, cache map[string]string, email string) (string, error) {
-	if email == "" {
-		return "", nil
+// domainAccountID links prompts to the Claude user's own DevLake account, writing it once
+// per session for each email and Claude account ID the session's prompts carry.
+func domainAccountID(tx dal.Transaction, cache map[string]string, workspaceKey, userKey string, userAccountID *string, email string) (string, error) {
+	cacheKey := email + "\x00"
+	if userAccountID != nil {
+		cacheKey += *userAccountID
 	}
-	if accountID, cached := cache[email]; cached {
+	if accountID, cached := cache[cacheKey]; cached {
 		return accountID, nil
 	}
-	account := &crossdomain.Account{}
-	if err := tx.First(account, dal.Where("email = ?", email), dal.Orderby("id ASC")); err != nil {
-		if !tx.IsErrorNotFound(err) {
-			return "", fmt.Errorf("resolve Claude Code prompt account: %w", err)
-		}
-		account.Id = ""
+	accountID, err := ensureClaudeAccount(tx, workspaceKey, userKey, userAccountID, email)
+	if err != nil {
+		return "", err
 	}
-	cache[email] = account.Id
-	return account.Id, nil
+	cache[cacheKey] = accountID
+	return accountID, nil
 }
 
 // eventAttributes decodes an event's attributes. The decode error is discarded because
