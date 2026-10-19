@@ -136,6 +136,13 @@
       "skips": 0,
       "fixmes": 0
     },
+    "otel/otel-rebuilds.spec.ts": {
+      "tests": 6,
+      "expects": 55,
+      "backend": 2,
+      "skips": 0,
+      "fixmes": 0
+    },
     "projects/blueprint-connection.spec.ts": {
       "tests": 5,
       "expects": 19,

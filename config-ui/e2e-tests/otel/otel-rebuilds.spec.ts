@@ -31,7 +31,7 @@ import {
   retireOtelConnections,
   uniqueName,
 } from '../support/api';
-import { OTEL_MODAL_COPY, REPLAY_COPY } from '../support/app-copy';
+import { OTEL_MODAL_COPY, OTEL_REPLAY_KIND, REPLAY_COPY } from '../support/app-copy';
 import { deleteOtelConnectionsOfTeam } from '../support/db';
 import {
   OtelRowMarks,
@@ -41,6 +41,7 @@ import {
   otelAuditEvents,
   otelOrganizationOf,
   otelReplayRequestsFor,
+  otelReplayRequestsAfter,
   otelRowMarks,
   seedOtelReplayRequests,
 } from '../support/db-otel';
@@ -139,19 +140,29 @@ test.describe.serial('Claude Code OTel organization change and data rebuilds', (
 
     await expect.poll(() => row.organization()).toBe(newOrganization);
     const table = new OtelRebuildsTable(page);
-    const rebuild = table.rowFor(today);
-    await expect(rebuild).toBeVisible();
-    await expect(await table.requestedFor(rebuild)).toHaveText(teamName);
-    await expect(await table.stateOf(rebuild)).toHaveText(REPLAY_COPY.state.waiting);
+    const metricsRebuild = table.rowFor(today);
+    const logsRebuild = table.rowFor(today, OTEL_REPLAY_KIND.LOGS);
+    await expect(metricsRebuild).toBeVisible();
+    await expect(logsRebuild).toBeVisible();
+    await expect(await table.requestedFor(metricsRebuild)).toHaveText(teamName);
+    await expect(await table.stateOf(metricsRebuild)).toHaveText(REPLAY_COPY.state.waiting);
 
     expect(otelOrganizationOf(teamName)).toBe(newOrganization);
     const audit = otelAuditEvents(id).slice(auditBefore);
     expect(audit.map(({ action }) => action)).toEqual(['organization_rebind', 'replay_requested']);
     expect(audit[0]).toMatchObject({ oldValue: firstOrganization, newValue: newOrganization });
     const replays = otelReplayRequestsFor(id);
-    expect(replays).toHaveLength(1);
+    expect(replays).toHaveLength(2);
+    expect(replays.map(({ kind }) => kind)).toEqual([OTEL_REPLAY_KIND.METRICS, OTEL_REPLAY_KIND.LOGS]);
     expect(replays[0]).toMatchObject({
+      kind: OTEL_REPLAY_KIND.METRICS,
       status: 'pending',
+      requestedBy: requireEnv('E2E_ADMIN_EMAIL').E2E_ADMIN_EMAIL,
+      rangeStart: today,
+      rangeEnd: dayOffset(1),
+    });
+    expect(replays[1]).toMatchObject({
+      kind: OTEL_REPLAY_KIND.LOGS,
       requestedBy: requireEnv('E2E_ADMIN_EMAIL').E2E_ADMIN_EMAIL,
       rangeStart: today,
       rangeEnd: dayOffset(1),
@@ -196,7 +207,7 @@ test.describe.serial('Claude Code OTel organization change and data rebuilds', (
     expect(otelAuditEvents(connection.id)).toEqual([]);
   });
 
-  test('rebuilding all teams from the section queues one request and reuses it the second time', async ({ page }) => {
+  test('rebuilding all teams queues both kinds and reuses the pending metrics request', async ({ page }) => {
     const otel = new OtelPage(page);
     await otel.open();
     const replay = new OtelReplayDialog(page);
@@ -208,20 +219,44 @@ test.describe.serial('Claude Code OTel organization change and data rebuilds', (
     await replay.submit();
     await expect(replay.confirmDialog).toBeVisible();
     await replay.confirm();
-    await expect(otel.toast(REPLAY_COPY.queued(1, 0, true))).toBeVisible();
+    await expect(otel.toast(REPLAY_COPY.queued(2, 0, true))).toBeVisible();
 
-    const rebuild = table.rowFor(today);
-    await expect(rebuild).toBeVisible();
-    await expect(await table.requestedFor(rebuild)).toHaveText(REPLAY_COPY.manual);
+    const metricsRebuild = table.rowFor(today);
+    const logsRebuild = table.rowFor(today, OTEL_REPLAY_KIND.LOGS);
+    await expect(metricsRebuild).toBeVisible();
+    await expect(logsRebuild).toBeVisible();
+    await expect(await table.requestedFor(metricsRebuild)).toHaveText(REPLAY_COPY.manual);
+    const firstRequests = otelReplayRequestsAfter(marks.replayId);
+    expect(firstRequests.map(({ kind }) => kind)).toEqual([OTEL_REPLAY_KIND.METRICS, OTEL_REPLAY_KIND.LOGS]);
+    const firstMetrics = firstRequests.find(({ kind }) => kind === OTEL_REPLAY_KIND.METRICS);
+    const firstLogs = firstRequests.find(({ kind }) => kind === OTEL_REPLAY_KIND.LOGS);
+    expect(firstMetrics).toBeDefined();
+    expect(firstLogs).toBeDefined();
     const countAfterFirst = countOtelReplayRequests();
-    expect(countAfterFirst).toBe(countBefore + 1);
+    expect(countAfterFirst).toBe(countBefore + 2);
+
+    await expect
+      .poll(() => otelReplayRequestsAfter(marks.replayId).find(({ id }) => id === firstLogs?.id)?.status)
+      .toBe('completed');
 
     await replay.open();
     await replay.setRange(today, today);
     await replay.submit();
     await replay.confirm();
-    await expect(otel.toast(REPLAY_COPY.queued(0, 1, true))).toBeVisible();
-    expect(countOtelReplayRequests()).toBe(countAfterFirst);
+    await expect(otel.toast(REPLAY_COPY.queued(1, 1, true))).toBeVisible();
+    const secondRequests = otelReplayRequestsAfter(marks.replayId);
+    expect(secondRequests.map(({ kind }) => kind)).toEqual([
+      OTEL_REPLAY_KIND.METRICS,
+      OTEL_REPLAY_KIND.LOGS,
+      OTEL_REPLAY_KIND.LOGS,
+    ]);
+    const secondMetrics = secondRequests.find(({ kind }) => kind === OTEL_REPLAY_KIND.METRICS);
+    const logsAfterSecond = secondRequests.filter(({ kind }) => kind === OTEL_REPLAY_KIND.LOGS);
+    expect(secondMetrics?.id).toBe(firstMetrics?.id);
+    expect(logsAfterSecond).toHaveLength(2);
+    expect(logsAfterSecond[0].id).toBe(firstLogs?.id);
+    expect(logsAfterSecond[1].id).not.toBe(firstLogs?.id);
+    expect(countOtelReplayRequests()).toBe(countAfterFirst + 1);
   });
 
   test('the rebuild range cannot reach the future or past the 90 day window', async ({ page }) => {

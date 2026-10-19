@@ -16,6 +16,8 @@
  *
  */
 
+import type { OtelReplayKind } from '../../src/api/otel/types';
+
 import { runSql } from './db';
 
 const sqlString = (value: string): string => `'${value.replace(/'/g, "''")}'`;
@@ -34,6 +36,8 @@ export interface OtelAuditRow {
 }
 
 export interface OtelReplayRow {
+  id: number;
+  kind: OtelReplayKind;
   status: string;
   requestedBy: string | null;
   rangeStart: string;
@@ -79,16 +83,26 @@ export function otelAuditEvents(connectionId: number): OtelAuditRow[] {
   }));
 }
 
-// Replay requests queued for a connection, oldest first; range ends are exclusive UTC midnights.
-export function otelReplayRequestsFor(connectionId: number): OtelReplayRow[] {
+function replayRows(where: string): OtelReplayRow[] {
   return sqlRows(
-    `SELECT status, requested_by, DATE_FORMAT(range_start, '%Y-%m-%d'), DATE_FORMAT(range_end, '%Y-%m-%d') FROM ${REPLAY_TABLE} WHERE requested_for_connection_id = ${Number(connectionId)} ORDER BY id;`,
-  ).map(([status, requestedBy, rangeStart, rangeEnd]) => ({
+    `SELECT id, kind, status, requested_by, DATE_FORMAT(range_start, '%Y-%m-%d'), DATE_FORMAT(range_end, '%Y-%m-%d') FROM ${REPLAY_TABLE} ${where} ORDER BY id;`,
+  ).map(([id, kind, status, requestedBy, rangeStart, rangeEnd]) => ({
+    id: Number(id),
+    kind: kind as OtelReplayKind,
     status,
     requestedBy: sqlNullable(requestedBy),
     rangeStart,
     rangeEnd,
   }));
+}
+
+// Replay requests queued for a connection, oldest first; range ends are exclusive UTC midnights.
+export function otelReplayRequestsFor(connectionId: number): OtelReplayRow[] {
+  return replayRows(`WHERE requested_for_connection_id = ${Number(connectionId)}`);
+}
+
+export function otelReplayRequestsAfter(replayId: number): OtelReplayRow[] {
+  return replayRows(`WHERE id > ${Number(replayId)}`);
 }
 
 export function countOtelReplayRequests(): number {

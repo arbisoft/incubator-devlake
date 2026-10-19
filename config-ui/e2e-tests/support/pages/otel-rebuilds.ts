@@ -18,7 +18,7 @@
 
 import { expect, Locator, Page } from '@playwright/test';
 
-import { COMMON_COPY, OTEL_MODAL_COPY, REPLAY_COPY } from '../app-copy';
+import { COMMON_COPY, OTEL_MODAL_COPY, OTEL_REPLAY_KIND, REPLAY_COPY, type OtelReplayKind } from '../app-copy';
 
 import { columnCell, tableRows } from './common';
 
@@ -229,8 +229,10 @@ export class OtelRebuildsTable {
     return Number(await this.countBadge.innerText());
   }
 
-  rowFor(days: string): Locator {
-    return this.rows.filter({ has: this.page.getByRole('cell', { name: days, exact: true }) });
+  rowFor(days: string, kind: OtelReplayKind = OTEL_REPLAY_KIND.METRICS): Locator {
+    return this.rows
+      .filter({ has: this.page.getByText(days, { exact: true }) })
+      .filter({ has: this.page.getByText(REPLAY_COPY.kind[kind], { exact: true }) });
   }
 
   async stateOf(row: Locator): Promise<Locator> {
