@@ -180,16 +180,14 @@ export class OtelReplayDialog {
     return this.dialog.getByRole('button', { name: OTEL_MODAL_COPY.replayModal.submit, exact: true });
   }
 
-  get disabledReasonTooltip(): Locator {
-    return this.page.getByRole('tooltip');
-  }
-
   async submit(): Promise<void> {
     await this.submitButton.click();
   }
 
-  async showDisabledReason(): Promise<void> {
+  // Hovers the disabled Rebuild button and returns the tooltip giving its reason.
+  async disabledReason(): Promise<Locator> {
     await this.submitButton.hover();
+    return this.page.getByRole('tooltip');
   }
 
   async confirm(): Promise<void> {

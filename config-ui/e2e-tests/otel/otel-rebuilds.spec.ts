@@ -264,11 +264,9 @@ test.describe.serial('Claude Code OTel organization change and data rebuilds', (
     await otel.open();
     const replay = new OtelReplayDialog(page);
     await replay.open();
-    await expect(replay.dialog).toBeVisible();
     const earliest = dayOffset(-89);
     await expect(replay.submitButton).toBeDisabled();
-    await replay.showDisabledReason();
-    await expect(replay.disabledReasonTooltip).toHaveText(OTEL_MODAL_COPY.range.hint(earliest, today));
+    await expect(await replay.disabledReason()).toHaveText(OTEL_MODAL_COPY.range.hint(earliest, today));
 
     for (const [day, pickable] of [
       [dayOffset(1), false],
