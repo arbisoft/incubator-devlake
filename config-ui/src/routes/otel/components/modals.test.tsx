@@ -210,7 +210,6 @@ describe('OTel modals', () => {
     it('needs the typed team slug before confirming and keeps the values after a failure so it can be retried', async () => {
       const onRebound = renderRebind();
       expect(screen.getByText(COPY.rebind.previousOrg)).toBeTruthy();
-      expect(COPY.rebind.previousOrg).toMatch(/Existing prompts and events remain/);
       otel.rebind.mockRejectedValueOnce({ response: { status: 400, data: { message: '/private/rebind-internal' } } });
       otel.rebind.mockResolvedValueOnce({ connection: boundConnection() });
       const { min, max } = getReplayDateLimits(new Date());

@@ -141,7 +141,6 @@ export type OtelReplayInput = OtelReplayRange & { requestedForConnectionId?: ID 
 export type OtelReplay = {
   id: ID;
   requestedForConnectionId: ID | null;
-  requestedForTeamName: string | null;
   kind: OtelReplayKind;
   rangeStart: string;
   rangeEnd: string;

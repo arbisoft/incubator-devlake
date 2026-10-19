@@ -63,7 +63,6 @@ const replayRequest = (
 ): OtelReplay => ({
   id: 1,
   requestedForConnectionId: null,
-  requestedForTeamName: null,
   kind,
   rangeStart: DAY_START,
   rangeEnd: NEXT_DAY_START,

@@ -16,8 +16,7 @@
  *
  */
 
-import type { OtelReplayKind } from '../../src/api/otel/types';
-
+import type { OtelReplayKind } from './app-copy';
 import { runSql } from './db';
 
 const sqlString = (value: string): string => `'${value.replace(/'/g, "''")}'`;

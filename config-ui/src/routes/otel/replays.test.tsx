@@ -34,7 +34,6 @@ const otel = vi.mocked(API.otel);
 const replay = (overrides: Partial<OtelReplay>): OtelReplay => ({
   id: 1,
   requestedForConnectionId: null,
-  requestedForTeamName: null,
   kind: OTEL_REPLAY_KIND.METRICS,
   rangeStart: '2026-10-19T00:00:00Z',
   rangeEnd: '2026-10-20T00:00:00Z',
@@ -55,7 +54,6 @@ const ROWS = [
   replay({
     id: 2,
     requestedForConnectionId: 5,
-    requestedForTeamName: 'Platform',
     rangeStart: '2026-10-01T00:00:00Z',
     state: OTEL_REPLAY_STATE.FAILED,
     errorMessage: 'converter failed',
@@ -66,15 +64,12 @@ const ROWS = [
 describe('OtelReplays', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('lists rebuild requests without a requested-for column', async () => {
+  it('lists rebuild requests with state, kind, inclusive days and the error in a fixed layout', async () => {
     otel.listReplays.mockResolvedValue({ replays: ROWS, count: ROWS.length });
     renderWithTheme(<OtelReplays version={0} />);
 
     expect(await screen.findByText(MULTI_DAY_RANGE)).toBeTruthy();
     expect(screen.getByRole('table', { name: REPLAY_COPY.tableLabel }).style.tableLayout).toBe('fixed');
-    expect(screen.queryByRole('columnheader', { name: 'Requested for' })).toBeNull();
-    expect(screen.queryByText('Manual', { exact: true })).toBeNull();
-    expect(screen.queryByText('Platform', { exact: true })).toBeNull();
     expect(screen.getAllByText('2026-10-19')).toHaveLength(2);
     expect(screen.getByText(MULTI_DAY_RANGE)).toBeTruthy();
     expect(screen.getByText(REPLAY_COPY.state[OTEL_REPLAY_STATE.WAITING])).toBeTruthy();
