@@ -48,25 +48,43 @@ const revoked: OtelConnectionResponse = {
   projects: [],
 };
 
-describe('getConnectionColumns', () => {
-  it('keeps Change organization enabled for a revoked connection', () => {
-    const onRebind = vi.fn();
-    const columns = getConnectionColumns({
+const OLD_ORGANIZATION = '5820749f-066d-40bf-889f-7014fd3b8696';
+const NEW_ORGANIZATION = 'f5e0fe16-567c-4fac-b41a-40cfff5407e3';
+
+const boundTo = (organizationId: string): OtelConnectionResponse => ({
+  ...revoked,
+  connection: { ...revoked.connection, organizationId },
+});
+
+const table = (row: OtelConnectionResponse, onRebind = vi.fn()) => (
+  <DataTable
+    rowKey={({ connection }) => connection.id}
+    ariaLabel={COPY.connections.tableLabel}
+    loading={false}
+    columns={getConnectionColumns({
       onManageProjects: vi.fn(),
       onRebind,
       onAction: vi.fn(),
       onActionButtonRef: vi.fn(),
-    });
-    renderWithTheme(
-      <DataTable
-        rowKey={({ connection }) => connection.id}
-        ariaLabel={COPY.connections.tableLabel}
-        loading={false}
-        columns={columns}
-        dataSource={[revoked]}
-        empty={{ ...COPY.connections.empty, size: EMPTY_STATE_SIZE.SECTION }}
-      />,
-    );
+    })}
+    dataSource={[row]}
+    empty={{ ...COPY.connections.empty, size: EMPTY_STATE_SIZE.SECTION }}
+  />
+);
+
+describe('getConnectionColumns', () => {
+  it('labels the organization cell with the current organization after a rebind', () => {
+    const { rerender } = renderWithTheme(table(boundTo(OLD_ORGANIZATION)));
+
+    rerender(table(boundTo(NEW_ORGANIZATION)));
+
+    expect(screen.queryByLabelText(OLD_ORGANIZATION)).toBeNull();
+    expect(screen.getByText(NEW_ORGANIZATION)).toBeTruthy();
+  });
+
+  it('keeps Change organization enabled for a revoked connection', () => {
+    const onRebind = vi.fn();
+    renderWithTheme(table(revoked, onRebind));
 
     const rebind = screen.getByRole('button', { name: REPLAY_COPY.rebindAction('Platform') });
     expect(rebind).toHaveProperty('disabled', false);

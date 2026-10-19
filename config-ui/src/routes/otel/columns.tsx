@@ -89,7 +89,8 @@ const renderProjects = ({ projects }: OtelConnectionResponse) => {
 const renderOrganization = ({ connection }: OtelConnectionResponse) =>
   connection.organizationId ? (
     <Tooltip title={COPY.organization.boundHelp}>
-      <Typography.Text code copyable ellipsis>
+      {/* Keyed so antd re-measures its ellipsis label when the organization changes. */}
+      <Typography.Text key={connection.organizationId} code copyable ellipsis>
         {connection.organizationId}
       </Typography.Text>
     </Tooltip>
