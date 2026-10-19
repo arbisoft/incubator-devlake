@@ -107,13 +107,15 @@ Follow the standards by rule ID. The rules that are most often missed:
 
 ```bash
 gofmt -l <changed dirs>                  # must print nothing
-go build ./...
+go build ./<pkg>/...
 go vet ./<pkg>/...
 go test -race ./<pkg>/...
 golangci-lint run ./<pkg>/...            # only if installed; use the repo's config
-govulncheck ./...                        # only if installed
+govulncheck ./<pkg>/...                  # only if installed
 <repo spec generator>                    # if routes changed, e.g. make swag / swag init
 ```
+
+Don't run `go build ./...` or `make build` across the whole module unless libgit2 is installed: `plugins/gitextractor` needs cgo + libgit2. If a changed package imports gitextractor and can't build for that reason, say so in the report rather than reporting it as a failure. For a full-repo, CI-like run, use the repo's `make unit-test` and `make lint`.
 
 Fix every failure. If a command can't run (missing tool, needs a DB or network), say which one and why. Never claim it passed.
 

@@ -53,7 +53,7 @@ Four areas: **Security (`SEC-*`)**, **Observability (`OBS-*`)**, **Config and re
 
 ### SEC-D — Dependencies
 - **SEC-D1 New dependencies come from maintained, trusted sources** and are pinned in `go.mod`/`go.sum`. Prefer the stdlib or an existing dependency over adding a new one.
-- **SEC-D2 No known-vulnerable versions.** Run `govulncheck ./...` when it's installed, and report vulnerabilities that the change brings in or that affect code it touches.
+- **SEC-D2 No known-vulnerable versions.** Run `govulncheck ./<pkg>/...` on the changed packages when it's installed, and report vulnerabilities that the change brings in or that affect code it touches.
 
 ## Observability (OBS)
 
