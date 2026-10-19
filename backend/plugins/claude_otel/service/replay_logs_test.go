@@ -122,7 +122,7 @@ func expectRequeuePage(transaction *dalmocks.Transaction, batchIDs []uint64) (ma
 	return requeued, &selection
 }
 
-func TestRequeueLogBatchesQueuesReceivedBatchesBehindLiveOnes(t *testing.T) {
+func TestRequeueLogBatchesSelectsObservedBatchesWithReceiptFallback(t *testing.T) {
 	database := dalmocks.NewDal(t)
 	transaction := dalmocks.NewTransaction(t)
 	expectRenewReplayLease(t, database)
@@ -135,12 +135,20 @@ func TestRequeueLogBatchesQueuesReceivedBatchesBehindLiveOnes(t *testing.T) {
 	if err != nil || replayed != 2 {
 		t.Fatalf("requeueLogBatches() = %d, %v; want 2 requeued batches", replayed, err)
 	}
-	// Batches are chosen by the server's received_at, so batches without valid record
-	// timestamps or from a client whose clock is ahead are included.
+	// Valid observed bounds control selection; missing or reversed bounds use received_at.
 	where := (*selection)[1].Data.(dal.DalClause)
-	if !strings.Contains(where.Expr, "received_at >= ? AND received_at < ?") || strings.Contains(where.Expr, "observed_at") ||
-		where.Params[1] != request.RangeStart || where.Params[2] != request.RangeEnd {
-		t.Fatalf("requeue selection = %s %v; want batches received in the range", where.Expr, where.Params)
+	wantExpr := "id > ? AND ((min_observed_at IS NOT NULL AND max_observed_at IS NOT NULL AND min_observed_at <= max_observed_at AND max_observed_at >= ? AND min_observed_at < ?) OR ((min_observed_at IS NULL OR max_observed_at IS NULL OR min_observed_at > max_observed_at) AND received_at >= ? AND received_at < ?))"
+	if where.Expr != wantExpr {
+		t.Fatalf("requeue selection = %s; want observed overlap with gated receipt fallback", where.Expr)
+	}
+	wantParams := []interface{}{uint64(0), request.RangeStart.UTC(), request.RangeEnd.UTC(), request.RangeStart.UTC(), request.RangeEnd.UTC()}
+	if len(where.Params) != len(wantParams) {
+		t.Fatalf("requeue selection params = %v; want %v", where.Params, wantParams)
+	}
+	for index, want := range wantParams {
+		if where.Params[index] != want {
+			t.Fatalf("requeue selection param %d = %v; want %v", index, where.Params[index], want)
+		}
 	}
 	// A rerun after a lost lease counts the batches an earlier run queued, unless one is
 	// being converted, so its count covers the whole range.
