@@ -19,7 +19,7 @@
 import styled from 'styled-components';
 
 export const ErrorText = styled.div`
-  margin-top: 4px;
+  margin-top: ${({ theme }) => theme.space.xxs}px;
   color: ${({ theme }) => theme.colors.error};
-  font-size: 12px;
+  font-size: ${({ theme }) => theme.typography.scale.caption.fontSize}px;
 `;

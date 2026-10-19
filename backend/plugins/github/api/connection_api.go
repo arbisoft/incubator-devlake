@@ -219,7 +219,7 @@ func testGithubConnAccessTokenAuth(ctx context.Context, conn models.GithubConn) 
 	if err != nil {
 		return nil, errors.BadInput.Wrap(err, "verify token failed")
 	} else if githubUserOfToken.Login == "" {
-		return nil, errors.BadInput.Wrap(err, "invalid token")
+		return nil, errors.BadInput.New("invalid token")
 	}
 	success := false
 	warning := false
@@ -255,6 +255,13 @@ func testGithubConnAccessTokenAuth(ctx context.Context, conn models.GithubConn) 
 				strings.Join(missingPriPerms, ", "),
 			))
 		}
+	} else if strings.HasPrefix(conn.Token, "github_pat_") {
+		// Fine-grained PATs authenticate via /user; repository permissions are checked by later requests.
+		success = true
+		messages = append(messages, "Connection valid. Repository permissions have not been verified. Ensure the selected repositories have Read access to Actions, Contents, Discussions, Issues, Metadata and Pull requests.")
+	} else {
+		// Keep unsupported and legacy token formats from being reported as valid.
+		messages = append(messages, "Only classic personal access tokens (ghp_) and fine-grained personal access tokens (github_pat_) are supported for this connection test.")
 	}
 
 	sanitizeConn := conn.Sanitize()

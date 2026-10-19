@@ -16,6 +16,10 @@
  *
  */
 
+import type { SortParams } from '../types';
+
+export type ListParams = Pagination & SortParams<'id' | 'beganAt' | 'finishedAt'> & { blueprint_id?: ID };
+
 export type SubTasksRes = {
   completionRate: number;
   status: string;

@@ -97,7 +97,7 @@ func (s *RawIngestService) IngestLogs(request *http.Request) (*RawIngestResult, 
 		RecordCount:          recordCount,
 		MinObservedAt:        minObservedAt,
 		MaxObservedAt:        maxObservedAt,
-		Status:               models.OtelMetricBatchStatusPending,
+		Status:               models.OtelBatchStatusPending,
 	}
 	duplicate, err := s.insertRawBatch(batch)
 	if err != nil {
@@ -138,14 +138,17 @@ func resourceLogRecords(resourceLogs *logsv1.ResourceLogs) []*logsv1.LogRecord {
 }
 
 // stripContentAttributes removes content attributes from every resource and record, keeps
-// each prompt's text once, as prompt_text, and keeps only allowlisted tool parameters.
+// each prompt's text once, as prompt_text, keeps only allowlisted tool parameters and
+// normalizes the repository URL, dropping any credentials in it.
 func stripContentAttributes(request *collectorlogs.ExportLogsServiceRequest) {
 	for _, resourceLogs := range request.GetResourceLogs() {
 		if resource := resourceLogs.GetResource(); resource != nil {
 			resource.Attributes = withoutAttributes(resource.GetAttributes(), contentAttributes)
+			normalizeRepositoryAttributes(resource.GetAttributes())
 		}
 		for _, record := range resourceLogRecords(resourceLogs) {
 			record.Attributes = filterToolParameters(normalizePromptText(withoutAttributes(record.GetAttributes(), contentAttributes)))
+			normalizeRepositoryAttributes(record.GetAttributes())
 			if logEventName(record) == eventToolResult {
 				record.Attributes = withoutAttributes(record.GetAttributes(), toolResultContentAttributes)
 			}

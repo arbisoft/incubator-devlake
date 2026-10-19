@@ -23,15 +23,39 @@ import (
 )
 
 func TestCanonicalIDsAreSourceIndependentAndGrainSpecific(t *testing.T) {
-	date := time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
-	activityID := CanonicalActivityID("claude", "org", "acct:user_1", date, "CODE_EDIT", "cli")
-	if activityID != CanonicalActivityID("claude", "org", "acct:user_1", date, "CODE_EDIT", "cli") {
+	day := DayGrain(time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC))
+	activity := CanonicalKey{Kind: IDKindActivity, Provider: "claude", WorkspaceKey: "org", Grain: []string{"acct:user_1", day, "CODE_EDIT", "cli"}}
+	modelUsage := CanonicalKey{Kind: IDKindModelUsage, Provider: "claude", WorkspaceKey: "org", Grain: []string{"acct:user_1", day, "claude-sonnet"}}
+	otherInterface := CanonicalKey{Kind: IDKindActivity, Provider: "claude", WorkspaceKey: "org", Grain: []string{"acct:user_1", day, "CODE_EDIT", "web_ui"}}
+	if activity.ID() != activity.ID() {
 		t.Fatal("canonical activity ID changed for the same source-independent identity")
 	}
-	if activityID == CanonicalModelUsageID("claude", "org", "acct:user_1", date, "claude-sonnet") {
+	if activity.ID() == modelUsage.ID() {
 		t.Fatal("activity and model usage IDs must remain distinct fact identities")
 	}
-	if activityID == CanonicalActivityID("claude", "org", "acct:user_1", date, "CODE_EDIT", "web_ui") {
+	if activity.ID() == otherInterface.ID() {
 		t.Fatal("different canonical activity grains must not share an ID")
+	}
+}
+
+// Stored rows are keyed by these IDs, so their encoding must not change.
+func TestCanonicalIDsAreStable(t *testing.T) {
+	day := DayGrain(time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC))
+	changedAt := TimeGrain(time.Date(2026, 9, 14, 10, 5, 0, 123, time.UTC))
+	tests := []struct {
+		key  CanonicalKey
+		want string
+	}{
+		{CanonicalKey{IDKindActivity, "claude", "org", []string{"acct:user_1", day, "CODE_EDIT", "cli"}}, "ai:canonical_activity:d8b111186fbd8b9998ebff9ffe719b7ebe6ec702a70472dc3d2aad18be5f82f8"},
+		{CanonicalKey{IDKindModelUsage, "claude", "org", []string{"acct:user_1", day, "claude-sonnet"}}, "ai:model_usage:6fb407cd72c7377f8f5c4fe1763750bbd0205abfa32b6db7aec0b05bcabd3481"},
+		{CanonicalKey{IDKindToolDecision, "claude", "org", []string{"acct:user_1", day, "Edit"}}, "ai:tool_decision:8e7b0334781fd9933ffcbf9d1c18eac50565d9a87a7a69994e8593e6b56f7446"},
+		{CanonicalKey{IDKindPrompt, "claude", "org", []string{"p1"}}, "ai:prompt:68348a1d4f972e89b9616c34bcfa999d1e395e44c1740e7ac3439a35e189ec3a"},
+		{CanonicalKey{IDKindPromptSkill, "claude", "org", []string{"p1", "code-review"}}, "ai:prompt_skill:5eeafb7dd9b45af2bf5dc4c6bcc7c45ddfb2615c2aba8f0addc211a79364bd99"},
+		{CanonicalKey{IDKindPermissionModeChange, "claude", "org", []string{"sess-1", changedAt, "default", "plan"}}, "ai:permission_mode_change:01e42eb011fa31c6ee416aadcf7b08277010ce76ea6656ab808f37b7454a61e5"},
+	}
+	for _, test := range tests {
+		if got := test.key.ID(); got != test.want {
+			t.Errorf("%s ID = %s, want %s", test.key.Kind, got, test.want)
+		}
 	}
 }

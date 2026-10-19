@@ -15,20 +15,31 @@
  * limitations under the License.
  *
  */
-import { test, expect } from '../fixtures';
+import { APIRequestContext } from '@playwright/test';
+
 import { loginAsAdmin } from '../auth-helpers';
-import { API_URL, APP_URL, E2E_USER_PREFIX } from '../support/env';
+import { test, expect } from '../fixtures';
+import { adminApi, findAccessUserByLogin, findOidcProvider } from '../support/api';
+import { AuthMethods, fetchAuthMethods } from '../support/auth-state';
 import { resetLocalAuthState } from '../support/db';
-import { fetchAuthMethods } from '../support/auth-state';
-import {
-  accessUserRow,
-  addLocalUserModal,
-  oneTimePasswordModal,
-  passwordInputs,
-  tableWithRow,
-} from '../support/selectors';
+import { API_URL, APP_URL, E2E_USER_PREFIX } from '../support/env';
+import { LoginPage } from '../support/pages/login';
+import { PATHS } from '../support/pages/paths';
+import { SettingsAuthPage } from '../support/pages/settings-auth';
+import { SettingsUsersPage } from '../support/pages/settings-users';
+import { ShellPage } from '../support/pages/shell';
 
 test.describe('Rebase Verification Matrix: Local Auth & Multi-Provider OIDC', () => {
+  let api: APIRequestContext;
+
+  test.beforeAll(async ({ playwright }) => {
+    api = await adminApi(playwright);
+  });
+
+  test.afterAll(async () => {
+    await api.dispose();
+  });
+
   test.beforeEach(async ({ request }) => {
     const methods = await fetchAuthMethods(request);
     test.skip(!methods.localPassword?.enabled, 'Local password authentication is disabled (auth state B is required)');
@@ -43,31 +54,32 @@ test.describe('Rebase Verification Matrix: Local Auth & Multi-Provider OIDC', ()
     // 1. Check API methods structure and stability
     const methodsRes = await page.request.get(`${API_URL}/auth/methods`);
     expect(methodsRes.status()).toBe(200);
-    const methods = await methodsRes.json();
+    const methods: AuthMethods = await methodsRes.json();
 
     expect(methods.localPassword?.enabled).toBe(true);
     expect(methods.localPassword?.loginUrl).toBe('/auth/local/login');
     expect(methods.apiKey?.enabled).toBe(true);
     expect(Array.isArray(methods.providers)).toBe(true);
 
-    const providerKeys = methods.providers.map((p: any) => p.name);
+    const providerKeys = (methods.providers ?? []).map((p) => p.name);
     expect(providerKeys).toContain('google-one');
     expect(providerKeys).toContain('auth0');
     expect(new Set(providerKeys).size).toBe(providerKeys.length);
 
     // 2. Check UI rendering
-    await page.goto('/login');
-    await expect(page.getByRole('button', { name: /Sign in with Google/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Sign in with Auth0/i })).toBeVisible();
+    const loginPage = new LoginPage(page);
+    await loginPage.open();
+    await expect(loginPage.providerButton('Google')).toBeVisible();
+    await expect(loginPage.providerButton('Auth0')).toBeVisible();
 
     // Ensure no duplicates
-    expect(await page.getByRole('button', { name: /Sign in with Google/i }).count()).toBe(1);
-    expect(await page.getByRole('button', { name: /Sign in with Auth0/i }).count()).toBe(1);
+    expect(await loginPage.providerButton('Google').count()).toBe(1);
+    expect(await loginPage.providerButton('Auth0').count()).toBe(1);
 
     // Local authentication form elements
-    await expect(page.getByLabel(/username/i)).toBeVisible();
-    await expect(page.getByLabel(/password/i)).toBeVisible();
-    await expect(page.getByRole('button', { name: /^Sign in$/i })).toBeVisible();
+    await expect(loginPage.usernameInput).toBeVisible();
+    await expect(loginPage.passwordInput).toBeVisible();
+    await expect(loginPage.signInButton).toBeVisible();
   });
 
   test('Matrix 2: Provider Initiation and Callback Safety', async ({ page }) => {
@@ -118,32 +130,31 @@ test.describe('Rebase Verification Matrix: Local Auth & Multi-Provider OIDC', ()
   test('Matrix 3: Local Session and Identity Linking Regression', async ({ page, context, browser }) => {
     // 1. Admin creates local user
     await loginAsAdmin(context);
-    await page.goto('/access');
+    const usersPage = new SettingsUsersPage(page);
+    await usersPage.open();
 
     const testLogin = `${E2E_USER_PREFIX}rebase_${Date.now()}`;
-    await page.getByRole('button', { name: 'Add local user' }).click();
-    const modal = addLocalUserModal(page);
-    await modal.getByPlaceholder('person').fill(testLogin);
-    await modal.getByRole('button', { name: 'Create' }).click();
-
-    const otpModal = oneTimePasswordModal(page);
-    const tempPass = (await otpModal.getByRole('textbox').inputValue()).trim();
-    await otpModal.getByRole('button', { name: 'Done' }).click();
+    const otpDialog = await usersPage.createLocalUser(testLogin);
+    const tempPass = await otpDialog.readPassword();
+    await otpDialog.done();
+    expect(await findAccessUserByLogin(api, testLogin)).toMatchObject({
+      role: 'member',
+      status: 'active',
+      hasLocalCredential: true,
+    });
 
     // 2. User logs in and changes password (with 15+ characters password)
     const userContext = await browser.newContext({ baseURL: APP_URL });
     const userPage = await userContext.newPage();
-    await userPage.goto('/login');
-    await userPage.getByLabel(/username/i).fill(testLogin);
-    await userPage.getByLabel(/password/i).fill(tempPass);
-    await userPage.getByRole('button', { name: /^Sign in$/i }).click();
-    await userPage.waitForURL(/.*\/change-password/);
+    const userLogin = new LoginPage(userPage);
+    const userShell = new ShellPage(userPage);
+    await userLogin.open();
+    await userLogin.signIn(testLogin, tempPass);
+    await userShell.waitUntilUrl(/.*\/change-password/);
 
     const userPass = 'ValidRebasePassword12345!';
-    await passwordInputs(userPage).first().fill(userPass);
-    await passwordInputs(userPage).nth(1).fill(userPass);
-    await userPage.getByRole('button', { name: 'Change password' }).click();
-    await userPage.waitForURL((url) => !url.pathname.includes('/change-password'), { timeout: 10000 });
+    await userShell.changePassword(userPass);
+    await userShell.waitUntilPathLeaves('/change-password', 10000);
 
     // 3. Verify Account menu linkable providers does not return 401
     const linkableResp = await userPage.request.get(`${APP_URL}/api/access/oidc-providers/linkable`);
@@ -153,11 +164,12 @@ test.describe('Rebase Verification Matrix: Local Auth & Multi-Provider OIDC', ()
     expect(linkableProviders.length).toBeGreaterThan(0);
 
     // 4. Verify disabling user immediately revokes the active local session
-    await page.goto('/access');
-    const userRow = accessUserRow(page, testLogin);
-    await expect(userRow).toBeVisible();
-    await userRow.getByRole('button', { name: 'Disable' }).click();
-    await expect(userRow.getByRole('button', { name: 'Enable' })).toBeVisible();
+    await usersPage.open();
+    const userRow = usersPage.userRow(testLogin);
+    await expect(userRow.root).toBeVisible();
+    await userRow.disable();
+    await expect(userRow.enableButton).toBeVisible();
+    expect((await findAccessUserByLogin(api, testLogin))?.status).toBe('disabled');
 
     // User session must now be rejected with 401 on next request
     const postDisableResp = await userPage.request.get(`${APP_URL}/api/access/me`);
@@ -168,50 +180,37 @@ test.describe('Rebase Verification Matrix: Local Auth & Multi-Provider OIDC', ()
 
   test('Matrix 4: Provider Lifecycle and Grafana Target Selection', async ({ page, context }) => {
     await loginAsAdmin(context);
-    await page.goto('/access');
+    const authPage = new SettingsAuthPage(page);
+    const loginPage = new LoginPage(page);
+    await authPage.open();
 
     // 1. Verify both providers are listed on /access in the Authentication section
-    const authTable = tableWithRow(page, 'google-one');
-    await expect(authTable.getByText('google-one').first()).toBeVisible();
-    await expect(authTable.getByText('Auth0').first()).toBeVisible();
+    await expect(authPage.providerLabel('google-one', 'google-one')).toBeVisible();
+    await expect(authPage.providerLabel('google-one', 'Auth0')).toBeVisible();
 
     try {
       // 2. Disable Auth0 via the official access API
-      const disableResp = await page.evaluate(async () => {
-        const resp = await fetch('/api/access/oidc-providers/auth0/disable', {
-          method: 'POST',
-          headers: {
-            'X-CSRF-Token': document.cookie.match(/devlake_csrf=([^;]+)/)?.[1] || '',
-          },
-        });
-        return { status: resp.status, body: await resp.json() };
-      });
+      const disableResp = await authPage.disableProvider('auth0');
       expect(disableResp.status).toBe(200);
+      expect((await findOidcProvider(api, 'auth0'))?.enabled).toBe(false);
 
       const methodsRes = await page.request.get(`${API_URL}/auth/methods`);
-      const methods = await methodsRes.json();
-      const providerNames = methods.providers.map((p: any) => p.name);
+      const methods: AuthMethods = await methodsRes.json();
+      const providerNames = (methods.providers ?? []).map((p) => p.name);
       expect(providerNames).toContain('google-one');
       expect(providerNames).not.toContain('auth0');
 
-      await page.goto('/login');
-      await expect(page.getByRole('button', { name: /Sign in with Google/i })).toBeVisible();
-      await expect(page.getByRole('button', { name: /Sign in with Auth0/i })).not.toBeVisible();
+      await loginPage.open();
+      await expect(loginPage.providerButton('Google')).toBeVisible();
+      await expect(loginPage.providerButton('Auth0')).not.toBeVisible();
 
       // 3. Re-enable Auth0 and verify it returns
-      const enableResp = await page.evaluate(async () => {
-        const resp = await fetch('/api/access/oidc-providers/auth0/enable', {
-          method: 'POST',
-          headers: {
-            'X-CSRF-Token': document.cookie.match(/devlake_csrf=([^;]+)/)?.[1] || '',
-          },
-        });
-        return { status: resp.status, body: await resp.json() };
-      });
+      const enableResp = await authPage.enableProvider('auth0');
       expect(enableResp.status).toBe(200);
+      expect((await findOidcProvider(api, 'auth0'))?.enabled).toBe(true);
 
-      await page.goto('/login');
-      await expect(page.getByRole('button', { name: /Sign in with Auth0/i })).toBeVisible();
+      await loginPage.open();
+      await expect(loginPage.providerButton('Auth0')).toBeVisible();
     } finally {
       // Always restore Auth0 so a mid-test failure cannot leave the provider disabled
       await page.request.post(`${APP_URL}/api/access/oidc-providers/auth0/enable`, {
@@ -222,10 +221,11 @@ test.describe('Rebase Verification Matrix: Local Auth & Multi-Provider OIDC', ()
 
   test('Matrix 5: Dashboard Navigation and Authorization Boundaries', async ({ page, context }) => {
     await loginAsAdmin(context);
-    await page.goto('/');
+    const shell = new ShellPage(page);
+    await shell.visit(PATHS.root);
 
     // 1. Verify Dashboard link resolves to external Grafana URL and not internal docker URL
-    const dashboardLink = page.getByRole('link', { name: /Dashboards/i }).first();
+    const dashboardLink = shell.dashboardsLink;
     if (await dashboardLink.isVisible()) {
       const href = await dashboardLink.getAttribute('href');
       expect(href).not.toContain('grafana:3000');

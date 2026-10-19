@@ -1,0 +1,7 @@
+{
+  "titlePath": [
+    "Login provider buttons",
+    "renders one button for each real provider and the API exposes only the issuer host"
+  ],
+  "writes": []
+}

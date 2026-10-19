@@ -23,6 +23,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/models/domainlayer"
@@ -43,6 +44,14 @@ const (
 	skillToolName       = "Skill"
 	toolDecisionReject  = "reject"
 	maxModelsUsedLength = 1024
+	// Widths of ai_* columns filled straight from event attributes, which have no typed
+	// event column to bound them. The rollup rereads stored events, so an oversized value
+	// would otherwise fail every later batch that touches its prompt or session.
+	maxCommandSourceLength = 32 // ai_prompts.command_source
+	maxAiLabelLength       = 64 // skill invocation_trigger and skill_source, permission modes and trigger
+	// maxRepositoryURLLength is the width of ai_prompts.repository_url. A longer URL is left
+	// out rather than truncated, because a truncated URL would name a different repository.
+	maxRepositoryURLLength = 255
 )
 
 // subagentToolNames launch a subagent; Task is the legacy name of Agent.
@@ -101,33 +110,60 @@ type sessionModes struct {
 	changes []modeChange
 }
 
-// isModeChangeEvent reports whether an event switches the session's permission mode.
-// Claude Code reports Shift+Tab and plan-mode exits as permission_mode_changed, but
-// entering plan mode with /plan only as the user_prompt of that command.
-func isModeChangeEvent(event *models.OtelEvent) bool {
-	if event.EventName == eventPermissionModeChanged {
-		return true
+// modeChangeSource reads a permission mode change from one kind of event that switches
+// the session's mode.
+type modeChangeSource struct {
+	matches func(event *models.OtelEvent) bool
+	read    func(attributes map[string]interface{}) (fromMode, toMode, trigger string)
+}
+
+// modeChangeSources are the events that switch a session's permission mode. Claude Code
+// reports Shift+Tab and plan-mode exits as permission_mode_changed, but entering plan mode
+// with /plan only as the user_prompt of that command.
+var modeChangeSources = []modeChangeSource{
+	{
+		matches: func(event *models.OtelEvent) bool { return event.EventName == eventPermissionModeChanged },
+		read: func(attributes map[string]interface{}) (string, string, string) {
+			return truncate(eventString(attributes, "from_mode"), maxAiLabelLength),
+				truncate(eventString(attributes, "to_mode"), maxAiLabelLength),
+				truncate(eventString(attributes, "trigger"), maxAiLabelLength)
+		},
+	},
+	{
+		matches: func(event *models.OtelEvent) bool {
+			return event.EventName == eventUserPrompt && event.CommandName == planCommand
+		},
+		// The mode before /plan is unknown; prompts before it fall back to the default.
+		read: func(map[string]interface{}) (string, string, string) {
+			return "", ai.PermissionModePlan, "plan_command"
+		},
+	},
+}
+
+// modeChangeSourceOf returns the source that reads event as a mode change, or nil when
+// event does not switch the mode.
+func modeChangeSourceOf(event *models.OtelEvent) *modeChangeSource {
+	for i := range modeChangeSources {
+		if modeChangeSources[i].matches(event) {
+			return &modeChangeSources[i]
+		}
 	}
-	return event.EventName == eventUserPrompt && event.CommandName == planCommand
+	return nil
+}
+
+func isModeChangeEvent(event *models.OtelEvent) bool {
+	return modeChangeSourceOf(event) != nil
 }
 
 func newSessionModes(events []*models.OtelEvent) sessionModes {
 	changes := make([]modeChange, 0)
 	for _, event := range events {
-		if !isModeChangeEvent(event) {
+		source := modeChangeSourceOf(event)
+		if source == nil {
 			continue
 		}
-		attributes := eventAttributes(event)
 		change := modeChange{at: event.EventTimestamp, sequence: int64Value(event.EventSequence)}
-		if event.EventName == eventPermissionModeChanged {
-			change.fromMode = eventString(attributes, "from_mode")
-			change.toMode = eventString(attributes, "to_mode")
-			change.trigger = eventString(attributes, "trigger")
-		} else {
-			// The mode before /plan is unknown; prompts before it fall back to the default.
-			change.toMode = ai.PermissionModePlan
-			change.trigger = "plan_command"
-		}
+		change.fromMode, change.toMode, change.trigger = source.read(eventAttributes(event))
 		changes = append(changes, change)
 	}
 	sort.SliceStable(changes, func(i, j int) bool {
@@ -181,17 +217,20 @@ func buildPromptRollup(workspaceKey, promptID string, events []*models.OtelEvent
 	sort.SliceStable(events, func(i, j int) bool {
 		return lessEventOrder(events[i].EventTimestamp, int64Value(events[i].EventSequence), events[j].EventTimestamp, int64Value(events[j].EventSequence))
 	})
-	prompt := &ai.AiPrompt{
-		DomainEntity:     domainlayer.NewDomainEntity(ai.PromptID(aiProviderClaude, workspaceKey, promptID)),
-		Provider:         aiProviderClaude,
-		WorkspaceKey:     workspaceKey,
-		PromptId:         promptID,
-		EstimatedCostUsd: "0.00000000",
-		SourceType:       aiSourceOtel,
+	builder := &promptBuilder{
+		prompt: &ai.AiPrompt{
+			DomainEntity:     domainlayer.NewDomainEntity(ai.CanonicalKey{Kind: ai.IDKindPrompt, Provider: aiProviderClaude, WorkspaceKey: workspaceKey, Grain: []string{promptID}}.ID()),
+			Provider:         aiProviderClaude,
+			WorkspaceKey:     workspaceKey,
+			PromptId:         promptID,
+			EstimatedCostUsd: "0.00000000",
+			SourceType:       aiSourceOtel,
+		},
+		skills:     newSkillCollector(workspaceKey, promptID),
+		modelNames: make([]string, 0),
+		seenModels: make(map[string]struct{}),
 	}
-	skills := newSkillCollector(workspaceKey, promptID)
-	modelNames := make([]string, 0)
-	seenModels := make(map[string]struct{})
+	prompt := builder.prompt
 	for index, event := range events {
 		if index == 0 {
 			prompt.StartedAt = event.EventTimestamp
@@ -199,57 +238,109 @@ func buildPromptRollup(workspaceKey, promptID string, events []*models.OtelEvent
 		}
 		prompt.EndedAt = latestTime(prompt.EndedAt, event.EventTimestamp)
 		attributes := eventAttributes(event)
-		switch event.EventName {
-		case eventUserPrompt:
-			// The user_prompt event marks the start, even when an earlier-stamped event of
-			// the same prompt arrived.
-			prompt.StartedAt = event.EventTimestamp
-			fillPromptIdentity(prompt, event)
-			prompt.PromptLength = int64Value(eventNumber(attributes, "prompt_length"))
-			prompt.CommandName = event.CommandName
-			prompt.CommandSource = eventString(attributes, "command_source")
-		case eventAPIRequest:
-			prompt.ApiRequestCount++
-			prompt.InputTokens += event.InputTokens
-			prompt.OutputTokens += event.OutputTokens
-			prompt.CacheReadTokens += event.CacheReadTokens
-			prompt.CacheCreationTokens += event.CacheCreationTokens
-			if event.CostUsd != nil {
-				if total, err := addDecimal(prompt.EstimatedCostUsd, *event.CostUsd, 8); err == nil {
-					prompt.EstimatedCostUsd = total
-				}
-			}
-			if _, seen := seenModels[event.Model]; event.Model != "" && !seen {
-				seenModels[event.Model] = struct{}{}
-				modelNames = append(modelNames, event.Model)
-			}
-			skills.add(event.SkillName, ai.SkillDetectedViaApiRequest, "", "", event.PluginName, event.EventTimestamp)
-		case eventAPIError:
-			prompt.ApiErrorCount++
-		case eventToolResult:
-			prompt.ToolCallCount++
-			if event.Success != nil && !*event.Success {
-				prompt.ToolFailureCount++
-			}
-			if _, subagent := subagentToolNames[event.ToolName]; subagent {
-				prompt.SubagentCount++
-			}
-			if event.ToolName == skillToolName {
-				skills.add(event.SkillName, ai.SkillDetectedViaSkillTool, "", "", "", event.EventTimestamp)
-			}
-		case eventToolDecision:
-			if eventString(attributes, "decision") == toolDecisionReject {
-				prompt.ToolRejectCount++
-			}
-		case eventSkillActivated:
-			skills.add(event.SkillName, ai.SkillDetectedViaActivation, eventString(attributes, "invocation_trigger"), eventString(attributes, "skill.source"), event.PluginName, event.EventTimestamp)
+		if prompt.RepositoryUrl == nil {
+			prompt.RepositoryUrl = repositoryURL(attributes)
+		}
+		if apply, handled := promptEventAppliers[event.EventName]; handled {
+			apply(builder, event, attributes)
 		}
 	}
-	prompt.ModelsUsed = truncate(strings.Join(modelNames, ","), maxModelsUsedLength)
-	collected := skills.result(prompt)
+	prompt.ModelsUsed = truncate(strings.Join(builder.modelNames, ","), maxModelsUsedLength)
+	collected := builder.skills.result(prompt)
 	prompt.SkillCount = int64(len(collected))
 	prompt.UsedSkill = len(collected) > 0
 	return promptRollup{prompt: prompt, skills: collected}
+}
+
+// promptBuilder accumulates one prompt's row, skills and models from its ordered events.
+type promptBuilder struct {
+	prompt     *ai.AiPrompt
+	skills     *skillCollector
+	modelNames []string
+	seenModels map[string]struct{}
+}
+
+// promptEventApplier adds one event's contribution to the prompt being built.
+type promptEventApplier func(b *promptBuilder, event *models.OtelEvent, attributes map[string]interface{})
+
+// promptEventAppliers maps each event name that contributes to a prompt to its applier.
+// Other events only extend the prompt's time range.
+var promptEventAppliers = map[string]promptEventApplier{
+	eventUserPrompt:     (*promptBuilder).applyUserPrompt,
+	eventAPIRequest:     (*promptBuilder).applyAPIRequest,
+	eventAPIError:       (*promptBuilder).applyAPIError,
+	eventToolResult:     (*promptBuilder).applyToolResult,
+	eventToolDecision:   (*promptBuilder).applyToolDecision,
+	eventSkillActivated: (*promptBuilder).applySkillActivated,
+}
+
+func (b *promptBuilder) applyUserPrompt(event *models.OtelEvent, attributes map[string]interface{}) {
+	// The user_prompt event marks the start, even when an earlier-stamped event of the same
+	// prompt arrived.
+	b.prompt.StartedAt = event.EventTimestamp
+	fillPromptIdentity(b.prompt, event)
+	b.prompt.PromptLength = int64Value(eventNumber(attributes, "prompt_length"))
+	b.prompt.CommandName = event.CommandName
+	b.prompt.CommandSource = truncate(eventString(attributes, "command_source"), maxCommandSourceLength)
+}
+
+func (b *promptBuilder) applyAPIRequest(event *models.OtelEvent, _ map[string]interface{}) {
+	b.prompt.ApiRequestCount++
+	b.prompt.InputTokens += event.InputTokens
+	b.prompt.OutputTokens += event.OutputTokens
+	b.prompt.CacheReadTokens += event.CacheReadTokens
+	b.prompt.CacheCreationTokens += event.CacheCreationTokens
+	if event.CostUsd != nil {
+		if total, err := addDecimal(b.prompt.EstimatedCostUsd, *event.CostUsd, 8); err == nil {
+			b.prompt.EstimatedCostUsd = total
+		}
+	}
+	if _, seen := b.seenModels[event.Model]; event.Model != "" && !seen {
+		b.seenModels[event.Model] = struct{}{}
+		b.modelNames = append(b.modelNames, event.Model)
+	}
+	b.skills.add(event.SkillName, ai.SkillDetectedViaApiRequest, "", "", event.PluginName, event.EventTimestamp)
+}
+
+func (b *promptBuilder) applyAPIError(_ *models.OtelEvent, _ map[string]interface{}) {
+	b.prompt.ApiErrorCount++
+}
+
+func (b *promptBuilder) applyToolResult(event *models.OtelEvent, _ map[string]interface{}) {
+	b.prompt.ToolCallCount++
+	if event.Success != nil && !*event.Success {
+		b.prompt.ToolFailureCount++
+	}
+	if _, subagent := subagentToolNames[event.ToolName]; subagent {
+		b.prompt.SubagentCount++
+	}
+	if event.ToolName == skillToolName {
+		b.skills.add(event.SkillName, ai.SkillDetectedViaSkillTool, "", "", "", event.EventTimestamp)
+	}
+}
+
+func (b *promptBuilder) applyToolDecision(_ *models.OtelEvent, attributes map[string]interface{}) {
+	if eventString(attributes, "decision") == toolDecisionReject {
+		b.prompt.ToolRejectCount++
+	}
+}
+
+func (b *promptBuilder) applySkillActivated(event *models.OtelEvent, attributes map[string]interface{}) {
+	b.skills.add(event.SkillName, ai.SkillDetectedViaActivation, truncate(eventString(attributes, "invocation_trigger"), maxAiLabelLength),
+		truncate(eventString(attributes, "skill.source"), maxAiLabelLength), event.PluginName, event.EventTimestamp)
+}
+
+// repositoryURL returns an event's normalized repository URL, or nil when it has none, it
+// is not a remote repository URL, or it does not fit ai_prompts.repository_url. Ingest
+// already normalized it; normalizing again keeps the column clean for events stored from
+// earlier raw batches. Claude Code derives it once per session, so every event of a prompt
+// carries the same value.
+func repositoryURL(attributes map[string]interface{}) *string {
+	url, ok := normalizeRepositoryURL(eventString(attributes, repositoryURLAttribute))
+	if !ok || utf8.RuneCountInString(url) > maxRepositoryURLLength {
+		return nil
+	}
+	return &url
 }
 
 func fillPromptIdentity(prompt *ai.AiPrompt, event *models.OtelEvent) {
@@ -287,7 +378,7 @@ func (c *skillCollector) add(name, detectedVia, trigger, source, plugin string, 
 	skill := c.skills[name]
 	if skill == nil {
 		skill = &ai.AiPromptSkill{
-			DomainEntity: domainlayer.NewDomainEntity(ai.PromptSkillID(aiProviderClaude, c.workspaceKey, c.promptID, name)),
+			DomainEntity: domainlayer.NewDomainEntity(ai.CanonicalKey{Kind: ai.IDKindPromptSkill, Provider: aiProviderClaude, WorkspaceKey: c.workspaceKey, Grain: []string{c.promptID, name}}.ID()),
 			Provider:     aiProviderClaude,
 			WorkspaceKey: c.workspaceKey,
 			PromptId:     c.promptID,
@@ -321,7 +412,8 @@ func (c *skillCollector) result(prompt *ai.AiPrompt) []*ai.AiPromptSkill {
 }
 
 // rollupSessions rebuilds the prompts a batch touched, and when the batch changed a
-// session's mode history, the mode of every prompt in that session.
+// session's mode history, the mode of every prompt in that session. Every storage error is
+// classified here, once, so the rollup's helpers return plain wrapped errors.
 func rollupSessions(tx dal.Transaction, workspaceKeys map[uint64]string, targets []*sessionTarget) error {
 	for _, target := range targets {
 		workspaceKey := workspaceKeys[target.connectionID]
@@ -329,7 +421,7 @@ func rollupSessions(tx dal.Transaction, workspaceKeys map[uint64]string, targets
 			continue
 		}
 		if err := rollupSession(tx, workspaceKey, target); err != nil {
-			return err
+			return classifyStorageError(err)
 		}
 	}
 	return nil
@@ -413,14 +505,14 @@ func promptSequence(events []*models.OtelEvent) int64 {
 
 func writePromptRollup(tx dal.Transaction, rollup promptRollup) error {
 	if err := tx.CreateOrUpdate(rollup.prompt); err != nil {
-		return classifyStorageError(fmt.Errorf("write Claude Code prompt: %w", err))
+		return fmt.Errorf("write Claude Code prompt: %w", err)
 	}
 	if err := tx.Delete(&ai.AiPromptSkill{}, dal.Where("workspace_key = ? AND prompt_id = ?", rollup.prompt.WorkspaceKey, rollup.prompt.PromptId)); err != nil {
-		return classifyStorageError(fmt.Errorf("clear Claude Code prompt skills: %w", err))
+		return fmt.Errorf("clear Claude Code prompt skills: %w", err)
 	}
 	for _, skill := range rollup.skills {
 		if err := tx.CreateOrUpdate(skill); err != nil {
-			return classifyStorageError(fmt.Errorf("write Claude Code prompt skill: %w", err))
+			return fmt.Errorf("write Claude Code prompt skill: %w", err)
 		}
 	}
 	return nil
@@ -433,7 +525,10 @@ func writeModeChanges(tx dal.Transaction, workspaceKey string, target *sessionTa
 	}
 	for _, change := range modes.changes {
 		row := &ai.AiPermissionModeChange{
-			DomainEntity: domainlayer.NewDomainEntity(ai.PermissionModeChangeID(aiProviderClaude, workspaceKey, target.sessionID, change.at, change.fromMode, change.toMode)),
+			DomainEntity: domainlayer.NewDomainEntity(ai.CanonicalKey{
+				Kind: ai.IDKindPermissionModeChange, Provider: aiProviderClaude, WorkspaceKey: workspaceKey,
+				Grain: []string{target.sessionID, ai.TimeGrain(change.at), change.fromMode, change.toMode},
+			}.ID()),
 			Provider:     aiProviderClaude,
 			WorkspaceKey: workspaceKey,
 			UserKey:      target.userKey,
@@ -445,7 +540,7 @@ func writeModeChanges(tx dal.Transaction, workspaceKey string, target *sessionTa
 			Trigger:      change.trigger,
 		}
 		if err := tx.CreateOrUpdate(row); err != nil {
-			return classifyStorageError(fmt.Errorf("write Claude Code permission mode change: %w", err))
+			return fmt.Errorf("write Claude Code permission mode change: %w", err)
 		}
 	}
 	return nil
@@ -473,7 +568,7 @@ func refreshSessionModes(tx dal.Transaction, workspaceKey string, target *sessio
 			{ColumnName: "permission_mode", Value: mode},
 			{ColumnName: "permission_mode_inferred", Value: inferred},
 		}, dal.Where("id = ?", prompt.Id)); err != nil {
-			return classifyStorageError(fmt.Errorf("update Claude Code prompt permission mode: %w", err))
+			return fmt.Errorf("update Claude Code prompt permission mode: %w", err)
 		}
 	}
 	return nil
@@ -498,6 +593,10 @@ func domainAccountID(tx dal.Transaction, cache map[string]string, email string) 
 	return account.Id, nil
 }
 
+// eventAttributes decodes an event's attributes. The decode error is discarded because
+// prepareLogRecord always writes Attributes with json.Marshal of a map, so it cannot fail.
+// Failing here would also quarantine the wrong batch: the rollup reads events written by
+// earlier batches, so one bad row would block every later batch for its session.
 func eventAttributes(event *models.OtelEvent) map[string]interface{} {
 	attributes := make(map[string]interface{})
 	if len(event.Attributes) > 0 {

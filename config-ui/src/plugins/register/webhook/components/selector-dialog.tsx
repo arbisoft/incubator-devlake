@@ -16,25 +16,28 @@
  *
  */
 
-import { useState } from 'react';
-import { Modal } from 'antd';
 import MillerColumnsSelect from 'miller-columns-select';
+import { useState } from 'react';
 
-import { useAppSelector } from '@/hooks';
 import { Block, Loading } from '@/components';
 import { selectWebhooks } from '@/features';
-import { IWebhook } from '@/types';
+import { useAppSelector } from '@/hooks';
+import type { IWebhook } from '@/types';
+import { FormModal, MODAL_WIDTH } from '@/ui';
 
-import * as S from '../styled';
+import { COPY, SELECT_COLUMN_HEIGHT } from '../constants';
+import { LoadingRow } from '../styled';
 
-interface Props {
+import { WebhookIcon } from './webhook-icon';
+
+type SelectorDialogProps = {
   open: boolean;
   saving: boolean;
   onCancel: () => void;
   onSubmit: (items: IWebhook[]) => void;
-}
+};
 
-export const SelectorDialog = ({ open, saving, onCancel, onSubmit }: Props) => {
+export const SelectorDialog = ({ open, saving, onCancel, onSubmit }: SelectorDialogProps) => {
   const [selectedIds, setSelectedIds] = useState<ID[]>([]);
 
   const webhooks = useAppSelector(selectWebhooks);
@@ -42,39 +45,38 @@ export const SelectorDialog = ({ open, saving, onCancel, onSubmit }: Props) => {
   const handleSubmit = () => onSubmit(webhooks.filter((it) => selectedIds.includes(it.id)));
 
   return (
-    <Modal
+    <FormModal
       open={open}
-      width={820}
-      centered
-      title="Select Existing Webhooks"
-      okText="Confirm"
-      okButtonProps={{
-        disabled: !selectedIds.length,
-        loading: saving,
-      }}
+      icon={<WebhookIcon />}
+      title={COPY.select.title}
+      submitLabel={COPY.select.submit}
+      width={MODAL_WIDTH.LG}
+      loading={saving}
+      submitDisabled={!selectedIds.length}
+      onSubmit={handleSubmit}
       onCancel={onCancel}
-      onOk={handleSubmit}
+      afterClose={() => setSelectedIds([])}
     >
-      <S.Wrapper>
-        <Block title="Webhooks" description="Select an existing Webhook to import to the current project.">
-          <MillerColumnsSelect
-            columnCount={1}
-            columnHeight={160}
-            getHasMore={() => false}
-            renderLoading={() => <Loading size={20} style={{ padding: '4px 12px' }} />}
-            items={webhooks.map((it) => ({
-              parentId: null,
-              id: it.id,
-              title: it.name,
-              name: it.name,
-            }))}
-            selectedIds={selectedIds}
-            onSelectItemIds={setSelectedIds}
-          />
-        </Block>
-      </S.Wrapper>
-    </Modal>
+      <Block title={COPY.select.label} description={COPY.select.description}>
+        <MillerColumnsSelect
+          columnCount={1}
+          columnHeight={SELECT_COLUMN_HEIGHT}
+          getHasMore={() => false}
+          renderLoading={() => (
+            <LoadingRow>
+              <Loading size={20} />
+            </LoadingRow>
+          )}
+          items={webhooks.map((it) => ({
+            parentId: null,
+            id: it.id,
+            title: it.name,
+            name: it.name,
+          }))}
+          selectedIds={selectedIds}
+          onSelectItemIds={setSelectedIds}
+        />
+      </Block>
+    </FormModal>
   );
 };
-
-export default SelectorDialog;

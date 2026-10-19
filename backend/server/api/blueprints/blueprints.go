@@ -66,6 +66,9 @@ func Post(c *gin.Context) {
 // @Param page query int false "page"
 // @Param pageSize query int false "pageSize"
 // @Param label query string false "label"
+// @Param keyword query string false "case-insensitive match on the blueprint or project name"
+// @Param sortBy query string false "sort column, defaults to creation order" Enums(name, createdAt)
+// @Param sortOrder query string false "sort direction, defaults to desc" Enums(asc, desc)
 // @Success 200  {object} PaginatedBlueprint
 // @Failure 400  {object} shared.ApiBody "Bad Request"
 // @Failure 500  {object} shared.ApiBody "Internal Error"
@@ -79,6 +82,10 @@ func Index(c *gin.Context) {
 	}
 	blueprints, count, err := services.GetBlueprints(&query, true)
 	if err != nil {
+		if e, ok := err.(errors.Error); ok && e.GetType() == errors.BadInput {
+			shared.ApiOutputError(c, e)
+			return
+		}
 		shared.ApiOutputAbort(c, errors.Default.Wrap(err, "error getting blueprints"))
 		return
 	}
@@ -203,6 +210,8 @@ func Trigger(c *gin.Context) {
 // @Tags framework/blueprints
 // @Accept application/json
 // @Param blueprintId path int true "blueprint id"
+// @Param sortBy query string false "sort column, defaults to id" Enums(id, beganAt, finishedAt)
+// @Param sortOrder query string false "sort direction, defaults to desc" Enums(asc, desc)
 // @Success 200  {object} shared.ResponsePipelines
 // @Failure 400  {object} shared.ApiBody "Bad Request"
 // @Failure 500  {object} shared.ApiBody "Internal Error"
@@ -221,6 +230,10 @@ func GetBlueprintPipelines(c *gin.Context) {
 	}
 	pipelines, count, err := services.GetPipelines(&query, true)
 	if err != nil {
+		if e, ok := err.(errors.Error); ok && e.GetType() == errors.BadInput {
+			shared.ApiOutputError(c, e)
+			return
+		}
 		shared.ApiOutputError(c, errors.Default.Wrap(err, "error getting pipelines"))
 		return
 	}

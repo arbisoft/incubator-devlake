@@ -24,18 +24,24 @@ import (
 )
 
 func TestManagedSettingsExportEventsWithPromptTextOnly(t *testing.T) {
-	connection := &models.OtelConnection{Protocol: defaultOtelProtocol, CollectorEndpoint: "https://otel.example.com:4317"}
-	credential := &models.OtelCredential{Username: "otel_platform_abc"}
-	env := responseWithSettings(connection, nil, credential, "secret").ManagedSettings.Env
+	const (
+		collectorEndpoint = "https://otel.example.com:4317"
+		username          = "otel_platform_abc"
+		password          = "secret"
+	)
+	connection := &models.OtelConnection{Protocol: defaultOtelProtocol, CollectorEndpoint: collectorEndpoint}
+	credential := &models.OtelCredential{Username: username}
+	env := responseWithSettings(connection, nil, credential, password).ManagedSettings.Env
 
 	want := map[string]string{
-		"OTEL_LOGS_EXPORTER":              "otlp",
-		"OTEL_LOG_TOOL_DETAILS":           "1",
-		"OTEL_METRICS_INCLUDE_SESSION_ID": "true",
-		"OTEL_LOG_USER_PROMPTS":           "1",
-		"OTEL_LOG_ASSISTANT_RESPONSES":    "0",
-		"OTEL_LOG_TOOL_CONTENT":           "0",
-		"OTEL_LOG_RAW_API_BODIES":         "0",
+		envLogsExporter:             otlpExporter,
+		envLogToolDetails:           envFlagOn,
+		envMetricsIncludeSessionID:  envBoolTrue,
+		envMetricsIncludeRepository: envBoolTrue,
+		envLogUserPrompts:           envFlagOn,
+		envLogAssistantResponses:    envFlagOff,
+		envLogToolContent:           envFlagOff,
+		envLogRawAPIBodies:          envFlagOff,
 	}
 	for key, value := range want {
 		if env[key] != value {

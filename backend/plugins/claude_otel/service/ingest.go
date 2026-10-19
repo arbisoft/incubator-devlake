@@ -54,7 +54,7 @@ type RawIngestResult struct {
 }
 
 // RawIngestService owns the authenticated OTLP request-to-raw-record transition.
-// It deliberately does no metric aggregation; the raw metric converter derives facts.
+// It deliberately does no metric aggregation; the raw batch converter derives facts.
 type RawIngestService struct {
 	db     dal.Dal
 	cfg    config.ConfigReader
@@ -83,6 +83,7 @@ func (s *RawIngestService) Ingest(request *http.Request) (*RawIngestResult, erro
 	if err != nil {
 		return nil, err
 	}
+	normalizeMetricRepositoryURLs(metricsRequest)
 	minObservedAt, maxObservedAt := observedTimeRange(metricsRequest.GetResourceMetrics())
 	deterministicPayload, marshalErr := proto.MarshalOptions{Deterministic: true}.Marshal(metricsRequest)
 	if marshalErr != nil {
@@ -99,7 +100,7 @@ func (s *RawIngestService) Ingest(request *http.Request) (*RawIngestResult, erro
 		DatapointCount:       datapointCount,
 		MinObservedAt:        minObservedAt,
 		MaxObservedAt:        maxObservedAt,
-		Status:               models.OtelMetricBatchStatusPending,
+		Status:               models.OtelBatchStatusPending,
 	}
 
 	duplicate, err := s.insertRawBatch(batch)
@@ -214,6 +215,17 @@ func validateOtelMetricsRequest(request *collectormetrics.ExportMetricsServiceRe
 type otlpDatapoint interface {
 	GetAttributes() []*commonv1.KeyValue
 	GetTimeUnixNano() uint64
+}
+
+// normalizeMetricRepositoryURLs normalizes the repository URL on every resource and
+// datapoint before the raw batch is stored, so credentials in a remote URL are never kept.
+func normalizeMetricRepositoryURLs(request *collectormetrics.ExportMetricsServiceRequest) {
+	for _, resourceMetrics := range request.GetResourceMetrics() {
+		normalizeRepositoryAttributes(resourceMetrics.GetResource().GetAttributes())
+		for _, datapoint := range resourceDatapoints(resourceMetrics) {
+			normalizeRepositoryAttributes(datapoint.GetAttributes())
+		}
+	}
 }
 
 func resourceDatapoints(resourceMetrics *metricsv1.ResourceMetrics) []otlpDatapoint {

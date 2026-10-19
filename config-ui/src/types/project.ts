@@ -22,7 +22,7 @@ import { IPipeline } from './pipeline';
 export interface IProject {
   name: string;
   description: string;
-  blueprint: IBlueprint;
+  blueprint: IBlueprint | null;
   metrics: Array<{ pluginName: string; pluginOption: any; enable: boolean }>;
   createdAt?: string;
   lastPipeline?: IPipeline;

@@ -1,0 +1,4 @@
+{
+  "titlePath": ["Login provider buttons", "falls back to a key icon for an unknown or missing issuer host"],
+  "writes": []
+}

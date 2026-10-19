@@ -16,9 +16,9 @@
  *
  */
 
-import * as connection from '../../connection';
-
 import { IWebhookAPI } from '@/types';
+
+import * as connection from '../../connection';
 
 export const list = (): Promise<IWebhookAPI[]> => connection.list('webhook') as any;
 

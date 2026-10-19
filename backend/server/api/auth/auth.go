@@ -58,10 +58,16 @@ const (
 	PathUserInfo            = "/auth/userinfo"
 	PathLocalLogin          = "/auth/local/login"
 	PathLocalChangePassword = "/auth/local/change-password"
-	// PathClaudeOtelMetrics is authenticated by the Collector-only ingest token,
-	// not an interactive user session. It must remain an exact path match.
+	// The Claude Code OTLP ingest paths are authenticated by the Collector-only ingest
+	// token, not an interactive user session. They must remain exact path matches.
 	PathClaudeOtelMetrics = "/plugins/claude_otel/otlp/v1/metrics"
+	PathClaudeOtelLogs    = "/plugins/claude_otel/otlp/v1/logs"
 )
+
+// IsClaudeOtelIngestPath reports whether path is one of the Collector's OTLP ingest paths.
+func IsClaudeOtelIngestPath(path string) bool {
+	return path == PathClaudeOtelMetrics || path == PathClaudeOtelLogs
+}
 
 // RegisterRoutes keeps auth-owned route paths and handlers together so the
 // generic API router has one narrow integration point.
@@ -237,6 +243,7 @@ type ProviderInfo struct {
 	Name        string `json:"name"`
 	DisplayName string `json:"displayName"`
 	LoginURL    string `json:"loginUrl"`
+	IssuerHost  string `json:"issuerHost,omitempty"`
 }
 
 type Methods struct {
@@ -254,6 +261,15 @@ type APIKey struct {
 type LocalPasswordMethod struct {
 	Enabled  bool   `json:"enabled"`
 	LoginURL string `json:"loginUrl"`
+}
+
+// issuerHost returns only the host of an issuer URL, or "" when it cannot be parsed.
+func issuerHost(issuerURL string) string {
+	u, err := url.Parse(strings.TrimSpace(issuerURL))
+	if err != nil {
+		return ""
+	}
+	return u.Host
 }
 
 func GetMethods(c *gin.Context) { defaultService.GetMethods(c) }
@@ -275,6 +291,7 @@ func (s *Service) GetMethods(c *gin.Context) {
 				Name:        name,
 				DisplayName: pc.DisplayName,
 				LoginURL:    PathLogin + "?provider=" + url.QueryEscape(name),
+				IssuerHost:  issuerHost(pc.IssuerURL),
 			})
 		}
 	}

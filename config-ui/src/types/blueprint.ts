@@ -25,7 +25,7 @@ export type BlueprintConnectionPayload = {
   pluginName: string;
   connectionId: ID;
   scopes?: Array<{
-    scopeId: string;
+    scopeId: ID;
   }>;
 };
 

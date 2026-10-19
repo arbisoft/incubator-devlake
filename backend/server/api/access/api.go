@@ -128,11 +128,21 @@ func ListLinkableOIDCProviders(c *gin.Context) {
 	shared.ApiOutputSuccess(c, providers, http.StatusOK)
 }
 
+// @Summary List access users
+// @Description GET /access/users?page=1&pageSize=10&keyword=search_text&status=active
+// @Tags framework/access
+// @Param page query int false "page"
+// @Param pageSize query int false "pageSize (10, 25 or 50)"
+// @Param keyword query string false "case-insensitive match on email or display name"
+// @Param status query string false "filter by status (active or disabled)"
+// @Success 200  {object} PaginatedUsers
+// @Failure 400  {object} ApiErrorResponse "Bad Request"
+// @Router /access/users [get]
 func ListUsers(c *gin.Context) {
 	if _, ok := requireAdmin(c); !ok {
 		return
 	}
-	query, ok := listQuery(c)
+	query, ok := userListQuery(c)
 	if !ok {
 		return
 	}
@@ -533,6 +543,20 @@ func listQuery(c *gin.Context) (PageQuery, bool) {
 	if !valid {
 		outputError(c, errors.BadInput.New(invalidPageSizeMessage))
 		return PageQuery{}, false
+	}
+	return query, true
+}
+
+func userListQuery(c *gin.Context) (UserListQuery, bool) {
+	query := UserListQuery{}
+	if err := c.ShouldBindQuery(&query); err != nil {
+		outputError(c, errors.BadInput.Wrap(err, "invalid access list query"))
+		return UserListQuery{}, false
+	}
+	query, err := query.Normalize()
+	if err != nil {
+		outputError(c, err)
+		return UserListQuery{}, false
 	}
 	return query, true
 }

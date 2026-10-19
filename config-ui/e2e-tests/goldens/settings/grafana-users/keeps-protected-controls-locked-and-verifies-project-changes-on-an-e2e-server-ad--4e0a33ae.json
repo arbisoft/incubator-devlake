@@ -1,0 +1,22 @@
+{
+  "titlePath": [
+    "Grafana user management ordinary flows",
+    "keeps protected controls locked and verifies project changes on an e2e server admin"
+  ],
+  "writes": [
+    {
+      "method": "PUT",
+      "path": "/api/access/grafana/users/:id/projects",
+      "body": {
+        "projectNames": ["e2e-*"]
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/api/access/grafana/users/:id/projects",
+      "body": {
+        "projectNames": []
+      }
+    }
+  ]
+}

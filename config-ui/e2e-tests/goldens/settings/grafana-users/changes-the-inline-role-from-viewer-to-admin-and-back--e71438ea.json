@@ -1,0 +1,19 @@
+{
+  "titlePath": ["Grafana user management ordinary flows", "changes the inline role from Viewer to Admin and back"],
+  "writes": [
+    {
+      "method": "PATCH",
+      "path": "/api/access/grafana/users/:id",
+      "body": {
+        "role": "Admin"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/access/grafana/users/:id",
+      "body": {
+        "role": "Viewer"
+      }
+    }
+  ]
+}

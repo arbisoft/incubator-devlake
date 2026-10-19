@@ -18,37 +18,17 @@
 
 import { request } from '@/utils';
 
-export const ACCESS_ROLE = {
-  CUSTOMER_ADMIN: 'customer_admin',
-  MEMBER: 'member',
-} as const;
+import type { KeywordParams } from '../types';
 
-export type AccessRole = (typeof ACCESS_ROLE)[keyof typeof ACCESS_ROLE];
+import type {
+  AccessErrorCode,
+  AccessRole,
+  AccessStatus,
+  GrafanaProviderKind,
+  OIDCProviderSyncStatus,
+} from './constants';
 
-export const ACCESS_STATUS = {
-  ACTIVE: 'active',
-  DISABLED: 'disabled',
-} as const;
-
-export type AccessStatus = (typeof ACCESS_STATUS)[keyof typeof ACCESS_STATUS];
-
-export const ACCESS_ERROR_CODE = {
-  DUPLICATE_USER: 'DUPLICATE_USER',
-  DUPLICATE_DOMAIN: 'DUPLICATE_DOMAIN',
-  INVALID_USER: 'INVALID_USER',
-  INVALID_DOMAIN: 'INVALID_DOMAIN',
-  INVALID_OIDC_PROVIDER: 'INVALID_OIDC_PROVIDER',
-  LOCAL_CREDENTIAL_MISSING: 'LOCAL_CREDENTIAL_MISSING',
-  LAST_LOGIN_METHOD: 'LAST_LOGIN_METHOD',
-  OIDC_PROVIDER_BLOCKED: 'OIDC_PROVIDER_BLOCKED',
-  OIDC_PROVIDER_MISSING: 'OIDC_PROVIDER_MISSING',
-  OIDC_PROVIDER_REVISION_CONFLICT: 'OIDC_PROVIDER_REVISION_CONFLICT',
-  GRAFANA_TARGET_CONFLICT: 'GRAFANA_TARGET_CONFLICT',
-  OIDC_IDENTITY_LINKED: 'OIDC_IDENTITY_LINKED',
-  GRAFANA_SYNC_FAILED: 'GRAFANA_SYNC_FAILED',
-} as const;
-
-export type AccessErrorCode = (typeof ACCESS_ERROR_CODE)[keyof typeof ACCESS_ERROR_CODE];
+export * from './constants';
 
 export type AccessApiErrorResponse = {
   success: false;
@@ -96,28 +76,6 @@ export type AccessAuditEvent = {
   detail: string;
   createdAt: string;
 };
-
-export const OIDC_PROVIDER_SYNC_STATUS = {
-  PENDING: 'pending',
-  SYNCHRONIZED: 'synchronized',
-  FAILED: 'failed',
-  COMPENSATED: 'compensated',
-  COMPENSATION_FAILED: 'compensation_failed',
-  NOT_APPLICABLE: 'not_applicable',
-} as const;
-
-export type OIDCProviderSyncStatus = (typeof OIDC_PROVIDER_SYNC_STATUS)[keyof typeof OIDC_PROVIDER_SYNC_STATUS];
-
-export const GRAFANA_PROVIDER_KIND = {
-  NONE: 'none',
-  GOOGLE: 'google',
-  AZURE_AD: 'azuread',
-  OKTA: 'okta',
-  GITLAB: 'gitlab',
-  GENERIC_OAUTH: 'generic_oauth',
-} as const;
-
-export type GrafanaProviderKind = (typeof GRAFANA_PROVIDER_KIND)[keyof typeof GRAFANA_PROVIDER_KIND];
 
 export type OIDCProviderInput = {
   providerKey: string;
@@ -175,8 +133,10 @@ export type PaginatedAccessDomains = {
 const basePath = '/access';
 
 export const current = (): Promise<AccessCurrent> => request(`${basePath}/me`);
-export const listUsers = (params: AccessPagination): Promise<PaginatedAccessUsers> =>
-  request(`${basePath}/users`, { data: params });
+export type AccessUserListParams = AccessPagination & KeywordParams & { status?: AccessStatus };
+
+export const listUsers = (params: AccessUserListParams, signal?: AbortSignal): Promise<PaginatedAccessUsers> =>
+  request(`${basePath}/users`, { data: params, signal });
 export const createUser = (data: { email: string; role: AccessRole }): Promise<AccessUser> =>
   request(`${basePath}/users`, { method: 'POST', data });
 export const updateUser = (id: ID, data: { role: AccessRole; status: AccessStatus }): Promise<AccessUser> =>
@@ -193,15 +153,16 @@ export const resetLocalCredential = (id: ID): Promise<LocalCredentialResponse> =
   request(`${basePath}/users/${id}/local-credential/reset`, { method: 'POST' });
 export const removeLocalCredential = (id: ID): Promise<AccessUser> =>
   request(`${basePath}/users/${id}/local-credential`, { method: 'DELETE' });
-export const listDomains = (params: AccessPagination): Promise<PaginatedAccessDomains> =>
-  request(`${basePath}/domains`, { data: params });
+export const listDomains = (params: AccessPagination, signal?: AbortSignal): Promise<PaginatedAccessDomains> =>
+  request(`${basePath}/domains`, { data: params, signal });
 export const createDomain = (data: { domain: string; defaultRole: AccessRole }): Promise<AccessDomain> =>
   request(`${basePath}/domains`, { method: 'POST', data });
 export const updateDomain = (id: ID, data: { defaultRole: AccessRole; status: AccessStatus }): Promise<AccessDomain> =>
   request(`${basePath}/domains/${id}`, { method: 'PATCH', data });
 export const hideDomain = (id: ID): Promise<AccessDomain> =>
   request(`${basePath}/domains/${id}/hide`, { method: 'POST' });
-export const listAuditEvents = (): Promise<AccessAuditEvent[]> => request(`${basePath}/audit-events`);
+export const listAuditEvents = (signal?: AbortSignal): Promise<AccessAuditEvent[]> =>
+  request(`${basePath}/audit-events`, { signal });
 export const getOIDCCallbacks = (): Promise<OIDCCallbacks> => request(`${basePath}/oidc-providers/callbacks`);
 export const listOIDCProviders = (): Promise<OIDCProvider[]> => request(`${basePath}/oidc-providers`);
 export const listLinkableOIDCProviders = (): Promise<LinkableOIDCProvider[]> =>

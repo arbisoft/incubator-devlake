@@ -77,10 +77,13 @@ func GetProjectCheck(c *gin.Context) {
 }
 
 // @Summary Get list of projects
-// @Description GET /projects?page=1&pageSize=10
+// @Description GET /projects?page=1&pageSize=10&keyword=search_text&sortBy=createdAt&sortOrder=desc
 // @Tags framework/projects
 // @Param page query int false "query"
 // @Param pageSize query int false "query"
+// @Param keyword query string false "case-insensitive match on the project name"
+// @Param sortBy query string false "sort column, defaults to createdAt" Enums(name, createdAt, lastRunAt)
+// @Param sortOrder query string false "sort direction, defaults to desc" Enums(asc, desc)
 // @Success 200  {object} PaginatedProjects
 // @Failure 400  {string} errcode.Error "Bad Request"
 // @Failure 500  {string} errcode.Error "Internal Error"
@@ -94,6 +97,10 @@ func GetProjects(c *gin.Context) {
 	}
 	projects, count, err := services.GetProjects(&query)
 	if err != nil {
+		if e, ok := err.(errors.Error); ok && e.GetType() == errors.BadInput {
+			shared.ApiOutputError(c, e)
+			return
+		}
 		shared.ApiOutputAbort(c, errors.Default.Wrap(err, "error getting projects"))
 		return
 	}

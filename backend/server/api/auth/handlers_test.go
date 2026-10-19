@@ -555,6 +555,75 @@ func TestLogoutPublicWhenNoSession(t *testing.T) {
 	}
 }
 
+// The Collector posts OTLP with its ingest token and no session, so both ingest paths
+// must pass the session and CSRF middleware; the plugin checks the token itself.
+func TestClaudeOtelIngestPathsPublicWithoutSession(t *testing.T) {
+	idp := newFakeIdP(t)
+	s, _ := newTestService(t, idp)
+	r := newTestRouter(s)
+	for _, path := range []string{PathClaudeOtelMetrics, PathClaudeOtelLogs} {
+		r.POST(path, func(c *gin.Context) { c.Status(http.StatusOK) })
+	}
+
+	for _, path := range []string{PathClaudeOtelMetrics, PathClaudeOtelLogs} {
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodPost, path, nil))
+		if w.Code != http.StatusOK {
+			t.Fatalf("POST %s without session = %d body=%s, want 200", path, w.Code, w.Body.String())
+		}
+	}
+}
+
 // Compile-time assertion that the testify mock satisfies the dal.Dal
 // interface so the tests catch any new method that gets added.
 var _ dal.Dal = (*mockdal.Dal)(nil)
+
+func TestIssuerHost(t *testing.T) {
+	cases := []struct {
+		name   string
+		issuer string
+		want   string
+	}{
+		{"normal issuer", "https://accounts.google.com", "accounts.google.com"},
+		{"issuer with port", "http://localhost:8080/dex", "localhost:8080"},
+		{"keycloak realm path", "https://sso.example.com/realms/x", "sso.example.com"},
+		{"empty", "", ""},
+		{"invalid", "https://exa mple.com/%zz", ""},
+		{"no host", "/realms/x", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := issuerHost(tc.issuer); got != tc.want {
+				t.Fatalf("issuerHost(%q) = %q, want %q", tc.issuer, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestGetMethodsIncludesIssuerHostOnly(t *testing.T) {
+	idp := newFakeIdP(t)
+	s, _ := newTestService(t, idp)
+	r := newTestRouter(s)
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, PathMethods, nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var body struct {
+		Providers []ProviderInfo `json:"providers"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode methods: %v", err)
+	}
+	if len(body.Providers) != 1 {
+		t.Fatalf("expected one provider, got %d", len(body.Providers))
+	}
+	wantHost := strings.TrimPrefix(idp.issuer, "http://")
+	if body.Providers[0].IssuerHost != wantHost {
+		t.Fatalf("issuerHost = %q, want %q", body.Providers[0].IssuerHost, wantHost)
+	}
+	if strings.Contains(w.Body.String(), "test-client") || strings.Contains(w.Body.String(), idp.issuer) {
+		t.Fatalf("methods response leaks issuer URL or client id: %s", w.Body.String())
+	}
+}

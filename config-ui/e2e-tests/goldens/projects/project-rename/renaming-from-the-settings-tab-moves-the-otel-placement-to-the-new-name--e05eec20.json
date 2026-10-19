@@ -1,0 +1,35 @@
+{
+  "titlePath": [
+    "Project rename with Claude Code OTel placements",
+    "renaming from the Settings tab moves the OTel placement to the new name"
+  ],
+  "writes": [
+    {
+      "method": "PATCH",
+      "path": "/api/projects/e2e-*",
+      "body": {
+        "description": "",
+        "metrics": [
+          {
+            "enable": true,
+            "pluginName": "dora",
+            "pluginOption": {}
+          },
+          {
+            "enable": false,
+            "pluginName": "linker",
+            "pluginOption": {
+              "prToIssueRegexp": "(?mi)(Closes)[\\s]*.*(((and )?#\\d+[ ]*)+)"
+            }
+          },
+          {
+            "enable": false,
+            "pluginName": "issue_trace",
+            "pluginOption": {}
+          }
+        ],
+        "name": "e2e-*"
+      }
+    }
+  ]
+}

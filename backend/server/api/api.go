@@ -39,6 +39,7 @@ import (
 	"github.com/apache/incubator-devlake/server/api/auth"
 	_ "github.com/apache/incubator-devlake/server/api/docs"
 	"github.com/apache/incubator-devlake/server/api/grafanarole"
+	"github.com/apache/incubator-devlake/server/api/grafanausers"
 	"github.com/apache/incubator-devlake/server/api/ping"
 	"github.com/apache/incubator-devlake/server/api/shared"
 	"github.com/apache/incubator-devlake/server/api/version"
@@ -65,6 +66,7 @@ func Init() {
 	access.Init(basicRes)
 	auth.Init(basicRes)
 	grafanarole.Init(basicRes)
+	grafanausers.Init(basicRes)
 }
 
 func InjectCustomService(pipelineNotifier services.PipelineNotificationService, projectService services.ProjectService) errors.Error {
@@ -148,7 +150,7 @@ func SetupApiServer(router *gin.Engine) {
 	router.Use(func(ctx *gin.Context) {
 		serviceStatus := services.CurrentStatus()
 		// The OTLP Collector permanently drops 428 responses; 503 keeps its batch queued.
-		if ctx.Request.URL.Path == auth.PathClaudeOtelMetrics &&
+		if auth.IsClaudeOtelIngestPath(ctx.Request.URL.Path) &&
 			(serviceStatus == services.SERVICE_STATUS_WAIT_CONFIRM || serviceStatus == services.SERVICE_STATUS_MIGRATING) {
 			outputOtlpMigrationUnavailable(ctx, DB_MIGRATING)
 			ctx.Abort()

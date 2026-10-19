@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
 	collectorlogs "go.opentelemetry.io/proto/otlp/collector/logs/v1"
@@ -45,6 +46,15 @@ const (
 	eventPermissionModeChanged = "permission_mode_changed"
 )
 
+// Typed event column widths in characters, from models.OtelEvent.
+const (
+	eventIDColumnLength      = 128 // session_id, prompt_id
+	eventNameColumnLength    = 100
+	eventVersionColumnLength = 64  // app_version
+	eventLabelColumnLength   = 100 // terminal_type, query_source
+	eventNamedColumnLength   = 255 // model, tool, skill, agent, plugin, MCP server and command names
+)
+
 // preparedEvent is one converted log record plus the connection binding it requires.
 type preparedEvent struct {
 	event      *models.OtelEvent
@@ -57,61 +67,41 @@ type preparedLogBatch struct {
 	events []preparedEvent
 }
 
-func (c *rawMetricConverter) prepareEvents(request *collectorlogs.ExportLogsServiceRequest, batchID uint64) (*preparedLogBatch, error) {
-	preparer := &batchPreparer{
-		converter:        c,
-		connections:      make(map[string][]*models.OtelConnection),
-		pendingBindings:  make(map[uint64]string),
-		unknownMetricSet: make(map[string]struct{}),
-	}
+func (c *rawConverter) prepareEvents(request *collectorlogs.ExportLogsServiceRequest, batchID uint64) (*preparedLogBatch, error) {
+	preparer := c.newBatchPreparer()
 	result := &preparedLogBatch{}
-	for _, resourceLogs := range request.GetResourceLogs() {
-		resourceBindings := make(map[uint64]string)
-		events, err := preparer.prepareLogResource(resourceLogs, resourceBindings, batchID)
-		if err == nil {
-			result.events = append(result.events, events...)
-			for connectionID, organizationID := range resourceBindings {
-				preparer.pendingBindings[connectionID] = organizationID
-			}
-			continue
+	resources := request.GetResourceLogs()
+	err := preparer.prepareResources(len(resources), func(i int, bindings map[uint64]string) error {
+		events, err := preparer.prepareLogResource(resources[i], bindings, batchID)
+		if err != nil {
+			return err
 		}
-		conversionErr, attribution := attributionError(err)
-		if !attribution {
-			return nil, err
-		}
-		preparer.recordSkip(conversionErr)
+		result.events = append(result.events, events...)
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	result.preparedBatch = preparer.result
 	return result, nil
 }
 
-// prepareLogResource converts one resource group. As for metrics, any attribution failure
-// discards the whole group. A record with bad data, such as no user identity or event name,
-// is skipped on its own.
+// prepareLogResource converts one resource group. As for metrics, an attribution failure
+// discards the whole group. A record with bad data, such as no user identity, event name
+// or organization.id, is skipped on its own.
 func (p *batchPreparer) prepareLogResource(resourceLogs *logsv1.ResourceLogs, resourceBindings map[uint64]string, batchID uint64) ([]preparedEvent, error) {
 	resourceAttrs := resourceLogs.GetResource().GetAttributes()
-	if hasAttribute(resourceAttrs, devlakeTeamAttribute) || hasAttribute(resourceAttrs, devlakeProjectAttribute) {
-		return nil, permanentMetricError(errorInvalidAttribution, "OTLP logs resource must not include DevLake attribution")
+	records := resourceLogRecords(resourceLogs)
+	team, err := validateAttribution(logsSignal, resourceAttrs, records)
+	if err != nil {
+		return nil, err
 	}
 	events := make([]preparedEvent, 0)
-	teamSlug := ""
-	for _, record := range resourceLogRecords(resourceLogs) {
-		recordAttrs := record.GetAttributes()
-		if hasAttribute(recordAttrs, devlakeProjectAttribute) {
-			return nil, permanentMetricError(errorInvalidAttribution, "OTLP log record must not include devlake_project attribution")
-		}
-		team := attributeString(recordAttrs, devlakeTeamAttribute)
-		if team == "" {
-			return nil, permanentMetricError(errorMissingTeam, "OTLP log record is missing trusted devlake_team attribution")
-		}
-		if teamSlug != "" && team != teamSlug {
-			return nil, permanentMetricError(errorInvalidAttribution, "OTLP logs resource has inconsistent trusted devlake_team attribution")
-		}
-		teamSlug = team
+	for _, record := range records {
 		event, connection, err := p.prepareLogRecord(team, resourceAttrs, record, resourceBindings)
 		if err != nil {
 			if conversionErr, skip := conversionErrorIn(err, logRecordErrorCodes); skip {
-				p.recordRecordSkip(conversionErr)
+				p.recordSkip(skippedLogRecord, conversionErr)
 				continue
 			}
 			return nil, err
@@ -126,11 +116,11 @@ func (p *batchPreparer) prepareLogRecord(teamSlug string, resourceAttrs []*commo
 	recordAttrs := record.GetAttributes()
 	eventName := logEventName(record)
 	if eventName == "" {
-		return nil, nil, permanentMetricError(errorInvalidDimension, "OTLP log record has no event name")
+		return nil, nil, permanentConversionError(errorInvalidDimension, "OTLP log record has no event name")
 	}
 	observedAt, err := logRecordTime(record)
 	if err != nil {
-		return nil, nil, permanentMetricError(errorInvalidTimestamp, "OTLP log record has an invalid timestamp")
+		return nil, nil, permanentConversionError(errorInvalidTimestamp, "OTLP log record has an invalid timestamp")
 	}
 	connection, err := p.resolveConnection(teamSlug, observedAt)
 	if err != nil {
@@ -147,37 +137,76 @@ func (p *batchPreparer) prepareLogRecord(teamSlug string, resourceAttrs []*commo
 	if err != nil {
 		return nil, nil, err
 	}
+	if err := checkIdentityLengths(identity); err != nil {
+		return nil, nil, err
+	}
 	attributes := mergedAttributeMap(resourceAttrs, recordAttrs)
 	// Prompt text gets its own column so the attributes JSON stays small to query.
 	promptText, _ := attributes[promptTextAttribute].(string)
-	delete(attributes, promptTextAttribute)
-	encoded, err := json.Marshal(attributes)
+	encoded, err := json.Marshal(storedAttributes(attributes))
 	if err != nil {
-		return nil, nil, permanentMetricError(errorInvalidValue, "OTLP log record attributes cannot be encoded")
+		return nil, nil, permanentConversionError(errorInvalidValue, "OTLP log record attributes cannot be encoded")
 	}
-	event := &models.OtelEvent{
-		ConnectionId:        connection.ID,
-		TeamSlug:            connection.TeamSlug,
-		OrganizationId:      organizationID,
-		UserKey:             identity.key,
-		UserAccountId:       identity.accountID,
-		UserAccountUUID:     identity.accountUUID,
-		UserEmail:           identity.email,
+	event := eventFromRecord(resourceAttrs, recordAttrs, attributes)
+	event.ConnectionId = connection.ID
+	event.TeamSlug = connection.TeamSlug
+	event.OrganizationId = organizationID
+	event.UserKey = identity.key
+	event.UserAccountId = identity.accountID
+	event.UserAccountUUID = identity.accountUUID
+	event.UserEmail = identity.email
+	event.EventName = eventName
+	event.EventTimestamp = observedAt
+	event.Attributes = encoded
+	if event.EventName == eventUserPrompt && promptText != "" {
+		event.PromptText = &promptText
+	}
+	if err := checkEventKeyLengths(event); err != nil {
+		return nil, nil, err
+	}
+	event.EventKey = otelEventKey(event, attributeString(recordAttrs, "tool_use_id"), attributeString(recordAttrs, "request_id"))
+	return event, connection, nil
+}
+
+// checkEventKeyLengths rejects a record whose session, prompt or event name does not fit
+// its column. Truncating them could merge different sessions or prompts, so the record is
+// skipped on its own rather than letting MySQL reject, and quarantine, the whole batch.
+// The user identity is checked by checkIdentityLengths.
+func checkEventKeyLengths(event *models.OtelEvent) error {
+	for _, field := range []struct {
+		name  string
+		value string
+		width int
+	}{
+		{"session.id", event.SessionId, eventIDColumnLength},
+		{"prompt.id", event.PromptId, eventIDColumnLength},
+		{"event.name", event.EventName, eventNameColumnLength},
+	} {
+		if utf8.RuneCountInString(field.value) > field.width {
+			return permanentConversionError(errorValueTooLong, "OTLP log record %s is longer than %d characters", field.name, field.width)
+		}
+	}
+	return nil
+}
+
+// eventFromRecord maps a log record's attributes to the event's typed columns. attributes
+// is the merged resource and record map, which carries the decoded tool parameters.
+// Descriptive columns are truncated to their width; the full value stays in attributes.
+func eventFromRecord(resourceAttrs, recordAttrs []*commonv1.KeyValue, attributes map[string]interface{}) *models.OtelEvent {
+	return &models.OtelEvent{
 		SessionId:           attributeString(recordAttrs, "session.id"),
 		PromptId:            attributeString(recordAttrs, "prompt.id"),
-		EventName:           eventName,
 		EventSequence:       attributeInt(recordAttrs, "event.sequence"),
-		EventTimestamp:      observedAt,
-		AppVersion:          firstNonEmpty(attributeString(recordAttrs, "app.version"), attributeString(resourceAttrs, "service.version")),
-		TerminalType:        attributeString(recordAttrs, "terminal.type"),
-		Model:               attributeString(recordAttrs, "model"),
-		ToolName:            attributeString(recordAttrs, "tool_name"),
-		SkillName:           firstNonEmpty(attributeString(recordAttrs, "skill.name"), toolParameter(attributes, "skill_name")),
-		AgentName:           attributeString(recordAttrs, "agent.name"),
-		PluginName:          attributeString(recordAttrs, "plugin.name"),
-		McpServerName:       firstNonEmpty(attributeString(recordAttrs, "mcp_server.name"), toolParameter(attributes, "mcp_server_name")),
-		QuerySource:         attributeString(recordAttrs, "query_source"),
-		CommandName:         attributeString(recordAttrs, "command_name"),
+		AppVersion:          truncate(firstNonEmpty(attributeString(recordAttrs, "app.version"), attributeString(resourceAttrs, "service.version")), eventVersionColumnLength),
+		TerminalType:        truncate(attributeString(recordAttrs, "terminal.type"), eventLabelColumnLength),
+		Model:               truncate(attributeString(recordAttrs, "model"), eventNamedColumnLength),
+		ToolName:            truncate(attributeString(recordAttrs, "tool_name"), eventNamedColumnLength),
+		SkillName:           truncate(firstNonEmpty(attributeString(recordAttrs, "skill.name"), toolParameter(attributes, "skill_name")), eventNamedColumnLength),
+		AgentName:           truncate(attributeString(recordAttrs, "agent.name"), eventNamedColumnLength),
+		PluginName:          truncate(attributeString(recordAttrs, "plugin.name"), eventNamedColumnLength),
+		McpServerName:       truncate(firstNonEmpty(attributeString(recordAttrs, "mcp_server.name"), toolParameter(attributes, "mcp_server_name")), eventNamedColumnLength),
+		QuerySource:         truncate(attributeString(recordAttrs, "query_source"), eventLabelColumnLength),
+		CommandName:         truncate(attributeString(recordAttrs, "command_name"), eventNamedColumnLength),
 		Success:             attributeBool(recordAttrs, "success"),
 		DurationMs:          attributeInt(recordAttrs, "duration_ms"),
 		CostUsd:             attributeDecimal(recordAttrs, "cost_usd", 8),
@@ -185,13 +214,7 @@ func (p *batchPreparer) prepareLogRecord(teamSlug string, resourceAttrs []*commo
 		OutputTokens:        int64Value(attributeInt(recordAttrs, "output_tokens")),
 		CacheReadTokens:     int64Value(attributeInt(recordAttrs, "cache_read_tokens")),
 		CacheCreationTokens: int64Value(attributeInt(recordAttrs, "cache_creation_tokens")),
-		Attributes:          encoded,
 	}
-	if event.EventName == eventUserPrompt && promptText != "" {
-		event.PromptText = &promptText
-	}
-	event.EventKey = otelEventKey(event, attributeString(recordAttrs, "tool_use_id"), attributeString(recordAttrs, "request_id"))
-	return event, connection, nil
 }
 
 // otelEventKey identifies one emitted event, so a replayed or re-exported record updates
@@ -237,12 +260,8 @@ func logRecordTime(record *logsv1.LogRecord) (time.Time, error) {
 // stored parsed so it can be queried.
 func mergedAttributeMap(resourceAttrs, recordAttrs []*commonv1.KeyValue) map[string]interface{} {
 	values := make(map[string]interface{}, len(resourceAttrs)+len(recordAttrs))
-	for _, attribute := range resourceAttrs {
-		values[attribute.GetKey()] = anyValue(attribute.GetValue())
-	}
-	for _, attribute := range recordAttrs {
-		values[attribute.GetKey()] = anyValue(attribute.GetValue())
-	}
+	putAttributes(values, resourceAttrs)
+	putAttributes(values, recordAttrs)
 	if raw, ok := values["tool_parameters"].(string); ok {
 		var parsed interface{}
 		if json.Unmarshal([]byte(raw), &parsed) == nil {
@@ -252,6 +271,66 @@ func mergedAttributeMap(resourceAttrs, recordAttrs []*commonv1.KeyValue) map[str
 	return values
 }
 
+// storedEventAttributes are the attributes kept in an event's attributes column: Claude
+// Code's documented event and resource attributes that carry no content. The column is
+// kept as long as the event, so it is an allowlist: an attribute a later Claude Code
+// release adds, which might carry content, is dropped until it is reviewed and listed
+// here. The raw batch keeps it until raw retention. prompt_text has its own column.
+var storedEventAttributes = map[string]struct{}{
+	// Resource and standard attributes.
+	"service.name": {}, "service.version": {}, "os.type": {}, "os.version": {}, "host.arch": {},
+	"session.id": {}, "app.version": {}, "organization.id": {}, "terminal.type": {},
+	"user.id": {}, "user.account_id": {}, "user.account_uuid": {}, "user.email": {},
+	"prompt.id": {}, "event.name": {}, "event.timestamp": {}, "event.sequence": {},
+	devlakeTeamAttribute: {},
+	// Repository identity under OTEL_METRICS_INCLUDE_REPOSITORY, from the origin remote with
+	// credentials stripped.
+	repositoryURLAttribute: {}, "vcs.owner.name": {}, "vcs.repository.name": {}, "vcs.provider.name": {},
+	// user_prompt.
+	"prompt_length": {}, "command_name": {}, "command_source": {},
+	// api_request and api_error. On api_error, error is a service message; ingest drops
+	// the tool_result error, which can echo file contents.
+	"model": {}, "cost_usd": {}, "duration_ms": {}, "input_tokens": {}, "output_tokens": {},
+	"cache_read_tokens": {}, "cache_creation_tokens": {}, "request_id": {}, "query_source": {},
+	"speed": {}, "error": {}, "error_type": {}, "status_code": {}, "attempt": {}, "response_length": {},
+	// tool_result and tool_decision. tool_parameters keeps only toolParameterKeys.
+	"tool_name": {}, "tool_use_id": {}, "success": {}, "decision": {}, "source": {},
+	"decision_type": {}, "decision_source": {}, "tool_result_size_bytes": {},
+	toolParametersAttribute: {}, "mcp_server_scope": {},
+	// skill_activated and other named components.
+	"skill.name": {}, "skill.source": {}, "invocation_trigger": {}, "plugin.name": {},
+	"agent.name": {}, "mcp_server.name": {},
+	// permission_mode_changed.
+	"from_mode": {}, "to_mode": {}, "trigger": {},
+}
+
+// storedAttributes returns the allowlisted subset of attributes, with the repository URL
+// normalized and blanked as ingest does. A raw batch stored before ingest normalized the URL,
+// or before a later normalization fix, is cleaned when it is replayed.
+func storedAttributes(attributes map[string]interface{}) map[string]interface{} {
+	stored := make(map[string]interface{}, len(attributes))
+	for key, value := range attributes {
+		if _, keep := storedEventAttributes[key]; keep {
+			stored[key] = value
+		}
+	}
+	if value, found := stored[repositoryURLAttribute]; found {
+		raw, _ := value.(string)
+		normalized, _ := normalizeRepositoryURL(raw)
+		stored[repositoryURLAttribute] = normalized
+	}
+	return stored
+}
+
+// putAttributes adds attributes to values as JSON-ready values, replacing existing keys.
+func putAttributes(values map[string]interface{}, attributes []*commonv1.KeyValue) {
+	for _, attribute := range attributes {
+		values[attribute.GetKey()] = anyValue(attribute.GetValue())
+	}
+}
+
+// anyValue converts one OTLP value to its JSON form. The switch covers each case of the
+// AnyValue oneof.
 func anyValue(value *commonv1.AnyValue) interface{} {
 	switch typed := value.GetValue().(type) {
 	case *commonv1.AnyValue_StringValue:
@@ -275,9 +354,7 @@ func anyValue(value *commonv1.AnyValue) interface{} {
 		return items
 	case *commonv1.AnyValue_KvlistValue:
 		values := make(map[string]interface{}, len(typed.KvlistValue.GetValues()))
-		for _, item := range typed.KvlistValue.GetValues() {
-			values[item.GetKey()] = anyValue(item.GetValue())
-		}
+		putAttributes(values, typed.KvlistValue.GetValues())
 		return values
 	default:
 		return nil
@@ -294,79 +371,72 @@ func toolParameter(attributes map[string]interface{}, key string) string {
 	return strings.TrimSpace(value)
 }
 
-// attributeInt reads an integer attribute that Claude Code may send as an int, a double
-// or a numeric string.
-func attributeInt(attributes []*commonv1.KeyValue, key string) *int64 {
+// attributeValue returns the value of the first attribute named key, or nil.
+func attributeValue(attributes []*commonv1.KeyValue, key string) *commonv1.AnyValue {
 	for _, attribute := range attributes {
-		if attribute.GetKey() != key {
-			continue
+		if attribute.GetKey() == key {
+			return attribute.GetValue()
 		}
-		switch typed := attribute.GetValue().GetValue().(type) {
-		case *commonv1.AnyValue_IntValue:
-			return &typed.IntValue
-		case *commonv1.AnyValue_DoubleValue:
-			if math.IsNaN(typed.DoubleValue) || math.IsInf(typed.DoubleValue, 0) || math.Abs(typed.DoubleValue) >= math.MaxInt64 {
-				return nil
-			}
-			value := int64(typed.DoubleValue)
-			return &value
-		case *commonv1.AnyValue_StringValue:
-			if value, err := strconv.ParseFloat(strings.TrimSpace(typed.StringValue), 64); err == nil && !math.IsInf(value, 0) && math.Abs(value) < math.MaxInt64 {
-				result := int64(value)
-				return &result
-			}
-		}
-		return nil
 	}
 	return nil
 }
 
-func attributeBool(attributes []*commonv1.KeyValue, key string) *bool {
-	for _, attribute := range attributes {
-		if attribute.GetKey() != key {
-			continue
+// numberValue reads a finite number that Claude Code may send as an int, a double or a
+// numeric string.
+func numberValue(value *commonv1.AnyValue) (float64, bool) {
+	var number float64
+	switch typed := value.GetValue().(type) {
+	case *commonv1.AnyValue_IntValue:
+		number = float64(typed.IntValue)
+	case *commonv1.AnyValue_DoubleValue:
+		number = typed.DoubleValue
+	case *commonv1.AnyValue_StringValue:
+		parsed, err := strconv.ParseFloat(strings.TrimSpace(typed.StringValue), 64)
+		if err != nil {
+			return 0, false
 		}
-		switch typed := attribute.GetValue().GetValue().(type) {
-		case *commonv1.AnyValue_BoolValue:
-			return &typed.BoolValue
-		case *commonv1.AnyValue_StringValue:
-			if value, err := strconv.ParseBool(strings.TrimSpace(typed.StringValue)); err == nil {
-				return &value
-			}
-		}
+		number = parsed
+	default:
+		return 0, false
+	}
+	return number, !math.IsNaN(number) && !math.IsInf(number, 0)
+}
+
+// attributeInt reads an integer attribute. An int is kept exact; any other number is
+// truncated toward zero.
+func attributeInt(attributes []*commonv1.KeyValue, key string) *int64 {
+	value := attributeValue(attributes, key)
+	if typed, isInt := value.GetValue().(*commonv1.AnyValue_IntValue); isInt {
+		return &typed.IntValue
+	}
+	number, ok := numberValue(value)
+	if !ok || math.Abs(number) >= math.MaxInt64 {
 		return nil
+	}
+	result := int64(number)
+	return &result
+}
+
+func attributeBool(attributes []*commonv1.KeyValue, key string) *bool {
+	switch typed := attributeValue(attributes, key).GetValue().(type) {
+	case *commonv1.AnyValue_BoolValue:
+		return &typed.BoolValue
+	case *commonv1.AnyValue_StringValue:
+		if value, err := strconv.ParseBool(strings.TrimSpace(typed.StringValue)); err == nil {
+			return &value
+		}
 	}
 	return nil
 }
 
 // attributeDecimal reads a non-negative number as a fixed-scale decimal string.
 func attributeDecimal(attributes []*commonv1.KeyValue, key string, scale int) *string {
-	for _, attribute := range attributes {
-		if attribute.GetKey() != key {
-			continue
-		}
-		var value float64
-		switch typed := attribute.GetValue().GetValue().(type) {
-		case *commonv1.AnyValue_DoubleValue:
-			value = typed.DoubleValue
-		case *commonv1.AnyValue_IntValue:
-			value = float64(typed.IntValue)
-		case *commonv1.AnyValue_StringValue:
-			parsed, err := strconv.ParseFloat(strings.TrimSpace(typed.StringValue), 64)
-			if err != nil {
-				return nil
-			}
-			value = parsed
-		default:
-			return nil
-		}
-		if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || value >= 1e12 {
-			return nil
-		}
-		formatted := fmt.Sprintf("%.*f", scale, value)
-		return &formatted
+	number, ok := numberValue(attributeValue(attributes, key))
+	if !ok || number < 0 || number >= 1e12 {
+		return nil
 	}
-	return nil
+	formatted := fmt.Sprintf("%.*f", scale, number)
+	return &formatted
 }
 
 func int64Value(value *int64) int64 {

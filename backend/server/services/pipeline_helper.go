@@ -124,6 +124,10 @@ func CreateDbPipeline(newPipeline *models.NewPipeline) (pipeline *models.Pipelin
 
 // GetDbPipelines by query
 func GetDbPipelines(query *PipelineQuery) ([]*models.Pipeline, int64, errors.Error) {
+	orderBy, orderErr := query.orderBy(pipelineSortSpec)
+	if orderErr != nil {
+		return nil, 0, orderErr
+	}
 	// process query parameters
 	clauses := []dal.Clause{dal.From(&models.Pipeline{})}
 	if query.BlueprintId != 0 {
@@ -150,7 +154,7 @@ func GetDbPipelines(query *PipelineQuery) ([]*models.Pipeline, int64, errors.Err
 
 	// load paginated blueprints from database
 	clauses = append(clauses,
-		dal.Orderby("id DESC"),
+		dal.Orderby(orderBy),
 		dal.Offset(query.GetSkip()),
 		dal.Limit(query.GetPageSize()),
 	)

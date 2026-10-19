@@ -20,12 +20,15 @@ package service
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/errors"
@@ -35,6 +38,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	collectorlogs "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	commonv1 "go.opentelemetry.io/proto/otlp/common/v1"
+	logsv1 "go.opentelemetry.io/proto/otlp/logs/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -170,12 +174,12 @@ func TestPrepareEventsMapsTypedColumnsAndKeepsAttributes(t *testing.T) {
 	stripContentAttributes(request)
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
 
-	prepared, err := newRawMetricConverter(database, nil).prepareEvents(request, 9)
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 9)
 	if err != nil {
 		t.Fatalf("prepareEvents() error = %v", err)
 	}
-	if len(prepared.events) != 13 || prepared.skippedCount != 0 {
-		t.Fatalf("prepareEvents() events=%d skipped=%d, want 13 and 0", len(prepared.events), prepared.skippedCount)
+	if len(prepared.events) != 13 || prepared.skipped[skippedResource] != 0 {
+		t.Fatalf("prepareEvents() events=%d skipped=%d, want 13 and 0", len(prepared.events), prepared.skipped[skippedResource])
 	}
 	keys := make(map[string]struct{})
 	for _, item := range prepared.events {
@@ -254,12 +258,12 @@ func TestPrepareEventsSkipsOnlyInvalidRecords(t *testing.T) {
 	records[1].Body = nil
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
 
-	prepared, err := newRawMetricConverter(database, nil).prepareEvents(request, 9)
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 9)
 	if err != nil {
 		t.Fatalf("prepareEvents() error = %v", err)
 	}
-	if len(prepared.events) != 11 || prepared.skippedCount != 0 || prepared.skippedRecordCount != 2 {
-		t.Fatalf("prepareEvents() events=%d skipped groups=%d records=%d, want 11, 0 and 2", len(prepared.events), prepared.skippedCount, prepared.skippedRecordCount)
+	if len(prepared.events) != 11 || prepared.skipped[skippedResource] != 0 || prepared.skipped[skippedLogRecord] != 2 {
+		t.Fatalf("prepareEvents() events=%d skipped groups=%d records=%d, want 11, 0 and 2", len(prepared.events), prepared.skipped[skippedResource], prepared.skipped[skippedLogRecord])
 	}
 	if code := prepared.diagnosticCode(); code == nil || *code != string(diagnosticRecordsSkipped) {
 		t.Fatalf("diagnosticCode() = %v, want %s", code, diagnosticRecordsSkipped)
@@ -271,13 +275,240 @@ func TestPrepareEventsSkipsOnlyInvalidRecords(t *testing.T) {
 	}
 }
 
+func TestPrepareEventsSkipsOnlyRecordsWithOversizedKeys(t *testing.T) {
+	request := loadLogEventsFixture(t)
+	stripContentAttributes(request)
+	records := resourceLogRecords(request.GetResourceLogs()[0])
+	setStringAttribute(records[0], "session.id", strings.Repeat("s", eventIDColumnLength+1))
+	setStringAttribute(records[7], "prompt.id", strings.Repeat("p", eventIDColumnLength+1))
+	// A value at the column width still fits.
+	setStringAttribute(records[6], "prompt.id", strings.Repeat("é", eventIDColumnLength))
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
+
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 9)
+	if err != nil {
+		t.Fatalf("prepareEvents() error = %v, want only the oversized records skipped", err)
+	}
+	if len(prepared.events) != 11 || prepared.skipped[skippedResource] != 0 || prepared.skipped[skippedLogRecord] != 2 {
+		t.Fatalf("prepareEvents() events=%d skipped groups=%d records=%d, want 11, 0 and 2", len(prepared.events), prepared.skipped[skippedResource], prepared.skipped[skippedLogRecord])
+	}
+	message := prepared.diagnostic()
+	if message == nil || !strings.Contains(*message, string(errorValueTooLong)) {
+		t.Fatalf("diagnostic() = %v, want %s", message, errorValueTooLong)
+	}
+}
+
+func TestPrepareEventsSkipsOnlyRecordsWithOversizedIdentity(t *testing.T) {
+	request := loadLogEventsFixture(t)
+	stripContentAttributes(request)
+	records := resourceLogRecords(request.GetResourceLogs()[0])
+	setStringAttribute(records[1], "user.email", strings.Repeat("e", identityColumnLength+1))
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
+
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 9)
+	if err != nil || len(prepared.events) != 12 || prepared.skipped[skippedLogRecord] != 1 {
+		t.Fatalf("prepareEvents() = %v, %v; want 12 events and the oversized identity record skipped", prepared, err)
+	}
+}
+
+func TestPrepareEventsTruncatesDescriptiveColumnsToTheirWidth(t *testing.T) {
+	request := loadLogEventsFixture(t)
+	stripContentAttributes(request)
+	records := resourceLogRecords(request.GetResourceLogs()[0])
+	longToolName := strings.Repeat("é", 300)
+	setStringAttribute(records[7], "tool_name", longToolName)
+	setStringAttribute(records[6], "model", strings.Repeat("m", 300))
+	setStringAttribute(records[6], "app.version", strings.Repeat("9", 100))
+	setStringAttribute(records[6], "query_source", strings.Repeat("q", 200))
+	setStringAttribute(records[11], "command_name", strings.Repeat("c", 300))
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
+
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 9)
+	if err != nil || len(prepared.events) != 13 || prepared.skipped[skippedLogRecord] != 0 {
+		t.Fatalf("prepareEvents() = %v, %v; want every record kept", prepared, err)
+	}
+	bash := findPreparedEvent(t, prepared, eventToolResult, "tu-2")
+	if bash.ToolName != strings.Repeat("é", eventNamedColumnLength) || !utf8.ValidString(bash.ToolName) {
+		t.Fatalf("tool_name = %d characters, want %d whole characters", utf8.RuneCountInString(bash.ToolName), eventNamedColumnLength)
+	}
+	var attributes map[string]interface{}
+	if err := json.Unmarshal(bash.Attributes, &attributes); err != nil || attributes["tool_name"] != longToolName {
+		t.Fatalf("attributes tool_name = %v, want the full value kept", attributes["tool_name"])
+	}
+	apiRequest := findPreparedEvent(t, prepared, eventAPIRequest, "req-2")
+	if len(apiRequest.Model) != eventNamedColumnLength || len(apiRequest.AppVersion) != eventVersionColumnLength || len(apiRequest.QuerySource) != eventLabelColumnLength {
+		t.Fatalf("api_request model/app_version/query_source lengths = %d/%d/%d", len(apiRequest.Model), len(apiRequest.AppVersion), len(apiRequest.QuerySource))
+	}
+	for _, item := range prepared.events {
+		if item.event.PromptId == "p3" && item.event.EventName == eventUserPrompt && len(item.event.CommandName) != eventNamedColumnLength {
+			t.Fatalf("command_name length = %d, want %d", len(item.event.CommandName), eventNamedColumnLength)
+		}
+	}
+}
+
+func TestPromptRollupTruncatesAttributeValuesToAiColumns(t *testing.T) {
+	request := loadLogEventsFixture(t)
+	stripContentAttributes(request)
+	records := resourceLogRecords(request.GetResourceLogs()[0])
+	setStringAttribute(records[11], "command_source", strings.Repeat("b", 40))
+	setStringAttribute(records[4], "invocation_trigger", strings.Repeat("t", 100))
+	setStringAttribute(records[2], "from_mode", strings.Repeat("f", 100))
+	setStringAttribute(records[2], "to_mode", strings.Repeat("o", 100))
+	setStringAttribute(records[2], "trigger", strings.Repeat("r", 100))
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 1)
+	if err != nil {
+		t.Fatalf("prepareEvents() error = %v", err)
+	}
+	byPrompt := make(map[string][]*models.OtelEvent)
+	modeEvents := make([]*models.OtelEvent, 0)
+	for _, item := range prepared.events {
+		byPrompt[item.event.PromptId] = append(byPrompt[item.event.PromptId], item.event)
+		if isModeChangeEvent(item.event) {
+			modeEvents = append(modeEvents, item.event)
+		}
+	}
+
+	if command := buildPromptRollup(testOrganizationID, "p3", byPrompt["p3"]).prompt; len(command.CommandSource) != maxCommandSourceLength {
+		t.Fatalf("command_source length = %d, want %d", len(command.CommandSource), maxCommandSourceLength)
+	}
+	skills := buildPromptRollup(testOrganizationID, "p2", byPrompt["p2"]).skills
+	if len(skills) != 1 || len(skills[0].InvocationTrigger) != maxAiLabelLength {
+		t.Fatalf("skills = %#v, want one skill with a %d-character trigger", skills, maxAiLabelLength)
+	}
+	change := newSessionModes(modeEvents).changes[0]
+	if len(change.fromMode) != maxAiLabelLength || len(change.toMode) != maxAiLabelLength || len(change.trigger) != maxAiLabelLength {
+		t.Fatalf("mode change lengths = %d/%d/%d, want %d", len(change.fromMode), len(change.toMode), len(change.trigger), maxAiLabelLength)
+	}
+}
+
+// setStringAttribute replaces a record's string attribute, or adds it.
+// A record sent before the client signed in has no organization.id; the rest of its
+// resource group is still converted.
+func TestPrepareEventsSkipsOnlyRecordsWithoutOrganization(t *testing.T) {
+	request := loadLogEventsFixture(t)
+	stripContentAttributes(request)
+	records := resourceLogRecords(request.GetResourceLogs()[0])
+	records[2].Attributes = withoutAttributes(records[2].GetAttributes(), map[string]struct{}{organizationIDAttribute: {}})
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
+
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 9)
+	if err != nil || len(prepared.events) != 12 || prepared.skipped[skippedResource] != 0 || prepared.skipped[skippedLogRecord] != 1 {
+		t.Fatalf("prepareEvents() = %v, %v; want 12 events and only the record without organization.id skipped", prepared, err)
+	}
+	if message := prepared.diagnostic(); message == nil || !strings.Contains(*message, string(errorMissingOrganization)) {
+		t.Fatalf("diagnostic() = %v, want %s", message, errorMissingOrganization)
+	}
+}
+
+// The attributes column keeps only allowlisted attributes, so an attribute a later Claude
+// Code release adds is not stored with the event.
+func TestPrepareEventsStoresOnlyAllowlistedAttributes(t *testing.T) {
+	request := loadLogEventsFixture(t)
+	stripContentAttributes(request)
+	for _, record := range resourceLogRecords(request.GetResourceLogs()[0]) {
+		setStringAttribute(record, "assistant_draft", "content from a future release")
+	}
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
+
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 9)
+	if err != nil || len(prepared.events) != 13 {
+		t.Fatalf("prepareEvents() = %v, %v; want 13 events", prepared, err)
+	}
+	for _, item := range prepared.events {
+		var attributes map[string]interface{}
+		if err := json.Unmarshal(item.event.Attributes, &attributes); err != nil {
+			t.Fatalf("attributes are not JSON: %v", err)
+		}
+		for key := range attributes {
+			if _, allowed := storedEventAttributes[key]; !allowed {
+				t.Fatalf("%s attributes kept %q, which is not allowlisted", item.event.EventName, key)
+			}
+		}
+		if _, kept := attributes["event.sequence"]; !kept {
+			t.Fatalf("%s attributes = %v, want allowlisted attributes kept", item.event.EventName, attributes)
+		}
+	}
+}
+
+// A raw batch stored before ingest normalized the repository URL is converted again on
+// replay, so conversion normalizes it too, the same way ingest does.
+func TestStoredAttributesNormalizesTheRepositoryURL(t *testing.T) {
+	tests := []struct {
+		name  string
+		value interface{}
+		want  string
+	}{
+		{"credentials, case and .git", "https://user:secret@GitHub.com/Org/Repo.git", "https://github.com/org/repo"},
+		{"already normalized", "https://github.com/org/repo", "https://github.com/org/repo"},
+		{"local drive path", "C:/Users/dev/repos/origin.git", ""},
+		{"not a string", int64(42), ""},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			stored := storedAttributes(map[string]interface{}{
+				repositoryURLAttribute: test.value,
+				"vcs.repository.name":  "Repo",
+				"vcs.owner.name":       "Org",
+				"assistant_draft":      "content from a future release",
+			})
+			if got := stored[repositoryURLAttribute]; got != test.want {
+				t.Fatalf("repository url = %#v, want %q", got, test.want)
+			}
+			if stored["vcs.repository.name"] != "Repo" || stored["vcs.owner.name"] != "Org" {
+				t.Fatalf("stored = %v, want the other vcs attributes untouched", stored)
+			}
+			if _, kept := stored["assistant_draft"]; kept {
+				t.Fatalf("stored = %v, want attributes outside the allowlist dropped", stored)
+			}
+		})
+	}
+
+	stored := storedAttributes(map[string]interface{}{"vcs.repository.name": "Repo"})
+	if _, added := stored[repositoryURLAttribute]; added || len(stored) != 1 {
+		t.Fatalf("stored = %v, want no repository url added", stored)
+	}
+}
+
+func TestPrepareEventsNormalizesTheStoredRepositoryURL(t *testing.T) {
+	const secret = "ghp_replaysecret"
+	request := loadLogEventsFixture(t)
+	stripContentAttributes(request)
+	for _, record := range resourceLogRecords(request.GetResourceLogs()[0]) {
+		setStringAttribute(record, repositoryURLAttribute, "https://user:"+secret+"@GitHub.com/Example-Org/Example-Repo.git")
+	}
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
+
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 9)
+	if err != nil || len(prepared.events) == 0 {
+		t.Fatalf("prepareEvents() = %v, %v; want events", prepared, err)
+	}
+	for _, item := range prepared.events {
+		if bytes.Contains(item.event.Attributes, []byte(secret)) {
+			t.Fatalf("%s attributes kept the credential: %s", item.event.EventName, item.event.Attributes)
+		}
+		var attributes map[string]interface{}
+		if err := json.Unmarshal(item.event.Attributes, &attributes); err != nil {
+			t.Fatalf("attributes are not JSON: %v", err)
+		}
+		if got := attributes[repositoryURLAttribute]; got != "https://github.com/example-org/example-repo" {
+			t.Fatalf("%s repository url = %v, want it normalized", item.event.EventName, got)
+		}
+	}
+}
+
+func setStringAttribute(record *logsv1.LogRecord, key, value string) {
+	attribute := &commonv1.KeyValue{Key: key, Value: &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: value}}}
+	record.Attributes = append(withoutAttributes(record.GetAttributes(), map[string]struct{}{key: {}}), attribute)
+}
+
 func TestPrepareEventsFailsBatchOnConnectionLookupError(t *testing.T) {
 	request := loadLogEventsFixture(t)
 	stripContentAttributes(request)
 	database := dalmocks.NewDal(t)
 	database.EXPECT().All(mock.AnythingOfType("*[]*models.OtelConnection"), mock.Anything).Return(errors.Default.New("database unavailable"))
 
-	_, err := newRawMetricConverter(database, nil).prepareEvents(request, 9)
+	_, err := newRawConverter(database, nil).prepareEvents(request, 9)
 	if code, permanent, _ := classifyConversionError(err); err == nil || code != errorConnectionLookup || permanent {
 		t.Fatalf("prepareEvents() error = %v, want retryable %s", err, errorConnectionLookup)
 	}
@@ -288,12 +519,12 @@ func TestPrepareEventsSkipsResourceWithoutTeam(t *testing.T) {
 	records := resourceLogRecords(request.GetResourceLogs()[0])
 	records[0].Attributes = withoutAttributes(records[0].GetAttributes(), map[string]struct{}{devlakeTeamAttribute: {}})
 
-	prepared, err := newRawMetricConverter(dalmocks.NewDal(t), nil).prepareEvents(request, 1)
+	prepared, err := newRawConverter(dalmocks.NewDal(t), nil).prepareEvents(request, 1)
 	if err != nil {
 		t.Fatalf("prepareEvents() error = %v", err)
 	}
-	if len(prepared.events) != 0 || prepared.skippedCount != 1 || prepared.diagnosticCode() == nil {
-		t.Fatalf("prepareEvents() events=%d skipped=%d, want the resource group skipped", len(prepared.events), prepared.skippedCount)
+	if len(prepared.events) != 0 || prepared.skipped[skippedResource] != 1 || prepared.diagnosticCode() == nil {
+		t.Fatalf("prepareEvents() events=%d skipped=%d, want the resource group skipped", len(prepared.events), prepared.skipped[skippedResource])
 	}
 }
 
@@ -357,13 +588,45 @@ func TestBuildPromptRollupMergesSkillSourcesAndCounts(t *testing.T) {
 	if skill.SkillName != "code-review" || skill.DetectedVia != ai.SkillDetectedViaActivation || skill.InvocationTrigger != "claude-proactive" || skill.SkillSource != "userSettings" || skill.SessionId != "sess-1" {
 		t.Fatalf("skill = %#v", skill)
 	}
-	if skill.Id != ai.PromptSkillID(aiProviderClaude, testOrganizationID, "p2", "code-review") || prompt.Id != ai.PromptID(aiProviderClaude, testOrganizationID, "p2") {
+	if skill.Id != (ai.CanonicalKey{Kind: ai.IDKindPromptSkill, Provider: aiProviderClaude, WorkspaceKey: testOrganizationID, Grain: []string{"p2", "code-review"}}).ID() ||
+		prompt.Id != (ai.CanonicalKey{Kind: ai.IDKindPrompt, Provider: aiProviderClaude, WorkspaceKey: testOrganizationID, Grain: []string{"p2"}}).ID() {
 		t.Fatalf("prompt or skill id is not canonical: %q %q", prompt.Id, skill.Id)
 	}
 
 	command := buildPromptRollup(testOrganizationID, "p3", fixturePromptEvents(t, "p3")).prompt
 	if command.CommandName != "review" || command.CommandSource != "builtin" || command.UsedSkill {
 		t.Fatalf("command prompt = %q %q used skill %t", command.CommandName, command.CommandSource, command.UsedSkill)
+	}
+}
+
+// The repository URL comes from the prompt's events. A prompt without one, or with one that
+// does not fit its column, stores NULL instead of failing or truncating.
+func TestPromptRollupRecordsRepositoryURL(t *testing.T) {
+	const repository = "https://github.com/example-org/example-repo"
+	request := loadLogEventsFixture(t)
+	stripContentAttributes(request)
+	records := resourceLogRecords(request.GetResourceLogs()[0])
+	for _, index := range []int{3, 4, 5, 6, 7, 8, 9} { // p2, sent with credentials and mixed case
+		setStringAttribute(records[index], repositoryURLAttribute, "https://user:ghp_secret@GitHub.com/Example-Org/example-repo.git")
+	}
+	setStringAttribute(records[0], repositoryURLAttribute, "https://github.com/"+strings.Repeat("r", maxRepositoryURLLength)) // p1
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 1)
+	if err != nil {
+		t.Fatalf("prepareEvents() error = %v", err)
+	}
+	byPrompt := make(map[string][]*models.OtelEvent)
+	for _, item := range prepared.events {
+		byPrompt[item.event.PromptId] = append(byPrompt[item.event.PromptId], item.event)
+	}
+
+	if got := buildPromptRollup(testOrganizationID, "p2", byPrompt["p2"]).prompt.RepositoryUrl; got == nil || *got != repository {
+		t.Fatalf("p2 repository = %v, want %q", got, repository)
+	}
+	for _, promptID := range []string{"p1", "p3"} {
+		if got := buildPromptRollup(testOrganizationID, promptID, byPrompt[promptID]).prompt.RepositoryUrl; got != nil {
+			t.Fatalf("%s repository = %q, want nil", promptID, *got)
+		}
 	}
 }
 
@@ -387,21 +650,53 @@ func TestPromptRollupNeverCarriesPromptText(t *testing.T) {
 	}
 }
 
-func TestClearExpiredPromptTextKeepsEventRows(t *testing.T) {
+// An event whose client clock ran ahead carries an event_timestamp far in the future. Its prompt
+// text must still be cleared when its raw batch expires, so the clear selects events by raw
+// batch ID only and never by event_timestamp.
+func TestDeleteExpiredLogBatchesClearsPromptTextRegardlessOfEventTimestamp(t *testing.T) {
 	database := dalmocks.NewDal(t)
 	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
-	expiredKeys := [][]byte{{1}, {2}}
-	database.EXPECT().Pluck("event_key", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(_ string, destination interface{}, clauses ...dal.Clause) {
+	futureEvent := models.OtelEvent{RawBatchId: 7, EventTimestamp: now.AddDate(5, 0, 0)}
+	expiredBatchIDs := []uint64{futureEvent.RawBatchId, 8}
+	var calls []string
+	database.EXPECT().Pluck("id", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(_ string, destination interface{}, clauses ...dal.Clause) {
 		where := clauses[1].Data.(dal.DalClause)
-		if where.Expr != "prompt_text IS NOT NULL AND event_timestamp < ?" || !where.Params[0].(time.Time).Equal(now.Add(-rawBatchRetention)) {
+		if where.Expr != "received_at < ? AND status IN ?" || !where.Params[0].(time.Time).Equal(now.Add(-rawBatchRetention)) {
 			t.Fatalf("Pluck() where = %q %v", where.Expr, where.Params)
 		}
-		*destination.(*[][]byte) = expiredKeys
+		*destination.(*[]uint64) = expiredBatchIDs
 	}).Return(nil).Once()
-	database.EXPECT().UpdateColumn(mock.AnythingOfType("*models.OtelEvent"), "prompt_text", nil, mock.Anything).Return(nil).Once()
+	// The generated Run helper cannot pass a nil value through, so read the raw arguments.
+	database.On("UpdateColumn", mock.AnythingOfType("*models.OtelEvent"), "prompt_text", nil, mock.Anything).Run(func(args mock.Arguments) {
+		where := args.Get(3).(dal.Clause).Data.(dal.DalClause)
+		ids, _ := where.Params[0].([]uint64)
+		if where.Expr != "raw_batch_id IN ?" || len(ids) != 2 || ids[0] != futureEvent.RawBatchId || ids[1] != 8 {
+			t.Fatalf("UpdateColumn() where = %q %v", where.Expr, where.Params)
+		}
+		calls = append(calls, "clear")
+	}).Return(nil).Once()
+	database.EXPECT().Delete(mock.AnythingOfType("*models.OtelLogBatch"), mock.Anything).Run(func(_ interface{}, _ ...dal.Clause) {
+		calls = append(calls, "delete")
+	}).Return(nil).Once()
 
-	if err := newRawMetricConverter(database, nil).clearExpiredPromptText(now); err != nil {
-		t.Fatalf("clearExpiredPromptText() error = %v", err)
+	if err := newRawConverter(database, nil).deleteExpiredRawBatches(now, &models.OtelLogBatch{}); err != nil {
+		t.Fatalf("deleteExpiredRawBatches() error = %v", err)
+	}
+	if strings.Join(calls, ",") != "clear,delete" {
+		t.Fatalf("calls = %v; want prompt text cleared before the batches are deleted", calls)
+	}
+}
+
+func TestDeleteExpiredMetricBatchesLeavesEventsAlone(t *testing.T) {
+	database := dalmocks.NewDal(t)
+	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	database.EXPECT().Pluck("id", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(_ string, destination interface{}, _ ...dal.Clause) {
+		*destination.(*[]uint64) = []uint64{3}
+	}).Return(nil).Once()
+	database.EXPECT().Delete(mock.AnythingOfType("*models.OtelMetricBatch"), mock.Anything).Return(nil).Once()
+
+	if err := newRawConverter(database, nil).deleteExpiredRawBatches(now, &models.OtelMetricBatch{}); err != nil {
+		t.Fatalf("deleteExpiredRawBatches() error = %v", err)
 	}
 }
 
@@ -412,7 +707,7 @@ func rollupEventColumnsSQL() string {
 func TestSessionTargetsGroupPromptsAndFlagModeChanges(t *testing.T) {
 	request := loadLogEventsFixture(t)
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
-	prepared, err := newRawMetricConverter(database, nil).prepareEvents(request, 1)
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 1)
 	if err != nil {
 		t.Fatalf("prepareEvents() error = %v", err)
 	}
@@ -454,7 +749,7 @@ func fixturePromptEvents(t *testing.T, promptID string) []*models.OtelEvent {
 	request := loadLogEventsFixture(t)
 	stripContentAttributes(request)
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
-	prepared, err := newRawMetricConverter(database, nil).prepareEvents(request, 1)
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 1)
 	if err != nil {
 		t.Fatalf("prepareEvents() error = %v", err)
 	}
@@ -481,4 +776,79 @@ func findPreparedEvent(t *testing.T, prepared *preparedLogBatch, eventName, corr
 	}
 	t.Fatalf("no %s event with id %s", eventName, correlationID)
 	return nil
+}
+
+func TestTypedAttributeReaders(t *testing.T) {
+	str := func(v string) *commonv1.AnyValue {
+		return &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: v}}
+	}
+	num := func(v float64) *commonv1.AnyValue {
+		return &commonv1.AnyValue{Value: &commonv1.AnyValue_DoubleValue{DoubleValue: v}}
+	}
+	integer := func(v int64) *commonv1.AnyValue {
+		return &commonv1.AnyValue{Value: &commonv1.AnyValue_IntValue{IntValue: v}}
+	}
+	boolean := func(v bool) *commonv1.AnyValue {
+		return &commonv1.AnyValue{Value: &commonv1.AnyValue_BoolValue{BoolValue: v}}
+	}
+	show := func(value interface{}) string {
+		switch typed := value.(type) {
+		case *int64:
+			if typed != nil {
+				return fmt.Sprint(*typed)
+			}
+		case *bool:
+			if typed != nil {
+				return fmt.Sprint(*typed)
+			}
+		case *string:
+			if typed != nil {
+				return *typed
+			}
+		}
+		return "nil"
+	}
+	tests := []struct {
+		name  string
+		read  func([]*commonv1.KeyValue, string) interface{}
+		value *commonv1.AnyValue
+		want  string
+	}{
+		{"int keeps large ints exact", readInt, integer(math.MaxInt64), "9223372036854775807"},
+		{"int truncates a double", readInt, num(12.9), "12"},
+		{"int parses a numeric string", readInt, str(" 7.5 "), "7"},
+		{"int rejects NaN", readInt, num(math.NaN()), "nil"},
+		{"int rejects an out-of-range string", readInt, str("1e19"), "nil"},
+		{"int rejects a bool", readInt, boolean(true), "nil"},
+		{"bool reads a bool", readBool, boolean(false), "false"},
+		{"bool parses a string", readBool, str("true"), "true"},
+		{"bool rejects a number", readBool, integer(1), "nil"},
+		{"decimal formats an int", readDecimal, integer(3), "3.00000000"},
+		{"decimal parses a string", readDecimal, str("0.25"), "0.25000000"},
+		{"decimal rejects a negative", readDecimal, num(-1), "nil"},
+		{"decimal rejects infinity", readDecimal, num(math.Inf(1)), "nil"},
+		{"decimal rejects 1e12", readDecimal, num(1e12), "nil"},
+		{"missing attribute", readInt, nil, "nil"},
+	}
+	for _, test := range tests {
+		attributes := []*commonv1.KeyValue{{Key: "other", Value: integer(1)}}
+		if test.value != nil {
+			attributes = append(attributes, &commonv1.KeyValue{Key: "value", Value: test.value})
+		}
+		if got := show(test.read(attributes, "value")); got != test.want {
+			t.Errorf("%s: got %s, want %s", test.name, got, test.want)
+		}
+	}
+}
+
+func readInt(attributes []*commonv1.KeyValue, key string) interface{} {
+	return attributeInt(attributes, key)
+}
+
+func readBool(attributes []*commonv1.KeyValue, key string) interface{} {
+	return attributeBool(attributes, key)
+}
+
+func readDecimal(attributes []*commonv1.KeyValue, key string) interface{} {
+	return attributeDecimal(attributes, key, 8)
 }

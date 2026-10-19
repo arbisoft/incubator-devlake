@@ -16,10 +16,10 @@
  *
  */
 
-import { useState } from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import { ThemeProvider as StyledThemeProvider } from 'styled-components';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { getTheme } from '@/theme/tokens';
 

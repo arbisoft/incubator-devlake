@@ -33,6 +33,7 @@ const (
 	errorInvalidTimestamp       conversionErrorCode = "invalid_timestamp"
 	errorInvalidValue           conversionErrorCode = "invalid_value"
 	errorInvalidDimension       conversionErrorCode = "invalid_dimension"
+	errorValueTooLong           conversionErrorCode = "value_too_long"
 	errorMissingUserIdentity    conversionErrorCode = "missing_user_identity"
 	errorOutOfOrderCumulative   conversionErrorCode = "out_of_order_cumulative"
 	errorInvalidSeriesState     conversionErrorCode = "invalid_series_state"
@@ -68,12 +69,25 @@ var attributionErrorCodes = map[conversionErrorCode]struct{}{
 }
 
 // logRecordErrorCodes identify one log record's bad data. They skip only that record:
-// unlike cumulative metrics, events have no ordering that a missing record breaks.
+// unlike cumulative metrics, events have no ordering that a missing record breaks. A
+// record without organization.id, such as one sent before the client signed in, carries no
+// conflicting attribution, so it is skipped without discarding its resource group.
 var logRecordErrorCodes = map[conversionErrorCode]struct{}{
+	errorMissingOrganization: {},
 	errorInvalidTimestamp:    {},
 	errorMissingUserIdentity: {},
 	errorInvalidDimension:    {},
 	errorInvalidValue:        {},
+	errorValueTooLong:        {},
+}
+
+// metricPointErrorCodes identify one data point's bad data that skips only that point.
+// Other point errors fail the batch, because skipping one cumulative sample would change
+// the next delta. An oversized identity is safe to skip: identity attributes are part of
+// the series hash, so every sample of that series is skipped alike and no series state
+// is written.
+var metricPointErrorCodes = map[conversionErrorCode]struct{}{
+	errorValueTooLong: {},
 }
 
 type conversionError struct {
@@ -86,7 +100,7 @@ func (e *conversionError) Error() string { return e.err.Error() }
 
 func (e *conversionError) Unwrap() error { return e.err }
 
-func permanentMetricError(code conversionErrorCode, format string, args ...interface{}) error {
+func permanentConversionError(code conversionErrorCode, format string, args ...interface{}) error {
 	return &conversionError{code: code, permanent: true, err: fmt.Errorf(format, args...)}
 }
 
@@ -111,7 +125,9 @@ var deterministicMySQLDataErrors = map[uint16]struct{}{
 }
 
 // classifyStorageError marks deterministic MySQL data rejections as permanent so the
-// batch is quarantined for operator replay instead of blocking the ordered queue.
+// batch is quarantined instead of blocking the ordered queue. After the cause is fixed, an
+// operator replay request rebuilds a metric batch's days (kind metrics) or returns a log
+// batch to the log queue (kind logs).
 func classifyStorageError(err error) error {
 	var conversionErr *conversionError
 	if stderrors.As(err, &conversionErr) {
