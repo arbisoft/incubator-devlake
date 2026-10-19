@@ -230,6 +230,14 @@ type logFacts struct {
 	Mode   []ai.AiPermissionModeChange
 }
 
+// requireLogsOn asserts the connection has events, and the organization has prompts, for one user on one UTC day.
+func (w *world) requireLogsOn(connectionID uint64, org string, who actor, day time.Time) {
+	w.t.Helper()
+	next := day.AddDate(0, 0, 1)
+	require.Positive(w.t, w.count(&models.OtelEvent{}, "connection_id = ? AND organization_id = ? AND user_key = ? AND event_timestamp >= ? AND event_timestamp < ?", connectionID, org, who.logUserKey(), day, next), "%s %s", who.name, day.Format(dateLayout))
+	require.Positive(w.t, w.count(&ai.AiPrompt{}, "workspace_key = ? AND user_key = ? AND started_at >= ? AND started_at < ?", org, who.logUserKey(), day, next), "%s %s", who.name, day.Format(dateLayout))
+}
+
 func (w *world) logFactsOf(connectionID uint64, org string) logFacts {
 	return logFacts{
 		Events: snapshot[models.OtelEvent](w, "event_key", "connection_id = ?", connectionID),
@@ -500,9 +508,7 @@ func TestRebindRequeuesLogBatchesForTheReboundTeam(t *testing.T) {
 
 	for _, who := range []actor{a1, a2, a3, a4, a5} {
 		for offset := -2; offset <= 0; offset++ {
-			day := w.day(offset)
-			require.Positive(t, w.count(&models.OtelEvent{}, "connection_id = ? AND organization_id = ? AND user_key = ? AND event_timestamp >= ? AND event_timestamp < ?", fixture.a.ID, orgR, who.logUserKey(), day, day.AddDate(0, 0, 1)), "%s %s", who.name, day.Format(dateLayout))
-			require.Positive(t, w.count(&ai.AiPrompt{}, "workspace_key = ? AND user_key = ? AND started_at >= ? AND started_at < ?", orgR, who.logUserKey(), day, day.AddDate(0, 0, 1)), "%s %s", who.name, day.Format(dateLayout))
+			w.requireLogsOn(fixture.a.ID, orgR, who, w.day(offset))
 		}
 	}
 	require.Equal(t, int64(120), w.count(&models.OtelEvent{}, "connection_id = ? AND organization_id = ?", fixture.a.ID, orgR))

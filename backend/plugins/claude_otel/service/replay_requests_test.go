@@ -177,21 +177,6 @@ func TestQueueReplaysReusesPerKind(t *testing.T) {
 	}
 }
 
-func TestQueueReplaysNamesReusedTeamOnlyForTheSameConnection(t *testing.T) {
-	otherConnection := uint64(4)
-	tx := dalmocks.NewTransaction(t)
-	tx.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		*args.Get(0).(*models.OtelReplayRequest) = models.OtelReplayRequest{Model: common.Model{ID: 9}, Status: models.OtelReplayRequestStatusPending, RequestedForConnectionId: &otherConnection}
-	}).Return(nil).Twice()
-	tx.On("Create", mock.AnythingOfType("*models.OtelAuditEvent")).Return(nil).Once()
-	requestedFor := &models.OtelConnection{Model: common.Model{ID: 8}, TeamName: "Textalize"}
-
-	queue, err := queueReplays(tx, nil, requestedFor, replayTestChunks(), replayTestNow)
-	if err != nil || len(queue.Reused) != 2 || queue.Reused[0].RequestedForTeamName != nil || queue.Reused[1].RequestedForTeamName != nil {
-		t.Fatalf("queueReplays() = %+v, %v; want the reused request without the new requester's team", queue, err)
-	}
-}
-
 func TestQueueReplaysInsertsWhenNoPendingCovers(t *testing.T) {
 	connection := &models.OtelConnection{Model: common.Model{ID: 4}, TeamName: "Platform"}
 	user := &common.User{Name: "Ada", Email: "ada@example.com"}
@@ -223,10 +208,6 @@ func TestQueueReplaysInsertsWhenNoPendingCovers(t *testing.T) {
 		created.RequestedForConnectionId == nil || *created.RequestedForConnectionId != 4 ||
 		!created.RangeStart.Equal(chunks[0].start) || !created.RangeEnd.Equal(chunks[0].end) {
 		t.Fatalf("created request = %+v", created)
-	}
-	if queue.Queued[0].RequestedForTeamName == nil || *queue.Queued[0].RequestedForTeamName != "Platform" ||
-		queue.Queued[1].RequestedForTeamName == nil || *queue.Queued[1].RequestedForTeamName != "Platform" {
-		t.Fatalf("queued views = %+v, want team name", queue.Queued)
 	}
 	if createdAll[1].RequestedForConnectionId == nil || *createdAll[1].RequestedForConnectionId != 4 || !createdAll[1].RangeStart.Equal(chunks[0].start) || !createdAll[1].RangeEnd.Equal(chunks[0].end) {
 		t.Fatalf("created logs request = %+v", createdAll[1])
@@ -429,7 +410,7 @@ func TestRebindOtelOrganizationRollsBackWhenReplayPlanFails(t *testing.T) {
 	tx.AssertNotCalled(t, "Commit")
 }
 
-func TestListOtelReplaysValidatesPagingAndResolvesTeams(t *testing.T) {
+func TestListOtelReplaysValidatesPaging(t *testing.T) {
 	for _, paging := range [][2]int{{0, 20}, {1, 0}, {1, 101}} {
 		useReplayTestDal(t, dalmocks.NewDal(t))
 		_, err := ListOtelReplays(paging[0], paging[1])
@@ -446,20 +427,16 @@ func TestListOtelReplaysValidatesPagingAndResolvesTeams(t *testing.T) {
 			{Model: common.Model{ID: 1}, Status: models.OtelReplayRequestStatusCompleted},
 		}
 	}).Return(nil).Once()
-	database.On("All", mock.AnythingOfType("*[]*models.OtelConnection"), mock.Anything).Run(func(args mock.Arguments) {
-		*args.Get(0).(*[]*models.OtelConnection) = []*models.OtelConnection{{Model: common.Model{ID: 4}, TeamName: "Platform"}}
-	}).Return(nil).Once()
 	useReplayTestDal(t, database)
 
 	page, err := ListOtelReplays(1, 20)
 	if err != nil || page.Count != 3 || len(page.Replays) != 3 {
 		t.Fatalf("ListOtelReplays() = %+v, %v", page, err)
 	}
-	if page.Replays[0].RequestedForTeamName == nil || *page.Replays[0].RequestedForTeamName != "Platform" ||
-		page.Replays[1].RequestedForTeamName == nil || page.Replays[2].RequestedForTeamName != nil {
-		t.Fatalf("team names = %+v", page.Replays)
+	if page.Replays[0].Id != 3 || *page.Replays[0].RequestedForConnectionId != connectionId || page.Replays[2].RequestedForConnectionId != nil {
+		t.Fatalf("replays = %+v", page.Replays)
 	}
-	database.AssertNumberOfCalls(t, "All", 2)
+	database.AssertNumberOfCalls(t, "All", 1)
 }
 
 func TestActiveOtelReplayReturnsKind(t *testing.T) {

@@ -29,9 +29,7 @@ import (
 // converter lease row is held briefly.
 const logReplayPage = 1000
 
-// requeueLogBatches returns terminal and unleased replay_pending batches whose valid observed bounds overlap the range.
-// Missing or reversed observed bounds use received_at as a legacy fallback.
-// It requeues whole batches behind live logs, preserves pending retry state, and completes when queueing finishes.
+// requeueLogBatches requeues batches observed in the range (received_at when bounds are unusable), keeping pending retry state.
 func (c *rawConverter) requeueLogBatches(request *models.OtelReplayRequest, leaseOwner string) (int, error) {
 	if err := c.validateLogReplayRange(request); err != nil {
 		return 0, err

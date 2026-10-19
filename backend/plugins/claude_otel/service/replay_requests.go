@@ -63,7 +63,6 @@ type OtelReplayInput struct {
 type OtelReplayView struct {
 	Id                       uint64          `json:"id"`
 	RequestedForConnectionId *uint64         `json:"requestedForConnectionId"`
-	RequestedForTeamName     *string         `json:"requestedForTeamName"`
 	Kind                     string          `json:"kind"`
 	RangeStart               time.Time       `json:"rangeStart"`
 	RangeEnd                 time.Time       `json:"rangeEnd"`
@@ -180,10 +179,8 @@ var replayKinds = []string{models.OtelReplayKindMetrics, models.OtelReplayKindLo
 func queueReplays(tx dal.Transaction, user *common.User, requestedFor *models.OtelConnection, chunks []replayChunk, now time.Time) (*OtelReplayQueue, errors.Error) {
 	queue := &OtelReplayQueue{Queued: make([]OtelReplayView, 0), Reused: make([]OtelReplayView, 0)}
 	var requestedForId *uint64
-	var teamName *string
 	if requestedFor != nil {
 		requestedForId = &requestedFor.ID
-		teamName = &requestedFor.TeamName
 	}
 	detail := replayAuditDetail{Queued: make([]uint64, 0), Reused: make([]uint64, 0), Ranges: make([]OtelReplayRange, 0, len(chunks))}
 	for _, chunk := range chunks {
@@ -196,7 +193,7 @@ func queueReplays(tx dal.Transaction, user *common.User, requestedFor *models.Ot
 			)
 			if err == nil {
 				detail.Reused = append(detail.Reused, request.ID)
-				queue.Reused = append(queue.Reused, replayView(request, reusedTeamName(request, requestedFor), now))
+				queue.Reused = append(queue.Reused, replayView(request, now))
 				continue
 			}
 			if !tx.IsErrorNotFound(err) {
@@ -214,21 +211,13 @@ func queueReplays(tx dal.Transaction, user *common.User, requestedFor *models.Ot
 				return nil, errors.Default.Wrap(err, "error creating Claude Code OTel replay request")
 			}
 			detail.Queued = append(detail.Queued, request.ID)
-			queue.Queued = append(queue.Queued, replayView(request, teamName, now))
+			queue.Queued = append(queue.Queued, replayView(request, now))
 		}
 	}
 	if err := writeOtelAudit(tx, user, models.OtelAuditActionReplayRequested, requestedForId, nil, nil, detail); err != nil {
 		return nil, err
 	}
 	return queue, nil
-}
-
-// reusedTeamName names a reused request's team only when it was requested for the same connection.
-func reusedTeamName(request *models.OtelReplayRequest, requestedFor *models.OtelConnection) *string {
-	if requestedFor == nil || request.RequestedForConnectionId == nil || *request.RequestedForConnectionId != requestedFor.ID {
-		return nil
-	}
-	return &requestedFor.TeamName
 }
 
 func replayState(request *models.OtelReplayRequest, now time.Time) OtelReplayState {
@@ -243,11 +232,10 @@ func replayState(request *models.OtelReplayRequest, now time.Time) OtelReplaySta
 	return OtelReplayState(status)
 }
 
-func replayView(request *models.OtelReplayRequest, teamName *string, now time.Time) OtelReplayView {
+func replayView(request *models.OtelReplayRequest, now time.Time) OtelReplayView {
 	return OtelReplayView{
 		Id:                       request.ID,
 		RequestedForConnectionId: request.RequestedForConnectionId,
-		RequestedForTeamName:     teamName,
 		Kind:                     request.Kind,
 		RangeStart:               request.RangeStart,
 		RangeEnd:                 request.RangeEnd,
@@ -358,46 +346,12 @@ func ListOtelReplays(page, pageSize int) (*OtelReplayPage, errors.Error) {
 	if err := db.All(&requests, dal.Orderby("id DESC"), dal.Offset((page-1)*pageSize), dal.Limit(pageSize)); err != nil {
 		return nil, errors.Default.Wrap(err, "error listing Claude Code OTel replay requests")
 	}
-	teamNames, lookupErr := replayTeamNames(requests)
-	if lookupErr != nil {
-		return nil, lookupErr
-	}
 	now := time.Now()
 	views := make([]OtelReplayView, 0, len(requests))
 	for _, request := range requests {
-		var teamName *string
-		if request.RequestedForConnectionId != nil {
-			if name, found := teamNames[*request.RequestedForConnectionId]; found {
-				teamName = &name
-			}
-		}
-		views = append(views, replayView(request, teamName, now))
+		views = append(views, replayView(request, now))
 	}
 	return &OtelReplayPage{Replays: views, Count: count}, nil
-}
-
-// replayTeamNames resolves requested-for team names in one query, hidden connections included.
-func replayTeamNames(requests []*models.OtelReplayRequest) (map[uint64]string, errors.Error) {
-	ids := make([]uint64, 0)
-	seen := make(map[uint64]bool)
-	for _, request := range requests {
-		if request.RequestedForConnectionId != nil && !seen[*request.RequestedForConnectionId] {
-			seen[*request.RequestedForConnectionId] = true
-			ids = append(ids, *request.RequestedForConnectionId)
-		}
-	}
-	names := make(map[uint64]string, len(ids))
-	if len(ids) == 0 {
-		return names, nil
-	}
-	connections := make([]*models.OtelConnection, 0, len(ids))
-	if err := db.All(&connections, dal.Where("id IN ?", ids)); err != nil {
-		return nil, errors.Default.Wrap(err, "error getting Claude Code OTel replay teams")
-	}
-	for _, connection := range connections {
-		names[connection.ID] = connection.TeamName
-	}
-	return names, nil
 }
 
 func activeOtelReplay(now time.Time) (*OtelActiveReplay, errors.Error) {

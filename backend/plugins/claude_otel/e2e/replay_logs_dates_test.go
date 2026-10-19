@@ -28,21 +28,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func requireCompletedLogReplayCounts(t *testing.T, w *world, wantLogs int) {
-	t.Helper()
+func (w *world) requireLogReplayCompleted(wantLogs int) {
+	w.t.Helper()
 	requests := snapshot[models.OtelReplayRequest](w, "id", "1 = 1")
-	require.Len(t, requests, 2)
+	require.Len(w.t, requests, 2)
 	byKind := make(map[string]models.OtelReplayRequest, len(requests))
 	for _, request := range requests {
-		require.Equal(t, models.OtelReplayRequestStatusCompleted, request.Status)
+		require.Equal(w.t, models.OtelReplayRequestStatusCompleted, request.Status)
 		byKind[request.Kind] = request
 	}
 	metrics, hasMetrics := byKind[models.OtelReplayKindMetrics]
 	logs, hasLogs := byKind[models.OtelReplayKindLogs]
-	require.True(t, hasMetrics)
-	require.True(t, hasLogs)
-	require.Zero(t, metrics.ReplayedBatches)
-	require.Equal(t, wantLogs, logs.ReplayedBatches)
+	require.True(w.t, hasMetrics)
+	require.True(w.t, hasLogs)
+	require.Zero(w.t, metrics.ReplayedBatches)
+	require.Equal(w.t, wantLogs, logs.ReplayedBatches)
 }
 
 func TestRebindReplaysDelayedLogsByObservedDay(t *testing.T) {
@@ -66,11 +66,9 @@ func TestRebindReplaysDelayedLogsByObservedDay(t *testing.T) {
 	w.rebind(a, orgR, w.replayDates(-2, -2))
 	w.drainNow()
 
-	start, end := w.day(-2), w.day(-1)
-	require.Positive(t, w.count(&models.OtelEvent{}, "connection_id = ? AND organization_id = ? AND user_key = ? AND event_timestamp >= ? AND event_timestamp < ?", a.ID, orgR, a1.logUserKey(), start, end))
-	require.Positive(t, w.count(&ai.AiPrompt{}, "workspace_key = ? AND user_key = ? AND started_at >= ? AND started_at < ?", orgR, a1.logUserKey(), start, end))
+	w.requireLogsOn(a.ID, orgR, a1, w.day(-2))
 	require.Equal(t, beforeB, w.logFactsOf(b.ID, orgB))
-	requireCompletedLogReplayCounts(t, w, 1)
+	w.requireLogReplayCompleted(1)
 }
 
 func TestRebindRevokedConnectionReplaysOnlyItsObservedDay(t *testing.T) {
@@ -99,13 +97,11 @@ func TestRebindRevokedConnectionReplaysOnlyItsObservedDay(t *testing.T) {
 	w.rebind(revoked, orgR, w.replayDates(-2, -2))
 	w.drainNow()
 
-	start, end := w.day(-2), w.day(-1)
-	require.Positive(t, w.count(&models.OtelEvent{}, "connection_id = ? AND organization_id = ? AND user_key = ? AND event_timestamp >= ? AND event_timestamp < ?", revoked.ID, orgR, d1.logUserKey(), start, end))
-	require.Positive(t, w.count(&ai.AiPrompt{}, "workspace_key = ? AND user_key = ? AND started_at >= ? AND started_at < ?", orgR, d1.logUserKey(), start, end))
+	w.requireLogsOn(revoked.ID, orgR, d1, w.day(-2))
 	afterSuccessor := w.logFactsOf(successor.ID, orgR)
 	require.Equal(t, beforeSuccessor.Events, afterSuccessor.Events)
 	require.Equal(t, beforeSuccessorPrompts, snapshot[ai.AiPrompt](w, "workspace_key, prompt_id", "workspace_key = ? AND user_key = ?", orgR, d3.logUserKey()))
-	requireCompletedLogReplayCounts(t, w, 1)
+	w.requireLogReplayCompleted(1)
 }
 
 func TestLogReplayObservedDateBoundariesAndFallback(t *testing.T) {
@@ -164,5 +160,5 @@ func TestLogReplayObservedDateBoundariesAndFallback(t *testing.T) {
 			require.Equal(t, sentinel, *rows[0].ProcessedAt, testCase.name)
 		}
 	}
-	requireCompletedLogReplayCounts(t, w, selectedCount)
+	w.requireLogReplayCompleted(selectedCount)
 }
