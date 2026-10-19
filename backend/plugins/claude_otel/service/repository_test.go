@@ -50,10 +50,20 @@ func TestNormalizeRepositoryURL(t *testing.T) {
 		{"surrounding space", "  " + want + "  ", want, true},
 		{"https port kept", "https://git.example.com:8443/team/repo", "https://git.example.com:8443/team/repo", true},
 		{"http kept", "http://gitlab.internal/team/repo.git", "http://gitlab.internal/team/repo", true},
+		{"short internal host", "git@gitlab:org/repo.git", "https://gitlab/org/repo", true},
+		{"ip host", "git@10.0.0.5:org/repo.git", "https://10.0.0.5/org/repo", true},
 		{"empty", "", "", false},
 		{"no path", "https://github.com", "", false},
 		{"local path", "/home/dev/repo", "", false},
 		{"windows path", `C:\code\repo`, "", false},
+		{"windows path with slashes", "C:/Users/dev/repos/origin.git", "", false},
+		{"lowercase drive letter", "c:/users/dev/repos/origin", "", false},
+		{"drive-relative path", "d:repo", "", false},
+		{"localhost scp-like", "localhost:repo", "", false},
+		{"localhost with user", "git@localhost:org/repo.git", "", false},
+		{"loopback ip", "ssh://git@127.0.0.1/org/repo.git", "", false},
+		{"loopback ipv6", "ssh://git@[::1]/org/repo.git", "", false},
+		{"uppercase localhost", "https://LOCALHOST/org/repo", "", false},
 		{"file scheme", "file:///home/dev/repo", "", false},
 		{"not a url", "not a repository", "", false},
 	}
@@ -155,5 +165,11 @@ func TestNormalizeRepositoryAttributesRewritesOnlyTheRepositoryURL(t *testing.T)
 	normalizeRepositoryAttributes(unknown)
 	if got := unknown[0].GetValue().GetStringValue(); got != "" {
 		t.Fatalf("unrecognized repository url = %q, want it blanked", got)
+	}
+
+	local := []*commonv1.KeyValue{{Key: repositoryURLAttribute, Value: stringValue("C:/Users/dev/repos/origin.git")}}
+	normalizeRepositoryAttributes(local)
+	if got := local[0].GetValue().GetStringValue(); got != "" {
+		t.Fatalf("local repository path = %q, want it blanked", got)
 	}
 }

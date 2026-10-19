@@ -38,12 +38,19 @@ var repositoryURLSchemes = map[string]string{
 	"git+ssh": "https",
 }
 
+// loopbackHosts are hosts that cannot identify a shared repository or match repos.url.
+var loopbackHosts = map[string]bool{
+	"localhost": true,
+	"127.0.0.1": true,
+	"::1":       true,
+}
+
 // normalizeRepositoryURL returns a remote URL in the form repos.url uses, lowercased, so
 // LOWER(repos.url) matches it. It drops any user info, port of an SSH remote, query,
 // fragment, trailing slash and .git suffix, and rewrites SSH and scp-like remotes
 // (git@host:org/repo.git) to https. Claude Code is documented to strip credentials and
 // lowercase the URL, but DevLake does not rely on the client for either. It reports false
-// for a value that is not a remote repository URL.
+// for a value that is not a remote repository URL, or whose host is a loopback address.
 func normalizeRepositoryURL(raw string) (string, bool) {
 	value := strings.TrimSpace(raw)
 	if value == "" {
@@ -62,6 +69,9 @@ func normalizeRepositoryURL(raw string) (string, bool) {
 	}
 	scheme, supported := repositoryURLSchemes[strings.ToLower(parsed.Scheme)]
 	if !supported {
+		return "", false
+	}
+	if loopbackHosts[strings.ToLower(parsed.Hostname())] {
 		return "", false
 	}
 	host := parsed.Host
@@ -90,7 +100,16 @@ func scpRemoteURL(value string) (string, bool) {
 	if hostPart == "" || strings.ContainsAny(hostPart, "/\\") || strings.Contains(path, "\\") {
 		return "", false
 	}
+	if len(hostPart) == 1 && isASCIILetter(hostPart[0]) {
+		// A drive letter, as in C:/repo, is a local Windows path, as git's is_dos_drive_prefix
+		// treats it.
+		return "", false
+	}
 	return "ssh://" + hostPart + "/" + strings.TrimPrefix(path, "/"), true
+}
+
+func isASCIILetter(c byte) bool {
+	return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z')
 }
 
 // normalizeRepositoryAttributes normalizes the repository URL attribute in place, so it is
