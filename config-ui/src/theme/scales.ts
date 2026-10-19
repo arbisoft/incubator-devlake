@@ -80,7 +80,7 @@ export type LayoutTokens = {
   sortSelectWidth: number;
   datePickerWidth: number;
   otelReplayRangeWidth: number;
-  otelReplayColumnWidth: Record<'requested' | 'requestedFor' | 'days' | 'status' | 'batches' | 'error', number>;
+  otelReplayColumnWidth: Record<'requested' | 'days' | 'status' | 'batches' | 'error', number>;
   statusDotSize: number;
   chipMaxWidth: number;
   stageDotSize: number;
@@ -193,7 +193,6 @@ export const LAYOUT: LayoutTokens = {
   otelReplayRangeWidth: 280,
   otelReplayColumnWidth: {
     requested: 180,
-    requestedFor: 140,
     days: 210,
     status: 190,
     batches: 160,

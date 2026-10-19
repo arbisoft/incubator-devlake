@@ -219,6 +219,10 @@ export class OtelRebuildsTable {
     return tableRows(this.table);
   }
 
+  get headers(): Locator {
+    return this.table.getByRole('columnheader');
+  }
+
   private get countBadge(): Locator {
     return this.section
       .getByRole('heading', { name: REPLAY_COPY.title, exact: true })
@@ -237,10 +241,6 @@ export class OtelRebuildsTable {
 
   async stateOf(row: Locator): Promise<Locator> {
     return columnCell(this.table, row, REPLAY_COPY.columns.status);
-  }
-
-  async requestedFor(row: Locator): Promise<Locator> {
-    return columnCell(this.table, row, REPLAY_COPY.columns.requestedFor);
   }
 
   async nextPage(): Promise<void> {

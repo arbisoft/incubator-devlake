@@ -142,9 +142,9 @@ test.describe.serial('Claude Code OTel organization change and data rebuilds', (
     const table = new OtelRebuildsTable(page);
     const metricsRebuild = table.rowFor(today);
     const logsRebuild = table.rowFor(today, OTEL_REPLAY_KIND.LOGS);
+    await expect(table.headers).toHaveText(Object.values(REPLAY_COPY.columns));
     await expect(metricsRebuild).toBeVisible();
     await expect(logsRebuild).toBeVisible();
-    await expect(await table.requestedFor(metricsRebuild)).toHaveText(teamName);
     await expect(await table.stateOf(metricsRebuild)).toHaveText(REPLAY_COPY.state.waiting);
 
     expect(otelOrganizationOf(teamName)).toBe(newOrganization);
@@ -223,9 +223,9 @@ test.describe.serial('Claude Code OTel organization change and data rebuilds', (
 
     const metricsRebuild = table.rowFor(today);
     const logsRebuild = table.rowFor(today, OTEL_REPLAY_KIND.LOGS);
+    await expect(table.headers).toHaveText(Object.values(REPLAY_COPY.columns));
     await expect(metricsRebuild).toBeVisible();
     await expect(logsRebuild).toBeVisible();
-    await expect(await table.requestedFor(metricsRebuild)).toHaveText(REPLAY_COPY.manual);
     const firstRequests = otelReplayRequestsAfter(marks.replayId);
     expect(firstRequests.map(({ kind }) => kind)).toEqual([OTEL_REPLAY_KIND.METRICS, OTEL_REPLAY_KIND.LOGS]);
     const firstMetrics = firstRequests.find(({ kind }) => kind === OTEL_REPLAY_KIND.METRICS);

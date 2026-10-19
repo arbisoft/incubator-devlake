@@ -28,7 +28,6 @@ export const ORGANIZATION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
 
 export const REPLAY_COLUMN = {
   REQUESTED: 'requested',
-  REQUESTED_FOR: 'requestedFor',
   DAYS: 'days',
   STATUS: 'status',
   BATCHES: 'batches',
@@ -43,14 +42,12 @@ export const REPLAY_COPY = {
   rebuild: 'Rebuild data',
   tableLabel: 'Data rebuild requests',
   unavailable: 'Data rebuilds could not be loaded.',
-  manual: 'Manual',
   empty: {
     title: 'No data rebuilds yet',
     description: 'Rebuilds appear here when an organization changes or someone rebuilds data.',
   },
   columns: {
     requested: 'Requested',
-    requestedFor: 'Requested for',
     days: 'Days (UTC)',
     status: 'Status',
     batches: 'Replayed / skipped',

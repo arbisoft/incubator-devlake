@@ -48,6 +48,8 @@ const replay = (overrides: Partial<OtelReplay>): OtelReplay => ({
   ...overrides,
 });
 
+const MULTI_DAY_RANGE = '2026-10-01 – 2026-10-19';
+
 const ROWS = [
   replay({ id: 1 }),
   replay({
@@ -64,14 +66,17 @@ const ROWS = [
 describe('OtelReplays', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('lists rebuild requests with state, inclusive days, the manual badge and the error', async () => {
+  it('lists rebuild requests without a requested-for column', async () => {
     otel.listReplays.mockResolvedValue({ replays: ROWS, count: ROWS.length });
     renderWithTheme(<OtelReplays version={0} />);
 
-    expect(await screen.findAllByText(REPLAY_COPY.manual)).toHaveLength(2);
-    expect(screen.getByText('Platform')).toBeTruthy();
+    expect(await screen.findByText(MULTI_DAY_RANGE)).toBeTruthy();
+    expect(screen.getByRole('table', { name: REPLAY_COPY.tableLabel }).style.tableLayout).toBe('fixed');
+    expect(screen.queryByRole('columnheader', { name: 'Requested for' })).toBeNull();
+    expect(screen.queryByText('Manual', { exact: true })).toBeNull();
+    expect(screen.queryByText('Platform', { exact: true })).toBeNull();
     expect(screen.getAllByText('2026-10-19')).toHaveLength(2);
-    expect(screen.getByText('2026-10-01 – 2026-10-19')).toBeTruthy();
+    expect(screen.getByText(MULTI_DAY_RANGE)).toBeTruthy();
     expect(screen.getByText(REPLAY_COPY.state[OTEL_REPLAY_STATE.WAITING])).toBeTruthy();
     expect(screen.getByText(REPLAY_COPY.state[OTEL_REPLAY_STATE.FAILED])).toBeTruthy();
     expect(screen.getByText(REPLAY_COPY.state[OTEL_REPLAY_STATE.COMPLETED])).toBeTruthy();
@@ -84,7 +89,7 @@ describe('OtelReplays', () => {
   it('requests the next server page when the page changes', async () => {
     otel.listReplays.mockResolvedValue({ replays: ROWS, count: 25 });
     renderWithTheme(<OtelReplays version={0} />);
-    await screen.findByText('Platform');
+    await screen.findByText(MULTI_DAY_RANGE);
     expect(otel.listReplays).toHaveBeenLastCalledWith({ page: 1, pageSize: 10 }, expect.anything());
 
     fireEvent.click(screen.getByTitle('2'));
@@ -109,7 +114,7 @@ describe('OtelReplays', () => {
     expect(await screen.findByText(REPLAY_COPY.unavailable)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: COMMON_COPY.retry }));
 
-    expect(await screen.findByText('Platform')).toBeTruthy();
+    expect(await screen.findByText(MULTI_DAY_RANGE)).toBeTruthy();
     expect(otel.listReplays).toHaveBeenCalledTimes(2);
   });
 });

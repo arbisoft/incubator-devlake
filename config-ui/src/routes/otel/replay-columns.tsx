@@ -21,7 +21,7 @@ import { Typography, type TableColumnsType } from 'antd';
 import type { OtelReplay } from '@/api/otel';
 import { LAYOUT } from '@/theme/scales';
 import { IdentityCell, STATUS_BADGE_VARIANT, StatusBadge, formatDateTime } from '@/ui';
-import { COMMON_COPY, STATUS_TONE } from '@/ui/constants';
+import { COMMON_COPY } from '@/ui/constants';
 
 import { REPLAY_COLUMN, REPLAY_COPY } from './replay-constants';
 import { REPLAY_STATE_TONE } from './tones';
@@ -35,18 +35,6 @@ export const getReplayColumns = (): TableColumnsType<OtelReplay> => [
     render: (_, { createdAt, requestedBy }) => (
       <IdentityCell primary={formatDateTime(createdAt)} secondary={requestedBy ?? COMMON_COPY.emptyValue} />
     ),
-  },
-  {
-    key: REPLAY_COLUMN.REQUESTED_FOR,
-    title: REPLAY_COPY.columns.requestedFor,
-    width: LAYOUT.otelReplayColumnWidth.requestedFor,
-    ellipsis: true,
-    render: (_, { requestedForConnectionId, requestedForTeamName }) =>
-      requestedForConnectionId === null ? (
-        <StatusBadge tone={STATUS_TONE.NEUTRAL} label={REPLAY_COPY.manual} variant={STATUS_BADGE_VARIANT.TEXT} />
-      ) : (
-        requestedForTeamName
-      ),
   },
   {
     key: REPLAY_COLUMN.DAYS,
@@ -80,6 +68,7 @@ export const getReplayColumns = (): TableColumnsType<OtelReplay> => [
     key: REPLAY_COLUMN.ERROR,
     title: REPLAY_COPY.columns.error,
     width: LAYOUT.otelReplayColumnWidth.error,
+    ellipsis: true,
     dataIndex: 'errorMessage',
     render: (value: string | null) =>
       value ? (
