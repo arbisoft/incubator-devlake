@@ -52,7 +52,9 @@ export const getReplayColumns = (): TableColumnsType<OtelReplay> => [
     key: REPLAY_COLUMN.DAYS,
     title: REPLAY_COPY.columns.days,
     width: LAYOUT.otelReplayColumnWidth.days,
-    render: (_, { rangeStart, rangeEnd }) => formatReplayDays(rangeStart, rangeEnd),
+    render: (_, { rangeStart, rangeEnd, kind }) => (
+      <IdentityCell primary={formatReplayDays(rangeStart, rangeEnd)} secondary={REPLAY_COPY.kind[kind]} />
+    ),
   },
   {
     key: REPLAY_COLUMN.STATUS,

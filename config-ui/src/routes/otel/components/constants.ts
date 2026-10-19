@@ -57,7 +57,7 @@ export const COPY = {
   range: {
     label: 'Days to rebuild (UTC)',
     hint: (min: string, max: string) => `Pick days from ${min} to ${max}. Raw telemetry is kept for 90 days.`,
-    today: 'Today finishes rebuilding after the next midnight UTC.',
+    today: 'Metrics for today finish rebuilding after the next midnight UTC.',
   },
   rebind: {
     title: 'Change organization',
@@ -79,7 +79,7 @@ export const COPY = {
     wrongId: "A wrong ID silently drops the whole team's telemetry, even though the credentials still work.",
     rebuild: 'Rebuild past data',
     rebuildHint:
-      "Past days only recover through a rebuild. The rebuild recomputes every team's figures for those days; other teams' numbers stay the same.",
+      "Past days only recover through a rebuild. It recomputes every team's metrics, prompts and events for those days; other teams' numbers stay the same.",
     previousOrg: 'Data received under the previous organization is removed for those days.',
     unavailable: "No retained data for this connection's live period.",
     confirm: {
@@ -95,11 +95,11 @@ export const COPY = {
     title: 'Rebuild data (all teams)',
     submit: 'Rebuild',
     notice:
-      "Every team's data for these days is deleted and rebuilt from retained telemetry. Use it after a converter fix. Live data pauses while it runs.",
+      "Every team's metrics, prompts and events for these days are rebuilt from retained telemetry. Use it after a converter fix. Live data pauses while it runs.",
     confirm: {
       tone: CONFIRM_TONE.DANGER,
       title: () => "Rebuild every team's data?",
-      description: (days: string) => `Every team's data for ${days} (UTC) is deleted and rebuilt.`,
+      description: (days: string) => `Every team's metrics, prompts and events for ${days} (UTC) are rebuilt.`,
       confirm: 'Rebuild',
     },
   },

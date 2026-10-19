@@ -98,6 +98,7 @@ type OtelRebindResult struct {
 
 type OtelActiveReplay struct {
 	Id                   uint64    `json:"id"`
+	Kind                 string    `json:"kind"`
 	RequestedForTeamName *string   `json:"requestedForTeamName"`
 	RangeStart           time.Time `json:"rangeStart"`
 	RangeEnd             time.Time `json:"rangeEnd"`
@@ -173,6 +174,9 @@ func writeOtelAudit(tx dal.Transaction, user *common.User, action string, connec
 	return nil
 }
 
+// replayKinds are the request kinds every rebuild queues, in order.
+var replayKinds = []string{models.OtelReplayKindMetrics, models.OtelReplayKindLogs}
+
 func queueReplays(tx dal.Transaction, user *common.User, requestedFor *models.OtelConnection, chunks []replayChunk, now time.Time) (*OtelReplayQueue, errors.Error) {
 	queue := &OtelReplayQueue{Queued: make([]OtelReplayView, 0), Reused: make([]OtelReplayView, 0)}
 	var requestedForId *uint64
@@ -184,32 +188,34 @@ func queueReplays(tx dal.Transaction, user *common.User, requestedFor *models.Ot
 	detail := replayAuditDetail{Queued: make([]uint64, 0), Reused: make([]uint64, 0), Ranges: make([]OtelReplayRange, 0, len(chunks))}
 	for _, chunk := range chunks {
 		detail.Ranges = append(detail.Ranges, OtelReplayRange{StartDate: chunk.start.Format(replayDateLayout), EndDate: chunk.end.AddDate(0, 0, -1).Format(replayDateLayout)})
-		request := &models.OtelReplayRequest{}
-		err := tx.First(request,
-			dal.Where("status = ? AND range_start <= ? AND range_end >= ? AND kind = ?", models.OtelReplayRequestStatusPending, chunk.start, chunk.end, models.OtelReplayKindMetrics),
-			dal.Orderby("id ASC"),
-		)
-		if err == nil {
-			detail.Reused = append(detail.Reused, request.ID)
-			queue.Reused = append(queue.Reused, replayView(request, reusedTeamName(request, requestedFor), now))
-			continue
+		for _, kind := range replayKinds {
+			request := &models.OtelReplayRequest{}
+			err := tx.First(request,
+				dal.Where("status = ? AND range_start <= ? AND range_end >= ? AND kind = ?", models.OtelReplayRequestStatusPending, chunk.start, chunk.end, kind),
+				dal.Orderby("id ASC"),
+			)
+			if err == nil {
+				detail.Reused = append(detail.Reused, request.ID)
+				queue.Reused = append(queue.Reused, replayView(request, reusedTeamName(request, requestedFor), now))
+				continue
+			}
+			if !tx.IsErrorNotFound(err) {
+				return nil, errors.Default.Wrap(err, "error finding Claude Code OTel replay request")
+			}
+			request = &models.OtelReplayRequest{
+				Kind:                     kind,
+				RangeStart:               chunk.start,
+				RangeEnd:                 chunk.end,
+				Status:                   models.OtelReplayRequestStatusPending,
+				RequestedBy:              replayActor(user),
+				RequestedForConnectionId: requestedForId,
+			}
+			if err := tx.Create(request); err != nil {
+				return nil, errors.Default.Wrap(err, "error creating Claude Code OTel replay request")
+			}
+			detail.Queued = append(detail.Queued, request.ID)
+			queue.Queued = append(queue.Queued, replayView(request, teamName, now))
 		}
-		if !tx.IsErrorNotFound(err) {
-			return nil, errors.Default.Wrap(err, "error finding Claude Code OTel replay request")
-		}
-		request = &models.OtelReplayRequest{
-			Kind:                     models.OtelReplayKindMetrics,
-			RangeStart:               chunk.start,
-			RangeEnd:                 chunk.end,
-			Status:                   models.OtelReplayRequestStatusPending,
-			RequestedBy:              replayActor(user),
-			RequestedForConnectionId: requestedForId,
-		}
-		if err := tx.Create(request); err != nil {
-			return nil, errors.Default.Wrap(err, "error creating Claude Code OTel replay request")
-		}
-		detail.Queued = append(detail.Queued, request.ID)
-		queue.Queued = append(queue.Queued, replayView(request, teamName, now))
 	}
 	if err := writeOtelAudit(tx, user, models.OtelAuditActionReplayRequested, requestedForId, nil, nil, detail); err != nil {
 		return nil, err
@@ -403,7 +409,7 @@ func activeOtelReplay(now time.Time) (*OtelActiveReplay, errors.Error) {
 		}
 		return nil, errors.Default.Wrap(err, "error getting active Claude Code OTel replay")
 	}
-	active := &OtelActiveReplay{Id: request.ID, RangeStart: request.RangeStart, RangeEnd: request.RangeEnd}
+	active := &OtelActiveReplay{Id: request.ID, Kind: request.Kind, RangeStart: request.RangeStart, RangeEnd: request.RangeEnd}
 	if request.RequestedForConnectionId != nil {
 		connection, err := getOtelConnection(*request.RequestedForConnectionId)
 		if err == nil {

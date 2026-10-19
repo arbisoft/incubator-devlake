@@ -129,6 +129,7 @@ export type OtelIngestionStatus = {
 export type OtelActiveReplay = {
   id: ID;
   requestedForTeamName: string | null;
+  kind: OtelReplayKind;
   rangeStart: string;
   rangeEnd: string;
 };

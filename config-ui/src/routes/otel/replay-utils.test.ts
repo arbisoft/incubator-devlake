@@ -57,11 +57,14 @@ const otelConnection = (overrides: Partial<OtelConnection> = {}): OtelConnection
   ...overrides,
 });
 
-const replayRequest = (state: OtelReplay['state']): OtelReplay => ({
+const replayRequest = (
+  state: OtelReplay['state'],
+  kind: OtelReplay['kind'] = OTEL_REPLAY_KIND.METRICS,
+): OtelReplay => ({
   id: 1,
   requestedForConnectionId: null,
   requestedForTeamName: null,
-  kind: OTEL_REPLAY_KIND.METRICS,
+  kind,
   rangeStart: DAY_START,
   rangeEnd: NEXT_DAY_START,
   state,
@@ -141,6 +144,14 @@ describe('routes/otel/utils replay helpers', () => {
     expect(getReplayQueuedMessage({ queued: [], reused: [pending] })).toBe(
       'Already queued. 1 request already pending covered some days.',
     );
+  });
+
+  it('counts both kinds of a queued rebuild and waits only for metrics', () => {
+    const metrics = replayRequest(OTEL_REPLAY_STATE.WAITING);
+    const logs = replayRequest(OTEL_REPLAY_STATE.PENDING, OTEL_REPLAY_KIND.LOGS);
+
+    expect(getReplayQueuedMessage({ queued: [metrics, logs], reused: [] })).toBe(REPLAY_COPY.queued(2, 0, true));
+    expect(getReplayQueuedMessage({ queued: [logs], reused: [] })).toBe(REPLAY_COPY.queued(1, 0, false));
   });
 
   it('maps rebind and rebuild failures to safe copy', () => {

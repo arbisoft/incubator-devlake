@@ -19,13 +19,16 @@ package e2e
 
 import (
 	"crypto/sha256"
+	"strconv"
 	"time"
 
 	"github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
 	"github.com/stretchr/testify/require"
+	collectorlogs "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	collectormetrics "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 	commonv1 "go.opentelemetry.io/proto/otlp/common/v1"
+	logsv1 "go.opentelemetry.io/proto/otlp/logs/v1"
 	metricsv1 "go.opentelemetry.io/proto/otlp/metrics/v1"
 	resourcev1 "go.opentelemetry.io/proto/otlp/resource/v1"
 	"google.golang.org/protobuf/proto"
@@ -59,6 +62,9 @@ type actor struct {
 func (a actor) email() string     { return a.name + "@example.com" }
 func (a actor) accountID() string { return "acct-" + a.name }
 func (a actor) userKey() string   { return "acct:" + a.accountID() }
+
+// logUserKey is the key log events carry, since they send no user.account_id.
+func (a actor) logUserKey() string { return "uuid:uuid-" + a.name }
 
 var (
 	a1      = actor{"alpha1", "alpha", orgR, 1}
@@ -248,6 +254,112 @@ func (w *world) seedBatches(layout [][]actor, days ...time.Time) []*models.OtelM
 				specs = append(specs, resourceSpec{who: who, at: at, seed: who.idx*37 + dayIdx*11 + batchIdx*3 + 1})
 			}
 			batches = append(batches, w.insertBatch(specs))
+		}
+	}
+	return batches
+}
+
+func intAttr(key string, value int64) *commonv1.KeyValue {
+	return &commonv1.KeyValue{Key: key, Value: &commonv1.AnyValue{Value: &commonv1.AnyValue_IntValue{IntValue: value}}}
+}
+
+func doubleAttr(key string, value float64) *commonv1.KeyValue {
+	return &commonv1.KeyValue{Key: key, Value: &commonv1.AnyValue{Value: &commonv1.AnyValue_DoubleValue{DoubleValue: value}}}
+}
+
+// logResource builds one Claude Code client's log export for a session: a prompt, its API request, a tool decision and result, and the response.
+func (a actor) logResource(at time.Time, seed int) *logsv1.ResourceLogs {
+	session := "sess-" + a.team + "-" + a.name + "-" + strconv.Itoa(seed)
+	prompt := "p-" + a.team + "-" + a.name + "-" + strconv.Itoa(seed)
+	model, query := fxModels[seed%len(fxModels)], fxQueries[seed%len(fxQueries)]
+	tool := fxTools[seed%len(fxTools)]
+	toolUse := "tu-" + strconv.Itoa(seed)
+	sequence := int64(0)
+	record := func(name string, extra ...*commonv1.KeyValue) *logsv1.LogRecord {
+		sequence++
+		base := []*commonv1.KeyValue{
+			strAttr("devlake_team", a.team),
+			strAttr("event.name", name),
+			strAttr("event.timestamp", at.Add(time.Duration(sequence)*time.Second).UTC().Format("2006-01-02T15:04:05.000Z")),
+			intAttr("event.sequence", sequence),
+			strAttr("session.id", session),
+			strAttr("organization.id", a.org),
+			strAttr("user.account_uuid", "uuid-"+a.name),
+			strAttr("user.email", a.email()),
+			strAttr("user.id", "install-"+a.name),
+			strAttr("terminal.type", fxTerminal[seed%len(fxTerminal)]),
+			strAttr("prompt.id", prompt),
+		}
+		return &logsv1.LogRecord{Body: &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "claude_code." + name}}, Attributes: withAttrs(base, extra...)}
+	}
+	f := int64(seed)
+	records := []*logsv1.LogRecord{
+		record("user_prompt", intAttr("prompt_length", 20+f%50), strAttr("prompt_text", "synthetic prompt "+strconv.Itoa(seed))),
+		record("api_request", strAttr("model", model), intAttr("input_tokens", f*113), intAttr("output_tokens", f*29+7), intAttr("cache_read_tokens", f*457),
+			intAttr("cache_creation_tokens", f*61+3), doubleAttr("cost_usd", float64(seed)*0.0125+0.0003), intAttr("duration_ms", 900+f*7), strAttr("query_source", query), strAttr("request_id", "req-"+strconv.Itoa(seed))),
+		record("tool_decision", strAttr("tool_name", tool), strAttr("tool_use_id", toolUse), strAttr("decision", []string{"accept", "reject"}[seed%2]), strAttr("source", fxSources[seed%len(fxSources)])),
+		record("tool_result", strAttr("tool_name", tool), strAttr("tool_use_id", toolUse), strAttr("success", []string{"true", "false"}[seed%2]), intAttr("duration_ms", 10+f)),
+		record("assistant_response", intAttr("response_length", 100+f*3), strAttr("model", model)),
+	}
+	return &logsv1.ResourceLogs{
+		Resource: &resourcev1.Resource{Attributes: []*commonv1.KeyValue{
+			strAttr("service.name", "claude-code"),
+			strAttr("service.version", "2.1."+string(rune('0'+seed%10))),
+		}},
+		ScopeLogs: []*logsv1.ScopeLogs{{Scope: &commonv1.InstrumentationScope{Name: "com.anthropic.claude_code.events", Version: "2.1.300"}, LogRecords: records}},
+	}
+}
+
+// insertLogBatch stores one raw log batch the way the ingest path does.
+func (w *world) insertLogBatch(specs []resourceSpec) *models.OtelLogBatch {
+	request := &collectorlogs.ExportLogsServiceRequest{}
+	for _, spec := range specs {
+		request.ResourceLogs = append(request.ResourceLogs, spec.who.logResource(spec.at, spec.seed))
+	}
+	payload, err := proto.MarshalOptions{Deterministic: true}.Marshal(request)
+	require.NoError(w.t, err)
+	hash := sha256.Sum256(payload)
+	var minAt, maxAt time.Time
+	records := 0
+	for _, resource := range request.ResourceLogs {
+		for _, record := range resource.ScopeLogs[0].LogRecords {
+			records++
+			observed, err := time.Parse(time.RFC3339Nano, record.Attributes[2].GetValue().GetStringValue())
+			require.NoError(w.t, err)
+			if minAt.IsZero() || observed.Before(minAt) {
+				minAt = observed
+			}
+			if observed.After(maxAt) {
+				maxAt = observed
+			}
+		}
+	}
+	batch := &models.OtelLogBatch{
+		ReceivedAt:           maxAt.Add(10 * time.Second),
+		PayloadSha256:        hash[:],
+		PayloadProto:         payload,
+		PayloadSchemaVersion: 1,
+		ResourceCount:        len(request.ResourceLogs),
+		RecordCount:          records,
+		MinObservedAt:        &minAt,
+		MaxObservedAt:        &maxAt,
+		Status:               models.OtelBatchStatusPending,
+	}
+	require.NoError(w.t, w.tester.Dal.Create(batch))
+	return batch
+}
+
+// seedLogBatches stores one mixed-team log batch per layout entry for each of the given days.
+func (w *world) seedLogBatches(layout [][]actor, days ...time.Time) []*models.OtelLogBatch {
+	batches := make([]*models.OtelLogBatch, 0, len(days)*len(layout))
+	for dayIdx, day := range days {
+		for batchIdx, actors := range layout {
+			specs := make([]resourceSpec, 0, len(actors))
+			for resIdx, who := range actors {
+				at := w.slot(day, batchIdx).Add(time.Duration(resIdx) * 20 * time.Second)
+				specs = append(specs, resourceSpec{who: who, at: at, seed: who.idx*37 + dayIdx*11 + batchIdx*3 + 1})
+			}
+			batches = append(batches, w.insertLogBatch(specs))
 		}
 	}
 	return batches

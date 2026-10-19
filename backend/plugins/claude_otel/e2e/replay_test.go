@@ -18,6 +18,7 @@ limitations under the License.
 package e2e
 
 import (
+	"encoding/json"
 	"math/big"
 	"reflect"
 	"strings"
@@ -63,7 +64,7 @@ func newWorld(t *testing.T) *world {
 	for _, table := range models.GetTablesInfo() {
 		tester.FlushTabler(table)
 	}
-	for _, table := range []dal.Tabler{&ai.AiActivity{}, &ai.AiModelUsage{}, &ai.AiToolDecision{}, &ai.AiSourcePreference{}, &crossdomain.Account{}} {
+	for _, table := range []dal.Tabler{&ai.AiActivity{}, &ai.AiModelUsage{}, &ai.AiToolDecision{}, &ai.AiSourcePreference{}, &ai.AiPrompt{}, &ai.AiPromptSkill{}, &ai.AiPermissionModeChange{}, &crossdomain.Account{}} {
 		tester.FlushTabler(table)
 	}
 	now := time.Now().UTC()
@@ -214,9 +215,28 @@ func (w *world) requireReplaysCompleted() []models.OtelReplayRequest {
 	require.NotEmpty(w.t, requests)
 	for _, request := range requests {
 		require.Equal(w.t, models.OtelReplayRequestStatusCompleted, request.Status)
-		require.Greater(w.t, request.ReplayedBatches, 0)
+		if request.Kind == models.OtelReplayKindMetrics {
+			require.Greater(w.t, request.ReplayedBatches, 0)
+		}
 	}
 	return requests
+}
+
+// logFacts is every event and prompt row the log converter wrote for one connection.
+type logFacts struct {
+	Events []models.OtelEvent
+	Prompt []ai.AiPrompt
+	Skill  []ai.AiPromptSkill
+	Mode   []ai.AiPermissionModeChange
+}
+
+func (w *world) logFactsOf(connectionID uint64, org string) logFacts {
+	return logFacts{
+		Events: snapshot[models.OtelEvent](w, "event_key", "connection_id = ?", connectionID),
+		Prompt: snapshot[ai.AiPrompt](w, "workspace_key, prompt_id", "workspace_key = ?", org),
+		Skill:  snapshot[ai.AiPromptSkill](w, "workspace_key, prompt_id, skill_name", "workspace_key = ?", org),
+		Mode:   snapshot[ai.AiPermissionModeChange](w, "workspace_key, session_id, changed_at", "workspace_key = ?", org),
+	}
 }
 
 // base is the shared fixture: three connections, nine mixed batches, one mis-bound team.
@@ -370,20 +390,28 @@ func TestReplayIncludingTodayWaitsForMidnight(t *testing.T) {
 	w.drainNow()
 
 	requests := snapshot[models.OtelReplayRequest](w, "id", "1 = 1")
-	require.Len(t, requests, 2)
+	require.Len(t, requests, 4)
+	wantKinds := []string{models.OtelReplayKindMetrics, models.OtelReplayKindLogs, models.OtelReplayKindMetrics, models.OtelReplayKindLogs}
+	for index, request := range requests {
+		require.Equal(t, wantKinds[index], request.Kind)
+	}
 	require.Equal(t, models.OtelReplayRequestStatusCompleted, requests[0].Status)
-	require.Equal(t, models.OtelReplayRequestStatusPending, requests[1].Status)
+	require.Equal(t, models.OtelReplayRequestStatusCompleted, requests[1].Status)
+	require.Equal(t, models.OtelReplayRequestStatusPending, requests[2].Status)
+	require.Equal(t, models.OtelReplayRequestStatusCompleted, requests[3].Status)
 	require.True(t, requests[0].RangeEnd.Before(w.today))
-	require.True(t, requests[1].RangeEnd.After(w.today))
+	require.True(t, requests[2].RangeEnd.After(w.today))
 	page, err := service.ListOtelReplays(1, 100)
 	require.NoError(t, err)
-	states := make(map[time.Time]service.OtelReplayState)
+	states := make(map[uint64]service.OtelReplayState)
 	for _, replay := range page.Replays {
-		states[replay.RangeEnd] = replay.State
+		states[replay.Id] = replay.State
 	}
-	require.Equal(t, map[time.Time]service.OtelReplayState{
-		requests[0].RangeEnd: service.OtelReplayStateCompleted,
-		requests[1].RangeEnd: service.OtelReplayStateWaiting,
+	require.Equal(t, map[uint64]service.OtelReplayState{
+		requests[0].ID: service.OtelReplayStateCompleted,
+		requests[1].ID: service.OtelReplayStateCompleted,
+		requests[2].ID: service.OtelReplayStateWaiting,
+		requests[3].ID: service.OtelReplayStateCompleted,
 	}, states)
 
 	w.drainAfterMidnight()
@@ -393,11 +421,11 @@ func TestReplayIncludingTodayWaitsForMidnight(t *testing.T) {
 
 func (w *world) requireReplaysCompletedAfterSplit() []models.OtelReplayRequest {
 	requests := snapshot[models.OtelReplayRequest](w, "id", "1 = 1")
-	require.Len(w.t, requests, 2)
+	require.Len(w.t, requests, 4)
 	for _, request := range requests {
 		require.Equal(w.t, models.OtelReplayRequestStatusCompleted, request.Status)
 	}
-	require.Greater(w.t, requests[1].ReplayedBatches, 0)
+	require.Greater(w.t, requests[2].ReplayedBatches, 0)
 	return requests
 }
 
@@ -449,4 +477,44 @@ func TestRebindRevokedConnectionRecoversItsLivePeriod(t *testing.T) {
 		require.Zero(t, w.count(table, "connection_id = ? AND hour_start < ?", successor.ID, revokedAt))
 	}
 	w.requireReplaysCompleted()
+}
+
+func TestRebindRequeuesLogBatchesForTheReboundTeam(t *testing.T) {
+	w := newWorld(t)
+	fixture := w.seedBase(w.day(-3))
+	w.seedLogBatches(baseLayout, w.day(-2), w.day(-1), w.today)
+	w.drainNow()
+
+	require.Zero(t, w.count(&models.OtelEvent{}, "connection_id = ? AND organization_id = ?", fixture.a.ID, orgR))
+	require.Positive(t, w.count(&models.OtelEvent{}, "connection_id = ? AND user_key = ?", fixture.a.ID, stray.logUserKey()))
+	beforeB, beforeC := w.logFactsOf(fixture.b.ID, orgB), w.logFactsOf(fixture.c.ID, orgC)
+	for _, set := range []logFacts{beforeB, beforeC} {
+		require.NotEmpty(t, set.Events)
+		require.NotEmpty(t, set.Prompt)
+	}
+
+	w.rebind(fixture.a, orgR, w.replayDates(-2, 0))
+	w.drainNow()
+	w.drainAfterMidnight()
+
+	for _, who := range []actor{a1, a2, a3, a4, a5} {
+		for offset := -2; offset <= 0; offset++ {
+			day := w.day(offset)
+			require.Positive(t, w.count(&models.OtelEvent{}, "connection_id = ? AND organization_id = ? AND user_key = ? AND event_timestamp >= ? AND event_timestamp < ?", fixture.a.ID, orgR, who.logUserKey(), day, day.AddDate(0, 0, 1)), "%s %s", who.name, day.Format(dateLayout))
+		}
+	}
+	require.Equal(t, int64(120), w.count(&models.OtelEvent{}, "connection_id = ? AND organization_id = ?", fixture.a.ID, orgR))
+	require.Equal(t, beforeB, w.logFactsOf(fixture.b.ID, orgB))
+	require.Equal(t, beforeC, w.logFactsOf(fixture.c.ID, orgC))
+
+	requests := w.requireReplaysCompleted()
+	require.Len(t, requests, 2)
+	require.Equal(t, models.OtelReplayKindMetrics, requests[0].Kind)
+	require.Equal(t, models.OtelReplayKindLogs, requests[1].Kind)
+	audits := snapshot[models.OtelAuditEvent](w, "id", "action = ? AND connection_id = ?", models.OtelAuditActionReplayRequested, fixture.a.ID)
+	require.Len(t, audits, 1)
+	require.NotNil(t, audits[0].Detail)
+	var detail struct{ Queued []uint64 }
+	require.NoError(t, json.Unmarshal([]byte(*audits[0].Detail), &detail))
+	require.Equal(t, []uint64{requests[0].ID, requests[1].ID}, detail.Queued)
 }

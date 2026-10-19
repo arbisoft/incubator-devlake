@@ -58,7 +58,7 @@ const ROWS = [
     state: OTEL_REPLAY_STATE.FAILED,
     errorMessage: 'converter failed',
   }),
-  replay({ id: 3, state: OTEL_REPLAY_STATE.COMPLETED, requestedBy: null }),
+  replay({ id: 3, kind: OTEL_REPLAY_KIND.LOGS, state: OTEL_REPLAY_STATE.COMPLETED, requestedBy: null }),
 ];
 
 describe('OtelReplays', () => {
@@ -77,6 +77,8 @@ describe('OtelReplays', () => {
     expect(screen.getByText(REPLAY_COPY.state[OTEL_REPLAY_STATE.COMPLETED])).toBeTruthy();
     expect(screen.getAllByText(REPLAY_COPY.batches(3, 1))).toHaveLength(ROWS.length);
     expect(screen.getByText('converter failed')).toBeTruthy();
+    expect(screen.getAllByText(REPLAY_COPY.kind[OTEL_REPLAY_KIND.METRICS])).toHaveLength(2);
+    expect(screen.getAllByText(REPLAY_COPY.kind[OTEL_REPLAY_KIND.LOGS])).toHaveLength(1);
   });
 
   it('requests the next server page when the page changes', async () => {

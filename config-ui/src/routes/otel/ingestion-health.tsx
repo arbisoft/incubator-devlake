@@ -148,6 +148,7 @@ export const OtelIngestionHealth = ({ loading, failed, status, onRetry }: OtelIn
               type="info"
               showIcon
               title={REPLAY_COPY.rebuilding(
+                status.activeReplay.kind,
                 formatReplayDays(status.activeReplay.rangeStart, status.activeReplay.rangeEnd),
                 status.activeReplay.requestedForTeamName,
               )}

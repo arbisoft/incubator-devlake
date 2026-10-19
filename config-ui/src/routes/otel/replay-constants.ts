@@ -18,7 +18,8 @@
 
 import { HttpStatusCode } from 'axios';
 
-import { OTEL_REPLAY_STATE } from '@/api/otel/constants';
+import { OTEL_REPLAY_KIND, OTEL_REPLAY_STATE } from '@/api/otel/constants';
+import type { OtelReplayKind } from '@/api/otel/types';
 import { formatPlural } from '@/utils/text';
 
 export const REPLAY_DAY_FORMAT = 'YYYY-MM-DD';
@@ -38,7 +39,7 @@ export const REPLAY_COPY = {
   rebindAction: (name: string) => `Change organization for ${name}`,
   title: 'Data rebuilds',
   description:
-    "Rebuilds recompute every team's hourly and daily figures for the chosen UTC days from retained telemetry.",
+    "Rebuilds recompute every team's metrics, prompts and events for the chosen UTC days from retained telemetry.",
   rebuild: 'Rebuild data',
   tableLabel: 'Data rebuild requests',
   unavailable: 'Data rebuilds could not be loaded.',
@@ -56,6 +57,10 @@ export const REPLAY_COPY = {
     error: 'Error',
   },
   batches: (replayed: number, skipped: number) => `${replayed} / ${skipped}`,
+  kind: {
+    [OTEL_REPLAY_KIND.METRICS]: 'Metrics',
+    [OTEL_REPLAY_KIND.LOGS]: 'Prompts and events',
+  } satisfies Record<OtelReplayKind, string>,
   state: {
     [OTEL_REPLAY_STATE.PENDING]: 'Pending',
     [OTEL_REPLAY_STATE.WAITING]: 'Waiting for end of day',
@@ -71,9 +76,10 @@ export const REPLAY_COPY = {
     ]
       .filter(Boolean)
       .join(' '),
-  rebuilding: (days: string, team: string | null) => {
+  rebuilding: (kind: OtelReplayKind, days: string, team: string | null) => {
     const requester = team ? `requested for ${team}` : 'requested manually';
-    return `Rebuilding ${days} (UTC), ${requester}. New telemetry appears once it finishes.`;
+    const what = REPLAY_COPY.kind[kind].toLowerCase();
+    return `Rebuilding ${what} for ${days} (UTC), ${requester}. New telemetry appears once it finishes.`;
   },
   errors: {
     rebind: 'Check the organization ID and the days to rebuild, then try again.',
