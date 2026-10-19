@@ -102,23 +102,34 @@ Strict applies to **new and changed code**, not to rewriting the whole codebase:
 ## Example
 
 ```go
+import (
+	"context"
+	"net/http"
+	"time"
+
+	"github.com/apache/incubator-devlake/core/errors" // the project's error package (GO-X1)
+	"github.com/apache/incubator-devlake/core/log"
+)
+
 // Consumer-side interfaces (DIP, ISP).
 type pricer interface {
-	Price(ctx context.Context, model string) (Rate, error)
+	Price(ctx context.Context, model string) (Rate, errors.Error)
 }
 
 // Service holds logic only; all dependencies are injected.
 type CostService struct {
 	prices pricer
 	now    func() time.Time
-	log    Logger
+	logger log.Logger
 }
 
-func NewCostService(prices pricer, log Logger, opts ...Option) (*CostService, error) {
-	if prices == nil || log == nil {
-		return nil, errors.New("cost service: nil dependency")
+type Option func(*CostService)
+
+func NewCostService(prices pricer, logger log.Logger, opts ...Option) (*CostService, errors.Error) {
+	if prices == nil || logger == nil {
+		return nil, errors.Default.New("cost service: nil dependency")
 	}
-	s := &CostService{prices: prices, log: log, now: time.Now}
+	s := &CostService{prices: prices, logger: logger, now: time.Now}
 	for _, o := range opts {
 		o(s)
 	}
@@ -129,10 +140,10 @@ func NewCostService(prices pricer, log Logger, opts ...Option) (*CostService, er
 func WithClock(now func() time.Time) Option { return func(s *CostService) { s.now = now } }
 
 // Composition root (main / entrypoint): the only place with concrete types.
-func run(ctx context.Context, cfg Config) error {
+func run(ctx context.Context, cfg Config) errors.Error {
 	httpc := &http.Client{Timeout: cfg.Timeout}
 	prices := pricing.NewHTTPAdapter(httpc, cfg.PricingURL) // Adapter
-	svc, err := NewCostService(retry.Wrap(prices, 3), logger) // Decorator; logger is the project's Logger (e.g. basicRes.GetLogger())
+	svc, err := NewCostService(retry.Wrap(prices, 3), logger) // Decorator; logger is a log.Logger (e.g. basicRes.GetLogger())
 	…
 }
 ```
