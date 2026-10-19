@@ -80,7 +80,8 @@ export const COPY = {
     rebuild: 'Rebuild past data',
     rebuildHint:
       "Past days only recover through a rebuild. It recomputes every team's metrics, prompts and events for those days; other teams' numbers stay the same.",
-    previousOrg: 'Data received under the previous organization is removed for those days.',
+    previousOrg:
+      'Metric data received under the previous organization is removed for those days. Existing prompts and events remain.',
     unavailable: "No retained data for this connection's live period.",
     confirm: {
       tone: CONFIRM_TONE.DANGER,
