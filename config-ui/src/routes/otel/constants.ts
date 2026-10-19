@@ -25,7 +25,8 @@ import type { ConfirmConfig } from '@/ui/types';
 import { HEALTH_COPY } from './health-copy';
 
 export const OTEL_ATTENTION_CHANGED_EVENT = 'devlake:otel-attention-changed';
-export const OTEL_POLL = { interval: 30_000 } as const;
+export const OTEL_REFRESH_INTERVAL_MS = 30_000;
+export const OTEL_POLL = { interval: OTEL_REFRESH_INTERVAL_MS } as const;
 export const OTEL_VISIBILITY_THROTTLE_MS = 10_000;
 export const PROJECT_CHIP_LIMIT = 3;
 export const OTEL_PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;

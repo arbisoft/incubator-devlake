@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { OTEL_REPLAY_KIND, OTEL_REPLAY_STATE, OTEL_STATUS } from '@/api/otel/constants';
+import { OTEL_ERROR_CODE, OTEL_REPLAY_KIND, OTEL_REPLAY_STATE, OTEL_STATUS } from '@/api/otel/constants';
 import type { OtelConnection, OtelReplay } from '@/api/otel/types';
 
 import { REPLAY_COPY } from './replay-constants';
@@ -75,7 +75,9 @@ const replayRequest = (
   completedAt: null,
 });
 
-const httpError = (status: number) => ({ response: { status, data: { message: 'SELECT * FROM secrets' } } });
+const httpError = (status: number, code?: string) => ({
+  response: { status, data: { message: 'SELECT * FROM secrets', code } },
+});
 
 describe('routes/otel/utils replay helpers', () => {
   it('limits rebuild days to the UTC retention window', () => {
@@ -155,6 +157,8 @@ describe('routes/otel/utils replay helpers', () => {
 
   it('maps rebind and rebuild failures to safe copy', () => {
     expect(getOtelRebindError(httpError(400))).toBe(REPLAY_COPY.errors.rebind);
+    expect(getOtelRebindError(httpError(400, OTEL_ERROR_CODE.ALREADY_BOUND))).toBe(REPLAY_COPY.errors.alreadyBound);
+    expect(getOtelRebindError(httpError(400, OTEL_ERROR_CODE.REPLAY_RANGE))).toBe(REPLAY_COPY.errors.rebindRange);
     expect(getOtelRebindError(httpError(404))).toBe(REPLAY_COPY.errors.connectionMissing);
     expect(getOtelRebindError(new Error('network error'))).toBe(REPLAY_COPY.errors.rebindFailed);
     expect(getOtelReplayError(httpError(400))).toBe(REPLAY_COPY.errors.replay);

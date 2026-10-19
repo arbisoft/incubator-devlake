@@ -24,18 +24,20 @@ import API from '@/api';
 import type { OtelReplayQueue, OtelReplayRange } from '@/api/otel';
 import { ConfirmModal, FormModal, MODAL_WIDTH, useModalForm } from '@/ui';
 
+import { EMPTY_REPLAY_RANGE } from '../replay-constants';
 import { Fields } from '../styled';
 import type { ReplayModalProps } from '../types';
-import { formatDayRange, getOtelReplayError, getReplayDateLimits, getReplayQueuedMessage } from '../utils';
+import {
+  formatDayRange,
+  getOtelReplayError,
+  getReplayDateLimits,
+  getReplayQueuedMessage,
+  hasReplayRange,
+} from '../utils';
 
 import { COPY } from './constants';
 import { ReplayRangeField } from './replay-range-field';
 import { useConfirmedMutation } from './use-confirmed-mutation';
-
-const getFullRange = (): OtelReplayRange => {
-  const { min, max } = getReplayDateLimits(new Date());
-  return { startDate: min, endDate: max };
-};
 
 const resolve = ({ startDate, endDate }: OtelReplayRange) => ({
   config: COPY.replayModal.confirm,
@@ -48,9 +50,10 @@ const formatSuccess = (_range: OtelReplayRange, queue: OtelReplayQueue) => getRe
 
 export const ReplayModal = ({ open, onClose, onQueued }: ReplayModalProps) => {
   const { values, setField, modalProps } = useModalForm(
-    { range: getFullRange() },
-    { onClose, required: [], disabledReason: COPY.range.label },
+    { range: EMPTY_REPLAY_RANGE },
+    { onClose, required: [], disabledReason: '' },
   );
+  const limits = getReplayDateLimits(new Date());
   const { request: confirm, confirmProps } = useConfirmedMutation({
     resolve,
     request,
@@ -63,7 +66,7 @@ export const ReplayModal = ({ open, onClose, onQueued }: ReplayModalProps) => {
   });
 
   useEffect(() => {
-    if (open) setField('range', getFullRange());
+    if (open) setField('range', EMPTY_REPLAY_RANGE);
   }, [open, setField]);
 
   return (
@@ -75,15 +78,13 @@ export const ReplayModal = ({ open, onClose, onQueued }: ReplayModalProps) => {
         icon={<HistoryOutlined aria-hidden />}
         title={COPY.replayModal.title}
         submitLabel={COPY.replayModal.submit}
+        submitDisabled={!hasReplayRange(values.range)}
+        disabledReason={COPY.range.hint(limits.min, limits.max)}
         onSubmit={() => confirm(values.range)}
       >
         <Fields>
           <Alert type="warning" showIcon title={COPY.replayModal.notice} />
-          <ReplayRangeField
-            value={values.range}
-            limits={getReplayDateLimits(new Date())}
-            onChange={(range) => setField('range', range)}
-          />
+          <ReplayRangeField value={values.range} limits={limits} onChange={(range) => setField('range', range)} />
         </Fields>
       </FormModal>
       <ConfirmModal {...confirmProps} />

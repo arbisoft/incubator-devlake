@@ -18,12 +18,13 @@
 
 import { HttpStatusCode } from 'axios';
 
-import { OTEL_REPLAY_KIND, OTEL_REPLAY_STATE } from '@/api/otel/constants';
-import type { OtelReplayKind } from '@/api/otel/types';
+import { OTEL_ERROR_CODE, OTEL_REPLAY_KIND, OTEL_REPLAY_STATE } from '@/api/otel/constants';
+import type { OtelReplayKind, OtelReplayRange } from '@/api/otel/types';
 import { formatPlural } from '@/utils/text';
 
 export const REPLAY_DAY_FORMAT = 'YYYY-MM-DD';
 export const REPLAY_MAX_LOOKBACK_DAYS = 89;
+export const EMPTY_REPLAY_RANGE: OtelReplayRange = { startDate: '', endDate: '' };
 export const ORGANIZATION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const REPLAY_COLUMN = {
@@ -82,6 +83,10 @@ export const REPLAY_COPY = {
     rebind: 'Check the organization ID and the days to rebuild, then try again.',
     replay: 'Pick days within the last 90 days, up to today (UTC).',
     connectionMissing: 'This connection no longer exists. Refresh the page.',
+    alreadyBound:
+      'This connection is already bound to this organization. Someone may have just changed it; check the current organization.',
+    rebindRange:
+      "Some of these days can't be rebuilt. Pick days from the connection's first day, within the last 90 days, up to today (UTC).",
     rebindFailed: 'Unable to change the organization. Please try again.',
     replayFailed: 'Unable to queue the rebuild. Please try again.',
   },
@@ -90,6 +95,8 @@ export const REPLAY_COPY = {
 export const REBIND_ERROR_MAP: Record<string, string> = {
   [HttpStatusCode.BadRequest]: REPLAY_COPY.errors.rebind,
   [HttpStatusCode.NotFound]: REPLAY_COPY.errors.connectionMissing,
+  [OTEL_ERROR_CODE.ALREADY_BOUND]: REPLAY_COPY.errors.alreadyBound,
+  [OTEL_ERROR_CODE.REPLAY_RANGE]: REPLAY_COPY.errors.rebindRange,
 };
 
 export const REPLAY_ERROR_MAP: Record<string, string> = {

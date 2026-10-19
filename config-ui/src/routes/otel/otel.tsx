@@ -61,7 +61,7 @@ export const Otel = () => {
   const [credential, setCredential] = useState<OtelConnectionResponse>();
   const [credentialOpen, setCredentialOpen] = useState(false);
   const generateButtonRef = useRef<HTMLButtonElement>(null);
-  const [actionButtons] = useState(() => new Map<string, HTMLButtonElement>());
+  const actionButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const pendingCredentialFocus = useRef<PendingCredentialFocus | undefined>(undefined);
 
   const connections = useAutoRefresh((signal) => API.otel.list(signal), [version], OTEL_POLL);
@@ -71,6 +71,7 @@ export const Otel = () => {
   const projectOptions = projectOptionsQuery.data;
 
   const rows = useMemo(() => connections.data ?? [], [connections.data]);
+  const rebindTarget = rows.find((row) => row.connection.id === target?.connection.id) ?? target;
   const { rows: pageRows, pagination } = useClientPagination(rows);
   const failed = connections.data === undefined && connections.error !== undefined;
 
@@ -100,10 +101,10 @@ export const Otel = () => {
   const registerActionButton = useCallback(
     (connectionId: string | number, action: LifecycleAction, button: HTMLButtonElement | null) => {
       const key = `${connectionId}:${action}`;
-      if (button) actionButtons.set(key, button);
-      else actionButtons.delete(key);
+      if (button) actionButtonRefs.current.set(key, button);
+      else actionButtonRefs.current.delete(key);
     },
-    [actionButtons],
+    [],
   );
 
   useEffect(() => {
@@ -112,13 +113,13 @@ export const Otel = () => {
 
     const button =
       pending.action && pending.connectionId !== undefined
-        ? actionButtons.get(`${pending.connectionId}:${pending.action}`)
+        ? actionButtonRefs.current.get(`${pending.connectionId}:${pending.action}`)
         : generateButtonRef.current;
     if (!button || button.disabled) return;
 
     button.focus();
     pendingCredentialFocus.current = undefined;
-  }, [actionButtons, credential, credentialOpen, rows]);
+  }, [credential, credentialOpen, rows]);
 
   const columns = useMemo(
     () =>
@@ -219,7 +220,7 @@ export const Otel = () => {
       />
       <RebindModal
         open={modal === OTEL_MODAL.REBIND}
-        connection={target}
+        connection={rebindTarget}
         onClose={closeModal}
         onRebound={() => {
           closeModal();

@@ -63,3 +63,8 @@ export const OTEL_REPLAY_KIND = {
   METRICS: 'metrics',
   LOGS: 'logs',
 } as const;
+
+export const OTEL_ERROR_CODE = {
+  ALREADY_BOUND: 'OTEL_ALREADY_BOUND',
+  REPLAY_RANGE: 'OTEL_REPLAY_RANGE',
+} as const;

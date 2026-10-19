@@ -18,14 +18,15 @@
 
 import { SwapOutlined } from '@ant-design/icons';
 import { Alert, Checkbox, Input, Typography } from 'antd';
-import { useEffect, useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 
 import { OTEL_STATUS, type OtelReplayRange } from '@/api/otel';
 import { ConfirmModal, FormField, FormModal, KeyValueList, MODAL_WIDTH, useModalForm } from '@/ui';
 
+import { EMPTY_REPLAY_RANGE } from '../replay-constants';
 import { Fields, Hint } from '../styled';
 import type { RebindModalProps } from '../types';
-import { getRebindDefaults, getReplayDateLimits, isOrganizationId } from '../utils';
+import { getRebindDefaults, getReplayDateLimits, hasReplayRange, isOrganizationId } from '../utils';
 
 import { COPY } from './constants';
 import { ReplayRangeField } from './replay-range-field';
@@ -34,7 +35,7 @@ import { useRebindConfirm } from './use-rebind-confirm';
 const INITIAL_FORM: { organizationId: string; rebuild: boolean; range: OtelReplayRange } = {
   organizationId: '',
   rebuild: false,
-  range: { startDate: '', endDate: '' },
+  range: EMPTY_REPLAY_RANGE,
 };
 
 export const RebindModal = ({ open, connection, onClose, onRebound }: RebindModalProps) => {
@@ -52,20 +53,25 @@ export const RebindModal = ({ open, connection, onClose, onRebound }: RebindModa
   });
   const target = connection?.connection;
 
+  const targetId = target?.id;
+
+  const applyDefaults = useEffectEvent(() => {
+    if (!target) return;
+    const { rebuild, range } = getRebindDefaults(target, new Date());
+    setField('rebuild', rebuild);
+    setField('range', range);
+  });
+
   useEffect(() => {
-    if (open && target) {
-      const { rebuild, range } = getRebindDefaults(target, new Date());
-      setField('rebuild', rebuild);
-      setField('range', range);
-    }
-  }, [open, target, setField]);
+    if (open && targetId !== undefined) applyDefaults();
+  }, [open, targetId]);
 
   const now = new Date();
   const limits = getReplayDateLimits(now, target?.createdAt);
   const available = target ? getRebindDefaults(target, now).available : false;
   const organizationId = values.organizationId.trim();
   const same = organizationId.toLowerCase() === (target?.organizationId ?? '').toLowerCase();
-  const rangeMissing = values.rebuild && !(values.range.startDate && values.range.endDate);
+  const rangeMissing = values.rebuild && !hasReplayRange(values.range);
   const invalid = !isOrganizationId(organizationId);
   const disabledReason = [
     { blocked: invalid, reason: COPY.rebind.invalid },

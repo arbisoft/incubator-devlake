@@ -200,6 +200,8 @@ export const getReplayDateLimits = (now: Date, createdAt?: string): ReplayDateLi
 
 export const isReplayDayDisabled = (day: string, { min, max }: ReplayDateLimits) => day < min || day > max;
 
+export const hasReplayRange = ({ startDate, endDate }: OtelReplayRange) => Boolean(startDate && endDate);
+
 export const includesToday = ({ endDate }: OtelReplayRange, { max }: Pick<ReplayDateLimits, 'max'>) => endDate === max;
 
 export const getRebindDefaults = (connection: OtelConnection, now: Date) => {

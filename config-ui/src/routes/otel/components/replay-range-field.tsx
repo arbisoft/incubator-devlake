@@ -23,7 +23,7 @@ import { FormField } from '@/ui';
 import { REPLAY_DAY_FORMAT } from '../replay-constants';
 import { ReplayRange } from '../styled';
 import type { ReplayRangeFieldProps } from '../types';
-import { includesToday, isReplayDayDisabled } from '../utils';
+import { hasReplayRange, includesToday, isReplayDayDisabled } from '../utils';
 
 import { COPY } from './constants';
 
@@ -39,7 +39,7 @@ export const ReplayRangeField = ({ value, limits, onChange }: ReplayRangeFieldPr
           {...control}
           format={REPLAY_DAY_FORMAT}
           allowClear={false}
-          value={[dayjs(value.startDate), dayjs(value.endDate)]}
+          value={hasReplayRange(value) ? [dayjs(value.startDate), dayjs(value.endDate)] : null}
           disabledDate={(day) => isReplayDayDisabled(day.format(REPLAY_DAY_FORMAT), limits)}
           onChange={(range) => {
             const [start, end] = range ?? [];
