@@ -83,6 +83,13 @@ type AiPrompt struct {
 	SkillCount             int64  `json:"skillCount"`
 	UsedSkill              bool   `gorm:"index" json:"usedSkill"`
 	SourceType             string `gorm:"type:varchar(64)" json:"sourceType"`
+
+	// Effort is the reasoning effort level (such as low, medium, high, xhigh or max) of the
+	// prompt's main conversation requests, from Claude Code's api_request effort attribute.
+	// When no main-thread request reports one, it is the first effort any request reported.
+	// It is nil when no request reported one: prompts that made no model request, clients
+	// that do not send effort, and prompts converted before it was recorded.
+	Effort *string `gorm:"type:varchar(64);index" json:"effort,omitempty"`
 }
 
 func (AiPrompt) TableName() string { return "ai_prompts" }

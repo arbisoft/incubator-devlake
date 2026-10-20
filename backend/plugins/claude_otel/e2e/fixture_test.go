@@ -271,7 +271,7 @@ func doubleAttr(key string, value float64) *commonv1.KeyValue {
 func (a actor) logResource(at time.Time, seed int) *logsv1.ResourceLogs {
 	session := "sess-" + a.team + "-" + a.name + "-" + strconv.Itoa(seed)
 	prompt := "p-" + a.team + "-" + a.name + "-" + strconv.Itoa(seed)
-	model, query := fxModels[seed%len(fxModels)], fxQueries[seed%len(fxQueries)]
+	model, query, effort := fxModels[seed%len(fxModels)], fxQueries[seed%len(fxQueries)], fxEfforts[seed%len(fxEfforts)]
 	tool := fxTools[seed%len(fxTools)]
 	toolUse := "tu-" + strconv.Itoa(seed)
 	sequence := int64(0)
@@ -296,7 +296,7 @@ func (a actor) logResource(at time.Time, seed int) *logsv1.ResourceLogs {
 	records := []*logsv1.LogRecord{
 		record("user_prompt", intAttr("prompt_length", 20+f%50), strAttr("prompt_text", "synthetic prompt "+strconv.Itoa(seed))),
 		record("api_request", strAttr("model", model), intAttr("input_tokens", f*113), intAttr("output_tokens", f*29+7), intAttr("cache_read_tokens", f*457),
-			intAttr("cache_creation_tokens", f*61+3), doubleAttr("cost_usd", float64(seed)*0.0125+0.0003), intAttr("duration_ms", 900+f*7), strAttr("query_source", query), strAttr("request_id", "req-"+strconv.Itoa(seed))),
+			intAttr("cache_creation_tokens", f*61+3), doubleAttr("cost_usd", float64(seed)*0.0125+0.0003), intAttr("duration_ms", 900+f*7), strAttr("query_source", query), strAttr("effort", effort), strAttr("request_id", "req-"+strconv.Itoa(seed))),
 		record("tool_decision", strAttr("tool_name", tool), strAttr("tool_use_id", toolUse), strAttr("decision", []string{"accept", "reject"}[seed%2]), strAttr("source", fxSources[seed%len(fxSources)])),
 		record("tool_result", strAttr("tool_name", tool), strAttr("tool_use_id", toolUse), strAttr("success", []string{"true", "false"}[seed%2]), intAttr("duration_ms", 10+f)),
 		record("assistant_response", intAttr("response_length", 100+f*3), strAttr("model", model)),

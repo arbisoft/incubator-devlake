@@ -630,6 +630,102 @@ func TestPromptRollupRecordsRepositoryURL(t *testing.T) {
 	}
 }
 
+// The api_request effort attribute is kept on the stored event and becomes the prompt's
+// effort. A prompt whose requests report no effort, or that made none, has none.
+func TestPromptRollupRecordsEffort(t *testing.T) {
+	request := loadLogEventsFixture(t)
+	stripContentAttributes(request)
+	records := resourceLogRecords(request.GetResourceLogs()[0])
+	setStringAttribute(records[1], "effort", "high") // p1's api_request
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 1)
+	if err != nil {
+		t.Fatalf("prepareEvents() error = %v", err)
+	}
+	byPrompt := make(map[string][]*models.OtelEvent)
+	for _, item := range prepared.events {
+		byPrompt[item.event.PromptId] = append(byPrompt[item.event.PromptId], item.event)
+	}
+
+	if got := eventString(eventAttributes(firstEventNamed(t, byPrompt["p1"], eventAPIRequest)), "effort"); got != "high" {
+		t.Fatalf("stored p1 api_request effort = %q, want %q", got, "high")
+	}
+	for _, test := range []struct {
+		promptID string
+		want     string
+	}{
+		{"p1", "high"},
+		{"p2", ""}, // its api_request reports no effort
+		{"p3", ""}, // no api_request
+	} {
+		t.Run(test.promptID, func(t *testing.T) {
+			got := buildPromptRollup(testOrganizationID, test.promptID, byPrompt[test.promptID]).prompt.Effort
+			if gotValue := stringValue(got); gotValue != test.want || (test.want == "") != (got == nil) {
+				t.Fatalf("%s effort = %v, want %q", test.promptID, got, test.want)
+			}
+		})
+	}
+}
+
+// The main conversation's effort wins over background requests such as session titles,
+// which may run at another level. Background effort is used only while the prompt has no
+// main-thread effort.
+func TestPromptBuilderApplyEffort(t *testing.T) {
+	type request struct{ querySource, effort string }
+	for _, test := range []struct {
+		name     string
+		requests []request
+		want     string
+	}{
+		{"main thread after background", []request{{"generate_session_title", "low"}, {mainThreadQuerySource, "high"}, {mainThreadQuerySource, "max"}}, "high"},
+		{"main thread before background", []request{{mainThreadQuerySource, "xhigh"}, {"generate_session_title", "low"}}, "xhigh"},
+		{"background only", []request{{"generate_session_title", "low"}, {"away_summary", "medium"}}, "low"},
+		{"main thread without effort", []request{{mainThreadQuerySource, ""}, {"away_summary", "medium"}}, "medium"},
+		{"no query source", []request{{"", "medium"}}, "medium"},
+		{"no effort", []request{{mainThreadQuerySource, ""}}, ""},
+		{"no requests", nil, ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			builder := &promptBuilder{prompt: &ai.AiPrompt{}}
+			for _, r := range test.requests {
+				builder.applyEffort(r.querySource, r.effort)
+			}
+			got := builder.prompt.Effort
+			if gotValue := stringValue(got); gotValue != test.want || (test.want == "") != (got == nil) {
+				t.Fatalf("effort = %v, want %q", got, test.want)
+			}
+		})
+	}
+}
+
+// The rollup reloads a prompt's stored events with rollupEventColumns, so every column the
+// effort rule reads must be in it. Without query_source, every reloaded request looks like
+// background work and a session-title request could decide the prompt's effort.
+func TestRollupEventColumnsLoadEffortInputs(t *testing.T) {
+	columns := strings.Split(strings.ReplaceAll(rollupEventColumnsSQL(), " ", ""), ",")
+	for _, want := range []string{"query_source", "attributes"} {
+		found := false
+		for _, column := range columns {
+			found = found || column == want
+		}
+		if !found {
+			t.Errorf("rollup event columns = %q, missing %s", rollupEventColumnsSQL(), want)
+		}
+	}
+}
+
+// firstEventNamed returns the first of a prompt's events with the given name.
+func firstEventNamed(t *testing.T, events []*models.OtelEvent, eventName string) *models.OtelEvent {
+	t.Helper()
+	for _, event := range events {
+		if event.EventName == eventName {
+			return event
+		}
+	}
+	t.Fatalf("no %s event among %d events", eventName, len(events))
+	return nil
+}
+
 func TestPromptRollupNeverCarriesPromptText(t *testing.T) {
 	for _, promptID := range []string{"p1", "p2"} {
 		rollup := buildPromptRollup(testOrganizationID, promptID, fixturePromptEvents(t, promptID))

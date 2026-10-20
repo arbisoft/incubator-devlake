@@ -93,6 +93,7 @@ func TestColumnWidthConstantsMatchModels(t *testing.T) {
 		{ai.AiPrompt{}, "CommandSource", maxCommandSourceLength},
 		{ai.AiPrompt{}, "ModelsUsed", maxModelsUsedLength},
 		{ai.AiPrompt{}, "RepositoryUrl", maxRepositoryURLLength},
+		{ai.AiPrompt{}, "Effort", maxAiLabelLength},
 		{ai.AiPromptSkill{}, "SkillName", eventNamedColumnLength},
 		{ai.AiPromptSkill{}, "PluginName", eventNamedColumnLength},
 		{ai.AiPromptSkill{}, "InvocationTrigger", maxAiLabelLength},

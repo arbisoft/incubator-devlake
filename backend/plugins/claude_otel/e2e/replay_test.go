@@ -238,6 +238,8 @@ func (w *world) requireLogsOn(connectionID uint64, org string, who actor, day ti
 	next := day.AddDate(0, 0, 1)
 	require.Positive(w.t, w.count(&models.OtelEvent{}, "connection_id = ? AND organization_id = ? AND user_key = ? AND event_timestamp >= ? AND event_timestamp < ?", connectionID, org, who.logUserKey(), day, next), "%s %s", who.name, day.Format(dateLayout))
 	require.Positive(w.t, w.count(&ai.AiPrompt{}, "workspace_key = ? AND user_key = ? AND started_at >= ? AND started_at < ?", org, who.logUserKey(), day, next), "%s %s", who.name, day.Format(dateLayout))
+	// Every fixture api_request reports an effort, so every converted prompt carries one.
+	require.Zero(w.t, w.count(&ai.AiPrompt{}, "workspace_key = ? AND user_key = ? AND started_at >= ? AND started_at < ? AND effort IS NULL", org, who.logUserKey(), day, next), "%s %s prompts without effort", who.name, day.Format(dateLayout))
 }
 
 func (w *world) logFactsOf(connectionID uint64, org string) logFacts {

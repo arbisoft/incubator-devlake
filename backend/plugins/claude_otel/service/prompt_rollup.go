@@ -34,7 +34,7 @@ import (
 // rollupEventColumns are the event columns the rollup reads. prompt_text is left out, so
 // prompt text can never reach ai_* tables and large texts are not loaded per rollup.
 var rollupEventColumns = dal.Select("event_key, connection_id, user_key, user_account_id, user_email, session_id, prompt_id, " +
-	"event_name, event_sequence, event_timestamp, command_name, model, tool_name, skill_name, plugin_name, success, cost_usd, " +
+	"event_name, event_sequence, event_timestamp, command_name, model, query_source, tool_name, skill_name, plugin_name, success, cost_usd, " +
 	"input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, attributes")
 
 const (
@@ -43,6 +43,9 @@ const (
 	skillToolName       = "Skill"
 	toolDecisionReject  = "reject"
 	maxModelsUsedLength = 1024
+	// mainThreadQuerySource is the api_request query_source of the conversation itself,
+	// as opposed to background work such as session titles and summaries.
+	mainThreadQuerySource = "repl_main_thread"
 	// Widths of ai_* columns filled straight from event attributes, which have no typed
 	// event column to bound them. The rollup rereads stored events, so an oversized value
 	// would otherwise fail every later batch that touches its prompt or session.
@@ -257,6 +260,9 @@ type promptBuilder struct {
 	skills     *skillCollector
 	modelNames []string
 	seenModels map[string]struct{}
+	// mainThreadEffort is set once a main-thread request has given the prompt its effort,
+	// so a later request cannot replace it.
+	mainThreadEffort bool
 }
 
 // promptEventApplier adds one event's contribution to the prompt being built.
@@ -283,8 +289,9 @@ func (b *promptBuilder) applyUserPrompt(event *models.OtelEvent, attributes map[
 	b.prompt.CommandSource = truncate(eventString(attributes, "command_source"), maxCommandSourceLength)
 }
 
-func (b *promptBuilder) applyAPIRequest(event *models.OtelEvent, _ map[string]interface{}) {
+func (b *promptBuilder) applyAPIRequest(event *models.OtelEvent, attributes map[string]interface{}) {
 	b.prompt.ApiRequestCount++
+	b.applyEffort(event.QuerySource, truncate(eventString(attributes, "effort"), maxAiLabelLength))
 	b.prompt.InputTokens += event.InputTokens
 	b.prompt.OutputTokens += event.OutputTokens
 	b.prompt.CacheReadTokens += event.CacheReadTokens
@@ -299,6 +306,24 @@ func (b *promptBuilder) applyAPIRequest(event *models.OtelEvent, _ map[string]in
 		b.modelNames = append(b.modelNames, event.Model)
 	}
 	b.skills.add(event.SkillName, ai.SkillDetectedViaApiRequest, "", "", event.PluginName, event.EventTimestamp)
+}
+
+// applyEffort records one api_request's effort on the prompt. The first main-thread
+// request that reports an effort decides it. Until one does, the first request of any
+// source does, so a prompt whose only requests were background work still gets a value.
+// An empty effort changes nothing.
+func (b *promptBuilder) applyEffort(querySource, effort string) {
+	if effort == "" || b.mainThreadEffort {
+		return
+	}
+	if querySource == mainThreadQuerySource {
+		b.prompt.Effort = &effort
+		b.mainThreadEffort = true
+		return
+	}
+	if b.prompt.Effort == nil {
+		b.prompt.Effort = &effort
+	}
 }
 
 func (b *promptBuilder) applyAPIError(_ *models.OtelEvent, _ map[string]interface{}) {

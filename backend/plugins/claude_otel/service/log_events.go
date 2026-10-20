@@ -289,10 +289,11 @@ var storedEventAttributes = map[string]struct{}{
 	// user_prompt.
 	"prompt_length": {}, "command_name": {}, "command_source": {},
 	// api_request and api_error. On api_error, error is a service message; ingest drops
-	// the tool_result error, which can echo file contents.
+	// the tool_result error, which can echo file contents. effort is the reasoning effort
+	// level an api_request ran at.
 	"model": {}, "cost_usd": {}, "duration_ms": {}, "input_tokens": {}, "output_tokens": {},
 	"cache_read_tokens": {}, "cache_creation_tokens": {}, "request_id": {}, "query_source": {},
-	"speed": {}, "error": {}, "error_type": {}, "status_code": {}, "attempt": {}, "response_length": {},
+	"speed": {}, "effort": {}, "error": {}, "error_type": {}, "status_code": {}, "attempt": {}, "response_length": {},
 	// tool_result and tool_decision. tool_parameters keeps only toolParameterKeys.
 	"tool_name": {}, "tool_use_id": {}, "success": {}, "decision": {}, "source": {},
 	"decision_type": {}, "decision_source": {}, "tool_result_size_bytes": {},

@@ -109,6 +109,8 @@ LEFT JOIN repos r ON LOWER(r.url) = p.repository_url
 LEFT JOIN project_mapping pm ON pm.`table` = 'repos' AND pm.row_id = r.id;
 ```
 
+Each prompt records its reasoning effort level (such as `low`, `medium`, `high`, `xhigh` or `max`) as `ai_prompts.effort`, from the `effort` attribute Claude Code sends on `api_request` events; events keep it in `_tool_claude_code_otel_events.attributes`. The prompt takes the effort of its main conversation requests (`query_source` `repl_main_thread`), and falls back to the first effort any request reported, such as a background session-title request. It is NULL when no request reported one, for example for local slash commands and older clients. Prompts converted before the column existed are filled by a log replay, because the raw batches keep the attribute.
+
 Claude Code reports only permission mode changes, not the mode a session starts in. A prompt before a session's first change takes that change's `from_mode`. Prompts in a session with no change are recorded as `default` with `permission_mode_inferred` set.
 
 The generated endpoint must be HTTPS in a real deployment. Basic Auth only encodes credentials; TLS provides transport confidentiality. Do not send customer credentials to an `http://` endpoint.
