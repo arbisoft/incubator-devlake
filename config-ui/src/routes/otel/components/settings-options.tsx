@@ -17,11 +17,12 @@
  */
 
 import { Alert } from 'antd';
+import { useId } from 'react';
 
 import { HelpPopover, SettingOption } from '@/ui';
 
 import { childrenOf, estimateStorage, hasSingleSignal, isLastSignal, TOP_LEVEL_OPTIONS } from '../managed-settings';
-import { Hint } from '../styled';
+import { LastSignalHint } from '../styled';
 import type { SettingsOption, SettingsOptionsProps } from '../types';
 
 import { COPY } from './constants';
@@ -31,6 +32,7 @@ import { OptionHelp } from './option-help';
 const OPTIONS_COPY = COPY.snippet.options;
 
 export const SettingsOptions = ({ value, onChange }: SettingsOptionsProps) => {
+  const lastSignalId = useId();
   const renderOption = (option: SettingsOption) => (
     <SettingOption
       key={option}
@@ -41,6 +43,7 @@ export const SettingsOptions = ({ value, onChange }: SettingsOptionsProps) => {
       }
       checked={value[option]}
       disabled={isLastSignal(value, option)}
+      describedBy={isLastSignal(value, option) ? lastSignalId : undefined}
       onChange={(checked) => onChange({ ...value, [option]: checked })}
     >
       {value[option] && childrenOf(option).map((child) => renderOption(child))}
@@ -53,8 +56,10 @@ export const SettingsOptions = ({ value, onChange }: SettingsOptionsProps) => {
     <>
       <div role="group" aria-label={OPTIONS_COPY.title}>
         {TOP_LEVEL_OPTIONS.map((option) => renderOption(option))}
+        <LastSignalHint id={lastSignalId} role="status">
+          {hasSingleSignal(value) ? OPTIONS_COPY.lastSignal : null}
+        </LastSignalHint>
       </div>
-      {hasSingleSignal(value) && <Hint>{OPTIONS_COPY.lastSignal}</Hint>}
       <Alert type="info" role="status" showIcon title={OPTIONS_COPY.estimate(rawMb, monthlyMb)} />
     </>
   );

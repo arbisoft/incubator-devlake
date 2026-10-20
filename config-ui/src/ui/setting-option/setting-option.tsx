@@ -17,6 +17,7 @@
  */
 
 import { Checkbox } from 'antd';
+import { useId } from 'react';
 
 import { Option, OptionExtra, OptionHint, OptionLabel } from './styled';
 import type { SettingOptionProps } from './types';
@@ -27,17 +28,26 @@ export const SettingOption = ({
   checked,
   disabled,
   aside,
+  describedBy,
   onChange,
   children,
-}: SettingOptionProps) => (
-  <Option>
-    <Checkbox checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)}>
-      <OptionLabel>{label}</OptionLabel>
-    </Checkbox>
-    <OptionHint>
-      {description}
-      {aside}
-    </OptionHint>
-    {children && <OptionExtra>{children}</OptionExtra>}
-  </Option>
-);
+}: SettingOptionProps) => {
+  const hintId = useId();
+  return (
+    <Option>
+      <Checkbox
+        checked={checked}
+        disabled={disabled}
+        aria-describedby={[hintId, describedBy].filter(Boolean).join(' ')}
+        onChange={(event) => onChange(event.target.checked)}
+      >
+        <OptionLabel>{label}</OptionLabel>
+      </Checkbox>
+      <OptionHint id={hintId}>
+        {description}
+        {aside}
+      </OptionHint>
+      {children && <OptionExtra>{children}</OptionExtra>}
+    </Option>
+  );
+};

@@ -26,6 +26,7 @@ import { SettingOption } from './setting-option';
 const LABEL = 'Share usage data';
 const DESCRIPTION = 'Send anonymous usage data.';
 const CHILD = 'Nested content';
+const ASIDE = 'More about this';
 
 describe('SettingOption', () => {
   it('renders the label and description and reports toggles', () => {
@@ -49,8 +50,43 @@ describe('SettingOption', () => {
     expect(screen.getByText(CHILD)).toBeTruthy();
   });
 
+  it('reports unchecking', () => {
+    const onChange = vi.fn();
+    renderWithTheme(<SettingOption label={LABEL} description={DESCRIPTION} checked onChange={onChange} />);
+    fireEvent.click(screen.getByRole('checkbox', { name: LABEL }));
+    expect(onChange).toHaveBeenCalledWith(false);
+  });
+
   it('passes disabled to the checkbox', () => {
-    renderWithTheme(<SettingOption label={LABEL} description={DESCRIPTION} checked disabled onChange={vi.fn()} />);
-    expect(screen.getByRole<HTMLInputElement>('checkbox', { name: LABEL }).disabled).toBe(true);
+    const onChange = vi.fn();
+    renderWithTheme(<SettingOption label={LABEL} description={DESCRIPTION} checked disabled onChange={onChange} />);
+    const checkbox = screen.getByRole<HTMLInputElement>('checkbox', { name: LABEL });
+    expect(checkbox.disabled).toBe(true);
+    fireEvent.click(checkbox);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('renders the aside next to the description', () => {
+    renderWithTheme(
+      <SettingOption
+        label={LABEL}
+        description={DESCRIPTION}
+        checked
+        aside={<button>{ASIDE}</button>}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(DESCRIPTION).contains(screen.getByRole('button', { name: ASIDE }))).toBe(true);
+  });
+
+  it('describes the checkbox with its description and extra ids', () => {
+    renderWithTheme(
+      <SettingOption label={LABEL} description={DESCRIPTION} checked describedBy="extra-id" onChange={vi.fn()} />,
+    );
+    const describedBy = screen.getByRole('checkbox', { name: LABEL }).getAttribute('aria-describedby') ?? '';
+    const ids = describedBy.split(' ');
+    expect(ids).toContain('extra-id');
+    const hintId = ids.find((id) => id !== 'extra-id') ?? '';
+    expect(document.getElementById(hintId)?.textContent).toContain(DESCRIPTION);
   });
 });

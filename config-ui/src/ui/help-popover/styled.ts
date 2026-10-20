@@ -22,6 +22,10 @@ import { focusRingStyle } from '@/ui/style-helpers';
 
 export const HelpButton = styled.button`
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: ${({ theme }) => theme.space.lg}px;
+  min-height: ${({ theme }) => theme.space.lg}px;
   padding: 0;
   border: 0;
   background: none;

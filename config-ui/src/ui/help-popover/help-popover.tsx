@@ -18,14 +18,18 @@
 
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import { Popover } from 'antd';
+import { useState } from 'react';
 
 import { HelpButton } from './styled';
 import type { HelpPopoverProps } from './types';
 
-export const HelpPopover = ({ label, content }: HelpPopoverProps) => (
-  <Popover trigger={['hover', 'focus']} content={content}>
-    <HelpButton type="button" aria-label={label}>
-      <QuestionCircleOutlined />
-    </HelpButton>
-  </Popover>
-);
+export const HelpPopover = ({ label, content }: HelpPopoverProps) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen} trigger={['hover', 'focus']} content={content}>
+      <HelpButton type="button" aria-label={label} onClick={() => setOpen(true)}>
+        <QuestionCircleOutlined />
+      </HelpButton>
+    </Popover>
+  );
+};

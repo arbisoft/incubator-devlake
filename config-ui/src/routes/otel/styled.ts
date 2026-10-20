@@ -55,6 +55,12 @@ export const Hint = styled.p`
   color: ${({ theme }) => theme.colors.textSecondary};
 `;
 
+export const LastSignalHint = styled(Hint)`
+  &:not(:empty) {
+    margin-top: ${({ theme }) => theme.space.xs}px;
+  }
+`;
+
 export const HelpDetails = styled.div`
   display: flex;
   flex-direction: column;

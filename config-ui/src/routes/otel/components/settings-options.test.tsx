@@ -16,7 +16,7 @@
  *
  */
 
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { OTEL_STATUS } from '@/api/otel';
@@ -63,6 +63,20 @@ describe('SettingsOptions in the snippet modal', () => {
     expect(events.checked).toBe(true);
     expect(shownEnv().OTEL_METRICS_EXPORTER).toBe('none');
     expect(screen.getByText(OPTIONS.lastSignal)).toBeTruthy();
+  });
+
+  it('explains why the last signal is locked', () => {
+    renderWithTheme(<SnippetModal open credential={credential} onClose={vi.fn()} onClosed={vi.fn()} />);
+    const group = within(screen.getByRole('group', { name: OPTIONS.title }));
+    expect(group.getAllByRole('status').some((node) => node.textContent === '')).toBe(true);
+    fireEvent.click(checkbox(OPTIONS.metrics.label));
+    const ids = (checkbox(OPTIONS.logs.label).getAttribute('aria-describedby') ?? '').split(' ');
+    const [, hintId] = ids;
+    const hint = document.getElementById(hintId);
+    expect(ids).toHaveLength(2);
+    expect(hint?.getAttribute('role')).toBe('status');
+    expect(hint?.textContent).toBe(OPTIONS.lastSignal);
+    expect(group.getByText(OPTIONS.lastSignal)).toBe(hint);
   });
 
   it('nests repository under events', () => {

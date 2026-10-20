@@ -24,6 +24,7 @@ export type SettingOptionProps = {
   checked: boolean;
   disabled?: boolean;
   aside?: ReactNode;
+  describedBy?: string;
   onChange: (checked: boolean) => void;
   children?: ReactNode;
 };
