@@ -26,6 +26,7 @@ export const HelpButton = styled.button`
   justify-content: center;
   min-width: ${({ theme }) => theme.space.lg}px;
   min-height: ${({ theme }) => theme.space.lg}px;
+  width: fit-content;
   padding: 0;
   border: 0;
   background: none;
