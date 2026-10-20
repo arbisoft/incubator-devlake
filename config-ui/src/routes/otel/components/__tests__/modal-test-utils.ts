@@ -19,7 +19,13 @@
 import { message } from 'antd';
 import { vi } from 'vitest';
 
-import { OTEL_STATUS, type OtelConnection, type OtelConnectionResponse } from '@/api/otel';
+import {
+  OTEL_STATUS,
+  type OtelConnection,
+  type OtelConnectionResponse,
+  type OtelCredential,
+  type OtelStatus,
+} from '@/api/otel';
 
 export const connection = (overrides: Partial<OtelConnection> = {}): OtelConnectionResponse => ({
   connection: {
@@ -41,6 +47,16 @@ export const connection = (overrides: Partial<OtelConnection> = {}): OtelConnect
   recoveryRequired: false,
   storageNeedsApplying: false,
   projects: [{ name: 'Project Alpha' }],
+});
+
+export const otelCredential = (status: OtelStatus): OtelCredential => ({
+  id: 1,
+  connectionId: 7,
+  username: 'platform',
+  status,
+  createdAt: '',
+  updatedAt: '',
+  pendingCollectorRestart: false,
 });
 
 export const isDisabled = (button: HTMLElement) => button.getAttribute('aria-disabled') === 'true';

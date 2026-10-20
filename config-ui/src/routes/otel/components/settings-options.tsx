@@ -20,30 +20,30 @@ import { Alert } from 'antd';
 
 import { HelpPopover, SettingOption } from '@/ui';
 
-import { SETTINGS_OPTION_TREE } from '../constants';
-import { estimateStorage, isLastSignal } from '../managed-settings';
+import { childrenOf, estimateStorage, hasSingleSignal, isLastSignal, TOP_LEVEL_OPTIONS } from '../managed-settings';
 import { Hint } from '../styled';
 import type { SettingsOption, SettingsOptionsProps } from '../types';
 
 import { COPY } from './constants';
+import { OPTION_COPY } from './option-copy';
 import { OptionHelp } from './option-help';
 
 const OPTIONS_COPY = COPY.snippet.options;
 
 export const SettingsOptions = ({ value, onChange }: SettingsOptionsProps) => {
-  const renderOption = (option: SettingsOption, children?: SettingsOption[]) => (
+  const renderOption = (option: SettingsOption) => (
     <SettingOption
       key={option}
-      label={OPTIONS_COPY[option].label}
-      description={OPTIONS_COPY[option].description}
+      label={OPTION_COPY[option].label}
+      description={OPTION_COPY[option].description}
       aside={
-        <HelpPopover label={OPTIONS_COPY.help(OPTIONS_COPY[option].label)} content={<OptionHelp option={option} />} />
+        <HelpPopover label={OPTIONS_COPY.help(OPTION_COPY[option].label)} content={<OptionHelp option={option} />} />
       }
       checked={value[option]}
       disabled={isLastSignal(value, option)}
       onChange={(checked) => onChange({ ...value, [option]: checked })}
     >
-      {value[option] && children?.map((child) => renderOption(child))}
+      {value[option] && childrenOf(option).map((child) => renderOption(child))}
     </SettingOption>
   );
 
@@ -52,9 +52,9 @@ export const SettingsOptions = ({ value, onChange }: SettingsOptionsProps) => {
   return (
     <>
       <div role="group" aria-label={OPTIONS_COPY.title}>
-        {SETTINGS_OPTION_TREE.map(({ option, children }) => renderOption(option, children))}
+        {TOP_LEVEL_OPTIONS.map((option) => renderOption(option))}
       </div>
-      {SETTINGS_OPTION_TREE.some(({ option }) => isLastSignal(value, option)) && <Hint>{OPTIONS_COPY.lastSignal}</Hint>}
+      {hasSingleSignal(value) && <Hint>{OPTIONS_COPY.lastSignal}</Hint>}
       <Alert type="info" role="status" showIcon title={OPTIONS_COPY.estimate(rawMb, monthlyMb)} />
     </>
   );

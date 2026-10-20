@@ -19,10 +19,11 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { OTEL_STATUS } from '@/api/otel';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 import { COPY as CODE_COPY } from '@/ui/code-block/constants';
 
-import { connection, MANAGED_ENV } from './__tests__/modal-test-utils';
+import { connection, MANAGED_ENV, otelCredential } from './__tests__/modal-test-utils';
 import { COPY } from './constants';
 import { SnippetModal } from './snippet-modal';
 
@@ -55,8 +56,40 @@ describe('SettingsOptions in the snippet modal', () => {
   it('keeps the last signal checked', () => {
     renderWithTheme(<SnippetModal open credential={credential} onClose={vi.fn()} onClosed={vi.fn()} />);
     fireEvent.click(checkbox(OPTIONS.metrics.label));
-    expect(checkbox(OPTIONS.logs.label).disabled).toBe(true);
+    const events = checkbox(OPTIONS.logs.label);
+    expect(events.checked).toBe(true);
+    expect(events.disabled).toBe(true);
+    fireEvent.click(events);
+    expect(events.checked).toBe(true);
+    expect(shownEnv().OTEL_METRICS_EXPORTER).toBe('none');
     expect(screen.getByText(OPTIONS.lastSignal)).toBeTruthy();
+  });
+
+  it('nests repository under events', () => {
+    renderWithTheme(<SnippetModal open credential={credential} onClose={vi.fn()} onClosed={vi.fn()} />);
+    fireEvent.click(checkbox(OPTIONS.logs.label));
+    expect(screen.queryByRole('checkbox', { name: OPTIONS.repository.label })).toBeNull();
+    fireEvent.click(checkbox(OPTIONS.logs.label));
+    expect(checkbox(OPTIONS.repository.label)).toBeTruthy();
+  });
+
+  it('explains a content option with its own storage line', async () => {
+    renderWithTheme(<SnippetModal open credential={credential} onClose={vi.fn()} onClosed={vi.fn()} />);
+    screen.getByRole('button', { name: OPTIONS.help(OPTIONS.promptText.label) }).focus();
+    await waitFor(() => expect(screen.getByText(OPTIONS.storageRawOnly(1))).toBeTruthy());
+    screen.getByRole('button', { name: OPTIONS.help(OPTIONS.toolDetails.label) }).focus();
+    await waitFor(() => expect(screen.getByText(OPTIONS.storageNone)).toBeTruthy());
+  });
+
+  it('shows the rotate notice only for a rotation', () => {
+    const { unmount } = renderWithTheme(
+      <SnippetModal open credential={credential} onClose={vi.fn()} onClosed={vi.fn()} />,
+    );
+    expect(screen.queryByText(OPTIONS.rotateNotice)).toBeNull();
+    unmount();
+    const retiring = { ...credential, credentials: [otelCredential(OTEL_STATUS.RETIRING)] };
+    renderWithTheme(<SnippetModal open credential={retiring} onClose={vi.fn()} onClosed={vi.fn()} />);
+    expect(screen.getByText(OPTIONS.rotateNotice)).toBeTruthy();
   });
 
   it('resets the options after the modal closes', async () => {
@@ -79,14 +112,14 @@ describe('SettingsOptions in the snippet modal', () => {
 
   it('updates the storage estimate as signals change', () => {
     renderWithTheme(<SnippetModal open credential={credential} onClose={vi.fn()} onClosed={vi.fn()} />);
-    expect(screen.getByText(OPTIONS.estimate(70, 21))).toBeTruthy();
+    expect(screen.getByText(OPTIONS.estimate(73, 21))).toBeTruthy();
     fireEvent.click(checkbox(OPTIONS.logs.label));
     expect(screen.getByText(OPTIONS.estimate(20, 1))).toBeTruthy();
   });
 
   it('announces the estimate as a status, not an alert', () => {
     renderWithTheme(<SnippetModal open credential={credential} onClose={vi.fn()} onClosed={vi.fn()} />);
-    const estimate = screen.getByText(OPTIONS.estimate(70, 21));
+    const estimate = screen.getByText(OPTIONS.estimate(73, 21));
     expect(estimate.closest('[role="status"]')).not.toBeNull();
     expect(estimate.closest('[role="alert"]')).toBeNull();
   });
@@ -95,6 +128,6 @@ describe('SettingsOptions in the snippet modal', () => {
     renderWithTheme(<SnippetModal open credential={credential} onClose={vi.fn()} onClosed={vi.fn()} />);
     screen.getByRole('button', { name: OPTIONS.help(OPTIONS.logs.label) }).focus();
     await waitFor(() => expect(screen.getByText(OPTIONS.logs.details[0])).toBeTruthy());
-    expect(screen.getByText(OPTIONS.storage(50, 20))).toBeTruthy();
+    expect(screen.getByText(OPTIONS.storage(42, 17))).toBeTruthy();
   });
 });

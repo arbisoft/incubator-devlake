@@ -20,8 +20,14 @@ import { omit } from 'lodash';
 import { describe, expect, it } from 'vitest';
 
 import { MANAGED_ENV } from './components/__tests__/modal-test-utils';
-import { DEFAULT_SETTINGS_SELECTION, SETTINGS_OPTION } from './constants';
-import { buildManagedSettings, estimateStorage, isLastSignal } from './managed-settings';
+import { SETTINGS_OPTION } from './constants';
+import {
+  buildManagedSettings,
+  DEFAULT_SETTINGS_SELECTION,
+  estimateStorage,
+  hasSingleSignal,
+  isLastSignal,
+} from './managed-settings';
 import type { SettingsSelection } from './types';
 
 const BASE = { env: MANAGED_ENV };
@@ -43,20 +49,18 @@ const shapedEnv = (selection: SettingsSelection) => buildManagedSettings(BASE, s
 
 describe('buildManagedSettings', () => {
   it('returns the server settings unchanged for the default selection', () => {
+    expect(buildManagedSettings(BASE, DEFAULT_SETTINGS_SELECTION)).toEqual(BASE);
+  });
+
+  it('does not mutate the server settings', () => {
     const snapshot = structuredClone(BASE);
-    const result = buildManagedSettings(BASE, DEFAULT_SETTINGS_SELECTION);
-    expect(result).toEqual(BASE);
+    buildManagedSettings(BASE, withoutOption(SETTINGS_OPTION.METRICS));
     expect(BASE).toEqual(snapshot);
   });
 
   it('disables the metrics exporter and drops the export interval', () => {
     const env = shapedEnv(withoutOption(SETTINGS_OPTION.METRICS));
     expect(env).toEqual({ ...omit(BASE.env, 'OTEL_METRIC_EXPORT_INTERVAL'), OTEL_METRICS_EXPORTER: 'none' });
-  });
-
-  it('disables the logs exporter', () => {
-    const env = shapedEnv(withoutOption(SETTINGS_OPTION.LOGS));
-    expect(env).toEqual({ ...BASE.env, OTEL_LOGS_EXPORTER: 'none' });
   });
 
   it.each([
@@ -68,13 +72,30 @@ describe('buildManagedSettings', () => {
     expect(env).toEqual({ ...BASE.env, [key]: value });
   });
 
-  it('keeps forced-off content flags and connection keys', () => {
-    const env = shapedEnv(ALL_OFF);
-    expect(env.OTEL_LOG_ASSISTANT_RESPONSES).toBe('0');
-    expect(env.OTEL_LOG_TOOL_CONTENT).toBe('0');
-    expect(env.OTEL_LOG_RAW_API_BODIES).toBe('0');
-    expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(BASE.env.OTEL_EXPORTER_OTLP_ENDPOINT);
-    expect(env.OTEL_EXPORTER_OTLP_HEADERS).toBe(BASE.env.OTEL_EXPORTER_OTLP_HEADERS);
+  it('turns every events option off with events and keeps forced-off flags', () => {
+    const env = shapedEnv({ ...ALL_OFF, metrics: true });
+    expect(env).toEqual({
+      ...BASE.env,
+      OTEL_LOGS_EXPORTER: 'none',
+      OTEL_LOG_USER_PROMPTS: '0',
+      OTEL_LOG_TOOL_DETAILS: '0',
+      OTEL_METRICS_INCLUDE_REPOSITORY: 'false',
+    });
+  });
+
+  it('writes events children off while events are off', () => {
+    const env = shapedEnv(withoutOption(SETTINGS_OPTION.LOGS));
+    expect(env).toEqual({
+      ...BASE.env,
+      OTEL_LOGS_EXPORTER: 'none',
+      OTEL_LOG_USER_PROMPTS: '0',
+      OTEL_LOG_TOOL_DETAILS: '0',
+      OTEL_METRICS_INCLUDE_REPOSITORY: 'false',
+    });
+  });
+
+  it('returns undefined when no signal is on', () => {
+    expect(buildManagedSettings(BASE, ALL_OFF)).toBeUndefined();
   });
 
   it('returns undefined without server settings', () => {
@@ -92,11 +113,23 @@ describe('isLastSignal', () => {
   });
 });
 
+describe('hasSingleSignal', () => {
+  it('is true only when exactly one signal is on', () => {
+    expect(hasSingleSignal(DEFAULT_SETTINGS_SELECTION)).toBe(false);
+    expect(hasSingleSignal(withoutOption(SETTINGS_OPTION.METRICS))).toBe(true);
+  });
+});
+
 describe('estimateStorage', () => {
   it.each([
-    ['default', DEFAULT_SETTINGS_SELECTION, { rawMb: 70, monthlyMb: 21 }],
+    ['default', DEFAULT_SETTINGS_SELECTION, { rawMb: 73, monthlyMb: 21 }],
     ['events off', withoutOption(SETTINGS_OPTION.LOGS), { rawMb: 20, monthlyMb: 1 }],
-    ['metrics off', withoutOption(SETTINGS_OPTION.METRICS), { rawMb: 50, monthlyMb: 20 }],
+    [
+      'events off with repository still selected',
+      { ...withoutOption(SETTINGS_OPTION.LOGS), repository: true },
+      { rawMb: 20, monthlyMb: 1 },
+    ],
+    ['metrics off', withoutOption(SETTINGS_OPTION.METRICS), { rawMb: 53, monthlyMb: 20 }],
   ])('estimates storage for the selected signals (%s)', (_name, selection, expected) => {
     expect(estimateStorage(selection)).toEqual(expected);
   });

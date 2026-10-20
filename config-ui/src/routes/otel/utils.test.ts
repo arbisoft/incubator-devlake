@@ -19,9 +19,11 @@
 import { AxiosError, AxiosHeaders, HttpStatusCode } from 'axios';
 import { describe, expect, it } from 'vitest';
 
+import type { OtelStatus } from '@/api/otel';
 import { OTEL_STATUS } from '@/api/otel/constants';
 import { COMMON_COPY, METRIC_TILE_TONE } from '@/ui';
 
+import { connection, otelCredential } from './components/__tests__/modal-test-utils';
 import { CONNECTION_STATE, COPY, LIFECYCLE_ACTION } from './constants';
 import {
   formatAge,
@@ -38,6 +40,7 @@ import {
   hasRecoveryRequired,
   hasStorageNeedsApplying,
   isActionAllowed,
+  isRotation,
   isSameAttentionState,
 } from './utils';
 
@@ -199,5 +202,14 @@ describe('routes/otel/utils', () => {
     expect(getPermanentErrorTone(0)).toBe(METRIC_TILE_TONE.DEFAULT);
     expect(getPermanentErrorTone(1)).toBe(METRIC_TILE_TONE.WARNING);
     expect(getPermanentErrorTone(5)).toBe(METRIC_TILE_TONE.DANGER);
+  });
+
+  it('detects a rotation by a retiring credential', () => {
+    const withStatuses = (...statuses: OtelStatus[]) => ({
+      ...connection(),
+      credentials: statuses.map(otelCredential),
+    });
+    expect(isRotation(withStatuses(OTEL_STATUS.ACTIVE))).toBe(false);
+    expect(isRotation(withStatuses(OTEL_STATUS.ACTIVE, OTEL_STATUS.RETIRING))).toBe(true);
   });
 });

@@ -77,30 +77,6 @@ export const SETTINGS_OPTION = {
   REPOSITORY: 'repository',
 } as const;
 
-type OptionId = (typeof SETTINGS_OPTION)[keyof typeof SETTINGS_OPTION];
-
-export const DEFAULT_SETTINGS_SELECTION: Record<OptionId, boolean> = {
-  metrics: true,
-  logs: true,
-  promptText: true,
-  toolDetails: true,
-  repository: true,
-};
-
-export const SETTINGS_OPTION_TREE: { option: OptionId; children?: OptionId[] }[] = [
-  { option: SETTINGS_OPTION.METRICS },
-  { option: SETTINGS_OPTION.LOGS, children: [SETTINGS_OPTION.PROMPT_TEXT, SETTINGS_OPTION.TOOL_DETAILS] },
-  { option: SETTINGS_OPTION.REPOSITORY },
-];
-
-export const STORAGE_PER_DEVELOPER: Record<OptionId, { rawMb: number; monthlyMb: number }> = {
-  [SETTINGS_OPTION.METRICS]: { rawMb: 20, monthlyMb: 1 },
-  [SETTINGS_OPTION.LOGS]: { rawMb: 50, monthlyMb: 20 },
-  [SETTINGS_OPTION.PROMPT_TEXT]: { rawMb: 0, monthlyMb: 0 },
-  [SETTINGS_OPTION.TOOL_DETAILS]: { rawMb: 0, monthlyMb: 0 },
-  [SETTINGS_OPTION.REPOSITORY]: { rawMb: 0, monthlyMb: 0 },
-};
-
 export const COPY = {
   title: 'Claude Code OTel',
   description: 'Generate and manage the Basic Auth credential used by Claude Code telemetry.',
