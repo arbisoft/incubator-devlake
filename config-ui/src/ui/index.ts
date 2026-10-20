@@ -30,6 +30,7 @@ export * from './external-link';
 export * from './filter-tabs';
 export * from './form-field';
 export * from './form-modal';
+export * from './help-popover';
 export * from './hooks';
 export * from './icon-button';
 export * from './identity-cell';

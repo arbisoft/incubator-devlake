@@ -26,7 +26,7 @@ import type {
 } from '@/api/otel';
 
 import type { CONNECTION_STATE, LIFECYCLE_ACTION, OTEL_MODAL } from './constants';
-import type { SettingsSelection } from './managed-settings';
+import type { SettingsOption, SettingsSelection } from './managed-settings';
 
 export type ConnectionState = (typeof CONNECTION_STATE)[keyof typeof CONNECTION_STATE];
 export type LifecycleAction = (typeof LIFECYCLE_ACTION)[keyof typeof LIFECYCLE_ACTION];
@@ -136,3 +136,5 @@ export type SettingsOptionsProps = {
   value: SettingsSelection;
   onChange: (value: SettingsSelection) => void;
 };
+
+export type OptionHelpProps = { option: SettingsOption };

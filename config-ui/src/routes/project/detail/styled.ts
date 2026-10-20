@@ -64,19 +64,6 @@ export const FieldBox = styled.div`
   max-width: ${({ theme }) => theme.layout.fieldMaxWidth}px;
 `;
 
-export const HelpButton = styled.button`
-  display: inline-flex;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: ${({ theme }) => theme.colors.textSecondary};
-  cursor: pointer;
-
-  &:focus-visible {
-    ${focusRingStyle}
-  }
-`;
-
 export const Examples = styled.div`
   display: flex;
   flex-direction: column;

@@ -29,6 +29,7 @@ export const SECTION = {
   PIPELINE_PROGRESS: 'pipelineProgress',
   SEGMENTED_METER: 'segmentedMeter',
   SETTING_OPTION: 'settingOption',
+  HELP_POPOVER: 'helpPopover',
   SEARCH_INPUT: 'searchInput',
   FILTER_TABS: 'filterTabs',
   SORT_SELECT: 'sortSelect',

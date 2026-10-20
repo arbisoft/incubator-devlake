@@ -23,6 +23,7 @@ import { MANAGED_ENV } from './components/__tests__/modal-test-utils';
 import {
   buildManagedSettings,
   DEFAULT_SETTINGS_SELECTION,
+  estimateStorage,
   isLastSignal,
   SETTINGS_OPTION,
   type SettingsSelection,
@@ -91,5 +92,15 @@ describe('isLastSignal', () => {
     expect(isLastSignal(metricsOff, SETTINGS_OPTION.LOGS)).toBe(true);
     expect(isLastSignal(metricsOff, SETTINGS_OPTION.METRICS)).toBe(false);
     expect(isLastSignal(metricsOff, SETTINGS_OPTION.REPOSITORY)).toBe(false);
+  });
+});
+
+describe('estimateStorage', () => {
+  it.each([
+    ['default', DEFAULT_SETTINGS_SELECTION, { rawMb: 70, monthlyMb: 21 }],
+    ['events off', withOption(SETTINGS_OPTION.LOGS), { rawMb: 20, monthlyMb: 1 }],
+    ['metrics off', withOption(SETTINGS_OPTION.METRICS), { rawMb: 50, monthlyMb: 20 }],
+  ])('estimates storage for the selected signals (%s)', (_name, selection, expected) => {
+    expect(estimateStorage(selection)).toEqual(expected);
   });
 });

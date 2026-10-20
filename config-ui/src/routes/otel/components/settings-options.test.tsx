@@ -71,4 +71,18 @@ describe('SettingsOptions in the snippet modal', () => {
     await waitFor(() => expect(checkbox(OPTIONS.repository.label).checked).toBe(true));
     expect(shownEnv()).toEqual(MANAGED_ENV);
   });
+
+  it('updates the storage estimate as signals change', () => {
+    renderWithTheme(<SnippetModal open credential={credential} onClose={vi.fn()} onClosed={vi.fn()} />);
+    expect(screen.getByText(OPTIONS.estimate(70, 21))).toBeTruthy();
+    fireEvent.click(checkbox(OPTIONS.logs.label));
+    expect(screen.getByText(OPTIONS.estimate(20, 1))).toBeTruthy();
+  });
+
+  it('explains what an option sends', async () => {
+    renderWithTheme(<SnippetModal open credential={credential} onClose={vi.fn()} onClosed={vi.fn()} />);
+    screen.getByRole('button', { name: OPTIONS.help(OPTIONS.logs.label) }).focus();
+    await waitFor(() => expect(screen.getByText(OPTIONS.logs.details[0])).toBeTruthy());
+    expect(screen.getByText(OPTIONS.storage(50, 20))).toBeTruthy();
+  });
 });

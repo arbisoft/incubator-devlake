@@ -16,13 +16,17 @@
  *
  */
 
-import { SettingOption } from '@/ui';
+import { Alert } from 'antd';
 
-import { isLastSignal, SETTINGS_OPTION, type SettingsOption } from '../managed-settings';
-import { Hint } from '../styled';
-import type { SettingsOptionsProps } from '../types';
+import { HelpPopover, SettingOption } from '@/ui';
+
+import { estimateStorage, isLastSignal, SETTINGS_OPTION, type SettingsOption, storageFor } from '../managed-settings';
+import { Hint, HelpDetails } from '../styled';
+import type { OptionHelpProps, SettingsOptionsProps } from '../types';
 
 import { COPY } from './constants';
+
+const OPTIONS_COPY = COPY.snippet.options;
 
 const OPTIONS: { option: SettingsOption; children?: SettingsOption[] }[] = [
   { option: SETTINGS_OPTION.METRICS },
@@ -31,12 +35,29 @@ const OPTIONS: { option: SettingsOption; children?: SettingsOption[] }[] = [
   { option: SETTINGS_OPTION.REPOSITORY },
 ];
 
+const OptionHelp = ({ option }: OptionHelpProps) => {
+  const { rawMb, monthlyMb } = storageFor(option);
+  return (
+    <HelpDetails>
+      <ul>
+        {OPTIONS_COPY[option].details.map((detail) => (
+          <li key={detail}>{detail}</li>
+        ))}
+      </ul>
+      <span>{rawMb > 0 ? OPTIONS_COPY.storage(rawMb, monthlyMb) : OPTIONS_COPY.storageNone}</span>
+    </HelpDetails>
+  );
+};
+
 export const SettingsOptions = ({ value, onChange }: SettingsOptionsProps) => {
   const renderOption = (option: SettingsOption, children?: SettingsOption[]) => (
     <SettingOption
       key={option}
-      label={COPY.snippet.options[option].label}
-      description={COPY.snippet.options[option].description}
+      label={OPTIONS_COPY[option].label}
+      description={OPTIONS_COPY[option].description}
+      aside={
+        <HelpPopover label={OPTIONS_COPY.help(OPTIONS_COPY[option].label)} content={<OptionHelp option={option} />} />
+      }
       checked={value[option]}
       disabled={isLastSignal(value, option)}
       onChange={(checked) => onChange({ ...value, [option]: checked })}
@@ -45,12 +66,15 @@ export const SettingsOptions = ({ value, onChange }: SettingsOptionsProps) => {
     </SettingOption>
   );
 
+  const { rawMb, monthlyMb } = estimateStorage(value);
+
   return (
     <>
-      <div role="group" aria-label={COPY.snippet.options.title}>
+      <div role="group" aria-label={OPTIONS_COPY.title}>
         {OPTIONS.map(({ option, children }) => renderOption(option, children))}
       </div>
-      {OPTIONS.some(({ option }) => isLastSignal(value, option)) && <Hint>{COPY.snippet.options.lastSignal}</Hint>}
+      {OPTIONS.some(({ option }) => isLastSignal(value, option)) && <Hint>{OPTIONS_COPY.lastSignal}</Hint>}
+      <Alert type="info" showIcon title={OPTIONS_COPY.estimate(rawMb, monthlyMb)} />
     </>
   );
 };

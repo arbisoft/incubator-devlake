@@ -58,21 +58,49 @@ export const COPY = {
       metrics: {
         label: 'Metrics',
         description: 'Tokens, cost, lines of code, commits, pull requests and edit decisions.',
+        details: [
+          'Usage dashboards: tokens, cost and active developers.',
+          'Code impact: lines changed, commits and pull requests.',
+          'Accepted and rejected edits.',
+        ],
       },
-      logs: { label: 'Events', description: 'Prompts, skills and permission modes for each session.' },
+      logs: {
+        label: 'Events',
+        description: 'Prompts, skills and permission modes for each session.',
+        details: [
+          'Prompts per session and developer.',
+          'Skills used in each prompt.',
+          'Permission mode changes, such as plan mode.',
+        ],
+      },
       promptText: {
         label: 'Prompt text',
         description: 'Keep the text of each prompt in raw telemetry. Off still counts prompts.',
+        details: ['The text developers type, kept in raw telemetry for 90 days.', 'Never copied into dashboards.'],
       },
       toolDetails: {
         label: 'Skill and MCP names',
         description: 'Attribute prompts and usage to skills, plugins and MCP servers.',
+        details: [
+          'Skill, plugin and MCP server names on prompts and usage.',
+          'Command lines and file paths are dropped when ingested.',
+        ],
       },
       repository: {
         label: 'Repository',
         description: 'Attribute usage to the session repository. Needs Claude Code v2.1.269 or later.',
+        details: [
+          'The repository of each session, from its origin remote.',
+          'Credentials in the remote URL are stripped.',
+        ],
       },
       lastSignal: 'Metrics or events must stay on.',
+      help: (label: string) => `About ${label}`,
+      storage: (rawMb: number, monthlyMb: number) =>
+        `Roughly ${rawMb} MB per developer over 90 days, plus ${monthlyMb} MB a month that is kept.`,
+      storageNone: 'Adds almost no storage.',
+      estimate: (rawMb: number, monthlyMb: number) =>
+        `Estimated storage per developer: about ${rawMb} MB of raw telemetry kept for 90 days, plus about ${monthlyMb} MB a month kept indefinitely.`,
     },
   },
   range: {

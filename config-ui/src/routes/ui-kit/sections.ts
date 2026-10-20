@@ -31,6 +31,7 @@ import { ExternalLinkDemo } from './external-link.demo';
 import { FilterTabsDemo } from './filter-tabs.demo';
 import { FormFieldDemo } from './form-field.demo';
 import { FormModalDemo } from './form-modal.demo';
+import { HelpPopoverDemo } from './help-popover.demo';
 import { IconButtonDemo } from './icon-button.demo';
 import { IdentityCellDemo } from './identity-cell.demo';
 import { IntegrationCardDemo } from './integration-card.demo';
@@ -82,6 +83,7 @@ export const SECTIONS: SectionDefinition[] = [
   { id: SECTION.PIPELINE_PROGRESS, Demo: PipelineProgressDemo },
   { id: SECTION.SEGMENTED_METER, Demo: SegmentedMeterDemo },
   { id: SECTION.SETTING_OPTION, Demo: SettingOptionDemo },
+  { id: SECTION.HELP_POPOVER, Demo: HelpPopoverDemo },
   { id: SECTION.SEARCH_INPUT, Demo: SearchInputDemo },
   { id: SECTION.FILTER_TABS, Demo: FilterTabsDemo },
   { id: SECTION.SORT_SELECT, Demo: SortSelectDemo },

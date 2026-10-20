@@ -92,3 +92,26 @@ export const buildManagedSettings = (
   });
   return { ...base, env };
 };
+
+type StorageEstimate = { rawMb: number; monthlyMb: number };
+
+const STORAGE_PER_DEVELOPER: Record<SettingsOption, StorageEstimate> = {
+  [SETTINGS_OPTION.METRICS]: { rawMb: 20, monthlyMb: 1 },
+  [SETTINGS_OPTION.LOGS]: { rawMb: 50, monthlyMb: 20 },
+  [SETTINGS_OPTION.PROMPT_TEXT]: { rawMb: 0, monthlyMb: 0 },
+  [SETTINGS_OPTION.TOOL_DETAILS]: { rawMb: 0, monthlyMb: 0 },
+  [SETTINGS_OPTION.REPOSITORY]: { rawMb: 0, monthlyMb: 0 },
+};
+
+export const storageFor = (option: SettingsOption): StorageEstimate => STORAGE_PER_DEVELOPER[option];
+
+export const estimateStorage = (selection: SettingsSelection): StorageEstimate =>
+  (Object.keys(selection) as SettingsOption[])
+    .filter((option) => selection[option])
+    .reduce(
+      (total, option) => ({
+        rawMb: total.rawMb + storageFor(option).rawMb,
+        monthlyMb: total.monthlyMb + storageFor(option).monthlyMb,
+      }),
+      { rawMb: 0, monthlyMb: 0 },
+    );

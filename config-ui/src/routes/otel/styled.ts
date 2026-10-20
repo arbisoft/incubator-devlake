@@ -55,6 +55,18 @@ export const Hint = styled.p`
   color: ${({ theme }) => theme.colors.textSecondary};
 `;
 
+export const HelpDetails = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.xs}px;
+  max-width: ${({ theme }) => theme.layout.fieldMaxWidth}px;
+
+  ul {
+    margin: 0;
+    padding-left: ${({ theme }) => theme.space.lg}px;
+  }
+`;
+
 export const TagRow = styled.div`
   display: flex;
   flex-wrap: wrap;
