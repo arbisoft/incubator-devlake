@@ -64,6 +64,7 @@ export const HelpDetails = styled.div`
   ul {
     margin: 0;
     padding-left: ${({ theme }) => theme.space.lg}px;
+    list-style: disc;
   }
 `;
 
