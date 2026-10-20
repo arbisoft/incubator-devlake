@@ -16,20 +16,37 @@
  *
  */
 
-import { Locator } from '@playwright/test';
+import { expect, Locator, Page } from '@playwright/test';
 
 import { OTEL_MODAL_COPY } from '../app-copy';
 
 import type { OtelSnippetDialog } from './otel';
 
 type ManagedSettingsEnv = { env: Record<string, string> };
+type ManagedSettingsBody = { managedSettings: ManagedSettingsEnv };
+
+const CONNECTIONS_PATH = '/api/plugins/claude_otel/connections';
+
+export const createdManagedEnv = (page: Page): Promise<Record<string, string>> =>
+  page
+    .waitForResponse(
+      (response) => response.request().method() === 'POST' && new URL(response.url()).pathname === CONNECTIONS_PATH,
+      {
+        timeout: 0,
+      },
+    )
+    .then(async (response) => {
+      const body: unknown = await response.json();
+      expect(body).toHaveProperty('managedSettings.env');
+      return (body as ManagedSettingsBody).managedSettings.env;
+    });
 
 // The telemetry options of the one-time managed-settings snippet and the JSON they shape.
 export class OtelSettingsOptions {
   constructor(private readonly snippet: OtelSnippetDialog) {}
 
   option(label: string): Locator {
-    return this.snippet.dialog.getByRole('checkbox', { name: label });
+    return this.snippet.dialog.getByRole('checkbox', { name: label, exact: true });
   }
 
   get lastSignalHint(): Locator {
@@ -37,6 +54,8 @@ export class OtelSettingsOptions {
   }
 
   async settings(): Promise<ManagedSettingsEnv> {
-    return JSON.parse(await this.snippet.code.innerText()) as ManagedSettingsEnv;
+    const parsed: unknown = JSON.parse(await this.snippet.code.innerText());
+    expect(parsed).toHaveProperty('env');
+    return parsed as ManagedSettingsEnv;
   }
 }

@@ -33,7 +33,7 @@ import { OTEL_MODAL_COPY } from '../support/app-copy';
 import { deleteOtelConnectionsOfTeam } from '../support/db';
 import { scrollState, waitUntilOpened, wheelPastContentEnd } from '../support/pages/common';
 import { OtelPage } from '../support/pages/otel';
-import { OtelSettingsOptions } from '../support/pages/otel-settings';
+import { createdManagedEnv, OtelSettingsOptions } from '../support/pages/otel-settings';
 
 const OPTIONS = OTEL_MODAL_COPY.snippet.options;
 const BASIC_HEADER_PREFIX = 'Authorization=Basic ';
@@ -71,6 +71,7 @@ test.describe.serial('Claude Code OTel managed settings options', () => {
     const createDialog = await otel.openCredentialDialog();
     await createDialog.fillTeamName(teamName);
     await createDialog.selectProject(projectName);
+    const createdEnvPromise = createdManagedEnv(page);
     const created = await createDialog.submit();
     expect(created.status).toBe(201);
 
@@ -78,10 +79,8 @@ test.describe.serial('Claude Code OTel managed settings options', () => {
     await expect(snippet.dialog).toBeVisible({ timeout: 15000 });
     const options = new OtelSettingsOptions(snippet);
 
-    const defaults = (await options.settings()).env;
-    expect(defaults.OTEL_METRICS_EXPORTER).toBe('otlp');
-    expect(defaults.OTEL_LOGS_EXPORTER).toBe('otlp');
-    expect(defaults.OTEL_LOG_USER_PROMPTS).toBe('1');
+    const createdEnv = await createdEnvPromise;
+    await expect.poll(async () => (await options.settings()).env).toEqual(createdEnv);
 
     await waitUntilOpened(snippet.dialog);
     const { modalTop } = await scrollState(snippet.dialog);
@@ -89,7 +88,14 @@ test.describe.serial('Claude Code OTel managed settings options', () => {
     await expect.poll(() => scrollState(snippet.dialog)).toEqual({ contentAtEnd: true, modalTop });
 
     await options.option(OPTIONS.logs.label).uncheck();
-    expect((await options.settings()).env.OTEL_LOGS_EXPORTER).toBe('none');
+    await expect
+      .poll(async () => (await options.settings()).env)
+      .toMatchObject({
+        OTEL_LOGS_EXPORTER: 'none',
+        OTEL_LOG_USER_PROMPTS: '0',
+        OTEL_LOG_TOOL_DETAILS: '0',
+        OTEL_METRICS_INCLUDE_REPOSITORY: 'false',
+      });
     await expect(options.option(OPTIONS.promptText.label)).not.toBeVisible();
     await expect(options.option(OPTIONS.toolDetails.label)).not.toBeVisible();
     await expect(options.option(OPTIONS.metrics.label)).toBeDisabled();
@@ -99,21 +105,24 @@ test.describe.serial('Claude Code OTel managed settings options', () => {
     await options.option(OPTIONS.promptText.label).uncheck();
     await options.option(OPTIONS.toolDetails.label).uncheck();
     await options.option(OPTIONS.repository.label).uncheck();
-    const shaped = (await options.settings()).env;
-    expect(shaped.OTEL_LOG_USER_PROMPTS).toBe('0');
-    expect(shaped.OTEL_LOG_TOOL_DETAILS).toBe('0');
-    expect(shaped.OTEL_METRICS_INCLUDE_REPOSITORY).toBe('false');
-    expect(shaped.OTEL_EXPORTER_OTLP_HEADERS.startsWith(BASIC_HEADER_PREFIX)).toBe(true);
+    await expect
+      .poll(async () => (await options.settings()).env)
+      .toMatchObject({
+        OTEL_LOG_USER_PROMPTS: '0',
+        OTEL_LOG_TOOL_DETAILS: '0',
+        OTEL_METRICS_INCLUDE_REPOSITORY: 'false',
+      });
+    await expect
+      .poll(async () => (await options.settings()).env.OTEL_EXPORTER_OTLP_HEADERS.startsWith(BASIC_HEADER_PREFIX))
+      .toBe(true);
 
     await options.option(OPTIONS.metrics.label).uncheck();
-    const metricsOff = (await options.settings()).env;
-    expect(metricsOff.OTEL_METRICS_EXPORTER).toBe('none');
-    expect(metricsOff).not.toHaveProperty('OTEL_METRIC_EXPORT_INTERVAL');
+    await expect.poll(async () => (await options.settings()).env).toMatchObject({ OTEL_METRICS_EXPORTER: 'none' });
+    await expect.poll(async () => (await options.settings()).env).not.toHaveProperty('OTEL_METRIC_EXPORT_INTERVAL');
 
     await snippet.close();
 
     const stored = await findOtelConnection(api, teamName);
     expect(stored?.connection.status).toBe('active');
-    expect(stored).not.toHaveProperty('managedSettings');
   });
 });

@@ -39,10 +39,14 @@ export const wheelPastContentEnd = async (dialog: Locator): Promise<void> => {
 };
 
 export const scrollState = (dialog: Locator): Promise<{ contentAtEnd: boolean; modalTop: number }> =>
-  dialog.locator('.ant-modal-body').evaluate((body) => ({
-    contentAtEnd: body.scrollTop > 0 && body.scrollTop + body.clientHeight >= body.scrollHeight - 1,
-    modalTop: Math.round(body.closest('.ant-modal-container')?.getBoundingClientRect().top ?? Number.NaN),
-  }));
+  dialog.locator('.ant-modal-body').evaluate((body) => {
+    const container = body.closest('.ant-modal-container');
+    if (!container) throw new Error('Modal container is not visible');
+    return {
+      contentAtEnd: body.scrollTop > 0 && body.scrollTop + body.clientHeight >= body.scrollHeight - 1,
+      modalTop: Math.round(container.getBoundingClientRect().top),
+    };
+  });
 
 export const tableRow = (scope: Page | Locator, text: string | RegExp): Locator =>
   scope.locator('tbody tr.ant-table-row').filter({ hasText: text });
