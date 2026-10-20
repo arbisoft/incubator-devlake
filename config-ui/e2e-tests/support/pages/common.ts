@@ -27,6 +27,23 @@ const modalByTitle = (page: Page, title: string | RegExp): Locator => page.getBy
 export const modalWithText = (page: Page, text: string | RegExp): Locator =>
   page.getByRole('dialog').filter({ hasText: text });
 
+export const waitUntilOpened = (dialog: Locator): Promise<void> =>
+  expect(dialog.page().locator('.ant-modal[class*="ant-zoom-"]')).toHaveCount(0);
+
+export const wheelPastContentEnd = async (dialog: Locator): Promise<void> => {
+  const box = await dialog.locator('.ant-modal-body').boundingBox();
+  if (!box) throw new Error('Modal body is not visible');
+  const page = dialog.page();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  for (let step = 0; step < 6; step += 1) await page.mouse.wheel(0, box.height);
+};
+
+export const scrollState = (dialog: Locator): Promise<{ contentAtEnd: boolean; modalTop: number }> =>
+  dialog.locator('.ant-modal-body').evaluate((body) => ({
+    contentAtEnd: body.scrollTop > 0 && body.scrollTop + body.clientHeight >= body.scrollHeight - 1,
+    modalTop: Math.round(body.closest('.ant-modal-container')?.getBoundingClientRect().top ?? Number.NaN),
+  }));
+
 export const tableRow = (scope: Page | Locator, text: string | RegExp): Locator =>
   scope.locator('tbody tr.ant-table-row').filter({ hasText: text });
 

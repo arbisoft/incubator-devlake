@@ -23,7 +23,8 @@ import { useMemo, useState } from 'react';
 import { LINKS } from '@/config/links';
 import { CODE_LANGUAGE, CodeBlock, ExternalLink, FormModal, KeyValueList, MODAL_WIDTH } from '@/ui';
 
-import { buildManagedSettings, DEFAULT_SETTINGS_SELECTION } from '../managed-settings';
+import { DEFAULT_SETTINGS_SELECTION } from '../constants';
+import { buildManagedSettings } from '../managed-settings';
 import { Hint, Stack } from '../styled';
 import type { SnippetModalProps } from '../types';
 import { getOtelApplyError } from '../utils';

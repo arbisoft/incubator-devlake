@@ -20,34 +20,15 @@ import { Alert } from 'antd';
 
 import { HelpPopover, SettingOption } from '@/ui';
 
-import { estimateStorage, isLastSignal, SETTINGS_OPTION, type SettingsOption, storageFor } from '../managed-settings';
-import { Hint, HelpDetails } from '../styled';
-import type { OptionHelpProps, SettingsOptionsProps } from '../types';
+import { SETTINGS_OPTION_TREE } from '../constants';
+import { estimateStorage, isLastSignal } from '../managed-settings';
+import { Hint } from '../styled';
+import type { SettingsOption, SettingsOptionsProps } from '../types';
 
 import { COPY } from './constants';
+import { OptionHelp } from './option-help';
 
 const OPTIONS_COPY = COPY.snippet.options;
-
-const OPTIONS: { option: SettingsOption; children?: SettingsOption[] }[] = [
-  { option: SETTINGS_OPTION.METRICS },
-  { option: SETTINGS_OPTION.LOGS, children: [SETTINGS_OPTION.PROMPT_TEXT] },
-  { option: SETTINGS_OPTION.TOOL_DETAILS },
-  { option: SETTINGS_OPTION.REPOSITORY },
-];
-
-const OptionHelp = ({ option }: OptionHelpProps) => {
-  const { rawMb, monthlyMb } = storageFor(option);
-  return (
-    <HelpDetails>
-      <ul>
-        {OPTIONS_COPY[option].details.map((detail) => (
-          <li key={detail}>{detail}</li>
-        ))}
-      </ul>
-      <span>{rawMb > 0 ? OPTIONS_COPY.storage(rawMb, monthlyMb) : OPTIONS_COPY.storageNone}</span>
-    </HelpDetails>
-  );
-};
 
 export const SettingsOptions = ({ value, onChange }: SettingsOptionsProps) => {
   const renderOption = (option: SettingsOption, children?: SettingsOption[]) => (
@@ -71,9 +52,9 @@ export const SettingsOptions = ({ value, onChange }: SettingsOptionsProps) => {
   return (
     <>
       <div role="group" aria-label={OPTIONS_COPY.title}>
-        {OPTIONS.map(({ option, children }) => renderOption(option, children))}
+        {SETTINGS_OPTION_TREE.map(({ option, children }) => renderOption(option, children))}
       </div>
-      {OPTIONS.some(({ option }) => isLastSignal(value, option)) && <Hint>{OPTIONS_COPY.lastSignal}</Hint>}
+      {SETTINGS_OPTION_TREE.some(({ option }) => isLastSignal(value, option)) && <Hint>{OPTIONS_COPY.lastSignal}</Hint>}
       <Alert type="info" showIcon title={OPTIONS_COPY.estimate(rawMb, monthlyMb)} />
     </>
   );

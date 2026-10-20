@@ -18,27 +18,11 @@
 
 import type { OtelConnectionResponse } from '@/api/otel';
 
+import { SETTINGS_OPTION, STORAGE_PER_DEVELOPER } from './constants';
+import type { SettingsOption, SettingsSelection, StorageEstimate } from './types';
+
 type ManagedSettings = NonNullable<OtelConnectionResponse['managedSettings']>;
 type EnvMap = Record<string, string>;
-
-export const SETTINGS_OPTION = {
-  METRICS: 'metrics',
-  LOGS: 'logs',
-  PROMPT_TEXT: 'promptText',
-  TOOL_DETAILS: 'toolDetails',
-  REPOSITORY: 'repository',
-} as const;
-
-export type SettingsOption = (typeof SETTINGS_OPTION)[keyof typeof SETTINGS_OPTION];
-export type SettingsSelection = Record<SettingsOption, boolean>;
-
-export const DEFAULT_SETTINGS_SELECTION: SettingsSelection = {
-  metrics: true,
-  logs: true,
-  promptText: true,
-  toolDetails: true,
-  repository: true,
-};
 
 const SIGNALS: SettingsOption[] = [SETTINGS_OPTION.METRICS, SETTINGS_OPTION.LOGS];
 
@@ -91,16 +75,6 @@ export const buildManagedSettings = (
     }
   });
   return { ...base, env };
-};
-
-type StorageEstimate = { rawMb: number; monthlyMb: number };
-
-const STORAGE_PER_DEVELOPER: Record<SettingsOption, StorageEstimate> = {
-  [SETTINGS_OPTION.METRICS]: { rawMb: 20, monthlyMb: 1 },
-  [SETTINGS_OPTION.LOGS]: { rawMb: 50, monthlyMb: 20 },
-  [SETTINGS_OPTION.PROMPT_TEXT]: { rawMb: 0, monthlyMb: 0 },
-  [SETTINGS_OPTION.TOOL_DETAILS]: { rawMb: 0, monthlyMb: 0 },
-  [SETTINGS_OPTION.REPOSITORY]: { rawMb: 0, monthlyMb: 0 },
 };
 
 export const storageFor = (option: SettingsOption): StorageEstimate => STORAGE_PER_DEVELOPER[option];

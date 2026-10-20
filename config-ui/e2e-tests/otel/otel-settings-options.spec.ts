@@ -31,6 +31,7 @@ import {
 } from '../support/api';
 import { OTEL_MODAL_COPY } from '../support/app-copy';
 import { deleteOtelConnectionsOfTeam } from '../support/db';
+import { scrollState, waitUntilOpened, wheelPastContentEnd } from '../support/pages/common';
 import { OtelPage } from '../support/pages/otel';
 import { OtelSettingsOptions } from '../support/pages/otel-settings';
 
@@ -82,10 +83,10 @@ test.describe.serial('Claude Code OTel managed settings options', () => {
     expect(defaults.OTEL_LOGS_EXPORTER).toBe('otlp');
     expect(defaults.OTEL_LOG_USER_PROMPTS).toBe('1');
 
-    await options.waitUntilOpened();
-    const { modalTop } = await options.scrollState();
-    await options.wheelPastContentEnd();
-    await expect.poll(() => options.scrollState()).toEqual({ contentAtEnd: true, modalTop });
+    await waitUntilOpened(snippet.dialog);
+    const { modalTop } = await scrollState(snippet.dialog);
+    await wheelPastContentEnd(snippet.dialog);
+    await expect.poll(() => scrollState(snippet.dialog)).toEqual({ contentAtEnd: true, modalTop });
 
     await options.option(OPTIONS.logs.label).uncheck();
     expect((await options.settings()).env.OTEL_LOGS_EXPORTER).toBe('none');

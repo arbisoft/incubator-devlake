@@ -27,11 +27,6 @@ const LABEL = 'About this option';
 const CONTENT = 'Helpful details';
 
 describe('HelpPopover', () => {
-  it('labels the help button', () => {
-    renderWithTheme(<HelpPopover label={LABEL} content={CONTENT} />);
-    expect(screen.getByRole('button', { name: LABEL })).toBeTruthy();
-  });
-
   it('shows the content on focus', async () => {
     renderWithTheme(<HelpPopover label={LABEL} content={CONTENT} />);
     screen.getByRole('button', { name: LABEL }).focus();

@@ -20,14 +20,9 @@ import { omit } from 'lodash';
 import { describe, expect, it } from 'vitest';
 
 import { MANAGED_ENV } from './components/__tests__/modal-test-utils';
-import {
-  buildManagedSettings,
-  DEFAULT_SETTINGS_SELECTION,
-  estimateStorage,
-  isLastSignal,
-  SETTINGS_OPTION,
-  type SettingsSelection,
-} from './managed-settings';
+import { DEFAULT_SETTINGS_SELECTION, SETTINGS_OPTION } from './constants';
+import { buildManagedSettings, estimateStorage, isLastSignal } from './managed-settings';
+import type { SettingsSelection } from './types';
 
 const BASE = { env: MANAGED_ENV };
 
@@ -39,10 +34,12 @@ const ALL_OFF: SettingsSelection = {
   repository: false,
 };
 
-const withOption = (option: keyof SettingsSelection): SettingsSelection => ({
+const withoutOption = (option: keyof SettingsSelection): SettingsSelection => ({
   ...DEFAULT_SETTINGS_SELECTION,
   [option]: false,
 });
+
+const shapedEnv = (selection: SettingsSelection) => buildManagedSettings(BASE, selection)?.env ?? {};
 
 describe('buildManagedSettings', () => {
   it('returns the server settings unchanged for the default selection', () => {
@@ -53,12 +50,12 @@ describe('buildManagedSettings', () => {
   });
 
   it('disables the metrics exporter and drops the export interval', () => {
-    const { env } = buildManagedSettings(BASE, withOption(SETTINGS_OPTION.METRICS))!;
+    const env = shapedEnv(withoutOption(SETTINGS_OPTION.METRICS));
     expect(env).toEqual({ ...omit(BASE.env, 'OTEL_METRIC_EXPORT_INTERVAL'), OTEL_METRICS_EXPORTER: 'none' });
   });
 
   it('disables the logs exporter', () => {
-    const { env } = buildManagedSettings(BASE, withOption(SETTINGS_OPTION.LOGS))!;
+    const env = shapedEnv(withoutOption(SETTINGS_OPTION.LOGS));
     expect(env).toEqual({ ...BASE.env, OTEL_LOGS_EXPORTER: 'none' });
   });
 
@@ -67,12 +64,12 @@ describe('buildManagedSettings', () => {
     [SETTINGS_OPTION.TOOL_DETAILS, 'OTEL_LOG_TOOL_DETAILS', '0'],
     [SETTINGS_OPTION.REPOSITORY, 'OTEL_METRICS_INCLUDE_REPOSITORY', 'false'],
   ])('turns off prompt text, tool details and repository independently (%s)', (option, key, value) => {
-    const { env } = buildManagedSettings(BASE, withOption(option))!;
+    const env = shapedEnv(withoutOption(option));
     expect(env).toEqual({ ...BASE.env, [key]: value });
   });
 
   it('keeps forced-off content flags and connection keys', () => {
-    const { env } = buildManagedSettings(BASE, ALL_OFF)!;
+    const env = shapedEnv(ALL_OFF);
     expect(env.OTEL_LOG_ASSISTANT_RESPONSES).toBe('0');
     expect(env.OTEL_LOG_TOOL_CONTENT).toBe('0');
     expect(env.OTEL_LOG_RAW_API_BODIES).toBe('0');
@@ -88,7 +85,7 @@ describe('buildManagedSettings', () => {
 describe('isLastSignal', () => {
   it('is true only for the single remaining checked signal', () => {
     expect(isLastSignal(DEFAULT_SETTINGS_SELECTION, SETTINGS_OPTION.METRICS)).toBe(false);
-    const metricsOff = withOption(SETTINGS_OPTION.METRICS);
+    const metricsOff = withoutOption(SETTINGS_OPTION.METRICS);
     expect(isLastSignal(metricsOff, SETTINGS_OPTION.LOGS)).toBe(true);
     expect(isLastSignal(metricsOff, SETTINGS_OPTION.METRICS)).toBe(false);
     expect(isLastSignal(metricsOff, SETTINGS_OPTION.REPOSITORY)).toBe(false);
@@ -98,8 +95,8 @@ describe('isLastSignal', () => {
 describe('estimateStorage', () => {
   it.each([
     ['default', DEFAULT_SETTINGS_SELECTION, { rawMb: 70, monthlyMb: 21 }],
-    ['events off', withOption(SETTINGS_OPTION.LOGS), { rawMb: 20, monthlyMb: 1 }],
-    ['metrics off', withOption(SETTINGS_OPTION.METRICS), { rawMb: 50, monthlyMb: 20 }],
+    ['events off', withoutOption(SETTINGS_OPTION.LOGS), { rawMb: 20, monthlyMb: 1 }],
+    ['metrics off', withoutOption(SETTINGS_OPTION.METRICS), { rawMb: 50, monthlyMb: 20 }],
   ])('estimates storage for the selected signals (%s)', (_name, selection, expected) => {
     expect(estimateStorage(selection)).toEqual(expected);
   });

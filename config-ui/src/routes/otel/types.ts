@@ -25,12 +25,14 @@ import type {
   OtelReplayRange,
 } from '@/api/otel';
 
-import type { CONNECTION_STATE, LIFECYCLE_ACTION, OTEL_MODAL } from './constants';
-import type { SettingsOption, SettingsSelection } from './managed-settings';
+import type { CONNECTION_STATE, LIFECYCLE_ACTION, OTEL_MODAL, SETTINGS_OPTION } from './constants';
 
 export type ConnectionState = (typeof CONNECTION_STATE)[keyof typeof CONNECTION_STATE];
 export type LifecycleAction = (typeof LIFECYCLE_ACTION)[keyof typeof LIFECYCLE_ACTION];
 export type OtelModal = (typeof OTEL_MODAL)[keyof typeof OTEL_MODAL];
+export type SettingsOption = (typeof SETTINGS_OPTION)[keyof typeof SETTINGS_OPTION];
+export type SettingsSelection = Record<SettingsOption, boolean>;
+export type StorageEstimate = { rawMb: number; monthlyMb: number };
 
 export type PendingOtelAction = { action: LifecycleAction; connection: OtelConnectionResponse };
 export type PendingCredentialFocus = { connectionId?: string | number; action?: LifecycleAction };
