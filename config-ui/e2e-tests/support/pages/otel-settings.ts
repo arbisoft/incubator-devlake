@@ -16,7 +16,7 @@
  *
  */
 
-import { Locator } from '@playwright/test';
+import { expect, Locator } from '@playwright/test';
 
 import { OTEL_MODAL_COPY } from '../app-copy';
 
@@ -38,5 +38,24 @@ export class OtelSettingsOptions {
 
   async settings(): Promise<ManagedSettingsEnv> {
     return JSON.parse(await this.snippet.code.innerText()) as ManagedSettingsEnv;
+  }
+
+  async waitUntilOpened(): Promise<void> {
+    await expect(this.snippet.dialog.page().locator('.ant-modal[class*="ant-zoom-"]')).toHaveCount(0);
+  }
+
+  async wheelPastContentEnd(): Promise<void> {
+    const box = await this.snippet.dialog.locator('.ant-modal-body').boundingBox();
+    if (!box) throw new Error('Snippet modal body is not visible');
+    const page = this.snippet.dialog.page();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    for (let step = 0; step < 6; step += 1) await page.mouse.wheel(0, box.height);
+  }
+
+  async scrollState(): Promise<{ contentAtEnd: boolean; modalTop: number }> {
+    return this.snippet.dialog.locator('.ant-modal-body').evaluate((body) => ({
+      contentAtEnd: body.scrollTop > 0 && body.scrollTop + body.clientHeight >= body.scrollHeight - 1,
+      modalTop: Math.round(body.closest('.ant-modal-container')?.getBoundingClientRect().top ?? Number.NaN),
+    }));
   }
 }

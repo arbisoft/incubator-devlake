@@ -82,6 +82,11 @@ test.describe.serial('Claude Code OTel managed settings options', () => {
     expect(defaults.OTEL_LOGS_EXPORTER).toBe('otlp');
     expect(defaults.OTEL_LOG_USER_PROMPTS).toBe('1');
 
+    await options.waitUntilOpened();
+    const { modalTop } = await options.scrollState();
+    await options.wheelPastContentEnd();
+    await expect.poll(() => options.scrollState()).toEqual({ contentAtEnd: true, modalTop });
+
     await options.option(OPTIONS.logs.label).uncheck();
     expect((await options.settings()).env.OTEL_LOGS_EXPORTER).toBe('none');
     await expect(options.option(OPTIONS.promptText.label)).not.toBeVisible();

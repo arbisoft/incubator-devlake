@@ -81,11 +81,14 @@ export const scrollableModal = ({ theme }: { theme: DefaultTheme }) => {
       display: flex;
       flex-direction: column;
       max-height: calc(100vh - ${theme.layout.modalViewportMargin * 2}px);
+      /* A clipping box keeps the centred inline-block's baseline off the scrolled body text. */
+      overflow: hidden;
     }
 
     .ant-modal-body {
       flex: 1 1 auto;
       min-height: 0;
+      overscroll-behavior: contain;
       margin: -${focusRingGutter}px;
       padding: ${focusRingGutter}px;
       scroll-padding: ${focusRingGutter}px;
