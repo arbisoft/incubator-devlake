@@ -30,6 +30,7 @@ import (
 	"github.com/apache/incubator-devlake/core/models/common"
 	"github.com/apache/incubator-devlake/core/models/domainlayer"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/ai"
+	"github.com/apache/incubator-devlake/core/models/domainlayer/crossdomain"
 	dalmocks "github.com/apache/incubator-devlake/mocks/core/dal"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/models"
 	"github.com/stretchr/testify/mock"
@@ -143,6 +144,7 @@ func TestRollupSessionWithoutSessionIDSkipsModeQueries(t *testing.T) {
 		written = entity.(*ai.AiPrompt)
 	}).Return(nil).Once()
 	tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptSkill"), mock.Anything).Return(nil).Once()
+	expectStoredAccount(tx, &crossdomain.Account{})
 
 	target := &sessionTarget{connectionID: 1, userKey: "uuid:u1", promptIDs: map[string]struct{}{"p1": {}}}
 	if err := rollupSession(tx, testOrganizationID, target); err != nil {
@@ -150,6 +152,9 @@ func TestRollupSessionWithoutSessionIDSkipsModeQueries(t *testing.T) {
 	}
 	if written == nil || written.PermissionMode != ai.PermissionModeDefault || !written.PermissionModeInferred {
 		t.Fatalf("written prompt = %#v, want inferred default mode", written)
+	}
+	if wantAccountID := claudeAccountID(testOrganizationID, written.UserKey); written.AccountId != wantAccountID {
+		t.Fatalf("written prompt account = %q, want %q", written.AccountId, wantAccountID)
 	}
 }
 
@@ -172,6 +177,7 @@ func TestRollupSessionLoadsAndWritesModesOnlyWhenNeeded(t *testing.T) {
 			}).Return(nil)
 			tx.EXPECT().CreateOrUpdate(mock.AnythingOfType("*ai.AiPrompt")).Return(nil).Once()
 			tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptSkill"), mock.Anything).Return(nil).Once()
+			expectStoredAccount(tx, &crossdomain.Account{})
 			if modeChanged {
 				tx.EXPECT().CreateOrUpdate(mock.AnythingOfType("*ai.AiPermissionModeChange")).Return(nil).Once()
 			}
@@ -201,32 +207,46 @@ func TestRollupSessionLoadsAndWritesModesOnlyWhenNeeded(t *testing.T) {
 	}
 }
 
-func TestDomainAccountIDCachesLookupsPerEmail(t *testing.T) {
+func TestDomainAccountIDWritesClaudeAccountOncePerIdentity(t *testing.T) {
+	userAccountID := "user_1"
 	tx := dalmocks.NewTransaction(t)
-	notFound := errors.NotFound.New("no account")
-	tx.EXPECT().First(mock.AnythingOfType("*crossdomain.Account"), mock.Anything, mock.Anything).Return(notFound).Once()
-	tx.EXPECT().IsErrorNotFound(notFound).Return(true).Once()
+	expectNoStoredAccount(tx)
+	expectNameLookup(tx, "Dev Name")
+	expectAccountWrite(tx, "dev@example.com", userAccountID, "Dev Name")
 	cache := make(map[string]string)
 
 	for attempt := 0; attempt < 2; attempt++ {
-		accountID, err := domainAccountID(tx, cache, "dev@example.com")
-		if err != nil || accountID != "" {
-			t.Fatalf("domainAccountID() = %q, %v; want no account", accountID, err)
+		accountID, err := domainAccountID(tx, cache, testOrganizationID, testUserKey, &userAccountID, "dev@example.com")
+		if err != nil || accountID != testClaudeAccountID {
+			t.Fatalf("domainAccountID() = %q, %v; want %q", accountID, err, testClaudeAccountID)
 		}
-	}
-	if accountID, err := domainAccountID(tx, cache, ""); err != nil || accountID != "" {
-		t.Fatalf("domainAccountID(\"\") = %q, %v", accountID, err)
 	}
 }
 
-func TestDomainAccountIDReturnsLookupErrors(t *testing.T) {
+func TestDomainAccountIDRewritesAccountForNewEmail(t *testing.T) {
+	tx := dalmocks.NewTransaction(t)
+	expectNoStoredAccount(tx)
+	expectAccountWrite(tx, "", "", "")
+	expectStoredAccount(tx, &crossdomain.Account{})
+	expectNameLookup(tx, "Dev Name")
+	expectAccountWrite(tx, "dev@example.com", "", "Dev Name")
+	cache := make(map[string]string)
+
+	for _, email := range []string{"", "dev@example.com"} {
+		if accountID, err := domainAccountID(tx, cache, testOrganizationID, testUserKey, nil, email); err != nil || accountID != testClaudeAccountID {
+			t.Fatalf("domainAccountID(email %q) = %q, %v", email, accountID, err)
+		}
+	}
+}
+
+func TestDomainAccountIDReturnsAccountErrors(t *testing.T) {
 	tx := dalmocks.NewTransaction(t)
 	failure := errors.Default.New("database unavailable")
-	tx.EXPECT().First(mock.AnythingOfType("*crossdomain.Account"), mock.Anything, mock.Anything).Return(failure).Once()
+	tx.EXPECT().First(mock.AnythingOfType("*crossdomain.Account"), mock.Anything).Return(failure).Once()
 	tx.EXPECT().IsErrorNotFound(failure).Return(false).Once()
 
-	if _, err := domainAccountID(tx, make(map[string]string), "dev@example.com"); err == nil {
-		t.Fatal("domainAccountID() error = nil, want the lookup error")
+	if _, err := domainAccountID(tx, make(map[string]string), testOrganizationID, testUserKey, nil, "dev@example.com"); err == nil {
+		t.Fatal("domainAccountID() error = nil, want the account error")
 	}
 }
 
