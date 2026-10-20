@@ -37,6 +37,8 @@ export const GOLDEN_MASKED_KEYS: readonly string[] = [
   'rowId',
   'createdAt',
   'updatedAt',
+  'startDate',
+  'endDate',
   'createdDate',
   'updatedDate',
   'expiredAt',

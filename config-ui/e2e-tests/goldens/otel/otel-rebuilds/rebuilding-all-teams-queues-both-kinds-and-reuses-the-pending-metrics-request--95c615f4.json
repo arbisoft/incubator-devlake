@@ -1,0 +1,24 @@
+{
+  "titlePath": [
+    "Claude Code OTel organization change and data rebuilds",
+    "rebuilding all teams queues both kinds and reuses the pending metrics request"
+  ],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/plugins/claude_otel/replays",
+      "body": {
+        "endDate": "<masked>",
+        "startDate": "<masked>"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/plugins/claude_otel/replays",
+      "body": {
+        "endDate": "<masked>",
+        "startDate": "<masked>"
+      }
+    }
+  ]
+}

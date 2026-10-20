@@ -72,9 +72,10 @@ func (c *rawConverter) processNextReplay() (bool, errors.Error) {
 
 func (c *rawConverter) claimNextReplay() (*models.OtelReplayRequest, string, bool, errors.Error) {
 	now := c.now().UTC()
+	midnight := now.Truncate(24 * time.Hour)
 	request := &models.OtelReplayRequest{}
 	err := c.db.First(request,
-		dal.Where("status = ? OR (status = ? AND (lease_until IS NULL OR lease_until < ?))", models.OtelReplayRequestStatusPending, models.OtelReplayRequestStatusProcessing, now),
+		dal.Where("(status = ? OR (status = ? AND (lease_until IS NULL OR lease_until < ?))) AND (kind = ? OR range_end <= ?)", models.OtelReplayRequestStatusPending, models.OtelReplayRequestStatusProcessing, now, models.OtelReplayKindLogs, midnight),
 		dal.Orderby("id ASC"),
 	)
 	if err != nil {
@@ -88,7 +89,7 @@ func (c *rawConverter) claimNextReplay() (*models.OtelReplayRequest, string, boo
 		{ColumnName: "status", Value: models.OtelReplayRequestStatusProcessing},
 		{ColumnName: "lease_owner", Value: leaseOwner},
 		{ColumnName: "lease_until", Value: now.Add(converterLeaseDuration)},
-	}, dal.Where("id = ? AND (status = ? OR (status = ? AND (lease_until IS NULL OR lease_until < ?)))", request.ID, models.OtelReplayRequestStatusPending, models.OtelReplayRequestStatusProcessing, now)); err != nil {
+	}, dal.Where("id = ? AND (status = ? OR (status = ? AND (lease_until IS NULL OR lease_until < ?))) AND (kind = ? OR range_end <= ?)", request.ID, models.OtelReplayRequestStatusPending, models.OtelReplayRequestStatusProcessing, now, models.OtelReplayKindLogs, midnight)); err != nil {
 		return nil, "", false, errors.Default.Wrap(err, "failed to claim Claude Code OTel replay request")
 	}
 	if err := c.db.First(request, dal.Where("id = ? AND status = ? AND lease_owner = ? AND lease_until > ?", request.ID, models.OtelReplayRequestStatusProcessing, leaseOwner, now)); err != nil {
@@ -447,11 +448,17 @@ func (c *rawConverter) replaceReplayRange(tx dal.Transaction, rangeStart, rangeE
 			return fmt.Errorf("delete canonical facts for replay: %w", err)
 		}
 	}
-	updates := make([]factUpdate, 0, len(aggregates))
+	expected := make(map[uint64]string)
 	for _, aggregate := range aggregates {
-		if err := bindConnectionOrganization(tx, aggregate.update.connection, aggregate.update.organizationID); err != nil {
+		if err := expectOrganization(expected, aggregate.update.connection.ID, aggregate.update.organizationID); err != nil {
 			return err
 		}
+	}
+	if err := bindConnectionOrganizations(tx, expected); err != nil {
+		return err
+	}
+	updates := make([]factUpdate, 0, len(aggregates))
+	for _, aggregate := range aggregates {
 		if err := upsertHourlyFact(tx, aggregate.update, metricNumber{value: aggregate.value}, aggregate.lastObservedAt); err != nil {
 			return fmt.Errorf("write replayed hourly facts: %w", err)
 		}

@@ -16,7 +16,7 @@
  *
  */
 
-import { Alert } from 'antd';
+import { Alert, DatePicker } from 'antd';
 import styled from 'styled-components';
 
 import { textStyle } from '@/ui/style-helpers';
@@ -77,4 +77,8 @@ export const AttentionRegion = styled.div`
 
 export const AttentionAlert = styled(Alert)`
   border-radius: ${({ theme }) => theme.radius.lg}px;
+`;
+
+export const ReplayRange = styled(DatePicker.RangePicker)`
+  width: ${({ theme }) => theme.layout.otelReplayRangeWidth}px;
 `;

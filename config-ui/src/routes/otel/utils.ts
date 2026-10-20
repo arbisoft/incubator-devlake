@@ -17,8 +17,17 @@
  */
 
 import { HttpStatusCode } from 'axios';
+import dayjs from 'dayjs';
 
-import { OTEL_STATUS, type OtelConnectionResponse, type OtelIngestionStatus } from '@/api/otel';
+import {
+  OTEL_REPLAY_STATE,
+  OTEL_STATUS,
+  type OtelConnection,
+  type OtelConnectionResponse,
+  type OtelIngestionStatus,
+  type OtelReplayQueue,
+  type OtelReplayRange,
+} from '@/api/otel';
 import { METRIC_TILE_TONE, type MetricTileTone } from '@/ui/metric-tile';
 import { toUserMessage } from '@/ui/utils';
 import { formatPlural } from '@/utils/text';
@@ -36,7 +45,15 @@ import {
   RESTART_HINT_MARKER,
   SECONDS_PER_MINUTE,
 } from './constants';
-import type { ConnectionState, LifecycleAction, OtelAttentionState } from './types';
+import {
+  ORGANIZATION_ID_PATTERN,
+  REBIND_ERROR_MAP,
+  REPLAY_COPY,
+  REPLAY_DAY_FORMAT,
+  REPLAY_ERROR_MAP,
+  REPLAY_MAX_LOOKBACK_DAYS,
+} from './replay-constants';
+import type { ConnectionState, LifecycleAction, OtelAttentionState, ReplayDateLimits } from './types';
 
 const HEALTH_THRESHOLD = {
   DEGRADED_BACKLOG_SECONDS: 5 * SECONDS_PER_MINUTE,
@@ -171,3 +188,51 @@ export const getCreateIntent = (params: URLSearchParams) => {
   const projectName = params.get(CREATE_INTENT_PARAM.PROJECT);
   return params.get(CREATE_INTENT_PARAM.CREATE) === 'true' && projectName ? projectName : undefined;
 };
+
+const utcDay = (value: Date | string) => dayjs.utc(value).format(REPLAY_DAY_FORMAT);
+
+export const getReplayDateLimits = (now: Date, createdAt?: string): ReplayDateLimits => {
+  const max = utcDay(now);
+  const retentionMin = dayjs.utc(now).subtract(REPLAY_MAX_LOOKBACK_DAYS, 'day').format(REPLAY_DAY_FORMAT);
+  const createdDay = createdAt ? utcDay(createdAt) : retentionMin;
+  return { min: createdDay > retentionMin ? createdDay : retentionMin, max };
+};
+
+export const isReplayDayDisabled = (day: string, { min, max }: ReplayDateLimits) => day < min || day > max;
+
+export const hasReplayRange = ({ startDate, endDate }: OtelReplayRange) => Boolean(startDate && endDate);
+
+export const includesToday = ({ endDate }: OtelReplayRange, { max }: Pick<ReplayDateLimits, 'max'>) => endDate === max;
+
+export const getRebindDefaults = (connection: OtelConnection, now: Date) => {
+  const { min, max } = getReplayDateLimits(now, connection.createdAt);
+  const revokedDay = connection.revokedAt ? utcDay(connection.revokedAt) : max;
+  const endDate = revokedDay < max ? revokedDay : max;
+  const available = endDate >= min;
+  return {
+    rebuild: available && connection.organizationId !== null,
+    available,
+    range: { startDate: min, endDate },
+  };
+};
+
+export const isOrganizationId = (value: string) => ORGANIZATION_ID_PATTERN.test(value.trim());
+
+export const formatDayRange = (startDate: string, endDate: string) =>
+  startDate === endDate ? startDate : `${startDate} – ${endDate}`;
+
+export const formatReplayDays = (rangeStart: string, rangeEnd: string) =>
+  formatDayRange(utcDay(rangeStart), dayjs.utc(rangeEnd).subtract(1, 'day').format(REPLAY_DAY_FORMAT));
+
+export const getReplayQueuedMessage = ({ queued, reused }: OtelReplayQueue) =>
+  REPLAY_COPY.queued(
+    queued.length,
+    reused.length,
+    [...queued, ...reused].some(({ state }) => state === OTEL_REPLAY_STATE.WAITING),
+  );
+
+export const getOtelRebindError = (error: unknown) =>
+  toUserMessage(error, REBIND_ERROR_MAP, REPLAY_COPY.errors.rebindFailed);
+
+export const getOtelReplayError = (error: unknown) =>
+  toUserMessage(error, REPLAY_ERROR_MAP, REPLAY_COPY.errors.replayFailed);

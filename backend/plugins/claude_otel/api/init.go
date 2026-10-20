@@ -28,4 +28,5 @@ var logger log.Logger
 func Init(basicRes context.BasicRes) {
 	logger = basicRes.GetLogger()
 	service.Init(basicRes)
+	service.StartConverter()
 }

@@ -18,4 +18,6 @@
 
 export * from './create-modal';
 export * from './projects-modal';
+export * from './rebind-modal';
+export * from './replay-modal';
 export * from './snippet-modal';

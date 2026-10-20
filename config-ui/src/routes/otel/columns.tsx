@@ -22,6 +22,7 @@ import {
   DeleteOutlined,
   ReloadOutlined,
   StopOutlined,
+  SwapOutlined,
   SyncOutlined,
 } from '@ant-design/icons';
 import { Tooltip, Typography, type TableColumnsType } from 'antd';
@@ -40,6 +41,7 @@ import {
 import { STATUS_TONE } from '@/ui/constants';
 
 import { CONNECTION_COLUMN, COPY, LIFECYCLE_ACTION, PROJECT_CHIP_LIMIT } from './constants';
+import { REPLAY_COPY } from './replay-constants';
 import { ActionRow, TagRow } from './styled';
 import { CONNECTION_STATE_TONE, CREDENTIAL_TONE } from './tones';
 import type { ConnectionColumnActions } from './types';
@@ -87,7 +89,8 @@ const renderProjects = ({ projects }: OtelConnectionResponse) => {
 const renderOrganization = ({ connection }: OtelConnectionResponse) =>
   connection.organizationId ? (
     <Tooltip title={COPY.organization.boundHelp}>
-      <Typography.Text code copyable ellipsis>
+      {/* Keyed so antd re-measures its ellipsis label when the organization changes. */}
+      <Typography.Text key={connection.organizationId} code copyable ellipsis>
         {connection.organizationId}
       </Typography.Text>
     </Tooltip>
@@ -121,6 +124,7 @@ const renderCredentials = ({ credentials }: OtelConnectionResponse) => {
 
 export const getConnectionColumns = ({
   onManageProjects,
+  onRebind,
   onAction,
   onActionButtonRef,
 }: ConnectionColumnActions): TableColumnsType<OtelConnectionResponse> => [
@@ -184,6 +188,11 @@ export const getConnectionColumns = ({
           icon={<ApartmentOutlined aria-hidden />}
           label={COPY.actions.projects(record.connection.teamName)}
           onClick={() => onManageProjects(record)}
+        />
+        <IconButton
+          icon={<SwapOutlined aria-hidden />}
+          label={REPLAY_COPY.rebindAction(record.connection.teamName)}
+          onClick={() => onRebind(record)}
         />
         {ACTION_BUTTONS.map(({ action, icon, tone }) => (
           <IconButton

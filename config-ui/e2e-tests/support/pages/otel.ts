@@ -17,10 +17,12 @@
  */
 import { Locator, Page, expect } from '@playwright/test';
 
-import { COMMON_COPY, OTEL_COPY, OTEL_INGESTION_STATE, OTEL_MODAL_COPY, OTEL_STATUS } from '../app-copy';
+import { COMMON_COPY, OTEL_COPY, OTEL_INGESTION_STATE, OTEL_MODAL_COPY, OTEL_STATUS, REPLAY_COPY } from '../app-copy';
 
 import {
   BasePage,
+  columnCell,
+  columnIndex,
   Screen,
   cellFullText,
   modalWithText,
@@ -31,6 +33,7 @@ import {
   tableWithRow,
   urlEndingWith,
 } from './common';
+import { OtelRebindDialog } from './otel-rebuilds';
 import { PATHS } from './paths';
 
 type ListedConnection = { connection: { teamName: string }; restartRequired: boolean; managedSettings?: unknown };
@@ -40,14 +43,6 @@ const CONNECTIONS_API_PATH = '/api/plugins/claude_otel/connections';
 type LifecycleKey = keyof typeof OTEL_COPY.confirm;
 type IngestionState = (typeof OTEL_INGESTION_STATE)[keyof typeof OTEL_INGESTION_STATE];
 const FIRST_PAYLOAD_BUTTON_NAME = new RegExp(`^${OTEL_COPY.health.viewPayloadFor('')}`);
-
-const columnIndex = (table: Locator, column: string): Promise<number> =>
-  table
-    .getByRole('columnheader', { name: column, exact: true })
-    .evaluate((element) => (element as HTMLTableCellElement).cellIndex);
-
-const columnCell = async (table: Locator, row: Locator, column: string): Promise<Locator> =>
-  row.getByRole('cell').nth(await columnIndex(table, column));
 
 // The "Generate Claude Settings" form.
 export class OtelCredentialDialog {
@@ -297,6 +292,15 @@ export class OtelConnectionRow {
 
   async remove(): Promise<void> {
     await this.removeButton.click();
+  }
+
+  get rebindButton(): Locator {
+    return this.button(REPLAY_COPY.rebindAction(this.teamName));
+  }
+
+  async rebind(): Promise<OtelRebindDialog> {
+    await this.rebindButton.click();
+    return new OtelRebindDialog(this.page, this.teamName);
   }
 
   async openProjects(): Promise<OtelProjectsDialog> {
