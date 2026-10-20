@@ -51,7 +51,7 @@
                         "editorMode": "code",
                         "format": "time_series",
                         "rawQuery": true,
-                        "rawSql": "SELECT UNIX_TIMESTAMP(DATE(p.started_at)) AS time,\n  SUM(p.cache_read_tokens) / NULLIF(SUM(p.input_tokens + p.cache_read_tokens + p.cache_creation_tokens), 0) AS \"Cache read share\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\nGROUP BY UNIX_TIMESTAMP(DATE(p.started_at))\nORDER BY time"
+                        "rawSql": "SELECT UNIX_TIMESTAMP(DATE(p.started_at)) AS time,\n  SUM(p.cache_read_tokens) / NULLIF(SUM(p.input_tokens + p.cache_read_tokens + p.cache_creation_tokens), 0) AS \"Cache read share\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND p.command_name <> 'exit'\nGROUP BY UNIX_TIMESTAMP(DATE(p.started_at))\nORDER BY time"
                       },
                       "version": "v0"
                     },
@@ -168,7 +168,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT b.label AS \"Calls per prompt\",\n  SUM(CASE WHEN p.api_request_count BETWEEN b.lo AND b.hi THEN 1 ELSE 0 END) AS \"API requests\",\n  SUM(CASE WHEN p.tool_call_count BETWEEN b.lo AND b.hi THEN 1 ELSE 0 END) AS \"Tool calls\"\nFROM (\n  SELECT 0 AS ord, '0' AS label, 0 AS lo, 0 AS hi\n  UNION ALL SELECT 1, '1', 1, 1\n  UNION ALL SELECT 2, '2-3', 2, 3\n  UNION ALL SELECT 3, '4-7', 4, 7\n  UNION ALL SELECT 4, '8-15', 8, 15\n  UNION ALL SELECT 5, '16-31', 16, 31\n  UNION ALL SELECT 6, '32+', 32, 1000000000\n) AS b\nCROSS JOIN ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\nGROUP BY b.ord, b.label\nORDER BY b.ord"
+                        "rawSql": "SELECT b.label AS \"Calls per prompt\",\n  SUM(CASE WHEN p.api_request_count BETWEEN b.lo AND b.hi THEN 1 ELSE 0 END) AS \"API requests\",\n  SUM(CASE WHEN p.tool_call_count BETWEEN b.lo AND b.hi THEN 1 ELSE 0 END) AS \"Tool calls\"\nFROM (\n  SELECT 0 AS ord, '0' AS label, 0 AS lo, 0 AS hi\n  UNION ALL SELECT 1, '1', 1, 1\n  UNION ALL SELECT 2, '2-3', 2, 3\n  UNION ALL SELECT 3, '4-7', 4, 7\n  UNION ALL SELECT 4, '8-15', 8, 15\n  UNION ALL SELECT 5, '16-31', 16, 31\n  UNION ALL SELECT 6, '32+', 32, 1000000000\n) AS b\nCROSS JOIN ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND p.command_name <> 'exit'\nGROUP BY b.ord, b.label\nORDER BY b.ord"
                       },
                       "version": "v0"
                     },
@@ -244,7 +244,7 @@
                 },
                 "orientation": "auto",
                 "showValue": "auto",
-                "stacking": "none",
+                "stacking": "normal",
                 "tooltip": {
                   "hideZeros": false,
                   "mode": "multi",
@@ -395,7 +395,7 @@
                         "editorMode": "code",
                         "format": "time_series",
                         "rawQuery": true,
-                        "rawSql": "SELECT UNIX_TIMESTAMP(DATE(p.started_at)) AS time,\n  SUM(p.api_error_count) / NULLIF(SUM(p.api_request_count + p.api_error_count), 0) AS \"API error rate\",\n  SUM(p.tool_failure_count) / NULLIF(SUM(p.tool_call_count), 0) AS \"Tool failure rate\",\n  SUM(p.tool_reject_count) / NULLIF(SUM(p.tool_call_count + p.tool_reject_count), 0) AS \"Tool rejection rate\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\nGROUP BY UNIX_TIMESTAMP(DATE(p.started_at))\nORDER BY time"
+                        "rawSql": "SELECT UNIX_TIMESTAMP(DATE(p.started_at)) AS time,\n  SUM(p.api_error_count) / NULLIF(SUM(p.api_request_count + p.api_error_count), 0) AS \"API error rate\",\n  SUM(p.tool_failure_count) / NULLIF(SUM(p.tool_call_count), 0) AS \"Tool failure rate\",\n  SUM(p.tool_reject_count) / NULLIF(SUM(p.tool_call_count + p.tool_reject_count), 0) AS \"Tool rejection rate\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND p.command_name <> 'exit'\nGROUP BY UNIX_TIMESTAMP(DATE(p.started_at))\nORDER BY time"
                       },
                       "version": "v0"
                     },
@@ -511,7 +511,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT CASE WHEN p.subagent_count > 0 THEN 'With subagents' ELSE 'No subagents' END AS \"Prompts\",\n  COUNT(*) AS \"Count\",\n  COUNT(*) / SUM(COUNT(*)) OVER () AS \"Share\",\n  SUM(p.estimated_cost_usd) / COUNT(*) AS \"Cost per prompt\",\n  AVG(p.api_request_count) AS \"API requests per prompt\",\n  AVG(p.tool_call_count) AS \"Tool calls per prompt\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\nGROUP BY CASE WHEN p.subagent_count > 0 THEN 'With subagents' ELSE 'No subagents' END\nORDER BY COUNT(*) DESC"
+                        "rawSql": "SELECT CASE WHEN p.subagent_count > 0 THEN 'With subagents' ELSE 'No subagents' END AS \"Prompts\",\n  COUNT(*) AS \"Count\",\n  COUNT(*) / SUM(COUNT(*)) OVER () AS \"Share\",\n  SUM(p.estimated_cost_usd) / COUNT(*) AS \"Cost per prompt\",\n  AVG(p.api_request_count) AS \"API requests per prompt\",\n  AVG(p.tool_call_count) AS \"Tool calls per prompt\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND p.command_name <> 'exit'\nGROUP BY CASE WHEN p.subagent_count > 0 THEN 'With subagents' ELSE 'No subagents' END\nORDER BY COUNT(*) DESC"
                       },
                       "version": "v0"
                     },
@@ -646,7 +646,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT COALESCE(NULLIF(p.models_used, ''), '(no model request)') AS \"Models\",\n  COUNT(*) AS \"Prompts\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\nGROUP BY COALESCE(NULLIF(p.models_used, ''), '(no model request)')\nORDER BY COUNT(*) DESC"
+                        "rawSql": "SELECT REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(p.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') AS \"Models\",\n  COUNT(*) AS \"Prompts\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND p.models_used <> ''\nGROUP BY REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(p.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ')\nORDER BY COUNT(*) DESC"
                       },
                       "version": "v0"
                     },
@@ -658,7 +658,7 @@
               "transformations": []
             }
           },
-          "description": "Which model or combination of models each prompt used. '(no model request)' means the prompt made no API call, such as a local slash command.",
+          "description": "Which model or combination of models each prompt used. Prompts that made no API call, such as local slash commands, are left out.",
           "id": 16,
           "links": [],
           "title": "Models Used per Prompt",
@@ -690,7 +690,7 @@
                 "legend": {
                   "displayMode": "table",
                   "placement": "right",
-                  "showLegend": false,
+                  "showLegend": true,
                   "values": [
                     "value"
                   ]
@@ -736,7 +736,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT SUM(p.command_name <> '') / NULLIF(COUNT(*), 0) AS \"Share\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})"
+                        "rawSql": "SELECT SUM(p.command_name <> '') / NULLIF(COUNT(*), 0) AS \"Share\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND p.command_name <> 'exit'"
                       },
                       "version": "v0"
                     },
@@ -825,7 +825,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT SUM(p.used_skill) / NULLIF(COUNT(*), 0) AS \"Share\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})"
+                        "rawSql": "SELECT SUM(p.used_skill) / NULLIF(COUNT(*), 0) AS \"Share\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND p.command_name <> 'exit'"
                       },
                       "version": "v0"
                     },
@@ -914,7 +914,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT COUNT(*) AS \"Prompts\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})"
+                        "rawSql": "SELECT COUNT(*) AS \"Prompts\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND p.command_name <> 'exit'"
                       },
                       "version": "v0"
                     },
@@ -1173,7 +1173,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT CONCAT('/', p.command_name) AS \"Command\",\n  COUNT(*) AS \"Prompts\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND p.command_name <> ''\nGROUP BY p.command_name\nORDER BY COUNT(*) DESC\nLIMIT 20"
+                        "rawSql": "SELECT CONCAT('/', p.command_name) AS \"Command\",\n  COUNT(*) AS \"Prompts\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND p.command_name NOT IN ('', 'exit')\nGROUP BY p.command_name\nORDER BY COUNT(*) DESC\nLIMIT 20"
                       },
                       "version": "v0"
                     },
@@ -1185,7 +1185,7 @@
               "transformations": []
             }
           },
-          "description": "Prompts per slash command.",
+          "description": "Prompts per slash command. /exit is left out.",
           "id": 22,
           "links": [],
           "title": "Slash Command Usage",
@@ -1245,7 +1245,7 @@
                   "calcs": [],
                   "displayMode": "list",
                   "placement": "bottom",
-                  "showLegend": true
+                  "showLegend": false
                 },
                 "orientation": "horizontal",
                 "showValue": "auto",
@@ -1285,7 +1285,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT s.skill_name AS \"Skill\",\n  SUM(s.invocation_trigger = 'user-slash') AS \"user-slash\",\n  SUM(s.invocation_trigger = 'claude-proactive') AS \"claude-proactive\",\n  SUM(s.invocation_trigger = 'nested-skill') AS \"nested-skill\",\n  SUM(s.invocation_trigger NOT IN ('user-slash', 'claude-proactive', 'nested-skill')) AS \"unknown\"\nFROM ai_prompt_skills s\nJOIN ai_prompts p ON p.session_id = s.session_id AND p.prompt_id = s.prompt_id\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\nGROUP BY s.skill_name\nORDER BY COUNT(*) DESC\nLIMIT 20"
+                        "rawSql": "SELECT s.skill_name AS \"Skill\",\n  SUM(s.invocation_trigger = 'user-slash') AS \"user-slash\",\n  SUM(s.invocation_trigger = 'claude-proactive') AS \"claude-proactive\",\n  SUM(s.invocation_trigger = 'nested-skill') AS \"nested-skill\",\n  SUM(s.invocation_trigger NOT IN ('user-slash', 'claude-proactive', 'nested-skill')) AS \"none\"\nFROM ai_prompt_skills s\nJOIN ai_prompts p ON p.session_id = s.session_id AND p.prompt_id = s.prompt_id\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\nGROUP BY s.skill_name\nORDER BY COUNT(*) DESC\nLIMIT 20"
                       },
                       "version": "v0"
                     },
@@ -1397,7 +1397,7 @@
                         "editorMode": "code",
                         "format": "time_series",
                         "rawQuery": true,
-                        "rawSql": "SELECT UNIX_TIMESTAMP(DATE(p.started_at)) AS time,\n  SUM(p.used_skill) / NULLIF(COUNT(*), 0) AS \"Prompts using a skill\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\nGROUP BY UNIX_TIMESTAMP(DATE(p.started_at))\nORDER BY time"
+                        "rawSql": "SELECT UNIX_TIMESTAMP(DATE(p.started_at)) AS time,\n  SUM(p.used_skill) / NULLIF(COUNT(*), 0) AS \"Prompts using a skill\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND p.command_name <> 'exit'\nGROUP BY UNIX_TIMESTAMP(DATE(p.started_at))\nORDER BY time"
                       },
                       "version": "v0"
                     },
@@ -1513,7 +1513,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT p.permission_mode AS \"Mode\",\n  COUNT(*) AS \"Prompts\",\n  COUNT(*) / SUM(COUNT(*)) OVER () AS \"Share\",\n  SUM(p.estimated_cost_usd) AS \"Cost\",\n  SUM(p.estimated_cost_usd) / COUNT(*) AS \"Cost per prompt\",\n  AVG(p.input_tokens + p.output_tokens + p.cache_read_tokens + p.cache_creation_tokens) AS \"Tokens per prompt\",\n  AVG(p.tool_call_count) AS \"Tool calls per prompt\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\nGROUP BY p.permission_mode\nORDER BY COUNT(*) DESC"
+                        "rawSql": "SELECT CASE p.permission_mode WHEN 'default' THEN 'Agentic' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE p.permission_mode END AS \"Mode\",\n  REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(p.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') AS \"Model\",\n  CASE p.effort WHEN 'low' THEN 'Low' WHEN 'medium' THEN 'Medium' WHEN 'high' THEN 'High' WHEN 'xhigh' THEN 'XHigh' WHEN 'max' THEN 'Max' ELSE COALESCE(CONCAT(UPPER(LEFT(p.effort, 1)), SUBSTRING(p.effort, 2)), 'N/A') END AS \"Effort\",\n  COUNT(*) AS \"Prompts\",\n  COUNT(*) / SUM(COUNT(*)) OVER () AS \"Share\",\n  SUM(p.estimated_cost_usd) AS \"Cost\",\n  SUM(p.estimated_cost_usd) / COUNT(*) AS \"Cost per prompt\",\n  AVG(p.input_tokens + p.output_tokens + p.cache_read_tokens + p.cache_creation_tokens) AS \"Tokens per prompt\",\n  AVG(p.tool_call_count) AS \"Tool calls per prompt\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND p.models_used <> ''\nGROUP BY 1, 2, 3\nORDER BY 1, COUNT(*) DESC"
                       },
                       "version": "v0"
                     },
@@ -1525,7 +1525,7 @@
               "transformations": []
             }
           },
-          "description": "Prompts, cost and tokens per permission mode.",
+          "description": "Prompts, cost and tokens per permission mode, split by the model or combination of models the prompt used and its reasoning effort. Share is of all prompts shown. Prompts that made no API call, such as local slash commands, are left out. Effort 'N/A' means the client sent no effort.",
           "id": 26,
           "links": [],
           "title": "Permission Mode Breakdown",
@@ -1668,7 +1668,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT COALESCE(NULLIF(m.from_mode, ''), '(session start)') AS \"From\",\n  m.to_mode AS \"To\",\n  m.`trigger` AS \"Trigger\",\n  COUNT(*) AS \"Changes\",\n  COUNT(DISTINCT m.session_id) AS \"Sessions\"\nFROM ai_permission_mode_changes m\nWHERE $__timeFilter(m.changed_at)\n  AND m.session_id IN (SELECT p.session_id FROM ai_prompts p WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring}))\n  AND COALESCE(NULLIF(m.user_email, ''), m.user_key) IN (${user:sqlstring})\nGROUP BY COALESCE(NULLIF(m.from_mode, ''), '(session start)'), m.to_mode, m.`trigger`\nORDER BY COUNT(*) DESC"
+                        "rawSql": "SELECT COALESCE(NULLIF(CASE m.from_mode WHEN 'default' THEN 'Agentic' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE m.from_mode END, ''), '(session start)') AS \"From\",\n  CASE m.to_mode WHEN 'default' THEN 'Agentic' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE m.to_mode END AS \"To\",\n  CASE WHEN pr.models_used IS NULL THEN '(no prompt)' WHEN pr.models_used = '' THEN 'N/A' ELSE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(pr.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') END AS \"Model\",\n  CASE pr.effort WHEN 'low' THEN 'Low' WHEN 'medium' THEN 'Medium' WHEN 'high' THEN 'High' WHEN 'xhigh' THEN 'XHigh' WHEN 'max' THEN 'Max' ELSE COALESCE(CONCAT(UPPER(LEFT(pr.effort, 1)), SUBSTRING(pr.effort, 2)), 'N/A') END AS \"Effort\",\n  m.`trigger` AS \"Trigger\",\n  COUNT(*) AS \"Changes\",\n  COUNT(DISTINCT m.session_id) AS \"Sessions\"\nFROM ai_permission_mode_changes m\n-- The prompt running when the mode changed: the session's latest prompt started at or before the change.\nLEFT JOIN LATERAL (\n  SELECT p2.models_used, p2.effort\n  FROM ai_prompts p2\n  WHERE p2.workspace_key = m.workspace_key AND p2.session_id = m.session_id AND p2.started_at <= m.changed_at\n    AND p2.command_name <> 'exit'\n  ORDER BY p2.started_at DESC, p2.prompt_id DESC\n  LIMIT 1\n) pr ON TRUE\nWHERE $__timeFilter(m.changed_at)\n  AND m.session_id IN (SELECT p.session_id FROM ai_prompts p WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring}))\n  AND COALESCE(NULLIF(m.user_email, ''), m.user_key) IN (${user:sqlstring})\nGROUP BY 1, 2, 3, 4, 5\nORDER BY COUNT(*) DESC"
                       },
                       "version": "v0"
                     },
@@ -1680,7 +1680,7 @@
               "transformations": []
             }
           },
-          "description": "Every permission mode switch, grouped by from mode, to mode and what triggered it. Running /plan counts as entering plan mode.",
+          "description": "Every permission mode switch, grouped by from mode, to mode, the model and effort of the prompt running when it happened, and what triggered it. Running /plan counts as entering plan mode; that prompt makes no model request, so its model and effort show 'N/A'. '(no prompt)' means the switch came before the session's first prompt.",
           "id": 27,
           "links": [],
           "title": "Mode Transitions",
@@ -1725,96 +1725,6 @@
           }
         }
       },
-      "panel-28": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "datasource": {
-                        "name": "devlake-mysql"
-                      },
-                      "group": "mysql",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "format": "table",
-                        "rawQuery": true,
-                        "rawSql": "SELECT CASE WHEN p.permission_mode_inferred THEN 'Inferred' ELSE 'Observed' END AS \"Mode source\",\n  COUNT(*) AS \"Prompts\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\nGROUP BY CASE WHEN p.permission_mode_inferred THEN 'Inferred' ELSE 'Observed' END"
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": []
-            }
-          },
-          "description": "Whether a prompt's mode came from a reported mode change (observed) or was assumed to be 'default' because the session reported none (inferred).",
-          "id": 28,
-          "links": [],
-          "title": "Mode Observed vs Inferred",
-          "vizConfig": {
-            "group": "piechart",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "fixedColor": "#73BF69",
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    }
-                  }
-                },
-                "overrides": []
-              },
-              "options": {
-                "displayLabels": [
-                  "percent",
-                  "name"
-                ],
-                "legend": {
-                  "displayMode": "table",
-                  "placement": "right",
-                  "showLegend": true,
-                  "values": [
-                    "value"
-                  ]
-                },
-                "pieType": "donut",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": true
-                },
-                "sort": "desc",
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "single",
-                  "sort": "none"
-                }
-              }
-            },
-            "version": "13.2.2"
-          }
-        }
-      },
       "panel-3": {
         "kind": "Panel",
         "spec": {
@@ -1836,7 +1746,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT COUNT(DISTINCT p.session_id) AS \"Sessions\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})"
+                        "rawSql": "SELECT COUNT(DISTINCT p.session_id) AS \"Sessions\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND p.command_name <> 'exit'"
                       },
                       "version": "v0"
                     },
@@ -1922,7 +1832,7 @@
                         "editorMode": "code",
                         "format": "time_series",
                         "rawQuery": true,
-                        "rawSql": "SELECT UNIX_TIMESTAMP(DATE(p.started_at)) AS time,\n  SUM(p.tool_call_count) AS \"Tool calls\",\n  SUM(p.tool_failure_count) AS \"Failed\",\n  SUM(p.tool_reject_count) AS \"Rejected\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\nGROUP BY UNIX_TIMESTAMP(DATE(p.started_at))\nORDER BY time"
+                        "rawSql": "SELECT UNIX_TIMESTAMP(DATE(p.started_at)) AS time,\n  SUM(p.tool_call_count) AS \"Tool calls\",\n  SUM(p.tool_failure_count) AS \"Failed\",\n  SUM(p.tool_reject_count) AS \"Rejected\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND p.command_name <> 'exit'\nGROUP BY UNIX_TIMESTAMP(DATE(p.started_at))\nORDER BY time"
                       },
                       "version": "v0"
                     },
@@ -2038,7 +1948,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT AVG(p.tool_call_count) AS \"Tool calls\",\n  AVG(p.tool_failure_count) AS \"Failed\",\n  AVG(p.tool_reject_count) AS \"Rejected\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})"
+                        "rawSql": "SELECT AVG(p.tool_call_count) AS \"Tool calls\",\n  AVG(p.tool_failure_count) AS \"Failed\",\n  AVG(p.tool_reject_count) AS \"Rejected\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND p.command_name <> 'exit'"
                       },
                       "version": "v0"
                     },
@@ -2124,7 +2034,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT COALESCE(NULLIF(p.models_used, ''), '(no model request)') AS \"Models\",\n  COUNT(*) AS \"Prompts\",\n  SUM(p.api_request_count) AS \"API requests\",\n  SUM(p.api_error_count) AS \"API errors\",\n  SUM(p.estimated_cost_usd) AS \"Cost\",\n  SUM(p.estimated_cost_usd) / COUNT(*) AS \"Cost per prompt\",\n  AVG(p.input_tokens + p.output_tokens + p.cache_read_tokens + p.cache_creation_tokens) AS \"Tokens per prompt\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\nGROUP BY COALESCE(NULLIF(p.models_used, ''), '(no model request)')\nORDER BY COUNT(*) DESC"
+                        "rawSql": "SELECT REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(p.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') AS \"Models\",\n  CASE p.permission_mode WHEN 'default' THEN 'Agentic' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE p.permission_mode END AS \"Mode\",\n  CASE p.effort WHEN 'low' THEN 'Low' WHEN 'medium' THEN 'Medium' WHEN 'high' THEN 'High' WHEN 'xhigh' THEN 'XHigh' WHEN 'max' THEN 'Max' ELSE COALESCE(CONCAT(UPPER(LEFT(p.effort, 1)), SUBSTRING(p.effort, 2)), 'N/A') END AS \"Effort\",\n  COUNT(*) AS \"Prompts\",\n  SUM(p.api_request_count) AS \"API requests\",\n  SUM(p.api_error_count) AS \"API errors\",\n  SUM(p.estimated_cost_usd) AS \"Cost\",\n  SUM(p.estimated_cost_usd) / COUNT(*) AS \"Cost per prompt\",\n  AVG(p.input_tokens + p.output_tokens + p.cache_read_tokens + p.cache_creation_tokens) AS \"Tokens per prompt\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND p.models_used <> ''\nGROUP BY 1, 2, 3\nORDER BY 1, COUNT(*) DESC"
                       },
                       "version": "v0"
                     },
@@ -2136,7 +2046,7 @@
               "transformations": []
             }
           },
-          "description": "Prompts, model requests, cost and tokens by the model or combination of models each prompt used. '(no model request)' means the prompt never reached a model, such as a local slash command.",
+          "description": "Prompts, model requests, cost and tokens by the model or combination of models each prompt used, split by permission mode and reasoning effort. Prompts that never reached a model, such as local slash commands, are left out. Effort 'N/A' means the client sent no effort.",
           "id": 32,
           "links": [],
           "title": "Usage by Model Mix",
@@ -2251,7 +2161,7 @@
                         "editorMode": "code",
                         "format": "time_series",
                         "rawQuery": true,
-                        "rawSql": "SELECT UNIX_TIMESTAMP(DATE(p.started_at)) AS time,\n  SUM(p.api_request_count) AS \"API requests\",\n  SUM(p.api_error_count) AS \"API errors\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\nGROUP BY UNIX_TIMESTAMP(DATE(p.started_at))\nORDER BY time"
+                        "rawSql": "SELECT UNIX_TIMESTAMP(DATE(p.started_at)) AS time,\n  SUM(p.api_request_count) AS \"API requests\",\n  SUM(p.api_error_count) AS \"API errors\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND p.command_name <> 'exit'\nGROUP BY UNIX_TIMESTAMP(DATE(p.started_at))\nORDER BY time"
                       },
                       "version": "v0"
                     },
@@ -2367,7 +2277,7 @@
                         "editorMode": "code",
                         "format": "time_series",
                         "rawQuery": true,
-                        "rawSql": "SELECT UNIX_TIMESTAMP(DATE(p.started_at)) AS time,\n  SUM(p.estimated_cost_usd) AS \"Estimated cost\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\nGROUP BY UNIX_TIMESTAMP(DATE(p.started_at))\nORDER BY time"
+                        "rawSql": "SELECT UNIX_TIMESTAMP(DATE(p.started_at)) AS time,\n  SUM(p.estimated_cost_usd) AS \"Estimated cost\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND p.command_name <> 'exit'\nGROUP BY UNIX_TIMESTAMP(DATE(p.started_at))\nORDER BY time"
                       },
                       "version": "v0"
                     },
@@ -2484,7 +2394,7 @@
                         "editorMode": "code",
                         "format": "time_series",
                         "rawQuery": true,
-                        "rawSql": "SELECT UNIX_TIMESTAMP(DATE(p.started_at)) AS time,\n  SUM(p.input_tokens) AS \"Input\",\n  SUM(p.output_tokens) AS \"Output\",\n  SUM(p.cache_read_tokens) AS \"Cache read\",\n  SUM(p.cache_creation_tokens) AS \"Cache creation\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\nGROUP BY UNIX_TIMESTAMP(DATE(p.started_at))\nORDER BY time"
+                        "rawSql": "SELECT UNIX_TIMESTAMP(DATE(p.started_at)) AS time,\n  SUM(p.input_tokens) AS \"Input\",\n  SUM(p.output_tokens) AS \"Output\",\n  SUM(p.cache_read_tokens) AS \"Cache read\",\n  SUM(p.cache_creation_tokens) AS \"Cache creation\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND p.command_name <> 'exit'\nGROUP BY UNIX_TIMESTAMP(DATE(p.started_at))\nORDER BY time"
                       },
                       "version": "v0"
                     },
@@ -2600,7 +2510,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT COALESCE(u.full_name, u.user) AS \"User\",\n  u.team AS \"Team\",\n  u.prompts AS \"Prompts\",\n  u.sessions AS \"Sessions\",\n  u.cost AS \"Cost\",\n  u.cost / u.prompts AS \"Cost per prompt\",\n  u.plan_share AS \"Plan mode\",\n  u.skill_share AS \"Used a skill\",\n  u.command_share AS \"Slash command\",\n  u.tool_failure_rate AS \"Tool failure rate\"\nFROM (\n  SELECT COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name,\n    GROUP_CONCAT(DISTINCT c.team_slug ORDER BY c.team_slug SEPARATOR ', ') AS team,\n    COUNT(*) AS prompts,\n    COUNT(DISTINCT p.session_id) AS sessions,\n    SUM(p.estimated_cost_usd) AS cost,\n    AVG(p.permission_mode = 'plan') AS plan_share,\n    AVG(p.used_skill) AS skill_share,\n    AVG(p.command_name <> '') AS command_share,\n    SUM(p.tool_failure_count) / NULLIF(SUM(p.tool_call_count), 0) AS tool_failure_rate\n  FROM ai_prompts p\n  LEFT JOIN _tool_claude_code_otel_connections c ON c.id = p.source_connection_id\n  -- account_id is the user's DevLake account, whose full_name the plugin copies from\n  -- another account with the same email.\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  GROUP BY COALESCE(NULLIF(p.user_email, ''), p.user_key)\n) u\nORDER BY u.prompts DESC"
+                        "rawSql": "SELECT COALESCE(u.full_name, u.user) AS \"User\",\n  u.team AS \"Team\",\n  u.model AS \"Model\",\n  u.effort AS \"Effort\",\n  u.mode AS \"Mode\",\n  u.prompts AS \"Prompts\",\n  u.sessions AS \"Sessions\",\n  u.cost AS \"Cost\",\n  u.cost / u.prompts AS \"Cost per prompt\",\n  u.skill_share AS \"Used a skill\",\n  u.command_share AS \"Slash command\",\n  u.tool_failure_rate AS \"Tool failure rate\"\nFROM (\n  SELECT COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    CASE WHEN p.models_used = '' THEN 'N/A' ELSE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(p.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') END AS model,\n    CASE p.effort WHEN 'low' THEN 'Low' WHEN 'medium' THEN 'Medium' WHEN 'high' THEN 'High' WHEN 'xhigh' THEN 'XHigh' WHEN 'max' THEN 'Max' ELSE COALESCE(CONCAT(UPPER(LEFT(p.effort, 1)), SUBSTRING(p.effort, 2)), 'N/A') END AS effort,\n    CASE p.permission_mode WHEN 'default' THEN 'Agentic' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE p.permission_mode END AS mode,\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name,\n    GROUP_CONCAT(DISTINCT c.team_slug ORDER BY c.team_slug SEPARATOR ', ') AS team,\n    COUNT(*) AS prompts,\n    COUNT(DISTINCT p.session_id) AS sessions,\n    SUM(p.estimated_cost_usd) AS cost,\n    AVG(p.used_skill) AS skill_share,\n    AVG(p.command_name <> '') AS command_share,\n    COALESCE(SUM(p.tool_failure_count) / NULLIF(SUM(p.tool_call_count), 0), 0) AS tool_failure_rate\n  FROM ai_prompts p\n  LEFT JOIN _tool_claude_code_otel_connections c ON c.id = p.source_connection_id\n  -- account_id is the user's DevLake account, whose full_name the plugin copies from\n  -- another account with the same email.\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND p.command_name <> 'exit'\n  GROUP BY 1, 2, 3, 4\n) u\nORDER BY 1, u.prompts DESC"
                       },
                       "version": "v0"
                     },
@@ -2612,7 +2522,7 @@
               "transformations": []
             }
           },
-          "description": "Per-user prompt volume, cost and habits.",
+          "description": "Per-user prompt volume, cost and habits, split by the model or combination of models the prompt used, its reasoning effort and its permission mode. Model and effort 'N/A' mean the prompt made no model request, such as a local slash command, or the client sent no effort.",
           "id": 37,
           "links": [],
           "title": "Prompt Usage by User",
@@ -2676,22 +2586,6 @@
                       {
                         "id": "decimals",
                         "value": 2
-                      }
-                    ]
-                  },
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "Plan mode"
-                    },
-                    "properties": [
-                      {
-                        "id": "unit",
-                        "value": "percentunit"
-                      },
-                      {
-                        "id": "decimals",
-                        "value": 1
                       }
                     ]
                   },
@@ -2775,7 +2669,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT COALESCE(r.repository_url, '(no repository)') AS \"Repository\",\n  COALESCE(dl.projects, '(unmapped)') AS \"Project\",\n  r.prompts AS \"Prompts\",\n  r.prompts / SUM(r.prompts) OVER () AS \"Share\",\n  r.sessions AS \"Sessions\",\n  r.users AS \"Users\",\n  r.cost AS \"Cost\",\n  r.cost / r.prompts AS \"Cost per prompt\",\n  r.tokens / r.prompts AS \"Tokens per prompt\",\n  r.skill_share AS \"Used a skill\"\nFROM (\n  SELECT p.repository_url,\n    COUNT(*) AS prompts,\n    COUNT(DISTINCT p.session_id) AS sessions,\n    COUNT(DISTINCT COALESCE(NULLIF(p.user_email, ''), p.user_key)) AS users,\n    SUM(p.estimated_cost_usd) AS cost,\n    SUM(p.input_tokens + p.output_tokens + p.cache_read_tokens + p.cache_creation_tokens) AS tokens,\n    AVG(p.used_skill) AS skill_share\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  GROUP BY p.repository_url\n) r\nLEFT JOIN (\n  -- repository_url is lowercased with the .git suffix dropped, so normalize repos.url the same way.\n  SELECT TRIM(TRAILING '.git' FROM LOWER(rp.url)) AS url,\n    GROUP_CONCAT(DISTINCT pm.project_name ORDER BY pm.project_name SEPARATOR ', ') AS projects\n  FROM repos rp\n  JOIN project_mapping pm ON pm.row_id = rp.id AND pm.`table` = 'repos'\n  GROUP BY TRIM(TRAILING '.git' FROM LOWER(rp.url))\n) dl ON dl.url = r.repository_url\nORDER BY r.prompts DESC",
+                        "rawSql": "-- base is every prompt the panel counts, labelled once; metrics and skills are grouped from it\n-- separately, because joining skills into the metrics would repeat a prompt once per skill.\nWITH base AS (\n  SELECT p.workspace_key, p.session_id, p.prompt_id, p.repository_url,\n    COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    CASE WHEN p.models_used = '' THEN 'N/A' ELSE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(p.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') END AS model,\n    CASE p.permission_mode WHEN 'default' THEN 'Agentic' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE p.permission_mode END AS mode,\n    NULLIF(TRIM(a.full_name), '') AS full_name,\n    p.estimated_cost_usd, p.input_tokens, p.output_tokens, p.cache_read_tokens, p.cache_creation_tokens, p.used_skill\n  FROM ai_prompts p\n  -- account_id is the user's DevLake account, whose full_name the plugin copies from\n  -- another account with the same email.\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND p.command_name <> 'exit'\n), r AS (\n  SELECT repository_url, user, model, mode,\n    MAX(full_name) AS full_name,\n    COUNT(*) AS prompts,\n    COUNT(DISTINCT session_id) AS sessions,\n    SUM(estimated_cost_usd) AS cost,\n    SUM(input_tokens) AS input_tokens,\n    SUM(output_tokens) AS output_tokens,\n    SUM(cache_read_tokens) AS cache_read_tokens,\n    SUM(cache_creation_tokens) AS cache_creation_tokens,\n    AVG(used_skill) AS skill_share\n  FROM base\n  GROUP BY repository_url, user, model, mode\n), sk AS (\n  SELECT b.repository_url, b.user, b.model, b.mode,\n    GROUP_CONCAT(DISTINCT s.skill_name ORDER BY s.skill_name SEPARATOR ', ') AS skills\n  FROM base b\n  JOIN ai_prompt_skills s ON s.workspace_key = b.workspace_key AND s.session_id = b.session_id AND s.prompt_id = b.prompt_id\n  GROUP BY b.repository_url, b.user, b.model, b.mode\n)\nSELECT r.repository_url AS \"Repository\",\n  COALESCE(dl.projects, 'Unmapped') AS \"Project\",\n  COALESCE(r.full_name, r.user) AS \"User\",\n  r.model AS \"Model\",\n  r.mode AS \"Mode\",\n  r.prompts AS \"Prompts\",\n  r.prompts / SUM(r.prompts) OVER () AS \"Share\",\n  r.sessions AS \"Sessions\",\n  r.cost AS \"Cost\",\n  r.cost / r.prompts AS \"Cost per prompt\",\n  r.input_tokens / r.prompts AS \"Input Tokens per Prompt\",\n  r.output_tokens / r.prompts AS \"Output Tokens per Prompt\",\n  r.cache_read_tokens / r.prompts AS \"Cache Read Tokens per Prompt\",\n  r.cache_creation_tokens / r.prompts AS \"Cache Write Tokens per Prompt\",\n  r.skill_share AS \"Skill Usage\",\n  COALESCE(sk.skills, '') AS \"Skills\"\nFROM r\n-- repository_url is NULL for prompts without a repository, so match it NULL-safely.\nLEFT JOIN sk ON sk.repository_url <=> r.repository_url AND sk.user = r.user AND sk.model = r.model AND sk.mode = r.mode\nLEFT JOIN (\n  -- repository_url is lowercased with the .git suffix dropped, so normalize repos.url the same way.\n  SELECT TRIM(TRAILING '.git' FROM LOWER(rp.url)) AS url,\n    GROUP_CONCAT(DISTINCT pm.project_name ORDER BY pm.project_name SEPARATOR ', ') AS projects\n  FROM repos rp\n  JOIN project_mapping pm ON pm.row_id = rp.id AND pm.`table` = 'repos'\n  GROUP BY TRIM(TRAILING '.git' FROM LOWER(rp.url))\n) dl ON dl.url = r.repository_url\nORDER BY 1, 3, r.prompts DESC",
                         "sql": {
                           "columns": [
                             {
@@ -2804,7 +2698,7 @@
               "transformations": []
             }
           },
-          "description": "Prompts, sessions, users and cost per repository the prompt ran in, from the origin remote Claude Code reports. '(no repository)' means the session had no origin remote or the client did not report one. DevLake project is filled when the repository is also collected by a DevLake project.",
+          "description": "Prompts, sessions, cost and average input, output, cache read and cache write tokens per prompt for each repository the prompt ran in, from the origin remote Claude Code reports, split by user, the model or combination of models the prompt used, and permission mode. Share is of all prompts shown. Repository 'N/A' means the session had no origin remote or the client did not report one. Model 'N/A' means the prompt made no model request, such as a local slash command. Project is the DevLake project that also collects the repository, or 'Unmapped' when none does. /exit prompts are left out. Skills lists the distinct skills those prompts used, and is empty when none did.",
           "id": 38,
           "links": [],
           "title": "Prompt Usage by Repository",
@@ -2842,6 +2736,39 @@
                   {
                     "matcher": {
                       "id": "byName",
+                      "options": "Repository"
+                    },
+                    "properties": [
+                      {
+                        "id": "links",
+                        "value": [
+                          {
+                            "targetBlank": true,
+                            "title": "Open repository",
+                            "url": "${__value.raw}"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "special",
+                            "options": {
+                              "match": "null",
+                              "result": {
+                                "text": "N/A",
+                                "index": 0
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
                       "options": "Share"
                     },
                     "properties": [
@@ -2852,6 +2779,10 @@
                       {
                         "id": "decimals",
                         "value": 1
+                      },
+                      {
+                        "id": "custom.width",
+                        "value": 79
                       }
                     ]
                   },
@@ -2868,6 +2799,10 @@
                       {
                         "id": "decimals",
                         "value": 2
+                      },
+                      {
+                        "id": "custom.width",
+                        "value": 84
                       }
                     ]
                   },
@@ -2884,13 +2819,17 @@
                       {
                         "id": "decimals",
                         "value": 2
+                      },
+                      {
+                        "id": "custom.width",
+                        "value": 134
                       }
                     ]
                   },
                   {
                     "matcher": {
                       "id": "byName",
-                      "options": "Tokens per prompt"
+                      "options": "Input Tokens per Prompt"
                     },
                     "properties": [
                       {
@@ -2900,13 +2839,77 @@
                       {
                         "id": "decimals",
                         "value": 0
+                      },
+                      {
+                        "id": "custom.width",
+                        "value": 182
                       }
                     ]
                   },
                   {
                     "matcher": {
                       "id": "byName",
-                      "options": "Used a skill"
+                      "options": "Output Tokens per Prompt"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "short"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 0
+                      },
+                      {
+                        "id": "custom.width",
+                        "value": 193
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Cache Read Tokens per Prompt"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "short"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 0
+                      },
+                      {
+                        "id": "custom.width",
+                        "value": 229
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Cache Write Tokens per Prompt"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "short"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 0
+                      },
+                      {
+                        "id": "custom.width",
+                        "value": 230
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Skill Usage"
                     },
                     "properties": [
                       {
@@ -2916,6 +2919,32 @@
                       {
                         "id": "decimals",
                         "value": 1
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Prompts",
+                      "scope": "series"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 71
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Sessions",
+                      "scope": "series"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.width",
+                        "value": 83
                       }
                     ]
                   }
@@ -2951,7 +2980,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT COUNT(DISTINCT COALESCE(NULLIF(p.user_email, ''), p.user_key)) AS \"Active Users\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})"
+                        "rawSql": "SELECT COUNT(DISTINCT COALESCE(NULLIF(p.user_email, ''), p.user_key)) AS \"Active Users\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND p.command_name <> 'exit'"
                       },
                       "version": "v0"
                     },
@@ -3037,7 +3066,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT SUM(p.estimated_cost_usd) AS \"Estimated Cost\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})"
+                        "rawSql": "SELECT SUM(p.estimated_cost_usd) AS \"Estimated Cost\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND p.command_name <> 'exit'"
                       },
                       "version": "v0"
                     },
@@ -3124,7 +3153,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT SUM(p.estimated_cost_usd) / NULLIF(COUNT(*), 0) AS \"Cost per Prompt\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})"
+                        "rawSql": "SELECT SUM(p.estimated_cost_usd) / NULLIF(COUNT(*), 0) AS \"Cost per Prompt\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND p.command_name <> 'exit'"
                       },
                       "version": "v0"
                     },
@@ -3211,7 +3240,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT AVG(p.api_request_count) AS \"API Requests per Prompt\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})"
+                        "rawSql": "SELECT AVG(p.api_request_count) AS \"API Requests per Prompt\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND p.command_name <> 'exit'"
                       },
                       "version": "v0"
                     },
@@ -3298,7 +3327,7 @@
                         "editorMode": "code",
                         "format": "time_series",
                         "rawQuery": true,
-                        "rawSql": "SELECT UNIX_TIMESTAMP(DATE(p.started_at)) AS time,\n  p.permission_mode AS metric,\n  COUNT(*) AS value\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\nGROUP BY UNIX_TIMESTAMP(DATE(p.started_at)), p.permission_mode\nORDER BY time"
+                        "rawSql": "SELECT UNIX_TIMESTAMP(DATE(p.started_at)) AS time,\n  CONCAT(CASE p.permission_mode WHEN 'default' THEN 'Agentic' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE p.permission_mode END, ' · ', REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(p.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ')) AS metric,\n  COUNT(*) AS value\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND p.models_used <> ''\nGROUP BY 1, 2\nORDER BY time"
                       },
                       "version": "v0"
                     },
@@ -3310,7 +3339,7 @@
               "transformations": []
             }
           },
-          "description": "Prompts per day, split by the permission mode they ran in. 'default' includes sessions that never reported a mode change.",
+          "description": "Prompts per day, split by the permission mode they ran in and the model or combination of models they used. 'Agentic' is Claude Code's default mode and includes sessions that never reported a mode change. Prompts that made no API call, such as local slash commands, are left out.",
           "id": 8,
           "links": [],
           "title": "Prompts per Day by Permission Mode",
@@ -3413,7 +3442,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "SELECT p.permission_mode AS \"Mode\",\n  SUM(p.estimated_cost_usd) AS \"Cost (USD)\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\nGROUP BY p.permission_mode\nORDER BY SUM(p.estimated_cost_usd) DESC"
+                        "rawSql": "SELECT m.`Mode`, m.`Models`, m.`Cost`\nFROM (\n  SELECT CASE p.permission_mode WHEN 'default' THEN 'Agentic' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE p.permission_mode END AS \"Mode\",\n    REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(p.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') AS \"Models\",\n    SUM(p.estimated_cost_usd) AS \"Cost\"\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND p.models_used <> ''\n  GROUP BY 1, 2\n) m\nORDER BY SUM(m.`Cost`) OVER (PARTITION BY m.`Mode`) DESC, m.`Mode`, m.`Cost` DESC"
                       },
                       "version": "v0"
                     },
@@ -3422,10 +3451,23 @@
                 }
               ],
               "queryOptions": {},
-              "transformations": []
+              "transformations": [
+                {
+                  "group": "groupingToMatrix",
+                  "kind": "Transformation",
+                  "spec": {
+                    "options": {
+                      "columnField": "Models",
+                      "emptyValue": "zero",
+                      "rowField": "Mode",
+                      "valueField": "Cost"
+                    }
+                  }
+                }
+              ]
             }
           },
-          "description": "Total estimated cost of the prompts run in each permission mode.",
+          "description": "Total estimated cost of the prompts run in each permission mode, stacked by the model or combination of models each prompt used. A prompt that used several models counts once, under that combination.",
           "id": 9,
           "links": [],
           "title": "Estimated Cost by Permission Mode",
@@ -3489,13 +3531,12 @@
                 },
                 "orientation": "auto",
                 "showValue": "auto",
-                "stacking": "none",
+                "stacking": "normal",
                 "tooltip": {
                   "hideZeros": false,
                   "mode": "multi",
-                  "sort": "none"
+                  "sort": "desc"
                 },
-                "xField": "Mode",
                 "xTickLabelRotation": 0,
                 "xTickLabelSpacing": 0
               }
@@ -3602,8 +3643,8 @@
                           "kind": "ElementReference",
                           "name": "panel-8"
                         },
-                        "height": 8,
-                        "width": 12,
+                        "height": 9,
+                        "width": 24,
                         "x": 0,
                         "y": 4
                       }
@@ -3616,9 +3657,9 @@
                           "name": "panel-9"
                         },
                         "height": 8,
-                        "width": 12,
-                        "x": 12,
-                        "y": 4
+                        "width": 24,
+                        "x": 0,
+                        "y": 13
                       }
                     },
                     {
@@ -3628,10 +3669,10 @@
                           "kind": "ElementReference",
                           "name": "panel-10"
                         },
-                        "height": 8,
-                        "width": 12,
+                        "height": 9,
+                        "width": 24,
                         "x": 0,
-                        "y": 12
+                        "y": 21
                       }
                     }
                   ]
@@ -3655,22 +3696,9 @@
                           "kind": "ElementReference",
                           "name": "panel-12"
                         },
-                        "height": 8,
-                        "width": 12,
+                        "height": 9,
+                        "width": 24,
                         "x": 0,
-                        "y": 0
-                      }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-13"
-                        },
-                        "height": 8,
-                        "width": 12,
-                        "x": 12,
                         "y": 0
                       }
                     },
@@ -3681,10 +3709,23 @@
                           "kind": "ElementReference",
                           "name": "panel-14"
                         },
-                        "height": 8,
-                        "width": 12,
+                        "height": 9,
+                        "width": 24,
                         "x": 0,
-                        "y": 8
+                        "y": 9
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-13"
+                        },
+                        "height": 9,
+                        "width": 24,
+                        "x": 0,
+                        "y": 18
                       }
                     },
                     {
@@ -3694,10 +3735,10 @@
                           "kind": "ElementReference",
                           "name": "panel-16"
                         },
-                        "height": 8,
-                        "width": 12,
-                        "x": 12,
-                        "y": 8
+                        "height": 9,
+                        "width": 13,
+                        "x": 0,
+                        "y": 27
                       }
                     },
                     {
@@ -3710,7 +3751,7 @@
                         "height": 8,
                         "width": 24,
                         "x": 0,
-                        "y": 16
+                        "y": 36
                       }
                     }
                   ]
@@ -3786,8 +3827,8 @@
                           "kind": "ElementReference",
                           "name": "panel-22"
                         },
-                        "height": 8,
-                        "width": 12,
+                        "height": 9,
+                        "width": 24,
                         "x": 0,
                         "y": 4
                       }
@@ -3799,10 +3840,10 @@
                           "kind": "ElementReference",
                           "name": "panel-23"
                         },
-                        "height": 8,
-                        "width": 12,
-                        "x": 12,
-                        "y": 4
+                        "height": 9,
+                        "width": 24,
+                        "x": 0,
+                        "y": 13
                       }
                     },
                     {
@@ -3813,9 +3854,9 @@
                           "name": "panel-24"
                         },
                         "height": 8,
-                        "width": 12,
+                        "width": 24,
                         "x": 0,
-                        "y": 12
+                        "y": 22
                       }
                     }
                   ]
@@ -3857,19 +3898,6 @@
                         "x": 0,
                         "y": 8
                       }
-                    },
-                    {
-                      "kind": "GridLayoutItem",
-                      "spec": {
-                        "element": {
-                          "kind": "ElementReference",
-                          "name": "panel-28"
-                        },
-                        "height": 8,
-                        "width": 10,
-                        "x": 0,
-                        "y": 15
-                      }
                     }
                   ]
                 }
@@ -3890,9 +3918,9 @@
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
-                          "name": "panel-30"
+                          "name": "panel-31"
                         },
-                        "height": 9,
+                        "height": 4,
                         "width": 14,
                         "x": 0,
                         "y": 0
@@ -3903,12 +3931,12 @@
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
-                          "name": "panel-31"
+                          "name": "panel-30"
                         },
-                        "height": 9,
-                        "width": 10,
-                        "x": 14,
-                        "y": 0
+                        "height": 10,
+                        "width": 24,
+                        "x": 0,
+                        "y": 4
                       }
                     },
                     {
@@ -3921,7 +3949,7 @@
                         "height": 8,
                         "width": 24,
                         "x": 0,
-                        "y": 9
+                        "y": 14
                       }
                     },
                     {
@@ -3932,9 +3960,9 @@
                           "name": "panel-34"
                         },
                         "height": 8,
-                        "width": 12,
+                        "width": 24,
                         "x": 0,
-                        "y": 17
+                        "y": 22
                       }
                     },
                     {
@@ -3945,9 +3973,9 @@
                           "name": "panel-33"
                         },
                         "height": 8,
-                        "width": 12,
-                        "x": 12,
-                        "y": 17
+                        "width": 24,
+                        "x": 0,
+                        "y": 30
                       }
                     },
                     {
@@ -3958,9 +3986,9 @@
                           "name": "panel-35"
                         },
                         "height": 8,
-                        "width": 12,
+                        "width": 24,
                         "x": 0,
-                        "y": 25
+                        "y": 38
                       }
                     }
                   ]
