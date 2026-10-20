@@ -2549,6 +2549,155 @@
             }
           }
         }
+      },
+      "panel-38": {
+        "kind": "Panel",
+        "spec": {
+          "id": 38,
+          "title": "Prompt Usage by Repository",
+          "description": "Prompts, sessions, users and cost per repository the prompt ran in, from the origin remote Claude Code reports. '(no repository)' means the session had no origin remote or the client did not report one. DevLake project is filled when the repository is also collected by a DevLake project.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "spec": {
+                        "editorMode": "code",
+                        "format": "table",
+                        "rawQuery": true,
+                        "rawSql": "SELECT COALESCE(r.repository_url, '(no repository)') AS \"Repository\",\n  dl.projects AS \"DevLake project\",\n  r.prompts AS \"Prompts\",\n  r.prompts / SUM(r.prompts) OVER () AS \"Share\",\n  r.sessions AS \"Sessions\",\n  r.users AS \"Users\",\n  r.cost AS \"Cost\",\n  r.cost / r.prompts AS \"Cost per prompt\",\n  r.tokens / r.prompts AS \"Tokens per prompt\",\n  r.skill_share AS \"Used a skill\"\nFROM (\n  SELECT p.repository_url,\n    COUNT(*) AS prompts,\n    COUNT(DISTINCT p.session_id) AS sessions,\n    COUNT(DISTINCT COALESCE(NULLIF(p.user_email, ''), p.user_key)) AS users,\n    SUM(p.estimated_cost_usd) AS cost,\n    SUM(p.input_tokens + p.output_tokens + p.cache_read_tokens + p.cache_creation_tokens) AS tokens,\n    AVG(p.used_skill) AS skill_share\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  GROUP BY p.repository_url\n) r\nLEFT JOIN (\n  -- repository_url is lowercased with the .git suffix dropped, so normalize repos.url the same way.\n  SELECT TRIM(TRAILING '.git' FROM LOWER(rp.url)) AS url,\n    GROUP_CONCAT(DISTINCT pm.project_name ORDER BY pm.project_name SEPARATOR ', ') AS projects\n  FROM repos rp\n  JOIN project_mapping pm ON pm.row_id = rp.id AND pm.`table` = 'repos'\n  GROUP BY TRIM(TRAILING '.git' FROM LOWER(rp.url))\n) dl ON dl.url = r.repository_url\nORDER BY r.prompts DESC"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "",
+            "spec": {
+              "options": {
+                "cellHeight": "sm",
+                "footer": {
+                  "fields": "",
+                  "reducer": [
+                    "sum"
+                  ],
+                  "show": false
+                },
+                "showHeader": true
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "align": "auto",
+                    "cellOptions": {
+                      "type": "auto"
+                    }
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Share"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "percentunit"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Cost"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "currencyUSD"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 2
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Cost per prompt"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "currencyUSD"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 2
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Tokens per prompt"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "short"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Used a skill"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "percentunit"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "layout": {
@@ -3007,6 +3156,33 @@
                         "element": {
                           "kind": "ElementReference",
                           "name": "panel-35"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "title": "Repositories",
+              "collapse": false,
+              "layout": {
+                "kind": "GridLayout",
+                "spec": {
+                  "items": [
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 0,
+                        "width": 24,
+                        "height": 9,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-38"
                         }
                       }
                     }
