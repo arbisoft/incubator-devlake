@@ -81,7 +81,7 @@ const OFF_EFFECTS: Record<SettingsOption, (env: EnvMap) => void> = {
   },
 };
 
-export const effectiveSelection = (selection: SettingsSelection): SettingsSelection =>
+const effectiveSelection = (selection: SettingsSelection): SettingsSelection =>
   selectionFrom((option) => {
     const parent = PARENT_OF.get(option);
     return selection[option] && (parent === undefined || selection[parent]);
