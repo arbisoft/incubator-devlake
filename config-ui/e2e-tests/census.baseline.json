@@ -145,7 +145,7 @@
     },
     "otel/otel-settings-options.spec.ts": {
       "tests": 1,
-      "expects": 18,
+      "expects": 19,
       "backend": 2,
       "skips": 0,
       "fixmes": 0

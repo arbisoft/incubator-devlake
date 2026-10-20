@@ -89,8 +89,7 @@ export const DEFAULT_SETTINGS_SELECTION: Record<OptionId, boolean> = {
 
 export const SETTINGS_OPTION_TREE: { option: OptionId; children?: OptionId[] }[] = [
   { option: SETTINGS_OPTION.METRICS },
-  { option: SETTINGS_OPTION.LOGS, children: [SETTINGS_OPTION.PROMPT_TEXT] },
-  { option: SETTINGS_OPTION.TOOL_DETAILS },
+  { option: SETTINGS_OPTION.LOGS, children: [SETTINGS_OPTION.PROMPT_TEXT, SETTINGS_OPTION.TOOL_DETAILS] },
   { option: SETTINGS_OPTION.REPOSITORY },
 ];
 

@@ -91,6 +91,7 @@ test.describe.serial('Claude Code OTel managed settings options', () => {
     await options.option(OPTIONS.logs.label).uncheck();
     expect((await options.settings()).env.OTEL_LOGS_EXPORTER).toBe('none');
     await expect(options.option(OPTIONS.promptText.label)).not.toBeVisible();
+    await expect(options.option(OPTIONS.toolDetails.label)).not.toBeVisible();
     await expect(options.option(OPTIONS.metrics.label)).toBeDisabled();
     await expect(options.lastSignalHint).toBeVisible();
 

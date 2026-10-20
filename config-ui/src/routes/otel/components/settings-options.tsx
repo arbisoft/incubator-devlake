@@ -55,7 +55,7 @@ export const SettingsOptions = ({ value, onChange }: SettingsOptionsProps) => {
         {SETTINGS_OPTION_TREE.map(({ option, children }) => renderOption(option, children))}
       </div>
       {SETTINGS_OPTION_TREE.some(({ option }) => isLastSignal(value, option)) && <Hint>{OPTIONS_COPY.lastSignal}</Hint>}
-      <Alert type="info" showIcon title={OPTIONS_COPY.estimate(rawMb, monthlyMb)} />
+      <Alert type="info" role="status" showIcon title={OPTIONS_COPY.estimate(rawMb, monthlyMb)} />
     </>
   );
 };

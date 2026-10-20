@@ -39,12 +39,17 @@ describe('SettingsOptions in the snippet modal', () => {
     expect(screen.queryByText(OPTIONS.lastSignal)).toBeNull();
   });
 
-  it('unchecking events writes the disabled logs exporter and hides prompt text', () => {
+  it('unchecking events writes the disabled logs exporter', () => {
     renderWithTheme(<SnippetModal open credential={credential} onClose={vi.fn()} onClosed={vi.fn()} />);
-    expect(checkbox(OPTIONS.promptText.label).checked).toBe(true);
     fireEvent.click(checkbox(OPTIONS.logs.label));
     expect(shownEnv().OTEL_LOGS_EXPORTER).toBe('none');
-    expect(screen.queryByRole('checkbox', { name: OPTIONS.promptText.label })).toBeNull();
+  });
+
+  it.each([OPTIONS.promptText.label, OPTIONS.toolDetails.label])('hides %s while events are off', (label) => {
+    renderWithTheme(<SnippetModal open credential={credential} onClose={vi.fn()} onClosed={vi.fn()} />);
+    expect(checkbox(label).checked).toBe(true);
+    fireEvent.click(checkbox(OPTIONS.logs.label));
+    expect(screen.queryByRole('checkbox', { name: label })).toBeNull();
   });
 
   it('keeps the last signal checked', () => {
@@ -77,6 +82,13 @@ describe('SettingsOptions in the snippet modal', () => {
     expect(screen.getByText(OPTIONS.estimate(70, 21))).toBeTruthy();
     fireEvent.click(checkbox(OPTIONS.logs.label));
     expect(screen.getByText(OPTIONS.estimate(20, 1))).toBeTruthy();
+  });
+
+  it('announces the estimate as a status, not an alert', () => {
+    renderWithTheme(<SnippetModal open credential={credential} onClose={vi.fn()} onClosed={vi.fn()} />);
+    const estimate = screen.getByText(OPTIONS.estimate(70, 21));
+    expect(estimate.closest('[role="status"]')).not.toBeNull();
+    expect(estimate.closest('[role="alert"]')).toBeNull();
   });
 
   it('explains what an option sends', async () => {
