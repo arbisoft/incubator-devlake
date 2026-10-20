@@ -23,6 +23,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import API from '@/api';
 import { GRAFANA_ROLE } from '@/api/grafana-users/constants';
 import type { GrafanaUser, GrafanaUserList } from '@/api/grafana-users/types';
+import { finishModalExit } from '@/ui/__tests__/modal-exit';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
 import { createDeferred } from '../../__tests__/test-utils';
@@ -107,8 +108,7 @@ describe('GrafanaUsersCard', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: COPY.orphansDialog.confirm.confirm }));
     await waitFor(() => expect(grafana.clearOrphan).toHaveBeenCalledWith(ORPHAN));
     const orphansDialog = screen.getByText(COPY.orphansDialog.title).closest(MODAL_SELECTOR) as HTMLElement;
-    await waitFor(() => expect(orphansDialog.classList.contains('ant-zoom-leave-active')).toBe(true));
-    fireEvent.transitionEnd(orphansDialog);
+    await finishModalExit(orphansDialog);
     await waitFor(() => expect(screen.queryByRole('button', { name: COPY.orphansDialog.clearFor(ORPHAN) })).toBeNull());
 
     fireEvent.click(review);

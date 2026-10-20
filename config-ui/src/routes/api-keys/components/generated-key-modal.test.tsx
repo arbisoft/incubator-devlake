@@ -16,10 +16,11 @@
  *
  */
 
-import { fireEvent, waitFor } from '@testing-library/react';
+import { fireEvent } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { finishModalExit } from '@/ui/__tests__/modal-exit';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
 import { COPY } from '../constants';
@@ -117,10 +118,7 @@ describe('GeneratedKeyModal', () => {
     expect(onClose).toHaveBeenCalledOnce();
     rerender(<GeneratedKeyModal open={false} apiKey={API_KEY} onClose={onClose} onClosed={onClosed} />);
     const modal = requireControl(document.querySelector<HTMLElement>('.ant-modal'));
-    await waitFor(() => expect(modal.classList.contains('ant-zoom-leave-active')).toBe(true), {
-      onTimeout: () => new Error('Expected generated-key modal close transition.'),
-    });
-    fireEvent.transitionEnd(modal);
+    await finishModalExit(modal, 'Expected generated-key modal close transition.');
     expect(onClosed).toHaveBeenCalledOnce();
   });
 });

@@ -19,7 +19,7 @@
 import { omit } from 'lodash';
 import { describe, expect, it } from 'vitest';
 
-import { MANAGED_ENV } from './components/__tests__/modal-test-utils';
+import { MANAGED_ENV } from './__tests__/fixtures';
 import { SETTINGS_OPTION } from './constants';
 import {
   buildManagedSettings,

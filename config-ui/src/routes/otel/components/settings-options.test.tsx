@@ -20,10 +20,13 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { OTEL_STATUS } from '@/api/otel';
+import { finishModalExit } from '@/ui/__tests__/modal-exit';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 import { COPY as CODE_COPY } from '@/ui/code-block/constants';
 
-import { connection, MANAGED_ENV, otelCredential } from './__tests__/modal-test-utils';
+import { MANAGED_ENV } from '../__tests__/fixtures';
+
+import { connection, otelCredential } from './__tests__/modal-test-utils';
 import { COPY } from './constants';
 import { SnippetModal } from './snippet-modal';
 
@@ -116,8 +119,7 @@ describe('SettingsOptions in the snippet modal', () => {
     expect(shownEnv().OTEL_METRICS_INCLUDE_REPOSITORY).toBe('false');
     rerender(modal(false));
     const dialog = document.querySelector<HTMLElement>('.ant-modal');
-    await waitFor(() => expect(dialog?.classList.contains('ant-zoom-leave-active')).toBe(true));
-    fireEvent.transitionEnd(dialog as HTMLElement);
+    await finishModalExit(dialog);
     expect(onClosed).toHaveBeenCalledOnce();
     rerender(modal(true));
     await waitFor(() => expect(checkbox(OPTIONS.repository.label).checked).toBe(true));
