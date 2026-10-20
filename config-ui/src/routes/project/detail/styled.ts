@@ -64,37 +64,6 @@ export const FieldBox = styled.div`
   max-width: ${({ theme }) => theme.layout.fieldMaxWidth}px;
 `;
 
-export const Option = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${({ theme }) => theme.space.xs}px;
-
-  & + & {
-    margin-top: ${({ theme }) => theme.space.md}px;
-    padding-top: ${({ theme }) => theme.space.md}px;
-    border-top: 1px solid ${({ theme }) => theme.colors.borderSubtle};
-  }
-`;
-
-export const OptionLabel = styled.span`
-  ${textStyle('bodyMedium')}
-  color: ${({ theme }) => theme.colors.text};
-`;
-
-export const OptionHint = styled.p`
-  ${textStyle('body')}
-  display: flex;
-  align-items: center;
-  gap: ${({ theme }) => theme.space.xxs}px;
-  margin: 0 0 0 ${({ theme }) => theme.space.lg}px;
-  color: ${({ theme }) => theme.colors.textSecondary};
-`;
-
-export const OptionExtra = styled.div`
-  margin-left: ${({ theme }) => theme.space.lg}px;
-  max-width: ${({ theme }) => theme.layout.fieldMaxWidth}px;
-`;
-
 export const HelpButton = styled.button`
   display: inline-flex;
   padding: 0;

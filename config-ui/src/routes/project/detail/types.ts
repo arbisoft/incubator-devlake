@@ -16,8 +16,6 @@
  *
  */
 
-import type { ReactNode } from 'react';
-
 import type { ProjectTab } from '@/config';
 import type { IProject } from '@/types';
 import type { RouteTab } from '@/ui/types';
@@ -43,15 +41,6 @@ export type ProjectPayload = Pick<IProject, 'name' | 'description' | 'metrics'>;
 export type ProjectPanelProps = { project: IProject; onRefresh: () => void };
 
 export type ReadinessCardProps = { projectName: string };
-
-export type SettingOptionProps = {
-  label: string;
-  description: string;
-  checked: boolean;
-  aside?: ReactNode;
-  onChange: (checked: boolean) => void;
-  children?: ReactNode;
-};
 
 export type DeleteProjectModalProps = {
   open: boolean;

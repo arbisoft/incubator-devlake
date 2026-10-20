@@ -53,6 +53,27 @@ export const COPY = {
     team: 'Team',
     teamSlug: 'Team slug',
     endpoint: 'Endpoint',
+    options: {
+      title: 'Telemetry to send',
+      metrics: {
+        label: 'Metrics',
+        description: 'Tokens, cost, lines of code, commits, pull requests and edit decisions.',
+      },
+      logs: { label: 'Events', description: 'Prompts, skills and permission modes for each session.' },
+      promptText: {
+        label: 'Prompt text',
+        description: 'Keep the text of each prompt in raw telemetry. Off still counts prompts.',
+      },
+      toolDetails: {
+        label: 'Skill and MCP names',
+        description: 'Attribute prompts and usage to skills, plugins and MCP servers.',
+      },
+      repository: {
+        label: 'Repository',
+        description: 'Attribute usage to the session repository. Needs Claude Code v2.1.269 or later.',
+      },
+      lastSignal: 'Metrics or events must stay on.',
+    },
   },
   range: {
     label: 'Days to rebuild (UTC)',

@@ -37,6 +37,7 @@ export const COPY = {
     metricTile: 'MetricTile',
     pipelineProgress: 'PipelineProgress',
     segmentedMeter: 'SegmentedMeter',
+    settingOption: 'SettingOption',
     searchInput: 'SearchInput',
     filterTabs: 'FilterTabs',
     sortSelect: 'SortSelect',
@@ -200,6 +201,7 @@ export const COPY = {
     longLabel: 'Records synced across every connected source this month',
   },
   pipelineProgress: { status: (status: string) => `Status ${status}` },
+  settingOption: { label: 'Share usage data', description: 'Send anonymous usage data.', nested: 'Nested option' },
   segmentedMeter: {
     tone: { none: 'No segments filled', partial: 'Partly filled', complete: 'All filled' },
     label: (filled: number, total: number) => `${filled} of ${total} signals available`,

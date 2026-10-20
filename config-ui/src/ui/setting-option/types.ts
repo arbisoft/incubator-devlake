@@ -16,20 +16,14 @@
  *
  */
 
-import { Checkbox } from 'antd';
+import type { ReactNode } from 'react';
 
-import { Option, OptionExtra, OptionHint, OptionLabel } from './styled';
-import type { SettingOptionProps } from './types';
-
-export const SettingOption = ({ label, description, checked, aside, onChange, children }: SettingOptionProps) => (
-  <Option>
-    <Checkbox checked={checked} onChange={(event) => onChange(event.target.checked)}>
-      <OptionLabel>{label}</OptionLabel>
-    </Checkbox>
-    <OptionHint>
-      {description}
-      {aside}
-    </OptionHint>
-    {children && <OptionExtra>{children}</OptionExtra>}
-  </Option>
-);
+export type SettingOptionProps = {
+  label: string;
+  description: string;
+  checked: boolean;
+  disabled?: boolean;
+  aside?: ReactNode;
+  onChange: (checked: boolean) => void;
+  children?: ReactNode;
+};

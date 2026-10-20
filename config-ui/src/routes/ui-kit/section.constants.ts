@@ -28,6 +28,7 @@ export const SECTION = {
   METRIC_TILE: 'metricTile',
   PIPELINE_PROGRESS: 'pipelineProgress',
   SEGMENTED_METER: 'segmentedMeter',
+  SETTING_OPTION: 'settingOption',
   SEARCH_INPUT: 'searchInput',
   FILTER_TABS: 'filterTabs',
   SORT_SELECT: 'sortSelect',

@@ -18,18 +18,22 @@
 
 import { LockOutlined } from '@ant-design/icons';
 import { Alert } from 'antd';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 import { LINKS } from '@/config/links';
 import { CODE_LANGUAGE, CodeBlock, ExternalLink, FormModal, KeyValueList, MODAL_WIDTH } from '@/ui';
 
+import { buildManagedSettings, DEFAULT_SETTINGS_SELECTION } from '../managed-settings';
 import { Hint, Stack } from '../styled';
 import type { SnippetModalProps } from '../types';
 import { getOtelApplyError } from '../utils';
 
 import { COPY } from './constants';
+import { SettingsOptions } from './settings-options';
 
 export const SnippetModal = ({ open, credential, onClose, onClosed }: SnippetModalProps) => {
+  const [selection, setSelection] = useState(DEFAULT_SETTINGS_SELECTION);
+  const settings = useMemo(() => buildManagedSettings(credential?.managedSettings, selection), [credential, selection]);
   const summary = useMemo(
     () =>
       credential
@@ -42,6 +46,11 @@ export const SnippetModal = ({ open, credential, onClose, onClosed }: SnippetMod
     [credential],
   );
 
+  const handleAfterClose = () => {
+    setSelection(DEFAULT_SETTINGS_SELECTION);
+    onClosed();
+  };
+
   return (
     <FormModal
       open={open}
@@ -52,13 +61,14 @@ export const SnippetModal = ({ open, credential, onClose, onClosed }: SnippetMod
       showCancel={false}
       onSubmit={onClose}
       onCancel={onClose}
-      afterClose={onClosed}
+      afterClose={handleAfterClose}
     >
       <Stack>
         <Alert type="warning" showIcon title={COPY.snippet.storageNotice} />
         <Hint>{COPY.snippet.replaceNotice}</Hint>
         <KeyValueList items={summary} />
-        <CodeBlock value={credential?.managedSettings} language={CODE_LANGUAGE.JSON} copyLabel={COPY.snippet.copy} />
+        <SettingsOptions value={selection} onChange={setSelection} />
+        <CodeBlock value={settings} language={CODE_LANGUAGE.JSON} copyLabel={COPY.snippet.copy} />
         <Hint>
           {COPY.snippet.addIn}{' '}
           <ExternalLink href={LINKS.CLAUDE_CODE_MANAGED_SETTINGS}>{COPY.snippet.linkLabel}</ExternalLink>.

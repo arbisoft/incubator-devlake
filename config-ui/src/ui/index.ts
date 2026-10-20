@@ -49,6 +49,7 @@ export * from './row-link';
 export * from './search-input';
 export * from './section-card';
 export * from './segmented-meter';
+export * from './setting-option';
 export * from './sidebar-nav';
 export * from './sort-select';
 export * from './standalone-page';
