@@ -21,39 +21,23 @@ import { message } from 'antd';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import API from '@/api';
-import { OTEL_STATUS, type OtelConnectionResponse } from '@/api/otel';
+import type { OtelConnectionResponse } from '@/api/otel';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
 import { COPY as OTEL_COPY } from '../constants';
+import { getReplayDateLimits } from '../utils';
 
+import { connection, isDisabled, silenceFeedback } from './__tests__/modal-test-utils';
 import { COPY } from './constants';
 import { CreateModal } from './create-modal';
 import { ProjectsModal } from './projects-modal';
+import { ReplayModal } from './replay-modal';
 
-vi.mock('@/api', () => ({ default: { otel: { create: vi.fn(), updateProjects: vi.fn() } } }));
+vi.mock('@/api', () => ({
+  default: { otel: { create: vi.fn(), updateProjects: vi.fn(), rebind: vi.fn(), createReplay: vi.fn() } },
+}));
 
 const otel = vi.mocked(API.otel);
-
-const connection = (): OtelConnectionResponse => ({
-  connection: {
-    id: 7,
-    name: 'claude-platform',
-    teamName: 'Platform',
-    teamSlug: 'platform',
-    collectorEndpoint: 'https://collector.example.com',
-    protocol: 'http',
-    status: OTEL_STATUS.ACTIVE,
-    organizationId: null,
-    revokedAt: null,
-    createdAt: '',
-    updatedAt: '',
-  },
-  credentials: [],
-  restartRequired: false,
-  recoveryRequired: false,
-  storageNeedsApplying: false,
-  projects: [{ name: 'Project Alpha' }],
-});
 
 const LOADING_CLASS = 'ant-btn-loading';
 const PROJECT_ALPHA = 'Project Alpha';
@@ -61,14 +45,7 @@ const PROJECT_BETA = 'Project Beta';
 const projectOptions = [{ name: PROJECT_ALPHA }, { name: PROJECT_BETA }];
 
 describe('OTel modals', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.spyOn(message, 'success').mockImplementation(() => undefined as never);
-    vi.spyOn(message, 'error').mockImplementation(() => undefined as never);
-    vi.spyOn(message, 'warning').mockImplementation(() => undefined as never);
-    vi.spyOn(message, 'info').mockImplementation(() => undefined as never);
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
-  });
+  beforeEach(silenceFeedback);
   afterEach(() => vi.restoreAllMocks());
 
   it('keeps create values and the modal open after failure so the user can retry', async () => {
@@ -158,5 +135,45 @@ describe('OTel modals', () => {
         await pendingProjects.catch(() => undefined);
       });
     }
+  });
+
+  describe('rebuild data', () => {
+    const { min, max } = getReplayDateLimits(new Date());
+    const pickDays = (start: string, end: string) => {
+      const [from, to] = screen.getAllByPlaceholderText(/./).filter((input) => input.closest('.ant-picker'));
+      fireEvent.mouseDown(from);
+      fireEvent.change(from, { target: { value: start } });
+      fireEvent.keyDown(from, { key: 'Enter', keyCode: 13 });
+      fireEvent.change(to, { target: { value: end } });
+      fireEvent.keyDown(to, { key: 'Enter', keyCode: 13 });
+    };
+    const getSubmit = () => screen.getByRole('button', { name: COPY.replayModal.submit });
+
+    it('opens with no days picked, so Rebuild is disabled for the range hint', async () => {
+      renderWithTheme(<ReplayModal open onClose={vi.fn()} onQueued={vi.fn()} />);
+
+      expect(isDisabled(getSubmit())).toBe(true);
+      fireEvent.click(getSubmit());
+      expect(otel.createReplay).not.toHaveBeenCalled();
+      fireEvent.mouseEnter(getSubmit());
+      expect((await screen.findByRole('tooltip')).textContent).toBe(COPY.range.hint(min, max));
+    });
+
+    it('rebuilds every team only after the picked days are confirmed and sends no connection', async () => {
+      const onQueued = vi.fn();
+      otel.createReplay.mockResolvedValueOnce({ queued: [], reused: [] });
+      renderWithTheme(<ReplayModal open onClose={vi.fn()} onQueued={onQueued} />);
+
+      pickDays(max, max);
+      await waitFor(() => expect(isDisabled(getSubmit())).toBe(false));
+      fireEvent.click(getSubmit());
+      expect(otel.createReplay).not.toHaveBeenCalled();
+      expect(await screen.findByText(COPY.replayModal.confirm.title())).toBeTruthy();
+      fireEvent.click(screen.getAllByRole('button', { name: COPY.replayModal.confirm.confirm }).at(-1) as HTMLElement);
+
+      await waitFor(() => expect(onQueued).toHaveBeenCalledOnce());
+      expect(otel.createReplay).toHaveBeenCalledWith({ startDate: max, endDate: max });
+      expect(otel.createReplay.mock.calls[0][0]).not.toHaveProperty('requestedForConnectionId');
+    });
   });
 });

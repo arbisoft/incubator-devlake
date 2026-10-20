@@ -57,7 +57,7 @@ var (
 	db        dal.Dal
 	logger    log.Logger
 	rawIngest *RawIngestService
-	// lifecycleMu serializes htpasswd writes, Collector restarts and whole-row connection saves; take it before any transaction.
+	// lifecycleMu serializes htpasswd writes, Collector restarts and whole-row connection saves and replay queueing; take it before any transaction.
 	lifecycleMu sync.Mutex
 )
 
@@ -66,7 +66,6 @@ func Init(basicRes corecontext.BasicRes) {
 	db = basicRes.GetDal()
 	logger = basicRes.GetLogger()
 	rawIngest = NewRawIngestService(db, cfg, logger)
-	startRawConverter(db, logger)
 }
 
 type OtelConnectionInput struct {
@@ -146,6 +145,11 @@ func HideOtelConnection(user *common.User, id uint64) (*models.OtelConnectionWit
 		return nil, err
 	}
 
+	return lifecycleResponse(connection)
+}
+
+// lifecycleResponse builds the connection response returned by lifecycle operations.
+func lifecycleResponse(connection *models.OtelConnection) (*models.OtelConnectionWithCredentials, errors.Error) {
 	credentials, err := getOtelCredentials(connection.ID)
 	if err != nil {
 		return nil, err

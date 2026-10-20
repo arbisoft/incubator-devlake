@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -887,4 +888,162 @@ func newConverterRequest(observedAt time.Time, organizationID string) *collector
 			sum(metricToolDecision, point(2)),
 		}}},
 	}}}
+}
+
+// claimNextReplayBounds runs one claim attempt and returns the last two params (kind, midnight) of the find and update clauses.
+func claimNextReplayBounds(t *testing.T, now time.Time) (find, update []interface{}) {
+	t.Helper()
+	lastTwo := func(clauses []dal.Clause) []interface{} {
+		params := whereOf(clauses).Params
+		return params[len(params)-2:]
+	}
+	database := dalmocks.NewDal(t)
+	database.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		clauses := clauseArgs(args, 1)
+		if strings.Contains(whereOf(clauses).Expr, "range_end <= ?") {
+			find = lastTwo(clauses)
+		}
+		args.Get(0).(*models.OtelReplayRequest).ID = 5
+	}).Return(nil).Once()
+	database.On("UpdateColumns", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		update = lastTwo(clauseArgs(args, 2))
+	}).Return(nil).Once()
+	database.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything).Return(devlakeerrors.NotFound.New("none")).Once()
+	database.On("IsErrorNotFound", mock.Anything).Return(true).Once()
+	converter := newRawConverter(database, nil)
+	converter.now = func() time.Time { return now }
+
+	if _, _, found, err := converter.claimNextReplay(); err != nil || found {
+		t.Fatalf("claimNextReplay() = %v, %v; want no claim after the verify miss", found, err)
+	}
+	return find, update
+}
+
+func TestClaimNextReplaySkipsRequestsEndingAfterMidnight(t *testing.T) {
+	now := time.Date(2026, 10, 19, 10, 30, 0, 0, time.UTC)
+	midnight := now.Truncate(24 * time.Hour)
+	find, update := claimNextReplayBounds(t, now)
+	want := []interface{}{models.OtelReplayKindLogs, midnight}
+	if !reflect.DeepEqual(find, want) || !reflect.DeepEqual(update, want) {
+		t.Fatalf("kind and range_end bounds = find %v, update %v; want %v on both", find, update, want)
+	}
+}
+
+func TestClaimNextReplayClaimsLogRequestsBeforeMidnight(t *testing.T) {
+	now := time.Date(2026, 10, 19, 10, 30, 0, 0, time.UTC)
+	database := dalmocks.NewDal(t)
+	var findExpr string
+	var findParams []interface{}
+	onFirst := func(args mock.Arguments) {
+		clause := whereOf(clauseArgs(args, 1))
+		if strings.Contains(clause.Expr, "range_end <= ?") {
+			findExpr, findParams = clause.Expr, clause.Params
+			*args.Get(0).(*models.OtelReplayRequest) = models.OtelReplayRequest{Model: common.Model{ID: 6}, Kind: models.OtelReplayKindLogs, RangeEnd: now.Add(24 * time.Hour)}
+			return
+		}
+		request := args.Get(0).(*models.OtelReplayRequest)
+		request.Status = models.OtelReplayRequestStatusProcessing
+	}
+	database.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Run(onFirst).Return(nil).Once()
+	database.On("First", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything).Run(onFirst).Return(nil).Once()
+	database.On("UpdateColumns", mock.AnythingOfType("*models.OtelReplayRequest"), mock.Anything, mock.Anything).Return(nil).Once()
+	converter := newRawConverter(database, nil)
+	converter.now = func() time.Time { return now }
+
+	request, _, found, err := converter.claimNextReplay()
+	if err != nil || !found || request.ID != 6 {
+		t.Fatalf("claimNextReplay() = %+v, %v, %v; want the logs request 6 claimed", request, found, err)
+	}
+	if !strings.Contains(findExpr, "(kind = ? OR range_end <= ?)") || findParams[len(findParams)-2] != models.OtelReplayKindLogs {
+		t.Fatalf("find clause = %q %v; want the midnight bound waived for logs", findExpr, findParams)
+	}
+}
+
+func TestBindConnectionOrganizationsRejectsAConnectionReboundSincePreparation(t *testing.T) {
+	stored := rebindNewOrganization
+	tx := dalmocks.NewTransaction(t)
+	expectOtelConnectionLock(t, tx, models.OtelConnection{Model: common.Model{ID: 7}, OrganizationId: &stored})
+
+	err := bindConnectionOrganizations(tx, map[uint64]string{7: rebindOldOrganization})
+	if err == nil {
+		t.Fatalf("bindConnectionOrganizations() = nil; want a retryable %s", errorOrganizationMismatch)
+	}
+	if code, permanent, _ := classifyConversionError(err); code != errorOrganizationMismatch || permanent {
+		t.Fatalf("bindConnectionOrganizations() = %v (code %s, permanent %t); want a retryable %s", err, code, permanent, errorOrganizationMismatch)
+	}
+}
+
+func TestBindConnectionOrganizationsBindsAnUnboundConnection(t *testing.T) {
+	tx := dalmocks.NewTransaction(t)
+	expectOtelConnectionLock(t, tx, models.OtelConnection{Model: common.Model{ID: 7}})
+	var where dal.DalClause
+	var columns map[string]interface{}
+	tx.EXPECT().UpdateColumns(mock.AnythingOfType("*models.OtelConnection"), mock.Anything, mock.Anything).Run(func(_ interface{}, sets []dal.DalSet, clauses ...dal.Clause) {
+		columns = columnSets(sets)
+		where = whereOf(clauses)
+	}).Return(nil).Once()
+
+	if err := bindConnectionOrganizations(tx, map[uint64]string{7: rebindOldOrganization}); err != nil {
+		t.Fatalf("bindConnectionOrganizations() error = %v", err)
+	}
+	if columns["organization_id"] != rebindOldOrganization || where.Expr != "id = ? AND organization_id IS NULL" || where.Params[0] != uint64(7) {
+		t.Fatalf("bind columns = %v, where = %q %v; want the organization set only while unbound", columns, where.Expr, where.Params)
+	}
+}
+
+func TestBindConnectionOrganizationsLocksInIdOrder(t *testing.T) {
+	tx := dalmocks.NewTransaction(t)
+	var clauses []dal.Clause
+	tx.On("All", mock.AnythingOfType("*[]*models.OtelConnection"), mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		clauses = clauseArgs(args, 1)
+		organization := rebindOldOrganization
+		locked := args.Get(0).(*[]*models.OtelConnection)
+		for _, id := range []uint64{3, 5, 7} {
+			*locked = append(*locked, &models.OtelConnection{Model: common.Model{ID: id}, OrganizationId: &organization})
+		}
+	}).Return(nil).Once()
+
+	if err := bindConnectionOrganizations(tx, map[uint64]string{7: rebindOldOrganization, 3: rebindOldOrganization, 5: rebindOldOrganization}); err != nil {
+		t.Fatalf("bindConnectionOrganizations() error = %v", err)
+	}
+	if len(clauses) != 3 {
+		t.Fatalf("clauses = %#v; want where, order and lock", clauses)
+	}
+	where := whereOf(clauses)
+	if where.Expr != "id IN ?" || !reflect.DeepEqual(where.Params, []interface{}{[]uint64{3, 5, 7}}) {
+		t.Fatalf("where = %q %v; want sorted ids", where.Expr, where.Params)
+	}
+	if clauses[1].Type != dal.OrderbyClause || clauses[1].Data != "id ASC" {
+		t.Fatalf("order clause = %#v; want id ASC", clauses[1])
+	}
+	if clauses[2].Type != dal.LockClause || !reflect.DeepEqual(clauses[2].Data, []bool{true, false}) {
+		t.Fatalf("lock clause = %#v; want a write lock", clauses[2])
+	}
+}
+
+func TestBindConnectionOrganizationsRetriesWhenAConnectionIsGone(t *testing.T) {
+	tx := dalmocks.NewTransaction(t)
+	expectOtelConnectionLock(t, tx)
+
+	err := bindConnectionOrganizations(tx, map[uint64]string{7: rebindOldOrganization})
+	if code, permanent, _ := classifyConversionError(err); code != errorConnectionNotFound || permanent {
+		t.Fatalf("bindConnectionOrganizations() = %v (code %s, permanent %t); want a retryable %s", err, code, permanent, errorConnectionNotFound)
+	}
+}
+
+func TestExpectOrganizationRejectsTwoOrganizationsForOneConnection(t *testing.T) {
+	expected := map[uint64]string{}
+	if err := expectOrganization(expected, 7, rebindOldOrganization); err != nil {
+		t.Fatalf("first expectOrganization() error = %v", err)
+	}
+	if err := expectOrganization(expected, 7, rebindOldOrganization); err != nil {
+		t.Fatalf("same organization rejected: %v", err)
+	}
+	err := expectOrganization(expected, 7, rebindNewOrganization)
+	if err == nil {
+		t.Fatalf("expectOrganization() = nil; want a retryable %s", errorOrganizationMismatch)
+	}
+	if code, permanent, _ := classifyConversionError(err); code != errorOrganizationMismatch || permanent {
+		t.Fatalf("expectOrganization() = %v (code %s, permanent %t); want a retryable %s", err, code, permanent, errorOrganizationMismatch)
+	}
 }

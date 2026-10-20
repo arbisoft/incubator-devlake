@@ -16,6 +16,8 @@
  *
  */
 
+import { CONFIRM_TONE } from '@/ui/confirm-modal/constants';
+
 export const TEAM_NAME_MAX_LENGTH = 255;
 
 export const COPY = {
@@ -51,5 +53,55 @@ export const COPY = {
     team: 'Team',
     teamSlug: 'Team slug',
     endpoint: 'Endpoint',
+  },
+  range: {
+    label: 'Days to rebuild (UTC)',
+    hint: (min: string, max: string) => `Pick days from ${min} to ${max}. Raw telemetry is kept for 90 days.`,
+    today: 'Metrics for today finish rebuilding after the next midnight UTC.',
+  },
+  rebind: {
+    title: 'Change organization',
+    submit: 'Continue',
+    team: 'Team',
+    current: 'Current organization',
+    notBound: 'Not bound yet',
+    next: 'New organization',
+    field: {
+      label: 'New organization ID',
+      placeholder: '00000000-0000-0000-0000-000000000000',
+      hint: 'The Anthropic organization UUID this team sends telemetry from.',
+    },
+    invalid: 'Enter the organization ID as a UUID.',
+    same: 'This connection is already bound to this organization.',
+    acceptOnly:
+      "From now on, only this organization's telemetry is accepted. Other organizations and personal Pro or Max accounts are dropped.",
+    revoked: 'This connection is revoked; the change only affects rebuilding its past data.',
+    wrongId: "A wrong ID silently drops the whole team's telemetry, even though the credentials still work.",
+    rebuild: 'Rebuild past data',
+    rebuildHint:
+      "Past days only recover through a rebuild. It recomputes every team's metrics, prompts and events for those days; other teams' numbers stay the same.",
+    previousOrg:
+      'Metric data received under the previous organization is removed for those days. Existing prompts and events remain.',
+    unavailable: "No retained data for this connection's live period.",
+    confirm: {
+      tone: CONFIRM_TONE.DANGER,
+      title: (name: string) => `Change the organization for ${name}?`,
+      description: () => 'Telemetry from any other organization is dropped after this change.',
+      confirm: 'Change organization',
+      slug: (slug: string) => `Type ${slug} to confirm`,
+    },
+    done: (name: string) => `Organization changed for ${name}.`,
+  },
+  replayModal: {
+    title: 'Rebuild data (all teams)',
+    submit: 'Rebuild',
+    notice:
+      "Every team's metrics, prompts and events for these days are rebuilt from retained telemetry. Use it after a converter fix. Live data pauses while it runs.",
+    confirm: {
+      tone: CONFIRM_TONE.DANGER,
+      title: () => "Rebuild every team's data?",
+      description: (days: string) => `Every team's metrics, prompts and events for ${days} (UTC) are rebuilt.`,
+      confirm: 'Rebuild',
+    },
   },
 };

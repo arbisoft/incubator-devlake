@@ -93,12 +93,14 @@ func (c *rawConverter) convertLogBatch(batch *models.OtelLogBatch, lease *batchL
 func (c *rawConverter) applyEvents(tx dal.Transaction, events []preparedEvent) (map[uint64]string, error) {
 	workspaceKeys := make(map[uint64]string)
 	for _, prepared := range events {
-		if _, bound := workspaceKeys[prepared.connection.ID]; !bound {
-			if err := bindConnectionOrganization(tx, prepared.connection, prepared.event.OrganizationId); err != nil {
-				return nil, err
-			}
-			workspaceKeys[prepared.connection.ID] = prepared.event.OrganizationId
+		if err := expectOrganization(workspaceKeys, prepared.connection.ID, prepared.event.OrganizationId); err != nil {
+			return nil, err
 		}
+	}
+	if err := bindConnectionOrganizations(tx, workspaceKeys); err != nil {
+		return nil, err
+	}
+	for _, prepared := range events {
 		if err := tx.CreateOrUpdate(prepared.event); err != nil {
 			return nil, classifyStorageError(fmt.Errorf("write Claude Code OTel event: %w", err))
 		}

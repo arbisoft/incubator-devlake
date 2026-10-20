@@ -16,7 +16,14 @@
  *
  */
 
-import type { AiSourcePreference, OtelConnectionResponse, OtelIngestionStatus, OtelProject } from '@/api/otel';
+import type {
+  AiSourcePreference,
+  OtelConnectionResponse,
+  OtelIngestionStatus,
+  OtelProject,
+  OtelRebindInput,
+  OtelReplayRange,
+} from '@/api/otel';
 
 import type { CONNECTION_STATE, LIFECYCLE_ACTION, OTEL_MODAL } from './constants';
 
@@ -48,6 +55,7 @@ export type OtelAttentionState = {
 
 export type ConnectionColumnActions = {
   onManageProjects: (connection: OtelConnectionResponse) => void;
+  onRebind: (connection: OtelConnectionResponse) => void;
   onAction: (action: LifecycleAction, connection: OtelConnectionResponse) => void;
   onActionButtonRef: (connectionId: string | number, action: LifecycleAction, button: HTMLButtonElement | null) => void;
 };
@@ -76,6 +84,31 @@ export type ProjectsModalProps = {
   onClose: () => void;
   onSaved: () => void;
 };
+
+export type PendingRebind = { connection: OtelConnectionResponse; payload: OtelRebindInput };
+
+export type RebindModalProps = {
+  open: boolean;
+  connection?: OtelConnectionResponse;
+  onClose: () => void;
+  onRebound: () => void;
+};
+
+export type ReplayModalProps = {
+  open: boolean;
+  onClose: () => void;
+  onQueued: () => void;
+};
+
+export type ReplayDateLimits = { min: string; max: string };
+
+export type ReplayRangeFieldProps = {
+  value: OtelReplayRange;
+  limits: ReplayDateLimits;
+  onChange: (range: OtelReplayRange) => void;
+};
+
+export type OtelReplaysProps = { version: number };
 
 export type SnippetModalProps = {
   open: boolean;

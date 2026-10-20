@@ -1,0 +1,19 @@
+{
+  "titlePath": [
+    "Claude Code OTel organization change and data rebuilds",
+    "changing the organization with a rebuild queues a waiting rebuild and is audited"
+  ],
+  "writes": [
+    {
+      "method": "PATCH",
+      "path": "/api/plugins/claude_otel/connections/:id/organization",
+      "body": {
+        "organizationId": "4d88ba1f-e542-4427-a5d1-841effc21e4b",
+        "replay": {
+          "endDate": "<masked>",
+          "startDate": "<masked>"
+        }
+      }
+    }
+  ]
+}

@@ -19,11 +19,12 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { OTEL_BATCH_STATUS, OTEL_INGESTION_STATE, type OtelIngestionStatus } from '@/api/otel';
+import { OTEL_BATCH_STATUS, OTEL_INGESTION_STATE, OTEL_REPLAY_KIND, type OtelIngestionStatus } from '@/api/otel';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
 import { COPY } from './constants';
 import { OtelIngestionHealth } from './ingestion-health';
+import { REPLAY_COPY } from './replay-constants';
 import type { OtelIngestionHealthProps } from './types';
 
 const status: OtelIngestionStatus = {
@@ -103,5 +104,26 @@ describe('OtelIngestionHealth', () => {
     renderHealth({ loading: false, failed: false, status, onRetry: vi.fn() });
 
     expect(screen.queryByText(COPY.health.metrics.logPending)).toBeNull();
+  });
+
+  it('shows the rebuilding notice only while a rebuild is active', () => {
+    const activeReplay = {
+      id: 9,
+      requestedForTeamName: 'Platform',
+      kind: OTEL_REPLAY_KIND.LOGS,
+      rangeStart: '2026-10-18T00:00:00Z',
+      rangeEnd: '2026-10-20T00:00:00Z',
+    };
+    const { rerender } = renderHealth({ loading: false, failed: false, status, onRetry: vi.fn() });
+    expect(screen.queryByText(/Rebuilding/)).toBeNull();
+
+    rerender(
+      <OtelIngestionHealth loading={false} failed={false} status={{ ...status, activeReplay }} onRetry={vi.fn()} />,
+    );
+
+    expect(
+      screen.getByText(REPLAY_COPY.rebuilding(OTEL_REPLAY_KIND.LOGS, '2026-10-18 – 2026-10-19', 'Platform')),
+    ).toBeTruthy();
+    expect(screen.getByText(/Rebuilding prompts and events for/)).toBeTruthy();
   });
 });

@@ -19,8 +19,18 @@
 import { request } from '@/utils';
 
 import { OTEL_ACTION_PATH } from './constants';
-import type { AiSourcePreference, OtelConnectionResponse, OtelIngestionStatus, OtelProject } from './types';
-import { CONNECTIONS_PATH, OTEL_BASE_PATH, otelAction } from './utils';
+import type {
+  AiSourcePreference,
+  OtelConnectionResponse,
+  OtelIngestionStatus,
+  OtelProject,
+  OtelRebindInput,
+  OtelRebindResponse,
+  OtelReplayInput,
+  OtelReplayPage,
+  OtelReplayQueue,
+} from './types';
+import { CONNECTIONS_PATH, OTEL_BASE_PATH, REPLAYS_PATH, otelAction } from './utils';
 
 export * from './constants';
 export * from './types';
@@ -66,3 +76,14 @@ export const validateProjectRemoval = (projectName: string): Promise<void> =>
   request(`${OTEL_BASE_PATH}/projects/${encodeURIComponent(projectName)}/removal-preflight`, {
     method: 'POST',
   });
+
+export const rebind = (id: ID, data: OtelRebindInput): Promise<OtelRebindResponse> =>
+  request(`${CONNECTIONS_PATH}/${id}/organization`, { method: 'PATCH', data });
+
+export const createReplay = (data: OtelReplayInput): Promise<OtelReplayQueue> =>
+  request(REPLAYS_PATH, { method: 'POST', data });
+
+export const listReplays = (
+  params: { page: number; pageSize: number },
+  signal?: AbortSignal,
+): Promise<OtelReplayPage> => request(REPLAYS_PATH, { data: params, signal });

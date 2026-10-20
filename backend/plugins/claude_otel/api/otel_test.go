@@ -19,9 +19,13 @@ package api
 
 import (
 	"net/http"
+	"net/url"
 	"testing"
 
+	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/core/plugin"
+	"github.com/apache/incubator-devlake/helpers/pluginhelper/api"
+	"github.com/apache/incubator-devlake/plugins/claude_otel/service"
 )
 
 func TestGetMetricBatchPayloadRequiresCustomerAdministrator(t *testing.T) {
@@ -31,5 +35,62 @@ func TestGetMetricBatchPayloadRequiresCustomerAdministrator(t *testing.T) {
 	})
 	if err == nil || err.GetType().GetHttpCode() != http.StatusForbidden {
 		t.Fatalf("GetMetricBatchPayload() error = %v, want 403", err)
+	}
+}
+
+func TestParsePositiveQuery(t *testing.T) {
+	cases := []struct {
+		name    string
+		query   url.Values
+		want    int
+		wantErr bool
+	}{
+		{"absent uses fallback", url.Values{}, 7, false},
+		{"valid", url.Values{"page": {"3"}}, 3, false},
+		{"zero", url.Values{"page": {"0"}}, 0, true},
+		{"negative", url.Values{"page": {"-1"}}, 0, true},
+		{"not a number", url.Values{"page": {"abc"}}, 0, true},
+		{"empty", url.Values{"page": {""}}, 0, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := parsePositiveQuery(tc.query, "page", 7)
+			if tc.wantErr {
+				if err == nil || err.GetType().GetHttpCode() != http.StatusBadRequest {
+					t.Fatalf("parsePositiveQuery() error = %v, want 400", err)
+				}
+				return
+			}
+			if err != nil || got != tc.want {
+				t.Fatalf("parsePositiveQuery() = %d, %v; want %d", got, err, tc.want)
+			}
+		})
+	}
+}
+
+func TestReplayBodyDecodesFlatDates(t *testing.T) {
+	body := &service.OtelReplayInput{}
+	if err := api.Decode(map[string]interface{}{"requestedForConnectionId": 8, "startDate": "2026-10-18", "endDate": "2026-10-19"}, body, nil); err != nil {
+		t.Fatalf("Decode() error = %v", err)
+	}
+	if body.StartDate != "2026-10-18" || body.EndDate != "2026-10-19" || body.RequestedForConnectionId == nil || *body.RequestedForConnectionId != 8 {
+		t.Fatalf("Decode() = %+v; want the flat dates and connection decoded", body)
+	}
+}
+
+func TestCodedErrorKeepsTheCodeInTheBody(t *testing.T) {
+	err := errors.BadInput.New("Pick days from a to b (UTC).", errors.WithData(service.OtelErrorReplayRange))
+	output, got := codedError(err)
+	body, ok := output.Body.(*otelErrorBody)
+	if got != err || !ok || body.Code != service.OtelErrorReplayRange || body.Success || body.Message == "" {
+		t.Fatalf("codedError() = %+v, %v; want a body with code %s and the original error", output, got, service.OtelErrorReplayRange)
+	}
+}
+
+func TestCodedErrorLeavesAnUncodedErrorAlone(t *testing.T) {
+	err := errors.BadInput.New("bad input")
+	output, got := codedError(err)
+	if output != nil || got != err {
+		t.Fatalf("codedError() = %+v, %v; want a nil output and the original error", output, got)
 	}
 }

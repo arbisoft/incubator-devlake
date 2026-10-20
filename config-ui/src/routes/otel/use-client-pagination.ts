@@ -16,32 +16,19 @@
  *
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 import { DEFAULT_PAGE } from '@/ui';
 
-import { DEFAULT_OTEL_PAGE_SIZE, OTEL_PAGE_SIZE_OPTIONS } from './constants';
+import { usePageState } from './use-page-state';
 
 export const useClientPagination = <T>(items: T[]) => {
-  const [page, setPage] = useState(DEFAULT_PAGE);
-  const [pageSize, setPageSize] = useState<number>(DEFAULT_OTEL_PAGE_SIZE);
+  const { page, pageSize, paginationFor } = usePageState();
 
   const lastPage = Math.max(DEFAULT_PAGE, Math.ceil(items.length / pageSize));
   const current = Math.min(page, lastPage);
 
   const rows = useMemo(() => items.slice((current - 1) * pageSize, current * pageSize), [items, current, pageSize]);
 
-  const pagination = {
-    page: current,
-    pageSize,
-    total: items.length,
-    pageSizeOptions: OTEL_PAGE_SIZE_OPTIONS,
-    onPageChange: setPage,
-    onPageSizeChange: (size: number) => {
-      setPageSize(size);
-      setPage(DEFAULT_PAGE);
-    },
-  };
-
-  return { rows, pagination };
+  return { rows, pagination: paginationFor(items.length, current) };
 };

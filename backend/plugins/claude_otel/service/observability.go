@@ -53,6 +53,7 @@ type OtelIngestionStatus struct {
 	BatchCounts           map[string]int64            `json:"batchCounts"`
 	OldestNonterminal     *OtelOldestNonterminalBatch `json:"oldestNonterminal,omitempty"`
 	ConverterLease        *OtelConverterLeaseStatus   `json:"converterLease,omitempty"`
+	ActiveReplay          *OtelActiveReplay           `json:"activeReplay,omitempty"`
 	RecentPermanentErrors int64                       `json:"recentPermanentErrors"`
 	PermanentErrorReasons []OtelPermanentErrorReason  `json:"permanentErrorReasons"`
 	RecentBatches         []OtelMetricBatchSummary    `json:"recentBatches"`
@@ -131,6 +132,10 @@ func GetOtelIngestionStatus() (*OtelIngestionStatus, errors.Error) {
 	if err != nil {
 		return nil, err
 	}
+	activeReplay, err := activeOtelReplay(now)
+	if err != nil {
+		return nil, err
+	}
 	recentBatches, err := ListOtelMetricBatchSummaries(ingestionStatusRecentBatchLimit)
 	if err != nil {
 		return nil, err
@@ -148,6 +153,7 @@ func GetOtelIngestionStatus() (*OtelIngestionStatus, errors.Error) {
 		BatchCounts:           metrics.BatchCounts,
 		OldestNonterminal:     metrics.OldestNonterminal,
 		ConverterLease:        lease,
+		ActiveReplay:          activeReplay,
 		RecentPermanentErrors: metrics.RecentPermanentErrors,
 		PermanentErrorReasons: metrics.PermanentErrorReasons,
 		RecentBatches:         recentBatches,

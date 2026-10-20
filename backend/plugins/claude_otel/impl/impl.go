@@ -115,5 +115,12 @@ func (p ClaudeOtel) ApiResources() map[string]map[string]plugin.ApiResourceHandl
 		"connections/:connectionId/apply": {
 			"POST": api.ApplyConnection,
 		},
+		"connections/:connectionId/organization": {
+			"PATCH": api.RebindConnectionOrganization,
+		},
+		"replays": {
+			"GET":  api.ListReplays,
+			"POST": api.PostReplay,
+		},
 	}
 }

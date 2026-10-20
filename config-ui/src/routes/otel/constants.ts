@@ -26,6 +26,7 @@ import { HEALTH_COPY } from './health-copy';
 
 export const OTEL_ATTENTION_CHANGED_EVENT = 'devlake:otel-attention-changed';
 export const OTEL_REFRESH_INTERVAL_MS = 30_000;
+export const OTEL_POLL = { interval: OTEL_REFRESH_INTERVAL_MS } as const;
 export const OTEL_VISIBILITY_THROTTLE_MS = 10_000;
 export const PROJECT_CHIP_LIMIT = 3;
 export const OTEL_PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
@@ -66,7 +67,7 @@ export const BATCH_COLUMN = {
 } as const;
 export const POLICY_COLUMN = { WORKSPACE: 'workspace', FAMILY: 'family', SOURCE: 'source' } as const;
 
-export const OTEL_MODAL = { CREATE: 'create', PROJECTS: 'projects' } as const;
+export const OTEL_MODAL = { CREATE: 'create', PROJECTS: 'projects', REBIND: 'rebind' } as const;
 
 export const COPY = {
   title: 'Claude Code OTel',
@@ -118,9 +119,9 @@ export const COPY = {
   organization: {
     pending: 'Pending first telemetry',
     pendingHelp: 'This connection binds to the first Anthropic organization UUID it receives.',
-    boundHelp: 'Telemetry for a different Anthropic organization requires a separate connection and credential.',
+    boundHelp: 'Only telemetry from this Anthropic organization is accepted. Use Change organization to correct it.',
     createNotice:
-      'This connection binds to the first Anthropic organization UUID it receives. Use a separate connection and credential for another organization.',
+      'This connection binds to the first Anthropic organization UUID it receives. Use Change organization to set or correct it.',
   },
   actions: {
     projects: (name: string) => `Manage projects for ${name}`,

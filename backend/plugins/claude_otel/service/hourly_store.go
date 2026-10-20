@@ -36,10 +36,16 @@ var hourlyIdentityColumns = []string{
 
 // applyHourlyUpdates writes one batch's prepared facts inside the conversion transaction.
 func (c *rawConverter) applyHourlyUpdates(tx dal.Transaction, updates []factUpdate) error {
+	expected := make(map[uint64]string)
 	for _, update := range updates {
-		if err := bindConnectionOrganization(tx, update.connection, update.organizationID); err != nil {
+		if err := expectOrganization(expected, update.connection.ID, update.organizationID); err != nil {
 			return err
 		}
+	}
+	if err := bindConnectionOrganizations(tx, expected); err != nil {
+		return err
+	}
+	for _, update := range updates {
 		value, err := c.counterDelta(tx, update)
 		if err != nil {
 			return err
@@ -51,34 +57,51 @@ func (c *rawConverter) applyHourlyUpdates(tx dal.Transaction, updates []factUpda
 	return nil
 }
 
-// bindConnectionOrganization binds an unbound connection to its first valid organization.
-// Preparation already rejected known mismatches, so a mismatch here means another writer
-// bound the connection concurrently; retrying re-prepares against the stored binding.
-func bindConnectionOrganization(tx dal.Transaction, connection *models.OtelConnection, organizationID string) error {
-	if connection.OrganizationId == nil {
-		if err := tx.UpdateColumns(
-			&models.OtelConnection{},
-			[]dal.DalSet{{ColumnName: "organization_id", Value: organizationID}},
-			dal.Where("id = ? AND organization_id IS NULL", connection.ID),
-		); err != nil {
-			return classifyStorageError(fmt.Errorf("bind OTel connection organization: %w", err))
-		}
-		boundConnection := &models.OtelConnection{}
-		if err := tx.First(boundConnection, dal.Where("id = ?", connection.ID), dal.Lock(true, false)); err != nil {
-			return classifyStorageError(fmt.Errorf("verify OTel connection organization: %w", err))
-		}
-		connection.OrganizationId = boundConnection.OrganizationId
+// expectOrganization records the organization a connection must have in this commit and rejects a second, different one.
+func expectOrganization(expected map[uint64]string, connectionID uint64, organizationID string) error {
+	if previous, seen := expected[connectionID]; seen && previous != organizationID {
+		return &conversionError{code: errorOrganizationMismatch, err: fmt.Errorf("telemetry gives OTel connection %d two organizations", connectionID)}
 	}
-	boundOrganizationID := ""
-	if connection.OrganizationId != nil {
-		var valid bool
-		boundOrganizationID, valid = normalizeOrganizationID(*connection.OrganizationId)
+	expected[connectionID] = organizationID
+	return nil
+}
+
+// bindConnectionOrganizations locks the commit's connections in id order, binds unbound ones and
+// rejects any rebound since preparation, so a concurrent rebind cannot interleave.
+func bindConnectionOrganizations(tx dal.Transaction, expected map[uint64]string) error {
+	if len(expected) == 0 {
+		return nil
+	}
+	ids := make([]uint64, 0, len(expected))
+	for id := range expected {
+		ids = append(ids, id)
+	}
+	connections, err := lockOtelConnections(tx, ids)
+	if err != nil {
+		return classifyStorageError(err)
+	}
+	if len(connections) != len(ids) {
+		return &conversionError{code: errorConnectionNotFound, err: fmt.Errorf("an OTel connection of this commit no longer exists")}
+	}
+	for _, connection := range connections {
+		organizationID := expected[connection.ID]
+		if connection.OrganizationId == nil {
+			if err := tx.UpdateColumns(
+				&models.OtelConnection{},
+				[]dal.DalSet{{ColumnName: "organization_id", Value: organizationID}},
+				dal.Where("id = ? AND organization_id IS NULL", connection.ID),
+			); err != nil {
+				return classifyStorageError(fmt.Errorf("bind OTel connection organization: %w", err))
+			}
+			continue
+		}
+		bound, valid := normalizeOrganizationID(*connection.OrganizationId)
 		if !valid {
 			return permanentConversionError(errorInvalidOrganization, "OTel connection %d has an invalid stored organization", connection.ID)
 		}
-	}
-	if boundOrganizationID != organizationID {
-		return &conversionError{code: errorOrganizationMismatch, err: fmt.Errorf("OTel connection %d was bound to another organization concurrently", connection.ID)}
+		if bound != organizationID {
+			return &conversionError{code: errorOrganizationMismatch, err: fmt.Errorf("OTel connection %d was rebound to another organization concurrently", connection.ID)}
+		}
 	}
 	return nil
 }
