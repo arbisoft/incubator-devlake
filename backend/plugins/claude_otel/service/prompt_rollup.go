@@ -18,6 +18,7 @@ limitations under the License.
 package service
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -34,7 +35,7 @@ import (
 // rollupEventColumns are the event columns the rollup reads. prompt_text is left out, so
 // prompt text can never reach ai_* tables and large texts are not loaded per rollup.
 var rollupEventColumns = dal.Select("event_key, connection_id, user_key, user_account_id, user_email, session_id, prompt_id, " +
-	"event_name, event_sequence, event_timestamp, command_name, model, query_source, tool_name, skill_name, plugin_name, success, cost_usd, " +
+	"event_name, event_sequence, event_timestamp, command_name, model, query_source, tool_name, skill_name, plugin_name, success, duration_ms, cost_usd, " +
 	"input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, attributes")
 
 const (
@@ -54,6 +55,8 @@ const (
 	// maxRepositoryURLLength is the width of ai_prompts.repository_url. A longer URL is left
 	// out rather than truncated, because a truncated URL would name a different repository.
 	maxRepositoryURLLength = 255
+	// maxErrorMessageLength is the width of ai_prompt_failures.error_message.
+	maxErrorMessageLength = 1024
 )
 
 // subagentToolNames launch a subagent; Task is the legacy name of Agent.
@@ -209,12 +212,13 @@ func lessEventOrder(leftAt time.Time, leftSequence int64, rightAt time.Time, rig
 
 // promptRollup is one prompt's facts derived from its events.
 type promptRollup struct {
-	prompt *ai.AiPrompt
-	skills []*ai.AiPromptSkill
+	prompt   *ai.AiPrompt
+	skills   []*ai.AiPromptSkill
+	failures []*ai.AiPromptFailure
 }
 
-// buildPromptRollup derives one prompt row and its skills from the prompt's events. The
-// caller sets the permission mode and the DevLake account.
+// buildPromptRollup derives one prompt row, its skills and its failures from the prompt's
+// events. The caller sets the permission mode and the DevLake account.
 func buildPromptRollup(workspaceKey, promptID string, events []*models.OtelEvent) promptRollup {
 	sort.SliceStable(events, func(i, j int) bool {
 		return lessEventOrder(events[i].EventTimestamp, int64Value(events[i].EventSequence), events[j].EventTimestamp, int64Value(events[j].EventSequence))
@@ -251,15 +255,22 @@ func buildPromptRollup(workspaceKey, promptID string, events []*models.OtelEvent
 	collected := builder.skills.result(prompt)
 	prompt.SkillCount = int64(len(collected))
 	prompt.UsedSkill = len(collected) > 0
-	return promptRollup{prompt: prompt, skills: collected}
+	for _, failure := range builder.failures {
+		failure.AiPromptId = prompt.Id
+		failure.UserKey = prompt.UserKey
+		failure.UserEmail = prompt.UserEmail
+		failure.SessionId = prompt.SessionId
+	}
+	return promptRollup{prompt: prompt, skills: collected, failures: builder.failures}
 }
 
-// promptBuilder accumulates one prompt's row, skills and models from its ordered events.
+// promptBuilder accumulates one prompt's row, skills, failures and models from its ordered events.
 type promptBuilder struct {
 	prompt     *ai.AiPrompt
 	skills     *skillCollector
 	modelNames []string
 	seenModels map[string]struct{}
+	failures   []*ai.AiPromptFailure
 	// mainThreadEffort is set once a main-thread request has given the prompt its effort,
 	// so a later request cannot replace it.
 	mainThreadEffort bool
@@ -326,14 +337,21 @@ func (b *promptBuilder) applyEffort(querySource, effort string) {
 	}
 }
 
-func (b *promptBuilder) applyAPIError(_ *models.OtelEvent, _ map[string]interface{}) {
+func (b *promptBuilder) applyAPIError(event *models.OtelEvent, attributes map[string]interface{}) {
 	b.prompt.ApiErrorCount++
+	failure := b.newFailure(event, ai.FailureKindApiError, attributes)
+	failure.Model = event.Model
+	failure.QuerySource = event.QuerySource
+	failure.ErrorMessage = truncate(eventString(attributes, "error"), maxErrorMessageLength)
+	failure.StatusCode = eventNumber(attributes, "status_code")
+	failure.Attempt = eventNumber(attributes, "attempt")
 }
 
-func (b *promptBuilder) applyToolResult(event *models.OtelEvent, _ map[string]interface{}) {
+func (b *promptBuilder) applyToolResult(event *models.OtelEvent, attributes map[string]interface{}) {
 	b.prompt.ToolCallCount++
 	if event.Success != nil && !*event.Success {
 		b.prompt.ToolFailureCount++
+		b.newFailure(event, ai.FailureKindToolError, attributes).ToolName = event.ToolName
 	}
 	if _, subagent := subagentToolNames[event.ToolName]; subagent {
 		b.prompt.SubagentCount++
@@ -341,6 +359,26 @@ func (b *promptBuilder) applyToolResult(event *models.OtelEvent, _ map[string]in
 	if event.ToolName == skillToolName {
 		b.skills.add(event.SkillName, ai.SkillDetectedViaSkillTool, "", "", "", event.EventTimestamp)
 	}
+}
+
+// newFailure adds a failure row for event to the prompt and returns it. buildPromptRollup
+// fills in the prompt's identity once all events are applied.
+func (b *promptBuilder) newFailure(event *models.OtelEvent, kind string, attributes map[string]interface{}) *ai.AiPromptFailure {
+	failure := &ai.AiPromptFailure{
+		DomainEntity: domainlayer.NewDomainEntity(ai.CanonicalKey{
+			Kind: ai.IDKindPromptFailure, Provider: aiProviderClaude, WorkspaceKey: b.prompt.WorkspaceKey,
+			Grain: []string{b.prompt.PromptId, hex.EncodeToString(event.EventKey)},
+		}.ID()),
+		Provider:     aiProviderClaude,
+		WorkspaceKey: b.prompt.WorkspaceKey,
+		PromptId:     b.prompt.PromptId,
+		FailureKind:  kind,
+		OccurredAt:   event.EventTimestamp,
+		ErrorType:    truncate(eventString(attributes, "error_type"), eventNamedColumnLength),
+		DurationMs:   event.DurationMs,
+	}
+	b.failures = append(b.failures, failure)
+	return failure
 }
 
 func (b *promptBuilder) applyToolDecision(_ *models.OtelEvent, attributes map[string]interface{}) {
@@ -537,6 +575,14 @@ func writePromptRollup(tx dal.Transaction, rollup promptRollup) error {
 	for _, skill := range rollup.skills {
 		if err := tx.CreateOrUpdate(skill); err != nil {
 			return fmt.Errorf("write Claude Code prompt skill: %w", err)
+		}
+	}
+	if err := tx.Delete(&ai.AiPromptFailure{}, dal.Where("workspace_key = ? AND prompt_id = ?", rollup.prompt.WorkspaceKey, rollup.prompt.PromptId)); err != nil {
+		return fmt.Errorf("clear Claude Code prompt failures: %w", err)
+	}
+	for _, failure := range rollup.failures {
+		if err := tx.CreateOrUpdate(failure); err != nil {
+			return fmt.Errorf("write Claude Code prompt failure: %w", err)
 		}
 	}
 	return nil

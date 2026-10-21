@@ -113,6 +113,42 @@ type AiPromptSkill struct {
 
 func (AiPromptSkill) TableName() string { return "ai_prompt_skills" }
 
+// Kinds of failure recorded for a prompt.
+const (
+	FailureKindApiError  = "api_error"
+	FailureKindToolError = "tool_error"
+)
+
+// AiPromptFailure is one failed model request or tool call while handling a prompt.
+// ErrorMessage is set only for API errors, whose message comes from the service. A tool
+// error's message can echo file contents, so it never reaches DevLake; tool failures carry
+// only their ErrorType.
+type AiPromptFailure struct {
+	domainlayer.DomainEntity
+	Provider     string `gorm:"type:varchar(100);index" json:"provider"`
+	WorkspaceKey string `gorm:"type:varchar(255);index" json:"workspaceKey"`
+	UserKey      string `gorm:"type:varchar(255);index" json:"userKey"`
+	UserEmail    string `gorm:"type:varchar(255);index" json:"userEmail"`
+	SessionId    string `gorm:"type:varchar(128);index" json:"sessionId"`
+	PromptId     string `gorm:"type:varchar(128);index" json:"promptId"`
+	// AiPromptId is the id of the ai_prompts row this failure belongs to.
+	AiPromptId  string    `gorm:"type:varchar(255);index" json:"aiPromptId"`
+	FailureKind string    `gorm:"type:varchar(32);index" json:"failureKind"`
+	OccurredAt  time.Time `gorm:"type:datetime(3);index" json:"occurredAt"`
+	// Model and QuerySource are set for API errors.
+	Model       string `gorm:"type:varchar(255)" json:"model"`
+	QuerySource string `gorm:"type:varchar(100)" json:"querySource"`
+	// ToolName is set for tool errors.
+	ToolName     string `gorm:"type:varchar(255);index" json:"toolName"`
+	ErrorType    string `gorm:"type:varchar(255);index" json:"errorType"`
+	ErrorMessage string `gorm:"type:varchar(1024)" json:"errorMessage"`
+	StatusCode   *int64 `json:"statusCode,omitempty"`
+	Attempt      *int64 `json:"attempt,omitempty"`
+	DurationMs   *int64 `json:"durationMs,omitempty"`
+}
+
+func (AiPromptFailure) TableName() string { return "ai_prompt_failures" }
+
 // AiPermissionModeChange is one permission mode switch inside a Claude Code session.
 type AiPermissionModeChange struct {
 	domainlayer.DomainEntity

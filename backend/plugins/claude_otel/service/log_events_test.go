@@ -19,6 +19,7 @@ package service
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -599,6 +600,43 @@ func TestBuildPromptRollupMergesSkillSourcesAndCounts(t *testing.T) {
 	}
 }
 
+// Each api_error and failed tool_result becomes one failure row with its reason. A tool
+// error's message is stripped at ingest, so only its error type reaches the row; successful
+// tool calls add none.
+func TestBuildPromptRollupRecordsFailureReasons(t *testing.T) {
+	events := fixturePromptEvents(t, "p2")
+	rollup := buildPromptRollup(testOrganizationID, "p2", events)
+	prompt := rollup.prompt
+	if int64(len(rollup.failures)) != prompt.ApiErrorCount+prompt.ToolFailureCount || len(rollup.failures) != 2 {
+		t.Fatalf("failures = %d, want one per api error (%d) and tool failure (%d)", len(rollup.failures), prompt.ApiErrorCount, prompt.ToolFailureCount)
+	}
+	byKind := make(map[string]*ai.AiPromptFailure)
+	for _, failure := range rollup.failures {
+		byKind[failure.FailureKind] = failure
+		if failure.AiPromptId != prompt.Id || failure.PromptId != "p2" || failure.SessionId != "sess-1" || failure.UserKey != prompt.UserKey || failure.WorkspaceKey != testOrganizationID {
+			t.Fatalf("failure identity = %#v, want prompt %q", failure, prompt.Id)
+		}
+	}
+
+	api := byKind[ai.FailureKindApiError]
+	if api == nil || api.Model != "claude-opus-5-5" || api.ErrorMessage != "overloaded" || int64Value(api.StatusCode) != 529 || int64Value(api.Attempt) != 1 || api.ToolName != "" {
+		t.Fatalf("api failure = %#v", api)
+	}
+	tool := byKind[ai.FailureKindToolError]
+	if tool == nil || tool.ToolName != "Bash" || tool.ErrorType != "ShellError" || tool.ErrorMessage != "" || tool.StatusCode != nil {
+		t.Fatalf("tool failure = %#v", tool)
+	}
+	apiEvent := firstEventNamed(t, events, eventAPIError)
+	if api.Id != (ai.CanonicalKey{Kind: ai.IDKindPromptFailure, Provider: aiProviderClaude, WorkspaceKey: testOrganizationID, Grain: []string{"p2", hex.EncodeToString(apiEvent.EventKey)}}).ID() ||
+		!api.OccurredAt.Equal(apiEvent.EventTimestamp) {
+		t.Fatalf("api failure id/time = %q %s, want canonical id of its event", api.Id, api.OccurredAt)
+	}
+
+	if failures := buildPromptRollup(testOrganizationID, "p1", fixturePromptEvents(t, "p1")).failures; len(failures) != 0 {
+		t.Fatalf("p1 failures = %d, want none", len(failures))
+	}
+}
+
 // The repository URL comes from the prompt's events. A prompt without one, or with one that
 // does not fit its column, stores NULL instead of failing or truncating.
 func TestPromptRollupRecordsRepositoryURL(t *testing.T) {
@@ -698,19 +736,32 @@ func TestPromptBuilderApplyEffort(t *testing.T) {
 	}
 }
 
-// The rollup reloads a prompt's stored events with rollupEventColumns, so every column the
-// effort rule reads must be in it. Without query_source, every reloaded request looks like
-// background work and a session-title request could decide the prompt's effort.
-func TestRollupEventColumnsLoadEffortInputs(t *testing.T) {
-	columns := strings.Split(strings.ReplaceAll(rollupEventColumnsSQL(), " ", ""), ",")
-	for _, want := range []string{"query_source", "attributes"} {
-		found := false
-		for _, column := range columns {
-			found = found || column == want
-		}
-		if !found {
-			t.Errorf("rollup event columns = %q, missing %s", rollupEventColumnsSQL(), want)
-		}
+// The rollup reloads a prompt's stored events with rollupEventColumns, so every column it
+// reads must be in it. Without query_source, every reloaded request looks like background
+// work and a session-title request could decide the prompt's effort. Without event_key,
+// every failure of a prompt gets the same id and only one row survives.
+func TestRollupEventColumnsLoadRollupInputs(t *testing.T) {
+	columns := make(map[string]struct{})
+	for _, column := range strings.Split(strings.ReplaceAll(rollupEventColumnsSQL(), " ", ""), ",") {
+		columns[column] = struct{}{}
+	}
+	for _, test := range []struct {
+		reader string
+		column string
+	}{
+		{"effort", "query_source"},
+		{"effort", "attributes"},
+		{"failure id", "event_key"},
+		{"tool failure", "success"},
+		{"tool failure", "tool_name"},
+		{"api failure", "model"},
+		{"failure duration", "duration_ms"},
+	} {
+		t.Run(test.reader+"/"+test.column, func(t *testing.T) {
+			if _, found := columns[test.column]; !found {
+				t.Errorf("rollup event columns = %q, missing %s", rollupEventColumnsSQL(), test.column)
+			}
+		})
 	}
 }
 

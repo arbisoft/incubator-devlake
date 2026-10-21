@@ -37,6 +37,7 @@ const (
 	IDKindToolDecision         IDKind = "tool_decision"
 	IDKindPrompt               IDKind = "prompt"
 	IDKindPromptSkill          IDKind = "prompt_skill"
+	IDKindPromptFailure        IDKind = "prompt_failure"
 	IDKindPermissionModeChange IDKind = "permission_mode_change"
 )
 
