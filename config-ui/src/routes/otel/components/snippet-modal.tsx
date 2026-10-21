@@ -21,13 +21,14 @@ import { Alert } from 'antd';
 import { useMemo } from 'react';
 
 import { LINKS } from '@/config/links';
-import { CODE_LANGUAGE, CodeBlock, ExternalLink, FormModal, KeyValueList, MODAL_WIDTH } from '@/ui';
+import { ExternalLink, FormModal, KeyValueList, MODAL_WIDTH } from '@/ui';
 
 import { Hint, Stack } from '../styled';
 import type { SnippetModalProps } from '../types';
-import { getOtelApplyError } from '../utils';
+import { getOtelApplyError, isRotation } from '../utils';
 
 import { COPY } from './constants';
+import { SnippetSettings } from './snippet-settings';
 
 export const SnippetModal = ({ open, credential, onClose, onClosed }: SnippetModalProps) => {
   const summary = useMemo(
@@ -58,7 +59,10 @@ export const SnippetModal = ({ open, credential, onClose, onClosed }: SnippetMod
         <Alert type="warning" showIcon title={COPY.snippet.storageNotice} />
         <Hint>{COPY.snippet.replaceNotice}</Hint>
         <KeyValueList items={summary} />
-        <CodeBlock value={credential?.managedSettings} language={CODE_LANGUAGE.JSON} copyLabel={COPY.snippet.copy} />
+        <SnippetSettings
+          managedSettings={credential?.managedSettings}
+          rotation={!!credential && isRotation(credential)}
+        />
         <Hint>
           {COPY.snippet.addIn}{' '}
           <ExternalLink href={LINKS.CLAUDE_CODE_MANAGED_SETTINGS}>{COPY.snippet.linkLabel}</ExternalLink>.

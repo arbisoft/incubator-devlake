@@ -113,6 +113,20 @@ Each prompt records its reasoning effort level (such as `low`, `medium`, `high`,
 
 Claude Code reports only permission mode changes, not the mode a session starts in. A prompt before a session's first change takes that change's `from_mode`. Prompts in a session with no change are recorded as `default` with `permission_mode_inferred` set.
 
+### Settings options
+
+Before copying the settings, the admin chooses what this team sends. The defaults reproduce the block above. Each option that is turned off changes one value:
+
+| Option | When off |
+| --- | --- |
+| Metrics | `OTEL_METRICS_EXPORTER=none`, and `OTEL_METRIC_EXPORT_INTERVAL` is left out |
+| Events | `OTEL_LOGS_EXPORTER=none`, and its three options below are written off too |
+| Prompt text (under Events) | `OTEL_LOG_USER_PROMPTS=0`. Prompts are still counted, without their text |
+| Skill and MCP names (under Events) | `OTEL_LOG_TOOL_DETAILS=0` |
+| Repository (under Events) | `OTEL_METRICS_INCLUDE_REPOSITORY=false`. `ai_prompts.repository_url` stays NULL |
+
+At least one of Metrics and Events stays on. Session and account ids are always included, and the response, tool content and raw API body gates are always off. The choices are not stored: they apply only to the copied settings.
+
 The generated endpoint must be HTTPS in a real deployment. Basic Auth only encodes credentials; TLS provides transport confidentiality. Do not send customer credentials to an `http://` endpoint.
 
 For a local mock sender, use OTLP/HTTP against `http://localhost:4318/v1/metrics` and pass the generated Basic Auth header. This is a transport-level test and is separate from the managed Claude Code configuration above.
@@ -120,7 +134,7 @@ For a local mock sender, use OTLP/HTTP against `http://localhost:4318/v1/metrics
 ## Credential Lifecycle
 
 - **Create:** generates one team-scoped credential, writes its verifier to `.htpasswd`, and restarts the Collector.
-- **Rotate:** adds a second credential for the same team while the old one remains valid. Update managed settings with the new one, then finalize the rotation to remove the old credential.
+- **Rotate:** adds a second credential for the same team while the old one remains valid. Update managed settings with the new one, then finalize the rotation to remove the old credential. The settings options aren't remembered, so re-apply the team's previous choices before copying.
 - **Revoke:** removes all active and retiring verifiers for that connection and restarts the Collector.
 - **Apply:** retries the Collector restart when the desired auth file was written but the helper did not confirm the restart.
 

@@ -18,7 +18,51 @@
 
 import { CONFIRM_TONE } from '@/ui/confirm-modal/constants';
 
+import type { OptionCopy, SettingsOption } from '../types';
+
 export const TEAM_NAME_MAX_LENGTH = 255;
+
+export const OPTION_COPY = {
+  metrics: {
+    label: 'Metrics',
+    description: 'Tokens, cost, lines of code, commits, pull requests and edit decisions.',
+    details: [
+      'Usage dashboards: tokens, cost and active developers.',
+      'Code impact: lines changed, commits and pull requests.',
+      'Accepted and rejected edits.',
+    ],
+  },
+  logs: {
+    label: 'Events',
+    description: 'Prompts, skills and permission modes for each session.',
+    details: [
+      'Prompts per session and developer.',
+      'Skills used in each prompt.',
+      'Permission mode changes, such as plan mode.',
+    ],
+  },
+  promptText: {
+    label: 'Prompt text',
+    description: 'Keep the text of each prompt in raw telemetry. Off still counts prompts.',
+    details: ['The text developers type, kept in raw telemetry for 90 days.', 'Never copied into dashboards.'],
+  },
+  toolDetails: {
+    label: 'Skill and MCP names',
+    description: 'Attribute prompts to skills, plugins and MCP servers.',
+    details: [
+      'Skill, plugin and MCP server names on each prompt.',
+      'Command lines and file paths are dropped when ingested.',
+    ],
+  },
+  repository: {
+    label: 'Repository',
+    description: 'Record the repository each prompt ran in. Needs Claude Code v2.1.269 or later.',
+    details: [
+      "The repository of each prompt's session, from its origin remote.",
+      'Credentials in the remote URL are stripped.',
+    ],
+  },
+} satisfies Record<SettingsOption, OptionCopy>;
 
 export const COPY = {
   create: {
@@ -53,6 +97,18 @@ export const COPY = {
     team: 'Team',
     teamSlug: 'Team slug',
     endpoint: 'Endpoint',
+    options: {
+      title: 'Telemetry to send',
+      rotateNotice: "Choices aren't remembered. Re-apply the options this team used before rotating.",
+      lastSignal: 'Metrics or events must stay on.',
+      help: (label: string) => `About ${label}`,
+      storage: (rawMb: number, monthlyMb: number) =>
+        `Roughly ${rawMb} MB per developer over 90 days, plus ${monthlyMb} MB a month that is kept.`,
+      storageRawOnly: (rawMb: number) => `Roughly ${rawMb} MB per developer over 90 days. Nothing is kept after that.`,
+      storageNone: 'Adds almost no storage.',
+      estimate: (rawMb: number, monthlyMb: number) =>
+        `Estimated storage per developer: about ${rawMb} MB of raw telemetry kept for 90 days, plus about ${monthlyMb} MB a month kept indefinitely.`,
+    },
   },
   range: {
     label: 'Days to rebuild (UTC)',

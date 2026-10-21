@@ -89,6 +89,9 @@ const ACTION_ALLOWED: Record<LifecycleAction, (target: ActionTarget) => boolean>
   [LIFECYCLE_ACTION.HIDE]: (target) => target.connection.status === OTEL_STATUS.REVOKED,
 };
 
+export const isRotation = (response: OtelConnectionResponse) =>
+  response.credentials.some(({ status }) => status === OTEL_STATUS.RETIRING);
+
 export const isActionAllowed = (action: LifecycleAction, target: ActionTarget) => ACTION_ALLOWED[action](target);
 
 export const getAttentionState = (connections: AttentionTarget[]): OtelAttentionState =>

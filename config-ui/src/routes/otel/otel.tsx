@@ -22,7 +22,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import API from '@/api';
-import { OTEL_STATUS, type OtelConnectionResponse } from '@/api/otel';
+import type { OtelConnectionResponse } from '@/api/otel';
 import { PATHS } from '@/config';
 import { useAutoRefresh, useRefreshData } from '@/hooks';
 import {
@@ -47,7 +47,13 @@ import { Hint } from './styled';
 import type { LifecycleAction, OtelModal, PendingCredentialFocus } from './types';
 import { useClientPagination } from './use-client-pagination';
 import { useOtelAction } from './use-otel-action';
-import { getCreateIntent, hasRecoveryRequired, hasStorageNeedsApplying, notifyOtelAttentionChanged } from './utils';
+import {
+  getCreateIntent,
+  hasRecoveryRequired,
+  hasStorageNeedsApplying,
+  isRotation,
+  notifyOtelAttentionChanged,
+} from './utils';
 
 const BREADCRUMBS = [{ label: COPY.breadcrumbConnections, path: PATHS.CONNECTIONS() }, { label: COPY.title }];
 
@@ -76,7 +82,7 @@ export const Otel = () => {
   const failed = connections.data === undefined && connections.error !== undefined;
 
   const showCredential = useCallback((response: OtelConnectionResponse) => {
-    const rotated = response.credentials.some(({ status }) => status === OTEL_STATUS.RETIRING);
+    const rotated = isRotation(response);
     pendingCredentialFocus.current = rotated
       ? { connectionId: response.connection.id, action: LIFECYCLE_ACTION.FINALIZE }
       : {};

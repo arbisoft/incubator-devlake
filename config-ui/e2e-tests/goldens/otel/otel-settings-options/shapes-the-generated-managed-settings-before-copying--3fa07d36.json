@@ -1,0 +1,13 @@
+{
+  "titlePath": ["Claude Code OTel managed settings options", "shapes the generated managed settings before copying"],
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/plugins/claude_otel/connections",
+      "body": {
+        "projectNames": ["e2e-*"],
+        "teamName": "e2e-*"
+      }
+    }
+  ]
+}

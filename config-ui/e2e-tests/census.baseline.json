@@ -138,8 +138,15 @@
     },
     "otel/otel-rebuilds.spec.ts": {
       "tests": 6,
-      "expects": 55,
+      "expects": 56,
       "backend": 2,
+      "skips": 0,
+      "fixmes": 0
+    },
+    "otel/otel-settings-options.spec.ts": {
+      "tests": 1,
+      "expects": 14,
+      "backend": 1,
       "skips": 0,
       "fixmes": 0
     },

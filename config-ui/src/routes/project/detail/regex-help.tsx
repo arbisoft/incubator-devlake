@@ -16,15 +16,14 @@
  *
  */
 
-import { QuestionCircleOutlined } from '@ant-design/icons';
-import { Popover } from 'antd';
+import { HelpPopover } from '@/ui';
 
 import { COPY } from './constants';
-import { Examples, HelpButton } from './styled';
+import { Examples } from './styled';
 
 export const RegexHelp = () => (
-  <Popover
-    trigger={['hover', 'focus']}
+  <HelpPopover
+    label={COPY.settings.linker.help}
     content={
       <Examples>
         {COPY.settings.linker.examples.map((example) => (
@@ -32,9 +31,5 @@ export const RegexHelp = () => (
         ))}
       </Examples>
     }
-  >
-    <HelpButton type="button" aria-label={COPY.settings.linker.help}>
-      <QuestionCircleOutlined />
-    </HelpButton>
-  </Popover>
+  />
 );

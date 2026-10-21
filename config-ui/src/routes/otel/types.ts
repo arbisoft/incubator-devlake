@@ -23,13 +23,27 @@ import type {
   OtelProject,
   OtelRebindInput,
   OtelReplayRange,
-} from '@/api/otel';
+} from '@/api/otel/types';
 
 import type { CONNECTION_STATE, LIFECYCLE_ACTION, OTEL_MODAL } from './constants';
+import type { MANAGED_ENV_KEY, SETTINGS_OPTION } from './settings-option-constants';
 
 export type ConnectionState = (typeof CONNECTION_STATE)[keyof typeof CONNECTION_STATE];
 export type LifecycleAction = (typeof LIFECYCLE_ACTION)[keyof typeof LIFECYCLE_ACTION];
 export type OtelModal = (typeof OTEL_MODAL)[keyof typeof OTEL_MODAL];
+export type SettingsOption = (typeof SETTINGS_OPTION)[keyof typeof SETTINGS_OPTION];
+export type ManagedSettings = NonNullable<OtelConnectionResponse['managedSettings']>;
+export type SettingsSelection = Record<SettingsOption, boolean>;
+export type StorageEstimate = { rawMb: number; monthlyMb: number };
+type ManagedEnvKey = (typeof MANAGED_ENV_KEY)[keyof typeof MANAGED_ENV_KEY];
+export type OptionMeta = {
+  isSignal: boolean;
+  defaultOn: boolean;
+  storage: StorageEstimate;
+  children?: readonly SettingsOption[];
+  offEnv: { set: Partial<Record<ManagedEnvKey, string>>; remove?: readonly ManagedEnvKey[] };
+};
+export type OptionCopy = { label: string; description: string; details: readonly string[] };
 
 export type PendingOtelAction = { action: LifecycleAction; connection: OtelConnectionResponse };
 export type PendingCredentialFocus = { connectionId?: string | number; action?: LifecycleAction };
@@ -110,6 +124,8 @@ export type ReplayRangeFieldProps = {
 
 export type OtelReplaysProps = { version: number };
 
+export type SnippetSettingsProps = { managedSettings?: ManagedSettings; rotation: boolean };
+
 export type SnippetModalProps = {
   open: boolean;
   credential?: OtelConnectionResponse;
@@ -130,3 +146,10 @@ export type OtelSourcePolicyProps = {
   preferences?: AiSourcePreference[];
   onRetry: () => void;
 };
+
+export type SettingsOptionsProps = {
+  value: SettingsSelection;
+  onChange: (value: SettingsSelection) => void;
+};
+
+export type OptionHelpProps = { option: SettingsOption };

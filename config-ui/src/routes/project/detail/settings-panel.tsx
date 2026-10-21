@@ -26,14 +26,13 @@ import API from '@/api';
 import { PATHS, PROJECT_TAB } from '@/config';
 import { useRefreshData } from '@/hooks';
 import { getOtelProjectError } from '@/routes/otel/utils';
-import { COMMON_COPY, FormField, SectionCard, Toolbar, toUserMessage, useRefreshVersion } from '@/ui';
+import { COMMON_COPY, FormField, SectionCard, SettingOption, Toolbar, toUserMessage, useRefreshVersion } from '@/ui';
 import { operator } from '@/utils';
 
 import { COPY, DEFAULT_PR_ISSUE_REGEXP, SAVE_ERROR_MAP } from './constants';
 import { DeleteProjectModal } from './delete-project-modal';
 import { ReadinessCard } from './readiness-card';
 import { RegexHelp } from './regex-help';
-import { SettingOption } from './setting-option';
 import { FieldBox, Fields, Footer, Stack } from './styled';
 import type { ProjectPanelProps, SettingsForm } from './types';
 import {
