@@ -69,14 +69,6 @@ export const POLICY_COLUMN = { WORKSPACE: 'workspace', FAMILY: 'family', SOURCE:
 
 export const OTEL_MODAL = { CREATE: 'create', PROJECTS: 'projects', REBIND: 'rebind' } as const;
 
-export const SETTINGS_OPTION = {
-  METRICS: 'metrics',
-  LOGS: 'logs',
-  PROMPT_TEXT: 'promptText',
-  TOOL_DETAILS: 'toolDetails',
-  REPOSITORY: 'repository',
-} as const;
-
 export const COPY = {
   title: 'Claude Code OTel',
   description: 'Generate and manage the Basic Auth credential used by Claude Code telemetry.',

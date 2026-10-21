@@ -25,11 +25,10 @@ import { childrenOf, estimateStorage, hasSingleSignal, isLastSignal, TOP_LEVEL_O
 import { LastSignalHint } from '../styled';
 import type { SettingsOption, SettingsOptionsProps } from '../types';
 
-import { COPY } from './constants';
-import { OPTION_COPY } from './option-copy';
+import { COPY, OPTION_COPY } from './constants';
 import { OptionHelp } from './option-help';
 
-const OPTIONS_COPY = COPY.snippet.options;
+const { title, help, lastSignal, estimate } = COPY.snippet.options;
 
 export const SettingsOptions = ({ value, onChange }: SettingsOptionsProps) => {
   const lastSignalId = useId();
@@ -38,9 +37,7 @@ export const SettingsOptions = ({ value, onChange }: SettingsOptionsProps) => {
       key={option}
       label={OPTION_COPY[option].label}
       description={OPTION_COPY[option].description}
-      aside={
-        <HelpPopover label={OPTIONS_COPY.help(OPTION_COPY[option].label)} content={<OptionHelp option={option} />} />
-      }
+      aside={<HelpPopover label={help(OPTION_COPY[option].label)} content={<OptionHelp option={option} />} />}
       checked={value[option]}
       disabled={isLastSignal(value, option)}
       describedBy={isLastSignal(value, option) ? lastSignalId : undefined}
@@ -54,13 +51,13 @@ export const SettingsOptions = ({ value, onChange }: SettingsOptionsProps) => {
 
   return (
     <>
-      <div role="group" aria-label={OPTIONS_COPY.title}>
+      <div role="group" aria-label={title}>
         {TOP_LEVEL_OPTIONS.map((option) => renderOption(option))}
         <LastSignalHint id={lastSignalId} role="status">
-          {hasSingleSignal(value) ? OPTIONS_COPY.lastSignal : null}
+          {hasSingleSignal(value) && lastSignal}
         </LastSignalHint>
       </div>
-      <Alert type="info" role="status" showIcon title={OPTIONS_COPY.estimate(rawMb, monthlyMb)} />
+      <Alert type="info" role="status" showIcon title={estimate(rawMb, monthlyMb)} />
     </>
   );
 };

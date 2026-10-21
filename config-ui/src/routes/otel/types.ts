@@ -23,9 +23,10 @@ import type {
   OtelProject,
   OtelRebindInput,
   OtelReplayRange,
-} from '@/api/otel';
+} from '@/api/otel/types';
 
-import type { CONNECTION_STATE, LIFECYCLE_ACTION, OTEL_MODAL, SETTINGS_OPTION } from './constants';
+import type { CONNECTION_STATE, LIFECYCLE_ACTION, OTEL_MODAL } from './constants';
+import type { MANAGED_ENV_KEY, SETTINGS_OPTION } from './settings-option-constants';
 
 export type ConnectionState = (typeof CONNECTION_STATE)[keyof typeof CONNECTION_STATE];
 export type LifecycleAction = (typeof LIFECYCLE_ACTION)[keyof typeof LIFECYCLE_ACTION];
@@ -34,11 +35,13 @@ export type SettingsOption = (typeof SETTINGS_OPTION)[keyof typeof SETTINGS_OPTI
 export type ManagedSettings = NonNullable<OtelConnectionResponse['managedSettings']>;
 export type SettingsSelection = Record<SettingsOption, boolean>;
 export type StorageEstimate = { rawMb: number; monthlyMb: number };
+type ManagedEnvKey = (typeof MANAGED_ENV_KEY)[keyof typeof MANAGED_ENV_KEY];
 export type OptionMeta = {
   isSignal: boolean;
   defaultOn: boolean;
   storage: StorageEstimate;
   children?: readonly SettingsOption[];
+  offEnv: { set: Partial<Record<ManagedEnvKey, string>>; remove?: readonly ManagedEnvKey[] };
 };
 export type OptionCopy = { label: string; description: string; details: readonly string[] };
 

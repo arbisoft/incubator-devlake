@@ -20,15 +20,14 @@ import { storageFor } from '../managed-settings';
 import { HelpDetails } from '../styled';
 import type { OptionHelpProps, StorageEstimate } from '../types';
 
-import { COPY } from './constants';
-import { OPTION_COPY } from './option-copy';
+import { COPY, OPTION_COPY } from './constants';
 
-const OPTIONS_COPY = COPY.snippet.options;
+const { storage, storageRawOnly, storageNone } = COPY.snippet.options;
 
 const storageLine = ({ rawMb, monthlyMb }: StorageEstimate) => {
-  if (rawMb === 0) return OPTIONS_COPY.storageNone;
-  if (monthlyMb === 0) return OPTIONS_COPY.storageRawOnly(rawMb);
-  return OPTIONS_COPY.storage(rawMb, monthlyMb);
+  if (rawMb === 0) return storageNone;
+  if (monthlyMb === 0) return storageRawOnly(rawMb);
+  return storage(rawMb, monthlyMb);
 };
 
 export const OptionHelp = ({ option }: OptionHelpProps) => {

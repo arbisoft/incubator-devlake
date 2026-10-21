@@ -27,7 +27,7 @@ import { COPY as CODE_COPY } from '@/ui/code-block/constants';
 import { MANAGED_ENV } from '../__tests__/fixtures';
 
 import { connection, otelCredential } from './__tests__/modal-test-utils';
-import { COPY } from './constants';
+import { COPY, OPTION_COPY } from './constants';
 import { SnippetModal } from './snippet-modal';
 
 const credential = { ...connection(), managedSettings: { env: MANAGED_ENV } };
@@ -45,21 +45,21 @@ describe('SettingsOptions in the snippet modal', () => {
 
   it('unchecking events writes the disabled logs exporter', () => {
     renderWithTheme(<SnippetModal open credential={credential} onClose={vi.fn()} onClosed={vi.fn()} />);
-    fireEvent.click(checkbox(OPTIONS.logs.label));
+    fireEvent.click(checkbox(OPTION_COPY.logs.label));
     expect(shownEnv().OTEL_LOGS_EXPORTER).toBe('none');
   });
 
-  it.each([OPTIONS.promptText.label, OPTIONS.toolDetails.label])('hides %s while events are off', (label) => {
+  it.each([OPTION_COPY.promptText.label, OPTION_COPY.toolDetails.label])('hides %s while events are off', (label) => {
     renderWithTheme(<SnippetModal open credential={credential} onClose={vi.fn()} onClosed={vi.fn()} />);
     expect(checkbox(label).checked).toBe(true);
-    fireEvent.click(checkbox(OPTIONS.logs.label));
+    fireEvent.click(checkbox(OPTION_COPY.logs.label));
     expect(screen.queryByRole('checkbox', { name: label })).toBeNull();
   });
 
   it('keeps the last signal checked', () => {
     renderWithTheme(<SnippetModal open credential={credential} onClose={vi.fn()} onClosed={vi.fn()} />);
-    fireEvent.click(checkbox(OPTIONS.metrics.label));
-    const events = checkbox(OPTIONS.logs.label);
+    fireEvent.click(checkbox(OPTION_COPY.metrics.label));
+    const events = checkbox(OPTION_COPY.logs.label);
     expect(events.checked).toBe(true);
     expect(events.disabled).toBe(true);
     fireEvent.click(events);
@@ -72,8 +72,8 @@ describe('SettingsOptions in the snippet modal', () => {
     renderWithTheme(<SnippetModal open credential={credential} onClose={vi.fn()} onClosed={vi.fn()} />);
     const group = within(screen.getByRole('group', { name: OPTIONS.title }));
     expect(group.getAllByRole('status').some((node) => node.textContent === '')).toBe(true);
-    fireEvent.click(checkbox(OPTIONS.metrics.label));
-    const ids = (checkbox(OPTIONS.logs.label).getAttribute('aria-describedby') ?? '').split(' ');
+    fireEvent.click(checkbox(OPTION_COPY.metrics.label));
+    const ids = (checkbox(OPTION_COPY.logs.label).getAttribute('aria-describedby') ?? '').split(' ');
     const [, hintId] = ids;
     const hint = document.getElementById(hintId);
     expect(ids).toHaveLength(2);
@@ -84,17 +84,17 @@ describe('SettingsOptions in the snippet modal', () => {
 
   it('nests repository under events', () => {
     renderWithTheme(<SnippetModal open credential={credential} onClose={vi.fn()} onClosed={vi.fn()} />);
-    fireEvent.click(checkbox(OPTIONS.logs.label));
-    expect(screen.queryByRole('checkbox', { name: OPTIONS.repository.label })).toBeNull();
-    fireEvent.click(checkbox(OPTIONS.logs.label));
-    expect(checkbox(OPTIONS.repository.label)).toBeTruthy();
+    fireEvent.click(checkbox(OPTION_COPY.logs.label));
+    expect(screen.queryByRole('checkbox', { name: OPTION_COPY.repository.label })).toBeNull();
+    fireEvent.click(checkbox(OPTION_COPY.logs.label));
+    expect(checkbox(OPTION_COPY.repository.label)).toBeTruthy();
   });
 
   it('explains a content option with its own storage line', async () => {
     renderWithTheme(<SnippetModal open credential={credential} onClose={vi.fn()} onClosed={vi.fn()} />);
-    screen.getByRole('button', { name: OPTIONS.help(OPTIONS.promptText.label) }).focus();
+    screen.getByRole('button', { name: OPTIONS.help(OPTION_COPY.promptText.label) }).focus();
     await waitFor(() => expect(screen.getByText(OPTIONS.storageRawOnly(1))).toBeTruthy());
-    screen.getByRole('button', { name: OPTIONS.help(OPTIONS.toolDetails.label) }).focus();
+    screen.getByRole('button', { name: OPTIONS.help(OPTION_COPY.toolDetails.label) }).focus();
     await waitFor(() => expect(screen.getByText(OPTIONS.storageNone)).toBeTruthy());
   });
 
@@ -115,21 +115,21 @@ describe('SettingsOptions in the snippet modal', () => {
       <SnippetModal open={open} credential={credential} onClose={vi.fn()} onClosed={onClosed} />
     );
     const { rerender } = renderWithTheme(modal(true));
-    fireEvent.click(checkbox(OPTIONS.repository.label));
+    fireEvent.click(checkbox(OPTION_COPY.repository.label));
     expect(shownEnv().OTEL_METRICS_INCLUDE_REPOSITORY).toBe('false');
     rerender(modal(false));
     const dialog = document.querySelector<HTMLElement>('.ant-modal');
     await finishModalExit(dialog);
     expect(onClosed).toHaveBeenCalledOnce();
     rerender(modal(true));
-    await waitFor(() => expect(checkbox(OPTIONS.repository.label).checked).toBe(true));
+    await waitFor(() => expect(checkbox(OPTION_COPY.repository.label).checked).toBe(true));
     expect(shownEnv()).toEqual(MANAGED_ENV);
   });
 
   it('updates the storage estimate as signals change', () => {
     renderWithTheme(<SnippetModal open credential={credential} onClose={vi.fn()} onClosed={vi.fn()} />);
     expect(screen.getByText(OPTIONS.estimate(73, 21))).toBeTruthy();
-    fireEvent.click(checkbox(OPTIONS.logs.label));
+    fireEvent.click(checkbox(OPTION_COPY.logs.label));
     expect(screen.getByText(OPTIONS.estimate(20, 1))).toBeTruthy();
   });
 
@@ -142,8 +142,8 @@ describe('SettingsOptions in the snippet modal', () => {
 
   it('explains what an option sends', async () => {
     renderWithTheme(<SnippetModal open credential={credential} onClose={vi.fn()} onClosed={vi.fn()} />);
-    screen.getByRole('button', { name: OPTIONS.help(OPTIONS.logs.label) }).focus();
-    await waitFor(() => expect(screen.getByText(OPTIONS.logs.details[0])).toBeTruthy());
+    screen.getByRole('button', { name: OPTIONS.help(OPTION_COPY.logs.label) }).focus();
+    await waitFor(() => expect(screen.getByText(OPTION_COPY.logs.details[0])).toBeTruthy());
     expect(screen.getByText(OPTIONS.storage(42, 17))).toBeTruthy();
   });
 });

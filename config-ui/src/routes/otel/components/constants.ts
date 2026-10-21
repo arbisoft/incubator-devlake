@@ -18,9 +18,11 @@
 
 import { CONFIRM_TONE } from '@/ui/confirm-modal/constants';
 
+import type { OptionCopy, SettingsOption } from '../types';
+
 export const TEAM_NAME_MAX_LENGTH = 255;
 
-const OPTION_COPY = {
+export const OPTION_COPY = {
   metrics: {
     label: 'Metrics',
     description: 'Tokens, cost, lines of code, commits, pull requests and edit decisions.',
@@ -60,7 +62,7 @@ const OPTION_COPY = {
       'Credentials in the remote URL are stripped.',
     ],
   },
-};
+} satisfies Record<SettingsOption, OptionCopy>;
 
 export const COPY = {
   create: {
@@ -97,7 +99,6 @@ export const COPY = {
     endpoint: 'Endpoint',
     options: {
       title: 'Telemetry to send',
-      ...OPTION_COPY,
       rotateNotice: "Choices aren't remembered. Re-apply the options this team used before rotating.",
       lastSignal: 'Metrics or events must stay on.',
       help: (label: string) => `About ${label}`,

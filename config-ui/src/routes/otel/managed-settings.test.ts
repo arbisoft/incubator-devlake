@@ -20,7 +20,6 @@ import { omit } from 'lodash';
 import { describe, expect, it } from 'vitest';
 
 import { MANAGED_ENV } from './__tests__/fixtures';
-import { SETTINGS_OPTION } from './constants';
 import {
   buildManagedSettings,
   DEFAULT_SETTINGS_SELECTION,
@@ -28,6 +27,7 @@ import {
   hasSingleSignal,
   isLastSignal,
 } from './managed-settings';
+import { SETTINGS_OPTION } from './settings-option-constants';
 import type { SettingsSelection } from './types';
 
 const BASE = { env: MANAGED_ENV };

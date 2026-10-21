@@ -16,6 +16,7 @@
  *
  */
 
+import { noop } from 'lodash';
 import { useState } from 'react';
 
 import { SettingOption } from '@/ui';
@@ -28,16 +29,18 @@ export const SettingOptionDemo = () => {
   const [parent, setParent] = useState(true);
   const [child, setChild] = useState(false);
 
+  const cases = [
+    { label: COPY.cases.default, checked: plain, onChange: setPlain },
+    { label: COPY.cases.disabled, checked: true, disabled: true, onChange: noop },
+  ];
+
   return (
     <DemoSection id={SECTION.SETTING_OPTION} title={COPY.sections.settingOption}>
-      <DemoCase label={COPY.cases.default}>
-        <SettingOption
-          label={COPY.settingOption.label}
-          description={COPY.settingOption.description}
-          checked={plain}
-          onChange={setPlain}
-        />
-      </DemoCase>
+      {cases.map(({ label, ...props }) => (
+        <DemoCase key={label} label={label}>
+          <SettingOption label={COPY.settingOption.label} description={COPY.settingOption.description} {...props} />
+        </DemoCase>
+      ))}
       <DemoCase label={COPY.settingOption.nested}>
         <SettingOption
           label={COPY.settingOption.label}
@@ -54,15 +57,6 @@ export const SettingOptionDemo = () => {
             />
           )}
         </SettingOption>
-      </DemoCase>
-      <DemoCase label={COPY.cases.disabled}>
-        <SettingOption
-          label={COPY.settingOption.label}
-          description={COPY.settingOption.description}
-          checked
-          disabled
-          onChange={setPlain}
-        />
       </DemoCase>
     </DemoSection>
   );
