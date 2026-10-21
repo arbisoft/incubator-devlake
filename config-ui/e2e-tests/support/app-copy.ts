@@ -71,7 +71,7 @@ export { COPY as ONBOARD_COPY } from '../../src/routes/onboard/constants';
 export { COPY as LOGIN_COPY, LOGIN_PARAMS, PROVIDER_ID } from '../../src/routes/login/constants';
 export { COPY as CHANGE_PASSWORD_COPY } from '../../src/routes/change-password/constants';
 export { COPY as OTEL_COPY } from '../../src/routes/otel/constants';
-export { COPY as OTEL_MODAL_COPY } from '../../src/routes/otel/components/constants';
+export { COPY as OTEL_MODAL_COPY, OPTION_COPY as OTEL_OPTION_COPY } from '../../src/routes/otel/components/constants';
 export { REPLAY_COPY } from '../../src/routes/otel/replay-constants';
 export { OTEL_INGESTION_STATE, OTEL_REPLAY_KIND, OTEL_STATUS } from '../../src/api/otel/constants';
 export type { OtelReplayKind } from '../../src/api/otel/types';

@@ -1,0 +1,92 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+import { fireEvent, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+
+import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
+
+import { SettingOption } from './setting-option';
+
+const LABEL = 'Share usage data';
+const DESCRIPTION = 'Send anonymous usage data.';
+const CHILD = 'Nested content';
+const ASIDE = 'More about this';
+
+describe('SettingOption', () => {
+  it('renders the label and description and reports toggles', () => {
+    const onChange = vi.fn();
+    renderWithTheme(<SettingOption label={LABEL} description={DESCRIPTION} checked={false} onChange={onChange} />);
+    expect(screen.getByText(DESCRIPTION)).toBeTruthy();
+    fireEvent.click(screen.getByRole('checkbox', { name: LABEL }));
+    expect(onChange).toHaveBeenCalledWith(true);
+  });
+
+  it('renders children only when given', () => {
+    const { rerender } = renderWithTheme(
+      <SettingOption label={LABEL} description={DESCRIPTION} checked onChange={vi.fn()} />,
+    );
+    expect(screen.queryByText(CHILD)).toBeNull();
+    rerender(
+      <SettingOption label={LABEL} description={DESCRIPTION} checked onChange={vi.fn()}>
+        <span>{CHILD}</span>
+      </SettingOption>,
+    );
+    expect(screen.getByText(CHILD)).toBeTruthy();
+  });
+
+  it('reports unchecking', () => {
+    const onChange = vi.fn();
+    renderWithTheme(<SettingOption label={LABEL} description={DESCRIPTION} checked onChange={onChange} />);
+    fireEvent.click(screen.getByRole('checkbox', { name: LABEL }));
+    expect(onChange).toHaveBeenCalledWith(false);
+  });
+
+  it('passes disabled to the checkbox', () => {
+    const onChange = vi.fn();
+    renderWithTheme(<SettingOption label={LABEL} description={DESCRIPTION} checked disabled onChange={onChange} />);
+    const checkbox = screen.getByRole<HTMLInputElement>('checkbox', { name: LABEL });
+    expect(checkbox.disabled).toBe(true);
+    fireEvent.click(checkbox);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('renders the aside next to the description', () => {
+    renderWithTheme(
+      <SettingOption
+        label={LABEL}
+        description={DESCRIPTION}
+        checked
+        aside={<button>{ASIDE}</button>}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(DESCRIPTION).contains(screen.getByRole('button', { name: ASIDE }))).toBe(true);
+  });
+
+  it('describes the checkbox with its description and extra ids', () => {
+    renderWithTheme(
+      <SettingOption label={LABEL} description={DESCRIPTION} checked describedBy="extra-id" onChange={vi.fn()} />,
+    );
+    const describedBy = screen.getByRole('checkbox', { name: LABEL }).getAttribute('aria-describedby') ?? '';
+    const ids = describedBy.split(' ');
+    expect(ids).toContain('extra-id');
+    const hintId = ids.find((id) => id !== 'extra-id') ?? '';
+    expect(document.getElementById(hintId)?.textContent).toContain(DESCRIPTION);
+  });
+});

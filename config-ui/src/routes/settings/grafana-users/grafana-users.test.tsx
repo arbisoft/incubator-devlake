@@ -24,6 +24,7 @@ import API from '@/api';
 import { GRAFANA_ERROR_CODE, GRAFANA_ROLE } from '@/api/grafana-users/constants';
 import type { GrafanaUser, GrafanaUserList } from '@/api/grafana-users/types';
 import { COMMON_COPY } from '@/ui';
+import { finishModalExit } from '@/ui/__tests__/modal-exit';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
 import { COPY, MAX_VISIBLE_PROJECTS } from './constants';
@@ -190,8 +191,7 @@ describe('GrafanaUsers', () => {
 
     fireEvent.click(screen.getByRole('button', { name: COPY.password.oneTime.done }));
     const otp = screen.getByText(COPY.password.oneTime.title).closest(MODAL_SELECTOR) as HTMLElement;
-    await waitFor(() => expect(otp.classList.contains('ant-zoom-leave-active')).toBe(true));
-    fireEvent.transitionEnd(otp);
+    await finishModalExit(otp);
     await waitFor(() => expect(screen.queryAllByLabelText(COPY.password.oneTime.passwordFor(EMAIL))).toHaveLength(0));
   });
 });

@@ -24,6 +24,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import API from '@/api';
 import type { IProject } from '@/types';
 import { COMMON_COPY } from '@/ui';
+import { finishModalExit } from '@/ui/__tests__/modal-exit';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
 import { TemporaryPasswordModal } from '../../components';
@@ -198,8 +199,7 @@ describe('TemporaryPasswordModal', () => {
 
     const modal = screen.getByText(copy.title).closest(MODAL_SELECTOR) as HTMLElement;
     fireEvent.click(within(modal).getByRole('button', { name: copy.done }));
-    await waitFor(() => expect(modal.classList.contains('ant-zoom-leave-active')).toBe(true));
-    fireEvent.transitionEnd(modal);
+    await finishModalExit(modal);
     await waitFor(() => expect(screen.queryAllByLabelText(passwordLabel)).toHaveLength(0));
 
     fireEvent.click(screen.getByRole('button', { name: 'Reopen temporary password' }));
