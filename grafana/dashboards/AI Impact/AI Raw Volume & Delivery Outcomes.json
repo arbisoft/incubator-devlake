@@ -40,7 +40,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "**Scope & caveats:**\n\n- **AI usage/activity figures on this dashboard come from Claude Code OTel** and are scoped through the connection-to-project mapping and the Project/Claude Code OTel Teams filters above. Activity totals use `canonical_activity` rows; model-usage totals come from `ai_model_usages`. Legacy Claude Admin-API and Cursor activity are excluded — neither carries a reliable per-project mapping, so mixing them in made the “Company-wide” figures uncomparable to the project-scoped delivery panels below.\n- **Active Hours** is queried directly from Claude Code's OTel telemetry, not the shared `ai_activities` table — session duration isn't rolled up into the domain layer for any provider.\n- **Commits/code churn in closed, unmerged PRs** require at least one closed PR and no merged or open PR association for the same commit SHA in the same base repository. All commit/PR checks use the PR base repository; PRs in another repository do not affect qualification. Closed-PR commit counts come directly from recorded PR associations without requiring repository history or commit metadata; closed-PR churn requires commit metadata, so it can cover fewer commits. Each SHA is counted once per panel if any selected accessible repository qualifies. A SHA shared across repositories can therefore qualify in both categories; these totals should not be added as disjoint sets.\n- **Commits/code churn without recorded PRs** have no recorded PR association of any status in a qualifying repository, and are not a merged PR's merge commit there. This includes branches without PRs and direct-to-default-branch commits; it does not prove the commits never reached main or bypassed review. Counts depend on complete commit/PR ingestion, and historical associations may remain after branch history changes. Equivalent code can ship under another SHA (for example, through squashing or cherry-picking). Known overcounts: rebase-merged PRs (every rewritten commit except the merge result), GitLab MRs that are squashed and also get a merge commit (DevLake stores only the merge commit, so the squash commit looks unassociated; a backend fix is tracked separately), and merges of PRs that DevLake never collected.\n- **Reporting periods and line counts:** PRs Closed, Never Merged and the closed-PR commit/churn panels use PR closure dates; commits may have been created before the selected period. The merged-PR exclusion checks all dates. Panels without recorded PRs use commit dates and check PR associations across all dates, so their reporting periods differ from the closed-PR panels. Code churn is shown in lines (additions + deletions), counted once per SHA, and only covers commits with additions/deletions metadata; it shows no data when none of the qualifying commits have it. Repeated edits are counted; this is not unique abandoned code.\n- **PR Abandonment Rate** is the delivery-outcome view of the same problem: no field links an AI session to the branch or PR it produced, so a dollar/token cost can't be attached to abandoned work directly. This table measures it a different way instead — PR-level: (PRs authored that closed without merging) ÷ (all PRs authored) — as an outcome-based proxy for wasted effort, not an AI-cost-denominated one.\n- **Developer filter:** AI figures match the developer's OTel email. PR and closed-PR figures match the PR author's GitHub account, and commit figures match the commit email, using the GitHub account that GitHub itself links to the developer's OTel email through their commits. Developers marked *no GitHub link* have no commits under their OTel email in the collected GitHub repos, so their PR and commit figures are empty rather than zero output; *no AI data* marks PR authors without OTel activity. An email that GitHub links to more than one account counts as *no GitHub link*. Account IDs are assumed to come from a single GitHub host (github.com).",
+        "content": "**Scope & caveats:**\n\n- **AI usage/activity figures on this dashboard come from Claude Code OTel** and are scoped through the connection-to-project mapping and the Project/Claude Code OTel Teams filters above. Activity totals use `canonical_activity` rows; model-usage totals come from `ai_model_usages`. Legacy Claude Admin-API and Cursor activity are excluded — neither carries a reliable per-project mapping, so mixing them in made the “Company-wide” figures uncomparable to the project-scoped delivery panels below.\n- **Active Hours** is queried directly from Claude Code's OTel telemetry, not the shared `ai_activities` table — session duration isn't rolled up into the domain layer for any provider.\n- **Commits/code churn in closed, unmerged PRs** require at least one closed PR and no merged or open PR association for the same commit SHA in the same base repository. All commit/PR checks use the PR base repository; PRs in another repository do not affect qualification. Closed-PR commit counts come directly from recorded PR associations without requiring repository history or commit metadata; closed-PR churn requires commit metadata, so it can cover fewer commits. Each SHA is counted once per panel if any selected accessible repository qualifies. A SHA shared across repositories can therefore qualify in both categories; these totals should not be added as disjoint sets.\n- **Commits/code churn without recorded PRs** have no recorded PR association of any status in a qualifying repository, and are not a merged PR's merge commit there. This includes branches without PRs and direct-to-default-branch commits; it does not prove the commits never reached main or bypassed review. Counts depend on complete commit/PR ingestion, and historical associations may remain after branch history changes. Equivalent code can ship under another SHA (for example, through squashing or cherry-picking). Known overcounts: rebase-merged PRs (every rewritten commit except the merge result), GitLab MRs that are squashed and also get a merge commit (DevLake stores only the merge commit, so the squash commit looks unassociated; a backend fix is tracked separately), and merges of PRs that DevLake never collected.\n- **Reporting periods and line counts:** PRs Closed, Never Merged and the closed-PR commit/churn panels use PR closure dates; commits may have been created before the selected period. The merged-PR exclusion checks all dates. Panels without recorded PRs use commit dates and check PR associations across all dates, so their reporting periods differ from the closed-PR panels. Code churn is shown in lines (additions + deletions), counted once per SHA, and only covers commits with additions/deletions metadata; it shows no data when none of the qualifying commits have it. Repeated edits are counted; this is not unique abandoned code.\n- **PR Abandonment Rate** is the delivery-outcome view of the same problem: no field links an AI session to the branch or PR it produced, so a dollar/token cost can't be attached to abandoned work directly. This table measures it a different way instead — PR-level: (PRs authored that closed without merging) ÷ (all PRs authored) — as an outcome-based proxy for wasted effort, not an AI-cost-denominated one.\n- **Developer filter:** AI figures match the developer's OTel email. PR and closed-PR figures match the PR author's GitHub account, and commit figures match the commit email, using the GitHub account that GitHub itself links to the developer's OTel email through their commits. Developers marked *no GitHub link* have no commits under their OTel email in the collected GitHub repos, so their PR and commit figures are empty rather than zero output; *no AI data* marks PR authors without OTel activity. An email that GitHub links to more than one account counts as *no GitHub link*. Account IDs are assumed to come from a single GitHub host (github.com).\n- **Merged Pull Requests** lists each merged PR with its ticket, author, approvers, files changed and whether any of its commits carry a `Co-Authored-By: Claude` line, so bug-fix PRs can be traced to the PRs that caused them and AI-assisted PRs compared with the rest. It uses PR merge dates; the panel description covers how each column is derived.",
         "mode": "markdown"
       },
       "pluginVersion": "11.0.0",
@@ -966,6 +966,244 @@
         }
       ],
       "title": "PR Abandonment Rate by Contributor",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 45
+      },
+      "id": 17,
+      "panels": [],
+      "title": "Merged PR Details",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "One row per merged pull request in the selected project(s) and time range, by merge date, newest first. Use it to trace bug-fix PRs back to the PRs that caused them and to compare AI-assisted with non-AI PRs.\n\n- **Ticket** is the first key found in the title or branch: a Jira-style key (`ABC-123`), then `#123` (ignoring `(#123)` and `pull request #123`, which are PR numbers), then a 4+ digit number between `/`, `_` or `-` in the branch name.\n- **Approvers** are reviewers with an approving review. Only GitHub records reviews, so GitLab and Bitbucket PRs show none.\n- **Files Changed** counts distinct file paths across the PR's non-merge commits and its merge commit, so a file changed and then reverted inside the PR still counts. It needs commit file data from the git extractor (`skipCommitFiles` off); without it the column is blank.\n- **Claude Co-Authored** is Yes when any commit in the PR, or its merge commit, has a `Co-Authored-By: Claude` line. Release and back-merge PRs carry every commit they promote, so they are Yes when any of those commits are.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": true
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "url"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "PR"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 70
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Open pull request",
+                    "url": "${__data.fields.url}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repository"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 140
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Ticket"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Merged"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              },
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Files Changed"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 120
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Claude Co-Authored"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 140
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "No": {
+                        "color": "text",
+                        "index": 1
+                      },
+                      "Yes": {
+                        "color": "purple",
+                        "index": 0
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Branch"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 170
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Author"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 130
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Approvers"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 14,
+        "w": 24,
+        "x": 0,
+        "y": 46
+      },
+      "id": 18,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": true,
+          "enablePagination": true,
+          "fields": "",
+          "reducer": [
+            "count"
+          ],
+          "show": true
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Merged"
+          }
+        ]
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH prs AS (\n  SELECT pr.id, pr.base_repo_id, pr.pull_request_key, pr.url, pr.title, pr.head_ref, pr.author_id, pr.author_name, pr.merged_date, pr.merge_commit_sha\n  FROM pull_requests pr\n  WHERE pr.base_repo_id IN (SELECT pm.row_id FROM project_mapping pm WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project)))\n    AND pr.status = 'MERGED' AND $__timeFilter(pr.merged_date)\n    AND ('__all' IN ($developer) OR (pr.author_id LIKE 'github:GithubAccount:%' AND CONCAT('gh:', SUBSTRING_INDEX(pr.author_id, ':', -1)) IN ($developer)))\n),\npr_commits AS (\n  SELECT prc.pull_request_id, prc.commit_sha FROM pull_request_commits prc WHERE prc.pull_request_id IN (SELECT id FROM prs)\n  UNION\n  SELECT id, merge_commit_sha FROM prs WHERE merge_commit_sha <> ''\n),\nclaude AS (\n  SELECT pc.pull_request_id, COUNT(*) AS commits\n  FROM pr_commits pc JOIN commits c ON c.sha = pc.commit_sha\n  WHERE REGEXP_LIKE(CONVERT(c.message USING utf8mb4), 'co-authored-by:[[:blank:]]*claude', 'i')\n  GROUP BY pc.pull_request_id\n),\nfiles AS (\n  SELECT pc.pull_request_id, COUNT(DISTINCT cf.file_path) AS files\n  FROM pr_commits pc JOIN commit_files cf ON cf.commit_sha = pc.commit_sha\n  WHERE (SELECT COUNT(*) FROM commit_parents cp WHERE cp.commit_sha = pc.commit_sha) <= 1\n  GROUP BY pc.pull_request_id\n),\napprovers AS (\n  SELECT c.pull_request_id, GROUP_CONCAT(DISTINCT COALESCE(NULLIF(a.full_name, ''), NULLIF(a.user_name, ''), c.account_id) ORDER BY 1 SEPARATOR ', ') AS names\n  FROM pull_request_comments c LEFT JOIN accounts a ON a.id = c.account_id\n  WHERE c.status = 'APPROVED' AND c.pull_request_id IN (SELECT id FROM prs)\n  GROUP BY c.pull_request_id\n)\nSELECT\n  r.name AS \"Repository\",\n  CONCAT('#', prs.pull_request_key) AS \"PR\",\n  prs.url AS \"url\",\n  prs.title AS \"Title\",\n  prs.head_ref AS \"Branch\",\n  COALESCE(\n    REGEXP_SUBSTR(CONCAT(prs.title, ' ', prs.head_ref), '[A-Z][A-Z0-9]+-[0-9]+', 1, 1, 'c'),\n    REGEXP_SUBSTR(CONCAT(prs.title, ' ', prs.head_ref), '(?<![(]|request )#[0-9]+'),\n    CONCAT('#', REGEXP_SUBSTR(prs.head_ref, '(?<![^/_-])[0-9]{4,}(?![^/_-]|-[0-9])'))\n  ) AS \"Ticket\",\n  COALESCE(NULLIF(au.full_name, ''), prs.author_name) AS \"Author\",\n  prs.merged_date AS \"Merged\",\n  ap.names AS \"Approvers\",\n  f.files AS \"Files Changed\",\n  IF(cl.commits > 0, 'Yes', 'No') AS \"Claude Co-Authored\"\nFROM prs\nLEFT JOIN repos r ON r.id = prs.base_repo_id\nLEFT JOIN accounts au ON au.id = prs.author_id\nLEFT JOIN approvers ap ON ap.pull_request_id = prs.id\nLEFT JOIN files f ON f.pull_request_id = prs.id\nLEFT JOIN claude cl ON cl.pull_request_id = prs.id\nORDER BY prs.merged_date DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Merged Pull Requests",
       "type": "table"
     }
   ],
