@@ -51,3 +51,5 @@ export type ConnectionDetail = {
 };
 
 export type CategoryCount = { category: IntegrationCategory; count: number };
+
+export type ProjectFilters = { connection: string[]; lastRunStatus: string[] };

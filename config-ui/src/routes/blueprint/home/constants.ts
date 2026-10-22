@@ -29,8 +29,13 @@ export const BLUEPRINT_COLUMN = {
 } as const;
 
 export const STATUS_FILTER = { ALL: 'all', ENABLED: 'enabled', DISABLED: 'disabled' } as const;
-export const TYPE_FILTER_ALL = 'all';
-export const LIST_FILTER = { TYPE: 'type', STATUS: 'status' } as const;
+export const LIST_FILTER = {
+  CONNECTION: 'connection',
+  TYPE: 'type',
+  PROJECT: 'projectName',
+  STATUS: 'status',
+} as const;
+export const PROJECT_FILTER_OPTIONS_LIMIT = 200;
 
 export const BLUEPRINT_STATUS_TONE = {
   [STATUS_FILTER.ENABLED]: STATUS_TONE.NEUTRAL,
@@ -45,14 +50,10 @@ export const COPY = {
   description: 'This is a complete list of all Blueprints you have created, whether they belong to Projects or not.',
   breadcrumbAdvanced: 'Advanced',
   searchPlaceholder: 'Search blueprints',
-  statusFilterLabel: 'Status',
-  typeFilterLabel: 'Frequency',
   statusFilter: {
-    [STATUS_FILTER.ALL]: 'All',
     [STATUS_FILTER.ENABLED]: 'Enabled',
     [STATUS_FILTER.DISABLED]: 'Disabled',
   },
-  allTypes: 'All',
   newBlueprint: 'New blueprint',
   columns: {
     name: 'Blueprint name',

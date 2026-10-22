@@ -16,9 +16,23 @@
  *
  */
 
-import { Select } from 'antd';
-import styled from 'styled-components';
+import { describe, expect, it } from 'vitest';
 
-export const TypeSelect = styled(Select)`
-  width: ${({ theme }) => theme.layout.sortSelectWidth}px;
-`;
+import { toSearchParams } from './utils';
+
+describe('toSearchParams', () => {
+  it('repeats array items and stringifies scalars', () => {
+    expect(toSearchParams({ page: 1, enable: false, connection: ['a:1', 'b:2'] }).toString()).toBe(
+      'page=1&enable=false&connection=a%3A1&connection=b%3A2',
+    );
+  });
+
+  it.each([
+    ['undefined', undefined],
+    ['null', null],
+    ['an empty string', ''],
+    ['an empty array', []],
+  ])('skips %s', (_, value) => {
+    expect(toSearchParams({ keyword: value, page: 1 }).toString()).toBe('page=1');
+  });
+});

@@ -24,30 +24,48 @@ import { useNavigate } from 'react-router-dom';
 import API from '@/api';
 import { BLUEPRINT_VIEW, PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
+import { useConnectionFilterOptions } from '@/routes/connection/use-connection-filter-options';
 import { OnboardTour } from '@/routes/onboard/components';
-import { DataTable, ListPage, ListToolbar, PageHeader, buildListEmpty, useListState, useRefreshVersion } from '@/ui';
+import {
+  DataTable,
+  ListPage,
+  ListToolbar,
+  PageHeader,
+  buildListEmpty,
+  toListFilterPatch,
+  useListState,
+  useRefreshVersion,
+} from '@/ui';
 
 import { toReadinessMap } from '../readiness';
 
 import { NewProjectModal } from './components';
-import { COPY } from './constants';
-import type { ProjectRow, ProjectSortKey } from './types';
+import { COPY, PROJECT_COLUMN, PROJECT_FILTER } from './constants';
+import type { ProjectFilters, ProjectRow, ProjectSortKey } from './types';
 import { useProjectColumns } from './use-project-columns';
-import { toProjectRow } from './utils';
+import { buildProjectQuery, toProjectRow } from './utils';
+
+const DEFAULT_FILTERS: ProjectFilters = { connection: [], lastRunStatus: [] };
+
+const FILTER_COLUMNS = {
+  [PROJECT_COLUMN.CONNECTIONS]: { name: PROJECT_FILTER.CONNECTION, multiple: true },
+  [PROJECT_COLUMN.LAST_RUN_STATUS]: { name: PROJECT_FILTER.LAST_RUN_STATUS, multiple: true },
+};
 
 export const ProjectHomePage = () => {
-  const list = useListState<ProjectSortKey, Record<string, never>>({ filters: {} });
-  const { keyword } = list;
+  const list = useListState<ProjectSortKey, ProjectFilters>({ filters: DEFAULT_FILTERS });
+  const { filters } = list;
   const { version, refresh } = useRefreshVersion();
   const [creating, setCreating] = useState(false);
 
   const navigate = useNavigate();
 
   const { data, ready, error } = useRefreshData(
-    (signal) => API.project.list(list.query, signal),
-    [version, list.query],
+    (signal) => API.project.list(buildProjectQuery(list.query, filters), signal),
+    [version, list.query, filters.connection.join(), filters.lastRunStatus.join()],
   );
   const { data: otelConnections } = useRefreshData(() => API.otel.list(), []);
+  const connectionOptions = useConnectionFilterOptions({ includeOtel: true, otelConnections });
   const { data: scorecard } = useRefreshData((signal) => API.complianceScorecard.list(signal), [version]);
 
   const rows = useMemo(
@@ -61,7 +79,7 @@ export const ProjectHomePage = () => {
     (name: string) => navigate(PATHS.PROJECT_BLUEPRINT_VIEW(name, BLUEPRINT_VIEW.CONFIGURATION)),
     [navigate],
   );
-  const { columns, tourRefs } = useProjectColumns(handleConfigure, readiness);
+  const { columns, tourRefs } = useProjectColumns(handleConfigure, readiness, filters, connectionOptions);
 
   const handleCreated = () => {
     setCreating(false);
@@ -78,7 +96,7 @@ export const ProjectHomePage = () => {
   const empty = buildListEmpty({
     failed: error !== undefined,
     onRetry: refresh,
-    filtered: keyword !== '',
+    filtered: list.isFiltered,
     empty: {
       ...COPY.empty,
       action: newProjectButton,
@@ -98,6 +116,7 @@ export const ProjectHomePage = () => {
         dataSource={rows}
         empty={empty}
         list={list}
+        onFilterChange={(changed) => list.setFilters(toListFilterPatch(changed, FILTER_COLUMNS))}
         total={data?.count ?? 0}
       />
       <NewProjectModal open={creating} onClose={() => setCreating(false)} onCreated={handleCreated} />

@@ -24,15 +24,26 @@ import { TextTooltip } from '@/components';
 import { BLUEPRINT_VIEW, PATHS } from '@/config';
 import { ConnectionName } from '@/features';
 import { IBPMode, type IBlueprint } from '@/types';
-import { OverflowList, RowLink, StatusBadge } from '@/ui';
+import { OverflowList, RowLink, StatusBadge, listFilterProps, type ListFilterOption } from '@/ui';
 import { formatTime } from '@/utils';
 
 import { getFrequencyLabel, getNextRunTime } from '../sync-policy';
 
-import { BLUEPRINT_COLUMN, BLUEPRINT_STATUS_TONE, COPY, MAX_VISIBLE_CONNECTIONS } from './constants';
-import { toStatusKey } from './utils';
+import { BLUEPRINT_COLUMN, BLUEPRINT_STATUS_TONE, COPY, MAX_VISIBLE_CONNECTIONS, STATUS_FILTER } from './constants';
+import type { BlueprintFilters } from './types';
+import { getTypeOptions, toStatusKey } from './utils';
 
-type ColumnOptions = { onConfigure: (id: ID) => void };
+type ColumnOptions = {
+  onConfigure: (id: ID) => void;
+  filters: BlueprintFilters;
+  connectionOptions: ListFilterOption[];
+  projectOptions: ListFilterOption[];
+};
+
+const STATUS_OPTIONS: ListFilterOption[] = [STATUS_FILTER.ENABLED, STATUS_FILTER.DISABLED].map((value) => ({
+  text: COPY.statusFilter[value],
+  value,
+}));
 
 const renderConnections = ({ mode, connections }: Pick<IBlueprint, 'mode' | 'connections'>) => {
   if (mode === IBPMode.ADVANCED) return COPY.advancedMode;
@@ -49,7 +60,12 @@ const renderConnections = ({ mode, connections }: Pick<IBlueprint, 'mode' | 'con
   );
 };
 
-export const getColumns = ({ onConfigure }: ColumnOptions): TableColumnsType<IBlueprint> => [
+export const getColumns = ({
+  onConfigure,
+  filters,
+  connectionOptions,
+  projectOptions,
+}: ColumnOptions): TableColumnsType<IBlueprint> => [
   {
     key: BLUEPRINT_COLUMN.NAME,
     title: COPY.columns.name,
@@ -61,10 +77,16 @@ export const getColumns = ({ onConfigure }: ColumnOptions): TableColumnsType<IBl
       </RowLink>
     ),
   },
-  { key: BLUEPRINT_COLUMN.CONNECTIONS, title: COPY.columns.connections, render: (_, row) => renderConnections(row) },
+  {
+    key: BLUEPRINT_COLUMN.CONNECTIONS,
+    title: COPY.columns.connections,
+    ...listFilterProps<IBlueprint>(filters.connection, connectionOptions, { search: true }),
+    render: (_, row) => renderConnections(row),
+  },
   {
     key: BLUEPRINT_COLUMN.FREQUENCY,
     title: COPY.columns.frequency,
+    ...listFilterProps<IBlueprint>(filters.type, getTypeOptions()),
     render: (_, { isManual, cronConfig }) => getFrequencyLabel(isManual, cronConfig),
   },
   {
@@ -76,6 +98,7 @@ export const getColumns = ({ onConfigure }: ColumnOptions): TableColumnsType<IBl
     key: BLUEPRINT_COLUMN.PROJECT,
     title: COPY.columns.project,
     dataIndex: 'projectName',
+    ...listFilterProps<IBlueprint>(filters.projectName, projectOptions, { search: true }),
     render: (projectName?: string) =>
       projectName ? (
         <Link to={PATHS.PROJECT(projectName)}>
@@ -89,6 +112,9 @@ export const getColumns = ({ onConfigure }: ColumnOptions): TableColumnsType<IBl
     key: BLUEPRINT_COLUMN.STATUS,
     title: COPY.columns.status,
     dataIndex: 'enable',
+    ...listFilterProps<IBlueprint>(filters.status === STATUS_FILTER.ALL ? undefined : filters.status, STATUS_OPTIONS, {
+      multiple: false,
+    }),
     render: (enable: boolean) => {
       const status = toStatusKey(enable);
       return <StatusBadge tone={BLUEPRINT_STATUS_TONE[status]} label={COPY.statusFilter[status]} variant="dot" />;
