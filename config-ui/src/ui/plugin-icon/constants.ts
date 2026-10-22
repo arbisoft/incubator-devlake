@@ -16,4 +16,4 @@
  *
  */
 
-export const CONNECTOR_LOGO_KIND = { LOGO: 'logo', MONO: 'mono' } as const;
+export const CONNECTOR_LOGO_KIND = { LOGO: 'logo', MONO: 'mono', TINT: 'tint' } as const;
