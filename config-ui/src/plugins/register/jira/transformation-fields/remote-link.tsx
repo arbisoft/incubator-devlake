@@ -30,6 +30,12 @@ import type { JiraTransformationValues } from '../types';
 
 import * as S from './styled';
 
+let nextRowId = 0;
+const newRowId = () => {
+  nextRowId += 1;
+  return `row-${nextRowId}`;
+};
+
 type Props = Pick<TransformationProps<JiraTransformationValues>, 'transformation' | 'setTransformation'>;
 
 export const RemoteLink = ({ transformation, setTransformation }: Props) => {
@@ -39,6 +45,7 @@ export const RemoteLink = ({ transformation, setTransformation }: Props) => {
   const [links, setLinks] = useState<Array<{ pattern: string; regex: string }>>(
     transformation.remotelinkRepoPattern ?? [],
   );
+  const [rowIds, setRowIds] = useState(() => links.map(newRowId));
   const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
@@ -72,20 +79,22 @@ export const RemoteLink = ({ transformation, setTransformation }: Props) => {
   const handleAddLink = () => {
     const newValue = [...links, { pattern: '', regex: '' }];
     setLinks(newValue);
+    setRowIds([...rowIds, newRowId()]);
   };
 
   const handleDeleteLink = (index: number) => {
     const newValue = links.filter((_, i) => i !== index);
     setLinks(newValue);
+    setRowIds(rowIds.filter((_, i) => i !== index));
   };
 
   return (
     <S.RemoteLinkWrapper>
       {links.map((link, i) => (
-        <div key={i} className="input">
+        <div key={rowIds[i]} className="input">
           <div className="inner">
             <Input
-              key={i}
+              key={rowIds[i]}
               placeholder="E.g. https://gitlab.com/{namespace}/{repo_name}/-/commit/{commit_sha}"
               value={index === i ? pattern : link.pattern}
               onChange={(e) => {

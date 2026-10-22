@@ -141,6 +141,16 @@ describe('project settings form', () => {
     });
   });
 
+  it('falls back to the default regexp for an empty or regexp-less linker option', () => {
+    const withOption = (pluginOption: IProject['metrics'][number]['pluginOption']) => ({
+      ...PROJECT,
+      metrics: [{ pluginName: 'linker', pluginOption, enable: true }],
+    });
+    expect(readSettingsForm(withOption('')).linkerRegexp).toBe(DEFAULT_PR_ISSUE_REGEXP);
+    expect(readSettingsForm(withOption({})).linkerRegexp).toBe(DEFAULT_PR_ISSUE_REGEXP);
+    expect(readSettingsForm(withOption({ prToIssueRegexp: '(z)' })).linkerRegexp).toBe('(z)');
+  });
+
   it('treats a project without a metrics list as having none enabled', () => {
     expect(readSettingsForm({ ...PROJECT, metrics: null as never }).dora).toBe(false);
   });

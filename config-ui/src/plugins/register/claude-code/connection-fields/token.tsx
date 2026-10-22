@@ -20,11 +20,10 @@ import { Input } from 'antd';
 import { useEffect, useMemo, type ChangeEvent } from 'react';
 
 import { Block } from '@/components';
+import * as S from '@/plugins/components/connection-form/fields/styled';
 import type { ConnectionFieldRenderProps } from '@/types';
 
 import type { ClaudeCodeConnectionValues } from '../types';
-
-import * as S from './styled';
 
 type Props = Pick<
   ConnectionFieldRenderProps<ClaudeCodeConnectionValues>,

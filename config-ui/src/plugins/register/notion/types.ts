@@ -16,9 +16,9 @@
  *
  */
 
-export type NotionConnectionValues = {
+import type { WebhookIngestionValues } from '@/plugins/components/connection-form/fields/webhook-ingestion';
+
+export type NotionConnectionValues = WebhookIngestionValues & {
   workspaceId?: string;
   apiVersion?: string;
-  enableWebhook?: boolean;
-  webhookSharedKey?: string;
 };

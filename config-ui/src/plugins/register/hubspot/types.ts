@@ -16,8 +16,8 @@
  *
  */
 
-export type HubspotConnectionValues = {
+import type { WebhookIngestionValues } from '@/plugins/components/connection-form/fields/webhook-ingestion';
+
+export type HubspotConnectionValues = WebhookIngestionValues & {
   portalId?: string;
-  enableWebhook?: boolean;
-  webhookSharedKey?: string;
 };

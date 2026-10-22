@@ -21,22 +21,7 @@ import { Button, Checkbox, Flex, Form, Input, InputNumber, Segmented, Table, Too
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useMemo } from 'react';
 
-import { trimSlashes, trimTrailingSlashes } from '@/utils';
-
-interface ScopeData {
-  prefix?: string;
-  year?: number;
-  month?: number | null;
-  basePath?: string;
-  accountId?: string;
-}
-
-interface ScopeItem {
-  id: string;
-  name: string;
-  fullName: string;
-  data?: ScopeData;
-}
+import { extractScopeMeta, normalizeBasePath, type ScopeItem } from './scope-meta';
 
 interface Props {
   connectionId: ID;
@@ -52,57 +37,6 @@ const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'S
 const DEFAULT_BASE_PATH = 'user-report';
 
 const ensureLeadingZero = (value: number) => value.toString().padStart(2, '0');
-
-const normalizeBasePath = (value: string) => trimSlashes(value.trim());
-
-const extractScopeMeta = (item: ScopeItem) => {
-  const data = item.data ?? {};
-  const rawPrefix = data.prefix ?? item.fullName ?? item.id;
-  const prefix = typeof rawPrefix === 'string' ? trimTrailingSlashes(rawPrefix) : '';
-  const segments = prefix ? prefix.split('/').filter(Boolean) : [];
-
-  let month = data.month ?? null;
-  if (month === undefined || month === null) {
-    const last = segments[segments.length - 1];
-    if (last && /^(0[1-9]|1[0-2])$/.test(last)) {
-      month = Number(last);
-    } else {
-      month = null;
-    }
-  }
-
-  let { year } = data;
-  if (year === undefined || year === null) {
-    const idx = month ? segments.length - 2 : segments.length - 1;
-    const candidate = idx >= 0 ? segments[idx] : undefined;
-    if (candidate && /^\d{4}$/.test(candidate)) {
-      year = Number(candidate);
-    } else {
-      year = undefined;
-    }
-  }
-
-  let baseSegments: string[];
-  if (segments.length === 0) {
-    baseSegments = [];
-  } else if (month) {
-    baseSegments = segments.slice(0, Math.max(segments.length - 2, 0));
-  } else {
-    baseSegments = segments.slice(0, Math.max(segments.length - 1, 0));
-  }
-
-  const basePath = normalizeBasePath(data.basePath ?? (baseSegments.length ? baseSegments.join('/') : ''));
-
-  const accountId = data.accountId ?? '';
-
-  return {
-    basePath,
-    year: typeof year === 'number' ? year : null,
-    month,
-    prefix,
-    accountId,
-  };
-};
 
 const deriveBasePathFromSelection = (items: ScopeItem[]) => {
   for (const item of items) {

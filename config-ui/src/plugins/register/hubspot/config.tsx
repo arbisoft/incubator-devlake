@@ -16,11 +16,11 @@
  *
  */
 
-import { CopyOutlined } from '@ant-design/icons';
-import { Button, Checkbox, Input, Space, message } from 'antd';
+import { Input } from 'antd';
 
 import { Block } from '@/components/block';
 import Icon from '@/images/plugin-icon.svg?react';
+import { webhookIngestionFields } from '@/plugins/components/connection-form/fields/webhook-ingestion';
 import type { ConnectionFieldRenderProps, IPluginConfig } from '@/types';
 
 import type { HubspotConnectionValues } from './types';
@@ -59,66 +59,11 @@ export const HubspotConfig: IPluginConfig = {
           />
         </Block>
       ),
-      ({ values, setValues, setErrors }: RenderProps) => (
-        <Block key="enableWebhook" title="Webhook Ingestion">
-          <Checkbox
-            checked={!!values.enableWebhook}
-            onChange={(e) => {
-              const enabled = e.target.checked;
-              setValues({ enableWebhook: enabled });
-              setErrors({ webhookSharedKey: enabled && !(values.webhookSharedKey ?? '').trim() ? 'required' : '' });
-            }}
-          >
-            Enable webhook ingestion in addition to polling
-          </Checkbox>
-        </Block>
-      ),
-      ({ values, errors, setValues, setErrors }: RenderProps) => (
-        <Block
-          key="webhookSharedKey"
-          title="Webhook Shared Key"
-          description="Use your HubSpot app client secret for signature verification (v1/v2/v3)."
-        >
-          <Input.Password
-            placeholder="HubSpot app client secret"
-            value={values.webhookSharedKey ?? ''}
-            status={values.enableWebhook && errors.webhookSharedKey ? 'error' : undefined}
-            onChange={(e) => {
-              setValues({ webhookSharedKey: e.target.value });
-              setErrors({ webhookSharedKey: values.enableWebhook && !e.target.value.trim() ? 'required' : '' });
-            }}
-          />
-          {values.enableWebhook && !!errors.webhookSharedKey && (
-            <p style={{ color: '#ff4d4f', marginTop: 8 }}>Webhook shared key is required when webhook is enabled.</p>
-          )}
-          {!values.enableWebhook && (
-            <p style={{ marginTop: 8 }}>Turn on webhook ingestion to enforce webhook shared key validation.</p>
-          )}
-        </Block>
-      ),
-      ({ values }: RenderProps) => {
-        const webhookUrl = `${window.location.origin}/plugins/hubspot/connections/{connectionId}/scopes/{scopeId}/webhook`;
-        return (
-          <Block
-            key="webhookUrl"
-            title="Webhook URL Template"
-            description="Replace {connectionId} and {scopeId} after creating connection and scope."
-          >
-            <Space.Compact style={{ width: '100%' }}>
-              <Input readOnly value={webhookUrl} disabled={!values.enableWebhook} />
-              <Button
-                type="text"
-                icon={<CopyOutlined />}
-                disabled={!values.enableWebhook}
-                onClick={() => {
-                  void navigator.clipboard.writeText(webhookUrl);
-                  void message.success('Webhook URL copied.');
-                }}
-              />
-            </Space.Compact>
-          </Block>
-        );
-      },
+      ...webhookIngestionFields({
+        plugin: 'hubspot',
+        sharedKeyDescription: 'Use your HubSpot app client secret for signature verification (v1/v2/v3).',
+        sharedKeyPlaceholder: 'HubSpot app client secret',
+      }),
       'proxy',
       {
         key: 'rateLimitPerHour',

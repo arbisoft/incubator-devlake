@@ -16,53 +16,23 @@
  *
  */
 
-import { Input } from 'antd';
-import { useEffect, useMemo } from 'react';
-
-import { Block } from '@/components';
-import type { ConnectionFieldRenderProps } from '@/types';
+import { IdentityField } from '@/plugins/components/connection-form/fields/identity-field';
 
 import type { GhCopilotConnectionValues } from '../types';
 
-import * as S from './styled';
+import { validateScopeIdentity, type ScopeIdentityProps } from './scope-identity';
 
-type Props = Pick<
-  ConnectionFieldRenderProps<GhCopilotConnectionValues>,
-  'type' | 'initialValues' | 'values' | 'setValues' | 'setErrors'
->;
-
-export const Organization = ({ type, initialValues, values, setValues, setErrors }: Props) => {
-  useEffect(() => {
-    setValues({ organization: initialValues.organization ?? '' });
-  }, [initialValues.organization]);
-
-  const error = useMemo(() => {
-    if (type === 'update') return '';
-    const hasOrg = !!values.organization?.trim();
-    const hasEnt = !!values.enterprise?.trim();
-    return hasOrg || hasEnt ? '' : 'At least one of Organization or Enterprise Slug is required';
-  }, [type, values.organization, values.enterprise]);
-
-  useEffect(() => {
-    setErrors({ scopeIdentity: error });
-  }, [error]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setValues({ organization: e.target.value });
-  };
-
-  return (
-    <Block
-      title="Organization"
-      description="Enter the GitHub organization name for org-level metrics and seat data. At least one of Organization or Enterprise Slug is required."
-    >
-      <Input
-        placeholder="e.g. github"
-        status={error ? 'error' : ''}
-        value={values.organization ?? ''}
-        onChange={handleChange}
-      />
-      {error && <S.ErrorText>{error}</S.ErrorText>}
-    </Block>
-  );
-};
+export const Organization = ({ type, initialValues, values, setValues, setErrors }: ScopeIdentityProps) => (
+  <IdentityField<GhCopilotConnectionValues>
+    fieldKey="organization"
+    errorKey="scopeIdentity"
+    title="Organization"
+    description="Enter the GitHub organization name for org-level metrics and seat data. At least one of Organization or Enterprise Slug is required."
+    placeholder="e.g. github"
+    validate={(v) => validateScopeIdentity(type, v)}
+    initialValues={initialValues}
+    values={values}
+    setValues={setValues}
+    setErrors={setErrors}
+  />
+);

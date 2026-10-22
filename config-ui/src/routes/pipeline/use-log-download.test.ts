@@ -27,7 +27,7 @@ import { COPY, LOGS_FILE_NAME } from './constants';
 import { useLogDownload } from './use-log-download';
 
 vi.mock('antd', async (importOriginal) =>
-  (await import('@/ui/__tests__/antd-message-mock')).loadMockedMessage(importOriginal),
+  (await import('@/ui/__tests__/mock-message')).loadMockedMessage(importOriginal),
 );
 
 vi.mock('file-saver', () => ({ saveAs: vi.fn() }));

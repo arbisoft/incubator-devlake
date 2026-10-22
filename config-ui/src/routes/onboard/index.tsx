@@ -16,7 +16,7 @@
  *
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import API from '@/api';
@@ -37,6 +37,13 @@ import { Step4 } from './step-4';
 import * as S from './styled';
 import type { OnboardRecord } from './types';
 
+type OnboardInitial = {
+  step: number;
+  records: OnboardRecord[];
+  projectName?: string;
+  plugin?: string;
+};
+
 interface Props {
   logo?: React.ReactNode;
   title?: React.ReactNode;
@@ -45,32 +52,31 @@ interface Props {
 export const Onboard = ({ logo, title }: Props) => {
   useDocumentTitle(COPY.title);
 
-  const [step, setStep] = useState(0);
-  const [records, setRecords] = useState<OnboardRecord[]>([]);
-  const [projectName, setProjectName] = useState<string>();
-  const [plugin, setPlugin] = useState<string>();
-
-  const navigate = useNavigate();
-
   const { ready, data } = useRefreshData((signal) => API.store.get(STORE_KEY, signal));
 
-  useEffect(() => {
-    if (ready && data) {
-      setStep(data.step);
-      setRecords(data.records);
-      setProjectName(data.projectName);
-      setPlugin(data.plugin);
-    }
-  }, [ready, data]);
+  if (!ready) {
+    return <PageLoading />;
+  }
+
+  return <OnboardWizard logo={logo} title={title} initial={data} />;
+};
+
+interface WizardProps extends Props {
+  initial?: OnboardInitial | null;
+}
+
+const OnboardWizard = ({ logo, title, initial }: WizardProps) => {
+  const [step, setStep] = useState(initial?.step ?? 0);
+  const [records, setRecords] = useState<OnboardRecord[]>(initial?.records ?? []);
+  const [projectName, setProjectName] = useState<string | undefined>(initial?.projectName);
+  const [plugin, setPlugin] = useState<string | undefined>(initial?.plugin);
+
+  const navigate = useNavigate();
 
   const handleExit = async () => {
     navigate(PATHS.ROOT());
     return true;
   };
-
-  if (!ready) {
-    return <PageLoading />;
-  }
 
   return (
     <Context.Provider

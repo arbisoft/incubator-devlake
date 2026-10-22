@@ -16,10 +16,18 @@
  *
  */
 
-import styled from 'styled-components';
+import type { ConnectionFieldRenderProps } from '@/types';
 
-export const ErrorText = styled.div`
-  margin-top: ${({ theme }) => theme.space.xxs}px;
-  color: ${({ theme }) => theme.colors.error};
-  font-size: ${({ theme }) => theme.typography.scale.caption.fontSize}px;
-`;
+import type { GhCopilotConnectionValues } from '../types';
+
+export type ScopeIdentityProps = Pick<
+  ConnectionFieldRenderProps<GhCopilotConnectionValues>,
+  'type' | 'initialValues' | 'values' | 'setValues' | 'setErrors'
+>;
+
+export const validateScopeIdentity = (type: 'create' | 'update', values: GhCopilotConnectionValues) => {
+  if (type === 'update') return '';
+  const hasOrg = !!values.organization?.trim();
+  const hasEnt = !!values.enterprise?.trim();
+  return hasOrg || hasEnt ? '' : 'At least one of Organization or Enterprise Slug is required';
+};
