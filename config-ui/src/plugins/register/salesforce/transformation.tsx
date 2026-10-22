@@ -19,16 +19,16 @@
 import { CaretRightOutlined } from '@ant-design/icons';
 import { Alert, Checkbox, Collapse, Form, Select, Tag, theme } from 'antd';
 
+import type { TransformationProps } from '@/plugins/components/scope-config-form/types';
+
+import type { SalesforceTransformationValues } from './types';
+
 const OBJECT_TYPE_OPTIONS = ['Account', 'Contact', 'Lead', 'Opportunity', 'Case', 'Task', 'Event'].map((value) => ({
   label: value,
   value,
 }));
 
-interface Props {
-  entities: string[];
-  transformation: any;
-  setTransformation: React.Dispatch<React.SetStateAction<any>>;
-}
+type Props = TransformationProps<SalesforceTransformationValues>;
 
 export const SalesforceTransformation = ({ entities, transformation, setTransformation }: Props) => {
   const { token } = theme.useToken();

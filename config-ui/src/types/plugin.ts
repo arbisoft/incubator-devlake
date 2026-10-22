@@ -16,6 +16,42 @@
  *
  */
 
+import type { ReactNode } from 'react';
+
+export type ScopeConfigTransformation = Record<string, unknown>;
+
+export type ConnectionFieldValues = Record<string, unknown>;
+export type ConnectionFieldErrors = Record<string, unknown>;
+
+export type ConnectionFieldRenderProps<V extends ConnectionFieldValues = ConnectionFieldValues> = {
+  type: 'create' | 'update';
+  connectionId?: ID;
+  initialValues: V;
+  values: V;
+  errors: ConnectionFieldErrors;
+  // method syntax keeps plugin-specific value types assignable to the shared renderer
+  setValues(values: Partial<V>): void;
+  setErrors(errors: ConnectionFieldErrors): void;
+};
+
+type ConnectionFieldRenderer = { render(props: ConnectionFieldRenderProps): ReactNode }['render'];
+
+export type ConnectionFieldOptions = {
+  key: string;
+  label?: ReactNode;
+  subLabel?: ReactNode;
+  placeholder?: string;
+  defaultValue?: string | number;
+  learnMore?: string;
+  externalInfo?: string;
+  multipleVersions?: Record<string, string>;
+  disabled?: boolean;
+  cloudName?: string;
+  type?: string;
+};
+
+export type ConnectionField = string | ConnectionFieldOptions | ConnectionFieldRenderer;
+
 export interface IPluginConfig {
   plugin: string;
   name: string;
@@ -26,8 +62,8 @@ export interface IPluginConfig {
   deprecationMessage?: string;
   connection: {
     docLink: string;
-    initialValues?: Record<string, any>;
-    fields: any[];
+    initialValues?: ConnectionFieldValues;
+    fields: ConnectionField[];
     // when true, a successful Test Connection shows the message returned by
     // the plugin's test API (e.g. the authenticated login, soft warnings)
     // instead of the generic toast
@@ -45,6 +81,6 @@ export interface IPluginConfig {
   };
   scopeConfig?: {
     entities: string[];
-    transformation: any;
+    transformation: ScopeConfigTransformation;
   };
 }

@@ -21,7 +21,11 @@ import { Button, Checkbox, Input, Space, message } from 'antd';
 
 import { Block } from '@/components/block';
 import Icon from '@/images/plugin-icon.svg?react';
-import { IPluginConfig } from '@/types';
+import type { ConnectionFieldRenderProps, IPluginConfig } from '@/types';
+
+import type { HubspotConnectionValues } from './types';
+
+type RenderProps = ConnectionFieldRenderProps<HubspotConnectionValues>;
 
 export const HubspotConfig: IPluginConfig = {
   plugin: 'hubspot',
@@ -46,7 +50,7 @@ export const HubspotConfig: IPluginConfig = {
         key: 'token',
         label: 'Private App Token',
       },
-      ({ values, setValues }: any) => (
+      ({ values, setValues }: RenderProps) => (
         <Block key="portalId" title="Portal ID">
           <Input
             placeholder="HubSpot portal ID"
@@ -55,7 +59,7 @@ export const HubspotConfig: IPluginConfig = {
           />
         </Block>
       ),
-      ({ values, setValues, setErrors }: any) => (
+      ({ values, setValues, setErrors }: RenderProps) => (
         <Block key="enableWebhook" title="Webhook Ingestion">
           <Checkbox
             checked={!!values.enableWebhook}
@@ -69,7 +73,7 @@ export const HubspotConfig: IPluginConfig = {
           </Checkbox>
         </Block>
       ),
-      ({ values, errors, setValues, setErrors }: any) => (
+      ({ values, errors, setValues, setErrors }: RenderProps) => (
         <Block
           key="webhookSharedKey"
           title="Webhook Shared Key"
@@ -84,7 +88,7 @@ export const HubspotConfig: IPluginConfig = {
               setErrors({ webhookSharedKey: values.enableWebhook && !e.target.value.trim() ? 'required' : '' });
             }}
           />
-          {values.enableWebhook && errors.webhookSharedKey && (
+          {values.enableWebhook && !!errors.webhookSharedKey && (
             <p style={{ color: '#ff4d4f', marginTop: 8 }}>Webhook shared key is required when webhook is enabled.</p>
           )}
           {!values.enableWebhook && (
@@ -92,7 +96,7 @@ export const HubspotConfig: IPluginConfig = {
           )}
         </Block>
       ),
-      ({ values }: any) => {
+      ({ values }: RenderProps) => {
         const webhookUrl = `${window.location.origin}/plugins/hubspot/connections/{connectionId}/scopes/{scopeId}/webhook`;
         return (
           <Block

@@ -18,18 +18,17 @@
 
 import { CaretRightOutlined } from '@ant-design/icons';
 import { theme, Collapse, Tag, Form, Input, Checkbox, Select } from 'antd';
+import type { CheckboxChangeEvent } from 'antd/lib/checkbox';
 import { useMemo, useState, useEffect } from 'react';
 
 import { ExternalLink, HelpTooltip } from '@/components';
+import type { TransformationProps } from '@/plugins/components/scope-config-form/types';
 import { DOC_URL } from '@/release';
 
 import ExampleJpg from './assets/bitbucket-example.jpg';
+import type { BitbucketTransformationValues } from './types';
 
-interface Props {
-  entities: string[];
-  transformation: any;
-  setTransformation: React.Dispatch<React.SetStateAction<any>>;
-}
+type Props = TransformationProps<BitbucketTransformationValues>;
 
 const ALL_STATES = ['new', 'open', 'resolved', 'closed', 'on hold', 'wontfix', 'duplicate', 'invalid'];
 
@@ -54,8 +53,8 @@ export const BitbucketTransformation = ({ entities, transformation, setTransform
     return ALL_STATES.filter((it) => !disabledOptions.includes(it)).map((it) => ({ label: it, value: it }));
   }, [transformation]);
 
-  const handleChangeUseCustom = (e: React.FormEvent<HTMLInputElement>) => {
-    const { checked } = e.target as HTMLInputElement;
+  const handleChangeUseCustom = (e: CheckboxChangeEvent) => {
+    const { checked } = e.target;
 
     if (!checked) {
       setTransformation({
@@ -109,10 +108,10 @@ const renderCollapseItems = ({
   entities: string[];
   panelStyle: React.CSSProperties;
   options: Array<{ label: string; value: string }>;
-  transformation: any;
-  onChangeTransformation: any;
+  transformation: BitbucketTransformationValues;
+  onChangeTransformation: (next: BitbucketTransformationValues) => void;
   useCustom: boolean;
-  onChangeUseCustom: any;
+  onChangeUseCustom: (e: CheckboxChangeEvent) => void;
 }) =>
   [
     {

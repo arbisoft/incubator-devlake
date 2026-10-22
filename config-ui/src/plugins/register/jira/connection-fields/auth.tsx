@@ -21,6 +21,9 @@ import { useState, useEffect } from 'react';
 
 import { Block, ExternalLink } from '@/components';
 import { DOC_URL } from '@/release';
+import type { ConnectionFieldRenderProps } from '@/types';
+
+import type { JiraConnectionValues } from '../types';
 
 const JIRA_CLOUD_REGEX = /^https:\/\/\w+\.atlassian\.net\/rest\/$/;
 const JIRA_GATEWAY_REGEX = /^https:\/\/api\.atlassian\.com\/ex\/jira\/[^/]+\/rest\/$/;
@@ -29,14 +32,10 @@ type JiraVersion = 'cloud' | 'gateway' | 'server';
 type Method = 'BasicAuth' | 'AccessToken' | 'OAuth2';
 type GatewayMethod = 'AccessToken' | 'OAuth2';
 
-interface Props {
-  type: 'create' | 'update';
-  initialValues: any;
-  values: any;
-  errors: any;
-  setValues: (value: any) => void;
-  setErrors: (value: any) => void;
-}
+type Props = Pick<
+  ConnectionFieldRenderProps<JiraConnectionValues>,
+  'type' | 'initialValues' | 'values' | 'errors' | 'setValues' | 'setErrors'
+>;
 
 export const Auth = ({ type, initialValues, values, setValues, setErrors }: Props) => {
   const [version, setVersion] = useState<JiraVersion>('cloud');

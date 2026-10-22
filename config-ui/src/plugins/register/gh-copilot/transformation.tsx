@@ -17,16 +17,15 @@
  */
 
 import { CaretRightOutlined } from '@ant-design/icons';
-import { theme, Collapse, Tag, DatePicker, InputNumber, Alert } from 'antd';
+import { theme, Collapse, Tag, DatePicker, InputNumber, Alert, type GlobalToken } from 'antd';
 import dayjs from 'dayjs';
 
 import { HelpTooltip } from '@/components';
+import type { TransformationProps } from '@/plugins/components/scope-config-form/types';
 
-interface Props {
-  entities: string[];
-  transformation: any;
-  setTransformation: React.Dispatch<React.SetStateAction<any>>;
-}
+import type { GhCopilotTransformationValues } from './types';
+
+type Props = TransformationProps<GhCopilotTransformationValues>;
 
 export const GhCopilotTransformation = ({ entities, transformation, setTransformation }: Props) => {
   const { token } = theme.useToken();
@@ -65,9 +64,9 @@ const renderCollapseItems = ({
 }: {
   entities: string[];
   panelStyle: React.CSSProperties;
-  transformation: any;
-  onChangeTransformation: any;
-  token: any;
+  transformation: GhCopilotTransformationValues;
+  onChangeTransformation: (next: GhCopilotTransformationValues) => void;
+  token: GlobalToken;
 }) =>
   [
     {

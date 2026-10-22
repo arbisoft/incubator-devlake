@@ -21,7 +21,10 @@ import { useEffect, useState } from 'react';
 
 import { ExternalLink } from '@/components';
 import JiraIssueTipsImg from '@/images/jira-issue-tips.png';
+import type { TransformationProps } from '@/plugins/components/scope-config-form/types';
 import { DOC_URL } from '@/release';
+
+import type { JiraTransformationValues } from '../types';
 
 import { DevPanel } from './dev-panel';
 import { RemoteLink } from './remote-link';
@@ -31,11 +34,10 @@ const PANEL = { REMOTE_LINK: 'remote-link', DEV_PANEL: 'dev-panel' } as const;
 
 type Panel = (typeof PANEL)[keyof typeof PANEL];
 
-interface Props {
-  connectionId: ID;
-  transformation: any;
-  setTransformation: React.Dispatch<React.SetStateAction<any>>;
-}
+type Props = Pick<
+  TransformationProps<JiraTransformationValues>,
+  'connectionId' | 'transformation' | 'setTransformation'
+>;
 
 export const CrossDomain = ({ connectionId, transformation, setTransformation }: Props) => {
   const [radio, setRadio] = useState<Panel>(PANEL.REMOTE_LINK);
@@ -105,7 +107,7 @@ export const CrossDomain = ({ connectionId, transformation, setTransformation }:
                 {transformation.applicationType && (
                   <div className="application">
                     <span>{transformation.applicationType}</span>
-                    <span>{transformation.remotelinkRepoPattern[0]?.pattern}</span>
+                    <span>{transformation.remotelinkRepoPattern?.[0]?.pattern}</span>
                   </div>
                 )}
                 <Button onClick={() => setOpen(true)}>

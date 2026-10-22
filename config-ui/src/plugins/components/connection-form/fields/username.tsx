@@ -22,8 +22,8 @@ import { useEffect } from 'react';
 import { Block } from '@/components';
 
 interface Props {
-  label?: string;
-  subLabel?: string;
+  label?: React.ReactNode;
+  subLabel?: React.ReactNode;
   placeholder?: string;
   initialValue: string;
   value: string;

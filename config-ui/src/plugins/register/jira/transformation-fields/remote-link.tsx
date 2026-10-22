@@ -19,17 +19,18 @@
 import { CloseOutlined, PlusOutlined } from '@ant-design/icons';
 import { useDebounce } from 'ahooks';
 import { Input, Button } from 'antd';
+import axios from 'axios';
 import { useEffect, useState } from 'react';
 
 import API from '@/api';
+import type { TransformationProps } from '@/plugins/components/scope-config-form/types';
 import { operator } from '@/utils';
+
+import type { JiraTransformationValues } from '../types';
 
 import * as S from './styled';
 
-interface Props {
-  transformation: any;
-  setTransformation: React.Dispatch<React.SetStateAction<any>>;
-}
+type Props = Pick<TransformationProps<JiraTransformationValues>, 'transformation' | 'setTransformation'>;
 
 export const RemoteLink = ({ transformation, setTransformation }: Props) => {
   const [index, setInedx] = useState<number>();
@@ -58,7 +59,7 @@ export const RemoteLink = ({ transformation, setTransformation }: Props) => {
     if (success) {
       setLinks(links.map((link, i) => (i === index ? { ...res, pattern } : link)));
     } else {
-      setError(res?.response?.data?.message ?? '');
+      setError(axios.isAxiosError<{ message?: string }>(res) ? (res.response?.data?.message ?? '') : '');
     }
   };
 

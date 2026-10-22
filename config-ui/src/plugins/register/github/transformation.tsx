@@ -22,14 +22,12 @@ import type { CheckboxChangeEvent } from 'antd/lib/checkbox';
 import { useState, useEffect } from 'react';
 
 import { HelpTooltip, ExternalLink } from '@/components';
+import type { TransformationProps } from '@/plugins/components/scope-config-form/types';
 import { DOC_URL } from '@/release';
 
-interface Props {
-  entities: string[];
-  transformation: any;
-  setTransformation: React.Dispatch<React.SetStateAction<any>>;
-  setHasError: React.Dispatch<React.SetStateAction<boolean>>;
-}
+import type { GitHubTransformationValues } from './types';
+
+type Props = TransformationProps<GitHubTransformationValues>;
 
 export const GitHubTransformation = ({ entities, transformation, setTransformation, setHasError }: Props) => {
   const [useCustom, setUseCustom] = useState(false);
@@ -98,10 +96,10 @@ const renderCollapseItems = ({
 }: {
   entities: string[];
   panelStyle: React.CSSProperties;
-  transformation: any;
-  onChangeTransformation: any;
+  transformation: GitHubTransformationValues;
+  onChangeTransformation: (next: GitHubTransformationValues) => void;
   useCustom: boolean;
-  onChangeUseCustom: any;
+  onChangeUseCustom: (e: CheckboxChangeEvent) => void;
 }) =>
   [
     {

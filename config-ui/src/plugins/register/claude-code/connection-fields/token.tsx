@@ -20,23 +20,23 @@ import { Input } from 'antd';
 import { useEffect, useMemo, type ChangeEvent } from 'react';
 
 import { Block } from '@/components';
+import type { ConnectionFieldRenderProps } from '@/types';
+
+import type { ClaudeCodeConnectionValues } from '../types';
 
 import * as S from './styled';
 
-interface Props {
-  type: 'create' | 'update';
-  initialValues: any;
-  values: any;
-  setValues: (value: any) => void;
-  setErrors: (value: any) => void;
-}
+type Props = Pick<
+  ConnectionFieldRenderProps<ClaudeCodeConnectionValues>,
+  'type' | 'initialValues' | 'values' | 'setValues' | 'setErrors'
+>;
 
 export const Token = ({ type, initialValues, values, setValues, setErrors }: Props) => {
   useEffect(() => {
     setValues({ token: type === 'create' ? (initialValues.token ?? '') : undefined });
   }, [type, initialValues.token]);
 
-  const customHeaders: Array<{ key: string; value: string }> = values.customHeaders ?? [];
+  const customHeaders = values.customHeaders ?? [];
   const hasValidCustomHeaders = customHeaders.some((h) => h.key?.trim() && h.value?.trim());
   const hasIncompleteCustomHeaders = !hasValidCustomHeaders && customHeaders.length > 0;
 

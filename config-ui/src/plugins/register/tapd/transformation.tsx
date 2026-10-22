@@ -24,6 +24,9 @@ import { useEffect, useState } from 'react';
 import API from '@/api';
 import { PageLoading } from '@/components';
 import { useProxyPrefix, useRefreshData } from '@/hooks';
+import type { TransformationProps } from '@/plugins/components/scope-config-form/types';
+
+import type { TapdTransformationValues } from './types';
 
 enum StandardType {
   Requirement = 'Requirement',
@@ -37,13 +40,7 @@ enum StandardStatus {
   Done = 'DONE',
 }
 
-interface Props {
-  entities: string[];
-  connectionId: ID;
-  scopeId: ID;
-  transformation: any;
-  setTransformation: React.Dispatch<React.SetStateAction<any>>;
-}
+type Props = TransformationProps<TapdTransformationValues> & { scopeId: ID };
 
 export const TapdTransformation = ({ entities, connectionId, scopeId, transformation, setTransformation }: Props) => {
   const [featureTypeList, setFeatureTypeList] = useState<string[]>([]);
@@ -95,7 +92,10 @@ export const TapdTransformation = ({ entities, connectionId, scopeId, transforma
     );
 
     const typeList: { id: string; name: string }[] = [
-      ...storyType.data.map((it: any) => ({ id: it.Category.id, name: it.Category.name })),
+      ...storyType.data.map((it: { Category: { id: string; name: string } }) => ({
+        id: it.Category.id,
+        name: it.Category.name,
+      })),
       { id: 'BUG', name: bugType['BUG'] },
       { id: 'TASK', name: taskType['TASK'] },
     ];
@@ -107,12 +107,12 @@ export const TapdTransformation = ({ entities, connectionId, scopeId, transforma
   }, [prefix]);
 
   useEffect(() => {
-    const typeList = Object.entries(transformation.typeMappings ?? {}).map(([key, value]: any) => ({ key, value }));
+    const typeList = Object.entries(transformation.typeMappings ?? {}).map(([key, value]) => ({ key, value }));
     setFeatureTypeList(typeList.filter((it) => it.value === StandardType.Requirement).map((it) => it.key));
     setBugTypeList(typeList.filter((it) => it.value === StandardType.Bug).map((it) => it.key));
     setIncidentTypeList(typeList.filter((it) => it.value === StandardType.Incident).map((it) => it.key));
 
-    const statusList = Object.entries(transformation.statusMappings ?? {}).map(([key, value]: any) => ({ key, value }));
+    const statusList = Object.entries(transformation.statusMappings ?? {}).map(([key, value]) => ({ key, value }));
     setTodoStatusList(statusList.filter((it) => it.value === StandardStatus.Todo).map((it) => it.key));
     setInProgressStatusList(statusList.filter((it) => it.value === StandardStatus.InProgress).map((it) => it.key));
     setDoneStatusList(statusList.filter((it) => it.value === StandardStatus.Done).map((it) => it.key));
@@ -184,23 +184,23 @@ const renderCollapseItems = ({
 }: {
   entities: string[];
   panelStyle: React.CSSProperties;
-  transformation: any;
-  onChangeTransformation: any;
+  transformation: TapdTransformationValues;
+  onChangeTransformation: (next: TapdTransformationValues) => void;
   typeList: Array<{
     id: string;
     name: string;
   }>;
-  featureTypeList: any;
-  bugTypeList: any;
-  incidentTypeList: any;
+  featureTypeList: string[];
+  bugTypeList: string[];
+  incidentTypeList: string[];
   statusList: Array<{
     id: string;
     name: string;
   }>;
-  todoStatusList: any;
-  inProgressStatusList: any;
-  doneStatusList: any;
-  transformaType: any;
+  todoStatusList: string[];
+  inProgressStatusList: string[];
+  doneStatusList: string[];
+  transformaType: (its: string[], standardType: string) => Record<string, string>;
 }) =>
   [
     {

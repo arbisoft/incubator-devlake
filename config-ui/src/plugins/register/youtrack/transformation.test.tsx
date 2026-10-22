@@ -23,6 +23,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
 import { YoutrackTransformation } from './transformation';
+import type { YoutrackTransformationValues } from './types';
 
 const scopeConfigProjects = vi.fn();
 const customFields = vi.fn();
@@ -31,8 +32,8 @@ vi.mock('@/api', () => ({
   default: {
     plugin: {
       youtrack: {
-        scopeConfigProjects: (...args: any[]) => scopeConfigProjects(...args),
-        customFields: (...args: any[]) => customFields(...args),
+        scopeConfigProjects: (...args: unknown[]) => scopeConfigProjects(...args),
+        customFields: (...args: unknown[]) => customFields(...args),
       },
     },
   },
@@ -68,7 +69,7 @@ const cbStates = [
   ...Array.from({ length: 31 }, (_, i) => ({ name: `State ${i + 2}`, ordinal: i + 2 })),
 ];
 
-const FIELDS: Record<string, any[]> = {
+const FIELDS: Record<string, Array<ReturnType<typeof cf>>> = {
   '0-1': [
     cf('PROJ2', 'Client type', 'enum', false, [
       { name: 'Bug', ordinal: 0 },
@@ -97,10 +98,11 @@ const FIELDS: Record<string, any[]> = {
 };
 
 const onTransformation = vi.fn();
-const latest = (): any => onTransformation.mock.lastCall?.[0];
+const noop = () => undefined;
+const latest = (): YoutrackTransformationValues | undefined => onTransformation.mock.lastCall?.[0];
 
-const Wrapper = ({ initial, scopeConfigId }: { initial: any; scopeConfigId?: string }) => {
-  const [transformation, setTransformation] = useState<any>(initial);
+const Wrapper = ({ initial, scopeConfigId }: { initial: YoutrackTransformationValues; scopeConfigId?: string }) => {
+  const [transformation, setTransformation] = useState<YoutrackTransformationValues>(initial);
   useEffect(() => onTransformation(transformation), [transformation]);
   return (
     <YoutrackTransformation
@@ -109,6 +111,7 @@ const Wrapper = ({ initial, scopeConfigId }: { initial: any; scopeConfigId?: str
       scopeConfigId={scopeConfigId}
       transformation={transformation}
       setTransformation={setTransformation}
+      setHasError={noop}
     />
   );
 };
@@ -162,14 +165,14 @@ describe('YoutrackTransformation (attached mode)', () => {
     renderWithTheme(<Wrapper initial={initialTransformation} scopeConfigId="9" />);
 
     await screen.findByText('Subtask');
-    await waitFor(() => expect(latest().statusMappings['Closed']).toBe('DONE'));
-    expect(latest().statusMappings['Backlog']).toBe('TODO');
-    expect(latest().statusMappings['Declined']).toBe('DONE');
-    expect(latest().statusMappings['State 2']).toBe('TODO');
+    await waitFor(() => expect(latest()?.statusMappings?.['Closed']).toBe('DONE'));
+    expect(latest()?.statusMappings?.['Backlog']).toBe('TODO');
+    expect(latest()?.statusMappings?.['Declined']).toBe('DONE');
+    expect(latest()?.statusMappings?.['State 2']).toBe('TODO');
     // a previously saved mapping is never overwritten by the seed
-    expect(latest().statusMappings['On hold']).toBe('OTHER');
+    expect(latest()?.statusMappings?.['On hold']).toBe('OTHER');
     // types are NOT seeded
-    expect(latest().typeMappings).toEqual({ 'Fixed (old)': 'BUG' });
+    expect(latest()?.typeMappings).toEqual({ 'Fixed (old)': 'BUG' });
 
     // every unioned state carries the auto badge (34 rows: 2 + 33 states, Backlog shared by both projects)
     expect(screen.getAllByText('auto')).toHaveLength(34);
@@ -194,8 +197,8 @@ describe('YoutrackTransformation (attached mode)', () => {
     // two stale rows × two badges each (presence column + mapping column)
     await waitFor(() => expect(screen.getAllByText('stale')).toHaveLength(4));
     // kept in the config
-    expect(latest().typeMappings['Fixed (old)']).toBe('BUG');
-    expect(latest().statusMappings['On hold']).toBe('OTHER');
+    expect(latest()?.typeMappings?.['Fixed (old)']).toBe('BUG');
+    expect(latest()?.statusMappings?.['On hold']).toBe('OTHER');
   });
 
   it('scrolls with a sticky header when a table exceeds 30 rows', async () => {

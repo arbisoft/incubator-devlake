@@ -20,16 +20,16 @@ import { Input } from 'antd';
 import { useEffect, useMemo, type ChangeEvent } from 'react';
 
 import { Block } from '@/components';
+import type { ConnectionFieldRenderProps } from '@/types';
+
+import type { ClaudeCodeConnectionValues } from '../types';
 
 import * as S from './styled';
 
-interface Props {
-  type: 'create' | 'update';
-  initialValues: any;
-  values: any;
-  setValues: (value: any) => void;
-  setErrors: (value: any) => void;
-}
+type Props = Pick<
+  ConnectionFieldRenderProps<ClaudeCodeConnectionValues>,
+  'type' | 'initialValues' | 'values' | 'setValues' | 'setErrors'
+>;
 
 export const Organization = ({ initialValues, values, setValues, setErrors }: Props) => {
   useEffect(() => {

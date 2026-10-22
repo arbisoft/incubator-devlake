@@ -19,11 +19,14 @@
 import { pick } from 'lodash';
 
 import { DOC_URL } from '@/release';
-import { IPluginConfig } from '@/types';
+import type { ConnectionFieldRenderProps, IPluginConfig } from '@/types';
 
 import Icon from './assets/icon.svg?react';
 import { Token, GithubApp, Authentication } from './connection-fields';
 import { COPY } from './constants';
+import type { GithubConnectionValues } from './types';
+
+type RenderProps = ConnectionFieldRenderProps<GithubConnectionValues>;
 
 export const GitHubConfig: IPluginConfig = {
   plugin: 'github',
@@ -45,7 +48,7 @@ export const GitHubConfig: IPluginConfig = {
           server: ' ',
         },
       },
-      ({ initialValues, values, setValues }: any) => (
+      ({ initialValues, values, setValues }: RenderProps) => (
         <Authentication
           key="authMethod"
           initialValue={initialValues.authMethod ?? ''}
@@ -53,7 +56,7 @@ export const GitHubConfig: IPluginConfig = {
           setValue={(value) => setValues({ authMethod: value })}
         />
       ),
-      ({ type, connectionId, initialValues, values, errors, setValues, setErrors }: any) =>
+      ({ type, connectionId, initialValues, values, errors, setValues, setErrors }: RenderProps) =>
         (values.authMethod || initialValues.authMethod) === 'AccessToken' ? (
           <Token
             key="token"

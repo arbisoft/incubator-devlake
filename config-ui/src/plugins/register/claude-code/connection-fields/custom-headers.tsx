@@ -20,19 +20,19 @@ import { Button, Input } from 'antd';
 import { useEffect, type ChangeEvent } from 'react';
 
 import { Block } from '@/components';
+import type { ConnectionFieldRenderProps } from '@/types';
+
+import type { ClaudeCodeConnectionValues } from '../types';
 
 import * as S from './styled';
 
-interface Props {
-  type: 'create' | 'update';
-  initialValues: any;
-  values: any;
-  setValues: (value: any) => void;
-  setErrors: (value: any) => void;
-}
+type Props = Pick<
+  ConnectionFieldRenderProps<ClaudeCodeConnectionValues>,
+  'type' | 'initialValues' | 'values' | 'setValues' | 'setErrors'
+>;
 
 export const CustomHeaders = ({ type, initialValues, values, setValues, setErrors }: Props) => {
-  const headers: Array<{ key: string; value: string }> = values.customHeaders ?? [];
+  const headers = values.customHeaders ?? [];
   const hasIncompleteHeaders = headers.some((header) => {
     const hasKey = !!header.key?.trim();
     const hasValue = !!header.value?.trim();
@@ -41,9 +41,7 @@ export const CustomHeaders = ({ type, initialValues, values, setValues, setError
 
   useEffect(() => {
     setValues({
-      customHeaders: (initialValues.customHeaders ?? []).filter(
-        (header: { key: string; value: string }) => header.key?.trim() || header.value?.trim(),
-      ),
+      customHeaders: (initialValues.customHeaders ?? []).filter((header) => header.key?.trim() || header.value?.trim()),
     });
   }, [type, initialValues.customHeaders]);
 

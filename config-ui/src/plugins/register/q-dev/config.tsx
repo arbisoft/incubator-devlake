@@ -16,11 +16,14 @@
  *
  */
 
-import { IPluginConfig } from '@/types';
+import type { ConnectionFieldRenderProps, IPluginConfig } from '@/types';
 
 import Icon from './assets/icon.svg?react';
 import { AwsCredentials, IdentityCenterConfig, S3Config } from './connection-fields';
 import { QDevDataScope } from './data-scope';
+import type { QDevConnectionValues } from './types';
+
+type RenderProps = ConnectionFieldRenderProps<QDevConnectionValues>;
 
 export const QDevConfig: IPluginConfig = {
   plugin: 'q_dev',
@@ -42,7 +45,7 @@ export const QDevConfig: IPluginConfig = {
     },
     fields: [
       'name',
-      ({ type, initialValues, values, setValues, setErrors }: any) => (
+      ({ type, initialValues, values, setValues, setErrors }: RenderProps) => (
         <AwsCredentials
           key="qdev-aws"
           type={type}
@@ -52,7 +55,7 @@ export const QDevConfig: IPluginConfig = {
           setErrors={setErrors}
         />
       ),
-      ({ initialValues, values, setValues, setErrors }: any) => (
+      ({ initialValues, values, setValues, setErrors }: RenderProps) => (
         <S3Config
           key="qdev-s3"
           initialValues={initialValues}
@@ -61,7 +64,7 @@ export const QDevConfig: IPluginConfig = {
           setErrors={setErrors}
         />
       ),
-      ({ initialValues, values, setValues, setErrors }: any) => (
+      ({ initialValues, values, setValues, setErrors }: RenderProps) => (
         <IdentityCenterConfig
           key="qdev-identity"
           initialValues={initialValues}

@@ -16,20 +16,20 @@
  *
  */
 
-import { Input, Radio } from 'antd';
+import { Input, Radio, type RadioChangeEvent } from 'antd';
 import { ChangeEvent, useEffect, useMemo, useRef } from 'react';
 
 import { Block } from '@/components';
+import type { ConnectionFieldErrors, ConnectionFieldRenderProps } from '@/types';
+
+import type { QDevConnectionValues } from '../types';
 
 const ERROR_STYLE = { marginTop: 4, color: 'var(--devlake-color-error)' };
 
-interface Props {
-  type: 'create' | 'update';
-  initialValues: any;
-  values: any;
-  setValues: (values: any) => void;
-  setErrors: (errors: any) => void;
-}
+type Props = Pick<
+  ConnectionFieldRenderProps<QDevConnectionValues>,
+  'type' | 'initialValues' | 'values' | 'setValues' | 'setErrors'
+>;
 
 const ACCESS_KEY_PATTERN = /^[A-Z0-9]{16,32}$/;
 const REGION_PATTERN = /^[a-z]{2}-[a-z]+-\d$/;
@@ -37,7 +37,7 @@ const REGION_PATTERN = /^[a-z]{2}-[a-z]+-\d$/;
 const syncError = (
   key: string,
   error: string,
-  setErrors: (errors: any) => void,
+  setErrors: (errors: ConnectionFieldErrors) => void,
   ref: React.MutableRefObject<string | undefined>,
 ) => {
   if (ref.current !== error) {
@@ -140,7 +140,7 @@ export const AwsCredentials = ({ type, initialValues, values, setValues, setErro
     setValues({ region: e.target.value.trim() });
   };
 
-  const handleAuthTypeChange = (e: any) => {
+  const handleAuthTypeChange = (e: RadioChangeEvent) => {
     const newAuthType = e.target.value;
     setValues({ authType: newAuthType });
 

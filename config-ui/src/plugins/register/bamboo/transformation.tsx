@@ -18,16 +18,16 @@
 
 import { CaretRightOutlined } from '@ant-design/icons';
 import { theme, Collapse, Tag, Input, Checkbox } from 'antd';
+import type { CheckboxChangeEvent } from 'antd/lib/checkbox';
 import { useState, useEffect } from 'react';
 
 import { ExternalLink, HelpTooltip } from '@/components';
+import type { TransformationProps } from '@/plugins/components/scope-config-form/types';
 import { DOC_URL } from '@/release';
 
-interface Props {
-  entities: string[];
-  transformation: any;
-  setTransformation: React.Dispatch<React.SetStateAction<any>>;
-}
+import type { BambooTransformationValues } from './types';
+
+type Props = TransformationProps<BambooTransformationValues>;
 
 export const BambooTransformation = ({ entities, transformation, setTransformation }: Props) => {
   const [useCustom, setUseCustom] = useState(false);
@@ -40,8 +40,8 @@ export const BambooTransformation = ({ entities, transformation, setTransformati
     }
   }, [transformation]);
 
-  const handleChangeUseCustom = (e: React.FormEvent<HTMLInputElement>) => {
-    const { checked } = e.target as HTMLInputElement;
+  const handleChangeUseCustom = (e: CheckboxChangeEvent) => {
+    const { checked } = e.target;
 
     if (!checked) {
       setTransformation({
@@ -92,10 +92,10 @@ const renderCollapseItems = ({
 }: {
   entities: string[];
   panelStyle: React.CSSProperties;
-  transformation: any;
-  onChangeTransformation: any;
+  transformation: BambooTransformationValues;
+  onChangeTransformation: (next: BambooTransformationValues) => void;
   useCustom: boolean;
-  onChangeUseCustom: any;
+  onChangeUseCustom: (e: CheckboxChangeEvent) => void;
 }) =>
   [
     {

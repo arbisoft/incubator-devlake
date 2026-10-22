@@ -21,15 +21,14 @@ import { useEffect } from 'react';
 
 import { Block, ExternalLink } from '@/components';
 import { DOC_URL } from '@/release';
+import type { ConnectionFieldRenderProps } from '@/types';
 
-interface Props {
-  type: 'create' | 'update';
-  initialValues: any;
-  values: any;
-  errors: any;
-  setValues: (value: any) => void;
-  setErrors: (value: any) => void;
-}
+import type { BitbucketConnectionValues } from '../types';
+
+type Props = Pick<
+  ConnectionFieldRenderProps<BitbucketConnectionValues>,
+  'type' | 'initialValues' | 'values' | 'errors' | 'setValues' | 'setErrors'
+>;
 
 export const Auth = ({ type, initialValues, values, setValues, setErrors }: Props) => {
   useEffect(() => {

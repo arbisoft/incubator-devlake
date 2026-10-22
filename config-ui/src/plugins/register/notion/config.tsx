@@ -21,7 +21,11 @@ import { Button, Checkbox, Input, Space, message } from 'antd';
 
 import { Block } from '@/components/block';
 import Icon from '@/images/plugin-icon.svg?react';
-import { IPluginConfig } from '@/types';
+import type { ConnectionFieldRenderProps, IPluginConfig } from '@/types';
+
+import type { NotionConnectionValues } from './types';
+
+type RenderProps = ConnectionFieldRenderProps<NotionConnectionValues>;
 
 export const NotionConfig: IPluginConfig = {
   plugin: 'notion',
@@ -47,7 +51,7 @@ export const NotionConfig: IPluginConfig = {
         key: 'token',
         label: 'Internal Integration Token',
       },
-      ({ values, setValues }: any) => (
+      ({ values, setValues }: RenderProps) => (
         <Block key="workspaceId" title="Workspace ID">
           <Input
             placeholder="Notion workspace ID"
@@ -56,7 +60,7 @@ export const NotionConfig: IPluginConfig = {
           />
         </Block>
       ),
-      ({ values, setValues }: any) => (
+      ({ values, setValues }: RenderProps) => (
         <Block key="apiVersion" title="Notion API Version">
           <Input
             placeholder="2026-03-11"
@@ -65,7 +69,7 @@ export const NotionConfig: IPluginConfig = {
           />
         </Block>
       ),
-      ({ values, setValues, setErrors }: any) => (
+      ({ values, setValues, setErrors }: RenderProps) => (
         <Block key="enableWebhook" title="Webhook Ingestion">
           <Checkbox
             checked={!!values.enableWebhook}
@@ -79,7 +83,7 @@ export const NotionConfig: IPluginConfig = {
           </Checkbox>
         </Block>
       ),
-      ({ values, errors, setValues, setErrors }: any) => (
+      ({ values, errors, setValues, setErrors }: RenderProps) => (
         <Block
           key="webhookSharedKey"
           title="Webhook Shared Key"
@@ -94,7 +98,7 @@ export const NotionConfig: IPluginConfig = {
               setErrors({ webhookSharedKey: values.enableWebhook && !e.target.value.trim() ? 'required' : '' });
             }}
           />
-          {values.enableWebhook && errors.webhookSharedKey && (
+          {values.enableWebhook && !!errors.webhookSharedKey && (
             <p style={{ color: '#ff4d4f', marginTop: 8 }}>Webhook shared key is required when webhook is enabled.</p>
           )}
           {!values.enableWebhook && (
@@ -102,7 +106,7 @@ export const NotionConfig: IPluginConfig = {
           )}
         </Block>
       ),
-      ({ values }: any) => {
+      ({ values }: RenderProps) => {
         const webhookUrl = `${window.location.origin}/plugins/notion/connections/{connectionId}/scopes/{scopeId}/webhook`;
         return (
           <Block

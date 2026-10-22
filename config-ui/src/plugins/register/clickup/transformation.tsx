@@ -19,14 +19,13 @@
 import { CaretRightOutlined } from '@ant-design/icons';
 import { theme, Collapse, Form, Input, Select } from 'antd';
 
+import type { TransformationProps } from '@/plugins/components/scope-config-form/types';
+
+import type { ClickUpTransformationValues } from './types';
+
 const HINT_STYLE = { margin: '8px 0 16px' };
 
-interface Props {
-  entities: string[];
-  connectionId: ID;
-  transformation: any;
-  setTransformation: React.Dispatch<React.SetStateAction<any>>;
-}
+type Props = TransformationProps<ClickUpTransformationValues>;
 
 export const ClickUpTransformation = ({ transformation, setTransformation }: Props) => {
   const { token } = theme.useToken();
@@ -38,7 +37,7 @@ export const ClickUpTransformation = ({ transformation, setTransformation }: Pro
     border: 'none',
   };
 
-  const set = (patch: Record<string, any>) => setTransformation({ ...transformation, ...patch });
+  const set = (patch: Partial<ClickUpTransformationValues>) => setTransformation({ ...transformation, ...patch });
 
   return (
     <Collapse

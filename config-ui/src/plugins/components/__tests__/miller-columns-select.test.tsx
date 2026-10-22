@@ -55,7 +55,7 @@ describe('miller-columns-select under React 19', () => {
     expect(() => render(<MillerColumnsSelect<Item> items={items} mode="multiple" columnCount={2} />)).not.toThrow();
 
     const internalErrors = errorSpy.mock.calls
-      .map((args: any[]) => args.map((a: any) => String(a)).join(' '))
+      .map((args: unknown[]) => args.map((a: unknown) => String(a)).join(' '))
       .filter((msg: string) => /ReactCurrentDispatcher|ReactCurrentOwner/.test(msg));
     expect(internalErrors).toEqual([]);
   });

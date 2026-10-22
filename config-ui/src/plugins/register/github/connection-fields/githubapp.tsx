@@ -21,10 +21,14 @@ import { useEffect, useMemo, useState } from 'react';
 
 import API from '@/api';
 import { Block, ExternalLink } from '@/components';
+import type { ConnectionFieldErrors } from '@/types';
+
+import type { GithubAppValues } from '../types';
 
 import {
   buildGithubInstallationOptions,
   GithubAppSettings,
+  GithubInstallation,
   invalidateGithubAppConfig,
   isMaskedGithubAppSecret,
   shouldValidateGithubAppConfig,
@@ -35,12 +39,16 @@ interface Props {
   connectionId?: ID;
   endpoint?: string;
   proxy: string;
-  initialValue: any;
-  value: any;
-  error: string;
-  setValue: (value: any) => void;
-  setError: (error: any) => void;
+  initialValue: GithubAppValues;
+  value: GithubAppValues;
+  error: ConnectionFieldErrors;
+  setValue: (value: GithubAppValues) => void;
+  setError: (error: ConnectionFieldErrors) => void;
 }
+
+type GithubAppTestResult = {
+  tokens?: Array<{ success?: boolean; login?: string; installationId?: number; installations?: GithubInstallation[] }>;
+};
 
 export const GithubApp = ({ connectionId, endpoint, proxy, initialValue, setValue, setError }: Props) => {
   const [settings, setSettings] = useState<GithubAppSettings>({
@@ -71,7 +79,7 @@ export const GithubApp = ({ connectionId, endpoint, proxy, initialValue, setValu
     }
 
     try {
-      const res: any = await API.connection.test('github', connectionId, {});
+      const res: GithubAppTestResult = await API.connection.test('github', connectionId, {});
       const testResult = res.tokens?.[0];
 
       return {
@@ -168,7 +176,7 @@ export const GithubApp = ({ connectionId, endpoint, proxy, initialValue, setValu
     setSettings(res);
   };
 
-  const checkConfig = async (appId: string, secretKey: string, installationId: number) => {
+  const checkConfig = async (appId?: string, secretKey?: string, installationId?: number) => {
     const res = await testConfiguration(appId, secretKey, installationId);
     setSettings(res);
   };

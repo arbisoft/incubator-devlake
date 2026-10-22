@@ -19,16 +19,19 @@
 import { Input, Select } from 'antd';
 
 import { Block } from '@/components/block';
-import { IPluginConfig } from '@/types';
+import type { ConnectionFieldRenderProps, IPluginConfig } from '@/types';
 
 import Icon from './assets/icon.svg?react';
+import type { SalesforceConnectionValues } from './types';
+
+type RenderProps = ConnectionFieldRenderProps<SalesforceConnectionValues>;
 
 const AUTH_MODE_OPTIONS = [
   { label: 'Access Token', value: 'access_token' },
   { label: 'Refresh Token', value: 'refresh_token' },
 ];
 
-const validateConnection = (values: Record<string, any>) => {
+const validateConnection = (values: SalesforceConnectionValues) => {
   const authMode = values.authMode ?? 'access_token';
 
   return {
@@ -40,7 +43,7 @@ const validateConnection = (values: Record<string, any>) => {
   };
 };
 
-const getConnectionValues = (initialValues: Record<string, any>, values: Record<string, any>) => ({
+const getConnectionValues = (initialValues: SalesforceConnectionValues, values: SalesforceConnectionValues) => ({
   ...initialValues,
   ...values,
 });
@@ -66,7 +69,7 @@ export const SalesforceConfig: IPluginConfig = {
     },
     fields: [
       'name',
-      ({ initialValues, values, setValues, setErrors }: any) => {
+      ({ initialValues, values, setValues, setErrors }: RenderProps) => {
         const formValues = getConnectionValues(initialValues, values);
 
         return (
@@ -76,7 +79,7 @@ export const SalesforceConfig: IPluginConfig = {
               value={formValues.authMode ?? 'access_token'}
               options={AUTH_MODE_OPTIONS}
               onChange={(value) => {
-                const changedValues: Record<string, string> = { authMode: value };
+                const changedValues: SalesforceConnectionValues = { authMode: value };
                 if (value === 'refresh_token' && formValues.instanceUrl) {
                   changedValues.loginUrl = formValues.instanceUrl;
                 }
@@ -91,7 +94,7 @@ export const SalesforceConfig: IPluginConfig = {
           </Block>
         );
       },
-      ({ initialValues, values, errors, setValues, setErrors }: any) => {
+      ({ initialValues, values, errors, setValues, setErrors }: RenderProps) => {
         const formValues = getConnectionValues(initialValues, values);
 
         return (formValues.authMode ?? 'access_token') === 'access_token' ? (
@@ -108,11 +111,11 @@ export const SalesforceConfig: IPluginConfig = {
                 setErrors(validateConnection(nextValues));
               }}
             />
-            {errors.instanceUrl && <p style={{ color: '#ff4d4f', marginTop: 8 }}>Instance URL is required.</p>}
+            {!!errors.instanceUrl && <p style={{ color: '#ff4d4f', marginTop: 8 }}>Instance URL is required.</p>}
           </Block>
         ) : null;
       },
-      ({ initialValues, values, errors, setValues, setErrors }: any) => {
+      ({ initialValues, values, errors, setValues, setErrors }: RenderProps) => {
         const formValues = getConnectionValues(initialValues, values);
 
         return (formValues.authMode ?? 'access_token') === 'access_token' ? (
@@ -129,11 +132,11 @@ export const SalesforceConfig: IPluginConfig = {
                 setErrors(validateConnection(nextValues));
               }}
             />
-            {errors.accessToken && <p style={{ color: '#ff4d4f', marginTop: 8 }}>Access token is required.</p>}
+            {!!errors.accessToken && <p style={{ color: '#ff4d4f', marginTop: 8 }}>Access token is required.</p>}
           </Block>
         ) : null;
       },
-      ({ initialValues, values, setValues }: any) => {
+      ({ initialValues, values, setValues }: RenderProps) => {
         const formValues = getConnectionValues(initialValues, values);
 
         return (formValues.authMode ?? 'access_token') === 'refresh_token' ? (
@@ -151,7 +154,7 @@ export const SalesforceConfig: IPluginConfig = {
           </Block>
         ) : null;
       },
-      ({ initialValues, values, errors, setValues, setErrors }: any) => {
+      ({ initialValues, values, errors, setValues, setErrors }: RenderProps) => {
         const formValues = getConnectionValues(initialValues, values);
 
         return (formValues.authMode ?? 'access_token') === 'refresh_token' ? (
@@ -168,11 +171,11 @@ export const SalesforceConfig: IPluginConfig = {
                 setErrors(validateConnection(nextValues));
               }}
             />
-            {errors.clientId && <p style={{ color: '#ff4d4f', marginTop: 8 }}>Client ID is required.</p>}
+            {!!errors.clientId && <p style={{ color: '#ff4d4f', marginTop: 8 }}>Client ID is required.</p>}
           </Block>
         ) : null;
       },
-      ({ initialValues, values, errors, setValues, setErrors }: any) => {
+      ({ initialValues, values, errors, setValues, setErrors }: RenderProps) => {
         const formValues = getConnectionValues(initialValues, values);
 
         return (formValues.authMode ?? 'access_token') === 'refresh_token' ? (
@@ -189,11 +192,11 @@ export const SalesforceConfig: IPluginConfig = {
                 setErrors(validateConnection(nextValues));
               }}
             />
-            {errors.clientSecret && <p style={{ color: '#ff4d4f', marginTop: 8 }}>Client secret is required.</p>}
+            {!!errors.clientSecret && <p style={{ color: '#ff4d4f', marginTop: 8 }}>Client secret is required.</p>}
           </Block>
         ) : null;
       },
-      ({ initialValues, values, errors, setValues, setErrors }: any) => {
+      ({ initialValues, values, errors, setValues, setErrors }: RenderProps) => {
         const formValues = getConnectionValues(initialValues, values);
 
         return (formValues.authMode ?? 'access_token') === 'refresh_token' ? (
@@ -210,11 +213,11 @@ export const SalesforceConfig: IPluginConfig = {
                 setErrors(validateConnection(nextValues));
               }}
             />
-            {errors.refreshToken && <p style={{ color: '#ff4d4f', marginTop: 8 }}>Refresh token is required.</p>}
+            {!!errors.refreshToken && <p style={{ color: '#ff4d4f', marginTop: 8 }}>Refresh token is required.</p>}
           </Block>
         ) : null;
       },
-      ({ initialValues, values, setValues }: any) => {
+      ({ initialValues, values, setValues }: RenderProps) => {
         const formValues = getConnectionValues(initialValues, values);
 
         return (

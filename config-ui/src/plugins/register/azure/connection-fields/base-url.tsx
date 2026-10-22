@@ -16,7 +16,7 @@
  *
  */
 
-import { Input, Radio } from 'antd';
+import { Input, Radio, type RadioChangeEvent } from 'antd';
 import { useState } from 'react';
 
 import { Block } from '@/components';
@@ -30,7 +30,7 @@ export const BaseURL = ({ value, onChange }: Props) => {
   // Default to 'server' mode if an endpoint value already exists, 'cloud' otherwise
   const [version, setVersion] = useState<'cloud' | 'server'>(value ? 'server' : 'cloud');
 
-  const handleVersionChange = (e: any) => {
+  const handleVersionChange = (e: RadioChangeEvent) => {
     const selectedVersion = e.target.value;
     setVersion(selectedVersion);
     if (selectedVersion === 'cloud') {

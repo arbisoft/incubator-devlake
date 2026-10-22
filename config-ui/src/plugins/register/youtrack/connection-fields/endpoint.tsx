@@ -20,7 +20,10 @@ import { Input } from 'antd';
 import { useEffect } from 'react';
 
 import { Block } from '@/components';
+import type { ConnectionFieldRenderProps } from '@/types';
 import { trimTrailingSlashes } from '@/utils';
+
+import type { YouTrackConnectionValues } from '../types';
 
 const ENDPOINT_EXAMPLE = 'https://example.myjetbrains.com/youtrack/api';
 
@@ -49,14 +52,10 @@ export const validateEndpoint = (endpoint: string): string => {
   return '';
 };
 
-interface Props {
-  type: 'create' | 'update';
-  initialValues: any;
-  values: any;
-  errors: any;
-  setValues: (value: any) => void;
-  setErrors: (value: any) => void;
-}
+type Props = Pick<
+  ConnectionFieldRenderProps<YouTrackConnectionValues>,
+  'type' | 'initialValues' | 'values' | 'errors' | 'setValues' | 'setErrors'
+>;
 
 export const Endpoint = ({ initialValues, values, errors, setValues, setErrors }: Props) => {
   useEffect(() => {
@@ -73,7 +72,8 @@ export const Endpoint = ({ initialValues, values, errors, setValues, setErrors }
 
   // like the built-in fields, an empty input only disables the buttons; a
   // malformed one also says why, with the canonical example
-  const showError = !!values.endpoint && !!errors?.endpoint;
+  const endpointError = typeof errors.endpoint === 'string' ? errors.endpoint : '';
+  const showError = !!values.endpoint && !!endpointError;
 
   return (
     <Block
@@ -105,7 +105,7 @@ export const Endpoint = ({ initialValues, values, errors, setValues, setErrors }
         value={values.endpoint}
         onChange={handleChange}
       />
-      {showError && <p style={{ margin: '4px 0 0', color: '#ff4d4f' }}>{errors.endpoint}</p>}
+      {showError && <p style={{ margin: '4px 0 0', color: '#ff4d4f' }}>{endpointError}</p>}
     </Block>
   );
 };
