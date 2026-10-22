@@ -57,6 +57,10 @@ export class ProjectsPage extends BasePage implements Screen {
     await box.press('Enter');
   }
 
+  async typeSearch(name: string): Promise<void> {
+    await this.page.getByRole('textbox', { name: COPY.searchPlaceholder }).fill(name);
+  }
+
   noResults(): Locator {
     return this.page.getByRole('heading', { name: COPY.noResults.title });
   }

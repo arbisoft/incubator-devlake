@@ -94,4 +94,12 @@ test.describe.serial('Projects list search, sort and pagination', () => {
     await expect(projects.noResults()).toBeVisible();
     expect(projects.urlParams.get('keyword')).toBe(keyword);
   });
+
+  test('searching while typing filters the list without Enter', async ({ page }) => {
+    const projects = new ProjectsPage(page);
+    await projects.open();
+    await projects.typeSearch(names[0]);
+    await expect.poll(() => projects.urlParams.get('keyword')).toBe(names[0]);
+    await expect(projects.projectRow(names[0])).toBeVisible();
+  });
 });

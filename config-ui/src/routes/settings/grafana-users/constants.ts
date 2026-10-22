@@ -49,7 +49,6 @@ export const GENERATED_PASSWORD_LENGTH = 24;
 // No 0, O, 1, l or I, so a shared password can be read aloud or typed from a screen.
 export const PASSWORD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
 
-export const SEARCH_DEBOUNCE_MS = 300;
 export const DEVLAKE_USER_SEARCH_PAGE_SIZE = 25;
 export const PROJECT_SEARCH_PAGE_SIZE = 50;
 
