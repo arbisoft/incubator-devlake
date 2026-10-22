@@ -18,6 +18,7 @@
 
 import { useId } from 'react';
 
+import { getConnectorLogo } from '@/config';
 import { selectConnection } from '@/features/connections';
 import { useAppSelector } from '@/hooks';
 import { getPluginConfig } from '@/plugins/utils';
@@ -36,7 +37,7 @@ export const ConnectionCard = ({ plugin, connectionId, scopeCount, href }: Conne
 
   return (
     <Card aria-labelledby={nameId}>
-      <PluginIcon icon={getPluginConfig(plugin).icon} size="lg" />
+      <PluginIcon icon={getPluginConfig(plugin).icon} size="lg" logo={getConnectorLogo(plugin)} />
       <div>
         <CardName id={nameId}>{name}</CardName>
         <CardCount>{COPY.connections.scopeCount(scopeCount)}</CardCount>

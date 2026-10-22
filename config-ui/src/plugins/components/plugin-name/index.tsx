@@ -18,6 +18,7 @@
 
 import { useMemo } from 'react';
 
+import { getConnectorLogo } from '@/config';
 import { getPluginConfig } from '@/plugins';
 import { PluginIcon } from '@/ui';
 
@@ -33,7 +34,7 @@ export const PluginName = ({ plugin, name }: Props) => {
 
   return (
     <Wrapper>
-      <PluginIcon icon={pluginConfig.icon} size="md" />
+      <PluginIcon icon={pluginConfig.icon} size="md" logo={getConnectorLogo(plugin)} />
       <span>{name}</span>
     </Wrapper>
   );

@@ -19,6 +19,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { OtelConnectionResponse } from '@/api/otel';
+import { OTEL_INTEGRATION_KEY } from '@/routes/connection/constants';
 import { PIPELINE_STATUS_COPY } from '@/routes/pipeline/status-tone';
 import { IPipelineStatus, type IProject } from '@/types';
 
@@ -30,7 +31,13 @@ import {
   PROJECT_METRICS,
 } from './constants';
 import type { ProjectRow } from './types';
-import { buildNewProject, buildProjectQuery, getConnectionEntries, toProjectRow } from './utils';
+import {
+  buildNewProject,
+  buildProjectQuery,
+  describeConnectionEntry,
+  getConnectionEntries,
+  toProjectRow,
+} from './utils';
 
 const otel = (id: number, projects: string[]) =>
   ({ connection: { id, name: `team-${id}` }, projects: projects.map((name) => ({ name })) }) as OtelConnectionResponse;
@@ -129,5 +136,21 @@ describe('LAST_RUN_STATUS_OPTIONS', () => {
     expect(LAST_RUN_STATUS_OPTIONS.find(({ value }) => value === LAST_RUN_STATUS_GROUP.IN_PROGRESS)?.text).toBe(
       PIPELINE_STATUS_COPY[IPipelineStatus.RUNNING],
     );
+  });
+});
+
+describe('describeConnectionEntry', () => {
+  it('carries the plugin key of a connector entry', () => {
+    const [entry] = getConnectionEntries({ ...toProjectRow(PROJECT) });
+    expect(describeConnectionEntry(entry, [], []).plugin).toBe('github');
+  });
+
+  it('uses the OTel integration key for an OTel entry', () => {
+    const [entry] = getConnectionEntries({
+      ...toProjectRow(PROJECT),
+      connections: [],
+      otelConnections: [otel(3, ['alpha'])],
+    });
+    expect(describeConnectionEntry(entry, [], []).plugin).toBe(OTEL_INTEGRATION_KEY);
   });
 });

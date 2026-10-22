@@ -44,6 +44,7 @@ export type ConnectionEntry =
 
 export type ConnectionDetail = {
   key: string;
+  plugin: string;
   name: string;
   pluginLabel: string;
   category: IntegrationCategory;

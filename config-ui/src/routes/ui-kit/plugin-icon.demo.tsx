@@ -16,6 +16,7 @@
  *
  */
 
+import { CONNECTOR_LOGO_KEYS, getConnectorLogo } from '@/config';
 import { getPluginConfig } from '@/plugins';
 import { ICON_SIZE_PX, PluginIcon, type IconSize } from '@/ui';
 
@@ -37,6 +38,13 @@ export const PluginIconDemo = () => (
         </Row>
       </DemoCase>
     ))}
+    <DemoCase label={COPY.cases.brandLogos}>
+      <Row>
+        {CONNECTOR_LOGO_KEYS.map((plugin) => (
+          <PluginIcon key={plugin} icon={getPluginConfig(plugin).icon} size="lg" logo={getConnectorLogo(plugin)} />
+        ))}
+      </Row>
+    </DemoCase>
     <DemoCase label={COPY.cases.fallback}>
       <PluginIcon icon={getPluginConfig(UNKNOWN_PLUGIN_KEY).icon} size="lg" />
     </DemoCase>
