@@ -239,12 +239,22 @@ func (w *world) requireLogsOn(connectionID uint64, org string, who actor, day ti
 	next := day.AddDate(0, 0, 1)
 	require.Positive(w.t, w.count(&models.OtelEvent{}, "connection_id = ? AND organization_id = ? AND user_key = ? AND event_timestamp >= ? AND event_timestamp < ?", connectionID, org, who.logUserKey(), day, next), "%s %s", who.name, day.Format(dateLayout))
 	require.Positive(w.t, w.count(&ai.AiPrompt{}, "workspace_key = ? AND user_key = ? AND started_at >= ? AND started_at < ?", org, who.logUserKey(), day, next), "%s %s", who.name, day.Format(dateLayout))
-	// Every fixture api_request reports an effort, so every converted prompt carries the one
-	// its main-thread request reported, or its only request's.
+	// A converted prompt carries the effort its main-thread request reported, or its only
+	// request's, and NULL when its requests reported none.
 	for _, prompt := range snapshot[ai.AiPrompt](w, "prompt_id", "workspace_key = ? AND user_key = ? AND started_at >= ? AND started_at < ?", org, who.logUserKey(), day, next) {
-		require.NotNil(w.t, prompt.Effort, prompt.PromptId)
-		require.Equal(w.t, fxPromptEffort(who.promptSeed(w.t, prompt.PromptId)), *prompt.Effort, prompt.PromptId)
+		require.Equal(w.t, fxPromptEffort(who.promptSeed(w.t, prompt.PromptId)), promptEffort(w.t, prompt), prompt.PromptId)
 	}
+}
+
+// promptEffort is the prompt's effort, or "" when it is NULL. It fails on a stored empty
+// effort, which would read as a level rather than as no effort.
+func promptEffort(t *testing.T, prompt ai.AiPrompt) string {
+	t.Helper()
+	if prompt.Effort == nil {
+		return ""
+	}
+	require.NotEmpty(t, *prompt.Effort, "%s stored an empty effort instead of NULL", prompt.PromptId)
+	return *prompt.Effort
 }
 
 func (w *world) logFactsOf(connectionID uint64, org string) logFacts {

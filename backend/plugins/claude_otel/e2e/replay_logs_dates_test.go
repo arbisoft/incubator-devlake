@@ -170,12 +170,18 @@ func TestLogReplayBackfillsPromptEffort(t *testing.T) {
 	actors := []actor{a1, a2, a3, a4, a5}
 	specs := make([]resourceSpec, 0, len(actors))
 	want := make(map[string]string, len(actors))
+	withoutEffort := int64(0)
 	for index, who := range actors {
-		// Consecutive seeds mix prompts with and without a main-thread request.
+		// Consecutive seeds mix prompts whose main-thread request comes first, last or not at
+		// all, and one whose requests report no effort.
 		seed := 1000 + index
 		specs = append(specs, resourceSpec{who: who, at: start.Add(time.Duration(index) * time.Minute), seed: seed})
 		want[who.promptID(seed)] = fxPromptEffort(seed)
+		if !fxHasEffort(seed) {
+			withoutEffort++
+		}
 	}
+	require.Positive(t, withoutEffort)
 	w.insertLogBatch(specs)
 	w.drainNow()
 	require.Equal(t, want, w.promptEfforts(orgR))
@@ -188,18 +194,17 @@ func TestLogReplayBackfillsPromptEffort(t *testing.T) {
 	require.NoError(t, err)
 	w.drainNow()
 
-	require.Zero(t, w.count(&ai.AiPrompt{}, "workspace_key = ? AND effort IS NULL", orgR))
+	require.Equal(t, withoutEffort, w.count(&ai.AiPrompt{}, "workspace_key = ? AND effort IS NULL", orgR))
 	require.Equal(t, want, w.promptEfforts(orgR))
 	w.requireLogReplayCompleted(1)
 }
 
-// promptEfforts maps each of the organization's prompt IDs to its effort, failing on a prompt without one.
+// promptEfforts maps each of the organization's prompt IDs to its effort, or "" for a NULL one.
 func (w *world) promptEfforts(org string) map[string]string {
 	w.t.Helper()
 	efforts := make(map[string]string)
 	for _, prompt := range snapshot[ai.AiPrompt](w, "prompt_id", "workspace_key = ?", org) {
-		require.NotNil(w.t, prompt.Effort, prompt.PromptId)
-		efforts[prompt.PromptId] = *prompt.Effort
+		efforts[prompt.PromptId] = promptEffort(w.t, prompt)
 	}
 	return efforts
 }

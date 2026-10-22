@@ -294,9 +294,18 @@ func doubleAttr(key string, value float64) *commonv1.KeyValue {
 // fxMainThreadQuerySource is the query_source of the conversation's own API requests.
 const fxMainThreadQuerySource = "repl_main_thread"
 
-// fxHasMainThreadRequest reports whether the seed's prompt makes a second, main-thread API
-// request after its background one.
+// fxHasMainThreadRequest reports whether the seed's prompt makes a main-thread API request
+// besides its background one.
 func fxHasMainThreadRequest(seed int) bool { return seed%2 == 0 }
+
+// fxMainThreadFirst reports whether the seed's main-thread request comes before its
+// background one. Both orders are sent, so neither the first nor the last request's effort
+// matches the main-thread effort for every prompt.
+func fxMainThreadFirst(seed int) bool { return seed%4 == 0 }
+
+// fxHasEffort reports whether the seed's API requests report an effort. A prompt whose
+// requests report none converts to a NULL effort.
+func fxHasEffort(seed int) bool { return seed%5 != 1 }
 
 // fxHasAPIError reports whether the seed's prompt reports an api_error.
 func fxHasAPIError(seed int) bool { return seed%3 == 0 }
@@ -309,8 +318,11 @@ func fxHasToolError(seed int) bool { return seed%2 == 1 }
 func fxMainThreadEffort(seed int) string { return fxEfforts[(seed+1)%len(fxEfforts)] }
 
 // fxPromptEffort is the effort the seed's prompt converts to: the main-thread request's
-// when it makes one, otherwise its only request's.
+// when it makes one, otherwise its only request's, and "" when its requests report none.
 func fxPromptEffort(seed int) string {
+	if !fxHasEffort(seed) {
+		return ""
+	}
 	if fxHasMainThreadRequest(seed) {
 		return fxMainThreadEffort(seed)
 	}
@@ -319,7 +331,8 @@ func fxPromptEffort(seed int) string {
 
 // logResource builds one Claude Code client's log export for a session: a prompt, its API
 // requests and errors, a tool decision and result, and the response. See the fxHas* helpers
-// for which seeds add a main-thread request, an api_error or a failed tool call.
+// for which seeds add a main-thread request, an api_error or a failed tool call, and
+// fxMainThreadFirst for the order of the API requests.
 func (a actor) logResource(at time.Time, seed int) *logsv1.ResourceLogs {
 	session := "sess-" + a.team + "-" + a.name + "-" + strconv.Itoa(seed)
 	prompt := a.promptID(seed)
@@ -345,15 +358,32 @@ func (a actor) logResource(at time.Time, seed int) *logsv1.ResourceLogs {
 		return &logsv1.LogRecord{Body: &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "claude_code." + name}}, Attributes: withAttrs(base, extra...)}
 	}
 	f := int64(seed)
+	withEffort := func(effort string, attrs ...*commonv1.KeyValue) []*commonv1.KeyValue {
+		if fxHasEffort(seed) {
+			attrs = append(attrs, strAttr("effort", effort))
+		}
+		return attrs
+	}
+	backgroundRequest := func() *logsv1.LogRecord {
+		return record("api_request", withEffort(effort, strAttr("model", model), intAttr("input_tokens", f*113), intAttr("output_tokens", f*29+7), intAttr("cache_read_tokens", f*457),
+			intAttr("cache_creation_tokens", f*61+3), doubleAttr("cost_usd", float64(seed)*0.0125+0.0003), intAttr("duration_ms", 900+f*7), strAttr("query_source", query), strAttr("request_id", "req-"+strconv.Itoa(seed)))...)
+	}
+	mainThreadRequest := func() *logsv1.LogRecord {
+		return record("api_request", withEffort(fxMainThreadEffort(seed), strAttr("model", model), intAttr("input_tokens", f*17), intAttr("output_tokens", f*5+3), intAttr("cache_read_tokens", f*71),
+			intAttr("cache_creation_tokens", f*9+1), doubleAttr("cost_usd", float64(seed)*0.002+0.0001), intAttr("duration_ms", 600+f*3), strAttr("query_source", fxMainThreadQuerySource),
+			strAttr("request_id", "req-main-"+strconv.Itoa(seed)))...)
+	}
 	records := []*logsv1.LogRecord{
 		record("user_prompt", intAttr("prompt_length", 20+f%50), strAttr("prompt_text", "synthetic prompt "+strconv.Itoa(seed))),
-		record("api_request", strAttr("model", model), intAttr("input_tokens", f*113), intAttr("output_tokens", f*29+7), intAttr("cache_read_tokens", f*457),
-			intAttr("cache_creation_tokens", f*61+3), doubleAttr("cost_usd", float64(seed)*0.0125+0.0003), intAttr("duration_ms", 900+f*7), strAttr("query_source", query), strAttr("effort", effort), strAttr("request_id", "req-"+strconv.Itoa(seed))),
 	}
-	if fxHasMainThreadRequest(seed) {
-		records = append(records, record("api_request", strAttr("model", model), intAttr("input_tokens", f*17), intAttr("output_tokens", f*5+3), intAttr("cache_read_tokens", f*71),
-			intAttr("cache_creation_tokens", f*9+1), doubleAttr("cost_usd", float64(seed)*0.002+0.0001), intAttr("duration_ms", 600+f*3), strAttr("query_source", fxMainThreadQuerySource),
-			strAttr("effort", fxMainThreadEffort(seed)), strAttr("request_id", "req-main-"+strconv.Itoa(seed))))
+	// record numbers events in the order it is called, so the requests are built in send order.
+	switch {
+	case fxHasMainThreadRequest(seed) && fxMainThreadFirst(seed):
+		records = append(records, mainThreadRequest(), backgroundRequest())
+	case fxHasMainThreadRequest(seed):
+		records = append(records, backgroundRequest(), mainThreadRequest())
+	default:
+		records = append(records, backgroundRequest())
 	}
 	if fxHasAPIError(seed) {
 		records = append(records, record("api_error", strAttr("model", model), strAttr("error", "overloaded"), intAttr("status_code", 529), intAttr("attempt", 1),
