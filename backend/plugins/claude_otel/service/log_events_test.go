@@ -657,10 +657,19 @@ func TestBuildPromptRollupNeverCopiesToolErrorMessage(t *testing.T) {
 	if eventString(eventAttributes(toolEvent), "error") == "" {
 		t.Fatal("unstripped tool_result has no error attribute; the fixture no longer exercises this case")
 	}
+	toolFailures := 0
 	for _, failure := range buildPromptRollup(testOrganizationID, "p2", events).failures {
-		if failure.FailureKind == ai.FailureKindToolError && failure.ErrorMessage != "" {
+		if failure.FailureKind != ai.FailureKindToolError {
+			continue
+		}
+		toolFailures++
+		if failure.ErrorMessage != "" {
 			t.Fatalf("tool failure error_message = %q, want empty", failure.ErrorMessage)
 		}
+	}
+	// Without a tool failure row the check above would pass without checking anything.
+	if toolFailures != 1 {
+		t.Fatalf("tool failures = %d, want 1", toolFailures)
 	}
 }
 
@@ -957,8 +966,6 @@ func newOtelLogsHTTPRequest(t *testing.T, logs *collectorlogs.ExportLogsServiceR
 	return request
 }
 
-// fixturePromptEvents converts the fixture and returns one prompt's events, as the rollup
-// loads them from storage.
 // fixturePromptEvents returns the fixture's events of one prompt as ingest stores them, with
 // content attributes stripped.
 func fixturePromptEvents(t *testing.T, promptID string) []*models.OtelEvent {
