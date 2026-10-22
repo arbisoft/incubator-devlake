@@ -1446,7 +1446,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Prompts per slash command. /exit is left out.",
+      "description": "Prompts per slash command, for the 20 most used commands. /exit counts like any other command. Prompts that ran no slash command are left out.",
       "fieldConfig": {
         "defaults": {
           "color": {
