@@ -125,12 +125,14 @@ const (
 // only their ErrorType.
 type AiPromptFailure struct {
 	domainlayer.DomainEntity
-	Provider     string `gorm:"type:varchar(100);index" json:"provider"`
-	WorkspaceKey string `gorm:"type:varchar(255);index" json:"workspaceKey"`
+	Provider string `gorm:"type:varchar(100);index" json:"provider"`
+	// WorkspaceKey and PromptId also share idx_ai_prompt_failures_workspace_prompt, the key
+	// the prompt rollup deletes a prompt's failures by.
+	WorkspaceKey string `gorm:"type:varchar(255);index;index:idx_ai_prompt_failures_workspace_prompt,priority:1" json:"workspaceKey"`
 	UserKey      string `gorm:"type:varchar(255);index" json:"userKey"`
 	UserEmail    string `gorm:"type:varchar(255);index" json:"userEmail"`
 	SessionId    string `gorm:"type:varchar(128);index" json:"sessionId"`
-	PromptId     string `gorm:"type:varchar(128);index" json:"promptId"`
+	PromptId     string `gorm:"type:varchar(128);index;index:idx_ai_prompt_failures_workspace_prompt,priority:2" json:"promptId"`
 	// AiPromptId is the id of the ai_prompts row this failure belongs to.
 	AiPromptId  string    `gorm:"type:varchar(255);index" json:"aiPromptId"`
 	FailureKind string    `gorm:"type:varchar(32);index" json:"failureKind"`

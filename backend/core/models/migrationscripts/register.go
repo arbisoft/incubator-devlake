@@ -159,5 +159,6 @@ func All() []plugin.MigrationScript {
 		new(addAiPromptRepositoryUrl),
 		new(addAiPromptEffort),
 		new(addAiPromptFailures),
+		new(addAiPromptFailuresPromptIndex),
 	}
 }
