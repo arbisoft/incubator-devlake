@@ -66,6 +66,11 @@ func (a actor) userKey() string   { return "acct:" + a.accountID() }
 // logUserKey is the key log events carry, since they send no user.account_id.
 func (a actor) logUserKey() string { return "uuid:uuid-" + a.name }
 
+// promptID is the prompt.id the actor's log resource for the seed carries.
+func (a actor) promptID(seed int) string {
+	return "p-" + a.team + "-" + a.name + "-" + strconv.Itoa(seed)
+}
+
 var (
 	a1      = actor{"alpha1", "alpha", orgR, 1}
 	a2      = actor{"alpha2", "alpha", orgR, 2}
@@ -270,7 +275,7 @@ func doubleAttr(key string, value float64) *commonv1.KeyValue {
 // logResource builds one Claude Code client's log export for a session: a prompt, its API request, a tool decision and result, and the response.
 func (a actor) logResource(at time.Time, seed int) *logsv1.ResourceLogs {
 	session := "sess-" + a.team + "-" + a.name + "-" + strconv.Itoa(seed)
-	prompt := "p-" + a.team + "-" + a.name + "-" + strconv.Itoa(seed)
+	prompt := a.promptID(seed)
 	model, query, effort := fxModels[seed%len(fxModels)], fxQueries[seed%len(fxQueries)], fxEfforts[seed%len(fxEfforts)]
 	tool := fxTools[seed%len(fxTools)]
 	toolUse := "tu-" + strconv.Itoa(seed)

@@ -162,3 +162,44 @@ func TestLogReplayObservedDateBoundariesAndFallback(t *testing.T) {
 	}
 	w.requireLogReplayCompleted(selectedCount)
 }
+
+func TestLogReplayBackfillsPromptEffort(t *testing.T) {
+	w := newWorld(t)
+	w.connection("alpha", orgR, w.day(-5))
+	start := w.day(-2).Add(8 * time.Hour)
+	actors := []actor{a1, a2, a3, a4, a5}
+	specs := make([]resourceSpec, 0, len(actors))
+	want := make(map[string]string, len(actors))
+	for index, who := range actors {
+		// Consecutive seeds give each actor's prompt a different fixture effort.
+		seed := 1000 + index
+		specs = append(specs, resourceSpec{who: who, at: start.Add(time.Duration(index) * time.Minute), seed: seed})
+		want[who.promptID(seed)] = fxEfforts[seed%len(fxEfforts)]
+	}
+	w.insertLogBatch(specs)
+	w.drainNow()
+	require.Equal(t, want, w.promptEfforts(orgR))
+
+	// Clearing effort leaves the prompts as they were before effort was recorded.
+	require.NoError(t, w.tester.Dal.UpdateColumns(&ai.AiPrompt{}, []dal.DalSet{{ColumnName: "effort", Value: nil}}, dal.Where("workspace_key = ?", orgR)))
+	require.Equal(t, int64(len(want)), w.count(&ai.AiPrompt{}, "workspace_key = ? AND effort IS NULL", orgR))
+
+	_, err := service.CreateOtelReplay(e2eUser, &service.OtelReplayInput{OtelReplayRange: w.replayDates(-2, -2)})
+	require.NoError(t, err)
+	w.drainNow()
+
+	require.Zero(t, w.count(&ai.AiPrompt{}, "workspace_key = ? AND effort IS NULL", orgR))
+	require.Equal(t, want, w.promptEfforts(orgR))
+	w.requireLogReplayCompleted(1)
+}
+
+// promptEfforts maps each of the organization's prompt IDs to its effort, failing on a prompt without one.
+func (w *world) promptEfforts(org string) map[string]string {
+	w.t.Helper()
+	efforts := make(map[string]string)
+	for _, prompt := range snapshot[ai.AiPrompt](w, "prompt_id", "workspace_key = ?", org) {
+		require.NotNil(w.t, prompt.Effort, prompt.PromptId)
+		efforts[prompt.PromptId] = *prompt.Effort
+	}
+	return efforts
+}
