@@ -19,6 +19,7 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { CONNECTOR_BRAND_COLORS } from '@/theme';
 import { getTheme } from '@/theme/tokens';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
@@ -26,14 +27,25 @@ import { CONNECTOR_LOGO_KIND } from './constants';
 import { PluginIcon } from './plugin-icon';
 import type { ConnectorLogo } from './types';
 
+type SvgComponent = NonNullable<Extract<ConnectorLogo, { kind: 'tint' }>['Svg']>;
+
 const LOGO_TEST_ID = 'brand-logo';
 const PLUGIN_TEST_ID = 'plugin-icon';
 const light = getTheme('light');
 
-const logo = (kind: ConnectorLogo['kind']): ConnectorLogo => ({
-  Svg: (props) => <svg data-testid={LOGO_TEST_ID} {...props} />,
+const TINT_COLOR = CONNECTOR_BRAND_COLORS.hubspot;
+const TestSvg: SvgComponent = (props) => <svg data-testid={LOGO_TEST_ID} {...props} />;
+
+const logo = (kind: typeof CONNECTOR_LOGO_KIND.LOGO | typeof CONNECTOR_LOGO_KIND.MONO): ConnectorLogo => ({
+  Svg: TestSvg,
   kind,
 });
+
+const colourOf = (value: string) => {
+  const probe = document.createElement('i');
+  probe.style.color = value;
+  return probe.style.color;
+};
 
 describe('PluginIcon', () => {
   it('renders the logo instead of the plugin icon', () => {
@@ -57,5 +69,30 @@ describe('PluginIcon', () => {
     renderWithTheme(<PluginIcon icon={icon} size="md" />);
     expect(screen.getByTestId(PLUGIN_TEST_ID)).toBeTruthy();
     expect(icon).toHaveBeenCalledWith({ color: light.colors.iconBrand });
+  });
+
+  it('colours a tint logo with its brand colour', () => {
+    renderWithTheme(
+      <PluginIcon
+        icon={() => null}
+        size="md"
+        logo={{ kind: CONNECTOR_LOGO_KIND.TINT, color: TINT_COLOR, Svg: TestSvg }}
+      />,
+    );
+    const wrapper = screen.getByTestId(LOGO_TEST_ID).parentElement as HTMLElement;
+    expect(getComputedStyle(wrapper).color).toBe(colourOf(TINT_COLOR));
+  });
+
+  it('asks the plugin icon for the brand colour when a tint has no Svg', () => {
+    const icon = vi.fn(() => <svg data-testid={PLUGIN_TEST_ID} />);
+    renderWithTheme(<PluginIcon icon={icon} size="md" logo={{ kind: CONNECTOR_LOGO_KIND.TINT, color: TINT_COLOR }} />);
+    expect(screen.getByTestId(PLUGIN_TEST_ID)).toBeTruthy();
+    expect(icon).toHaveBeenCalledWith({ color: TINT_COLOR });
+  });
+
+  it('asks the plugin icon for the text colour when a mono has no Svg', () => {
+    const icon = vi.fn(() => <svg data-testid={PLUGIN_TEST_ID} />);
+    renderWithTheme(<PluginIcon icon={icon} size="md" logo={{ kind: CONNECTOR_LOGO_KIND.MONO }} />);
+    expect(icon).toHaveBeenCalledWith({ color: light.colors.text });
   });
 });

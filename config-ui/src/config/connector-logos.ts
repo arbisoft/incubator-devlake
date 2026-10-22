@@ -18,22 +18,30 @@
 
 import ArgocdLogo from '@/images/connector-logos/argocd.svg?react';
 import AzureLogo from '@/images/connector-logos/azure.svg?react';
+import BambooLogo from '@/images/connector-logos/bamboo.svg?react';
 import BitbucketLogo from '@/images/connector-logos/bitbucket.svg?react';
 import CircleciLogo from '@/images/connector-logos/circleci.svg?react';
 import ClaudeLogo from '@/images/connector-logos/claude.svg?react';
 import ClickupLogo from '@/images/connector-logos/clickup.svg?react';
+import CursorLogo from '@/images/connector-logos/cursor.svg?react';
+import GhCopilotLogo from '@/images/connector-logos/gh-copilot.svg?react';
 import GithubLogo from '@/images/connector-logos/github.svg?react';
 import GitlabLogo from '@/images/connector-logos/gitlab.svg?react';
 import GrafanaIrmLogo from '@/images/connector-logos/grafana-irm.svg?react';
+import IncidentioLogo from '@/images/connector-logos/incidentio.svg?react';
 import JenkinsLogo from '@/images/connector-logos/jenkins.svg?react';
 import JiraLogo from '@/images/connector-logos/jira.svg?react';
+import OpsgenieLogo from '@/images/connector-logos/opsgenie.svg?react';
 import PagerdutyLogo from '@/images/connector-logos/pagerduty.svg?react';
+import PlaneLogo from '@/images/connector-logos/plane.svg?react';
 import SlackLogo from '@/images/connector-logos/slack.svg?react';
+import SonarqubeLogo from '@/images/connector-logos/sonarqube.svg?react';
 import WebhookLogo from '@/images/connector-logos/webhook.svg?react';
 import YoutrackLogo from '@/images/connector-logos/youtrack.svg?react';
+import { CONNECTOR_BRAND_COLORS } from '@/theme';
 import { CONNECTOR_LOGO_KIND, type ConnectorLogo } from '@/ui/plugin-icon';
 
-const { LOGO, MONO } = CONNECTOR_LOGO_KIND;
+const { LOGO, MONO, TINT } = CONNECTOR_LOGO_KIND;
 
 const CONNECTOR_LOGOS: Record<string, ConnectorLogo> = {
   github: { Svg: GithubLogo, kind: MONO },
@@ -53,6 +61,19 @@ const CONNECTOR_LOGOS: Record<string, ConnectorLogo> = {
   youtrack: { Svg: YoutrackLogo, kind: LOGO },
   clickup: { Svg: ClickupLogo, kind: LOGO },
   slack: { Svg: SlackLogo, kind: LOGO },
+  azuredevops_go: { Svg: AzureLogo, kind: LOGO },
+  incidentio: { Svg: IncidentioLogo, kind: LOGO },
+  asana: { color: CONNECTOR_BRAND_COLORS.asana, kind: TINT },
+  hubspot: { color: CONNECTOR_BRAND_COLORS.hubspot, kind: TINT },
+  linear: { color: CONNECTOR_BRAND_COLORS.linear, kind: TINT },
+  bamboo: { Svg: BambooLogo, color: CONNECTOR_BRAND_COLORS.bamboo, kind: TINT },
+  sonarqube: { Svg: SonarqubeLogo, color: CONNECTOR_BRAND_COLORS.sonarqube, kind: TINT },
+  codex: { kind: MONO },
+  plane: { Svg: PlaneLogo, kind: LOGO },
+  notion: { kind: MONO },
+  opsgenie: { Svg: OpsgenieLogo, kind: MONO },
+  cursor: { Svg: CursorLogo, kind: LOGO },
+  'gh-copilot': { Svg: GhCopilotLogo, kind: MONO },
 };
 
 export const CONNECTOR_LOGO_KEYS = Object.keys(CONNECTOR_LOGOS);

@@ -26,6 +26,14 @@ const SIDEBAR_TEXT_MUTED = 'rgba(255, 255, 255, 0.65)';
 const SIDEBAR_ITEM_HOVER_BG = 'rgba(255, 255, 255, 0.08)';
 const SIDEBAR_LOGO_FILTER = 'brightness(0) invert(1)';
 
+export const CONNECTOR_BRAND_COLORS = {
+  asana: '#F06A6A',
+  hubspot: '#FF7A59',
+  linear: '#5E6AD2',
+  bamboo: '#0052CC',
+  sonarqube: '#126ED3',
+} as const;
+
 export const PALETTE = {
   light: {
     brand: { onPrimary: WHITE },

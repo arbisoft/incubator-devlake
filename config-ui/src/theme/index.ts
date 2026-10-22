@@ -18,3 +18,4 @@
 
 export * from './tokens';
 export * from './ThemeProvider';
+export { CONNECTOR_BRAND_COLORS } from './palette';

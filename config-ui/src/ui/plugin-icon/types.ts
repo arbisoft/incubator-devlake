@@ -22,9 +22,12 @@ import type { IconSize } from '@/ui/types';
 
 import type { CONNECTOR_LOGO_KIND } from './constants';
 
-type ConnectorLogoKind = (typeof CONNECTOR_LOGO_KIND)[keyof typeof CONNECTOR_LOGO_KIND];
+type SvgComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
-export type ConnectorLogo = { Svg: ComponentType<SVGProps<SVGSVGElement>>; kind: ConnectorLogoKind };
+export type ConnectorLogo =
+  | { kind: typeof CONNECTOR_LOGO_KIND.LOGO; Svg: SvgComponent }
+  | { kind: typeof CONNECTOR_LOGO_KIND.MONO; Svg?: SvgComponent }
+  | { kind: typeof CONNECTOR_LOGO_KIND.TINT; color: string; Svg?: SvgComponent };
 
 type PluginIconRenderer = (props: { color: string }) => ReactNode;
 

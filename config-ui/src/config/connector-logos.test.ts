@@ -18,45 +18,61 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { CONNECTOR_BRAND_COLORS } from '@/theme';
 import { CONNECTOR_LOGO_KIND } from '@/ui/plugin-icon';
 
 import { CONNECTOR_LOGO_KEYS, getConnectorLogo } from './connector-logos';
 
-const EXPECTED_KEYS = [
-  'github',
-  'gitlab',
-  'bitbucket',
-  'bitbucket_server',
-  'azuredevops',
-  'jira',
-  'jenkins',
-  'pagerduty',
-  'circleci',
-  'claude_code',
-  'claude_otel',
-  'webhook',
-  'argocd',
-  'grafana_irm',
-  'youtrack',
-  'clickup',
-  'slack',
-];
+const EXPECTED_KINDS: Record<string, string> = {
+  github: 'mono',
+  gitlab: 'logo',
+  bitbucket: 'logo',
+  bitbucket_server: 'logo',
+  azuredevops: 'logo',
+  azuredevops_go: 'logo',
+  jira: 'logo',
+  jenkins: 'logo',
+  pagerduty: 'logo',
+  circleci: 'mono',
+  claude_code: 'logo',
+  claude_otel: 'logo',
+  webhook: 'mono',
+  argocd: 'logo',
+  grafana_irm: 'logo',
+  youtrack: 'logo',
+  clickup: 'logo',
+  slack: 'logo',
+  incidentio: 'logo',
+  plane: 'logo',
+  cursor: 'logo',
+  asana: 'tint',
+  hubspot: 'tint',
+  linear: 'tint',
+  bamboo: 'tint',
+  sonarqube: 'tint',
+  codex: 'mono',
+  notion: 'mono',
+  opsgenie: 'mono',
+  'gh-copilot': 'mono',
+};
 
 describe('getConnectorLogo', () => {
-  it.each(EXPECTED_KEYS)('resolves %s', (plugin) => {
-    expect(getConnectorLogo(plugin)).toBeDefined();
-  });
-
   it('covers exactly the registered keys', () => {
-    expect([...CONNECTOR_LOGO_KEYS].sort()).toEqual([...EXPECTED_KEYS].sort());
+    expect([...CONNECTOR_LOGO_KEYS].sort()).toEqual(Object.keys(EXPECTED_KINDS).sort());
   });
 
   it('returns undefined for an unknown plugin', () => {
     expect(getConnectorLogo('not-a-plugin')).toBeUndefined();
   });
 
-  it('gives every logo a valid kind', () => {
-    const kinds = Object.values(CONNECTOR_LOGO_KIND);
-    CONNECTOR_LOGO_KEYS.forEach((plugin) => expect(kinds).toContain(getConnectorLogo(plugin)?.kind));
+  it.each(Object.entries(EXPECTED_KINDS))('maps %s to the %s kind', (plugin, kind) => {
+    expect(getConnectorLogo(plugin)?.kind).toBe(kind);
+  });
+
+  it('draws every tint colour from the brand colours', () => {
+    CONNECTOR_LOGO_KEYS.forEach((plugin) => {
+      const logo = getConnectorLogo(plugin);
+      if (logo?.kind === CONNECTOR_LOGO_KIND.TINT) expect(Object.values(CONNECTOR_BRAND_COLORS)).toContain(logo.color);
+    });
   });
 });
