@@ -19,14 +19,23 @@
 import { createElement } from 'react';
 
 import type { OtelConnectionResponse } from '@/api/otel';
+import type { ListParams } from '@/api/project';
 import { WEBHOOK_PLUGIN } from '@/features/connections';
 import { getPluginConfig } from '@/plugins';
 import { INTEGRATION_CATEGORY, getCatalogEntry } from '@/plugins/catalog';
 import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?react';
 import type { IConnection, IProject, IWebhook } from '@/types';
+import type { ListQuery } from '@/ui';
 
-import { CONNECTION_ENTRY_KIND, COPY, PROJECT_METRICS } from './constants';
-import type { CategoryCount, ConnectionDetail, ConnectionEntry, ProjectRow } from './types';
+import { CONNECTION_ENTRY_KIND, COPY, LAST_RUN_STATUS_GROUP_STATUSES, PROJECT_METRICS } from './constants';
+import type {
+  CategoryCount,
+  ConnectionDetail,
+  ConnectionEntry,
+  ProjectFilters,
+  ProjectRow,
+  ProjectSortKey,
+} from './types';
 
 export const toProjectRow = (project: IProject, otelConnections: OtelConnectionResponse[] = []): ProjectRow => ({
   name: project.name,
@@ -40,6 +49,20 @@ export const toProjectRow = (project: IProject, otelConnections: OtelConnectionR
   lastRunCompletedAt: project.lastPipeline?.finishedAt,
   lastRunStatus: project.lastPipeline?.status,
 });
+
+const isStatusGroup = (group: string): group is keyof typeof LAST_RUN_STATUS_GROUP_STATUSES =>
+  group in LAST_RUN_STATUS_GROUP_STATUSES;
+
+export const buildProjectQuery = (query: ListQuery<ProjectSortKey>, filters: ProjectFilters): ListParams => {
+  const statuses = [
+    ...new Set(filters.lastRunStatus.filter(isStatusGroup).flatMap((group) => LAST_RUN_STATUS_GROUP_STATUSES[group])),
+  ];
+  return {
+    ...query,
+    connection: filters.connection.length ? filters.connection : undefined,
+    lastRunStatus: statuses.length ? statuses : undefined,
+  };
+};
 
 export const buildNewProject = (name: string) => ({
   name,

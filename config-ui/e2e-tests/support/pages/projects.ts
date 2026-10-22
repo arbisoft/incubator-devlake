@@ -20,7 +20,18 @@ import { Locator, Page } from '@playwright/test';
 import { BLUEPRINT_VIEW, COMMON_COPY, PROJECT_DETAIL_COPY, PROJECT_HOME_COPY as COPY, WEBHOOK_COPY } from '../app-copy';
 
 import { BlueprintViews, type BlueprintViewKey } from './blueprint-detail';
-import { BasePage, Screen, urlEndingWith, firstCellTexts, paginationPage, pipelineRowById, tableRow } from './common';
+import {
+  BasePage,
+  Screen,
+  clearColumnFilter,
+  columnCell,
+  filterColumn,
+  urlEndingWith,
+  firstCellTexts,
+  paginationPage,
+  pipelineRowById,
+  tableRow,
+} from './common';
 import { PATHS, PROJECT_TABS, ProjectTabKey } from './paths';
 import { ProjectsReadiness } from './project-readiness';
 import { ProjectOtel, ProjectSettings, ProjectWebhooks } from './project-tab-panels';
@@ -67,6 +78,23 @@ export class ProjectsPage extends BasePage implements Screen {
 
   async sortByColumn(label: string): Promise<void> {
     await this.page.getByRole('columnheader', { name: label }).click();
+  }
+
+  async filterColumn(columnName: string, optionTexts: string[]): Promise<void> {
+    await filterColumn(this.page, columnName, optionTexts);
+  }
+
+  async clearColumnFilter(columnName: string): Promise<void> {
+    await clearColumnFilter(this.page, columnName);
+  }
+
+  async lastRunStatusText(projectName: string): Promise<string> {
+    const cell = await columnCell(
+      this.page.locator('.ant-table'),
+      this.projectRow(projectName),
+      COPY.columns.lastRunStatus,
+    );
+    return (await cell.innerText()).trim();
   }
 
   async goToListPage(number: number): Promise<void> {

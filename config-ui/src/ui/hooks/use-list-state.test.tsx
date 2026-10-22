@@ -32,10 +32,15 @@ const DEFAULTS = {
   filters: { status: 'all' },
 };
 
-const setup = (initial = '/list') => {
-  const wrapper = ({ children }: { children: ReactNode }) => (
+const routerWrapper = (initial: string) => {
+  const Wrapper = ({ children }: { children: ReactNode }) => (
     <MemoryRouter initialEntries={[initial]}>{children}</MemoryRouter>
   );
+  return Wrapper;
+};
+
+const setup = (initial = '/list') => {
+  const wrapper = routerWrapper(initial);
   return renderHook(
     () => ({
       list: useListState<SortField, { status: string }>(DEFAULTS),
@@ -198,5 +203,50 @@ describe('useListState', () => {
     act(() => result.current.list.setKeyword('jira'));
     expect(result.current.list.query).not.toBe(first);
     expect(result.current.list.query.keyword).toBe('jira');
+  });
+});
+
+describe('useListState multi-value filters', () => {
+  type MultiFilters = { tags: string[]; status: string };
+  const MULTI_DEFAULTS = { filters: { tags: [], status: 'all' } as MultiFilters };
+  const setupMulti = (initial = '/list') => {
+    return renderHook(
+      () => ({ list: useListState<SortField, MultiFilters>(MULTI_DEFAULTS), location: useLocation() }),
+      { wrapper: routerWrapper(initial) },
+    );
+  };
+
+  it('reads repeated params as an array and falls back to the default array', () => {
+    expect(setupMulti('/list?tags=a&tags=b').result.current.list.filters.tags).toEqual(['a', 'b']);
+    expect(setupMulti().result.current.list.filters.tags).toEqual([]);
+  });
+
+  it('writes an array filter as repeated params and nothing for an empty array', () => {
+    const { result } = setupMulti();
+    act(() => result.current.list.setFilter('tags', ['a', 'b']));
+    expect(new URLSearchParams(result.current.location.search).getAll('tags')).toEqual(['a', 'b']);
+    act(() => result.current.list.setFilter('tags', []));
+    expect(result.current.location.search).toBe('');
+  });
+
+  it('setFilters applies several filters in one update, resets the page and restores undefined to the default', () => {
+    const { result } = setupMulti(`/list?${LIST_PARAMS.PAGE}=3&status=on&tags=x`);
+    act(() => result.current.list.setFilters({ tags: ['a', 'b'], status: undefined }));
+    const params = new URLSearchParams(result.current.location.search);
+    expect(params.getAll('tags')).toEqual(['a', 'b']);
+    expect(params.has('status')).toBe(false);
+    expect(params.has(LIST_PARAMS.PAGE)).toBe(false);
+  });
+
+  it('isFiltered reflects keyword and filters, comparing arrays regardless of order', () => {
+    expect(setupMulti().result.current.list.isFiltered).toBe(false);
+    expect(setupMulti('/list?tags=a&tags=b').result.current.list.isFiltered).toBe(true);
+    expect(setupMulti(`/list?${LIST_PARAMS.KEYWORD}=x`).result.current.list.isFiltered).toBe(true);
+    expect(setupMulti('/list?status=on').result.current.list.isFiltered).toBe(true);
+  });
+
+  it('toQuery includes array filters and omits empty ones', () => {
+    expect(setupMulti('/list?tags=b&tags=a').result.current.list.toQuery()).toMatchObject({ tags: ['b', 'a'] });
+    expect(setupMulti().result.current.list.toQuery()).not.toHaveProperty('tags');
   });
 });

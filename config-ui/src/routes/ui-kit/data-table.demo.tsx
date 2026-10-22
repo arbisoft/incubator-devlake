@@ -27,6 +27,8 @@ import {
   SORT_ORDER,
   STATUS_TONE,
   StatusBadge,
+  listFilterProps,
+  toListFilterPatch,
   type SortState,
   useListState,
 } from '@/ui';
@@ -83,6 +85,11 @@ const compare = (a: UserRow, b: UserRow, key: string) =>
 const empty = { title: text.emptyTitle, description: text.emptyDescription, size: EMPTY_STATE_SIZE.SECTION };
 
 const STATUS_FILTER_KEY = 'status';
+const STATUS_OPTIONS = [
+  { text: text.active, value: 'active' },
+  { text: text.inactive, value: 'inactive' },
+];
+const FILTER_COLUMNS = { [STATUS_FILTER_KEY]: { name: STATUS_FILTER_KEY, multiple: false } };
 
 const ServerTable = () => {
   const list = useListState<string, Record<string, string>>(TABLE_LIST_DEFAULTS);
@@ -91,15 +98,7 @@ const ServerTable = () => {
     () =>
       columns.map((column) =>
         column.key === STATUS_FILTER_KEY
-          ? {
-              ...column,
-              filters: [
-                { text: text.active, value: 'active' },
-                { text: text.inactive, value: 'inactive' },
-              ],
-              filterMultiple: false,
-              filteredValue: status ? [status] : null,
-            }
+          ? { ...column, ...listFilterProps<UserRow>(status, STATUS_OPTIONS, { multiple: false }) }
           : column,
       ),
     [status],
@@ -123,7 +122,7 @@ const ServerTable = () => {
         ariaLabel={text.ariaLabel}
         empty={empty}
         list={list}
-        onFilterChange={(filters) => list.setFilter(STATUS_FILTER_KEY, String(filters[STATUS_FILTER_KEY]?.[0] ?? ''))}
+        onFilterChange={(filters) => list.setFilters(toListFilterPatch(filters, FILTER_COLUMNS))}
         total={sorted.length}
       />
       <Mono>{JSON.stringify(list.toQuery())}</Mono>

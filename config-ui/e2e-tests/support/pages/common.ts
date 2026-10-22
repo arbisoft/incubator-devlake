@@ -53,9 +53,11 @@ export const tableRow = (scope: Page | Locator, text: string | RegExp): Locator 
 
 export const tableRows = (scope: Page | Locator): Locator => scope.locator('tbody tr.ant-table-row');
 
+// Matches by title text, because a filterable header's accessible name also carries the filter button's label.
 export const columnIndex = (table: Locator, column: string): Promise<number> =>
   table
-    .getByRole('columnheader', { name: column, exact: true })
+    .getByRole('columnheader')
+    .filter({ has: table.page().getByText(column, { exact: true }) })
     .evaluate((element) => (element as HTMLTableCellElement).cellIndex);
 
 export const columnCell = async (table: Locator, row: Locator, column: string): Promise<Locator> =>
@@ -177,6 +179,40 @@ export const pipelineRowById = (page: Page, id: number): Locator =>
 // The pill filter tabs are an antd Segmented whose radio input is visually hidden, so the label is the click target.
 export const segmentedOption = (scope: Page | Locator, label: string): Locator =>
   scope.locator('.ant-segmented-item').filter({ hasText: label });
+
+// antd's own labels for the column filter buttons.
+export const ANTD_FILTER_OK = 'OK';
+export const ANTD_FILTER_RESET = 'Reset';
+
+const columnFilterTrigger = (page: Page, column: string): Locator =>
+  page
+    .getByRole('columnheader')
+    .filter({ has: page.getByText(column, { exact: true }) })
+    .locator('.ant-table-filter-trigger');
+
+const openColumnFilter = async (page: Page, column: string): Promise<Locator> => {
+  await columnFilterTrigger(page, column).click();
+  const dropdown = page.locator('.ant-table-filter-dropdown:visible');
+  await expect(dropdown).toHaveCount(1);
+  return dropdown;
+};
+
+// Ticks each option in an antd column-header filter and confirms; types the option into the search box when there is one.
+export async function filterColumn(page: Page, column: string, optionTexts: string[]): Promise<void> {
+  const dropdown = await openColumnFilter(page, column);
+  const search = dropdown.getByRole('textbox');
+  for (const text of optionTexts) {
+    if (await search.count()) await search.fill(text);
+    await dropdown.getByText(text, { exact: true }).click();
+  }
+  await dropdown.getByRole('button', { name: ANTD_FILTER_OK, exact: true }).click();
+}
+
+export async function clearColumnFilter(page: Page, column: string): Promise<void> {
+  const dropdown = await openColumnFilter(page, column);
+  await dropdown.getByRole('button', { name: ANTD_FILTER_RESET, exact: true }).click();
+  await dropdown.getByRole('button', { name: ANTD_FILTER_OK, exact: true }).click();
+}
 
 export const selectBox = (scope: Page | Locator): Locator => scope.locator('.ant-select').first();
 
