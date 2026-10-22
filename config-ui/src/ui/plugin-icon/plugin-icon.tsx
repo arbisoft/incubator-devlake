@@ -18,14 +18,15 @@
 
 import { useTheme } from 'styled-components';
 
+import { CONNECTOR_LOGO_KIND } from './constants';
 import { Icon } from './styled';
 import type { PluginIconProps } from './types';
 
-export const PluginIcon = ({ icon, size }: PluginIconProps) => {
+export const PluginIcon = ({ icon, size, logo }: PluginIconProps) => {
   const { colors } = useTheme();
   return (
-    <Icon $size={size} aria-hidden>
-      {icon({ color: colors.iconBrand })}
+    <Icon $size={size} $mono={logo?.kind === CONNECTOR_LOGO_KIND.MONO} aria-hidden>
+      {logo ? <logo.Svg /> : icon({ color: colors.iconBrand })}
     </Icon>
   );
 };

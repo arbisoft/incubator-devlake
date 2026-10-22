@@ -20,6 +20,7 @@ import { Alert, Button, Skeleton } from 'antd';
 import { useState } from 'react';
 
 import API from '@/api';
+import { getConnectorLogo } from '@/config';
 import { getPluginConfig } from '@/plugins/utils';
 import { COMMON_COPY, FormModal, MODAL_WIDTH, PluginIcon, toUserMessage } from '@/ui';
 import { operator } from '@/utils';
@@ -91,7 +92,7 @@ export const DataScopeRemoteModal = ({
     <FormModal
       open={open}
       title={title}
-      icon={<PluginIcon icon={icon} size="sm" />}
+      icon={<PluginIcon icon={icon} size="sm" logo={getConnectorLogo(plugin)} />}
       width={MODAL_WIDTH.LG}
       submitLabel={COPY.submit}
       loading={operating}

@@ -21,11 +21,12 @@ import styled from 'styled-components';
 import { ICON_SIZE_PX } from '@/ui/constants';
 import type { IconSize } from '@/ui/types';
 
-export const Icon = styled.span<{ $size: IconSize }>`
+export const Icon = styled.span<{ $size: IconSize; $mono?: boolean }>`
   display: inline-flex;
   flex: none;
   width: ${({ $size }) => ICON_SIZE_PX[$size]}px;
   height: ${({ $size }) => ICON_SIZE_PX[$size]}px;
+  ${({ $mono, theme }) => $mono && `color: ${theme.colors.text};`}
 
   & > svg,
   & > img {

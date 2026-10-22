@@ -28,6 +28,7 @@ export const COPY = {
   themeLabel: 'Theme',
   sections: SECTION_TITLES,
   cases: {
+    brandLogos: 'Brand logos',
     default: 'Default',
     focusRestoration: 'Focus restoration',
     empty: 'Empty',
