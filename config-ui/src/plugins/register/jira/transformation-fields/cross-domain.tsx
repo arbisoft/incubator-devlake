@@ -27,6 +27,10 @@ import { DevPanel } from './dev-panel';
 import { RemoteLink } from './remote-link';
 import * as S from './styled';
 
+const PANEL = { REMOTE_LINK: 'remote-link', DEV_PANEL: 'dev-panel' } as const;
+
+type Panel = (typeof PANEL)[keyof typeof PANEL];
+
 interface Props {
   connectionId: ID;
   transformation: any;
@@ -34,21 +38,21 @@ interface Props {
 }
 
 export const CrossDomain = ({ connectionId, transformation, setTransformation }: Props) => {
-  const [radio, setRadio] = useState<'remote-link' | 'dev-panel'>('remote-link');
+  const [radio, setRadio] = useState<Panel>(PANEL.REMOTE_LINK);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
     if (transformation.applicationType) {
-      setRadio('dev-panel');
+      setRadio(PANEL.DEV_PANEL);
     } else {
-      setRadio('remote-link');
+      setRadio(PANEL.REMOTE_LINK);
     }
   }, []);
 
-  const handleChangeRadio = (r: 'remote-link' | 'dev-panel') => {
+  const handleChangeRadio = (r: Panel) => {
     setTransformation({
       ...transformation,
-      applicationType: r === 'remote-link' ? '' : transformation.applicationType,
+      applicationType: r === PANEL.REMOTE_LINK ? '' : transformation.applicationType,
       remotelinkRepoPattern: [],
     });
     setRadio(r);
@@ -66,7 +70,7 @@ export const CrossDomain = ({ connectionId, transformation, setTransformation }:
       </p>
       <div className="radio">
         <div className="radio-item">
-          <Radio checked={radio === 'remote-link'} onChange={() => handleChangeRadio('remote-link')} />
+          <Radio checked={radio === PANEL.REMOTE_LINK} onChange={() => handleChangeRadio(PANEL.REMOTE_LINK)} />
           <div className="content">
             <h5>Connect Jira issues and commits via Jira issues’ remote links that match the following pattern</h5>
             <Collapse
@@ -81,13 +85,13 @@ export const CrossDomain = ({ connectionId, transformation, setTransformation }:
                 },
               ]}
             />
-            {radio === 'remote-link' && (
+            {radio === PANEL.REMOTE_LINK && (
               <RemoteLink transformation={transformation} setTransformation={setTransformation} />
             )}
           </div>
         </div>
         <div className="radio-item">
-          <Radio checked={radio === 'dev-panel'} onChange={() => handleChangeRadio('dev-panel')} />
+          <Radio checked={radio === PANEL.DEV_PANEL} onChange={() => handleChangeRadio(PANEL.DEV_PANEL)} />
           <div className="content">
             <h5>
               Connect Jira issues and commits via{' '}
@@ -96,7 +100,7 @@ export const CrossDomain = ({ connectionId, transformation, setTransformation }:
               </ExternalLink>
             </h5>
             <p>Finish the configuration so DevLake can get your Git data from your Jira development panel.</p>
-            {radio === 'dev-panel' && (
+            {radio === PANEL.DEV_PANEL && (
               <>
                 {transformation.applicationType && (
                   <div className="application">

@@ -31,7 +31,7 @@ interface Props {
   setErrors: (value: any) => void;
 }
 
-export const Organization = ({ type, initialValues, values, setValues, setErrors }: Props) => {
+export const Organization = ({ initialValues, values, setValues, setErrors }: Props) => {
   useEffect(() => {
     setValues({ organization: initialValues.organization ?? '' });
   }, [initialValues.organization]);

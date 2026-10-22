@@ -86,6 +86,6 @@ export default defineConfig({
 
 function envBool(name: string, defaultValue = false): boolean {
   const v = process.env[name];
-  if (v == null) return defaultValue;
+  if (v === undefined) return defaultValue;
   return /^(1|true|yes|on)$/i.test(v);
 }

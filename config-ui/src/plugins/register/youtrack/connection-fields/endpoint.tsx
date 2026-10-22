@@ -20,6 +20,7 @@ import { Input } from 'antd';
 import { useEffect } from 'react';
 
 import { Block } from '@/components';
+import { trimTrailingSlashes } from '@/utils';
 
 const ENDPOINT_EXAMPLE = 'https://example.myjetbrains.com/youtrack/api';
 
@@ -32,7 +33,7 @@ export const validateEndpoint = (endpoint: string): string => {
   if (!endpoint) {
     return 'endpoint is required';
   }
-  const normalized = endpoint.replace(/\/+$/, '');
+  const normalized = trimTrailingSlashes(endpoint);
   let url: URL;
   try {
     url = new URL(normalized);

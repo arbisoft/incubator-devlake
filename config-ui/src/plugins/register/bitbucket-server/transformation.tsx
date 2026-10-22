@@ -53,7 +53,7 @@ export const BitbucketServerTransformation = ({ entities, transformation, setTra
   }, [transformation]);
 
   const handleChangeUseCustom = (e: React.FormEvent<HTMLInputElement>) => {
-    const checked = (e.target as HTMLInputElement).checked;
+    const { checked } = e.target as HTMLInputElement;
 
     if (!checked) {
       setTransformation({
@@ -98,11 +98,8 @@ export const BitbucketServerTransformation = ({ entities, transformation, setTra
 const renderCollapseItems = ({
   entities,
   panelStyle,
-  options,
   transformation,
   onChangeTransformation,
-  useCustom,
-  onChangeUseCustom,
 }: {
   entities: string[];
   panelStyle: React.CSSProperties;

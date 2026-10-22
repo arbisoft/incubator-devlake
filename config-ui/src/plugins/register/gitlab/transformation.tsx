@@ -46,7 +46,7 @@ export const GitLabTransformation = ({ entities, transformation, setTransformati
   }, [useCustom, transformation]);
 
   const handleChangeUseCustom = (e: React.FormEvent<HTMLInputElement>) => {
-    const checked = (e.target as HTMLInputElement).checked;
+    const { checked } = e.target as HTMLInputElement;
 
     if (!checked) {
       setTransformation({

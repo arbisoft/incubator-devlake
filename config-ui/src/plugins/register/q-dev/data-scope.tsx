@@ -21,6 +21,8 @@ import { Button, Checkbox, Flex, Form, Input, InputNumber, Segmented, Table, Too
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useMemo } from 'react';
 
+import { trimSlashes, trimTrailingSlashes } from '@/utils';
+
 interface ScopeData {
   prefix?: string;
   year?: number;
@@ -51,9 +53,7 @@ const DEFAULT_BASE_PATH = 'user-report';
 
 const ensureLeadingZero = (value: number) => value.toString().padStart(2, '0');
 
-const normalizeBasePath = (value: string) => value.trim().replace(/^\/+/, '').replace(/\/+$/, '');
-
-const trimTrailingSlashes = (value: string) => value.replace(/\/+$/, '');
+const normalizeBasePath = (value: string) => trimSlashes(value.trim());
 
 const extractScopeMeta = (item: ScopeItem) => {
   const data = item.data ?? {};
@@ -71,7 +71,7 @@ const extractScopeMeta = (item: ScopeItem) => {
     }
   }
 
-  let year = data.year;
+  let { year } = data;
   if (year === undefined || year === null) {
     const idx = month ? segments.length - 2 : segments.length - 1;
     const candidate = idx >= 0 ? segments[idx] : undefined;

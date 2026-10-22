@@ -16,8 +16,7 @@
  *
  */
 
-import type { RadioChangeEvent } from 'antd';
-import { Radio, Input } from 'antd';
+import { Input, Radio, type RadioChangeEvent } from 'antd';
 import { useState, useEffect } from 'react';
 
 import { Block, ExternalLink } from '@/components';

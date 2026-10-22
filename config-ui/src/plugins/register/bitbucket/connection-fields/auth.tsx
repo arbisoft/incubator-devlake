@@ -16,8 +16,7 @@
  *
  */
 
-import type { RadioChangeEvent } from 'antd';
-import { Radio, Input } from 'antd';
+import { Input, Radio, type RadioChangeEvent } from 'antd';
 import { useEffect } from 'react';
 
 import { Block, ExternalLink } from '@/components';
@@ -49,6 +48,8 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
       auth: required ? '' : 'auth is required',
     });
   }, [values, type, initialValues.endpoint]);
+
+  const credentialName = values.usesApiToken ? 'API Token' : 'App Password';
 
   const handleChangeEndpoint = (e: React.ChangeEvent<HTMLInputElement>) => {
     setValues({
@@ -128,7 +129,7 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
         required
       >
         <Input.Password
-          placeholder={type === 'update' ? '********' : `Your ${values.usesApiToken ? 'API Token' : 'App Password'}`}
+          placeholder={type === 'update' ? '********' : `Your ${credentialName}`}
           value={values.password}
           onChange={handleChangePassword}
         />

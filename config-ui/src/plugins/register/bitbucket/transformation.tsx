@@ -55,7 +55,7 @@ export const BitbucketTransformation = ({ entities, transformation, setTransform
   }, [transformation]);
 
   const handleChangeUseCustom = (e: React.FormEvent<HTMLInputElement>) => {
-    const checked = (e.target as HTMLInputElement).checked;
+    const { checked } = e.target as HTMLInputElement;
 
     if (!checked) {
       setTransformation({

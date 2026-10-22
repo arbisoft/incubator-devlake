@@ -86,7 +86,9 @@ const renderCollapseItems = ({
             <strong>Environment Detection</strong>
           </div>
           <div style={{ margin: '8px 0', paddingLeft: 28 }}>
-            <span>An ArgoCD sync operation is a 'Production Deployment' when the application name matches</span>
+            <span>
+              An ArgoCD sync operation is a &apos;Production Deployment&apos; when the application name matches
+            </span>
             <Input
               style={{ width: 200, margin: '0 8px' }}
               placeholder="(?i)prod(.*)"

@@ -21,6 +21,8 @@ import { ChangeEvent, useEffect, useMemo, useRef } from 'react';
 
 import { Block } from '@/components';
 
+const ERROR_STYLE = { marginTop: 4, color: 'var(--devlake-color-error)' };
+
 interface Props {
   type: 'create' | 'update';
   initialValues: any;
@@ -174,9 +176,7 @@ export const AwsCredentials = ({ type, initialValues, values, setValues, setErro
               onChange={handleAccessKeyChange}
               status={accessKeyError ? 'error' : ''}
             />
-            {accessKeyError && (
-              <div style={{ marginTop: 4, color: 'var(--devlake-color-error)' }}>{accessKeyError}</div>
-            )}
+            {accessKeyError && <div style={ERROR_STYLE}>{accessKeyError}</div>}
           </Block>
 
           <Block
@@ -190,9 +190,7 @@ export const AwsCredentials = ({ type, initialValues, values, setValues, setErro
               onChange={handleSecretKeyChange}
               status={secretKeyError ? 'error' : ''}
             />
-            {secretKeyError && (
-              <div style={{ marginTop: 4, color: 'var(--devlake-color-error)' }}>{secretKeyError}</div>
-            )}
+            {secretKeyError && <div style={ERROR_STYLE}>{secretKeyError}</div>}
           </Block>
         </>
       )}
@@ -225,7 +223,7 @@ export const AwsCredentials = ({ type, initialValues, values, setValues, setErro
           onChange={handleRegionChange}
           status={regionError ? 'error' : ''}
         />
-        {regionError && <div style={{ marginTop: 4, color: 'var(--devlake-color-error)' }}>{regionError}</div>}
+        {regionError && <div style={ERROR_STYLE}>{regionError}</div>}
       </Block>
     </>
   );

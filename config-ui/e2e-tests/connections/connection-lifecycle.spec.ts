@@ -99,6 +99,7 @@ test.describe('GitHub connection lifecycle through the UI', () => {
     const testRes = await api.post(`/plugins/github/connections/${id}/test`);
     expect(testRes.status()).toBe(200);
     expect((await testRes.json()).success).toBe(true);
+    expect(browserErrors).toEqual([]);
   });
 });
 

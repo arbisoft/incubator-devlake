@@ -66,5 +66,4 @@ const FEEDBACK_KINDS = ['success', 'error', 'warning', 'info'] as const;
 export const silenceFeedback = () => {
   vi.clearAllMocks();
   FEEDBACK_KINDS.forEach((kind) => vi.spyOn(message, kind).mockImplementation(() => undefined as never));
-  vi.spyOn(console, 'error').mockImplementation(() => undefined);
 };

@@ -25,7 +25,7 @@ interface ImportMetaEnv {
   readonly DEVLAKE_TITLE_CUSTOM: string;
   readonly DEVLAKE_COLOR_CUSTOM: string;
   readonly DEVLAKE_COPYRIGHT_HIDE: boolean;
-  readonly DEVLAKE_PLUGINS: string;
+  readonly DEVLAKE_PLUGINS?: string;
   readonly DEVLAKE_GRAFANA_PATH: string;
   readonly DEVLAKE_DASHBOARD_URL_GITHUB: string;
   readonly DEVLAKE_DASHBOARD_URL_GITLAB: string;

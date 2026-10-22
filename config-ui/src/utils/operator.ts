@@ -47,7 +47,6 @@ export const operator = async <T>(request: () => Promise<T>, config?: OperateCon
     }
     return [true, res];
   } catch (err) {
-    console.error('Operation failed.', err);
     const reason = formatReason?.(err) ?? (err as any).response?.data?.message ?? 'Operation failed.';
     if (!config?.hideToast) {
       message.error(reason);

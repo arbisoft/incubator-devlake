@@ -42,7 +42,7 @@ interface Props {
   setError: (error: any) => void;
 }
 
-export const GithubApp = ({ connectionId, endpoint, proxy, initialValue, value, error, setValue, setError }: Props) => {
+export const GithubApp = ({ connectionId, endpoint, proxy, initialValue, setValue, setError }: Props) => {
   const [settings, setSettings] = useState<GithubAppSettings>({
     appId: initialValue.appId,
     secretKey: initialValue.secretKey,

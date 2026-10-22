@@ -31,3 +31,5 @@ export const getAccountLabels = (user: LayoutUser | null, access: AccessCurrent 
 
   return { name, secondary: role ?? email };
 };
+
+export const parseEnvPlugins = (raw: string | undefined): string[] => (raw ?? '').split(',').filter(Boolean);
