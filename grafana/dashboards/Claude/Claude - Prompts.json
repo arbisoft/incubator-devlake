@@ -995,7 +995,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Which model or combination of models each prompt used. Prompts that made no API call, such as local slash commands, are left out.",
+      "description": "Which model or combination of models each prompt used. Prompts that made no API call, such as local slash commands, are left out. A combination lists its models in the order the prompt first used them, so the same models used in a different order, such as 'Opus 5.5, Haiku 5.5' and 'Haiku 5.5, Opus 5.5', show as separate slices.",
       "fieldConfig": {
         "defaults": {
           "color": {
