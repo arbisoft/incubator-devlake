@@ -37,6 +37,7 @@ export const COPY = {
     collapsed: 'Collapsed',
     pageTone: 'Page tone (light content area)',
     longText: 'Long text, narrow container',
+    wrapLongText: 'Wrap, long email in a narrow container',
     overflow: 'Overflow',
     withIcon: 'With icon',
     withAdornment: 'With an adornment',

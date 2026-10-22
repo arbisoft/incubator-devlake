@@ -46,6 +46,7 @@ const renderUser = (user: GrafanaUser) => {
     <IdentityCell
       primary={primary}
       secondary={secondary}
+      wrap
       adornment={
         user.sso && (
           <span role="img" aria-label={COPY.sso.label}>
@@ -83,7 +84,12 @@ const renderProjects = (user: GrafanaUser, onEditProjects: GrafanaColumnActions[
 );
 
 export const getGrafanaUserColumns = (actions: GrafanaColumnActions): TableColumnsType<GrafanaUser> => [
-  { key: GRAFANA_USER_COLUMN.USER, title: COPY.columns.user, render: (_, user) => renderUser(user) },
+  {
+    key: GRAFANA_USER_COLUMN.USER,
+    title: COPY.columns.user,
+    width: LAYOUT.grafanaUserColumnWidth,
+    render: (_, user) => renderUser(user),
+  },
   {
     ...buildRoleColumn<GrafanaUser, GrafanaRole>({
       key: GRAFANA_USER_COLUMN.ROLE,

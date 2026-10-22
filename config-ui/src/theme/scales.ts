@@ -108,6 +108,7 @@ export type LayoutTokens = {
   otelUpdatedColumnWidth: number;
   otelActionsColumnWidth: number;
   accessIconActionsColumnWidth: number;
+  grafanaUserColumnWidth: number;
   grafanaRoleColumnWidth: number;
   grafanaProjectsColumnWidth: number;
   grafanaStatusColumnWidth: number;
@@ -235,6 +236,7 @@ export const LAYOUT: LayoutTokens = {
   otelActionsColumnWidth: 290,
   accessIconActionsColumnWidth:
     ICON_ACTIONS_MAX * CONTROL_HEIGHT.md + (ICON_ACTIONS_MAX - 1) * SPACE.xs + ACTIONS_CELL_PADDING,
+  grafanaUserColumnWidth: 176,
   grafanaRoleColumnWidth: 130,
   grafanaProjectsColumnWidth: 320,
   grafanaStatusColumnWidth: 110,
