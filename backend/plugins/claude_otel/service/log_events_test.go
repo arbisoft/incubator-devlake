@@ -763,6 +763,35 @@ func TestPromptBuilderApplyEffort(t *testing.T) {
 	}
 }
 
+// models_used is what dashboards group prompts by, so a prompt's models are recorded as
+// sorted base model IDs: the same models in another order, a dated snapshot or a [1m] variant
+// must not make a separate group.
+func TestBuildPromptRollupRecordsModelsUsedAsBaseModelIDs(t *testing.T) {
+	start := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
+	for _, test := range []struct {
+		name   string
+		models []string
+		want   string
+	}{
+		{"one model", []string{"claude-opus-5-5"}, "claude-opus-5-5"},
+		{"sorted whatever the order", []string{"claude-opus-5-5", "claude-haiku-4-5"}, "claude-haiku-4-5,claude-opus-5-5"},
+		{"snapshot date dropped", []string{"claude-sonnet-4-20250514", "claude-sonnet-4"}, "claude-sonnet-4"},
+		{"variant dropped", []string{"claude-sonnet-4-5[1m]", "claude-sonnet-4-5-20250929"}, "claude-sonnet-4-5"},
+		{"empty model skipped", []string{"", " ", "claude-haiku-4-5"}, "claude-haiku-4-5"},
+		{"no requests", nil, ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			events := make([]*models.OtelEvent, 0, len(test.models))
+			for index, model := range test.models {
+				events = append(events, &models.OtelEvent{EventName: eventAPIRequest, Model: model, EventTimestamp: start.Add(time.Duration(index) * time.Second)})
+			}
+			if got := buildPromptRollup(testOrganizationID, "p1", events).prompt.ModelsUsed; got != test.want {
+				t.Fatalf("models used = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
 // The rollup reloads a prompt's stored events with rollupEventColumns, so every column it
 // reads must be in it. Without query_source, every reloaded request looks like background
 // work and a session-title request could decide the prompt's effort. Without event_key,

@@ -21,6 +21,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -60,6 +61,13 @@ const (
 	// promptFailureInsertBatchSize is the most failure rows one INSERT writes, which keeps a
 	// long agentic prompt's insert far below MySQL's 65,535 placeholder limit.
 	promptFailureInsertBatchSize = 500
+)
+
+// modelSnapshotDate and modelVariantSuffix match a model ID's -YYYYMMDD snapshot date and
+// trailing variant such as [1m], which baseModelID drops.
+var (
+	modelSnapshotDate  = regexp.MustCompile(`-[0-9]{8}`)
+	modelVariantSuffix = regexp.MustCompile(`\[[^\]]*\]$`)
 )
 
 // subagentToolNames launch a subagent; Task is the legacy name of Agent.
@@ -235,9 +243,8 @@ func buildPromptRollup(workspaceKey, promptID string, events []*models.OtelEvent
 			EstimatedCostUsd: "0.00000000",
 			SourceType:       aiSourceOtel,
 		},
-		skills:     newSkillCollector(workspaceKey, promptID),
-		modelNames: make([]string, 0),
-		seenModels: make(map[string]struct{}),
+		skills: newSkillCollector(workspaceKey, promptID),
+		models: make(map[string]struct{}),
 	}
 	prompt := builder.prompt
 	for index, event := range events {
@@ -254,7 +261,8 @@ func buildPromptRollup(workspaceKey, promptID string, events []*models.OtelEvent
 			apply(builder, event, attributes)
 		}
 	}
-	prompt.ModelsUsed = truncate(strings.Join(builder.modelNames, ","), maxModelsUsedLength)
+	// Sorted, so prompts that used the same models group together whatever order they used them in.
+	prompt.ModelsUsed = truncate(strings.Join(sortedKeys(builder.models), ","), maxModelsUsedLength)
 	collected := builder.skills.result(prompt)
 	prompt.SkillCount = int64(len(collected))
 	prompt.UsedSkill = len(collected) > 0
@@ -269,11 +277,10 @@ func buildPromptRollup(workspaceKey, promptID string, events []*models.OtelEvent
 
 // promptBuilder accumulates one prompt's row, skills, failures and models from its ordered events.
 type promptBuilder struct {
-	prompt     *ai.AiPrompt
-	skills     *skillCollector
-	modelNames []string
-	seenModels map[string]struct{}
-	failures   []*ai.AiPromptFailure
+	prompt   *ai.AiPrompt
+	skills   *skillCollector
+	models   map[string]struct{}
+	failures []*ai.AiPromptFailure
 	// mainThreadEffort is set once a main-thread request has given the prompt its effort,
 	// so a later request cannot replace it.
 	mainThreadEffort bool
@@ -315,9 +322,8 @@ func (b *promptBuilder) applyAPIRequest(event *models.OtelEvent, attributes map[
 			b.prompt.EstimatedCostUsd = total
 		}
 	}
-	if _, seen := b.seenModels[event.Model]; event.Model != "" && !seen {
-		b.seenModels[event.Model] = struct{}{}
-		b.modelNames = append(b.modelNames, event.Model)
+	if model := baseModelID(event.Model); model != "" {
+		b.models[model] = struct{}{}
 	}
 	b.skills.add(event.SkillName, ai.SkillDetectedViaApiRequest, "", "", event.PluginName, event.EventTimestamp)
 }
@@ -709,6 +715,13 @@ func stringValue(value *string) string {
 		return ""
 	}
 	return *value
+}
+
+// baseModelID drops a model ID's snapshot date and variant suffix, so that
+// claude-sonnet-4-20250514 and claude-sonnet-4-5[1m] count as claude-sonnet-4 and claude-sonnet-4-5.
+// The models_used migration in models/migrationscripts keeps a frozen copy of this rule.
+func baseModelID(model string) string {
+	return modelVariantSuffix.ReplaceAllString(modelSnapshotDate.ReplaceAllString(strings.TrimSpace(model), ""), "")
 }
 
 func sortedKeys(values map[string]struct{}) []string {

@@ -68,21 +68,23 @@ type AiPrompt struct {
 	// mode change, so the mode is assumed rather than observed.
 	PermissionMode         string `gorm:"type:varchar(64);index" json:"permissionMode"`
 	PermissionModeInferred bool   `json:"permissionModeInferred"`
-	ModelsUsed             string `gorm:"type:varchar(1024)" json:"modelsUsed"`
-	ApiRequestCount        int64  `json:"apiRequestCount"`
-	ApiErrorCount          int64  `json:"apiErrorCount"`
-	InputTokens            int64  `json:"inputTokens"`
-	OutputTokens           int64  `json:"outputTokens"`
-	CacheReadTokens        int64  `json:"cacheReadTokens"`
-	CacheCreationTokens    int64  `json:"cacheCreationTokens"`
-	EstimatedCostUsd       string `gorm:"type:decimal(20,8);not null" json:"estimatedCostUsd"`
-	ToolCallCount          int64  `json:"toolCallCount"`
-	ToolFailureCount       int64  `json:"toolFailureCount"`
-	ToolRejectCount        int64  `json:"toolRejectCount"`
-	SubagentCount          int64  `json:"subagentCount"`
-	SkillCount             int64  `json:"skillCount"`
-	UsedSkill              bool   `gorm:"index" json:"usedSkill"`
-	SourceType             string `gorm:"type:varchar(64)" json:"sourceType"`
+	// ModelsUsed lists the base model IDs of the prompt's API requests, comma-separated and
+	// sorted, without snapshot dates or variant suffixes such as [1m].
+	ModelsUsed          string `gorm:"type:varchar(1024)" json:"modelsUsed"`
+	ApiRequestCount     int64  `json:"apiRequestCount"`
+	ApiErrorCount       int64  `json:"apiErrorCount"`
+	InputTokens         int64  `json:"inputTokens"`
+	OutputTokens        int64  `json:"outputTokens"`
+	CacheReadTokens     int64  `json:"cacheReadTokens"`
+	CacheCreationTokens int64  `json:"cacheCreationTokens"`
+	EstimatedCostUsd    string `gorm:"type:decimal(20,8);not null" json:"estimatedCostUsd"`
+	ToolCallCount       int64  `json:"toolCallCount"`
+	ToolFailureCount    int64  `json:"toolFailureCount"`
+	ToolRejectCount     int64  `json:"toolRejectCount"`
+	SubagentCount       int64  `json:"subagentCount"`
+	SkillCount          int64  `json:"skillCount"`
+	UsedSkill           bool   `gorm:"index" json:"usedSkill"`
+	SourceType          string `gorm:"type:varchar(64)" json:"sourceType"`
 
 	// Effort is the reasoning effort level (such as low, medium, high, xhigh or max) of the
 	// prompt's main conversation requests, from Claude Code's api_request effort attribute.
