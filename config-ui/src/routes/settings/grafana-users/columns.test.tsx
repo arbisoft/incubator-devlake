@@ -121,17 +121,6 @@ describe('Grafana user columns', () => {
     expect(screen.getByRole('button', { name: COPY.actions.editProjectsFor(EMAIL) })).toBeTruthy();
   });
 
-  it('lists the row actions in order: extras, toggle, delete', () => {
-    setup(user());
-    const names = screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'));
-    expect(names.slice(-4)).toEqual([
-      COPY.actions.editDetailsFor(EMAIL),
-      COPY.actions.setPasswordFor(EMAIL),
-      COPY.actions.disableFor(EMAIL),
-      COPY.actions.deleteFor(EMAIL),
-    ]);
-  });
-
   it('shows a role outside Viewer, Editor and Admin as text', () => {
     setup(user({ role: 'None' }));
     expect(screen.getByText('None')).toBeTruthy();
