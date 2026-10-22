@@ -107,6 +107,10 @@ export type LayoutTokens = {
   otelCredentialsColumnWidth: number;
   otelUpdatedColumnWidth: number;
   otelActionsColumnWidth: number;
+  accessIconActionsColumnWidth: number;
+  grafanaRoleColumnWidth: number;
+  grafanaProjectsColumnWidth: number;
+  grafanaStatusColumnWidth: number;
   meterSegment: { sm: MeterSegmentTokens; md: MeterSegmentTokens };
   readinessPopoverWidth: number;
   popoverListMaxHeight: number;
@@ -163,6 +167,11 @@ export const TYPOGRAPHY: TypographyTokens = {
 export const SPACE: SpaceTokens = { xxs: 4, xs: 8, sm: 12, md: 16, lg: 24, xl: 32, xxl: 48 };
 
 export const RADIUS: RadiusTokens = { sm: 4, md: 6, lg: 8, pill: 999 };
+
+const ICON_ACTIONS_MAX = 4;
+const ACTIONS_CELL_PADDING = SPACE.md * 2;
+
+export const CONTROL_HEIGHT = { sm: 24, md: 32, lg: 40 } as const;
 
 export const LAYOUT: LayoutTokens = {
   sidebarWidth: 240,
@@ -224,6 +233,11 @@ export const LAYOUT: LayoutTokens = {
   otelCredentialsColumnWidth: 110,
   otelUpdatedColumnWidth: 90,
   otelActionsColumnWidth: 290,
+  accessIconActionsColumnWidth:
+    ICON_ACTIONS_MAX * CONTROL_HEIGHT.md + (ICON_ACTIONS_MAX - 1) * SPACE.xs + ACTIONS_CELL_PADDING,
+  grafanaRoleColumnWidth: 130,
+  grafanaProjectsColumnWidth: 320,
+  grafanaStatusColumnWidth: 110,
   meterSegment: { sm: { width: 13, height: 6, gap: 3 }, md: { width: 22, height: 8, gap: 4 } },
   readinessPopoverWidth: 380,
   popoverListMaxHeight: 456,
@@ -255,8 +269,6 @@ export const LAYOUT: LayoutTokens = {
 
 // antd's popup layer is 1000 (modal, drawer); dropdowns 1050; the sidebar sits below them.
 export const Z_INDEX: ZIndexTokens = { sidebar: 100, flyout: 900, drawer: 1000, modal: 1000 };
-
-export const CONTROL_HEIGHT = { sm: 24, md: 32, lg: 40 } as const;
 
 export const MOTION: MotionTokens = { fast: 120, base: 200, easing: 'ease-out' };
 

@@ -20,6 +20,8 @@ import type { ReactNode } from 'react';
 
 import type { AccessRole, AccessStatus } from '@/api/access';
 
+import type { ActionsLayout } from './types';
+
 export type RoleOption<R extends string> = { value: R; label: string };
 
 export type RoleColumnOptions<T, R extends string = AccessRole> = {
@@ -46,6 +48,8 @@ export type StatusColumnOptions<T> = {
   filter?: StatusColumnFilter;
 };
 
+export type RowIconAction = { key: string; icon: ReactNode; label: string; onClick: () => void };
+
 export type ActionsColumnOptions<T> = {
   key: string;
   title: string;
@@ -61,6 +65,8 @@ export type ActionsColumnOptions<T> = {
   canToggle?: (record: T) => boolean;
   canRemove?: (record: T) => boolean;
   renderExtra?: (record: T) => ReactNode;
+  layout?: ActionsLayout;
+  extraActions?: (record: T) => RowIconAction[];
   onToggle: (record: T, nextStatus: AccessStatus) => void;
   onRemove: (record: T) => void;
 };
