@@ -11,8 +11,8 @@
       "fixmes": 0
     },
     "advanced/blueprints.spec.ts": {
-      "tests": 5,
-      "expects": 24,
+      "tests": 7,
+      "expects": 41,
       "backend": 5,
       "skips": 0,
       "fixmes": 0
@@ -68,7 +68,7 @@
     },
     "connections/connection-lifecycle.spec.ts": {
       "tests": 5,
-      "expects": 32,
+      "expects": 33,
       "backend": 11,
       "skips": 1,
       "fixmes": 0
@@ -186,9 +186,9 @@
       "fixmes": 0
     },
     "projects/projects-list.spec.ts": {
-      "tests": 2,
-      "expects": 16,
-      "backend": 0,
+      "tests": 5,
+      "expects": 35,
+      "backend": 1,
       "skips": 0,
       "fixmes": 0
     },
@@ -200,8 +200,8 @@
       "fixmes": 0
     },
     "settings/grafana-users.spec.ts": {
-      "tests": 16,
-      "expects": 114,
+      "tests": 17,
+      "expects": 118,
       "backend": 22,
       "skips": 0,
       "fixmes": 0
@@ -236,7 +236,7 @@
     },
     "shell/sidebar.spec.ts": {
       "tests": 6,
-      "expects": 39,
+      "expects": 40,
       "backend": 1,
       "skips": 1,
       "fixmes": 0
