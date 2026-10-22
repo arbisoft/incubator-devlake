@@ -41,8 +41,18 @@ type GetBlueprintQuery struct {
 	Mode        string
 	Type        string
 	Keyword     string
+	// Types are OR'd; ignored when Type is set or IsManual is given
+	Types        []string
+	Connections  []BlueprintConnectionFilter
+	ProjectNames []string
 	// OrderBy must be a trusted expression; it is interpolated, never user input. Empty means "id DESC".
 	OrderBy string
+}
+
+// BlueprintConnectionFilter matches blueprints that use the given connection
+type BlueprintConnectionFilter struct {
+	PluginName   string
+	ConnectionId uint64
 }
 
 type BlueprintProjectPairs struct {
@@ -122,6 +132,54 @@ const (
 	BP_CRON_MONTHLY = "0 0 1 * *"
 )
 
+// blueprintTypeClause returns the SQL for one type; an empty string means no filter
+func blueprintTypeClause(t string) (string, []interface{}, errors.Error) {
+	switch t {
+	case "", BP_TYPE_ALL:
+		return "", nil, nil
+	case BP_TYPE_MANUAL:
+		return "is_manual = ?", []interface{}{true}, nil
+	case BP_TYPE_DAILY:
+		return "is_manual = ? AND cron_config = ?", []interface{}{false, BP_CRON_DAILY}, nil
+	case BP_TYPE_WEEKLY:
+		return "is_manual = ? AND cron_config = ?", []interface{}{false, BP_CRON_WEEKLY}, nil
+	case BP_TYPE_MONTHLY:
+		return "is_manual = ? AND cron_config = ?", []interface{}{false, BP_CRON_MONTHLY}, nil
+	case BP_TYPE_CUSTOM:
+		return "is_manual = ? AND cron_config NOT IN ?", []interface{}{false, []string{BP_CRON_DAILY, BP_CRON_WEEKLY, BP_CRON_MONTHLY}}, nil
+	default:
+		return "", nil, errors.BadInput.New(fmt.Sprintf("invalid type %s", t))
+	}
+}
+
+// blueprintTypesClause combines Type, or else Types, into one clause
+func blueprintTypesClause(query *GetBlueprintQuery) (string, []interface{}, errors.Error) {
+	if query.Type != "" || len(query.Types) == 0 {
+		return blueprintTypeClause(query.Type)
+	}
+	parts := make([]string, 0, len(query.Types))
+	params := make([]interface{}, 0)
+	for _, t := range query.Types {
+		if t == BP_TYPE_ALL {
+			return "", nil, nil
+		}
+		clause, clauseParams, err := blueprintTypeClause(t)
+		if err != nil {
+			return "", nil, err
+		}
+		if clause != "" {
+			parts = append(parts, clause)
+			params = append(params, clauseParams...)
+		}
+	}
+	if len(parts) > 1 {
+		for i := range parts {
+			parts[i] = "(" + parts[i] + ")"
+		}
+	}
+	return strings.Join(parts, " OR "), params, nil
+}
+
 // GetDbBlueprints returns a paginated list of Blueprints based on `query`
 func (b *BlueprintManager) GetDbBlueprints(query *GetBlueprintQuery) ([]*models.Blueprint, int64, errors.Error) {
 	// process query parameters
@@ -133,22 +191,28 @@ func (b *BlueprintManager) GetDbBlueprints(query *GetBlueprintQuery) ([]*models.
 	if query.IsManual != nil {
 		clauses = append(clauses, dal.Where("is_manual = ?", *query.IsManual))
 	} else {
-		switch query.Type {
-		case "", BP_TYPE_ALL:
-			// do nothing
-		case BP_TYPE_MANUAL:
-			clauses = append(clauses, dal.Where("is_manual = ?", true))
-		case BP_TYPE_DAILY:
-			clauses = append(clauses, dal.Where("is_manual = ? AND cron_config = ?", false, BP_CRON_DAILY))
-		case BP_TYPE_WEEKLY:
-			clauses = append(clauses, dal.Where("is_manual = ? AND cron_config = ?", false, BP_CRON_WEEKLY))
-		case BP_TYPE_MONTHLY:
-			clauses = append(clauses, dal.Where("is_manual = ? AND cron_config = ?", false, BP_CRON_MONTHLY))
-		case BP_TYPE_CUSTOM:
-			clauses = append(clauses, dal.Where("is_manual = ? AND cron_config NOT IN ?", false, []string{BP_CRON_DAILY, BP_CRON_WEEKLY, BP_CRON_MONTHLY}))
-		default:
-			return nil, 0, errors.BadInput.New(fmt.Sprintf("invalid type %s", query.Type))
+		typeClause, typeParams, err := blueprintTypesClause(query)
+		if err != nil {
+			return nil, 0, err
 		}
+		if typeClause != "" {
+			clauses = append(clauses, dal.Where(typeClause, typeParams...))
+		}
+	}
+	if len(query.Connections) > 0 {
+		conds := make([]string, 0, len(query.Connections))
+		params := make([]interface{}, 0, 2*len(query.Connections))
+		for _, conn := range query.Connections {
+			conds = append(conds, "(fbc.plugin_name = ? AND fbc.connection_id = ?)")
+			params = append(params, conn.PluginName, conn.ConnectionId)
+		}
+		clauses = append(clauses, dal.Where(
+			"EXISTS (SELECT 1 FROM _devlake_blueprint_connections fbc WHERE fbc.blueprint_id = _devlake_blueprints.id AND ("+strings.Join(conds, " OR ")+"))",
+			params...,
+		))
+	}
+	if len(query.ProjectNames) > 0 {
+		clauses = append(clauses, dal.Where("_devlake_blueprints.project_name IN ?", query.ProjectNames))
 	}
 	if query.Label != "" {
 		clauses = append(clauses,

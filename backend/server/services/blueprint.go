@@ -56,7 +56,10 @@ type BlueprintQuery struct {
 	IsManual *bool  `form:"isManual"`
 	Label    string `form:"label"`
 	// isManual must be omitted or `null` for type to take effect
-	Type string `form:"type" enums:"ALL,MANUAL,DAILY,WEEKLY,MONTHLY,CUSTOM" validate:"oneof=ALL MANUAL DAILY WEEKLY MONTHLY CUSTOM"`
+	Type []string `form:"type" enums:"ALL,MANUAL,DAILY,WEEKLY,MONTHLY,CUSTOM" validate:"dive,oneof=ALL MANUAL DAILY WEEKLY MONTHLY CUSTOM"`
+	// Connection values are repeatable "plugin:connectionId"
+	Connection  []string `form:"connection"`
+	ProjectName []string `form:"projectName"`
 }
 
 type BlueprintJob struct {
@@ -89,15 +92,21 @@ func GetBlueprints(query *BlueprintQuery, shouldSanitize bool) ([]*models.Bluepr
 	if err != nil {
 		return nil, 0, err
 	}
+	connections, err := parseConnectionFilters(query.Connection)
+	if err != nil {
+		return nil, 0, err
+	}
 	blueprints, count, err := bpManager.GetDbBlueprints(&services.GetBlueprintQuery{
-		Keyword:     query.Keyword,
-		OrderBy:     orderBy,
-		Enable:      query.Enable,
-		IsManual:    query.IsManual,
-		Label:       query.Label,
-		SkipRecords: query.GetSkip(),
-		PageSize:    query.GetPageSize(),
-		Type:        query.Type,
+		Keyword:      query.Keyword,
+		OrderBy:      orderBy,
+		Enable:       query.Enable,
+		IsManual:     query.IsManual,
+		Label:        query.Label,
+		SkipRecords:  query.GetSkip(),
+		PageSize:     query.GetPageSize(),
+		Types:        query.Type,
+		Connections:  connections,
+		ProjectNames: query.ProjectName,
 	})
 	if err != nil {
 		return nil, 0, err

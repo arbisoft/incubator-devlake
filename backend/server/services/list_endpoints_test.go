@@ -39,8 +39,14 @@ type capturedQueries struct {
 
 func useCapturingDal(t *testing.T) *capturedQueries {
 	t.Helper()
+	return useCapturingDalWithOtelTable(t, true)
+}
+
+func useCapturingDalWithOtelTable(t *testing.T, hasOtelTable bool) *capturedQueries {
+	t.Helper()
 	captured := &capturedQueries{}
 	testDal := dalmocks.NewDal(t)
+	testDal.On("HasTable", otelConnectionProjectTable).Return(hasOtelTable).Maybe()
 	testDal.On("Count", mock.Anything).Run(func(args mock.Arguments) {
 		captured.count = args.Get(0).([]dal.Clause)
 	}).Return(int64(0), nil).Maybe()
