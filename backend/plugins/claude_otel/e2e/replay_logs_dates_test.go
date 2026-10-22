@@ -171,10 +171,10 @@ func TestLogReplayBackfillsPromptEffort(t *testing.T) {
 	specs := make([]resourceSpec, 0, len(actors))
 	want := make(map[string]string, len(actors))
 	for index, who := range actors {
-		// Consecutive seeds give each actor's prompt a different fixture effort.
+		// Consecutive seeds mix prompts with and without a main-thread request.
 		seed := 1000 + index
 		specs = append(specs, resourceSpec{who: who, at: start.Add(time.Duration(index) * time.Minute), seed: seed})
-		want[who.promptID(seed)] = fxEfforts[seed%len(fxEfforts)]
+		want[who.promptID(seed)] = fxPromptEffort(seed)
 	}
 	w.insertLogBatch(specs)
 	w.drainNow()

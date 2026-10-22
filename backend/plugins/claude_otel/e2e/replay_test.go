@@ -239,8 +239,12 @@ func (w *world) requireLogsOn(connectionID uint64, org string, who actor, day ti
 	next := day.AddDate(0, 0, 1)
 	require.Positive(w.t, w.count(&models.OtelEvent{}, "connection_id = ? AND organization_id = ? AND user_key = ? AND event_timestamp >= ? AND event_timestamp < ?", connectionID, org, who.logUserKey(), day, next), "%s %s", who.name, day.Format(dateLayout))
 	require.Positive(w.t, w.count(&ai.AiPrompt{}, "workspace_key = ? AND user_key = ? AND started_at >= ? AND started_at < ?", org, who.logUserKey(), day, next), "%s %s", who.name, day.Format(dateLayout))
-	// Every fixture api_request reports an effort, so every converted prompt carries one.
-	require.Zero(w.t, w.count(&ai.AiPrompt{}, "workspace_key = ? AND user_key = ? AND started_at >= ? AND started_at < ? AND effort IS NULL", org, who.logUserKey(), day, next), "%s %s prompts without effort", who.name, day.Format(dateLayout))
+	// Every fixture api_request reports an effort, so every converted prompt carries the one
+	// its main-thread request reported, or its only request's.
+	for _, prompt := range snapshot[ai.AiPrompt](w, "prompt_id", "workspace_key = ? AND user_key = ? AND started_at >= ? AND started_at < ?", org, who.logUserKey(), day, next) {
+		require.NotNil(w.t, prompt.Effort, prompt.PromptId)
+		require.Equal(w.t, fxPromptEffort(who.promptSeed(w.t, prompt.PromptId)), *prompt.Effort, prompt.PromptId)
+	}
 }
 
 func (w *world) logFactsOf(connectionID uint64, org string) logFacts {
@@ -506,6 +510,7 @@ func TestRebindRequeuesLogBatchesForTheReboundTeam(t *testing.T) {
 	for _, set := range []logFacts{beforeB, beforeC} {
 		require.NotEmpty(t, set.Events)
 		require.NotEmpty(t, set.Prompt)
+		require.NotEmpty(t, set.Failure)
 	}
 
 	w.rebind(fixture.a, orgR, w.replayDates(-2, 0))
@@ -517,9 +522,17 @@ func TestRebindRequeuesLogBatchesForTheReboundTeam(t *testing.T) {
 			w.requireLogsOn(fixture.a.ID, orgR, who, w.day(offset))
 		}
 	}
-	require.Equal(t, int64(120), w.count(&models.OtelEvent{}, "connection_id = ? AND organization_id = ?", fixture.a.ID, orgR))
+	want := expectLogs(baseLayout, 3, func(who actor) bool { return who.team == "alpha" && who.org == orgR })
+	require.Equal(t, int64(want.events), w.count(&models.OtelEvent{}, "connection_id = ? AND organization_id = ?", fixture.a.ID, orgR))
 	require.Equal(t, beforeB, w.logFactsOf(fixture.b.ID, orgB))
 	require.Equal(t, beforeC, w.logFactsOf(fixture.c.ID, orgC))
+	reboundR := w.logFactsOf(fixture.a.ID, orgR)
+	require.NotEmpty(t, reboundR.Failure)
+	failureKinds := make(map[string]int)
+	for _, failure := range reboundR.Failure {
+		failureKinds[failure.FailureKind]++
+	}
+	require.Equal(t, map[string]int{ai.FailureKindToolError: want.toolErrors, ai.FailureKindApiError: want.apiErrors}, failureKinds)
 
 	requests := w.requireReplaysCompleted()
 	require.Len(t, requests, 2)
@@ -531,4 +544,14 @@ func TestRebindRequeuesLogBatchesForTheReboundTeam(t *testing.T) {
 	var detail struct{ Queued []uint64 }
 	require.NoError(t, json.Unmarshal([]byte(*audits[0].Detail), &detail))
 	require.Equal(t, []uint64{requests[0].ID, requests[1].ID}, detail.Queued)
+
+	// Replaying the rebound team's completed days again rebuilds the same rows.
+	_, err := service.CreateOtelReplay(e2eUser, &service.OtelReplayInput{OtelReplayRange: w.replayDates(-2, -1)})
+	require.NoError(t, err)
+	w.drainNow()
+	replays := w.requireReplaysCompleted()
+	require.Len(t, replays, len(requests)+2)
+	require.Equal(t, models.OtelReplayKindLogs, replays[len(replays)-1].Kind)
+	require.Positive(t, replays[len(replays)-1].ReplayedBatches)
+	require.Equal(t, reboundR, w.logFactsOf(fixture.a.ID, orgR))
 }

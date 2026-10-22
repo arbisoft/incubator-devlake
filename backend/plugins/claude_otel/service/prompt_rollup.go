@@ -57,6 +57,9 @@ const (
 	maxRepositoryURLLength = 255
 	// maxErrorMessageLength is the width of ai_prompt_failures.error_message.
 	maxErrorMessageLength = 1024
+	// promptFailureInsertBatchSize is the most failure rows one INSERT writes, which keeps a
+	// long agentic prompt's insert far below MySQL's 65,535 placeholder limit.
+	promptFailureInsertBatchSize = 500
 )
 
 // subagentToolNames launch a subagent; Task is the legacy name of Agent.
@@ -580,9 +583,15 @@ func writePromptRollup(tx dal.Transaction, rollup promptRollup) error {
 	if err := tx.Delete(&ai.AiPromptFailure{}, dal.Where("workspace_key = ? AND prompt_id = ?", rollup.prompt.WorkspaceKey, rollup.prompt.PromptId)); err != nil {
 		return fmt.Errorf("clear Claude Code prompt failures: %w", err)
 	}
-	for _, failure := range rollup.failures {
-		if err := tx.CreateOrUpdate(failure); err != nil {
-			return fmt.Errorf("write Claude Code prompt failure: %w", err)
+	// The prompt's rows were just deleted and failure ids are scoped to the prompt, so the
+	// rebuilt rows are inserted in batches rather than upserted one at a time.
+	for start := 0; start < len(rollup.failures); start += promptFailureInsertBatchSize {
+		end := start + promptFailureInsertBatchSize
+		if end > len(rollup.failures) {
+			end = len(rollup.failures)
+		}
+		if err := tx.Create(rollup.failures[start:end]); err != nil {
+			return fmt.Errorf("write Claude Code prompt failures: %w", err)
 		}
 	}
 	return nil

@@ -627,13 +627,19 @@ func TestConvertLogBatchReportsLostLease(t *testing.T) {
 }
 
 // writePromptRollup replaces a prompt's failure rows: it clears the stored ones before
-// writing the rebuilt ones, so a replay neither duplicates rows nor keeps rows for failures
-// that no longer exist. A storage error stops the write and names the step that failed.
+// inserting the rebuilt ones in batches, so a replay neither duplicates rows nor keeps rows
+// for failures that no longer exist. A storage error stops the write and names the step
+// that failed.
 func TestWritePromptRollupReplacesFailures(t *testing.T) {
 	prompt := &ai.AiPrompt{DomainEntity: domainlayer.DomainEntity{Id: "prompt-p1"}, WorkspaceKey: testOrganizationID, PromptId: "p1"}
-	failure := func(id string) *ai.AiPromptFailure {
-		return &ai.AiPromptFailure{DomainEntity: domainlayer.DomainEntity{Id: id}, WorkspaceKey: testOrganizationID, PromptId: "p1"}
+	failures := func(count int) []*ai.AiPromptFailure {
+		rows := make([]*ai.AiPromptFailure, 0, count)
+		for index := 1; index <= count; index++ {
+			rows = append(rows, &ai.AiPromptFailure{DomainEntity: domainlayer.DomainEntity{Id: fmt.Sprintf("f%d", index)}, WorkspaceKey: testOrganizationID, PromptId: "p1"})
+		}
+		return rows
 	}
+	full, overflow := promptFailureInsertBatchSize, promptFailureInsertBatchSize+1
 	for _, test := range []struct {
 		name      string
 		failures  []*ai.AiPromptFailure
@@ -642,10 +648,12 @@ func TestWritePromptRollupReplacesFailures(t *testing.T) {
 		wantCalls []string
 		wantErr   string
 	}{
-		{name: "writes failures after clearing", failures: []*ai.AiPromptFailure{failure("f1"), failure("f2")}, wantCalls: []string{"clear", "f1", "f2"}},
+		{name: "writes failures after clearing", failures: failures(2), wantCalls: []string{"clear", "f1..f2"}},
+		{name: "a full batch is one insert", failures: failures(full), wantCalls: []string{"clear", fmt.Sprintf("f1..f%d", full)}},
+		{name: "rows past a batch go in the next insert", failures: failures(overflow), wantCalls: []string{"clear", fmt.Sprintf("f1..f%d", full), fmt.Sprintf("f%d..f%d", overflow, overflow)}},
 		{name: "no failures clears stale rows", wantCalls: []string{"clear"}},
-		{name: "clear error", failures: []*ai.AiPromptFailure{failure("f1")}, clearErr: errors.Default.New("db down"), wantCalls: []string{"clear"}, wantErr: "clear Claude Code prompt failures"},
-		{name: "write error", failures: []*ai.AiPromptFailure{failure("f1")}, writeErr: errors.Default.New("db down"), wantCalls: []string{"clear", "f1"}, wantErr: "write Claude Code prompt failure"},
+		{name: "clear error", failures: failures(1), clearErr: errors.Default.New("db down"), wantCalls: []string{"clear"}, wantErr: "clear Claude Code prompt failures"},
+		{name: "write error stops at the failed batch", failures: failures(overflow), writeErr: errors.Default.New("db down"), wantCalls: []string{"clear", fmt.Sprintf("f1..f%d", full)}, wantErr: "write Claude Code prompt failures"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			tx := dalmocks.NewTransaction(t)
@@ -658,12 +666,11 @@ func TestWritePromptRollupReplacesFailures(t *testing.T) {
 				}
 				calls = append(calls, "clear")
 			}).Return(test.clearErr).Once()
-			if test.clearErr == nil {
-				for range test.failures {
-					tx.EXPECT().CreateOrUpdate(mock.AnythingOfType("*ai.AiPromptFailure")).Run(func(entity interface{}, _ ...dal.Clause) {
-						calls = append(calls, entity.(*ai.AiPromptFailure).Id)
-					}).Return(test.writeErr).Once()
-				}
+			for range test.wantCalls[1:] {
+				tx.EXPECT().Create(mock.AnythingOfType("[]*ai.AiPromptFailure")).Run(func(entity interface{}, _ ...dal.Clause) {
+					batch := entity.([]*ai.AiPromptFailure)
+					calls = append(calls, batch[0].Id+".."+batch[len(batch)-1].Id)
+				}).Return(test.writeErr).Once()
 			}
 
 			err := writePromptRollup(tx, promptRollup{prompt: prompt, failures: test.failures})

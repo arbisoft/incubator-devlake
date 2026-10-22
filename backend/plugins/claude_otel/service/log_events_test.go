@@ -619,21 +619,48 @@ func TestBuildPromptRollupRecordsFailureReasons(t *testing.T) {
 	}
 
 	api := byKind[ai.FailureKindApiError]
-	if api == nil || api.Model != "claude-opus-5-5" || api.ErrorMessage != "overloaded" || int64Value(api.StatusCode) != 529 || int64Value(api.Attempt) != 1 || api.ToolName != "" {
+	if api == nil || api.Model != "claude-opus-5-5" || api.QuerySource != mainThreadQuerySource || api.ErrorMessage != "overloaded" ||
+		int64Value(api.StatusCode) != 529 || int64Value(api.Attempt) != 1 || int64Value(api.DurationMs) != 2100 || api.ToolName != "" {
 		t.Fatalf("api failure = %#v", api)
 	}
 	tool := byKind[ai.FailureKindToolError]
-	if tool == nil || tool.ToolName != "Bash" || tool.ErrorType != "ShellError" || tool.ErrorMessage != "" || tool.StatusCode != nil {
+	if tool == nil || tool.ToolName != "Bash" || tool.ErrorType != "ShellError" || tool.ErrorMessage != "" || int64Value(tool.DurationMs) != 340 ||
+		tool.StatusCode != nil || tool.QuerySource != "" {
 		t.Fatalf("tool failure = %#v", tool)
 	}
-	apiEvent := firstEventNamed(t, events, eventAPIError)
-	if api.Id != (ai.CanonicalKey{Kind: ai.IDKindPromptFailure, Provider: aiProviderClaude, WorkspaceKey: testOrganizationID, Grain: []string{"p2", hex.EncodeToString(apiEvent.EventKey)}}).ID() ||
-		!api.OccurredAt.Equal(apiEvent.EventTimestamp) {
-		t.Fatalf("api failure id/time = %q %s, want canonical id of its event", api.Id, api.OccurredAt)
+	for _, check := range []struct {
+		failure *ai.AiPromptFailure
+		event   *models.OtelEvent
+	}{
+		{failure: api, event: firstEventNamed(t, events, eventAPIError)},
+		{failure: tool, event: failedToolResult(t, events)},
+	} {
+		wantID := ai.CanonicalKey{Kind: ai.IDKindPromptFailure, Provider: aiProviderClaude, WorkspaceKey: testOrganizationID, Grain: []string{"p2", hex.EncodeToString(check.event.EventKey)}}.ID()
+		if check.failure.Id != wantID || !check.failure.OccurredAt.Equal(check.event.EventTimestamp) {
+			t.Fatalf("%s failure id/time = %q %s, want %q %s", check.failure.FailureKind, check.failure.Id, check.failure.OccurredAt, wantID, check.event.EventTimestamp)
+		}
+	}
+	if api.Id == tool.Id {
+		t.Fatalf("api and tool failures share id %q", api.Id)
 	}
 
 	if failures := buildPromptRollup(testOrganizationID, "p1", fixturePromptEvents(t, "p1")).failures; len(failures) != 0 {
 		t.Fatalf("p1 failures = %d, want none", len(failures))
+	}
+}
+
+// A tool error's message never reaches its row, even from events that kept the error
+// attribute, so the rollup does not depend on ingest having stripped it.
+func TestBuildPromptRollupNeverCopiesToolErrorMessage(t *testing.T) {
+	events := promptEvents(t, loadLogEventsFixture(t), "p2")
+	toolEvent := failedToolResult(t, events)
+	if eventString(eventAttributes(toolEvent), "error") == "" {
+		t.Fatal("unstripped tool_result has no error attribute; the fixture no longer exercises this case")
+	}
+	for _, failure := range buildPromptRollup(testOrganizationID, "p2", events).failures {
+		if failure.FailureKind == ai.FailureKindToolError && failure.ErrorMessage != "" {
+			t.Fatalf("tool failure error_message = %q, want empty", failure.ErrorMessage)
+		}
 	}
 }
 
@@ -777,6 +804,18 @@ func firstEventNamed(t *testing.T, events []*models.OtelEvent, eventName string)
 	return nil
 }
 
+// failedToolResult returns the first tool_result among events that reports success=false.
+func failedToolResult(t *testing.T, events []*models.OtelEvent) *models.OtelEvent {
+	t.Helper()
+	for _, event := range events {
+		if event.EventName == eventToolResult && event.Success != nil && !*event.Success {
+			return event
+		}
+	}
+	t.Fatalf("no failed %s event among %d events", eventToolResult, len(events))
+	return nil
+}
+
 func TestPromptRollupNeverCarriesPromptText(t *testing.T) {
 	for _, promptID := range []string{"p1", "p2"} {
 		rollup := buildPromptRollup(testOrganizationID, promptID, fixturePromptEvents(t, promptID))
@@ -891,10 +930,18 @@ func newOtelLogsHTTPRequest(t *testing.T, logs *collectorlogs.ExportLogsServiceR
 
 // fixturePromptEvents converts the fixture and returns one prompt's events, as the rollup
 // loads them from storage.
+// fixturePromptEvents returns the fixture's events of one prompt as ingest stores them, with
+// content attributes stripped.
 func fixturePromptEvents(t *testing.T, promptID string) []*models.OtelEvent {
 	t.Helper()
 	request := loadLogEventsFixture(t)
 	stripContentAttributes(request)
+	return promptEvents(t, request, promptID)
+}
+
+// promptEvents prepares request and returns the events of one prompt.
+func promptEvents(t *testing.T, request *collectorlogs.ExportLogsServiceRequest, promptID string) []*models.OtelEvent {
+	t.Helper()
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
 	prepared, err := newRawConverter(database, nil).prepareEvents(request, 1)
 	if err != nil {
