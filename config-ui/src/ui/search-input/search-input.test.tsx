@@ -16,12 +16,12 @@
  *
  */
 
-import { fireEvent, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getTheme } from '@/theme/tokens';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
-import { COMMON_COPY } from '@/ui/constants';
+import { COMMON_COPY, SEARCH_DEBOUNCE_MS, SEARCH_TRIGGER } from '@/ui/constants';
 
 import { SearchInput } from './search-input';
 
@@ -29,11 +29,21 @@ const PLACEHOLDER = 'Search users';
 
 const setup = (props: { value?: string; allowClear?: boolean } = {}) => {
   const onSearch = vi.fn();
-  renderWithTheme(<SearchInput placeholder={PLACEHOLDER} onSearch={onSearch} {...props} />);
-  return { onSearch, input: screen.getByRole<HTMLInputElement>('textbox', { name: PLACEHOLDER }) };
+  const view = renderWithTheme(<SearchInput placeholder={PLACEHOLDER} onSearch={onSearch} {...props} />);
+  return { ...view, onSearch, input: screen.getByRole<HTMLInputElement>('textbox', { name: PLACEHOLDER }) };
 };
 
+const advance = (ms: number) => act(() => vi.advanceTimersByTime(ms));
+
 describe('SearchInput', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('may shrink to a minimum width so a toolbar can keep one row', () => {
     const { input } = setup();
     const root = input.closest('.ant-space-compact') as Element;
@@ -45,20 +55,23 @@ describe('SearchInput', () => {
     const { input, onSearch } = setup();
     fireEvent.change(input, { target: { value: '  jira ' } });
     fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', keyCode: 13 });
-    expect(onSearch).toHaveBeenCalledExactlyOnceWith('jira');
+    expect(onSearch).toHaveBeenCalledExactlyOnceWith('jira', SEARCH_TRIGGER.SUBMIT);
   });
 
   it('submits through the attached search button', () => {
     const { input, onSearch } = setup();
     fireEvent.change(input, { target: { value: 'git' } });
     fireEvent.click(screen.getByRole('button', { name: COMMON_COPY.search }));
-    expect(onSearch).toHaveBeenCalledExactlyOnceWith('git');
+    expect(onSearch).toHaveBeenCalledExactlyOnceWith('git', SEARCH_TRIGGER.SUBMIT);
   });
 
-  it('does not search while typing', () => {
+  it('searches once after the debounce while typing', () => {
     const { input, onSearch } = setup();
     fireEvent.change(input, { target: { value: 'abc' } });
+    advance(SEARCH_DEBOUNCE_MS - 1);
     expect(onSearch).not.toHaveBeenCalled();
+    advance(1);
+    expect(onSearch).toHaveBeenCalledExactlyOnceWith('abc', SEARCH_TRIGGER.TYPING);
   });
 
   it('shows the committed value and follows prop changes', () => {
@@ -71,12 +84,53 @@ describe('SearchInput', () => {
   it('searches for an empty keyword when cleared', () => {
     const { onSearch } = setup({ value: 'abc', allowClear: true });
     fireEvent.click(screen.getByRole('button', { name: COMMON_COPY.clear }));
-    expect(onSearch).toHaveBeenCalledExactlyOnceWith('');
+    advance(SEARCH_DEBOUNCE_MS);
+    expect(onSearch).toHaveBeenCalledExactlyOnceWith('', SEARCH_TRIGGER.SUBMIT);
   });
 
-  it('does not search when a user deletes the text manually', () => {
+  it('searches an empty keyword after the debounce when the text is deleted', () => {
     const { input, onSearch } = setup({ value: 'abc', allowClear: true });
     fireEvent.change(input, { target: { value: '' } });
+    advance(SEARCH_DEBOUNCE_MS);
+    expect(onSearch).toHaveBeenCalledExactlyOnceWith('', SEARCH_TRIGGER.TYPING);
+  });
+
+  it('Enter cancels the pending debounce', () => {
+    const { input, onSearch } = setup();
+    fireEvent.change(input, { target: { value: 'abc' } });
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', keyCode: 13 });
+    advance(SEARCH_DEBOUNCE_MS * 2);
+    expect(onSearch).toHaveBeenCalledExactlyOnceWith('abc', SEARCH_TRIGGER.SUBMIT);
+  });
+
+  it('does not re-search when typing returns to the current value', () => {
+    const { input, onSearch } = setup({ value: 'abc' });
+    fireEvent.change(input, { target: { value: 'abcd' } });
+    fireEvent.change(input, { target: { value: 'abc' } });
+    advance(SEARCH_DEBOUNCE_MS);
     expect(onSearch).not.toHaveBeenCalled();
+  });
+
+  it('searches again on Enter even when the keyword is unchanged', () => {
+    const { input, onSearch } = setup({ value: 'abc' });
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', keyCode: 13 });
+    expect(onSearch).toHaveBeenCalledExactlyOnceWith('abc', SEARCH_TRIGGER.SUBMIT);
+  });
+
+  it('unmount cancels a pending search', () => {
+    const { input, onSearch, unmount } = setup();
+    fireEvent.change(input, { target: { value: 'abc' } });
+    unmount();
+    advance(SEARCH_DEBOUNCE_MS * 2);
+    expect(onSearch).not.toHaveBeenCalled();
+  });
+
+  it('keeps the draft when the value prop echoes what was typed', () => {
+    const { input, onSearch, rerender } = setup();
+    fireEvent.change(input, { target: { value: 'ab' } });
+    advance(SEARCH_DEBOUNCE_MS);
+    rerender(<SearchInput value="ab" placeholder={PLACEHOLDER} onSearch={onSearch} />);
+    expect(screen.getByRole<HTMLInputElement>('textbox', { name: PLACEHOLDER }).value).toBe('ab');
+    expect(onSearch).toHaveBeenCalledOnce();
   });
 });

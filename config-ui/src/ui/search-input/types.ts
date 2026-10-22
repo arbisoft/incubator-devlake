@@ -16,9 +16,11 @@
  *
  */
 
+import type { SearchTrigger } from '@/ui/types';
+
 export type SearchInputProps = {
   value?: string;
   placeholder: string;
-  onSearch: (keyword: string) => void;
+  onSearch: (keyword: string, trigger: SearchTrigger) => void;
   allowClear?: boolean;
 };

@@ -61,7 +61,6 @@ export const PASSWORD_ALPHABET = Object.values(PASSWORD_CHARACTER_GROUPS).join('
 // Same classes as Grafana's password policy; a symbol is anything that is not a letter or digit.
 export const PASSWORD_CHARACTER_CLASSES = [/\p{Lu}/u, /\p{Ll}/u, /\p{N}/u, /[^\p{L}\p{N}]/u] as const;
 
-export const SEARCH_DEBOUNCE_MS = 300;
 export const DEVLAKE_USER_SEARCH_PAGE_SIZE = 25;
 export const PROJECT_SEARCH_PAGE_SIZE = 50;
 

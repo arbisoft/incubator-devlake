@@ -103,17 +103,23 @@ export const useListState = <S extends string, F extends ListFilters>(inlineDefa
   const values = useMemo(() => readList(params, defaults), [params, defaults]);
 
   const update = useCallback(
-    (patch: (current: ListValues<S, F>) => Partial<ListValues<S, F>>) =>
-      setParams((prev) => {
-        const current = readList(prev, defaults);
-        return writeList(prev, { ...current, ...patch(current) }, defaults);
-      }),
+    (patch: (current: ListValues<S, F>) => Partial<ListValues<S, F>>, options?: { replace?: boolean }) =>
+      setParams(
+        (prev) => {
+          const current = readList(prev, defaults);
+          return writeList(prev, { ...current, ...patch(current) }, defaults);
+        },
+        { replace: options?.replace },
+      ),
     [defaults, setParams],
   );
 
   const setPage = useCallback((page: number) => update(() => ({ page })), [update]);
   const setPageSize = useCallback((pageSize: number) => update(() => ({ pageSize, page: DEFAULT_PAGE })), [update]);
-  const setKeyword = useCallback((keyword: string) => update(() => ({ keyword, page: DEFAULT_PAGE })), [update]);
+  const setKeyword = useCallback(
+    (keyword: string, options?: { replace?: boolean }) => update(() => ({ keyword, page: DEFAULT_PAGE }), options),
+    [update],
+  );
   const setSort = useCallback((sort?: ListSort<S>) => update(() => ({ sort })), [update]);
   const setFilter = useCallback(
     <K extends keyof F>(name: K, value: F[K]) =>
