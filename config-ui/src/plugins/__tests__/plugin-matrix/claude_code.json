@@ -1,0 +1,68 @@
+{
+  "plugin": "claude_code",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "endpoint": "https://api.anthropic.com",
+      "organization": "",
+      "token": "",
+      "customHeaders": [],
+      "proxy": "",
+      "rateLimitPerHour": 1000
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Endpoint URL"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. org_123456789"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Your API Key"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      },
+      {
+        "tag": "input",
+        "role": "spinbutton"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.Endpoint URL*Provide the Claude Code instance API endpoint.Anthropic Organization*Enter the Anthropic organization from your Anthropic admin settings. DevLake uses it to scope Claude Code usage reporting.Anthropic Organization ID is requiredAnthropic API Key*Use an Anthropic API key with permission to read Claude Code usage reports for the selected organization.Anthropic API Key is required (unless custom headers are configured)Custom HeadersAdd custom HTTP headers for middleware or proxy authentication (e.g. Ocp-Apim-Subscription-Key). Required when not using an Anthropic API Key.+ Add HeaderProxyAdd a proxy if you cannot access Claude Code directly.Custom Rate LimitBy default, DevLake uses 1,000 requests/hour for Claude Code usage collection. Adjust this value to throttle collection speed. requests/hour",
+    "typed": {
+      "name": "v0",
+      "endpoint": "v1",
+      "organization": "v2",
+      "token": "v3",
+      "customHeaders": [],
+      "proxy": "v4",
+      "rateLimitPerHour": 1000
+    }
+  },
+  "scopeConfig": {
+    "mounted": {},
+    "controls": [],
+    "text": "",
+    "typed": {}
+  },
+  "consoleErrors": [],
+  "requests": []
+}

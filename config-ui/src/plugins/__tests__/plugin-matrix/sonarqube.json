@@ -1,0 +1,61 @@
+{
+  "plugin": "sonarqube",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "endpoint": "https://sonarcloud.io/api/",
+      "token": "",
+      "proxy": "",
+      "rateLimitPerHour": 0
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. org-1"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Your Token"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.SonarQube*SonarCloudSonarQube Server If you are using SonarQube Cloud, you do not need to enter the endpoint URL, which is https://sonarcloud.io/api/.Organization*Copy the organization key at here. If you have more than one, please create another connection.Token*A token with Browse permission on the projects you want is sufficient for listing projects and collecting issues, hotspots, and file metrics. Listing Accounts (users) may require a system admin token on some SonarQube instances.ProxyAdd a proxy if you cannot access SonarQube directly.Custom Rate LimitBy default, DevLake uses 10,000 requests/hour for data collection for SonarQube. But you can adjust the collection speed by setting up your desirable rate limit. Learn more",
+    "typed": {
+      "name": "v0",
+      "endpoint": "https://sonarcloud.io/api/",
+      "org": "v1",
+      "token": "v2",
+      "proxy": "v3",
+      "rateLimitPerHour": 0
+    }
+  },
+  "scopeConfig": null,
+  "consoleErrors": [
+    "A props object containing a \"key\" prop is being spread into JSX:"
+  ],
+  "requests": []
+}

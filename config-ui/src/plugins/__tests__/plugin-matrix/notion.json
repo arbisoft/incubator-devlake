@@ -1,0 +1,85 @@
+{
+  "plugin": "notion",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "endpoint": "https://api.notion.com",
+      "token": "",
+      "proxy": "",
+      "rateLimitPerHour": 10800
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Endpoint URL"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Your Token"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Notion workspace ID"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "2026-03-11"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Notion verification token"
+      },
+      {
+        "tag": "input",
+        "type": "text"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      },
+      {
+        "tag": "input",
+        "role": "spinbutton"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.Endpoint URL*Provide the Notion instance API endpoint.Internal Integration Token*Workspace IDNotion API VersionWebhook IngestionEnable webhook ingestion in addition to pollingWebhook Shared KeyUse Notion webhook verification_token for HMAC signature validation.Turn on webhook ingestion to enforce webhook shared key validation.Webhook URL TemplateReplace {connectionId} and {scopeId} after creating connection and scope.ProxyAdd a proxy if you cannot access Notion directly.Custom Rate Limit requests/hour",
+    "typed": {
+      "name": "v0",
+      "endpoint": "v1",
+      "token": "v2",
+      "proxy": "v6",
+      "rateLimitPerHour": 10800,
+      "workspaceId": "v3",
+      "apiVersion": "v4",
+      "webhookSharedKey": "v5"
+    }
+  },
+  "scopeConfig": {
+    "mounted": {},
+    "controls": [],
+    "text": "",
+    "typed": {}
+  },
+  "consoleErrors": [],
+  "requests": []
+}

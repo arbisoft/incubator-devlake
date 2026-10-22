@@ -1,0 +1,135 @@
+{
+  "plugin": "clickup",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "endpoint": "https://api.clickup.com/api/v2/",
+      "token": "",
+      "proxy": "",
+      "rateLimitPerHour": 0
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Endpoint URL"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Your Token"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.Endpoint URL*ClickUp REST API base URL. Keep the default unless self-hosted/proxied.API Token*Your ClickUp personal API token (ClickUp → Settings → Apps → API Token, starts with \"pk_\"). Sent verbatim in the Authorization header.ProxyAdd a proxy if you cannot access ClickUp directly.Custom Rate LimitMaximum number of API requests per hour. Leave blank for the default (6000).",
+    "typed": {
+      "name": "v0",
+      "endpoint": "v1",
+      "token": "v2",
+      "proxy": "v3",
+      "rateLimitPerHour": 0
+    }
+  },
+  "scopeConfig": {
+    "mounted": {
+      "sprintNamePattern": "",
+      "storyPointField": "",
+      "defaultIssueType": "",
+      "issueTypeRequirement": "",
+      "issueTypeBug": "",
+      "issueTypeIncident": "",
+      "issueStatusTodo": [],
+      "issueStatusInProgress": [],
+      "issueStatusDone": []
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "(?i)sprint\\s*\\d+"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "points (native)"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "role": "combobox"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "(feat|feature|story|requirement)"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "(?i)^bug$"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "(incident|outage|sev)"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "(?i)bug"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "(?i)incident"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "role": "combobox"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "role": "combobox"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "role": "combobox"
+      }
+    ],
+    "text": "Issue TrackingTell DevLake how the lists and tasks in this ClickUp folder map onto DevLake's domain model (boards, sprints, issues) so sprint velocity and DORA metrics are computed correctly.Sprint list name patternRegEx matched against each list's name. Matching lists become sprints; the rest are plain board issues.Story point fieldLeave blank to use ClickUp's native sprint points. Set a custom-field name to read story points (e.g. Fibonacci LOE) from that field instead.Force issue type for this board(auto — detect per task)Optional. Set to flag an entire folder as one type — e.g. INCIDENT for a Security Incidents folder (feeds DORA Change Failure Rate & MTTR). Leave as (auto) to detect per task.Per-task type detection (used when the board type above is left on auto). DevLake classifies each task by matching its ClickUp task type against these RegEx patterns; precedence is Incident > Bug > Requirement.RequirementBugIncidentType by list name (optional). ClickUp often has no per-task type, so teams group bugs/incidents in a dedicated list. Tasks in a list whose name matches these RegEx are classified accordingly; Incident takes precedence over Bug. This overrides per-task detection above (but a forced board type still wins).Bug list name patternTasks in matching lists become BUG — e.g. a QA Bugs / Bug Tracking list.Incident list name patternTasks in matching lists become INCIDENT (DORA CFR/MTTR).Status mapping (optional). ClickUp statuses are auto-mapped by their type (open/unstarted → To Do, custom → In Progress, done/closed → Done). List raw status names below to override.To Do statusese.g. backlog, ready for devIn Progress statusese.g. in development, in code reviewDone statusese.g. deployed, Closed",
+    "typed": {
+      "sprintNamePattern": "v0",
+      "storyPointField": "v1",
+      "defaultIssueType": "",
+      "issueTypeRequirement": "v2",
+      "issueTypeBug": "v3",
+      "issueTypeIncident": "v4",
+      "issueStatusTodo": [],
+      "issueStatusInProgress": [],
+      "issueStatusDone": [],
+      "bugListPattern": "v5",
+      "incidentListPattern": "v6"
+    }
+  },
+  "consoleErrors": [
+    "A props object containing a \"key\" prop is being spread into JSX:"
+  ],
+  "requests": []
+}

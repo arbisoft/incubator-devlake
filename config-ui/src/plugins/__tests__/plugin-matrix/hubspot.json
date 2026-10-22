@@ -1,0 +1,81 @@
+{
+  "plugin": "hubspot",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "endpoint": "https://api.hubapi.com",
+      "token": "",
+      "proxy": "",
+      "rateLimitPerHour": 3600
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Endpoint URL"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Your Token"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "HubSpot portal ID"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "HubSpot app client secret"
+      },
+      {
+        "tag": "input",
+        "type": "text"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      },
+      {
+        "tag": "input",
+        "role": "spinbutton"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.Endpoint URL*Provide the HubSpot instance API endpoint.Private App Token*Portal IDWebhook IngestionEnable webhook ingestion in addition to pollingWebhook Shared KeyUse your HubSpot app client secret for signature verification (v1/v2/v3).Turn on webhook ingestion to enforce webhook shared key validation.Webhook URL TemplateReplace {connectionId} and {scopeId} after creating connection and scope.ProxyAdd a proxy if you cannot access HubSpot directly.Custom Rate Limit requests/hour",
+    "typed": {
+      "name": "v0",
+      "endpoint": "v1",
+      "token": "v2",
+      "proxy": "v5",
+      "rateLimitPerHour": 3600,
+      "portalId": "v3",
+      "webhookSharedKey": "v4"
+    }
+  },
+  "scopeConfig": {
+    "mounted": {},
+    "controls": [],
+    "text": "",
+    "typed": {}
+  },
+  "consoleErrors": [
+    "A props object containing a \"key\" prop is being spread into JSX:"
+  ],
+  "requests": []
+}

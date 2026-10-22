@@ -1,0 +1,93 @@
+{
+  "plugin": "gh-copilot",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "endpoint": "https://api.github.com",
+      "organization": "",
+      "enterprise": "",
+      "token": "",
+      "proxy": "",
+      "rateLimitPerHour": 5000
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Endpoint URL"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. github"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. my-enterprise"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Your Token"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      },
+      {
+        "tag": "input",
+        "role": "spinbutton"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.Endpoint URL*Provide the GitHub Copilot instance API endpoint.OrganizationEnter the GitHub organization name for org-level metrics and seat data. At least one of Organization or Enterprise Slug is required.At least one of Organization or Enterprise Slug is requiredEnterprise SlugEnter the GitHub enterprise slug for enterprise-wide aggregate metrics and per-user data. At least one of Organization or Enterprise Slug is required. For the most complete data, provide both.At least one of Organization or Enterprise Slug is requiredGitHub Personal Access Token*Use a token with access to the organization/enterprise Copilot metrics (for example: manage_billing:copilot, read:enterprise).ProxyAdd a proxy if you cannot access GitHub Copilot directly.Custom Rate LimitBy default, DevLake uses 5,000 requests/hour for GitHub Copilot data collection. Adjust this value to throttle collection speed. requests/hour",
+    "typed": {
+      "name": "v0",
+      "endpoint": "v1",
+      "organization": "v2",
+      "enterprise": "v3",
+      "token": "v4",
+      "proxy": "v5",
+      "rateLimitPerHour": 5000
+    }
+  },
+  "scopeConfig": {
+    "mounted": {
+      "implementationDate": null,
+      "baselinePeriodDays": 90
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "placeholder": "Select implementation date"
+      },
+      {
+        "tag": "input",
+        "role": "spinbutton",
+        "placeholder": "90"
+      }
+    ],
+    "text": "GitHub Copilot Impact AnalysisRollout Milestone ConfigurationImpact DashboardOptional: Configure a rollout milestone date to add visual annotations on the GitHub Copilot Impact Dashboard. The dashboard works without this - correlation analysis is the primary view.GitHub Copilot Rollout Date (Optional)Baseline Period (Days)days(Recommended: 30-90 days for meaningful comparison)",
+    "typed": {
+      "implementationDate": null,
+      "baselinePeriodDays": 90
+    }
+  },
+  "consoleErrors": [
+    "Each child in a list should have a unique \"key\" prop.%s%s See https://react.dev/link/warning-keys for more information.",
+    "Warning: [antd: Alert] `message` is deprecated. Please use `title` instead.",
+    "Warning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead."
+  ],
+  "requests": []
+}

@@ -1,0 +1,105 @@
+{
+  "plugin": "azuredevops_go",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "username": "",
+      "token": "",
+      "organization": "",
+      "proxy": "",
+      "rateLimitPerHour": 0
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Username"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Your Token"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your organization"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.Azure DevOps Version*Azure DevOps CloudAzure DevOps Server (On-Premises)If you are using Azure DevOps Cloud, you do not need to enter the endpoint URL.Username (Optional for On-Premises)*For On-Premises Azure DevOps Server, enter your Windows/Domain username if required (e.g. Administrator or domain\\user). Leave empty for Cloud.Personal Access Token*For Azure DevOps Cloud, use a Personal Access Token (PAT). For On-Premises Server, use a PAT or your domain password.Personal Access Token ScopeIf you are using an organization-scoped token, please enter the organization. Otherwise make sure to create an unscoped token. Learn about how to create a PATUnscopedScopedProxyAdd a proxy if you cannot access Azure DevOps Go directly.Custom Rate LimitBy default, DevLake uses 18,000 requests/hour for data collection for Azure DevOps. But you can adjust the collection speed by setting up your desirable rate limit. Learn more",
+    "typed": {
+      "name": "v0",
+      "username": "v1",
+      "token": "v2",
+      "organization": "",
+      "proxy": "v3",
+      "rateLimitPerHour": 0
+    }
+  },
+  "scopeConfig": {
+    "mounted": {
+      "deploymentPattern": "(deploy|push-image)",
+      "productionPattern": "prod(.*)",
+      "refdiff": {
+        "tagsLimit": 10,
+        "tagsPattern": "/v\\d+\\.\\d+(\\.\\d+(-rc)*\\d*)*$/"
+      }
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "(deploy|push-image)"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "prod(.*)"
+      }
+    ],
+    "text": "CI/CDDeploymentDORAUse Regular Expression to define Deployments in DevLake in order to measure DORA metrics. Learn moreConvert a Azure Pipeline Run as a DevLake Deployment when: The pipeline name, run name, or one of its jobs matches*If the pipeline name, run name, or job name also matches, this Deployment is a ‘Production Deployment’Additional Settings",
+    "typed": {
+      "deploymentPattern": "v0",
+      "productionPattern": "v1",
+      "refdiff": {
+        "tagsLimit": 10,
+        "tagsPattern": "/v\\d+\\.\\d+(\\.\\d+(-rc)*\\d*)*$/"
+      }
+    }
+  },
+  "consoleErrors": [
+    "A props object containing a \"key\" prop is being spread into JSX:"
+  ],
+  "requests": []
+}
