@@ -21,8 +21,8 @@ import type { TableColumnsType } from 'antd';
 
 import { ACCESS_STATUS } from '@/api/access';
 import type { GrafanaRole, GrafanaUser } from '@/api/grafana-users';
+import { LAYOUT } from '@/theme/scales';
 import {
-  COMMON_COPY,
   IconButton,
   IdentityCell,
   OVERFLOW_LAYOUT,
@@ -33,12 +33,12 @@ import {
 } from '@/ui';
 
 import { buildActionsColumn, buildRoleColumn, buildStatusColumn } from '../columns';
+import { ACTIONS_LAYOUT } from '../constants';
 
-import { GrafanaMoreMenu } from './components';
 import { COPY, GRAFANA_ROLE_OPTIONS, GRAFANA_ROW_ACTION, GRAFANA_USER_COLUMN, MAX_VISIBLE_PROJECTS } from './constants';
-import { ProjectChips, ProjectsCell } from './styled';
+import { Muted, ProjectChips, ProjectsCell } from './styled';
 import type { GrafanaColumnActions } from './types';
-import { getMenuActions, getUserIdentity, toUserStatus } from './utils';
+import { getRowIconActions, getUserIdentity, toUserStatus } from './utils';
 
 const renderUser = (user: GrafanaUser) => {
   const { primary, secondary } = getUserIdentity(user);
@@ -59,10 +59,10 @@ const renderUser = (user: GrafanaUser) => {
 
 const renderProjects = (user: GrafanaUser, onEditProjects: GrafanaColumnActions['onEditProjects']) => (
   <ProjectsCell>
-    {user.projects.length === 0 ? (
-      COMMON_COPY.emptyValue
-    ) : (
-      <ProjectChips>
+    <ProjectChips>
+      {user.projects.length === 0 ? (
+        <Muted>{COPY.noProjects}</Muted>
+      ) : (
         <OverflowList
           max={MAX_VISIBLE_PROJECTS}
           layout={OVERFLOW_LAYOUT.INLINE}
@@ -72,8 +72,8 @@ const renderProjects = (user: GrafanaUser, onEditProjects: GrafanaColumnActions[
             node: <StatusBadge tone={STATUS_TONE.NEUTRAL} label={project} variant={STATUS_BADGE_VARIANT.CHIP} />,
           }))}
         />
-      </ProjectChips>
-    )}
+      )}
+    </ProjectChips>
     <IconButton
       icon={<EditOutlined />}
       label={COPY.actions.editProjectsFor(user.email)}
@@ -84,27 +84,34 @@ const renderProjects = (user: GrafanaUser, onEditProjects: GrafanaColumnActions[
 
 export const getGrafanaUserColumns = (actions: GrafanaColumnActions): TableColumnsType<GrafanaUser> => [
   { key: GRAFANA_USER_COLUMN.USER, title: COPY.columns.user, render: (_, user) => renderUser(user) },
-  buildRoleColumn<GrafanaUser, GrafanaRole>({
-    key: GRAFANA_USER_COLUMN.ROLE,
-    title: COPY.columns.role,
-    options: GRAFANA_ROLE_OPTIONS,
-    getRole: (user) => user.role,
-    getLabel: (user) => COPY.actions.roleFor(user.email),
-    getLockedReason: (user) => (user.protected ? COPY.actions.roleLocked : undefined),
-    isPending: actions.isRolePending,
-    onChange: actions.onRoleChange,
-  }),
+  {
+    ...buildRoleColumn<GrafanaUser, GrafanaRole>({
+      key: GRAFANA_USER_COLUMN.ROLE,
+      title: COPY.columns.role,
+      options: GRAFANA_ROLE_OPTIONS,
+      getRole: (user) => user.role,
+      getLabel: (user) => COPY.actions.roleFor(user.email),
+      getLockedReason: (user) => (user.protected ? COPY.actions.roleLocked : undefined),
+      isPending: actions.isRolePending,
+      onChange: actions.onRoleChange,
+    }),
+    width: LAYOUT.grafanaRoleColumnWidth,
+  },
   {
     key: GRAFANA_USER_COLUMN.PROJECTS,
     title: COPY.columns.projects,
+    width: LAYOUT.grafanaProjectsColumnWidth,
     render: (_, user) => renderProjects(user, actions.onEditProjects),
   },
-  buildStatusColumn<GrafanaUser>({
-    key: GRAFANA_USER_COLUMN.STATUS,
-    title: COPY.columns.status,
-    getStatus: toUserStatus,
-    labels: COPY.status,
-  }),
+  {
+    ...buildStatusColumn<GrafanaUser>({
+      key: GRAFANA_USER_COLUMN.STATUS,
+      title: COPY.columns.status,
+      getStatus: toUserStatus,
+      labels: COPY.status,
+    }),
+    width: LAYOUT.grafanaStatusColumnWidth,
+  },
   buildActionsColumn<GrafanaUser>({
     key: GRAFANA_USER_COLUMN.ACTIONS,
     title: COPY.columns.actions,
@@ -119,10 +126,8 @@ export const getGrafanaUserColumns = (actions: GrafanaColumnActions): TableColum
     },
     canToggle: (user) => !user.protected,
     canRemove: (user) => !user.protected,
-    renderExtra: (user) =>
-      getMenuActions(user).length > 0 && (
-        <GrafanaMoreMenu user={user} onSelect={(action) => actions.onMenuAction(user, action)} />
-      ),
+    layout: ACTIONS_LAYOUT.ICONS,
+    extraActions: (user) => getRowIconActions(user, actions),
     onToggle: (user, status) =>
       actions.onToggle(status === ACCESS_STATUS.ACTIVE ? GRAFANA_ROW_ACTION.ENABLE : GRAFANA_ROW_ACTION.DISABLE, user),
     onRemove: actions.onRemove,
