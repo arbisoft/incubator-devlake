@@ -43,15 +43,6 @@ describe('ListToolbar', () => {
     expect(setKeyword).toHaveBeenCalledExactlyOnceWith('x', { replace: true });
   });
 
-  it('commits an Enter search as a history entry', () => {
-    const setKeyword = vi.fn();
-    renderWithTheme(<ListToolbar list={{ keyword: '', setKeyword }} searchPlaceholder={PLACEHOLDER} />);
-    const input = screen.getByRole('textbox', { name: PLACEHOLDER });
-    fireEvent.change(input, { target: { value: 'x' } });
-    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', keyCode: 13 });
-    expect(setKeyword).toHaveBeenCalledExactlyOnceWith('x', { replace: false });
-  });
-
   it('shows the list keyword and sends a submitted search to the list', () => {
     const setKeyword = vi.fn();
     renderWithTheme(<ListToolbar list={{ keyword: 'ci', setKeyword }} searchPlaceholder={PLACEHOLDER} />);

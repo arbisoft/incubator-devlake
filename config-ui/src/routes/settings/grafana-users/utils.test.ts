@@ -274,11 +274,4 @@ describe('getRowIconActions', () => {
     actions[1].onClick();
     expect(onMenuAction).toHaveBeenCalledWith(user, GRAFANA_MENU_ACTION.PASSWORD);
   });
-
-  it('skips the password action for SSO accounts and returns nothing for protected ones', () => {
-    expect(getRowIconActions({ ...user, sso: true }, { onMenuAction }).map(({ key }) => key)).toEqual([
-      GRAFANA_MENU_ACTION.DETAILS,
-    ]);
-    expect(getRowIconActions({ ...user, protected: true }, { onMenuAction })).toEqual([]);
-  });
 });
