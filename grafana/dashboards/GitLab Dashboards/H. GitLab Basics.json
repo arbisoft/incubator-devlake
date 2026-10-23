@@ -1,0 +1,392 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Average days to resolve an issue, per developer.\n\rdatasource: issue_assignees, issues, board_issues, project_mapping, accounts\n\nNot built yet: the GitLab query for this panel is added by US-21.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 23,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.75,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Average Time for Issue Resolution (By Individual)",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Tasks vs bugs assigned per developer (top 20).\n\rdatasource: issue_assignees, issues, board_issues, project_mapping, accounts\n\nNot built yet: the GitLab query for this panel is added by US-21.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
+      "id": 2,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.75,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "normal",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Work Allocation by Tasks and Bugs",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Done vs pending bugs per developer (top 20).\n\rdatasource: issue_assignees, issues, board_issues, project_mapping, accounts\n\nNot built yet: the GitLab query for this panel is added by US-21.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      },
+      "id": 3,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.75,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "normal",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Bug Allocation & Status Overview",
+      "type": "barchart"
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 41,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "devlake-mysql"
+        },
+        "definition": "select DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'gitlab:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name ",
+        "includeAll": true,
+        "label": "Project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "select DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'gitlab:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name ",
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "devlake-mysql"
+        },
+        "definition": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'gitlab:%'\nAND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\nORDER BY text",
+        "includeAll": true,
+        "label": "Repo",
+        "multi": true,
+        "name": "repo_id",
+        "options": [],
+        "query": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'gitlab:%'\nAND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\nORDER BY text",
+        "refresh": 1,
+        "regex": "/^(?<text>.*)--(?<value>.*)$/",
+        "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "devlake-mysql"
+        },
+        "definition": "SELECT Name FROM (\n  WITH scoped_repos AS (\n    SELECT r.id\n    FROM repos r\n    WHERE r.id LIKE 'gitlab:%'\n      AND r.deleted = 0\n      AND r.id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n      AND EXISTS (SELECT 1 FROM project_mapping pm\n                   WHERE pm.row_id  = r.id\n                     AND pm.`table` = 'repos'\n                     AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  ),\n  scoped_issues AS (\n    -- gitlab board ids match repo ids\n    SELECT bi.issue_id\n    FROM board_issues bi\n    WHERE bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n      AND EXISTS (SELECT 1 FROM project_mapping pm\n                   WHERE pm.row_id  = bi.board_id\n                     AND pm.`table` = 'boards'\n                     AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  ),\n  scoped_accounts AS (\n    -- MR authors\n    SELECT pr.author_id AS account_id, NULL AS fallback_name, 0 AS assignee\n    FROM pull_requests pr\n    JOIN scoped_repos sr ON sr.id = pr.base_repo_id\n    WHERE pr.author_id LIKE 'gitlab:%'\n    UNION\n    -- MR reviewers and commenters\n    SELECT cmt.account_id, NULL, 0\n    FROM pull_request_comments cmt\n    JOIN pull_requests pr ON pr.id = cmt.pull_request_id\n    JOIN scoped_repos sr  ON sr.id = pr.base_repo_id\n    WHERE cmt.account_id LIKE 'gitlab:%'\n    UNION\n    -- issue assignees, from issue_assignees and issues.assignee_id (the :0 placeholder means unassigned)\n    SELECT ia.assignee_id, ia.assignee_name, 1\n    FROM issue_assignees ia\n    JOIN scoped_issues si ON si.issue_id = ia.issue_id\n    WHERE ia.assignee_id LIKE 'gitlab:%'\n    UNION\n    SELECT i.assignee_id, i.assignee_name, 1\n    FROM issues i\n    JOIN scoped_issues si ON si.issue_id = i.id\n    WHERE i.assignee_id LIKE 'gitlab:%'\n      AND i.assignee_id NOT LIKE 'gitlab:GitlabAccount:%:0'\n  )\n  -- assignees with no account row keep their GitLab username; bots are left out, unless issues are assigned to them\n  SELECT CONCAT(COALESCE(REPLACE(COALESCE(NULLIF(TRIM(REPLACE(a.full_name, _utf8mb4 X'E2808B', '')), ''), NULLIF(TRIM(a.user_name), '')), '-', ' '), REPLACE(NULLIF(TRIM(REPLACE(MAX(sa.fallback_name), _utf8mb4 X'E2808B', '')), ''), '-', ' '), sa.account_id), '--', sa.account_id) AS Name\n  FROM scoped_accounts sa\n  LEFT JOIN accounts a ON a.id = sa.account_id\n  GROUP BY sa.account_id, a.full_name, a.user_name\n  HAVING MAX(sa.assignee) = 1 OR NOT COALESCE(a.user_name, '') LIKE 'project\\_%\\_bot\\_%'\n  UNION ALL\n  SELECT 'Unassigned--unassigned'\n) all_developers\nORDER BY Name",
+        "description": "",
+        "includeAll": true,
+        "label": "Developer",
+        "multi": true,
+        "name": "developer_id",
+        "options": [],
+        "query": "SELECT Name FROM (\n  WITH scoped_repos AS (\n    SELECT r.id\n    FROM repos r\n    WHERE r.id LIKE 'gitlab:%'\n      AND r.deleted = 0\n      AND r.id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n      AND EXISTS (SELECT 1 FROM project_mapping pm\n                   WHERE pm.row_id  = r.id\n                     AND pm.`table` = 'repos'\n                     AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  ),\n  scoped_issues AS (\n    -- gitlab board ids match repo ids\n    SELECT bi.issue_id\n    FROM board_issues bi\n    WHERE bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n      AND EXISTS (SELECT 1 FROM project_mapping pm\n                   WHERE pm.row_id  = bi.board_id\n                     AND pm.`table` = 'boards'\n                     AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  ),\n  scoped_accounts AS (\n    -- MR authors\n    SELECT pr.author_id AS account_id, NULL AS fallback_name, 0 AS assignee\n    FROM pull_requests pr\n    JOIN scoped_repos sr ON sr.id = pr.base_repo_id\n    WHERE pr.author_id LIKE 'gitlab:%'\n    UNION\n    -- MR reviewers and commenters\n    SELECT cmt.account_id, NULL, 0\n    FROM pull_request_comments cmt\n    JOIN pull_requests pr ON pr.id = cmt.pull_request_id\n    JOIN scoped_repos sr  ON sr.id = pr.base_repo_id\n    WHERE cmt.account_id LIKE 'gitlab:%'\n    UNION\n    -- issue assignees, from issue_assignees and issues.assignee_id (the :0 placeholder means unassigned)\n    SELECT ia.assignee_id, ia.assignee_name, 1\n    FROM issue_assignees ia\n    JOIN scoped_issues si ON si.issue_id = ia.issue_id\n    WHERE ia.assignee_id LIKE 'gitlab:%'\n    UNION\n    SELECT i.assignee_id, i.assignee_name, 1\n    FROM issues i\n    JOIN scoped_issues si ON si.issue_id = i.id\n    WHERE i.assignee_id LIKE 'gitlab:%'\n      AND i.assignee_id NOT LIKE 'gitlab:GitlabAccount:%:0'\n  )\n  -- assignees with no account row keep their GitLab username; bots are left out, unless issues are assigned to them\n  SELECT CONCAT(COALESCE(REPLACE(COALESCE(NULLIF(TRIM(REPLACE(a.full_name, _utf8mb4 X'E2808B', '')), ''), NULLIF(TRIM(a.user_name), '')), '-', ' '), REPLACE(NULLIF(TRIM(REPLACE(MAX(sa.fallback_name), _utf8mb4 X'E2808B', '')), ''), '-', ' '), sa.account_id), '--', sa.account_id) AS Name\n  FROM scoped_accounts sa\n  LEFT JOIN accounts a ON a.id = sa.account_id\n  GROUP BY sa.account_id, a.full_name, a.user_name\n  HAVING MAX(sa.assignee) = 1 OR NOT COALESCE(a.user_name, '') LIKE 'project\\_%\\_bot\\_%'\n  UNION ALL\n  SELECT 'Unassigned--unassigned'\n) all_developers\nORDER BY Name",
+        "refresh": 1,
+        "regex": "/^(?<text>.*)--(?<value>.*)$/",
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "H. GitLab Basics",
+  "uid": "gitlab-h-basics",
+  "version": 1,
+  "description": "GitLab shell from US-13; panels are implemented in US-21."
+}
