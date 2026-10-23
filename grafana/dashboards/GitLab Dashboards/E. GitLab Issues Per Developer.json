@@ -1,0 +1,562 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "description": "",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 5,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "# GitLab Issues Per Developer",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.6.2",
+      "title": "Dashboard E",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Non-bug issues per assignee split into To Do, In Progress (open with an In Progress, In Review, In QA, Ready to be Merged or Ready For Deployment label) and Done. An issue with several assignees counts for each; the other panels use the issue's main assignee.\ndatasource: issue_assignees, issues, issue_labels, board_issues, accounts",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 3
+      },
+      "id": 1,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.75,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "normal",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Issues created in the range per assignee, split into To Do, In Progress and Done, top 20. Bugs are left out, as on GitHub.\n-- GitLab issues are only open or closed, so an open issue is In Progress when it has an In Progress, In Review or In QA label.\n-- An issue with several assignees counts once for each.\nWITH issue_types AS (\n  -- GitLab issue type mapping. Almost every GitLab issue has original_type ISSUE, so the type comes from labels,\n  -- checked in this order, with original_type (INCIDENT, TASK) as the fallback. Adhoc work carries the Ad-hoc label.\n  SELECT i.id,\n         CASE\n           WHEN SUM(LOWER(il.label_name) IN ('bug', 'minorbug', 'regression issue', 'prod issue', 'qa issues', 'hotfix',\n                                             'sentry', 'prod-sentry', 'existing issue', 'data-issue',\n                                             'validation-issue', 'logic-issue', 'deployment issues', 'security',\n                                             'show-stopper', 'debug')) > 0\n             OR i.original_type = 'INCIDENT'                                                      THEN 'Bugs'\n           WHEN SUM(LOWER(il.label_name) IN ('tech debt', 'enhancement', 'refinements & improvements',\n                                             'ui improvements', 'performance', 'optimization', 'n+1')) > 0 THEN 'Refactoring'\n           WHEN SUM(LOWER(il.label_name) IN ('documentation', 'docs-sync')) > 0                   THEN 'Documentation'\n           WHEN SUM(LOWER(il.label_name) IN ('r&d', 'r & d', 'research')) > 0                    THEN 'R&D'\n           WHEN SUM(LOWER(il.label_name) IN ('team review', 'qa review', 'testcase review')) > 0  THEN 'Reviews'\n           WHEN SUM(LOWER(il.label_name) IN ('feature', 'feature request', 'hot feature', 'client request',\n                                             'change request', 'unit tests', 'automation', 'e2e-testing', 'chore', 'ideation')) > 0\n             OR i.original_type = 'TASK'                                                          THEN 'Tasks'\n           ELSE 'Unclassified'\n         END                                                    AS category,\n         COALESCE(SUM(LOWER(il.label_name) IN ('ad-hoc', 'adhoc')) > 0, 0)  AS adhoc\n  FROM issues i\n  LEFT JOIN issue_labels il ON il.issue_id = i.id\n  WHERE i.id LIKE 'gitlab:%'\n  GROUP BY i.id, i.original_type\n),\nissue_owners AS (\n  -- an issue's assignees from issue_assignees, or its issues.assignee_id when it has none (NULL when unassigned)\n  SELECT ia.issue_id, ia.assignee_id, ia.assignee_name\n  FROM issue_assignees ia\n  WHERE ia.issue_id LIKE 'gitlab:%'\n  UNION ALL\n  SELECT i.id, CASE WHEN COALESCE(i.assignee_id, '') = '' OR i.assignee_id LIKE 'gitlab:GitlabAccount:%:0' THEN NULL ELSE i.assignee_id END, NULLIF(TRIM(i.assignee_name), '')\n  FROM issues i\n  WHERE i.id LIKE 'gitlab:%'\n    AND NOT EXISTS (SELECT 1 FROM issue_assignees ia WHERE ia.issue_id = i.id)\n)\nSELECT COALESCE(REPLACE(COALESCE(NULLIF(TRIM(REPLACE(a.full_name, _utf8mb4 X'E2808B', '')), ''), NULLIF(TRIM(a.user_name), '')), '-', ' '), REPLACE(NULLIF(TRIM(REPLACE(io.assignee_name, _utf8mb4 X'E2808B', '')), ''), '-', ' '), '(unassigned)')                                     AS developer,\n       SUM(i.status <> 'DONE' AND NOT EXISTS (SELECT 1 FROM issue_labels ilp WHERE ilp.issue_id = i.id AND LOWER(ilp.label_name) IN ('in progress', 'in review', 'in qa', 'ready to be merged (approved)', 'ready for deployment')))                      AS `To Do`,\n       SUM(i.status <> 'DONE' AND EXISTS (SELECT 1 FROM issue_labels ilp WHERE ilp.issue_id = i.id AND LOWER(ilp.label_name) IN ('in progress', 'in review', 'in qa', 'ready to be merged (approved)', 'ready for deployment')))                          AS `In Progress`,\n       SUM(i.status = 'DONE')                                                    AS Done\nFROM issues i\nJOIN issue_types it    ON it.id = i.id\nJOIN issue_owners io   ON io.issue_id = i.id\nLEFT JOIN accounts a   ON a.id = io.assignee_id\nWHERE i.id LIKE 'gitlab:%'\n  AND it.category <> 'Bugs'\n  AND $__timeFilter(i.created_date)\n  AND ((io.assignee_id) IN ( ${developer_id} ) OR ((io.assignee_id) IS NULL AND 'unassigned' IN ( ${developer_id} )))\n  AND EXISTS (SELECT 1 FROM board_issues bi2 JOIN project_mapping pm2 ON pm2.row_id = bi2.board_id AND pm2.`table` = 'boards' WHERE bi2.issue_id = i.id AND bi2.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) AND pm2.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\nGROUP BY developer\nORDER BY (`To Do` + `In Progress` + Done) DESC\nLIMIT 20;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Issues By Status",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Issues currently open per developer.\ndatasource: issues, accounts, board_issues, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 2,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(REPLACE(COALESCE(NULLIF(TRIM(REPLACE(a.full_name, _utf8mb4 X'E2808B', '')), ''), NULLIF(TRIM(a.user_name), '')), '-', ' '), REPLACE(NULLIF(TRIM(REPLACE(i.assignee_name, _utf8mb4 X'E2808B', '')), ''), '-', ' '), '(unassigned)')    AS Developer,\n       COUNT(*)                                            AS `Work In Progress`\nFROM issues i\nLEFT JOIN accounts a ON a.id = CASE WHEN COALESCE(i.assignee_id, '') = '' OR i.assignee_id LIKE 'gitlab:GitlabAccount:%:0' THEN NULL ELSE i.assignee_id END\nWHERE i.id LIKE 'gitlab:%'\n  AND i.status <> 'DONE'\n  AND ((CASE WHEN COALESCE(i.assignee_id, '') = '' OR i.assignee_id LIKE 'gitlab:GitlabAccount:%:0' THEN NULL ELSE i.assignee_id END) IN ( ${developer_id} ) OR ((CASE WHEN COALESCE(i.assignee_id, '') = '' OR i.assignee_id LIKE 'gitlab:GitlabAccount:%:0' THEN NULL ELSE i.assignee_id END) IS NULL AND 'unassigned' IN ( ${developer_id} )))\n  AND EXISTS (SELECT 1 FROM board_issues bi2 JOIN project_mapping pm2 ON pm2.row_id = bi2.board_id AND pm2.`table` = 'boards' WHERE bi2.issue_id = i.id AND bi2.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) AND pm2.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\nGROUP BY Developer\nORDER BY `Work In Progress` DESC;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Current Work In Progress",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Issues closed by the selected developers over time. About 1,100 issues created before 2021 have no resolution date and are left out, and about 1,000 were closed in one bulk clean-up on 2021-09-22.\ndatasource: issues, board_issues, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Issues Closed",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroup(i.resolution_date, ${interval})    AS time,\n       COUNT(*)                                        AS value\nFROM issues i\nWHERE i.status = 'DONE'\n  AND i.resolution_date IS NOT NULL\n  AND i.id LIKE 'gitlab:%'\n  AND $__timeFilter(i.resolution_date)\n  AND ((CASE WHEN COALESCE(i.assignee_id, '') = '' OR i.assignee_id LIKE 'gitlab:GitlabAccount:%:0' THEN NULL ELSE i.assignee_id END) IN ( ${developer_id} ) OR ((CASE WHEN COALESCE(i.assignee_id, '') = '' OR i.assignee_id LIKE 'gitlab:GitlabAccount:%:0' THEN NULL ELSE i.assignee_id END) IS NULL AND 'unassigned' IN ( ${developer_id} )))\n  AND EXISTS (SELECT 1 FROM board_issues bi2 JOIN project_mapping pm2 ON pm2.row_id = bi2.board_id AND pm2.`table` = 'boards' WHERE bi2.issue_id = i.id AND bi2.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) AND pm2.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\nGROUP BY time\nORDER BY time;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Issues Closed",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "devlake-mysql"
+      },
+      "description": "Issue types per developer, split into Planned vs Adhoc work. GitLab issues have no sprints, so Adhoc means the Ad-hoc label.\ndatasource: issues, issue_labels, accounts, board_issues, project_mapping",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "id": 4,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.6.2",
+      "targets": [
+        {
+          "dataset": "devlake",
+          "datasource": {
+            "type": "mysql",
+            "uid": "devlake-mysql"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- No GitLab issues are in sprints, so Adhoc means the issue has the Ad-hoc label and Planned means it does not.\nWITH issue_types AS (\n  -- GitLab issue type mapping. Almost every GitLab issue has original_type ISSUE, so the type comes from labels,\n  -- checked in this order, with original_type (INCIDENT, TASK) as the fallback. Adhoc work carries the Ad-hoc label.\n  SELECT i.id,\n         CASE\n           WHEN SUM(LOWER(il.label_name) IN ('bug', 'minorbug', 'regression issue', 'prod issue', 'qa issues', 'hotfix',\n                                             'sentry', 'prod-sentry', 'existing issue', 'data-issue',\n                                             'validation-issue', 'logic-issue', 'deployment issues', 'security',\n                                             'show-stopper', 'debug')) > 0\n             OR i.original_type = 'INCIDENT'                                                      THEN 'Bugs'\n           WHEN SUM(LOWER(il.label_name) IN ('tech debt', 'enhancement', 'refinements & improvements',\n                                             'ui improvements', 'performance', 'optimization', 'n+1')) > 0 THEN 'Refactoring'\n           WHEN SUM(LOWER(il.label_name) IN ('documentation', 'docs-sync')) > 0                   THEN 'Documentation'\n           WHEN SUM(LOWER(il.label_name) IN ('r&d', 'r & d', 'research')) > 0                    THEN 'R&D'\n           WHEN SUM(LOWER(il.label_name) IN ('team review', 'qa review', 'testcase review')) > 0  THEN 'Reviews'\n           WHEN SUM(LOWER(il.label_name) IN ('feature', 'feature request', 'hot feature', 'client request',\n                                             'change request', 'unit tests', 'automation', 'e2e-testing', 'chore', 'ideation')) > 0\n             OR i.original_type = 'TASK'                                                          THEN 'Tasks'\n           ELSE 'Unclassified'\n         END                                                    AS category,\n         COALESCE(SUM(LOWER(il.label_name) IN ('ad-hoc', 'adhoc')) > 0, 0)  AS adhoc\n  FROM issues i\n  LEFT JOIN issue_labels il ON il.issue_id = i.id\n  WHERE i.id LIKE 'gitlab:%'\n  GROUP BY i.id, i.original_type\n)\nSELECT COALESCE(REPLACE(COALESCE(NULLIF(TRIM(REPLACE(a.full_name, _utf8mb4 X'E2808B', '')), ''), NULLIF(TRIM(a.user_name), '')), '-', ' '), REPLACE(NULLIF(TRIM(REPLACE(i.assignee_name, _utf8mb4 X'E2808B', '')), ''), '-', ' '), '(unassigned)')    AS Developer,\n       SUM(it.category = 'Bugs')                           AS Bugs,\n       SUM(it.category = 'Documentation')                  AS Documentation,\n       SUM(it.category = 'R&D')                            AS `R&D`,\n       SUM(it.category = 'Reviews')                        AS Reviews,\n       SUM(it.category = 'Refactoring')                    AS Refactoring,\n       SUM(it.category = 'Tasks')                          AS Tasks,\n       SUM(it.category = 'Unclassified')                   AS Unclassified,\n       COUNT(*)                                            AS Total,\n       SUM(it.adhoc)                                       AS Adhoc,\n       SUM(NOT it.adhoc)                                   AS Planned\nFROM issues i\nJOIN issue_types it  ON it.id = i.id\nLEFT JOIN accounts a ON a.id = CASE WHEN COALESCE(i.assignee_id, '') = '' OR i.assignee_id LIKE 'gitlab:GitlabAccount:%:0' THEN NULL ELSE i.assignee_id END\nWHERE i.id LIKE 'gitlab:%'\n  AND $__timeFilter(i.created_date)\n  AND ((CASE WHEN COALESCE(i.assignee_id, '') = '' OR i.assignee_id LIKE 'gitlab:GitlabAccount:%:0' THEN NULL ELSE i.assignee_id END) IN ( ${developer_id} ) OR ((CASE WHEN COALESCE(i.assignee_id, '') = '' OR i.assignee_id LIKE 'gitlab:GitlabAccount:%:0' THEN NULL ELSE i.assignee_id END) IS NULL AND 'unassigned' IN ( ${developer_id} )))\n  AND EXISTS (SELECT 1 FROM board_issues bi2 JOIN project_mapping pm2 ON pm2.row_id = bi2.board_id AND pm2.`table` = 'boards' WHERE bi2.issue_id = i.id AND bi2.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) AND pm2.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\nGROUP BY Developer\nORDER BY Developer ASC;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Issue Type Mix Per Developer",
+      "type": "table"
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 41,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "1M",
+          "value": "1M"
+        },
+        "label": "Time Interval",
+        "name": "interval",
+        "options": [
+          {
+            "selected": true,
+            "text": "Month",
+            "value": "1M"
+          },
+          {
+            "selected": false,
+            "text": "Week",
+            "value": "1w"
+          },
+          {
+            "selected": false,
+            "text": "Day",
+            "value": "1d"
+          }
+        ],
+        "query": "Month : 1M, Week : 1w, Day : 1d",
+        "type": "custom"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "devlake-mysql"
+        },
+        "definition": "select DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'gitlab:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name ",
+        "includeAll": true,
+        "label": "Project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "select DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'gitlab:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name ",
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "devlake-mysql"
+        },
+        "definition": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'gitlab:%'\nAND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\nORDER BY text",
+        "includeAll": true,
+        "label": "Repo",
+        "multi": true,
+        "name": "repo_id",
+        "options": [],
+        "query": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'gitlab:%'\nAND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\nORDER BY text",
+        "refresh": 1,
+        "regex": "/^(?<text>.*)--(?<value>.*)$/",
+        "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "devlake-mysql"
+        },
+        "definition": "SELECT Name FROM (\n  WITH scoped_repos AS (\n    SELECT r.id\n    FROM repos r\n    WHERE r.id LIKE 'gitlab:%'\n      AND r.deleted = 0\n      AND r.id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n      AND EXISTS (SELECT 1 FROM project_mapping pm\n                   WHERE pm.row_id  = r.id\n                     AND pm.`table` = 'repos'\n                     AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  ),\n  scoped_issues AS (\n    -- gitlab board ids match repo ids\n    SELECT bi.issue_id\n    FROM board_issues bi\n    WHERE bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n      AND EXISTS (SELECT 1 FROM project_mapping pm\n                   WHERE pm.row_id  = bi.board_id\n                     AND pm.`table` = 'boards'\n                     AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  ),\n  scoped_accounts AS (\n    -- MR authors\n    SELECT pr.author_id AS account_id, NULL AS fallback_name, 0 AS assignee\n    FROM pull_requests pr\n    JOIN scoped_repos sr ON sr.id = pr.base_repo_id\n    WHERE pr.author_id LIKE 'gitlab:%'\n    UNION\n    -- MR reviewers and commenters\n    SELECT cmt.account_id, NULL, 0\n    FROM pull_request_comments cmt\n    JOIN pull_requests pr ON pr.id = cmt.pull_request_id\n    JOIN scoped_repos sr  ON sr.id = pr.base_repo_id\n    WHERE cmt.account_id LIKE 'gitlab:%'\n    UNION\n    -- issue assignees, from issue_assignees and issues.assignee_id (the :0 placeholder means unassigned)\n    SELECT ia.assignee_id, ia.assignee_name, 1\n    FROM issue_assignees ia\n    JOIN scoped_issues si ON si.issue_id = ia.issue_id\n    WHERE ia.assignee_id LIKE 'gitlab:%'\n    UNION\n    SELECT i.assignee_id, i.assignee_name, 1\n    FROM issues i\n    JOIN scoped_issues si ON si.issue_id = i.id\n    WHERE i.assignee_id LIKE 'gitlab:%'\n      AND i.assignee_id NOT LIKE 'gitlab:GitlabAccount:%:0'\n  )\n  -- assignees with no account row keep their GitLab username; bots are left out, unless issues are assigned to them\n  SELECT CONCAT(COALESCE(REPLACE(COALESCE(NULLIF(TRIM(REPLACE(a.full_name, _utf8mb4 X'E2808B', '')), ''), NULLIF(TRIM(a.user_name), '')), '-', ' '), REPLACE(NULLIF(TRIM(REPLACE(MAX(sa.fallback_name), _utf8mb4 X'E2808B', '')), ''), '-', ' '), sa.account_id), '--', sa.account_id) AS Name\n  FROM scoped_accounts sa\n  LEFT JOIN accounts a ON a.id = sa.account_id\n  GROUP BY sa.account_id, a.full_name, a.user_name\n  HAVING MAX(sa.assignee) = 1 OR NOT COALESCE(a.user_name, '') LIKE 'project\\_%\\_bot\\_%'\n  UNION ALL\n  SELECT 'Unassigned--unassigned'\n) all_developers\nORDER BY Name",
+        "description": "",
+        "includeAll": true,
+        "label": "Developer",
+        "multi": true,
+        "name": "developer_id",
+        "options": [],
+        "query": "SELECT Name FROM (\n  WITH scoped_repos AS (\n    SELECT r.id\n    FROM repos r\n    WHERE r.id LIKE 'gitlab:%'\n      AND r.deleted = 0\n      AND r.id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n      AND EXISTS (SELECT 1 FROM project_mapping pm\n                   WHERE pm.row_id  = r.id\n                     AND pm.`table` = 'repos'\n                     AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  ),\n  scoped_issues AS (\n    -- gitlab board ids match repo ids\n    SELECT bi.issue_id\n    FROM board_issues bi\n    WHERE bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n      AND EXISTS (SELECT 1 FROM project_mapping pm\n                   WHERE pm.row_id  = bi.board_id\n                     AND pm.`table` = 'boards'\n                     AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  ),\n  scoped_accounts AS (\n    -- MR authors\n    SELECT pr.author_id AS account_id, NULL AS fallback_name, 0 AS assignee\n    FROM pull_requests pr\n    JOIN scoped_repos sr ON sr.id = pr.base_repo_id\n    WHERE pr.author_id LIKE 'gitlab:%'\n    UNION\n    -- MR reviewers and commenters\n    SELECT cmt.account_id, NULL, 0\n    FROM pull_request_comments cmt\n    JOIN pull_requests pr ON pr.id = cmt.pull_request_id\n    JOIN scoped_repos sr  ON sr.id = pr.base_repo_id\n    WHERE cmt.account_id LIKE 'gitlab:%'\n    UNION\n    -- issue assignees, from issue_assignees and issues.assignee_id (the :0 placeholder means unassigned)\n    SELECT ia.assignee_id, ia.assignee_name, 1\n    FROM issue_assignees ia\n    JOIN scoped_issues si ON si.issue_id = ia.issue_id\n    WHERE ia.assignee_id LIKE 'gitlab:%'\n    UNION\n    SELECT i.assignee_id, i.assignee_name, 1\n    FROM issues i\n    JOIN scoped_issues si ON si.issue_id = i.id\n    WHERE i.assignee_id LIKE 'gitlab:%'\n      AND i.assignee_id NOT LIKE 'gitlab:GitlabAccount:%:0'\n  )\n  -- assignees with no account row keep their GitLab username; bots are left out, unless issues are assigned to them\n  SELECT CONCAT(COALESCE(REPLACE(COALESCE(NULLIF(TRIM(REPLACE(a.full_name, _utf8mb4 X'E2808B', '')), ''), NULLIF(TRIM(a.user_name), '')), '-', ' '), REPLACE(NULLIF(TRIM(REPLACE(MAX(sa.fallback_name), _utf8mb4 X'E2808B', '')), ''), '-', ' '), sa.account_id), '--', sa.account_id) AS Name\n  FROM scoped_accounts sa\n  LEFT JOIN accounts a ON a.id = sa.account_id\n  GROUP BY sa.account_id, a.full_name, a.user_name\n  HAVING MAX(sa.assignee) = 1 OR NOT COALESCE(a.user_name, '') LIKE 'project\\_%\\_bot\\_%'\n  UNION ALL\n  SELECT 'Unassigned--unassigned'\n) all_developers\nORDER BY Name",
+        "refresh": 1,
+        "regex": "/^(?<text>.*)--(?<value>.*)$/",
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "E. GitLab Issues Per Developer",
+  "uid": "gitlab-e-issues-per-developer",
+  "version": 1
+}
