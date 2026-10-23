@@ -39,19 +39,10 @@ export const OnboardTour = ({ nameRef, connectionRef, configRef }: Props) => {
   const { ready, data } = useRefreshData<OnboardStore | null>(() => API.store.get(STORE_KEY), []);
 
   const steps = [
-    {
-      ...COPY.tour.project,
-      target: targetOf(nameRef),
-    },
-    {
-      ...COPY.tour.connection,
-      target: targetOf(connectionRef),
-    },
-    {
-      ...COPY.tour.configure,
-      target: targetOf(configRef),
-    },
-  ];
+    { copy: COPY.tour.project, ref: nameRef },
+    { copy: COPY.tour.connection, ref: connectionRef },
+    { copy: COPY.tour.configure, ref: configRef },
+  ].map(({ copy, ref }) => ({ ...copy, target: targetOf(ref) }));
 
   if (!ready || !data || data.step !== ONBOARD_DONE_STEP || data.done) {
     return null;

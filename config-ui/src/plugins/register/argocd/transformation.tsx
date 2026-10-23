@@ -63,8 +63,10 @@ const renderCollapseItems = ({
   panelStyle: React.CSSProperties;
   transformation: ArgoCDTransformationValues;
   onChangeTransformation: (next: ArgoCDTransformationValues) => void;
-}) =>
-  [
+}) => {
+  const { envNamePattern, deploymentPattern, productionPattern } = transformation;
+
+  return [
     {
       key: 'CICD',
       label: 'CI/CD',
@@ -91,7 +93,7 @@ const renderCollapseItems = ({
             <Input
               style={{ width: 200, margin: '0 8px' }}
               placeholder="(?i)prod(.*)"
-              value={transformation.envNamePattern ?? '(?i)prod(.*)'}
+              value={envNamePattern ?? '(?i)prod(.*)'}
               onChange={(e) =>
                 onChangeTransformation({
                   ...transformation,
@@ -110,7 +112,7 @@ const renderCollapseItems = ({
             <Input
               style={{ width: 200, margin: '0 8px' }}
               placeholder=".*"
-              value={transformation.deploymentPattern ?? ''}
+              value={deploymentPattern ?? ''}
               onChange={(e) =>
                 onChangeTransformation({
                   ...transformation,
@@ -125,7 +127,7 @@ const renderCollapseItems = ({
             <Input
               style={{ width: 200, margin: '0 8px' }}
               placeholder=""
-              value={transformation.productionPattern ?? ''}
+              value={productionPattern ?? ''}
               onChange={(e) =>
                 onChangeTransformation({
                   ...transformation,
@@ -144,3 +146,4 @@ const renderCollapseItems = ({
       ),
     },
   ].filter((it) => entities.includes(it.key));
+};

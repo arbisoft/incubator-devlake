@@ -40,11 +40,12 @@ export type TransformationProps<T extends Transformation = Transformation> = {
   scopeId?: ID;
   scopeConfigId?: ID;
   transformation: T;
-  // method syntax keeps plugin-specific transformation types assignable to the shared renderer
+  // intentional unchecked cast: method syntax lets each plugin declare its own value type
   setTransformation(next: SetStateAction<T>): void;
   setHasError(hasError: boolean): void;
 };
 
+// intentional unchecked cast: method syntax lets each plugin declare its own value type
 export type TransformationComponent = { render(props: TransformationProps): ReactNode }['render'];
 
 export type StepDetailsProps = {

@@ -161,8 +161,10 @@ const renderCollapseItems = ({
   bugs: string[];
   incidents: string[];
   transformaType: (its: string[], standardType: StandardType) => TypeMappings;
-}) =>
-  [
+}) => {
+  const { storyPointField, extraJql } = transformation;
+
+  return [
     {
       key: 'TICKET',
       label: 'Issue Tracking',
@@ -255,7 +257,7 @@ const renderCollapseItems = ({
               filterOption={(input: string, option?: { label: string; value: string }) =>
                 (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
               }
-              value={transformation.storyPointField}
+              value={storyPointField}
               onChange={(value) =>
                 onChangeTransformation({
                   ...transformation,
@@ -275,7 +277,7 @@ const renderCollapseItems = ({
           >
             <Input
               placeholder='e.g. component = "my-project"'
-              value={transformation.extraJql}
+              value={extraJql}
               onChange={(e) =>
                 onChangeTransformation({
                   ...transformation,
@@ -300,3 +302,4 @@ const renderCollapseItems = ({
       ),
     },
   ].filter((it) => entities.includes(it.key));
+};

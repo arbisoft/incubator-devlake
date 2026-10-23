@@ -25,6 +25,12 @@ import type { QDevConnectionValues } from './types';
 
 type RenderProps = ConnectionFieldRenderProps<QDevConnectionValues>;
 
+const sections = [
+  { key: 'qdev-aws', Section: AwsCredentials },
+  { key: 'qdev-s3', Section: S3Config },
+  { key: 'qdev-identity', Section: IdentityCenterConfig },
+];
+
 export const QDevConfig: IPluginConfig = {
   plugin: 'q_dev',
   name: 'Q Developer',
@@ -45,33 +51,11 @@ export const QDevConfig: IPluginConfig = {
     },
     fields: [
       'name',
-      ({ type, initialValues, values, setValues, setErrors }: RenderProps) => (
-        <AwsCredentials
-          key="qdev-aws"
-          type={type}
-          initialValues={initialValues}
-          values={values}
-          setValues={setValues}
-          setErrors={setErrors}
-        />
-      ),
-      ({ initialValues, values, setValues, setErrors }: RenderProps) => (
-        <S3Config
-          key="qdev-s3"
-          initialValues={initialValues}
-          values={values}
-          setValues={setValues}
-          setErrors={setErrors}
-        />
-      ),
-      ({ initialValues, values, setValues, setErrors }: RenderProps) => (
-        <IdentityCenterConfig
-          key="qdev-identity"
-          initialValues={initialValues}
-          values={values}
-          setValues={setValues}
-          setErrors={setErrors}
-        />
+      ...sections.map(
+        ({ key, Section }) =>
+          function QDevSection(props: RenderProps) {
+            return <Section key={key} {...props} />;
+          },
       ),
       'proxy',
       {

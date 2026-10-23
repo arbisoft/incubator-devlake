@@ -19,7 +19,7 @@
 export type GithubConnectionValues = {
   endpoint?: string;
   authMethod?: string;
-  proxy: string;
+  proxy?: string;
   token?: string;
   appId?: string;
   secretKey?: string;

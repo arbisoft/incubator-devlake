@@ -23,7 +23,7 @@ import type { TransformationProps } from '@/plugins/components/scope-config-form
 
 import type { ClickUpTransformationValues } from './types';
 
-const HINT_STYLE = { margin: '8px 0 16px' };
+const hintStyle = { margin: '8px 0 16px' };
 
 type Props = TransformationProps<ClickUpTransformationValues>;
 
@@ -97,7 +97,7 @@ export const ClickUpTransformation = ({ transformation, setTransformation }: Pro
                 />
               </Form.Item>
 
-              <p style={HINT_STYLE}>
+              <p style={hintStyle}>
                 Per-task type detection (used when the board type above is left on auto). DevLake classifies each task
                 by matching its ClickUp task type against these RegEx patterns; precedence is Incident &gt; Bug &gt;
                 Requirement.
@@ -124,7 +124,7 @@ export const ClickUpTransformation = ({ transformation, setTransformation }: Pro
                 />
               </Form.Item>
 
-              <p style={HINT_STYLE}>
+              <p style={hintStyle}>
                 Type by list name (optional). ClickUp often has no per-task type, so teams group bugs/incidents in a
                 dedicated list. Tasks in a list whose name matches these RegEx are classified accordingly; Incident
                 takes precedence over Bug. This overrides per-task detection above (but a forced board type still wins).
@@ -150,7 +150,7 @@ export const ClickUpTransformation = ({ transformation, setTransformation }: Pro
                 />
               </Form.Item>
 
-              <p style={HINT_STYLE}>
+              <p style={hintStyle}>
                 Status mapping (optional). ClickUp statuses are auto-mapped by their type (open/unstarted → To Do,
                 custom → In Progress, done/closed → Done). List raw status names below to override.
               </p>

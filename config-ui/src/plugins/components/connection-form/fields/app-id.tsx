@@ -64,7 +64,7 @@ export const ConnectionAppId = ({ label, subLabel, placeholder, initialValue, va
   };
 
   return (
-    <Block title={label ?? 'AppId'} description={subLabel ? subLabel : null} required>
+    <Block title={label ?? 'AppId'} description={subLabel} required>
       <Input placeholder={placeholder ?? 'Your AppId'} value={value} onChange={handleChange} />
     </Block>
   );

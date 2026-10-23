@@ -29,11 +29,12 @@ export type ConnectionFieldRenderProps<V extends ConnectionFieldValues = Connect
   initialValues: V;
   values: V;
   errors: ConnectionFieldErrors;
-  // method syntax keeps plugin-specific value types assignable to the shared renderer
+  // intentional unchecked cast: method syntax lets each plugin declare its own value type
   setValues(values: Partial<V>): void;
   setErrors(errors: ConnectionFieldErrors): void;
 };
 
+// intentional unchecked cast: method syntax lets each plugin declare its own value type
 type ConnectionFieldRenderer = { render(props: ConnectionFieldRenderProps): ReactNode }['render'];
 
 export type ConnectionFieldOptions = {

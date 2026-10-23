@@ -24,6 +24,8 @@ import type { ThemeMode, ResolvedTheme } from '@/theme/tokens';
 
 import type { ThemeState } from './types';
 
+export const PREFERS_DARK_QUERY = '(prefers-color-scheme: dark)';
+
 const isThemeMode = (value: unknown): value is ThemeMode =>
   value === THEME_MODE.LIGHT || value === THEME_MODE.DARK || value === THEME_MODE.SYSTEM;
 
@@ -69,5 +71,5 @@ export const selectThemeMode = (state: RootState): ThemeMode => state.theme.mode
 export const resolveThemeMode = (mode: ThemeMode): ResolvedTheme => {
   if (mode !== THEME_MODE.SYSTEM) return mode;
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return THEME_MODE.LIGHT;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? THEME_MODE.DARK : THEME_MODE.LIGHT;
+  return window.matchMedia(PREFERS_DARK_QUERY).matches ? THEME_MODE.DARK : THEME_MODE.LIGHT;
 };

@@ -42,10 +42,10 @@ type Values = Record<string, unknown>;
 type Control = { tag: string; type?: string; role?: string; placeholder?: string };
 type Screen = { mounted: Values; controls: Control[]; text: string; typed: Values };
 
-const CONTROL_SELECTOR = 'input, textarea, [role="switch"], [role="combobox"], [role="radio"], [role="checkbox"]';
-const TEXT_INPUT_TYPES = [null, 'text', 'password', 'url', 'number'];
+const controlSelector = 'input, textarea, [role="switch"], [role="combobox"], [role="radio"], [role="checkbox"]';
+const textInputTypes = [null, 'text', 'password', 'url', 'number'];
 
-const SETTLE_MS = 60;
+const settleMs = 60;
 
 // React reports these once per component per module, so they are asserted absent instead of recorded
 const isReactKeyWarning = (message: string) =>
@@ -66,7 +66,7 @@ const flush = async () => {
   }
   // useRefreshData debounces requests by a real 10ms timer, so wait past it
   await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+    await new Promise((resolve) => setTimeout(resolve, settleMs));
   });
   await act(async () => {});
 };
@@ -108,7 +108,7 @@ const TransformationHost = ({ config, onValues }: { config: PluginConfig; onValu
 };
 
 const describeControls = (container: HTMLElement): Control[] =>
-  Array.from(container.querySelectorAll(CONTROL_SELECTOR)).map((el) => {
+  Array.from(container.querySelectorAll(controlSelector)).map((el) => {
     const control: Control = { tag: el.tagName.toLowerCase() };
     const type = el.getAttribute('type');
     const role = el.getAttribute('role');
@@ -120,7 +120,7 @@ const describeControls = (container: HTMLElement): Control[] =>
   });
 
 const isTextLike = (el: Element) =>
-  el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && TEXT_INPUT_TYPES.includes(el.getAttribute('type')));
+  el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && textInputTypes.includes(el.getAttribute('type')));
 
 const isEditable = (el: Element) => !(el as HTMLInputElement).disabled && !(el as HTMLInputElement).readOnly;
 

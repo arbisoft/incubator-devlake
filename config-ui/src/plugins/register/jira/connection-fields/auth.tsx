@@ -37,6 +37,22 @@ type Props = Pick<
   'type' | 'initialValues' | 'values' | 'errors' | 'setValues' | 'setErrors'
 >;
 
+const versionOptions = [
+  { label: 'Jira Cloud', value: 'cloud' },
+  { label: 'Jira Cloud (Atlassian API Gateway)', value: 'gateway' },
+  { label: 'Jira Server / Jira Data Center', value: 'server' },
+];
+
+const gatewayMethodOptions = [
+  { label: 'Scoped API Token', value: 'AccessToken' },
+  { label: 'OAuth 2.0 (Service Account)', value: 'OAuth2' },
+];
+
+const serverMethodOptions = [
+  { label: 'Basic Authentication', value: 'BasicAuth' },
+  { label: 'Using Personal Access Token', value: 'AccessToken' },
+];
+
 export const Auth = ({ type, initialValues, values, setValues, setErrors }: Props) => {
   const [version, setVersion] = useState<JiraVersion>('cloud');
   const [cloudId, setCloudId] = useState('');
@@ -181,11 +197,7 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
   return (
     <>
       <Block title="Jira Version" required>
-        <Radio.Group value={version} onChange={handleChangeVersion}>
-          <Radio value="cloud">Jira Cloud</Radio>
-          <Radio value="gateway">Jira Cloud (Atlassian API Gateway)</Radio>
-          <Radio value="server">Jira Server / Jira Data Center</Radio>
-        </Radio.Group>
+        <Radio.Group value={version} options={versionOptions} onChange={handleChangeVersion} />
 
         {version !== 'gateway' && (
           <Block
@@ -222,10 +234,11 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
             />
           </Block>
           <Block title="Authentication Method" required>
-            <Radio.Group value={gatewayAuthMethod} onChange={handleChangeGatewayMethod}>
-              <Radio value="AccessToken">Scoped API Token</Radio>
-              <Radio value="OAuth2">OAuth 2.0 (Service Account)</Radio>
-            </Radio.Group>
+            <Radio.Group
+              value={gatewayAuthMethod}
+              options={gatewayMethodOptions}
+              onChange={handleChangeGatewayMethod}
+            />
           </Block>
           {gatewayAuthMethod === 'AccessToken' && (
             <Block
@@ -285,10 +298,7 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
       {version === 'server' && (
         <>
           <Block title="Authentication Method" required>
-            <Radio.Group value={values.authMethod} onChange={handleChangeMethod}>
-              <Radio value="BasicAuth">Basic Authentication</Radio>
-              <Radio value="AccessToken">Using Personal Access Token</Radio>
-            </Radio.Group>
+            <Radio.Group value={values.authMethod} options={serverMethodOptions} onChange={handleChangeMethod} />
           </Block>
           {values.authMethod === 'BasicAuth' && (
             <>

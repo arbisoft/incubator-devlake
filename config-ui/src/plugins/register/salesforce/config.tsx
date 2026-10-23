@@ -22,14 +22,21 @@ import { Block } from '@/components/block';
 import type { ConnectionFieldRenderProps, IPluginConfig } from '@/types';
 
 import Icon from './assets/icon.svg?react';
-import { credentialField, getConnectionValues, validateConnection } from './connection-fields/credential-field';
-import type { SalesforceConnectionValues } from './types';
+import {
+  ACCESS_TOKEN_FIELDS,
+  REFRESH_TOKEN_FIELDS,
+  credentialField,
+  getConnectionValues,
+  validateConnection,
+} from './connection-fields/credential-field';
+import { SALESFORCE_AUTH_MODE } from './constants';
+import type { SalesforceAuthMode, SalesforceConnectionValues } from './types';
 
 type RenderProps = ConnectionFieldRenderProps<SalesforceConnectionValues>;
 
-const AUTH_MODE_OPTIONS = [
-  { label: 'Access Token', value: 'access_token' },
-  { label: 'Refresh Token', value: 'refresh_token' },
+const authModeOptions: Array<{ label: string; value: SalesforceAuthMode }> = [
+  { label: 'Access Token', value: SALESFORCE_AUTH_MODE.ACCESS_TOKEN },
+  { label: 'Refresh Token', value: SALESFORCE_AUTH_MODE.REFRESH_TOKEN },
 ];
 
 export const SalesforceConfig: IPluginConfig = {
@@ -41,7 +48,7 @@ export const SalesforceConfig: IPluginConfig = {
   connection: {
     docLink: 'https://developer.salesforce.com/docs/apis',
     initialValues: {
-      authMode: 'access_token',
+      authMode: SALESFORCE_AUTH_MODE.ACCESS_TOKEN,
       loginUrl: '',
       instanceUrl: '',
       accessToken: '',
@@ -55,20 +62,21 @@ export const SalesforceConfig: IPluginConfig = {
       'name',
       ({ initialValues, values, setValues, setErrors }: RenderProps) => {
         const formValues = getConnectionValues(initialValues, values);
+        const { authMode, instanceUrl, loginUrl } = formValues;
 
         return (
           <Block key="authMode" title="Authentication Mode" required>
             <Select
               style={{ width: '100%' }}
-              value={formValues.authMode ?? 'access_token'}
-              options={AUTH_MODE_OPTIONS}
+              value={authMode ?? SALESFORCE_AUTH_MODE.ACCESS_TOKEN}
+              options={authModeOptions}
               onChange={(value) => {
                 const changedValues: SalesforceConnectionValues = { authMode: value };
-                if (value === 'refresh_token' && formValues.instanceUrl) {
-                  changedValues.loginUrl = formValues.instanceUrl;
+                if (value === SALESFORCE_AUTH_MODE.REFRESH_TOKEN && instanceUrl) {
+                  changedValues.loginUrl = instanceUrl;
                 }
-                if (value === 'access_token' && formValues.loginUrl) {
-                  changedValues.instanceUrl = formValues.loginUrl;
+                if (value === SALESFORCE_AUTH_MODE.ACCESS_TOKEN && loginUrl) {
+                  changedValues.instanceUrl = loginUrl;
                 }
                 const nextValues = { ...formValues, ...changedValues };
                 setValues(changedValues);
@@ -78,69 +86,30 @@ export const SalesforceConfig: IPluginConfig = {
           </Block>
         );
       },
-      credentialField({
-        key: 'instanceUrl',
-        title: 'Instance URL',
-        name: 'salesforce-instance-url',
-        placeholder: 'https://your-instance.my.salesforce.com',
-        authMode: 'access_token',
-        requiredMessage: 'Instance URL is required.',
-      }),
-      credentialField({
-        key: 'accessToken',
-        title: 'Access Token',
-        name: 'salesforce-access-token',
-        placeholder: 'Salesforce access token',
-        password: true,
-        authMode: 'access_token',
-        requiredMessage: 'Access token is required.',
-      }),
+      ...ACCESS_TOKEN_FIELDS.map(credentialField),
       ({ initialValues, values, setValues }: RenderProps) => {
-        const formValues = getConnectionValues(initialValues, values);
+        const { authMode, loginUrl } = getConnectionValues(initialValues, values);
 
-        return (formValues.authMode ?? 'access_token') === 'refresh_token' ? (
-          <Block key="loginUrl" title="Login URL">
-            <Input
-              name="salesforce-login-url"
-              autoComplete="off"
-              placeholder="https://login.salesforce.com"
-              value={formValues.loginUrl ?? ''}
-              onChange={(e) => setValues({ loginUrl: e.target.value })}
-            />
-            <p style={{ margin: '4px 0 0', color: '#7a7a7a', fontSize: 12 }}>
-              Use <code>https://test.salesforce.com</code> for sandbox refresh-token authentication.
-            </p>
-          </Block>
-        ) : null;
+        return (
+          (authMode ?? SALESFORCE_AUTH_MODE.ACCESS_TOKEN) === SALESFORCE_AUTH_MODE.REFRESH_TOKEN && (
+            <Block key="loginUrl" title="Login URL">
+              <Input
+                name="salesforce-login-url"
+                autoComplete="off"
+                placeholder="https://login.salesforce.com"
+                value={loginUrl ?? ''}
+                onChange={(e) => setValues({ loginUrl: e.target.value })}
+              />
+              <p style={{ margin: '4px 0 0', color: '#7a7a7a', fontSize: 12 }}>
+                Use <code>https://test.salesforce.com</code> for sandbox refresh-token authentication.
+              </p>
+            </Block>
+          )
+        );
       },
-      credentialField({
-        key: 'clientId',
-        title: 'Client ID',
-        name: 'salesforce-client-id',
-        placeholder: 'Salesforce OAuth client ID',
-        authMode: 'refresh_token',
-        requiredMessage: 'Client ID is required.',
-      }),
-      credentialField({
-        key: 'clientSecret',
-        title: 'Client Secret',
-        name: 'salesforce-client-secret',
-        placeholder: 'Salesforce OAuth client secret',
-        password: true,
-        authMode: 'refresh_token',
-        requiredMessage: 'Client secret is required.',
-      }),
-      credentialField({
-        key: 'refreshToken',
-        title: 'Refresh Token',
-        name: 'salesforce-refresh-token',
-        placeholder: 'Salesforce refresh token',
-        password: true,
-        authMode: 'refresh_token',
-        requiredMessage: 'Refresh token is required.',
-      }),
+      ...REFRESH_TOKEN_FIELDS.map(credentialField),
       ({ initialValues, values, setValues }: RenderProps) => {
-        const formValues = getConnectionValues(initialValues, values);
+        const { apiVersion } = getConnectionValues(initialValues, values);
 
         return (
           <Block key="apiVersion" title="API Version">
@@ -148,7 +117,7 @@ export const SalesforceConfig: IPluginConfig = {
               name="salesforce-api-version"
               autoComplete="off"
               placeholder="v61.0"
-              value={formValues.apiVersion ?? ''}
+              value={apiVersion ?? ''}
               onChange={(e) => setValues({ apiVersion: e.target.value })}
             />
           </Block>

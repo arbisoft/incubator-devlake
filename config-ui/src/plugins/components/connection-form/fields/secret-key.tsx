@@ -57,7 +57,7 @@ export const ConnectionSecretKey = ({
   };
 
   return (
-    <Block title={label ?? 'SecretKey'} description={subLabel ? subLabel : null} required>
+    <Block title={label ?? 'SecretKey'} description={subLabel} required>
       <Input.Password placeholder={placeholder ?? 'Your SecretKey'} value={value} onChange={handleChange} />
     </Block>
   );

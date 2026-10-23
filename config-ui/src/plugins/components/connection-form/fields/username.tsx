@@ -54,7 +54,7 @@ export const ConnectionUsername = ({
   };
 
   return (
-    <Block title={label ?? 'Username'} description={subLabel ? subLabel : null} required>
+    <Block title={label ?? 'Username'} description={subLabel} required>
       <Input placeholder={placeholder ?? 'Your Username'} value={value} onChange={handleChange} />
     </Block>
   );

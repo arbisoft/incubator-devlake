@@ -41,7 +41,7 @@ const setup = (values: WebhookIngestionValues, errors: ConnectionFieldErrors = {
   const setValues = vi.fn();
   const setErrors = vi.fn();
   const props: RenderProps = { type: 'create', initialValues: {}, values, errors, setValues, setErrors };
-  renderWithTheme(<>{fields.map((field) => (typeof field === 'function' ? field(props) : null))}</>);
+  renderWithTheme(<>{fields.filter((field) => typeof field === 'function').map((field) => field(props))}</>);
   return { setValues, setErrors };
 };
 

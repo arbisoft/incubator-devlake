@@ -69,7 +69,7 @@ const cbStates = [
   ...Array.from({ length: 31 }, (_, i) => ({ name: `State ${i + 2}`, ordinal: i + 2 })),
 ];
 
-const FIELDS: Record<string, Array<ReturnType<typeof cf>>> = {
+const fields: Record<string, Array<ReturnType<typeof cf>>> = {
   '0-1': [
     cf('PROJ2', 'Client type', 'enum', false, [
       { name: 'Bug', ordinal: 0 },
@@ -144,7 +144,7 @@ describe('YoutrackTransformation (attached mode)', () => {
         },
       ],
     });
-    customFields.mockImplementation((_prefix: string, projectId: string) => Promise.resolve(FIELDS[projectId]));
+    customFields.mockImplementation((_prefix: string, projectId: string) => Promise.resolve(fields[projectId]));
   });
 
   it('unions bundle values by name — synonyms are separate rows with per-project presence badges', async () => {

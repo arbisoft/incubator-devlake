@@ -61,9 +61,9 @@ export const otelCredential = (status: OtelStatus): OtelCredential => ({
 
 export const isDisabled = (button: HTMLElement) => button.getAttribute('aria-disabled') === 'true';
 
-const FEEDBACK_KINDS = ['success', 'error', 'warning', 'info'] as const;
+const feedbackKinds = ['success', 'error', 'warning', 'info'] as const;
 
 export const silenceFeedback = () => {
   vi.clearAllMocks();
-  FEEDBACK_KINDS.forEach((kind) => vi.spyOn(message, kind).mockImplementation(() => undefined as never));
+  feedbackKinds.forEach((kind) => vi.spyOn(message, kind).mockImplementation(() => undefined as never));
 };

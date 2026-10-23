@@ -16,8 +16,12 @@
  *
  */
 
+import type { SALESFORCE_AUTH_MODE } from './constants';
+
+export type SalesforceAuthMode = (typeof SALESFORCE_AUTH_MODE)[keyof typeof SALESFORCE_AUTH_MODE];
+
 export type SalesforceConnectionValues = {
-  authMode?: string;
+  authMode?: SalesforceAuthMode;
   loginUrl?: string;
   instanceUrl?: string;
   accessToken?: string;
@@ -25,6 +29,7 @@ export type SalesforceConnectionValues = {
   clientId?: string;
   clientSecret?: string;
   apiVersion?: string;
+  rateLimitPerHour?: number;
 };
 
 export type SalesforceTransformationValues = {

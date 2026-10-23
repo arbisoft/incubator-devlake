@@ -56,7 +56,7 @@ export const ConnectionPassword = ({
   };
 
   return (
-    <Block title={label ?? 'Password'} description={subLabel ? subLabel : null} required>
+    <Block title={label ?? 'Password'} description={subLabel} required>
       <Input.Password
         placeholder={type === 'update' ? '********' : placeholder || 'Your Password'}
         value={value}

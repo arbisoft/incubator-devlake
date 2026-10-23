@@ -25,9 +25,9 @@ import { trimTrailingSlashes } from '@/utils';
 
 import type { YouTrackConnectionValues } from '../types';
 
-const ENDPOINT_EXAMPLE = 'https://example.myjetbrains.com/youtrack/api';
+const endpointExample = 'https://example.myjetbrains.com/youtrack/api';
 
-const INVALID_MESSAGE = `endpoint must be the full API base URL ending in /api — e.g. ${ENDPOINT_EXAMPLE}`;
+const invalidMessage = `endpoint must be the full API base URL ending in /api — e.g. ${endpointExample}`;
 
 // validateEndpoint mirrors the backend rule: after trimming trailing slashes,
 // the URL must be absolute http(s) with a path ending in `/api`. The endpoint
@@ -41,13 +41,13 @@ export const validateEndpoint = (endpoint: string): string => {
   try {
     url = new URL(normalized);
   } catch {
-    return INVALID_MESSAGE;
+    return invalidMessage;
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    return INVALID_MESSAGE;
+    return invalidMessage;
   }
   if (!url.pathname.endsWith('/api')) {
-    return INVALID_MESSAGE;
+    return invalidMessage;
   }
   return '';
 };
@@ -56,6 +56,29 @@ type Props = Pick<
   ConnectionFieldRenderProps<YouTrackConnectionValues>,
   'type' | 'initialValues' | 'values' | 'errors' | 'setValues' | 'setErrors'
 >;
+
+const endpointExamples = [
+  {
+    label: 'InCloud',
+    url: 'https://example.myjetbrains.com/youtrack/api',
+    note: (
+      <>
+        {' '}
+        — note the <code>/youtrack</code> context path, the most common setup error
+      </>
+    ),
+  },
+  { label: 'YouTrack Cloud', url: 'https://example.youtrack.cloud/api' },
+  {
+    label: 'Self-hosted',
+    url: 'https://youtrack.example.com/api',
+    note: (
+      <>
+        , or your custom context path such as <code>https://www.example.com/youtrack/api</code>
+      </>
+    ),
+  },
+];
 
 export const Endpoint = ({ initialValues, values, errors, setValues, setErrors }: Props) => {
   useEffect(() => {
@@ -82,17 +105,12 @@ export const Endpoint = ({ initialValues, values, errors, setValues, setErrors }
         <>
           The full API base URL of your YouTrack instance — it must end in <code>/api</code>:
           <ul style={{ margin: '4px 0 0', paddingLeft: 20 }}>
-            <li>
-              InCloud: <code>https://example.myjetbrains.com/youtrack/api</code> — note the <code>/youtrack</code>{' '}
-              context path, the most common setup error
-            </li>
-            <li>
-              YouTrack Cloud: <code>https://example.youtrack.cloud/api</code>
-            </li>
-            <li>
-              Self-hosted: <code>https://youtrack.example.com/api</code>, or your custom context path such as{' '}
-              <code>https://www.example.com/youtrack/api</code>
-            </li>
+            {endpointExamples.map(({ label, url, note }) => (
+              <li key={label}>
+                {label}: <code>{url}</code>
+                {note}
+              </li>
+            ))}
           </ul>
         </>
       }
@@ -101,7 +119,7 @@ export const Endpoint = ({ initialValues, values, errors, setValues, setErrors }
       <Input
         style={{ width: 480 }}
         status={showError ? 'error' : ''}
-        placeholder={ENDPOINT_EXAMPLE}
+        placeholder={endpointExample}
         value={values.endpoint}
         onChange={handleChange}
       />

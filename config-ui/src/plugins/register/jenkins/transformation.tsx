@@ -64,8 +64,10 @@ const renderCollapseItems = ({
   panelStyle: React.CSSProperties;
   transformation: JenkinsTransformationValues;
   onChangeTransformation: (next: JenkinsTransformationValues) => void;
-}) =>
-  [
+}) => {
+  const { deploymentPattern, productionPattern } = transformation;
+
+  return [
     {
       key: 'CICD',
       label: 'CI/CD',
@@ -90,12 +92,12 @@ const renderCollapseItems = ({
             <Input
               style={{ width: 200, margin: '0 8px' }}
               placeholder="(deploy|push-image)"
-              value={transformation.deploymentPattern ?? ''}
+              value={deploymentPattern ?? ''}
               onChange={(e) =>
                 onChangeTransformation({
                   ...transformation,
                   deploymentPattern: e.target.value,
-                  productionPattern: !e.target.value ? '' : transformation.productionPattern,
+                  productionPattern: !e.target.value ? '' : productionPattern,
                 })
               }
             />
@@ -106,9 +108,9 @@ const renderCollapseItems = ({
             <span>If the name also matches</span>
             <Input
               style={{ width: 120, margin: '0 8px' }}
-              disabled={!transformation.deploymentPattern}
+              disabled={!deploymentPattern}
               placeholder="prod(.*)"
-              value={transformation.productionPattern ?? ''}
+              value={productionPattern ?? ''}
               onChange={(e) =>
                 onChangeTransformation({
                   ...transformation,
@@ -123,3 +125,4 @@ const renderCollapseItems = ({
       ),
     },
   ].filter((it) => entities.includes(it.key));
+};

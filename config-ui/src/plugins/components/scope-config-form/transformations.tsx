@@ -38,8 +38,8 @@ import { YoutrackTransformation } from '@/plugins/register/youtrack';
 
 import type { TransformationComponent, TransformationProps } from './types';
 
-const TapdRenderer = (props: TransformationProps<TapdTransformationValues>) =>
-  props.scopeId ? <TapdTransformation {...props} scopeId={props.scopeId} /> : null;
+const TapdRenderer = ({ scopeId, ...props }: TransformationProps<TapdTransformationValues>) =>
+  scopeId ? <TapdTransformation {...props} scopeId={scopeId} /> : null;
 
 // resolved at call time: the plugin modules are still mid-evaluation when this module loads (import cycle)
 const getRenderers = (): Record<string, TransformationComponent> => ({

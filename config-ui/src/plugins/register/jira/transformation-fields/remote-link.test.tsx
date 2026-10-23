@@ -23,7 +23,7 @@ import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
 import { RemoteLink } from './remote-link';
 
-const PATTERNS = [
+const patterns = [
   { pattern: 'https://one/{repo}', regex: 'one-regex' },
   { pattern: 'https://two/{repo}', regex: 'two-regex' },
 ];
@@ -32,7 +32,7 @@ describe('RemoteLink', () => {
   it('keeps the remaining row and payload when the first row is deleted', () => {
     const setTransformation = vi.fn();
     renderWithTheme(
-      <RemoteLink transformation={{ remotelinkRepoPattern: PATTERNS }} setTransformation={setTransformation} />,
+      <RemoteLink transformation={{ remotelinkRepoPattern: patterns }} setTransformation={setTransformation} />,
     );
 
     fireEvent.click(screen.getAllByRole('button', { name: /close/i })[0]);
@@ -40,18 +40,42 @@ describe('RemoteLink', () => {
     const inputs = screen.getAllByRole('textbox');
     expect(inputs).toHaveLength(1);
     expect((inputs[0] as HTMLInputElement).value).toBe('https://two/{repo}');
-    expect(setTransformation).toHaveBeenLastCalledWith({ remotelinkRepoPattern: [PATTERNS[1]] });
+    expect(setTransformation).toHaveBeenLastCalledWith({ remotelinkRepoPattern: [patterns[1]] });
   });
 
   it('adds an empty row without adding it to the payload', () => {
     const setTransformation = vi.fn();
     renderWithTheme(
-      <RemoteLink transformation={{ remotelinkRepoPattern: [PATTERNS[0]] }} setTransformation={setTransformation} />,
+      <RemoteLink transformation={{ remotelinkRepoPattern: [patterns[0]] }} setTransformation={setTransformation} />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: /add a pattern/i }));
 
     expect(screen.getAllByRole('textbox')).toHaveLength(2);
-    expect(setTransformation).toHaveBeenLastCalledWith({ remotelinkRepoPattern: [PATTERNS[0]] });
+    expect(setTransformation).toHaveBeenLastCalledWith({ remotelinkRepoPattern: [patterns[0]] });
+  });
+
+  const deleteFirstWhileSecondFocused = () => {
+    renderWithTheme(<RemoteLink transformation={{ remotelinkRepoPattern: patterns }} setTransformation={vi.fn()} />);
+
+    const [, second] = screen.getAllByRole('textbox');
+    second.focus();
+    fireEvent.focus(second);
+    fireEvent.click(screen.getAllByRole('button', { name: /close/i })[0]);
+    return second;
+  };
+
+  it('keeps focus on the remaining row when an earlier row is deleted', () => {
+    const second = deleteFirstWhileSecondFocused();
+
+    expect(second.isConnected).toBe(true);
+    expect(document.activeElement).toBe(second);
+  });
+
+  it('edits the remaining row after an earlier row is deleted while the later row was focused', () => {
+    const second = deleteFirstWhileSecondFocused();
+    fireEvent.change(second, { target: { value: 'https://edited/{repo}' } });
+
+    expect((second as HTMLInputElement).value).toBe('https://edited/{repo}');
   });
 });
