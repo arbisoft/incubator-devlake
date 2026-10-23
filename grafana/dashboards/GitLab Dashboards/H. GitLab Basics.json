@@ -26,7 +26,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Average days to resolve an issue, per developer.\n\rdatasource: issue_assignees, issues, board_issues, project_mapping, accounts\n\nNot built yet: the GitLab query for this panel is added by US-21.",
+      "description": "Average days from creation to close of issues closed in the period, per assignee. An issue with several assignees counts for each.\ndatasource: issue_assignees, issues, board_issues, project_mapping, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -108,7 +108,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Average lead time in days of issues closed in the range, per assignee.\n-- An issue with several assignees counts once for each, as on dashboard E.\nWITH issue_owners AS (\n  -- an issue's assignees from issue_assignees, or its issues.assignee_id when it has none (NULL when unassigned)\n  SELECT ia.issue_id, ia.assignee_id, ia.assignee_name\n  FROM issue_assignees ia\n  WHERE ia.issue_id LIKE 'gitlab:%'\n  UNION ALL\n  SELECT i.id, CASE WHEN COALESCE(i.assignee_id, '') = '' OR i.assignee_id LIKE 'gitlab:GitlabAccount:%:0' THEN NULL ELSE i.assignee_id END, NULLIF(TRIM(i.assignee_name), '')\n  FROM issues i\n  WHERE i.id LIKE 'gitlab:%'\n    AND NOT EXISTS (SELECT 1 FROM issue_assignees ia WHERE ia.issue_id = i.id)\n)\nSELECT COALESCE(REPLACE(COALESCE(NULLIF(TRIM(REPLACE(a.full_name, _utf8mb4 X'E2808B', '')), ''), NULLIF(TRIM(a.user_name), '')), '-', ' '), REPLACE(NULLIF(TRIM(REPLACE(MAX(io.assignee_name), _utf8mb4 X'E2808B', '')), ''), '-', ' '), '(unassigned)') AS member,\n       ROUND(AVG(i.lead_time_minutes / 1440), 1) AS Days\nFROM issues i\nJOIN issue_owners io ON io.issue_id = i.id\nLEFT JOIN accounts a ON a.id = io.assignee_id\nWHERE i.id LIKE 'gitlab:%'\n  AND i.status = 'DONE'\n  AND i.lead_time_minutes IS NOT NULL\n  AND i.lead_time_minutes > 0\n  AND $__timeFilter(i.resolution_date)\n  AND ((io.assignee_id) IN ( ${developer_id} ) OR ((io.assignee_id) IS NULL AND 'unassigned' IN ( ${developer_id} )))\n  AND EXISTS (SELECT 1 FROM board_issues bi2 JOIN project_mapping pm2 ON pm2.row_id = bi2.board_id AND pm2.`table` = 'boards' WHERE bi2.issue_id = i.id AND bi2.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) AND pm2.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\nGROUP BY io.assignee_id, a.full_name, a.user_name\nORDER BY Days DESC\nLIMIT 100;",
           "refId": "A"
         }
       ],
@@ -120,7 +120,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Tasks vs bugs assigned per developer (top 20).\n\rdatasource: issue_assignees, issues, board_issues, project_mapping, accounts\n\nNot built yet: the GitLab query for this panel is added by US-21.",
+      "description": "Tasks vs bugs created in the period per assignee (top 20). Bugs have a bug label or the INCIDENT type; every other issue is a Task. An issue with several assignees counts for each.\ndatasource: issue_assignees, issues, issue_labels, board_issues, project_mapping, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -202,7 +202,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Issues created in the range per assignee, split into Tasks and Bugs, top 20.\n-- An issue is a Bug when it has a bug label or original_type INCIDENT (the US-13 type mapping); every other issue is a Task.\n-- An issue with several assignees counts once for each, as on dashboard E.\nWITH issue_owners AS (\n  -- an issue's assignees from issue_assignees, or its issues.assignee_id when it has none (NULL when unassigned)\n  SELECT ia.issue_id, ia.assignee_id, ia.assignee_name\n  FROM issue_assignees ia\n  WHERE ia.issue_id LIKE 'gitlab:%'\n  UNION ALL\n  SELECT i.id, CASE WHEN COALESCE(i.assignee_id, '') = '' OR i.assignee_id LIKE 'gitlab:GitlabAccount:%:0' THEN NULL ELSE i.assignee_id END, NULLIF(TRIM(i.assignee_name), '')\n  FROM issues i\n  WHERE i.id LIKE 'gitlab:%'\n    AND NOT EXISTS (SELECT 1 FROM issue_assignees ia WHERE ia.issue_id = i.id)\n)\nSELECT COALESCE(REPLACE(COALESCE(NULLIF(TRIM(REPLACE(a.full_name, _utf8mb4 X'E2808B', '')), ''), NULLIF(TRIM(a.user_name), '')), '-', ' '), REPLACE(NULLIF(TRIM(REPLACE(MAX(io.assignee_name), _utf8mb4 X'E2808B', '')), ''), '-', ' '), '(unassigned)') AS assignee,\n       SUM(NOT ${bug_issue:raw}) AS Task,\n       SUM(${bug_issue:raw})     AS Bug\nFROM issues i\nJOIN issue_owners io ON io.issue_id = i.id\nLEFT JOIN accounts a ON a.id = io.assignee_id\nWHERE i.id LIKE 'gitlab:%'\n  AND $__timeFilter(i.created_date)\n  AND ((io.assignee_id) IN ( ${developer_id} ) OR ((io.assignee_id) IS NULL AND 'unassigned' IN ( ${developer_id} )))\n  AND EXISTS (SELECT 1 FROM board_issues bi2 JOIN project_mapping pm2 ON pm2.row_id = bi2.board_id AND pm2.`table` = 'boards' WHERE bi2.issue_id = i.id AND bi2.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) AND pm2.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\nGROUP BY io.assignee_id, a.full_name, a.user_name\nORDER BY (Task + Bug) DESC\nLIMIT 20;",
           "refId": "A"
         }
       ],
@@ -214,7 +214,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Done vs pending bugs per developer (top 20).\n\rdatasource: issue_assignees, issues, board_issues, project_mapping, accounts\n\nNot built yet: the GitLab query for this panel is added by US-21.",
+      "description": "Closed vs open bugs created in the period per assignee (top 20). An issue with several assignees counts for each.\ndatasource: issue_assignees, issues, issue_labels, board_issues, project_mapping, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -296,7 +296,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Bugs created in the range per assignee, split into Done (closed) and Pending (open), top 20.\n-- An issue is a Bug when it has a bug label or original_type INCIDENT (the US-13 type mapping); every other issue is a Task.\n-- An issue with several assignees counts once for each, as on dashboard E.\nWITH issue_owners AS (\n  -- an issue's assignees from issue_assignees, or its issues.assignee_id when it has none (NULL when unassigned)\n  SELECT ia.issue_id, ia.assignee_id, ia.assignee_name\n  FROM issue_assignees ia\n  WHERE ia.issue_id LIKE 'gitlab:%'\n  UNION ALL\n  SELECT i.id, CASE WHEN COALESCE(i.assignee_id, '') = '' OR i.assignee_id LIKE 'gitlab:GitlabAccount:%:0' THEN NULL ELSE i.assignee_id END, NULLIF(TRIM(i.assignee_name), '')\n  FROM issues i\n  WHERE i.id LIKE 'gitlab:%'\n    AND NOT EXISTS (SELECT 1 FROM issue_assignees ia WHERE ia.issue_id = i.id)\n)\nSELECT COALESCE(REPLACE(COALESCE(NULLIF(TRIM(REPLACE(a.full_name, _utf8mb4 X'E2808B', '')), ''), NULLIF(TRIM(a.user_name), '')), '-', ' '), REPLACE(NULLIF(TRIM(REPLACE(MAX(io.assignee_name), _utf8mb4 X'E2808B', '')), ''), '-', ' '), '(unassigned)') AS assignee,\n       SUM(i.status = 'DONE')  AS Done,\n       SUM(i.status <> 'DONE') AS Pending\nFROM issues i\nJOIN issue_owners io ON io.issue_id = i.id\nLEFT JOIN accounts a ON a.id = io.assignee_id\nWHERE i.id LIKE 'gitlab:%'\n  AND ${bug_issue:raw}\n  AND $__timeFilter(i.created_date)\n  AND ((io.assignee_id) IN ( ${developer_id} ) OR ((io.assignee_id) IS NULL AND 'unassigned' IN ( ${developer_id} )))\n  AND EXISTS (SELECT 1 FROM board_issues bi2 JOIN project_mapping pm2 ON pm2.row_id = bi2.board_id AND pm2.`table` = 'boards' WHERE bi2.issue_id = i.id AND bi2.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) AND pm2.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\nGROUP BY io.assignee_id, a.full_name, a.user_name\nORDER BY (Done + Pending) DESC\nLIMIT 20;",
           "refId": "A"
         }
       ],
@@ -376,6 +376,25 @@
         "refresh": 1,
         "regex": "/^(?<text>.*)--(?<value>.*)$/",
         "type": "query"
+      },
+      {
+        "name": "bug_issue",
+        "label": "SQL: issue is a bug (alias i)",
+        "type": "constant",
+        "hide": 2,
+        "skipUrlSync": true,
+        "query": "(i.original_type = 'INCIDENT' OR EXISTS (SELECT 1 FROM issue_labels ilb WHERE ilb.issue_id = i.id AND LOWER(ilb.label_name) IN ('bug', 'minorbug', 'regression issue', 'prod issue', 'qa issues', 'hotfix', 'sentry', 'prod-sentry', 'existing issue', 'data-issue', 'validation-issue', 'logic-issue', 'deployment issues', 'security', 'show-stopper', 'debug')))",
+        "current": {
+          "text": "(i.original_type = 'INCIDENT' OR EXISTS (SELECT 1 FROM issue_labels ilb WHERE ilb.issue_id = i.id AND LOWER(ilb.label_name) IN ('bug', 'minorbug', 'regression issue', 'prod issue', 'qa issues', 'hotfix', 'sentry', 'prod-sentry', 'existing issue', 'data-issue', 'validation-issue', 'logic-issue', 'deployment issues', 'security', 'show-stopper', 'debug')))",
+          "value": "(i.original_type = 'INCIDENT' OR EXISTS (SELECT 1 FROM issue_labels ilb WHERE ilb.issue_id = i.id AND LOWER(ilb.label_name) IN ('bug', 'minorbug', 'regression issue', 'prod issue', 'qa issues', 'hotfix', 'sentry', 'prod-sentry', 'existing issue', 'data-issue', 'validation-issue', 'logic-issue', 'deployment issues', 'security', 'show-stopper', 'debug')))"
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "(i.original_type = 'INCIDENT' OR EXISTS (SELECT 1 FROM issue_labels ilb WHERE ilb.issue_id = i.id AND LOWER(ilb.label_name) IN ('bug', 'minorbug', 'regression issue', 'prod issue', 'qa issues', 'hotfix', 'sentry', 'prod-sentry', 'existing issue', 'data-issue', 'validation-issue', 'logic-issue', 'deployment issues', 'security', 'show-stopper', 'debug')))",
+            "value": "(i.original_type = 'INCIDENT' OR EXISTS (SELECT 1 FROM issue_labels ilb WHERE ilb.issue_id = i.id AND LOWER(ilb.label_name) IN ('bug', 'minorbug', 'regression issue', 'prod issue', 'qa issues', 'hotfix', 'sentry', 'prod-sentry', 'existing issue', 'data-issue', 'validation-issue', 'logic-issue', 'deployment issues', 'security', 'show-stopper', 'debug')))"
+          }
+        ]
       }
     ]
   },
@@ -387,6 +406,5 @@
   "timezone": "utc",
   "title": "H. GitLab Basics",
   "uid": "gitlab-h-basics",
-  "version": 1,
-  "description": "GitLab shell from US-13; panels are implemented in US-21."
+  "version": 1
 }
