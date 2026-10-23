@@ -72,7 +72,7 @@ export const detachWebhook = (blueprint: IBlueprint, id: ID): IBlueprint => ({
 export const readSettingsForm = (project: IProject): SettingsForm => {
   const metric = (plugin: string) => (project.metrics ?? []).find((item) => item.pluginName === plugin);
   const linkerOption = metric(PROJECT_PLUGIN.LINKER)?.pluginOption;
-  const linkerRegexp = typeof linkerOption === 'object' ? linkerOption.prToIssueRegexp : undefined;
+  const linkerRegexp = linkerOption && typeof linkerOption === 'object' ? linkerOption.prToIssueRegexp : undefined;
   return {
     name: project.name,
     dora: metric(PROJECT_PLUGIN.DORA)?.enable ?? false,

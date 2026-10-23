@@ -53,6 +53,13 @@ describe('operator', () => {
     consoleError.mockRestore();
   });
 
+  it('returns the rejection and the default toast when the request rejects with null', async () => {
+    const result = await operator(() => Promise.reject(null));
+
+    expect(result).toEqual([false, null]);
+    expect(messageMock.error).toHaveBeenCalledWith('Operation failed.');
+  });
+
   it('shows no toast when hideToast is set', async () => {
     await operator(() => Promise.resolve(1), { hideToast: true });
     await operator(() => Promise.reject(failure), { hideToast: true });

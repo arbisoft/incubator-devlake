@@ -52,7 +52,7 @@ export const operator = async <T>(
   } catch (err) {
     const reason =
       formatReason?.(err) ??
-      (err as { response?: { data?: { message?: string } } }).response?.data?.message ??
+      (err as { response?: { data?: { message?: string } } } | null | undefined)?.response?.data?.message ??
       'Operation failed.';
     if (!config?.hideToast) {
       message.error(reason);

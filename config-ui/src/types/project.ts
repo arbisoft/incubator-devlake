@@ -23,7 +23,7 @@ export interface IProject {
   name: string;
   description: string;
   blueprint: IBlueprint | null;
-  metrics: Array<{ pluginName: string; pluginOption: Record<string, unknown> | ''; enable: boolean }>;
+  metrics: Array<{ pluginName: string; pluginOption: Record<string, unknown> | '' | null; enable: boolean }>;
   createdAt?: string;
   lastPipeline?: IPipeline;
 }

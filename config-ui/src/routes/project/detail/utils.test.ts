@@ -141,11 +141,12 @@ describe('project settings form', () => {
     });
   });
 
-  it('falls back to the default regexp for an empty or regexp-less linker option', () => {
+  it('falls back to the default regexp for a null, empty or regexp-less linker option', () => {
     const withOption = (pluginOption: IProject['metrics'][number]['pluginOption']) => ({
       ...PROJECT,
       metrics: [{ pluginName: 'linker', pluginOption, enable: true }],
     });
+    expect(readSettingsForm(withOption(null)).linkerRegexp).toBe(DEFAULT_PR_ISSUE_REGEXP);
     expect(readSettingsForm(withOption('')).linkerRegexp).toBe(DEFAULT_PR_ISSUE_REGEXP);
     expect(readSettingsForm(withOption({})).linkerRegexp).toBe(DEFAULT_PR_ISSUE_REGEXP);
     expect(readSettingsForm(withOption({ prToIssueRegexp: '(z)' })).linkerRegexp).toBe('(z)');
