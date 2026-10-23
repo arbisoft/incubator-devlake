@@ -85,7 +85,6 @@
     }
   },
   "consoleErrors": [
-    "Each child in a list should have a unique \"key\" prop.%s%s See https://react.dev/link/warning-keys for more information.",
     "Warning: [antd: Alert] `message` is deprecated. Please use `title` instead.",
     "Warning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead."
   ],

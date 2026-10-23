@@ -15,6 +15,8 @@
  * limitations under the License.
  *
  */
+import { format } from 'node:util';
+
 import { act, fireEvent } from '@testing-library/react';
 import { useEffect, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -44,6 +46,19 @@ const CONTROL_SELECTOR = 'input, textarea, [role="switch"], [role="combobox"], [
 const TEXT_INPUT_TYPES = [null, 'text', 'password', 'url', 'number'];
 
 const SETTLE_MS = 60;
+
+// React reports these once per component per module, so they are asserted absent instead of recorded
+const isReactKeyWarning = (message: string) =>
+  message.startsWith('A props object containing a "key" prop') || message.includes('unique "key" prop');
+
+const formatMessage = (args: unknown[]) =>
+  format(...args)
+    .split('\n\n')[0]
+    .split('\n')
+    .filter((line) => !/^\s+at /.test(line))
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
 const flush = async () => {
   for (let i = 0; i < 3; i += 1) {
@@ -132,7 +147,7 @@ describe('plugin matrix', () => {
     requests.length = 0;
     collected.length = 0;
     const collect = (...args: unknown[]) => {
-      collected.push(String(args[0]).split('\n')[0]);
+      collected.push(formatMessage(args));
     };
     spies.push(vi.spyOn(console, 'error').mockImplementation(collect));
     spies.push(vi.spyOn(console, 'warn').mockImplementation(collect));
@@ -157,11 +172,13 @@ describe('plugin matrix', () => {
         ? await captureScreen(<TransformationHost config={config} onValues={onValues} />, read)
         : null;
 
+      expect(collected.filter(isReactKeyWarning)).toEqual([]);
+
       const record = {
         plugin,
         connection,
         scopeConfig,
-        consoleErrors: Array.from(new Set(collected)).sort(),
+        consoleErrors: Array.from(new Set(collected.filter((message) => !isReactKeyWarning(message)))).sort(),
         requests: Array.from(new Set(requests)).sort(),
       };
 

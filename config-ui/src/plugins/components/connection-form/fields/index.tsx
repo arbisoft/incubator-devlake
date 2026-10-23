@@ -16,7 +16,7 @@
  *
  */
 
-import type { Dispatch, SetStateAction } from 'react';
+import { Fragment, type Dispatch, type SetStateAction } from 'react';
 
 import type { ConnectionField, ConnectionFieldErrors, ConnectionFieldOptions, ConnectionFieldValues } from '@/types';
 
@@ -42,6 +42,23 @@ type Props = {
   errors: ConnectionFieldErrors;
   setValues: Dispatch<SetStateAction<ConnectionFieldValues>>;
   setErrors: Dispatch<SetStateAction<ConnectionFieldErrors>>;
+};
+
+const omitFormProps = ({ key: _key, type: _type, ...rest }: ConnectionFieldOptions) => rest;
+
+// function fields are static config, so their identity is a stable React key
+type FieldRenderer = Extract<ConnectionField, (...args: never[]) => unknown>;
+
+const fieldIds = new WeakMap<FieldRenderer, string>();
+let nextFieldId = 0;
+
+const fieldIdOf = (field: FieldRenderer) => {
+  const known = fieldIds.get(field);
+  if (known) return known;
+  nextFieldId += 1;
+  const id = `field-${nextFieldId}`;
+  fieldIds.set(field, id);
+  return id;
 };
 
 // the caller states the expected type; a missing key falls back to the default
@@ -76,20 +93,24 @@ export const Form = ({
   const generateForm = () => {
     return fields.map((field) => {
       if (typeof field === 'function') {
-        return field({
-          type,
-          connectionId,
-          initialValues,
-          values,
-          setValues: onValues,
-          errors,
-          setErrors: onErrors,
-        });
+        return (
+          <Fragment key={fieldIdOf(field)}>
+            {field({
+              type,
+              connectionId,
+              initialValues,
+              values,
+              setValues: onValues,
+              errors,
+              setErrors: onErrors,
+            })}
+          </Fragment>
+        );
       }
 
       const key = typeof field === 'string' ? field : field.key;
-      // the runtime spread is unchanged; key, type and string defaults are left untyped
-      const options = field as OptionProps;
+      // key and type belong to the form; string defaults are left untyped
+      const options = (typeof field === 'string' ? {} : omitFormProps(field)) as OptionProps;
 
       switch (key) {
         case 'name':

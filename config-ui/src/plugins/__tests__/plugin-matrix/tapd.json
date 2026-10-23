@@ -68,9 +68,7 @@
       "statusMappings": {}
     }
   },
-  "consoleErrors": [
-    "A props object containing a \"key\" prop is being spread into JSX:"
-  ],
+  "consoleErrors": [],
   "requests": [
     "/plugins/tapd/connections/1/proxy/rest/story_categories?workspace_id=e2e-scope",
     "/plugins/tapd/connections/1/proxy/rest/workflows/status_map?workspace_id=e2e-scope&system=bug",

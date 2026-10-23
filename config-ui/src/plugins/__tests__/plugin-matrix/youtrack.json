@@ -120,8 +120,8 @@
     }
   },
   "consoleErrors": [
-    "<%s> cannot contain a nested %s.",
-    "In HTML, %s cannot be a descendant of <%s>.",
+    "<p> cannot contain a nested <ul>. See this log for the ancestor stack trace.",
+    "In HTML, <ul> cannot be a descendant of <p>. This will cause a hydration error.",
     "Warning: [antd: Alert] `message` is deprecated. Please use `title` instead."
   ],
   "requests": [

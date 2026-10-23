@@ -74,8 +74,6 @@
     "text": "",
     "typed": {}
   },
-  "consoleErrors": [
-    "A props object containing a \"key\" prop is being spread into JSX:"
-  ],
+  "consoleErrors": [],
   "requests": []
 }
