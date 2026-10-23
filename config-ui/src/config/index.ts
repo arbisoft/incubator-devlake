@@ -17,6 +17,7 @@
  */
 
 export * from './brand';
+export * from './connector-logos';
 export * from './cron';
 export * from './endpoint';
 export * from './entities';

@@ -63,6 +63,7 @@ export const getNavItems = (visibility: NavVisibility): NavItem[] => {
       label: COPY.nav.connections,
       icon: createElement(ApiOutlined),
       path: PATHS.CONNECTIONS(),
+      matchPaths: [PATHS.OTEL()],
     },
     {
       kind: NAV_ITEM_KIND.ROUTE,

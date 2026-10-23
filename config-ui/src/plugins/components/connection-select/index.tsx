@@ -18,6 +18,7 @@
 
 import { SelectProps } from 'antd';
 
+import { getConnectorLogo } from '@/config';
 import { getPluginConfig } from '@/plugins';
 import { PluginIcon } from '@/ui';
 
@@ -34,7 +35,7 @@ export const ConnectionSelect = ({ ...props }: Props) => {
         const plugin = getPluginConfig(option.data.plugin);
         return (
           <Option>
-            <PluginIcon icon={plugin.icon} size="md" />
+            <PluginIcon icon={plugin.icon} size="md" logo={getConnectorLogo(option.data.plugin)} />
             <span className="name">{option.label}</span>
           </Option>
         );

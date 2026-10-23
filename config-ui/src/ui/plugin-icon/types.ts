@@ -16,13 +16,23 @@
  *
  */
 
-import type { ReactNode } from 'react';
+import type { ComponentType, ReactNode, SVGProps } from 'react';
 
 import type { IconSize } from '@/ui/types';
+
+import type { CONNECTOR_LOGO_KIND } from './constants';
+
+type SvgComponent = ComponentType<SVGProps<SVGSVGElement>>;
+
+export type ConnectorLogo =
+  | { kind: typeof CONNECTOR_LOGO_KIND.LOGO; Svg: SvgComponent }
+  | { kind: typeof CONNECTOR_LOGO_KIND.MONO; Svg?: SvgComponent }
+  | { kind: typeof CONNECTOR_LOGO_KIND.TINT; color: string; Svg?: SvgComponent };
 
 type PluginIconRenderer = (props: { color: string }) => ReactNode;
 
 export type PluginIconProps = {
   icon: PluginIconRenderer;
   size: IconSize;
+  logo?: ConnectorLogo;
 };

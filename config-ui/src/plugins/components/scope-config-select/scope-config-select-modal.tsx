@@ -18,6 +18,7 @@
 
 import { useState } from 'react';
 
+import { getConnectorLogo } from '@/config';
 import { getPluginConfig } from '@/plugins/utils';
 import { FormModal, MODAL_WIDTH, PluginIcon } from '@/ui';
 
@@ -37,12 +38,13 @@ export const ScopeConfigSelectModal = ({
   const [picked, setPicked] = useState<ID>();
   const selectedId = picked ?? scopeConfigId;
   const { icon } = getPluginConfig(plugin);
+  const pluginIcon = <PluginIcon icon={icon} size="sm" logo={getConnectorLogo(plugin)} />;
 
   return (
     <FormModal
       open={open}
       title={title}
-      icon={<PluginIcon icon={icon} size="sm" />}
+      icon={pluginIcon}
       width={MODAL_WIDTH.LG}
       submitLabel={COPY.save}
       submitDisabled={!selectedId}

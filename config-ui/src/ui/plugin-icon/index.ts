@@ -16,5 +16,6 @@
  *
  */
 
+export * from './constants';
 export * from './plugin-icon';
 export type * from './types';

@@ -36,6 +36,7 @@ import {
   generatePassword,
   getMenuActions,
   getPartialUserId,
+  getRowIconActions,
   getUnavailableMessage,
   getUserIdentity,
   hasPatchChanges,
@@ -258,5 +259,19 @@ describe('getMenuActions', () => {
   it('offers only details for an SSO account and nothing for a protected one', () => {
     expect(getMenuActions({ ...user, sso: true })).toEqual([GRAFANA_MENU_ACTION.DETAILS]);
     expect(getMenuActions({ ...user, protected: true })).toEqual([]);
+  });
+});
+
+describe('getRowIconActions', () => {
+  const onMenuAction = vi.fn();
+
+  it('maps each menu action to a labelled icon action that reports it', () => {
+    const actions = getRowIconActions(user, { onMenuAction });
+    expect(actions.map(({ key, label }) => ({ key, label }))).toEqual([
+      { key: GRAFANA_MENU_ACTION.DETAILS, label: COPY.actions.editDetailsFor(EMAIL) },
+      { key: GRAFANA_MENU_ACTION.PASSWORD, label: COPY.actions.setPasswordFor(EMAIL) },
+    ]);
+    actions[1].onClick();
+    expect(onMenuAction).toHaveBeenCalledWith(user, GRAFANA_MENU_ACTION.PASSWORD);
   });
 });

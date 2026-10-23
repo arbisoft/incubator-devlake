@@ -124,6 +124,9 @@ test.describe('sidebar', () => {
 
     await shell.visit(PATHS.settingsUsers);
     await expect(shell.selectedNavItem).toHaveText(shell.navLabels.users);
+
+    await shell.visit(PATHS.otel);
+    await expect(shell.selectedNavItem).toHaveText(shell.navLabels.connections);
     expect(browserErrors).toEqual([]);
   });
 
