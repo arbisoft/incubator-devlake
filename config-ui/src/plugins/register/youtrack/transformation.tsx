@@ -17,6 +17,7 @@
  */
 
 import { Alert } from 'antd';
+import axios from 'axios';
 import { uniqBy } from 'lodash';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -24,15 +25,22 @@ import API from '@/api';
 import type { YoutrackProjectCustomField } from '@/api/plugin/youtrack';
 import { PageLoading } from '@/components';
 import { useProxyPrefix, useRefreshData } from '@/hooks';
+import type { TransformationProps } from '@/plugins/components/scope-config-form/types';
 
 import { FieldNames, type FieldDef } from './transformation-fields/field-names';
 import { MappingTable, type UnionRow } from './transformation-fields/mapping-table';
+import type { YoutrackTransformationValues } from './types';
 
 const DEFAULT_TYPE_FIELD = 'Type';
 const DEFAULT_STATE_FIELD = 'State';
 
 const TYPE_OPTIONS = ['BUG', 'REQUIREMENT', 'INCIDENT', 'TASK', 'SUBTASK'].map((value) => ({ label: value, value }));
 const STATUS_OPTIONS = ['TODO', 'IN_PROGRESS', 'DONE', 'OTHER'].map((value) => ({ label: value, value }));
+
+const getFailureMessage = (err: unknown) =>
+  (axios.isAxiosError<{ message?: string }>(err) ? err.response?.data?.message : undefined) ??
+  (err instanceof Error ? err.message : undefined) ??
+  'request failed';
 
 type LoadedProject = {
   id: string;
@@ -85,13 +93,7 @@ const unionBundle = (
   return [...rows.values()].sort((a, b) => a.ordinal - b.ordinal || a.name.localeCompare(b.name));
 };
 
-interface Props {
-  entities: string[];
-  connectionId: ID;
-  scopeConfigId?: ID;
-  transformation: any;
-  setTransformation: React.Dispatch<React.SetStateAction<any>>;
-}
+type Props = TransformationProps<YoutrackTransformationValues>;
 
 export const YoutrackTransformation = ({
   entities,
@@ -128,12 +130,12 @@ export const YoutrackTransformation = ({
           const label =
             fields.find((cf) => cf.project?.shortName)?.project?.shortName || scope.scopeName || scope.scopeId;
           return { id: scope.scopeId, label, fields };
-        } catch (err: any) {
+        } catch (err) {
           return {
             id: scope.scopeId,
             label: scope.scopeName || scope.scopeId,
             fields: null,
-            error: err?.response?.data?.message ?? err?.message ?? 'request failed',
+            error: getFailureMessage(err),
           };
         }
       }),
@@ -193,7 +195,7 @@ export const YoutrackTransformation = ({
     });
     if (Object.keys(seeds).length) {
       setAutoSeeds((prev) => ({ ...prev, ...seeds }));
-      setTransformation((prev: any) => ({
+      setTransformation((prev) => ({
         ...prev,
         statusMappings: { ...(prev.statusMappings ?? {}), ...seeds },
       }));

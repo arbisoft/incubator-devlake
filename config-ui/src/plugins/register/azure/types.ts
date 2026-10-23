@@ -16,10 +16,16 @@
  *
  */
 
-import styled from 'styled-components';
+export type AzureConnectionValues = {
+  endpoint?: string;
+  organization?: string;
+};
 
-export const ErrorText = styled.div`
-  margin-top: ${({ theme }) => theme.space.xxs}px;
-  color: ${({ theme }) => theme.colors.error};
-  font-size: ${({ theme }) => theme.typography.scale.caption.fontSize}px;
-`;
+export type AzureTransformationValues = {
+  deploymentPattern?: string;
+  productionPattern?: string;
+  refdiff?: {
+    tagsLimit?: number;
+    tagsPattern?: string;
+  };
+};

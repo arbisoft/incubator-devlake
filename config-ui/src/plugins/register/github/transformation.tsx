@@ -22,14 +22,12 @@ import type { CheckboxChangeEvent } from 'antd/lib/checkbox';
 import { useState, useEffect } from 'react';
 
 import { HelpTooltip, ExternalLink } from '@/components';
+import type { TransformationProps } from '@/plugins/components/scope-config-form/types';
 import { DOC_URL } from '@/release';
 
-interface Props {
-  entities: string[];
-  transformation: any;
-  setTransformation: React.Dispatch<React.SetStateAction<any>>;
-  setHasError: React.Dispatch<React.SetStateAction<boolean>>;
-}
+import type { GitHubTransformationValues } from './types';
+
+type Props = TransformationProps<GitHubTransformationValues>;
 
 export const GitHubTransformation = ({ entities, transformation, setTransformation, setHasError }: Props) => {
   const [useCustom, setUseCustom] = useState(false);
@@ -47,7 +45,7 @@ export const GitHubTransformation = ({ entities, transformation, setTransformati
   }, [useCustom, transformation]);
 
   const handleChangeUseCustom = (e: CheckboxChangeEvent) => {
-    const checked = (e.target as HTMLInputElement).checked;
+    const { checked } = e.target as HTMLInputElement;
 
     if (!checked) {
       setTransformation({
@@ -98,10 +96,10 @@ const renderCollapseItems = ({
 }: {
   entities: string[];
   panelStyle: React.CSSProperties;
-  transformation: any;
-  onChangeTransformation: any;
+  transformation: GitHubTransformationValues;
+  onChangeTransformation: (next: GitHubTransformationValues) => void;
   useCustom: boolean;
-  onChangeUseCustom: any;
+  onChangeUseCustom: (e: CheckboxChangeEvent) => void;
 }) =>
   [
     {
@@ -369,16 +367,16 @@ const renderCollapseItems = ({
                     <>
                       <div>
                         <CheckCircleOutlined rev="" style={{ marginRight: 4, color: 'var(--devlake-color-success)' }} />
-                        Example 1: PR #321 body contains "<strong>Closes #1234</strong>" (PR #321 and issue #1234 will
-                        be mapped by the following RegEx)
+                        Example 1: PR #321 body contains &quot;<strong>Closes #1234</strong>&quot; (PR #321 and issue
+                        #1234 will be mapped by the following RegEx)
                       </div>
                       <div>
                         <CloseCircleOutlined
                           rev=""
                           style={{ marginRight: 4, color: 'var(--devlake-color-error-alt)' }}
                         />
-                        Example 2: PR #321 body contains "<strong>Related to #1234</strong>" (PR #321 and issue #1234
-                        will NOT be mapped by the following RegEx)
+                        Example 2: PR #321 body contains &quot;<strong>Related to #1234</strong>&quot; (PR #321 and
+                        issue #1234 will NOT be mapped by the following RegEx)
                       </div>
                     </>
                   }

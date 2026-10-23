@@ -16,18 +16,20 @@
  *
  */
 
-import { Input, Radio } from 'antd';
+import { Input, Radio, type RadioChangeEvent } from 'antd';
 import { ChangeEvent, useEffect, useMemo, useRef } from 'react';
 
 import { Block } from '@/components';
+import type { ConnectionFieldErrors, ConnectionFieldRenderProps } from '@/types';
 
-interface Props {
-  type: 'create' | 'update';
-  initialValues: any;
-  values: any;
-  setValues: (values: any) => void;
-  setErrors: (errors: any) => void;
-}
+import type { QDevConnectionValues } from '../types';
+
+const errorStyle = { marginTop: 4, color: 'var(--devlake-color-error)' };
+
+type Props = Pick<
+  ConnectionFieldRenderProps<QDevConnectionValues>,
+  'type' | 'initialValues' | 'values' | 'setValues' | 'setErrors'
+>;
 
 const ACCESS_KEY_PATTERN = /^[A-Z0-9]{16,32}$/;
 const REGION_PATTERN = /^[a-z]{2}-[a-z]+-\d$/;
@@ -35,7 +37,7 @@ const REGION_PATTERN = /^[a-z]{2}-[a-z]+-\d$/;
 const syncError = (
   key: string,
   error: string,
-  setErrors: (errors: any) => void,
+  setErrors: (errors: ConnectionFieldErrors) => void,
   ref: React.MutableRefObject<string | undefined>,
 ) => {
   if (ref.current !== error) {
@@ -138,7 +140,7 @@ export const AwsCredentials = ({ type, initialValues, values, setValues, setErro
     setValues({ region: e.target.value.trim() });
   };
 
-  const handleAuthTypeChange = (e: any) => {
+  const handleAuthTypeChange = (e: RadioChangeEvent) => {
     const newAuthType = e.target.value;
     setValues({ authType: newAuthType });
 
@@ -174,9 +176,7 @@ export const AwsCredentials = ({ type, initialValues, values, setValues, setErro
               onChange={handleAccessKeyChange}
               status={accessKeyError ? 'error' : ''}
             />
-            {accessKeyError && (
-              <div style={{ marginTop: 4, color: 'var(--devlake-color-error)' }}>{accessKeyError}</div>
-            )}
+            {accessKeyError && <div style={errorStyle}>{accessKeyError}</div>}
           </Block>
 
           <Block
@@ -190,9 +190,7 @@ export const AwsCredentials = ({ type, initialValues, values, setValues, setErro
               onChange={handleSecretKeyChange}
               status={secretKeyError ? 'error' : ''}
             />
-            {secretKeyError && (
-              <div style={{ marginTop: 4, color: 'var(--devlake-color-error)' }}>{secretKeyError}</div>
-            )}
+            {secretKeyError && <div style={errorStyle}>{secretKeyError}</div>}
           </Block>
         </>
       )}
@@ -225,7 +223,7 @@ export const AwsCredentials = ({ type, initialValues, values, setValues, setErro
           onChange={handleRegionChange}
           status={regionError ? 'error' : ''}
         />
-        {regionError && <div style={{ marginTop: 4, color: 'var(--devlake-color-error)' }}>{regionError}</div>}
+        {regionError && <div style={errorStyle}>{regionError}</div>}
       </Block>
     </>
   );

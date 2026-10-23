@@ -76,10 +76,10 @@ export const getPluginScopeId = (plugin: string, scope: ScopeIdInput): string =>
       id = scope.projectId;
       break;
     default:
-      id = scope.id;
+      ({ id } = scope);
   }
 
-  if (id == null) {
+  if (id === undefined || id === null) {
     throw new Error(`Missing scope ID field for plugin "${plugin}"`);
   }
 

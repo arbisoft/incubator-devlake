@@ -19,18 +19,24 @@
 import { IConnectionAPI, IConnectionTestResult, IConnectionOldTestResult } from '@/types';
 import { request } from '@/utils';
 
-export const list = (plugin: string): Promise<IConnectionAPI[]> => request(`/plugins/${plugin}/connections`);
+export const list = <T = IConnectionAPI>(plugin: string): Promise<T[]> => request(`/plugins/${plugin}/connections`);
 
-export const get = (plugin: string, connectionId: ID, signal?: AbortSignal): Promise<IConnectionAPI> =>
+export const get = <T = IConnectionAPI>(plugin: string, connectionId: ID, signal?: AbortSignal): Promise<T> =>
   request(`/plugins/${plugin}/connections/${connectionId}`, { signal });
 
-export const create = (plugin: string, payload: Omit<IConnectionAPI, 'id'>): Promise<IConnectionAPI> =>
-  request(`/plugins/${plugin}/connections`, { method: 'post', data: payload });
+export const create = <T = IConnectionAPI, P extends Partial<IConnectionAPI> = Omit<IConnectionAPI, 'id'>>(
+  plugin: string,
+  payload: P,
+): Promise<T> => request(`/plugins/${plugin}/connections`, { method: 'post', data: payload });
 
 export const remove = (plugin: string, id: ID): Promise<IConnectionAPI> =>
   request(`/plugins/${plugin}/connections/${id}`, { method: 'delete' });
 
-export const update = (plugin: string, id: ID, payload: Omit<IConnectionAPI, 'id'>): Promise<IConnectionAPI> =>
+export const update = <P extends Partial<IConnectionAPI> = Omit<IConnectionAPI, 'id'>>(
+  plugin: string,
+  id: ID,
+  payload: P,
+): Promise<IConnectionAPI> =>
   request(`/plugins/${plugin}/connections/${id}`, {
     method: 'patch',
     data: payload,

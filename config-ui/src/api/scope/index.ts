@@ -59,13 +59,13 @@ export const remove = (plugin: string, connectionId: ID, scopeId: ID, onlyData: 
     },
   );
 
-export const update = (plugin: string, connectionId: ID, scopeId: ID, payload: any) =>
+export const update = (plugin: string, connectionId: ID, scopeId: ID, payload: Record<string, unknown>) =>
   request(`/plugins/${plugin}/connections/${connectionId}/scopes/${encodeURIComponent(scopeId)}`, {
     method: 'patch',
     data: payload,
   });
 
-export const batch = (plugin: string, connectionId: ID, payload: any) =>
+export const batch = (plugin: string, connectionId: ID, payload: { data: unknown[] }) =>
   request(`/plugins/${plugin}/connections/${connectionId}/scopes`, {
     method: 'put',
     data: payload,
@@ -82,7 +82,7 @@ type RemoteScope = {
   id: ID;
   name: string;
   fullName: string;
-  data: any;
+  data: Record<string, unknown>;
 };
 
 export const remote = (

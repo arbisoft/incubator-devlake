@@ -53,6 +53,26 @@ import {
   toStatusFilter,
 } from './utils';
 
+const oidcProvider = (overrides: Partial<OIDCProvider> = {}): OIDCProvider => ({
+  providerKey: 'google',
+  displayName: 'Google',
+  issuerUrl: 'https://accounts.google.com',
+  clientId: 'client',
+  scopes: 'openid profile email',
+  enabled: true,
+  secretConfigured: true,
+  databaseSourceActive: true,
+  grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.SYNCHRONIZED,
+  grafanaSyncedRevision: 1,
+  providerRevision: 1,
+  hasCandidate: false,
+  grafanaTarget: GRAFANA_PROVIDER_KIND.GENERIC_OAUTH,
+  devlakeCallbackUrl: 'https://devlake.example.com/api/auth/callback',
+  grafanaCallbackUrl: 'https://grafana.example.com/login/generic_oauth',
+  allowLocalOidc: false,
+  ...overrides,
+});
+
 const createAxiosError = (status: number, data: unknown) =>
   new AxiosError('Request failed', 'ERR_BAD_REQUEST', undefined, undefined, {
     status,
@@ -219,48 +239,14 @@ describe('routes/settings/utils', () => {
       grafanaTarget: GRAFANA_PROVIDER_KIND.GENERIC_OAUTH,
       confirmDevlakeOnly: false,
     });
-    const configuredProvider: OIDCProvider = {
-      providerKey: 'google',
-      displayName: 'Google',
-      issuerUrl: 'https://accounts.example.com',
-      clientId: 'client-a',
-      scopes: 'openid profile email',
-      enabled: true,
-      secretConfigured: true,
-      databaseSourceActive: true,
-      grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.SYNCHRONIZED,
-      grafanaSyncedRevision: 1,
-      providerRevision: 1,
-      hasCandidate: false,
-      grafanaTarget: GRAFANA_PROVIDER_KIND.GENERIC_OAUTH,
-      devlakeCallbackUrl: 'https://devlake.example.com/api/auth/callback',
-      grafanaCallbackUrl: 'https://grafana.example.com/login/generic_oauth',
-      allowLocalOidc: false,
-    };
+    const configuredProvider = oidcProvider({ issuerUrl: 'https://accounts.example.com', clientId: 'client-a' });
 
     expect(isValidOIDCProviderInput(provider, configuredProvider)).toBe(true);
     expect(isValidOIDCProviderInput({ ...provider, clientId: 'client-b' }, configuredProvider)).toBe(false);
   });
 
   it('creates a write-only OIDC provider form from configured state', () => {
-    const provider: OIDCProvider = {
-      providerKey: 'google',
-      displayName: 'Google',
-      issuerUrl: 'https://accounts.google.com',
-      clientId: 'client',
-      scopes: 'openid profile email',
-      enabled: true,
-      secretConfigured: true,
-      databaseSourceActive: true,
-      grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.SYNCHRONIZED,
-      grafanaSyncedRevision: 1,
-      providerRevision: 1,
-      hasCandidate: false,
-      grafanaTarget: GRAFANA_PROVIDER_KIND.GENERIC_OAUTH,
-      devlakeCallbackUrl: 'https://devlake.example.com/api/auth/callback',
-      grafanaCallbackUrl: 'https://grafana.example.com/login/generic_oauth',
-      allowLocalOidc: false,
-    };
+    const provider = oidcProvider();
 
     expect(formFromOIDCProvider(provider).clientSecret).toBe('');
     expect(formFromOIDCProvider(provider).scopes).toBe(provider.scopes);
@@ -298,24 +284,7 @@ describe('routes/settings/utils', () => {
   });
 
   it('summarizes OIDC provider lifecycle state without exposing internal synchronization details', () => {
-    const disabledProvider: OIDCProvider = {
-      providerKey: 'google',
-      displayName: 'Google',
-      issuerUrl: 'https://accounts.google.com',
-      clientId: 'client',
-      scopes: 'openid profile email',
-      enabled: false,
-      secretConfigured: true,
-      databaseSourceActive: false,
-      grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.SYNCHRONIZED,
-      grafanaSyncedRevision: 1,
-      providerRevision: 1,
-      hasCandidate: false,
-      grafanaTarget: GRAFANA_PROVIDER_KIND.GENERIC_OAUTH,
-      devlakeCallbackUrl: 'https://devlake.example.com/api/auth/callback',
-      grafanaCallbackUrl: 'https://grafana.example.com/login/generic_oauth',
-      allowLocalOidc: false,
-    };
+    const disabledProvider = oidcProvider({ enabled: false, databaseSourceActive: false });
 
     expect(getOIDCProviderStatus(undefined)).toBe(OIDC_PROVIDER_STATUS.CONFIGURED);
     expect(getOIDCProviderStatus(disabledProvider)).toBe(OIDC_PROVIDER_STATUS.DISABLED);
@@ -339,24 +308,12 @@ describe('routes/settings/utils', () => {
   });
 
   it('summarizes the authentication configuration state without inferring environment configuration', () => {
-    const provider: OIDCProvider = {
-      providerKey: 'google',
-      displayName: 'Google',
-      issuerUrl: 'https://accounts.google.com',
-      clientId: 'client',
-      scopes: 'openid profile email',
+    const provider = oidcProvider({
       enabled: false,
-      secretConfigured: true,
       databaseSourceActive: false,
-      grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.SYNCHRONIZED,
-      grafanaSyncedRevision: 1,
-      providerRevision: 1,
-      hasCandidate: false,
       grafanaTarget: GRAFANA_PROVIDER_KIND.GOOGLE,
-      devlakeCallbackUrl: 'https://devlake.example.com/api/auth/callback',
       grafanaCallbackUrl: 'https://grafana.example.com/login/google',
-      allowLocalOidc: false,
-    };
+    });
 
     expect(getAuthenticationState([])).toBe(AUTHENTICATION_STATE.NO_MANAGED_OIDC);
     expect(getAuthenticationState([{ ...provider, hasCandidate: true }])).toBe(
@@ -382,24 +339,16 @@ describe('routes/settings/utils', () => {
     expect(isValidOIDCProviderInput(devLakeOnly)).toBe(false);
     expect(isValidOIDCProviderInput({ ...devLakeOnly, confirmDevlakeOnly: true })).toBe(true);
 
-    const provider: OIDCProvider = {
+    const provider = oidcProvider({
       providerKey: 'custom',
       displayName: 'Custom OIDC',
       issuerUrl: 'https://id.example.com',
-      clientId: 'client',
       scopes: 'openid email',
       grafanaTarget: GRAFANA_PROVIDER_KIND.NONE,
-      enabled: true,
-      secretConfigured: true,
-      databaseSourceActive: true,
       grafanaSyncStatus: OIDC_PROVIDER_SYNC_STATUS.NOT_APPLICABLE,
       grafanaSyncedRevision: 0,
-      providerRevision: 1,
-      hasCandidate: false,
-      devlakeCallbackUrl: 'https://devlake.example.com/api/auth/callback',
       grafanaCallbackUrl: 'https://grafana.example.com/login',
-      allowLocalOidc: false,
-    };
+    });
     expect(canSelectGenericOIDCProvider(provider)).toBe(true);
     expect(canSelectGenericOIDCProvider({ ...provider, enabled: false })).toBe(false);
     expect(canSelectGenericOIDCProvider({ ...provider, hasCandidate: true })).toBe(false);

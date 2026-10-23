@@ -1,0 +1,27 @@
+{
+  "plugin": "kiro",
+  "connection": {
+    "mounted": {
+      "name": ""
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.",
+    "typed": {
+      "name": "v0"
+    }
+  },
+  "scopeConfig": {
+    "mounted": {},
+    "controls": [],
+    "text": "",
+    "typed": {}
+  },
+  "consoleErrors": [],
+  "requests": []
+}

@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { formatPlural } from './text';
+import { formatPlural, trimSlashes, trimTrailingSlashes } from './text';
 
 describe('utils/text', () => {
   it('formats singular count correctly', () => {
@@ -37,5 +37,18 @@ describe('utils/text', () => {
     expect(formatPlural(1, 'person', 'people')).toBe('1 person');
     expect(formatPlural(2, 'person', 'people')).toBe('2 people');
     expect(formatPlural(0, 'person', 'people')).toBe('0 people');
+  });
+
+  it.each([
+    ['', '', ''],
+    ['/', '', ''],
+    ['///', '', ''],
+    ['a/', 'a', 'a'],
+    ['a///', 'a', 'a'],
+    ['/a/', '/a', 'a'],
+    ['//a//b//', '//a//b', 'a//b'],
+  ])('trims slashes from %j', (input, trailing, both) => {
+    expect(trimTrailingSlashes(input)).toBe(trailing);
+    expect(trimSlashes(input)).toBe(both);
   });
 });

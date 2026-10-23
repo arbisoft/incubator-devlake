@@ -38,3 +38,7 @@ export interface IWebhook {
   postPullRequestsEndpoint: string;
   apiKeyId: number;
 }
+
+export type WebhookPayload = {
+  name: string;
+};

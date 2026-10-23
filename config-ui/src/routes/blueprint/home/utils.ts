@@ -19,22 +19,11 @@
 import type { ListParams } from '@/api/blueprint';
 import { getCronOptions } from '@/config';
 import { IBPMode } from '@/types';
-import type { BlueprintConnectionPayload } from '@/types/blueprint';
+import type { BlueprintCreatePayload } from '@/types/blueprint';
 import type { ListQuery } from '@/ui';
 
 import { STATUS_FILTER, TYPE_FILTER_ALL, COPY } from './constants';
 import type { BlueprintFilters, BlueprintSortKey } from './types';
-
-type BlueprintCreatePayload = {
-  name: string;
-  mode: IBPMode;
-  enable: boolean;
-  cronConfig: string;
-  isManual: boolean;
-  skipOnFail: boolean;
-  connections?: BlueprintConnectionPayload[];
-  plan?: unknown[][];
-};
 
 export const buildBlueprintCreatePayload = (
   name: string,

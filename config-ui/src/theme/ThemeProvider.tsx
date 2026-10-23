@@ -17,20 +17,21 @@
  */
 
 import { ConfigProvider } from 'antd';
-import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { ThemeProvider as StyledThemeProvider } from 'styled-components';
 
 import { PRIMARY_OVERRIDE } from '@/config/brand';
-import { selectThemeMode, resolveThemeMode } from '@/features/theme/slice';
+import { PREFERS_DARK_QUERY, selectThemeMode, resolveThemeMode } from '@/features/theme/slice';
 import { useAppSelector } from '@/hooks';
 
+import { THEME_MODE } from './constants';
 import { getTheme, ResolvedTheme } from './tokens';
 
 interface Props {
   children: ReactNode;
 }
 
-const CSS_VAR_MAP: Record<string, keyof ReturnType<typeof getTheme>['colors']> = {
+const cssVarMap: Record<string, keyof ReturnType<typeof getTheme>['colors']> = {
   '--devlake-color-text': 'text',
   '--devlake-color-text-secondary': 'textSecondary',
   '--devlake-color-text-muted': 'textTertiary',
@@ -47,22 +48,19 @@ const CSS_VAR_MAP: Record<string, keyof ReturnType<typeof getTheme>['colors']> =
   '--devlake-color-warning-soft': 'warningSoft',
 };
 
+const subscribeSystemTheme = (onChange: () => void) => {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return () => undefined;
+  const media = window.matchMedia(PREFERS_DARK_QUERY);
+  media.addEventListener('change', onChange);
+  return () => media.removeEventListener('change', onChange);
+};
+
+const readSystemTheme = () => resolveThemeMode(THEME_MODE.SYSTEM);
+
 export const ThemeProvider = ({ children }: Props) => {
   const mode = useAppSelector(selectThemeMode);
-  const [resolved, setResolved] = useState<ResolvedTheme>(() => resolveThemeMode(mode));
-
-  useEffect(() => {
-    setResolved(resolveThemeMode(mode));
-
-    if (mode !== 'system' || typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-      return;
-    }
-
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const onChange = () => setResolved(media.matches ? 'dark' : 'light');
-    media.addEventListener('change', onChange);
-    return () => media.removeEventListener('change', onChange);
-  }, [mode]);
+  const systemTheme = useSyncExternalStore(subscribeSystemTheme, readSystemTheme, () => THEME_MODE.LIGHT);
+  const resolved: ResolvedTheme = mode === THEME_MODE.SYSTEM ? systemTheme : mode;
 
   const theme = useMemo(() => getTheme(resolved, PRIMARY_OVERRIDE), [resolved]);
 
@@ -71,7 +69,7 @@ export const ThemeProvider = ({ children }: Props) => {
     const root = document.documentElement;
     root.dataset.theme = resolved;
     root.style.colorScheme = resolved;
-    for (const [cssVar, key] of Object.entries(CSS_VAR_MAP)) {
+    for (const [cssVar, key] of Object.entries(cssVarMap)) {
       root.style.setProperty(cssVar, theme.colors[key]);
     }
   }, [resolved, theme]);

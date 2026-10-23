@@ -18,10 +18,13 @@
 
 import { ExternalLink } from '@/components';
 import { DOC_URL } from '@/release';
-import { IPluginConfig } from '@/types';
+import type { ConnectionFieldRenderProps, IPluginConfig } from '@/types';
 
 import Icon from './assets/icon.svg?react';
 import { Endpoint } from './connection-fields';
+import type { OpsgenieConnectionValues } from './types';
+
+type RenderProps = ConnectionFieldRenderProps<OpsgenieConnectionValues>;
 
 export const OpsgenieConfig: IPluginConfig = {
   plugin: 'opsgenie',
@@ -35,7 +38,7 @@ export const OpsgenieConfig: IPluginConfig = {
     },
     fields: [
       'name',
-      ({ initialValues, values, setValues }: any) => (
+      ({ initialValues, values, setValues }: RenderProps) => (
         <Endpoint
           initialValue={initialValues.endpoint ?? ''}
           value={values.endpoint ?? ''}

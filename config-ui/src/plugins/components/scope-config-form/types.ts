@@ -16,9 +16,11 @@
  *
  */
 
-import type { Dispatch, SetStateAction } from 'react';
+import type { ReactNode, SetStateAction } from 'react';
 
-export type Transformation = Record<string, unknown>;
+import type { ScopeConfigTransformation } from '@/types';
+
+export type Transformation = ScopeConfigTransformation;
 
 export type ScopeConfigFormProps = {
   plugin: string;
@@ -32,15 +34,19 @@ export type ScopeConfigFormProps = {
   onSubmit: (id: string) => void;
 };
 
-export type TransformationProps = {
+export type TransformationProps<T extends Transformation = Transformation> = {
   entities: string[];
   connectionId: ID;
   scopeId?: ID;
   scopeConfigId?: ID;
-  transformation: Transformation;
-  setTransformation: Dispatch<SetStateAction<Transformation>>;
-  setHasError: Dispatch<SetStateAction<boolean>>;
+  transformation: T;
+  // intentional unchecked cast: method syntax lets each plugin declare its own value type
+  setTransformation(next: SetStateAction<T>): void;
+  setHasError(hasError: boolean): void;
 };
+
+// intentional unchecked cast: method syntax lets each plugin declare its own value type
+export type TransformationComponent = { render(props: TransformationProps): ReactNode }['render'];
 
 export type StepDetailsProps = {
   name: string;

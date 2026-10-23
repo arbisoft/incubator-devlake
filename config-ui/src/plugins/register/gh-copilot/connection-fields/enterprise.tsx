@@ -16,53 +16,23 @@
  *
  */
 
-import { Input } from 'antd';
-import { useEffect, useMemo } from 'react';
+import { IdentityField } from '@/plugins/components/connection-form/fields/identity-field';
 
-import { Block } from '@/components';
+import type { GhCopilotConnectionValues } from '../types';
 
-import * as S from './styled';
+import { validateScopeIdentity, type ScopeIdentityProps } from './scope-identity';
 
-interface Props {
-  type: 'create' | 'update';
-  initialValues: any;
-  values: any;
-  setValues: (value: any) => void;
-  setErrors: (value: any) => void;
-}
-
-export const Enterprise = ({ type, initialValues, values, setValues, setErrors }: Props) => {
-  useEffect(() => {
-    setValues({ enterprise: initialValues.enterprise ?? '' });
-  }, [initialValues.enterprise]);
-
-  const error = useMemo(() => {
-    if (type === 'update') return '';
-    const hasOrg = !!values.organization?.trim();
-    const hasEnt = !!values.enterprise?.trim();
-    return hasOrg || hasEnt ? '' : 'At least one of Organization or Enterprise Slug is required';
-  }, [type, values.organization, values.enterprise]);
-
-  useEffect(() => {
-    setErrors({ scopeIdentity: error });
-  }, [error]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setValues({ enterprise: e.target.value });
-  };
-
-  return (
-    <Block
-      title="Enterprise Slug"
-      description="Enter the GitHub enterprise slug for enterprise-wide aggregate metrics and per-user data. At least one of Organization or Enterprise Slug is required. For the most complete data, provide both."
-    >
-      <Input
-        placeholder="e.g. my-enterprise"
-        status={error ? 'error' : ''}
-        value={values.enterprise ?? ''}
-        onChange={handleChange}
-      />
-      {error && <S.ErrorText>{error}</S.ErrorText>}
-    </Block>
-  );
-};
+export const Enterprise = ({ type, initialValues, values, setValues, setErrors }: ScopeIdentityProps) => (
+  <IdentityField<GhCopilotConnectionValues>
+    fieldKey="enterprise"
+    errorKey="scopeIdentity"
+    title="Enterprise Slug"
+    description="Enter the GitHub enterprise slug for enterprise-wide aggregate metrics and per-user data. At least one of Organization or Enterprise Slug is required. For the most complete data, provide both."
+    placeholder="e.g. my-enterprise"
+    validate={(v) => validateScopeIdentity(type, v)}
+    initialValues={initialValues}
+    values={values}
+    setValues={setValues}
+    setErrors={setErrors}
+  />
+);

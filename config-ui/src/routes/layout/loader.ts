@@ -23,6 +23,8 @@ import API from '@/api';
 import { PATHS } from '@/config';
 import { getRegisterPlugins } from '@/plugins';
 
+import { parseEnvPlugins } from './utils';
+
 type Props = {
   request: Request;
 };
@@ -40,11 +42,8 @@ export const layoutLoader = async ({ request }: Props) => {
     return redirect(PATHS.ONBOARD());
   }
 
-  let fePlugins = getRegisterPlugins();
-  try {
-    const envPlugins = import.meta.env.DEVLAKE_PLUGINS.split(',').filter(Boolean);
-    fePlugins = fePlugins.filter((plugin) => !envPlugins.length || envPlugins.includes(plugin));
-  } catch (err) {}
+  const envPlugins = parseEnvPlugins(import.meta.env.DEVLAKE_PLUGINS);
+  const fePlugins = getRegisterPlugins().filter((plugin) => !envPlugins.length || envPlugins.includes(plugin));
 
   const [bePlugins, res, access] = await Promise.all([
     API.plugin.list(),

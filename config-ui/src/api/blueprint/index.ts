@@ -16,7 +16,7 @@
  *
  */
 
-import type { IBlueprint } from '@/types';
+import type { BlueprintCreatePayload, IBlueprint } from '@/types';
 import { request } from '@/utils';
 
 import type { KeywordParams, SortParams } from '../types';
@@ -29,7 +29,7 @@ export const list = (data: ListParams, signal?: AbortSignal): Promise<{ count: n
 
 export const get = (id: ID, signal?: AbortSignal): Promise<IBlueprint> => request(`/blueprints/${id}`, { signal });
 
-export const create = (data: any) =>
+export const create = (data: BlueprintCreatePayload) =>
   request('/blueprints', {
     method: 'post',
     data,

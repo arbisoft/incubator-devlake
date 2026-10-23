@@ -22,9 +22,9 @@ import { useEffect } from 'react';
 import { Block } from '@/components';
 
 interface Props {
-  initialValue: string;
-  value: string;
-  setValue: (value: string) => void;
+  initialValue?: string;
+  value?: string;
+  setValue: (value?: string) => void;
 }
 
 export const DBUrl = ({ initialValue, value, setValue }: Props) => {

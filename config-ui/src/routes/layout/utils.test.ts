@@ -23,7 +23,7 @@ import { ROLE_OPTIONS } from '@/routes/settings/constants';
 
 import { COPY } from './constants';
 import type { LayoutUser } from './types';
-import { getAccountLabels } from './utils';
+import { getAccountLabels, parseEnvPlugins } from './utils';
 
 const USER: LayoutUser = {
   authenticated: true,
@@ -59,5 +59,16 @@ describe('getAccountLabels', () => {
       name: COPY.account.fallbackName,
       secondary: '',
     });
+  });
+});
+
+describe('parseEnvPlugins', () => {
+  it('returns no plugins when the variable is unset or empty', () => {
+    expect(parseEnvPlugins(undefined)).toEqual([]);
+    expect(parseEnvPlugins('')).toEqual([]);
+  });
+
+  it('splits on commas and drops empty entries', () => {
+    expect(parseEnvPlugins('github,,jira')).toEqual(['github', 'jira']);
   });
 });
