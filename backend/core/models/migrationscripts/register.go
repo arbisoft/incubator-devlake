@@ -157,5 +157,8 @@ func All() []plugin.MigrationScript {
 		new(retireClaudePlatformPlugin),
 		new(addAiPrompts),
 		new(addAiPromptRepositoryUrl),
+		new(addAiPromptEffort),
+		new(addAiPromptFailures),
+		new(addAiPromptFailuresPromptIndex),
 	}
 }

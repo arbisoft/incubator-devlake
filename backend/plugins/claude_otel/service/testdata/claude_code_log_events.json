@@ -827,6 +827,12 @@
          "value": {
           "stringValue": "{\"bash_command\": \"cat\", \"full_command\": \"cat secret.txt\"}"
          }
+        },
+        {
+         "key": "duration_ms",
+         "value": {
+          "intValue": "340"
+         }
         }
        ]
       },
@@ -1020,6 +1026,18 @@
          "key": "attempt",
          "value": {
           "intValue": "1"
+         }
+        },
+        {
+         "key": "duration_ms",
+         "value": {
+          "intValue": "2100"
+         }
+        },
+        {
+         "key": "query_source",
+         "value": {
+          "stringValue": "repl_main_thread"
          }
         }
        ]

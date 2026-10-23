@@ -162,3 +162,49 @@ func TestLogReplayObservedDateBoundariesAndFallback(t *testing.T) {
 	}
 	w.requireLogReplayCompleted(selectedCount)
 }
+
+func TestLogReplayBackfillsPromptEffort(t *testing.T) {
+	w := newWorld(t)
+	w.connection("alpha", orgR, w.day(-5))
+	start := w.day(-2).Add(8 * time.Hour)
+	actors := []actor{a1, a2, a3, a4, a5}
+	specs := make([]resourceSpec, 0, len(actors))
+	want := make(map[string]string, len(actors))
+	withoutEffort := int64(0)
+	for index, who := range actors {
+		// Consecutive seeds mix prompts whose main-thread request comes first, last or not at
+		// all, and one whose requests report no effort.
+		seed := 1000 + index
+		specs = append(specs, resourceSpec{who: who, at: start.Add(time.Duration(index) * time.Minute), seed: seed})
+		want[who.promptID(seed)] = fxPromptEffort(seed)
+		if !fxHasEffort(seed) {
+			withoutEffort++
+		}
+	}
+	require.Positive(t, withoutEffort)
+	w.insertLogBatch(specs)
+	w.drainNow()
+	require.Equal(t, want, w.promptEfforts(orgR))
+
+	// Clearing effort leaves the prompts as they were before effort was recorded.
+	require.NoError(t, w.tester.Dal.UpdateColumns(&ai.AiPrompt{}, []dal.DalSet{{ColumnName: "effort", Value: nil}}, dal.Where("workspace_key = ?", orgR)))
+	require.Equal(t, int64(len(want)), w.count(&ai.AiPrompt{}, "workspace_key = ? AND effort IS NULL", orgR))
+
+	_, err := service.CreateOtelReplay(e2eUser, &service.OtelReplayInput{OtelReplayRange: w.replayDates(-2, -2)})
+	require.NoError(t, err)
+	w.drainNow()
+
+	require.Equal(t, withoutEffort, w.count(&ai.AiPrompt{}, "workspace_key = ? AND effort IS NULL", orgR))
+	require.Equal(t, want, w.promptEfforts(orgR))
+	w.requireLogReplayCompleted(1)
+}
+
+// promptEfforts maps each of the organization's prompt IDs to its effort, or "" for a NULL one.
+func (w *world) promptEfforts(org string) map[string]string {
+	w.t.Helper()
+	efforts := make(map[string]string)
+	for _, prompt := range snapshot[ai.AiPrompt](w, "prompt_id", "workspace_key = ?", org) {
+		efforts[prompt.PromptId] = promptEffort(w.t, prompt)
+	}
+	return efforts
+}

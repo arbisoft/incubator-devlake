@@ -29,5 +29,6 @@ func All() []plugin.MigrationScript {
 		new(addClaudeCodeOtelLogEvents),
 		new(addClaudeCodeOtelReplayRequestKind),
 		new(addClaudeCodeOtelReplayAudit),
+		new(normalizeAiPromptModelsUsed),
 	}
 }

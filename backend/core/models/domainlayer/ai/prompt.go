@@ -68,21 +68,30 @@ type AiPrompt struct {
 	// mode change, so the mode is assumed rather than observed.
 	PermissionMode         string `gorm:"type:varchar(64);index" json:"permissionMode"`
 	PermissionModeInferred bool   `json:"permissionModeInferred"`
-	ModelsUsed             string `gorm:"type:varchar(1024)" json:"modelsUsed"`
-	ApiRequestCount        int64  `json:"apiRequestCount"`
-	ApiErrorCount          int64  `json:"apiErrorCount"`
-	InputTokens            int64  `json:"inputTokens"`
-	OutputTokens           int64  `json:"outputTokens"`
-	CacheReadTokens        int64  `json:"cacheReadTokens"`
-	CacheCreationTokens    int64  `json:"cacheCreationTokens"`
-	EstimatedCostUsd       string `gorm:"type:decimal(20,8);not null" json:"estimatedCostUsd"`
-	ToolCallCount          int64  `json:"toolCallCount"`
-	ToolFailureCount       int64  `json:"toolFailureCount"`
-	ToolRejectCount        int64  `json:"toolRejectCount"`
-	SubagentCount          int64  `json:"subagentCount"`
-	SkillCount             int64  `json:"skillCount"`
-	UsedSkill              bool   `gorm:"index" json:"usedSkill"`
-	SourceType             string `gorm:"type:varchar(64)" json:"sourceType"`
+	// ModelsUsed lists the base model IDs of the prompt's API requests, comma-separated and
+	// sorted, without snapshot dates or variant suffixes such as [1m].
+	ModelsUsed          string `gorm:"type:varchar(1024)" json:"modelsUsed"`
+	ApiRequestCount     int64  `json:"apiRequestCount"`
+	ApiErrorCount       int64  `json:"apiErrorCount"`
+	InputTokens         int64  `json:"inputTokens"`
+	OutputTokens        int64  `json:"outputTokens"`
+	CacheReadTokens     int64  `json:"cacheReadTokens"`
+	CacheCreationTokens int64  `json:"cacheCreationTokens"`
+	EstimatedCostUsd    string `gorm:"type:decimal(20,8);not null" json:"estimatedCostUsd"`
+	ToolCallCount       int64  `json:"toolCallCount"`
+	ToolFailureCount    int64  `json:"toolFailureCount"`
+	ToolRejectCount     int64  `json:"toolRejectCount"`
+	SubagentCount       int64  `json:"subagentCount"`
+	SkillCount          int64  `json:"skillCount"`
+	UsedSkill           bool   `gorm:"index" json:"usedSkill"`
+	SourceType          string `gorm:"type:varchar(64)" json:"sourceType"`
+
+	// Effort is the reasoning effort level (such as low, medium, high, xhigh or max) of the
+	// prompt's main conversation requests, from Claude Code's api_request effort attribute.
+	// When no main-thread request reports one, it is the first effort any request reported.
+	// It is nil when no request reported one: prompts that made no model request, clients
+	// that do not send effort, and prompts converted before it was recorded.
+	Effort *string `gorm:"type:varchar(64);index" json:"effort,omitempty"`
 }
 
 func (AiPrompt) TableName() string { return "ai_prompts" }
@@ -105,6 +114,44 @@ type AiPromptSkill struct {
 }
 
 func (AiPromptSkill) TableName() string { return "ai_prompt_skills" }
+
+// Kinds of failure recorded for a prompt.
+const (
+	FailureKindApiError  = "api_error"
+	FailureKindToolError = "tool_error"
+)
+
+// AiPromptFailure is one failed model request or tool call while handling a prompt.
+// ErrorMessage is set only for API errors, whose message comes from the service. A tool
+// error's message can echo file contents, so it never reaches DevLake; tool failures carry
+// only their ErrorType.
+type AiPromptFailure struct {
+	domainlayer.DomainEntity
+	Provider string `gorm:"type:varchar(100);index" json:"provider"`
+	// WorkspaceKey and PromptId also share idx_ai_prompt_failures_workspace_prompt, the key
+	// the prompt rollup deletes a prompt's failures by.
+	WorkspaceKey string `gorm:"type:varchar(255);index;index:idx_ai_prompt_failures_workspace_prompt,priority:1" json:"workspaceKey"`
+	UserKey      string `gorm:"type:varchar(255);index" json:"userKey"`
+	UserEmail    string `gorm:"type:varchar(255);index" json:"userEmail"`
+	SessionId    string `gorm:"type:varchar(128);index" json:"sessionId"`
+	PromptId     string `gorm:"type:varchar(128);index;index:idx_ai_prompt_failures_workspace_prompt,priority:2" json:"promptId"`
+	// AiPromptId is the id of the ai_prompts row this failure belongs to.
+	AiPromptId  string    `gorm:"type:varchar(255);index" json:"aiPromptId"`
+	FailureKind string    `gorm:"type:varchar(32);index" json:"failureKind"`
+	OccurredAt  time.Time `gorm:"type:datetime(3);index" json:"occurredAt"`
+	// Model and QuerySource are set for API errors.
+	Model       string `gorm:"type:varchar(255)" json:"model"`
+	QuerySource string `gorm:"type:varchar(100)" json:"querySource"`
+	// ToolName is set for tool errors.
+	ToolName     string `gorm:"type:varchar(255);index" json:"toolName"`
+	ErrorType    string `gorm:"type:varchar(255);index" json:"errorType"`
+	ErrorMessage string `gorm:"type:varchar(1024)" json:"errorMessage"`
+	StatusCode   *int64 `json:"statusCode,omitempty"`
+	Attempt      *int64 `json:"attempt,omitempty"`
+	DurationMs   *int64 `json:"durationMs,omitempty"`
+}
+
+func (AiPromptFailure) TableName() string { return "ai_prompt_failures" }
 
 // AiPermissionModeChange is one permission mode switch inside a Claude Code session.
 type AiPermissionModeChange struct {
