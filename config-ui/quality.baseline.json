@@ -6,7 +6,7 @@
     },
     "max-lines": {
       "errors": 0,
-      "warnings": 14
+      "warnings": 13
     },
     "react-hooks/exhaustive-deps": {
       "errors": 0,
@@ -23,7 +23,7 @@
   },
   "knip": [],
   "jscpd": {
-    "clones": 81,
-    "duplicatedLines": 1496
+    "clones": 80,
+    "duplicatedLines": 1442
   }
 }
