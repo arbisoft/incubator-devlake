@@ -26,6 +26,34 @@ limitations under the License.
 - **Logic in JSX** (filtering, sorting, formatting, permission checks inline) → hook, util or a named variable above the return.
 - Prefer `children` and slot props over configuration props that switch on what to render.
 
+## Idioms
+
+Check these in every changed file, including demos, stories and tests.
+
+- **Destructure** when a function reads two or more fields of one argument, or when a local just aliases a nested path:
+  ```ts
+  // before
+  const storageLine = (estimate: StorageEstimate) =>
+    estimate.rawMb === 0 ? none : storage(estimate.rawMb, estimate.monthlyMb);
+  const OPTIONS_COPY = COPY.snippet.options;
+  // after
+  const storageLine = ({ rawMb, monthlyMb }: StorageEstimate) => ...;
+  const { options } = COPY.snippet;
+  ```
+- **`&&` over `? … : null`** in JSX when the condition is a boolean: `{hasSingleSignal(value) && copy.lastSignal}`. Keep the ternary (or `!!x &&` / `x > 0 &&`) when the left side can be a number or empty string, which `&&` would render as `0` / `""`.
+- **Loop over repeated JSX.** Two or more sibling blocks that differ only in props or data → a config array (or map) plus `.map`, with a stable `key`. Applies to demo/ui-kit pages and test tables too:
+  ```tsx
+  // after
+  const cases = [
+    { label: COPY.cases.default, checked: plain, onChange: setPlain },
+    { label: COPY.cases.disabled, checked: true, disabled: true },
+  ];
+  {cases.map(({ label, ...props }) => (
+    <DemoCase key={label} label={label}><SettingOption {...base} {...props} /></DemoCase>
+  ))}
+  ```
+  Don't force it when the blocks differ in structure (e.g. one has nested children); extract the repeated part instead.
+
 ## Hygiene
 
 - Dead code: unused imports, exports, props, state, files; commented-out blocks.
