@@ -71,7 +71,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Not built yet: the GitLab query for this panel is added by US-23.",
+      "description": "MRs created in the selected period. Filtered by MR author; MRs imported from GitHub and open drafts are left out. Drafts are open MRs whose title starts with Draft:, [Draft], (Draft), WIP: or [WIP].\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -131,7 +131,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- MRs created in the range.\n-- Filtered by MR author (the developer variable lists GitLab usernames; All applies no filter), bots left out. MRs\n-- imported from GitHub (the not_imported_mr constant, shared with dashboards A, C and I) are left out.\n-- Open drafts are left out, as on dashboard I. GitLab's is_draft is always 0, so a Draft is an open MR whose title\n-- starts with Draft:, [Draft], (Draft), WIP: or [WIP].\nSELECT COUNT(*) AS merge_request_count\nFROM pull_requests pr\nWHERE pr.id LIKE 'gitlab:%'\n  AND $__timeFilter(pr.created_date)\n  AND NOT (pr.status = 'OPEN' AND LOWER(pr.title) REGEXP '^[[:space:]]*(draft:|\\\\[draft\\\\]|\\\\(draft\\\\)|wip:|\\\\[wip\\\\])')\n  AND ('__all__' IN (${developer}) OR pr.author_name IN (${developer}))\n  AND pr.author_name NOT REGEXP '^(project|group)_[0-9]+_bot_'\n  AND ${not_imported_mr:raw}\n  AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
           "refId": "A"
         }
       ],
@@ -143,7 +143,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Not built yet: the GitLab query for this panel is added by US-23.",
+      "description": "MRs created per month or week. Filtered by MR author; MRs imported from GitHub and open drafts are left out. Drafts are open MRs whose title starts with Draft:, [Draft], (Draft), WIP: or [WIP].\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -248,7 +248,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- MRs created per month or week.\n-- Filtered by MR author (the developer variable lists GitLab usernames; All applies no filter), bots left out. MRs\n-- imported from GitHub (the not_imported_mr constant, shared with dashboards A, C and I) are left out.\n-- Open drafts are left out, as on dashboard I. GitLab's is_draft is always 0, so a Draft is an open MR whose title\n-- starts with Draft:, [Draft], (Draft), WIP: or [WIP].\nWITH buckets AS (\n  SELECT CASE WHEN '$interval' = 'WEEKDAY' THEN DATE_SUB(DATE(pr.created_date), INTERVAL WEEKDAY(pr.created_date) DAY) ELSE DATE_SUB(DATE(pr.created_date), INTERVAL DAYOFMONTH(pr.created_date) - 1 DAY) END AS time,\n         COUNT(*) AS mr_count\n  FROM pull_requests pr\n  WHERE pr.id LIKE 'gitlab:%'\n    AND $__timeFilter(pr.created_date)\n    AND NOT (pr.status = 'OPEN' AND LOWER(pr.title) REGEXP '^[[:space:]]*(draft:|\\\\[draft\\\\]|\\\\(draft\\\\)|wip:|\\\\[wip\\\\])')\n    AND ('__all__' IN (${developer}) OR pr.author_name IN (${developer}))\n    AND pr.author_name NOT REGEXP '^(project|group)_[0-9]+_bot_'\n    AND ${not_imported_mr:raw}\n    AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  GROUP BY time\n)\nSELECT CASE WHEN '$interval' = 'DAYOFMONTH' THEN DATE_FORMAT(time, '%M %Y') ELSE DATE_FORMAT(time, 'W%v %x') END AS _time,\n       mr_count AS \"Merge Request Count\"\nFROM buckets\nORDER BY time;",
           "refId": "A"
         }
       ],
@@ -260,7 +260,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Not built yet: the GitLab query for this panel is added by US-23.",
+      "description": "Top 20 authors by merged MRs created in the period. Filtered by MR author; MRs imported from GitHub are left out.\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -354,7 +354,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Top 20 authors by MRs created in the range that are merged.\n-- Filtered by MR author (the developer variable lists GitLab usernames; All applies no filter), bots left out. MRs\n-- imported from GitHub (the not_imported_mr constant, shared with dashboards A, C and I) are left out.\nSELECT COALESCE(NULLIF(TRIM(REPLACE(MAX(a.full_name), _utf8mb4 X'E2808B', '')), ''), (SELECT NULLIF(TRIM(REPLACE(MIN(u.name), _utf8mb4 X'E2808B', '')), '') FROM user_accounts ua JOIN users u ON u.id = ua.user_id WHERE ua.account_id = pr.author_id), REPLACE(MAX(pr.author_name), '-', ' ')) AS contributor,\n       COUNT(*) AS merged_merge_request_count\nFROM pull_requests pr\nLEFT JOIN accounts a ON a.id = pr.author_id\nWHERE pr.id LIKE 'gitlab:%'\n  AND $__timeFilter(pr.created_date)\n  AND pr.status = 'MERGED'\n  AND ('__all__' IN (${developer}) OR pr.author_name IN (${developer}))\n  AND pr.author_name NOT REGEXP '^(project|group)_[0-9]+_bot_'\n  AND ${not_imported_mr:raw}\n  AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\nGROUP BY pr.author_id\nORDER BY merged_merge_request_count DESC\nLIMIT 20;",
           "refId": "A"
         }
       ],
@@ -366,7 +366,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Developer participation in the code reviews\n\nNot built yet: the GitLab query for this panel is added by US-23.",
+      "description": "Per reviewer, the latest decision on each MR reviewed in the period: approved, rejected (GitLab unapproval) or commented, on other people's MRs (top 20). Filtered by reviewer. Reviews on MRs imported from GitHub and on bot-authored MRs are left out.\ndatasource: pull_request_comments, pull_requests, accounts, users, user_accounts, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -448,7 +448,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Per reviewer, on other people's MRs, the latest decision on each MR in the range: approved, rejected (a GitLab\n-- unapproval, stored as a NORMAL comment with status CHANGES_REQUESTED) or, with no decision, commented. Top 20.\n-- Decisions use dashboard C's rule, so \"**Review:** Approved\" and \"**Review:** Changes requested\" notes count too.\n-- Filtered by the reviewer's username (All applies no filter). Bot reviewers, imported GitHub notes and AI-tool notes are\n-- left out, as on dashboard B. Reviews on bot-authored MRs and on MRs imported from GitHub (the not_imported_mr constant,\n-- shared with dashboards A, C and I) are left out too: the import account approved those while importing.\n-- A reviewer with no accounts row (GitLab only stores current members and issue people) is kept, as Unknown.\nWITH ranked AS (\n  SELECT c.account_id,\n         c.pull_request_id,\n         CASE WHEN (c.status = 'CHANGES_REQUESTED' OR c.body LIKE '**Review:** Changes requested%') THEN 'CHANGES_REQUESTED' WHEN ((c.type = 'REVIEW' AND c.status = 'APPROVED') OR c.body LIKE '**Review:** Approved%') THEN 'APPROVED' ELSE 'COMMENTED' END AS decision,\n         ROW_NUMBER() OVER (\n           PARTITION BY c.account_id, c.pull_request_id\n           ORDER BY (((c.type = 'REVIEW' AND c.status = 'APPROVED') OR c.body LIKE '**Review:** Approved%') OR (c.status = 'CHANGES_REQUESTED' OR c.body LIKE '**Review:** Changes requested%')) DESC, c.created_date DESC\n         ) AS rn\n  FROM pull_request_comments c\n  JOIN pull_requests pr ON pr.id = c.pull_request_id\n  LEFT JOIN accounts ra ON ra.id = c.account_id\n  WHERE pr.id LIKE 'gitlab:%'\n    AND ${not_imported_mr:raw}\n    AND pr.author_name NOT REGEXP '^(project|group)_[0-9]+_bot_'\n    AND ('__all__' IN (${developer}) OR ra.user_name IN (${developer}))\n    AND COALESCE(ra.user_name, '') NOT REGEXP '^(project|group)_[0-9]+_bot_'\n    AND c.account_id <> pr.author_id\n    AND NOT (c.body LIKE '*Created by%' OR c.body LIKE '*Merged by%') AND NOT (c.body LIKE 'Preparing PR description%' OR c.body LIKE 'Preparing review%' OR c.body LIKE '## PR Reviewer Guide%' OR c.body LIKE '## PR Code Suggestions%' OR c.body LIKE '**[Persistent review]%' OR c.body LIKE '**[PR Description]%')\n    AND $__timeFilter(c.created_date)\n    AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n)\nSELECT COALESCE(NULLIF(TRIM(REPLACE(MAX(a.full_name), _utf8mb4 X'E2808B', '')), ''), (SELECT NULLIF(TRIM(REPLACE(MIN(u.name), _utf8mb4 X'E2808B', '')), '') FROM user_accounts ua JOIN users u ON u.id = ua.user_id WHERE ua.account_id = r.account_id), REPLACE(MAX(a.user_name), '-', ' '), 'Unknown') AS reviewer,\n       SUM(r.decision = 'APPROVED')          AS approved,\n       SUM(r.decision = 'CHANGES_REQUESTED') AS rejected,\n       SUM(r.decision = 'COMMENTED')         AS commented\nFROM ranked r\nLEFT JOIN accounts a ON a.id = r.account_id\nWHERE r.rn = 1\nGROUP BY r.account_id\nORDER BY (approved + rejected + commented) DESC\nLIMIT 20;",
           "refId": "A"
         }
       ],
@@ -541,13 +541,13 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- The repo's commits in the range, merge commits excluded, as on dashboard B. Commit authors are matched to a GitLab\n-- account on the repo's own connection (see commit_authors) and filtered by that account's username (All applies no\n-- filter), bots left out. A commit that matches no account is kept under its git author name, as on GitHub J, and only\n-- shows under All.\nWITH scoped_commits AS (\n  -- each commit once, with the account-id prefix of its repo's connection (gitlab:GitlabAccount:<connection>:)\n  SELECT c.sha,\n         MAX(c.author_email) AS author_email,\n         MAX(c.author_name)  AS author_name,\n         MAX(c.additions)    AS additions,\n         MAX(c.deletions)    AS deletions,\n         MIN(CONCAT('gitlab:GitlabAccount:', SUBSTRING_INDEX(SUBSTRING_INDEX(rc.repo_id, ':', 3), ':', -1), ':')) AS account_prefix\n  FROM commits c\n  JOIN repo_commits rc ON rc.commit_sha = c.sha\n  WHERE rc.repo_id LIKE 'gitlab:%'\n    AND rc.repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = rc.repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n    AND $__timeFilter(c.authored_date)\n    AND (SELECT COUNT(*) FROM commit_parents cp WHERE cp.commit_sha = c.sha) < 2\n  GROUP BY c.sha\n),\ngitlab_accounts AS (\n  SELECT a.id,\n         CONCAT(SUBSTRING_INDEX(a.id, ':', 3), ':') AS account_prefix,\n         LOWER(NULLIF(TRIM(a.email), ''))           AS email,\n         LOWER(a.user_name)                         AS login,\n         LOWER(TRIM(a.full_name))                   AS name\n  FROM accounts a\n  WHERE a.id LIKE 'gitlab:GitlabAccount:%' AND a.id NOT LIKE 'gitlab:GitlabAccount:%:0'\n),\ncommit_authors AS (\n  -- A commit author is matched to a GitLab account on the repo's connection: by email (GitLab only returns account\n  -- emails to tokens that may see them), then by the email's local part against the username, then by the author name\n  -- against the username, then by a unique full name.\n  SELECT e.author_email,\n         e.author_name,\n         e.account_prefix,\n         COALESCE(\n           MIN(by_email.id),\n           MIN(by_local_part.id),\n           MIN(by_login.id),\n           CASE WHEN COUNT(DISTINCT by_name.id) = 1 THEN MIN(by_name.id) END\n         ) AS account_id\n  FROM (SELECT DISTINCT author_email, author_name, account_prefix FROM scoped_commits) e\n  LEFT JOIN gitlab_accounts by_email      ON by_email.account_prefix = e.account_prefix AND by_email.email = LOWER(e.author_email)\n  LEFT JOIN gitlab_accounts by_local_part ON by_local_part.account_prefix = e.account_prefix AND by_local_part.login = LOWER(SUBSTRING_INDEX(e.author_email, '@', 1))\n  LEFT JOIN gitlab_accounts by_login      ON by_login.account_prefix = e.account_prefix AND by_login.login = LOWER(TRIM(e.author_name))\n  LEFT JOIN gitlab_accounts by_name       ON by_name.account_prefix = e.account_prefix AND by_name.name = LOWER(TRIM(e.author_name))\n  GROUP BY e.author_email, e.author_name, e.account_prefix\n)\nSELECT COALESCE(NULLIF(TRIM(REPLACE(MAX(ga.full_name), _utf8mb4 X'E2808B', '')), ''), (SELECT NULLIF(TRIM(REPLACE(MIN(u.name), _utf8mb4 X'E2808B', '')), '') FROM user_accounts ua JOIN users u ON u.id = ua.user_id WHERE ua.account_id = MAX(ca.account_id)), REPLACE(MAX(ga.user_name), '-', ' '), MAX(TRIM(sc.author_name))) AS contributor,\n       SUM(sc.additions) AS `Lines Added`,\n       SUM(sc.deletions) AS `Lines Removed`\nFROM scoped_commits sc\nJOIN commit_authors ca ON ca.author_email <=> sc.author_email AND ca.author_name <=> sc.author_name AND ca.account_prefix = sc.account_prefix\nLEFT JOIN accounts ga  ON ga.id = ca.account_id\nWHERE ('__all__' IN (${developer}) OR ga.user_name IN (${developer}))\n  AND COALESCE(ga.user_name, '') NOT REGEXP '^(project|group)_[0-9]+_bot_'\nGROUP BY COALESCE(ca.account_id, CONCAT('name:', LOWER(TRIM(sc.author_name))))\nORDER BY SUM(sc.additions) + SUM(sc.deletions) DESC\nLIMIT 20;",
           "refId": "A"
         }
       ],
       "title": "3.5 Top 20 Code Changes by Developer",
       "type": "barchart",
-      "description": "Not built yet: the GitLab query for this panel is added by US-23."
+      "description": "Lines added and removed per developer (top 20), merge commits excluded. Commit authors are matched to GitLab accounts on the repo's connection by email, the email's local part or name, and filtered by developer; commits that match no account show under the git author name (under All only).\ndatasource: commits, repo_commits, commit_parents, accounts, users, user_accounts, project_mapping"
     },
     {
       "datasource": {
@@ -635,13 +635,13 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- The repo's commits in the range, merge commits excluded, as on dashboard B. Commit authors are matched to a GitLab\n-- account on the repo's own connection (see commit_authors) and filtered by that account's username (All applies no\n-- filter), bots left out. A commit that matches no account is kept under its git author name, as on GitHub J, and only\n-- shows under All.\nWITH scoped_commits AS (\n  -- each commit once, with the account-id prefix of its repo's connection (gitlab:GitlabAccount:<connection>:)\n  SELECT c.sha,\n         MAX(c.author_email) AS author_email,\n         MAX(c.author_name)  AS author_name,\n         MAX(c.additions)    AS additions,\n         MAX(c.deletions)    AS deletions,\n         MIN(CONCAT('gitlab:GitlabAccount:', SUBSTRING_INDEX(SUBSTRING_INDEX(rc.repo_id, ':', 3), ':', -1), ':')) AS account_prefix\n  FROM commits c\n  JOIN repo_commits rc ON rc.commit_sha = c.sha\n  WHERE rc.repo_id LIKE 'gitlab:%'\n    AND rc.repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = rc.repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n    AND $__timeFilter(c.authored_date)\n    AND (SELECT COUNT(*) FROM commit_parents cp WHERE cp.commit_sha = c.sha) < 2\n  GROUP BY c.sha\n),\ngitlab_accounts AS (\n  SELECT a.id,\n         CONCAT(SUBSTRING_INDEX(a.id, ':', 3), ':') AS account_prefix,\n         LOWER(NULLIF(TRIM(a.email), ''))           AS email,\n         LOWER(a.user_name)                         AS login,\n         LOWER(TRIM(a.full_name))                   AS name\n  FROM accounts a\n  WHERE a.id LIKE 'gitlab:GitlabAccount:%' AND a.id NOT LIKE 'gitlab:GitlabAccount:%:0'\n),\ncommit_authors AS (\n  -- A commit author is matched to a GitLab account on the repo's connection: by email (GitLab only returns account\n  -- emails to tokens that may see them), then by the email's local part against the username, then by the author name\n  -- against the username, then by a unique full name.\n  SELECT e.author_email,\n         e.author_name,\n         e.account_prefix,\n         COALESCE(\n           MIN(by_email.id),\n           MIN(by_local_part.id),\n           MIN(by_login.id),\n           CASE WHEN COUNT(DISTINCT by_name.id) = 1 THEN MIN(by_name.id) END\n         ) AS account_id\n  FROM (SELECT DISTINCT author_email, author_name, account_prefix FROM scoped_commits) e\n  LEFT JOIN gitlab_accounts by_email      ON by_email.account_prefix = e.account_prefix AND by_email.email = LOWER(e.author_email)\n  LEFT JOIN gitlab_accounts by_local_part ON by_local_part.account_prefix = e.account_prefix AND by_local_part.login = LOWER(SUBSTRING_INDEX(e.author_email, '@', 1))\n  LEFT JOIN gitlab_accounts by_login      ON by_login.account_prefix = e.account_prefix AND by_login.login = LOWER(TRIM(e.author_name))\n  LEFT JOIN gitlab_accounts by_name       ON by_name.account_prefix = e.account_prefix AND by_name.name = LOWER(TRIM(e.author_name))\n  GROUP BY e.author_email, e.author_name, e.account_prefix\n)\nSELECT COALESCE(NULLIF(TRIM(REPLACE(MAX(ga.full_name), _utf8mb4 X'E2808B', '')), ''), (SELECT NULLIF(TRIM(REPLACE(MIN(u.name), _utf8mb4 X'E2808B', '')), '') FROM user_accounts ua JOIN users u ON u.id = ua.user_id WHERE ua.account_id = MAX(ca.account_id)), REPLACE(MAX(ga.user_name), '-', ' '), MAX(TRIM(sc.author_name))) AS contributor,\n       COUNT(*) AS commit_count\nFROM scoped_commits sc\nJOIN commit_authors ca ON ca.author_email <=> sc.author_email AND ca.author_name <=> sc.author_name AND ca.account_prefix = sc.account_prefix\nLEFT JOIN accounts ga  ON ga.id = ca.account_id\nWHERE ('__all__' IN (${developer}) OR ga.user_name IN (${developer}))\n  AND COALESCE(ga.user_name, '') NOT REGEXP '^(project|group)_[0-9]+_bot_'\nGROUP BY COALESCE(ca.account_id, CONCAT('name:', LOWER(TRIM(sc.author_name))))\nORDER BY commit_count DESC\nLIMIT 20;",
           "refId": "A"
         }
       ],
       "title": "3.6 Top 20 Contributors by Commits",
       "type": "barchart",
-      "description": "Not built yet: the GitLab query for this panel is added by US-23."
+      "description": "Commits per developer (top 20), merge commits excluded. Commit authors are matched to GitLab accounts on the repo's connection by email, the email's local part or name, and filtered by developer; commits that match no account show under the git author name (under All only).\ndatasource: commits, repo_commits, commit_parents, accounts, users, user_accounts, project_mapping"
     },
     {
       "collapsed": false,
@@ -661,7 +661,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Not built yet: the GitLab query for this panel is added by US-23.",
+      "description": "% of closed MRs that were closed without merging. Filtered by MR author; MRs imported from GitHub are left out.\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -724,7 +724,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Share of closed MRs (merged or not) created in the range that were closed without merging.\n-- Filtered by MR author (the developer variable lists GitLab usernames; All applies no filter), bots left out. MRs\n-- imported from GitHub (the not_imported_mr constant, shared with dashboards A, C and I) are left out.\n-- Open drafts are left out, as on dashboard I. GitLab's is_draft is always 0, so a Draft is an open MR whose title\n-- starts with Draft:, [Draft], (Draft), WIP: or [WIP].\nSELECT SUM(pr.status = 'CLOSED') / NULLIF(SUM(pr.status IN ('CLOSED', 'MERGED')), 0) AS ratio\nFROM pull_requests pr\nWHERE pr.id LIKE 'gitlab:%'\n  AND $__timeFilter(pr.created_date)\n  AND NOT (pr.status = 'OPEN' AND LOWER(pr.title) REGEXP '^[[:space:]]*(draft:|\\\\[draft\\\\]|\\\\(draft\\\\)|wip:|\\\\[wip\\\\])')\n  AND ('__all__' IN (${developer}) OR pr.author_name IN (${developer}))\n  AND pr.author_name NOT REGEXP '^(project|group)_[0-9]+_bot_'\n  AND ${not_imported_mr:raw}\n  AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
           "refId": "A"
         }
       ],
@@ -736,7 +736,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Not built yet: the GitLab query for this panel is added by US-23.",
+      "description": "Open, closed and merged MRs per creation month or week. Filtered by MR author; MRs imported from GitHub and open drafts are left out. Drafts are open MRs whose title starts with Draft:, [Draft], (Draft), WIP: or [WIP].\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -870,7 +870,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- MRs created per month or week by current status.\n-- Filtered by MR author (the developer variable lists GitLab usernames; All applies no filter), bots left out. MRs\n-- imported from GitHub (the not_imported_mr constant, shared with dashboards A, C and I) are left out.\n-- Open drafts are left out, as on dashboard I. GitLab's is_draft is always 0, so a Draft is an open MR whose title\n-- starts with Draft:, [Draft], (Draft), WIP: or [WIP].\nWITH buckets AS (\n  SELECT CASE WHEN '$interval' = 'WEEKDAY' THEN DATE_SUB(DATE(pr.created_date), INTERVAL WEEKDAY(pr.created_date) DAY) ELSE DATE_SUB(DATE(pr.created_date), INTERVAL DAYOFMONTH(pr.created_date) - 1 DAY) END AS time,\n         SUM(pr.status = 'OPEN')   AS open,\n         SUM(pr.status = 'CLOSED') AS closed,\n         SUM(pr.status = 'MERGED') AS merged\n  FROM pull_requests pr\n  WHERE pr.id LIKE 'gitlab:%'\n    AND $__timeFilter(pr.created_date)\n    AND NOT (pr.status = 'OPEN' AND LOWER(pr.title) REGEXP '^[[:space:]]*(draft:|\\\\[draft\\\\]|\\\\(draft\\\\)|wip:|\\\\[wip\\\\])')\n    AND ('__all__' IN (${developer}) OR pr.author_name IN (${developer}))\n    AND pr.author_name NOT REGEXP '^(project|group)_[0-9]+_bot_'\n    AND ${not_imported_mr:raw}\n    AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  GROUP BY time\n)\nSELECT CASE WHEN '$interval' = 'DAYOFMONTH' THEN DATE_FORMAT(time, '%M %Y') ELSE DATE_FORMAT(time, 'W%v %x') END AS _time,\n       open   AS \"MR: Open\",\n       closed AS \"MR: Closed without merging\",\n       merged AS \"MR: Closed and merged\"\nFROM buckets\nORDER BY time;",
           "refId": "A"
         }
       ],
@@ -882,7 +882,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Not built yet: the GitLab query for this panel is added by US-23.",
+      "description": "MRs created in the period that were closed without merging. Filtered by MR author; MRs imported from GitHub are left out.\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -942,7 +942,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- MRs created in the range that were closed without merging.\n-- Filtered by MR author (the developer variable lists GitLab usernames; All applies no filter), bots left out. MRs\n-- imported from GitHub (the not_imported_mr constant, shared with dashboards A, C and I) are left out.\nSELECT COUNT(*) AS closed_merge_request_count\nFROM pull_requests pr\nWHERE pr.id LIKE 'gitlab:%'\n  AND $__timeFilter(pr.created_date)\n  AND pr.status = 'CLOSED'\n  AND ('__all__' IN (${developer}) OR pr.author_name IN (${developer}))\n  AND pr.author_name NOT REGEXP '^(project|group)_[0-9]+_bot_'\n  AND ${not_imported_mr:raw}\n  AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
           "refId": "A"
         }
       ],
@@ -954,7 +954,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Not built yet: the GitLab query for this panel is added by US-23.",
+      "description": "% of closed MRs not merged, per creation month or week. Filtered by MR author; MRs imported from GitHub are left out.\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1046,7 +1046,7 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Share of closed MRs created per month or week that were closed without merging.\n-- The first bucket is dated at the range start, so its point isn't drawn left of the visible axis.\n-- Filtered by MR author (the developer variable lists GitLab usernames; All applies no filter), bots left out. MRs\n-- imported from GitHub (the not_imported_mr constant, shared with dashboards A, C and I) are left out.\n-- Open drafts are left out, as on dashboard I. GitLab's is_draft is always 0, so a Draft is an open MR whose title\n-- starts with Draft:, [Draft], (Draft), WIP: or [WIP].\nSELECT GREATEST(CASE WHEN '$interval' = 'WEEKDAY' THEN DATE_SUB(DATE(pr.created_date), INTERVAL WEEKDAY(pr.created_date) DAY) ELSE DATE_SUB(DATE(pr.created_date), INTERVAL DAYOFMONTH(pr.created_date) - 1 DAY) END, DATE($__timeFrom())) AS time,\n       SUM(pr.status = 'CLOSED') / NULLIF(SUM(pr.status IN ('CLOSED', 'MERGED')), 0) AS ratio\nFROM pull_requests pr\nWHERE pr.id LIKE 'gitlab:%'\n  AND $__timeFilter(pr.created_date)\n  AND NOT (pr.status = 'OPEN' AND LOWER(pr.title) REGEXP '^[[:space:]]*(draft:|\\\\[draft\\\\]|\\\\(draft\\\\)|wip:|\\\\[wip\\\\])')\n  AND ('__all__' IN (${developer}) OR pr.author_name IN (${developer}))\n  AND pr.author_name NOT REGEXP '^(project|group)_[0-9]+_bot_'\n  AND ${not_imported_mr:raw}\n  AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\nGROUP BY time\nORDER BY time;",
           "refId": "A"
         }
       ],
@@ -1058,7 +1058,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Not built yet: the GitLab query for this panel is added by US-23.",
+      "description": "Average days from creation to merge of MRs merged in the period. Filtered by MR author; MRs imported from GitHub are left out.\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1123,7 +1123,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Average days from creation to merge of MRs merged in the range, as on dashboards A and C.\n-- Filtered by MR author (the developer variable lists GitLab usernames; All applies no filter), bots left out. MRs\n-- imported from GitHub (the not_imported_mr constant, shared with dashboards A, C and I) are left out.\nSELECT ROUND(AVG(TIMESTAMPDIFF(MINUTE, pr.created_date, pr.merged_date) / 1440), 1) AS time_to_merge\nFROM pull_requests pr\nWHERE pr.id LIKE 'gitlab:%'\n  AND $__timeFilter(pr.merged_date)\n  AND pr.status = 'MERGED'\n  AND pr.merged_date IS NOT NULL\n  AND pr.merged_date > pr.created_date\n  AND ('__all__' IN (${developer}) OR pr.author_name IN (${developer}))\n  AND pr.author_name NOT REGEXP '^(project|group)_[0-9]+_bot_'\n  AND ${not_imported_mr:raw}\n  AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
           "refId": "A"
         }
       ],
@@ -1135,7 +1135,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Not built yet: the GitLab query for this panel is added by US-23.",
+      "description": "Average days from creation to merge, per merge month or week. Filtered by MR author; MRs imported from GitHub are left out.\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1169,13 +1169,10 @@
             "steps": [
               {
                 "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
-          }
+          },
+          "unit": "d"
         },
         "overrides": []
       },
@@ -1228,7 +1225,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Average days from creation to merge of MRs merged per month or week, as on dashboards A and C.\n-- Filtered by MR author (the developer variable lists GitLab usernames; All applies no filter), bots left out. MRs\n-- imported from GitHub (the not_imported_mr constant, shared with dashboards A, C and I) are left out.\nWITH buckets AS (\n  SELECT CASE WHEN '$interval' = 'WEEKDAY' THEN DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY) ELSE DATE_SUB(DATE(pr.merged_date), INTERVAL DAYOFMONTH(pr.merged_date) - 1 DAY) END AS time,\n         AVG(TIMESTAMPDIFF(MINUTE, pr.created_date, pr.merged_date) / 1440) AS time_to_merge\n  FROM pull_requests pr\n  WHERE pr.id LIKE 'gitlab:%'\n    AND $__timeFilter(pr.merged_date)\n    AND pr.status = 'MERGED'\n    AND pr.merged_date IS NOT NULL\n    AND pr.merged_date > pr.created_date\n    AND ('__all__' IN (${developer}) OR pr.author_name IN (${developer}))\n    AND pr.author_name NOT REGEXP '^(project|group)_[0-9]+_bot_'\n    AND ${not_imported_mr:raw}\n    AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  GROUP BY time\n)\nSELECT CASE WHEN '$interval' = 'DAYOFMONTH' THEN DATE_FORMAT(time, '%M %Y') ELSE DATE_FORMAT(time, 'W%v %x') END AS _time,\n       ROUND(time_to_merge, 1) AS \"Time to Merge\"\nFROM buckets\nORDER BY time;",
           "refId": "A"
         }
       ],
@@ -1240,7 +1237,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Not built yet: the GitLab query for this panel is added by US-23.",
+      "description": "Average days from creation to close (merged or not) of MRs created in the period; a merged MR closes at its merge date, and MRs with no close date are left out. Filtered by MR author; MRs imported from GitHub are left out.\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1303,7 +1300,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Average days from creation to close (merged or not) of MRs created in the range.\n-- GitLab leaves closed_date empty on merged MRs, so a merged MR closes at its merge date. MRs with no close date at\n-- all are left out.\n-- Filtered by MR author (the developer variable lists GitLab usernames; All applies no filter), bots left out. MRs\n-- imported from GitHub (the not_imported_mr constant, shared with dashboards A, C and I) are left out.\nSELECT ROUND(AVG(TIMESTAMPDIFF(MINUTE, pr.created_date, COALESCE(pr.closed_date, pr.merged_date)) / 1440), 1) AS time_to_close\nFROM pull_requests pr\nWHERE pr.id LIKE 'gitlab:%'\n  AND $__timeFilter(pr.created_date)\n  AND pr.status IN ('CLOSED', 'MERGED')\n  AND COALESCE(pr.closed_date, pr.merged_date) IS NOT NULL\n  AND ('__all__' IN (${developer}) OR pr.author_name IN (${developer}))\n  AND pr.author_name NOT REGEXP '^(project|group)_[0-9]+_bot_'\n  AND ${not_imported_mr:raw}\n  AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
           "refId": "A"
         }
       ],
@@ -1315,7 +1312,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Not built yet: the GitLab query for this panel is added by US-23.",
+      "description": "Average days from creation to close (merged or not), per creation month or week; a merged MR closes at its merge date. Filtered by MR author; MRs imported from GitHub are left out.\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1349,13 +1346,10 @@
             "steps": [
               {
                 "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
-          }
+          },
+          "unit": "d"
         },
         "overrides": []
       },
@@ -1408,7 +1402,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Average days from creation to close (merged or not) of MRs created per month or week.\n-- GitLab leaves closed_date empty on merged MRs, so a merged MR closes at its merge date. MRs with no close date at\n-- all are left out.\n-- Filtered by MR author (the developer variable lists GitLab usernames; All applies no filter), bots left out. MRs\n-- imported from GitHub (the not_imported_mr constant, shared with dashboards A, C and I) are left out.\nWITH buckets AS (\n  SELECT CASE WHEN '$interval' = 'WEEKDAY' THEN DATE_SUB(DATE(pr.created_date), INTERVAL WEEKDAY(pr.created_date) DAY) ELSE DATE_SUB(DATE(pr.created_date), INTERVAL DAYOFMONTH(pr.created_date) - 1 DAY) END AS time,\n         AVG(TIMESTAMPDIFF(MINUTE, pr.created_date, COALESCE(pr.closed_date, pr.merged_date)) / 1440) AS time_to_close\n  FROM pull_requests pr\n  WHERE pr.id LIKE 'gitlab:%'\n    AND $__timeFilter(pr.created_date)\n    AND pr.status IN ('CLOSED', 'MERGED')\n    AND COALESCE(pr.closed_date, pr.merged_date) IS NOT NULL\n    AND ('__all__' IN (${developer}) OR pr.author_name IN (${developer}))\n    AND pr.author_name NOT REGEXP '^(project|group)_[0-9]+_bot_'\n    AND ${not_imported_mr:raw}\n    AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  GROUP BY time\n)\nSELECT CASE WHEN '$interval' = 'DAYOFMONTH' THEN DATE_FORMAT(time, '%M %Y') ELSE DATE_FORMAT(time, 'W%v %x') END AS _time,\n       ROUND(time_to_close, 1) AS \"Time to Close\"\nFROM buckets\nORDER BY time;",
           "refId": "A"
         }
       ],
@@ -1433,7 +1427,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Number of pipeline runs executed in the selected time range\n\nNot built yet: the GitLab query for this panel is added by US-23.",
+      "description": "Successful GitLab pipelines in the selected period. Pipelines are dated by finished date, or by created date while they have none (manual or still running). Not filtered by developer. Child pipelines are left out.\ndatasource: cicd_pipelines, project_mapping",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -1491,7 +1485,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Successful pipelines in the range.\n-- Pipelines are dated by finished date, or by created date while they have none (a pipeline waiting on a manual job,\n-- or still running).\n-- Child pipelines (is_child) are left out: they run as part of their parent pipeline.\nSELECT COUNT(*) AS successful_pipeline_run_count\nFROM cicd_pipelines cp\nWHERE cp.id LIKE 'gitlab:%'\n  AND COALESCE(cp.is_child, 0) = 0\n  AND COALESCE(cp.finished_date, cp.created_date) BETWEEN $__timeFrom() AND $__timeTo()\n  AND cp.result = 'SUCCESS'\n  AND cp.cicd_scope_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = cp.cicd_scope_id\n                 AND pm.`table` = 'cicd_scopes'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
           "refId": "A"
         }
       ],
@@ -1503,11 +1497,11 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Number of successful pipeline runs / Number of total pipeline runs\n\nNot built yet: the GitLab query for this panel is added by US-23.",
+      "description": "% of pipelines that succeeded, out of those that succeeded, failed or were canceled. Pipelines with no final result yet (blocked on a manual job, running, pending or skipped) are left out. Pipelines are dated by finished date, or by created date while they have none (manual or still running). Not filtered by developer. Child pipelines are left out.\ndatasource: cicd_pipelines, project_mapping",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
-          "max": 100,
+          "max": 1,
           "min": 0,
           "thresholds": {
             "mode": "absolute",
@@ -1567,7 +1561,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Share of pipelines in the range that succeeded.\n-- Pipelines are dated by finished date, or by created date while they have none (a pipeline waiting on a manual job,\n-- or still running).\n-- The rate covers pipelines with a final result only. A pipeline blocked on a manual job has no final result yet\n-- (nor do running, pending or skipped ones), so it is left out. FAILURE includes canceled pipelines.\n-- Child pipelines (is_child) are left out: they run as part of their parent pipeline.\nSELECT SUM(cp.result = 'SUCCESS') / NULLIF(COUNT(*), 0) AS success_rate\nFROM cicd_pipelines cp\nWHERE cp.id LIKE 'gitlab:%'\n  AND COALESCE(cp.is_child, 0) = 0\n  AND COALESCE(cp.finished_date, cp.created_date) BETWEEN $__timeFrom() AND $__timeTo()\n  AND cp.result IN ('SUCCESS', 'FAILURE')\n  AND cp.cicd_scope_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = cp.cicd_scope_id\n                 AND pm.`table` = 'cicd_scopes'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
           "refId": "A"
         }
       ],
@@ -1579,7 +1573,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Not built yet: the GitLab query for this panel is added by US-23.",
+      "description": "Succeeded vs failed (or canceled) pipelines per month or week. Pipelines are dated by finished date, or by created date while they have none (manual or still running). Not filtered by developer. Child pipelines are left out.\ndatasource: cicd_pipelines, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1702,7 +1696,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Succeeded vs failed (or canceled) pipelines per month or week.\n-- Pipelines are dated by finished date, or by created date while they have none (a pipeline waiting on a manual job,\n-- or still running).\n-- Child pipelines (is_child) are left out: they run as part of their parent pipeline.\nWITH buckets AS (\n  SELECT CASE WHEN '$interval' = 'WEEKDAY' THEN DATE_SUB(DATE(COALESCE(cp.finished_date, cp.created_date)), INTERVAL WEEKDAY(COALESCE(cp.finished_date, cp.created_date)) DAY) ELSE DATE_SUB(DATE(COALESCE(cp.finished_date, cp.created_date)), INTERVAL DAYOFMONTH(COALESCE(cp.finished_date, cp.created_date)) - 1 DAY) END AS time,\n         SUM(cp.result = 'SUCCESS') AS successful_pipeline_run_count,\n         SUM(cp.result = 'FAILURE') AS failed_pipeline_run_count\n  FROM cicd_pipelines cp\n  WHERE cp.id LIKE 'gitlab:%'\n    AND COALESCE(cp.is_child, 0) = 0\n    AND COALESCE(cp.finished_date, cp.created_date) BETWEEN $__timeFrom() AND $__timeTo()\n    AND cp.result IN ('SUCCESS', 'FAILURE')\n    AND cp.cicd_scope_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = cp.cicd_scope_id\n                   AND pm.`table` = 'cicd_scopes'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  GROUP BY time\n)\nSELECT CASE WHEN '$interval' = 'DAYOFMONTH' THEN DATE_FORMAT(time, '%M %Y') ELSE DATE_FORMAT(time, 'W%v %x') END AS _time,\n       successful_pipeline_run_count,\n       failed_pipeline_run_count\nFROM buckets\nORDER BY time;",
           "refId": "A"
         }
       ],
@@ -1714,7 +1708,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Number of successful pipeline runs / Number of total pipeline runs\n\nNot built yet: the GitLab query for this panel is added by US-23.",
+      "description": "Share of pipelines by result. Unknown = no final result yet (manual, running, pending, skipped); FAILURE includes canceled pipelines. Pipelines are dated by finished date, or by created date while they have none (manual or still running). Not filtered by developer. Child pipelines are left out.\ndatasource: cicd_pipelines, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1732,31 +1726,6 @@
           "unit": "none"
         },
         "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "build_count",
-                  "ABORT"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          },
           {
             "matcher": {
               "id": "byName",
@@ -1790,7 +1759,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "ABORT"
+              "options": "Unknown"
             },
             "properties": [
               {
@@ -1857,7 +1826,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Pipelines in the range by result. Unknown = no final result yet (manual, running, pending, skipped); FAILURE includes canceled\n-- pipelines.\n-- Pipelines are dated by finished date, or by created date while they have none (a pipeline waiting on a manual job,\n-- or still running).\n-- Child pipelines (is_child) are left out: they run as part of their parent pipeline.\nSELECT IF(cp.result = '', 'Unknown', cp.result) AS result,\n       COUNT(*)                                 AS build_count\nFROM cicd_pipelines cp\nWHERE cp.id LIKE 'gitlab:%'\n  AND COALESCE(cp.is_child, 0) = 0\n  AND COALESCE(cp.finished_date, cp.created_date) BETWEEN $__timeFrom() AND $__timeTo()\n  AND cp.cicd_scope_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = cp.cicd_scope_id\n                 AND pm.`table` = 'cicd_scopes'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\nGROUP BY 1\nORDER BY 2 DESC;",
           "refId": "A"
         }
       ],
@@ -1869,7 +1838,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "1. Mean Pipeline Runs success rate over time.\n2. The pipeline runs being calculated are filtered by \"pipeline runs starting time\" (time filter at the upper-right corner) and \"Jira board\" (\"Choose Board\" filter at the upper-left corner)\n\nNot built yet: the GitLab query for this panel is added by US-23.",
+      "description": "Pipeline success rate per month or week, out of pipelines that succeeded, failed or were canceled; pipelines with no final result yet (blocked on a manual job, running, pending or skipped) are left out. Pipelines are dated by finished date, or by created date while they have none (manual or still running). Not filtered by developer. Child pipelines are left out.\ndatasource: cicd_pipelines, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1981,7 +1950,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Share of pipelines per month or week that succeeded.\n-- Pipelines are dated by finished date, or by created date while they have none (a pipeline waiting on a manual job,\n-- or still running).\n-- The rate covers pipelines with a final result only. A pipeline blocked on a manual job has no final result yet\n-- (nor do running, pending or skipped ones), so it is left out. FAILURE includes canceled pipelines.\n-- Child pipelines (is_child) are left out: they run as part of their parent pipeline.\nWITH buckets AS (\n  SELECT CASE WHEN '$interval' = 'WEEKDAY' THEN DATE_SUB(DATE(COALESCE(cp.finished_date, cp.created_date)), INTERVAL WEEKDAY(COALESCE(cp.finished_date, cp.created_date)) DAY) ELSE DATE_SUB(DATE(COALESCE(cp.finished_date, cp.created_date)), INTERVAL DAYOFMONTH(COALESCE(cp.finished_date, cp.created_date)) - 1 DAY) END AS time,\n         SUM(cp.result = 'SUCCESS') / COUNT(*) AS success_rate\n  FROM cicd_pipelines cp\n  WHERE cp.id LIKE 'gitlab:%'\n    AND COALESCE(cp.is_child, 0) = 0\n    AND COALESCE(cp.finished_date, cp.created_date) BETWEEN $__timeFrom() AND $__timeTo()\n    AND cp.result IN ('SUCCESS', 'FAILURE')\n    AND cp.cicd_scope_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = cp.cicd_scope_id\n                   AND pm.`table` = 'cicd_scopes'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  GROUP BY time\n)\nSELECT CASE WHEN '$interval' = 'DAYOFMONTH' THEN DATE_FORMAT(time, '%M %Y') ELSE DATE_FORMAT(time, 'W%v %x') END AS _time,\n       success_rate AS \"Pipeline Runs Success Rate\"\nFROM buckets\nORDER BY time;",
           "refId": "A"
         }
       ],
@@ -1993,7 +1962,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Number of successful pipeline runs / Number of total pipeline runs\n\nNot built yet: the GitLab query for this panel is added by US-23.",
+      "description": "Average pipeline duration in minutes, manual pipelines included; pipelines with no recorded duration (mostly ones canceled before they started) are left out. Pipelines are dated by finished date, or by created date while they have none (manual or still running). Not filtered by developer. Child pipelines are left out.\ndatasource: cicd_pipelines, project_mapping",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -2051,7 +2020,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Average duration in minutes of pipelines in the range.\n-- Pipelines are dated by finished date, or by created date while they have none (a pipeline waiting on a manual job,\n-- or still running).\n-- Every pipeline with a recorded duration counts, manual ones included: they ran, and only lack a finished date while\n-- they wait on a manual job. Pipelines with no recorded duration (mostly ones canceled before they started) are left out.\n-- Child pipelines (is_child) are left out: they run as part of their parent pipeline.\nSELECT ROUND(AVG(cp.duration_sec / 60), 1) AS duration_in_minutes\nFROM cicd_pipelines cp\nWHERE cp.id LIKE 'gitlab:%'\n  AND COALESCE(cp.is_child, 0) = 0\n  AND COALESCE(cp.finished_date, cp.created_date) BETWEEN $__timeFrom() AND $__timeTo()\n  AND cp.duration_sec > 0\n  AND cp.cicd_scope_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = cp.cicd_scope_id\n                 AND pm.`table` = 'cicd_scopes'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
           "refId": "A"
         }
       ],
@@ -2063,7 +2032,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Not built yet: the GitLab query for this panel is added by US-23.",
+      "description": "Average pipeline duration per month or week, manual pipelines included; pipelines with no recorded duration (mostly ones canceled before they started) are left out. Pipelines are dated by finished date, or by created date while they have none (manual or still running). Not filtered by developer. Child pipelines are left out.\ndatasource: cicd_pipelines, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2173,7 +2142,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Average duration of pipelines per month or week.\n-- Pipelines are dated by finished date, or by created date while they have none (a pipeline waiting on a manual job,\n-- or still running).\n-- Every pipeline with a recorded duration counts, manual ones included: they ran, and only lack a finished date while\n-- they wait on a manual job. Pipelines with no recorded duration (mostly ones canceled before they started) are left out.\n-- Child pipelines (is_child) are left out: they run as part of their parent pipeline.\nWITH buckets AS (\n  SELECT CASE WHEN '$interval' = 'WEEKDAY' THEN DATE_SUB(DATE(COALESCE(cp.finished_date, cp.created_date)), INTERVAL WEEKDAY(COALESCE(cp.finished_date, cp.created_date)) DAY) ELSE DATE_SUB(DATE(COALESCE(cp.finished_date, cp.created_date)), INTERVAL DAYOFMONTH(COALESCE(cp.finished_date, cp.created_date)) - 1 DAY) END AS time,\n         AVG(cp.duration_sec) AS mean_duration_sec\n  FROM cicd_pipelines cp\n  WHERE cp.id LIKE 'gitlab:%'\n    AND COALESCE(cp.is_child, 0) = 0\n    AND COALESCE(cp.finished_date, cp.created_date) BETWEEN $__timeFrom() AND $__timeTo()\n    AND cp.duration_sec > 0\n    AND cp.cicd_scope_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = cp.cicd_scope_id\n                   AND pm.`table` = 'cicd_scopes'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  GROUP BY time\n)\nSELECT CASE WHEN '$interval' = 'DAYOFMONTH' THEN DATE_FORMAT(time, '%M %Y') ELSE DATE_FORMAT(time, 'W%v %x') END AS _time,\n       ROUND(mean_duration_sec) AS mean_duration_sec\nFROM buckets\nORDER BY time;",
           "refId": "A"
         }
       ],
@@ -2199,7 +2168,53 @@
           },
           "mappings": []
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Done"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "In Progress"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "To Do"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 7,
@@ -2238,13 +2253,13 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Issues created in the range by status. GitLab leaves original_status empty and issues are only open or closed, so an\n-- open issue is In Progress when it has an in-progress label (the in_progress_issue constant, shared with dashboards A\n-- and E).\nSELECT CASE WHEN i.status = 'DONE' THEN 'Done' WHEN ${in_progress_issue:raw} THEN 'In Progress' ELSE 'To Do' END AS status,\n       COUNT(*) AS issue_count\nFROM issues i\nWHERE i.id LIKE 'gitlab:%'\n  AND $__timeFilter(i.created_date)\n  AND EXISTS (SELECT 1 FROM board_issues bi2 JOIN project_mapping pm2 ON pm2.row_id = bi2.board_id AND pm2.`table` = 'boards' WHERE bi2.issue_id = i.id AND bi2.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) AND pm2.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\nGROUP BY 1\nORDER BY issue_count DESC;",
           "refId": "A"
         }
       ],
       "title": "GitLab Issues",
       "type": "piechart",
-      "description": "Not built yet: the GitLab query for this panel is added by US-23."
+      "description": "Issues created in the period by status: To Do, In Progress (open with an in-progress label) or Done. Not filtered by developer.\ndatasource: issues, issue_labels, board_issues, project_mapping"
     },
     {
       "fieldConfig": {
@@ -2336,17 +2351,18 @@
           "type": "mysql",
           "uid": "devlake-mysql"
         },
-        "definition": "select distinct author_name from pull_requests where base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) and author_name != '' and author_name NOT LIKE 'project\\_%\\_bot\\_%' union select distinct assignee_name from issues i join board_issues bi on i.id = bi.issue_id join boards b on bi.board_id = b.id where b.id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) and assignee_name != '' and assignee_name NOT LIKE 'project\\_%\\_bot\\_%' order by 1",
+        "definition": "select distinct author_name from pull_requests where base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) and author_name != '' and author_name NOT REGEXP '^(project|group)_[0-9]+_bot_' union select distinct assignee_name from issues i join board_issues bi on i.id = bi.issue_id join boards b on bi.board_id = b.id where b.id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) and assignee_name != '' and assignee_name NOT REGEXP '^(project|group)_[0-9]+_bot_' order by 1",
         "includeAll": true,
         "label": "Developer",
         "multi": true,
         "name": "developer",
         "options": [],
-        "query": "select distinct author_name from pull_requests where base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) and author_name != '' and author_name NOT LIKE 'project\\_%\\_bot\\_%' union select distinct assignee_name from issues i join board_issues bi on i.id = bi.issue_id join boards b on bi.board_id = b.id where b.id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) and assignee_name != '' and assignee_name NOT LIKE 'project\\_%\\_bot\\_%' order by 1",
+        "query": "select distinct author_name from pull_requests where base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) and author_name != '' and author_name NOT REGEXP '^(project|group)_[0-9]+_bot_' union select distinct assignee_name from issues i join board_issues bi on i.id = bi.issue_id join boards b on bi.board_id = b.id where b.id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) and assignee_name != '' and assignee_name NOT REGEXP '^(project|group)_[0-9]+_bot_' order by 1",
         "refresh": 2,
         "regex": "",
         "sort": 1,
-        "type": "query"
+        "type": "query",
+        "allValue": "'__all__'"
       },
       {
         "current": {
@@ -2370,6 +2386,46 @@
         ],
         "query": "Month : DAYOFMONTH, Week : WEEKDAY",
         "type": "custom"
+      },
+      {
+        "name": "not_imported_mr",
+        "label": "SQL: MR not imported from GitHub (alias pr)",
+        "type": "constant",
+        "hide": 2,
+        "skipUrlSync": true,
+        "query": "(COALESCE(pr.description, '') NOT LIKE '*Created by%' AND NOT EXISTS (SELECT 1 FROM pull_request_comments ic WHERE ic.pull_request_id = pr.id AND ic.body LIKE '*Created by%') AND NOT (pr.created_date < '2021-07-01' AND EXISTS (SELECT 1 FROM accounts ia WHERE ia.id = pr.author_id AND ia.user_name = 'tayyab-razzaq')))",
+        "current": {
+          "text": "(COALESCE(pr.description, '') NOT LIKE '*Created by%' AND NOT EXISTS (SELECT 1 FROM pull_request_comments ic WHERE ic.pull_request_id = pr.id AND ic.body LIKE '*Created by%') AND NOT (pr.created_date < '2021-07-01' AND EXISTS (SELECT 1 FROM accounts ia WHERE ia.id = pr.author_id AND ia.user_name = 'tayyab-razzaq')))",
+          "value": "(COALESCE(pr.description, '') NOT LIKE '*Created by%' AND NOT EXISTS (SELECT 1 FROM pull_request_comments ic WHERE ic.pull_request_id = pr.id AND ic.body LIKE '*Created by%') AND NOT (pr.created_date < '2021-07-01' AND EXISTS (SELECT 1 FROM accounts ia WHERE ia.id = pr.author_id AND ia.user_name = 'tayyab-razzaq')))"
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "(COALESCE(pr.description, '') NOT LIKE '*Created by%' AND NOT EXISTS (SELECT 1 FROM pull_request_comments ic WHERE ic.pull_request_id = pr.id AND ic.body LIKE '*Created by%') AND NOT (pr.created_date < '2021-07-01' AND EXISTS (SELECT 1 FROM accounts ia WHERE ia.id = pr.author_id AND ia.user_name = 'tayyab-razzaq')))",
+            "value": "(COALESCE(pr.description, '') NOT LIKE '*Created by%' AND NOT EXISTS (SELECT 1 FROM pull_request_comments ic WHERE ic.pull_request_id = pr.id AND ic.body LIKE '*Created by%') AND NOT (pr.created_date < '2021-07-01' AND EXISTS (SELECT 1 FROM accounts ia WHERE ia.id = pr.author_id AND ia.user_name = 'tayyab-razzaq')))"
+          }
+        ],
+        "description": "Org-specific. An MR counts as imported from GitHub when its description or a comment starts with \"*Created by\", or when the import account (tayyab-razzaq) created it before 2021-07-01. Admins should change the account and date to their own import, or drop that part, and keep this the same on every dashboard that has it."
+      },
+      {
+        "name": "in_progress_issue",
+        "label": "SQL: open issue is in progress (alias i)",
+        "type": "constant",
+        "hide": 2,
+        "skipUrlSync": true,
+        "query": "(EXISTS (SELECT 1 FROM issue_labels ilp WHERE ilp.issue_id = i.id AND LOWER(ilp.label_name) IN ('in progress', 'in review', 'in qa', 'ready to be merged (approved)', 'ready for deployment')))",
+        "current": {
+          "text": "(EXISTS (SELECT 1 FROM issue_labels ilp WHERE ilp.issue_id = i.id AND LOWER(ilp.label_name) IN ('in progress', 'in review', 'in qa', 'ready to be merged (approved)', 'ready for deployment')))",
+          "value": "(EXISTS (SELECT 1 FROM issue_labels ilp WHERE ilp.issue_id = i.id AND LOWER(ilp.label_name) IN ('in progress', 'in review', 'in qa', 'ready to be merged (approved)', 'ready for deployment')))"
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "(EXISTS (SELECT 1 FROM issue_labels ilp WHERE ilp.issue_id = i.id AND LOWER(ilp.label_name) IN ('in progress', 'in review', 'in qa', 'ready to be merged (approved)', 'ready for deployment')))",
+            "value": "(EXISTS (SELECT 1 FROM issue_labels ilp WHERE ilp.issue_id = i.id AND LOWER(ilp.label_name) IN ('in progress', 'in review', 'in qa', 'ready to be merged (approved)', 'ready for deployment')))"
+          }
+        ],
+        "description": "Org-specific. An open issue is In Progress when it has one of these labels (GitLab issues are only open or closed). Admins should edit the list to their own workflow labels (e.g. workflow::in progress) and keep it the same on every dashboard that has it."
       }
     ]
   },
@@ -2381,6 +2437,5 @@
   "timezone": "utc",
   "title": "J. GitLab Legacy",
   "uid": "gitlab-j-legacy",
-  "version": 1,
-  "description": "GitLab shell from US-13; panels are implemented in US-23."
+  "version": 1
 }

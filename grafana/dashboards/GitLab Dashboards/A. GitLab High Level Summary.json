@@ -39,7 +39,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "MRs raised in the period split into Merged, Open, Closed and Draft.\n\rdatasource: pull_requests, project_mapping\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "MRs created in the period split into Merged, Open, Closed and Draft. Drafts are open MRs whose title starts with Draft:, [Draft], (Draft), WIP: or [WIP]. MRs imported from GitHub are left out.\ndatasource: pull_requests, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -111,7 +111,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- MRs created in the range split into Merged, Open, Closed and Draft.\n-- MRs imported from GitHub are left out (the not_imported_mr constant).\n-- GitLab's is_draft is always 0, so an open MR is a Draft when its title starts with Draft:, [Draft], (Draft), WIP: or [WIP].\nSELECT COALESCE(SUM(pr.status = 'MERGED'), 0)                        AS Merged,\n       COALESCE(SUM(pr.status = 'OPEN' AND NOT (LOWER(pr.title) REGEXP '^[[:space:]]*(draft:|\\\\[draft\\\\]|\\\\(draft\\\\)|wip:|\\\\[wip\\\\])')), 0)           AS Open,\n       COALESCE(SUM(pr.status = 'CLOSED'), 0)                        AS Closed,\n       COALESCE(SUM(pr.status = 'OPEN' AND (LOWER(pr.title) REGEXP '^[[:space:]]*(draft:|\\\\[draft\\\\]|\\\\(draft\\\\)|wip:|\\\\[wip\\\\])')), 0)               AS Draft\nFROM pull_requests pr\nWHERE pr.id LIKE 'gitlab:%'\n  AND ${not_imported_mr:raw}\n  AND ('__all__' IN ( ${developer_id} ) OR pr.author_id IN ( ${developer_id} ))\n  AND NOT EXISTS (SELECT 1 FROM accounts ba WHERE ba.id = pr.author_id AND ba.user_name REGEXP '^(project|group)_[0-9]+_bot_')\n  AND $__timeFilter(pr.created_date)\n  AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
           "refId": "A"
         }
       ],
@@ -120,10 +120,10 @@
     },
     {
       "datasource": {
-        "type": "mysql",
-        "uid": "devlake-mysql"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
-      "description": "Total MRs raised in the selected period, project and repository.\n\rdatasource: pull_requests, project_mapping\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Total MRs raised in the selected period: the sum of the MRs Summary panel.\ndatasource: pull_requests, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -144,7 +144,8 @@
                 "color": "green"
               }
             ]
-          }
+          },
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -176,25 +177,35 @@
       "targets": [
         {
           "datasource": {
-            "type": "mysql",
-            "uid": "devlake-mysql"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "",
+          "panelId": 18,
           "refId": "A"
         }
       ],
       "title": "MRs Raised",
-      "type": "stat"
+      "type": "stat",
+      "transformations": [
+        {
+          "id": "calculateField",
+          "options": {
+            "mode": "reduceRow",
+            "reduce": {
+              "reducer": "sum"
+            },
+            "alias": "MRs Raised",
+            "replaceFields": true
+          }
+        }
+      ]
     },
     {
       "datasource": {
-        "type": "mysql",
-        "uid": "devlake-mysql"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
-      "description": "Total MRs merged in the selected period.\n\rdatasource: pull_requests, project_mapping\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "MRs created in the period that are merged.\ndatasource: pull_requests, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -248,13 +259,10 @@
       "targets": [
         {
           "datasource": {
-            "type": "mysql",
-            "uid": "devlake-mysql"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "",
+          "panelId": 18,
           "refId": "A"
         }
       ],
@@ -275,10 +283,10 @@
     },
     {
       "datasource": {
-        "type": "mysql",
-        "uid": "devlake-mysql"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
-      "description": "Total MRs closed without merging in the selected period.\n\rdatasource: pull_requests, project_mapping\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "MRs created in the period that were closed without merging.\ndatasource: pull_requests, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -332,13 +340,10 @@
       "targets": [
         {
           "datasource": {
-            "type": "mysql",
-            "uid": "devlake-mysql"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "",
+          "panelId": 18,
           "refId": "A"
         }
       ],
@@ -359,10 +364,10 @@
     },
     {
       "datasource": {
-        "type": "mysql",
-        "uid": "devlake-mysql"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
-      "description": "Open MRs still waiting for review.\n\ndatasource: pull_requests, project_mapping\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "MRs created in the period that are still open (drafts excluded).\ndatasource: pull_requests, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -420,13 +425,10 @@
       "targets": [
         {
           "datasource": {
-            "type": "mysql",
-            "uid": "devlake-mysql"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "",
+          "panelId": 18,
           "refId": "A"
         }
       ],
@@ -450,7 +452,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Merged MRs that never received an approval from someone other than the author.\n\rdatasource: pull_request_comments, pull_requests, repos, project_mapping\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Merged MRs with no approval from someone other than the author still standing at merge time. MRs imported from GitHub and bot-authored MRs are left out; approvals by bots don't count.\ndatasource: pull_request_comments, pull_requests, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -514,7 +516,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Merged MRs with no approval from anyone other than the author still standing at merge time.\n-- MRs imported from GitHub are left out (the not_imported_mr constant).\n-- An approval is a GitLab approval or a \"**Review:** Approved\" note, and a revoke is an unapproval or a \"**Review:**\n-- Changes requested\" note, as on dashboard C's panels 9 and 10. Approvals by bots don't count.\n-- Bot-authored MRs are left out (C's developer list already leaves bots out).\nSELECT COALESCE(SUM(NOT EXISTS (\n         SELECT 1\n         FROM pull_request_comments c\n         WHERE c.pull_request_id = pr.id\n           AND c.created_date <= pr.merged_date\n           AND ((c.type = 'REVIEW' AND c.status = 'APPROVED') OR c.body LIKE '**Review:** Approved%')\n           AND NOT EXISTS (SELECT 1 FROM accounts ra WHERE ra.id = c.account_id AND ra.user_name REGEXP '^(project|group)_[0-9]+_bot_')\n           AND c.account_id <> pr.author_id\n           -- still standing at merge time: the approver did not unapprove afterwards\n           AND NOT EXISTS (SELECT 1 FROM pull_request_comments u\n                            WHERE u.pull_request_id = pr.id\n                              AND u.account_id = c.account_id\n                              AND (u.status = 'CHANGES_REQUESTED' OR u.body LIKE '**Review:** Changes requested%')\n                              AND u.created_date > c.created_date\n                              AND u.created_date <= pr.merged_date)\n       )), 0) AS `Unapproved MRs`\nFROM pull_requests pr\nWHERE pr.status = 'MERGED'\n  AND pr.merged_date IS NOT NULL\n  AND pr.id LIKE 'gitlab:%'\n  AND ${not_imported_mr:raw}\n  AND ('__all__' IN ( ${developer_id} ) OR pr.author_id IN ( ${developer_id} ))\n  AND NOT EXISTS (SELECT 1 FROM accounts ba WHERE ba.id = pr.author_id AND ba.user_name REGEXP '^(project|group)_[0-9]+_bot_')\n  AND $__timeFilter(pr.created_date)\n  AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
           "refId": "A"
         }
       ],
@@ -526,7 +528,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Average number of lines changed per MR.\n\rdatasource: pull_requests, pull_request_commits, commits, project_mapping, accounts\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Average lines changed per MR, merge commits excluded. MRs whose commits were not collected, MRs imported from GitHub and environment promotion MRs (e.g. dev -> stage) are left out.\ndatasource: pull_requests, pull_request_commits, commits, commit_parents, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -586,7 +588,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Average lines changed per MR across its commits, merge commits excluded, as on dashboard C's MR Size panel.\n-- MRs whose commits were not collected and environment promotion MRs (from a branch that at least 20 MRs target)\n-- are left out.\n-- MRs imported from GitHub are left out (the not_imported_mr constant).\nWITH long_lived_branches AS (\n  SELECT lb.base_repo_id, lb.base_ref\n  FROM pull_requests lb\n  WHERE lb.id LIKE 'gitlab:%'\n  GROUP BY lb.base_repo_id, lb.base_ref\n  HAVING COUNT(*) >= 20\n),\nmr_size AS (\n  SELECT pr.id,\n         SUM(c.additions + c.deletions) AS lines_changed\n  FROM pull_requests pr\n  JOIN pull_request_commits prc ON prc.pull_request_id = pr.id\n  JOIN commits c                ON c.sha = prc.commit_sha\n  WHERE pr.id LIKE 'gitlab:%'\n    AND ('__all__' IN ( ${developer_id} ) OR pr.author_id IN ( ${developer_id} ))\n    AND ${not_imported_mr:raw}\n    AND NOT EXISTS (SELECT 1 FROM accounts ba WHERE ba.id = pr.author_id AND ba.user_name REGEXP '^(project|group)_[0-9]+_bot_')\n    AND $__timeFilter(pr.created_date)\n    AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n    AND (SELECT COUNT(*) FROM commit_parents cp WHERE cp.commit_sha = c.sha) < 2\n    AND NOT EXISTS (SELECT 1 FROM long_lived_branches llb WHERE llb.base_repo_id = pr.base_repo_id AND llb.base_ref = pr.head_ref)\n  GROUP BY pr.id\n)\nSELECT ROUND(AVG(lines_changed)) AS `Average MR Size`\nFROM mr_size;",
           "refId": "A"
         }
       ],
@@ -598,7 +600,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Average days from MR creation to merge.\n\rdatasource: pull_requests, project_mapping\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Average days from MR creation to merge, for MRs merged in the period. MRs imported from GitHub are left out.\ndatasource: pull_requests, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -662,7 +664,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Average days from MR creation to merge, for MRs merged in the range.\n-- MRs imported from GitHub are left out (the not_imported_mr constant).\nSELECT ROUND(AVG(TIMESTAMPDIFF(MINUTE, pr.created_date, pr.merged_date)) / 1440, 1) AS `Average Merge Days`\nFROM pull_requests pr\nWHERE pr.status      = 'MERGED'\n  AND pr.merged_date IS NOT NULL\n  AND pr.merged_date > pr.created_date\n  AND pr.id LIKE 'gitlab:%'\n  AND ${not_imported_mr:raw}\n  AND ('__all__' IN ( ${developer_id} ) OR pr.author_id IN ( ${developer_id} ))\n  AND NOT EXISTS (SELECT 1 FROM accounts ba WHERE ba.id = pr.author_id AND ba.user_name REGEXP '^(project|group)_[0-9]+_bot_')\n  AND $__timeFilter(pr.merged_date)\n  AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
           "refId": "A"
         }
       ],
@@ -674,7 +676,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Total commits made through MRs in the selected period.\n\rdatasource: commits, pull_request_commits, pull_requests, project_mapping\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "MR commits authored in the period, merge commits excluded. Commit authors are matched to GitLab accounts by the part of the email before the @ (against the username), then by name; unmatched authors count under Unassigned. All counts every author, bots included. Commits of MRs imported from GitHub are left out.\ndatasource: pull_request_commits, pull_requests, commit_parents, accounts, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -726,7 +728,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- MR commits authored in the range, each counted once, merge commits excluded where parent data was collected.\n-- Commit authors are matched to GitLab accounts as on dashboard B; unmatched authors count under Unassigned.\n-- All counts every author, whether or not they are in the developer list. Bot accounts count like any other author: under\n-- All, and under the bot when issues are assigned to it (so it is in the list), the same as in the CI/CD panels.\n-- Commits of MRs imported from GitHub are left out (the not_imported_mr constant).\nWITH mr_commits AS (\n  SELECT prc.commit_sha,\n         MAX(prc.commit_author_email)  AS author_email,\n         MAX(prc.commit_author_name)   AS author_name\n  FROM pull_request_commits prc\n  JOIN pull_requests pr ON pr.id = prc.pull_request_id\n  WHERE pr.id LIKE 'gitlab:%'\n    AND ${not_imported_mr:raw}\n    AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n    AND $__timeFilter(prc.commit_authored_date)\n    AND (SELECT COUNT(*) FROM commit_parents cp WHERE cp.commit_sha = prc.commit_sha) < 2\n  GROUP BY prc.commit_sha\n),\ngitlab_accounts AS (\n  SELECT a.id, LOWER(a.user_name) AS login, LOWER(TRIM(a.full_name)) AS name\n  FROM accounts a\n  WHERE a.id LIKE 'gitlab:GitlabAccount:%' AND a.id NOT LIKE 'gitlab:GitlabAccount:%:0'\n),\ncommit_authors AS (\n  -- GitLab accounts carry no email, so a commit author is matched to a GitLab account by the email's local part\n  -- against the username, then by the author name against the username, then by a unique full name.\n  SELECT e.author_email,\n         e.author_name,\n         COALESCE(\n           MIN(by_email.id),\n           MIN(by_login.id),\n           CASE WHEN COUNT(DISTINCT by_name.id) = 1 THEN MIN(by_name.id) END\n         ) AS account_id\n  FROM (SELECT DISTINCT author_email, author_name FROM mr_commits) e\n  LEFT JOIN gitlab_accounts by_email ON by_email.login = LOWER(SUBSTRING_INDEX(e.author_email, '@', 1))\n  LEFT JOIN gitlab_accounts by_login ON by_login.login = LOWER(TRIM(e.author_name))\n  LEFT JOIN gitlab_accounts by_name  ON by_name.name   = LOWER(TRIM(e.author_name))\n  GROUP BY e.author_email, e.author_name\n)\nSELECT COUNT(*) AS Commits\nFROM mr_commits mc\nJOIN commit_authors ca ON ca.author_email <=> mc.author_email AND ca.author_name <=> mc.author_name\nWHERE ('__all__' IN ( ${developer_id} ) OR ca.account_id IN ( ${developer_id} ) OR (ca.account_id IS NULL AND 'unassigned' IN ( ${developer_id} )));",
           "refId": "A"
         }
       ],
@@ -751,7 +753,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Issues created in the period split into Bugs and Tasks.\n\rdatasource: issues, board_issues, project_mapping\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Issues created in the period split into Bugs and Tasks (every other type). The type comes from issue labels. The developer filter matches any of an issue's assignees.\ndatasource: issues, issue_labels, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -821,19 +823,32 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Issue stats per type (Bugs, Tasks), the only issue query on this dashboard: the status pies and every issue stat\n-- read their numbers from this panel's result. The developer filter matches any of the issue's assignees (issue_owners,\n-- as on dashboards E and H); an issue counts once. Unassigned ignores the developer filter, as on GitHub A: it counts\n-- every unassigned issue created in the range.\n-- An issue is a Bug when it has a bug label or original_type INCIDENT (the bug_issue constant); every other issue is a Task.\n-- Counts cover issues created in the range. GitLab issues are only open or closed, so an open issue is In Progress when it has\n-- an in-progress label (the in_progress_issue constant), as on dashboard E. Average Days is the lead time of issues closed\n-- in the range.\nWITH issue_owners AS (\n  -- an issue's assignees from issue_assignees, or its issues.assignee_id when it has none (NULL when unassigned);\n  -- the :0 placeholder account means unassigned\n  SELECT ia.issue_id, ia.assignee_id, ia.assignee_name\n  FROM issue_assignees ia\n  WHERE ia.issue_id LIKE 'gitlab:%'\n    AND ia.assignee_id NOT LIKE 'gitlab:GitlabAccount:%:0'\n  UNION ALL\n  SELECT i.id, CASE WHEN COALESCE(i.assignee_id, '') = '' OR i.assignee_id LIKE 'gitlab:GitlabAccount:%:0' THEN NULL ELSE i.assignee_id END, NULLIF(TRIM(i.assignee_name), '')\n  FROM issues i\n  WHERE i.id LIKE 'gitlab:%'\n    AND NOT EXISTS (SELECT 1 FROM issue_assignees ia WHERE ia.issue_id = i.id AND ia.assignee_id NOT LIKE 'gitlab:GitlabAccount:%:0')\n),\nowner_flags AS (\n  -- per issue: whether it has an assignee, and whether one of its assignees (or Unassigned) is selected\n  SELECT io.issue_id,\n         MAX(io.assignee_id IS NOT NULL)                                                                       AS assigned,\n         COALESCE(MAX(io.assignee_id IN ( ${developer_id} ) OR (io.assignee_id IS NULL AND 'unassigned' IN ( ${developer_id} ))), 0) AS selected\n  FROM issue_owners io\n  GROUP BY io.issue_id\n),\nscoped AS (\n  SELECT CASE WHEN ${bug_issue:raw} THEN 'Bugs' ELSE 'Tasks' END    AS category,\n         $__timeFilter(i.created_date)                     AS created_in_range,\n         i.status = 'DONE'                                 AS done,\n         ${in_progress_issue:raw}                          AS progress_label,\n         NOT o.assigned                                    AS unassigned,\n         ('__all__' IN ( ${developer_id} ) OR o.selected)  AS selected,\n         CASE WHEN i.status = 'DONE' AND i.lead_time_minutes > 0 AND $__timeFilter(i.resolution_date)\n              THEN i.lead_time_minutes / 1440 END           AS resolved_days\n  FROM issues i\n  JOIN owner_flags o ON o.issue_id = i.id\n  WHERE i.id LIKE 'gitlab:%'\n    AND ($__timeFilter(i.created_date) OR $__timeFilter(i.resolution_date))\n    AND EXISTS (SELECT 1 FROM board_issues bi2 JOIN project_mapping pm2 ON pm2.row_id = bi2.board_id AND pm2.`table` = 'boards' WHERE bi2.issue_id = i.id AND bi2.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) AND pm2.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n)\nSELECT category,\n       SUM(selected AND created_in_range)                                   AS issues,\n       SUM(selected AND created_in_range AND NOT done AND progress_label)   AS `In Progress`,\n       SUM(selected AND created_in_range AND NOT done AND NOT progress_label) AS `To Do`,\n       SUM(selected AND created_in_range AND done)                          AS Done,\n       SUM(created_in_range AND unassigned)                                 AS Unassigned,\n       ROUND(AVG(CASE WHEN selected THEN resolved_days END), 1)             AS `Average Days`\nFROM scoped\nGROUP BY category\nORDER BY category;",
           "refId": "A"
         }
       ],
       "title": "GitLab Issues Summary",
-      "type": "piechart"
+      "type": "piechart",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "category",
+                "issues"
+              ]
+            }
+          }
+        }
+      ]
     },
     {
       "datasource": {
-        "type": "mysql",
-        "uid": "devlake-mysql"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
-      "description": "Tasks split by status: To Do, In Progress and Done.\n\rdatasource: issues, board_issues, project_mapping\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Tasks created in the period split into To Do, In Progress (open with an in-progress label) and Done.\ndatasource: issues, issue_labels, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -894,25 +909,54 @@
       "targets": [
         {
           "datasource": {
-            "type": "mysql",
-            "uid": "devlake-mysql"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "",
+          "panelId": 1,
           "refId": "A"
         }
       ],
       "title": "Tasks Status Distribution",
-      "type": "piechart"
+      "type": "piechart",
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "category",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "Tasks"
+                  }
+                }
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "In Progress",
+                "To Do",
+                "Done"
+              ]
+            }
+          }
+        }
+      ]
     },
     {
       "datasource": {
-        "type": "mysql",
-        "uid": "devlake-mysql"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
-      "description": "Bugs split by status: To Do, In Progress and Done.\n\rdatasource: issues, board_issues, project_mapping\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Bugs created in the period split into To Do, In Progress (open with an in-progress label) and Done.\ndatasource: issues, issue_labels, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -930,7 +974,7 @@
             {
               "targetBlank": true,
               "title": "Detail",
-              "url": "/d/gitlab-e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/d/gitlab-e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-4"
             }
           ],
           "mappings": []
@@ -973,25 +1017,54 @@
       "targets": [
         {
           "datasource": {
-            "type": "mysql",
-            "uid": "devlake-mysql"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "",
+          "panelId": 1,
           "refId": "A"
         }
       ],
       "title": "Bugs Status Distribution",
-      "type": "piechart"
+      "type": "piechart",
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "category",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "Bugs"
+                  }
+                }
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "In Progress",
+                "To Do",
+                "Done"
+              ]
+            }
+          }
+        }
+      ]
     },
     {
       "datasource": {
-        "type": "mysql",
-        "uid": "devlake-mysql"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
-      "description": "Non-bug issues created in the selected period.\n\rdatasource: issues, board_issues, project_mapping\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Tasks (non-bug issues) created in the period.\ndatasource: issues, issue_labels, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1001,7 +1074,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/gitlab-d-issue-overview?orgId=1&var-interval=1w&timezone=browser&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/d/gitlab-d-issue-overview?orgId=1&var-interval=1w&timezone=browser&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
             }
           ],
           "mappings": [],
@@ -1036,7 +1109,7 @@
         "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
-            "first"
+            "lastNotNull"
           ],
           "fields": "",
           "values": false
@@ -1049,22 +1122,36 @@
       "targets": [
         {
           "datasource": {
-            "type": "mysql",
-            "uid": "devlake-mysql"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "",
+          "panelId": 1,
           "refId": "A"
         }
       ],
       "title": "New Tasks Created",
       "transformations": [
         {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "category",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "Tasks"
+                  }
+                }
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
+        {
           "id": "filterFieldsByName",
           "options": {
-            "byVariable": false,
             "include": {
               "names": [
                 "issues"
@@ -1077,10 +1164,10 @@
     },
     {
       "datasource": {
-        "type": "mysql",
-        "uid": "devlake-mysql"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
-      "description": "Bug issues created in the selected period.\n\rdatasource: issues, board_issues, project_mapping\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Bugs created in the period.\ndatasource: issues, issue_labels, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1090,7 +1177,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/gitlab-d-issue-overview?orgId=1&var-interval=1w&timezone=browser&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/d/gitlab-d-issue-overview?orgId=1&var-interval=1w&timezone=browser&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
             }
           ],
           "mappings": [],
@@ -1100,10 +1187,6 @@
             "steps": [
               {
                 "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 0
               }
             ]
           }
@@ -1125,7 +1208,7 @@
         "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
-            "last"
+            "lastNotNull"
           ],
           "fields": "",
           "values": false
@@ -1138,24 +1221,40 @@
       "targets": [
         {
           "datasource": {
-            "type": "mysql",
-            "uid": "devlake-mysql"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "",
+          "panelId": 1,
           "refId": "A"
         }
       ],
       "title": "Bugs Reported",
       "transformations": [
         {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "category",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "Bugs"
+                  }
+                }
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
+        {
           "id": "filterFieldsByName",
           "options": {
-            "byVariable": false,
             "include": {
-              "names": []
+              "names": [
+                "issues"
+              ]
             }
           }
         }
@@ -1164,10 +1263,10 @@
     },
     {
       "datasource": {
-        "type": "mysql",
-        "uid": "devlake-mysql"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
-      "description": "Tasks currently in progress.\n\rdatasource: issues, board_issues, project_mapping\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Tasks created in the period that are open with an in-progress label.\ndatasource: issues, issue_labels, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1187,10 +1286,6 @@
             "steps": [
               {
                 "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 0
               }
             ]
           }
@@ -1225,18 +1320,33 @@
       "targets": [
         {
           "datasource": {
-            "type": "mysql",
-            "uid": "devlake-mysql"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "",
+          "panelId": 1,
           "refId": "A"
         }
       ],
       "title": "Tasks In-Progress",
       "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "category",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "Tasks"
+                  }
+                }
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
         {
           "id": "filterFieldsByName",
           "options": {
@@ -1252,10 +1362,10 @@
     },
     {
       "datasource": {
-        "type": "mysql",
-        "uid": "devlake-mysql"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
-      "description": "Tasks not yet started.\n\rdatasource: issues, board_issues, project_mapping\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Tasks created in the period that are open with no in-progress label.\ndatasource: issues, issue_labels, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1313,18 +1423,33 @@
       "targets": [
         {
           "datasource": {
-            "type": "mysql",
-            "uid": "devlake-mysql"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "",
+          "panelId": 1,
           "refId": "A"
         }
       ],
       "title": "Tasks in To Do List",
       "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "category",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "Tasks"
+                  }
+                }
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
         {
           "id": "filterFieldsByName",
           "options": {
@@ -1340,10 +1465,10 @@
     },
     {
       "datasource": {
-        "type": "mysql",
-        "uid": "devlake-mysql"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
-      "description": "Bugs currently in progress.\n\rdatasource: issues, board_issues, project_mapping\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Bugs created in the period that are open with an in-progress label.\ndatasource: issues, issue_labels, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1353,7 +1478,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/gitlab-e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/d/gitlab-e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-4"
             }
           ],
           "mappings": [],
@@ -1366,7 +1491,7 @@
               },
               {
                 "color": "red",
-                "value": 0
+                "value": 1
               }
             ]
           }
@@ -1401,18 +1526,33 @@
       "targets": [
         {
           "datasource": {
-            "type": "mysql",
-            "uid": "devlake-mysql"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "",
+          "panelId": 1,
           "refId": "A"
         }
       ],
       "title": "Bugs In-Progress",
       "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "category",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "Bugs"
+                  }
+                }
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
         {
           "id": "filterFieldsByName",
           "options": {
@@ -1428,10 +1568,10 @@
     },
     {
       "datasource": {
-        "type": "mysql",
-        "uid": "devlake-mysql"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
-      "description": "Bugs not yet started.\n\rdatasource: issues, board_issues, project_mapping\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Bugs created in the period that are open with no in-progress label.\ndatasource: issues, issue_labels, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1441,7 +1581,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/gitlab-e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/d/gitlab-e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-4"
             }
           ],
           "mappings": [],
@@ -1454,7 +1594,7 @@
               },
               {
                 "color": "red",
-                "value": 0
+                "value": 1
               }
             ]
           }
@@ -1489,18 +1629,33 @@
       "targets": [
         {
           "datasource": {
-            "type": "mysql",
-            "uid": "devlake-mysql"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "",
+          "panelId": 1,
           "refId": "A"
         }
       ],
       "title": "Bugs in To Do List",
       "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "category",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "Bugs"
+                  }
+                }
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
         {
           "id": "filterFieldsByName",
           "options": {
@@ -1516,10 +1671,10 @@
     },
     {
       "datasource": {
-        "type": "mysql",
-        "uid": "devlake-mysql"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
-      "description": "Tasks completed (Done/Closed).\n\rdatasource: issues, board_issues, project_mapping\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Tasks created in the period that are closed.\ndatasource: issues, issue_labels, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1577,18 +1732,33 @@
       "targets": [
         {
           "datasource": {
-            "type": "mysql",
-            "uid": "devlake-mysql"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "",
+          "panelId": 1,
           "refId": "A"
         }
       ],
       "title": "Tasks Done",
       "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "category",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "Tasks"
+                  }
+                }
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
         {
           "id": "filterFieldsByName",
           "options": {
@@ -1604,10 +1774,10 @@
     },
     {
       "datasource": {
-        "type": "mysql",
-        "uid": "devlake-mysql"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
-      "description": "Tasks not assigned to anyone.\n\rdatasource: issues, board_issues, project_mapping\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Tasks created in the period with no assignee, whatever the developer filter.\ndatasource: issues, issue_labels, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1625,7 +1795,8 @@
                 "value": 1
               }
             ]
-          }
+          },
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -1657,25 +1828,52 @@
       "targets": [
         {
           "datasource": {
-            "type": "mysql",
-            "uid": "devlake-mysql"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "",
+          "panelId": 1,
           "refId": "A"
         }
       ],
       "title": "Unassigned Tasks",
-      "type": "stat"
+      "type": "stat",
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "category",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "Tasks"
+                  }
+                }
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Unassigned"
+              ]
+            }
+          }
+        }
+      ]
     },
     {
       "datasource": {
-        "type": "mysql",
-        "uid": "devlake-mysql"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
-      "description": "Bugs completed (Done/Closed).\n\rdatasource: issues, board_issues, project_mapping\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Bugs created in the period that are closed.\ndatasource: issues, issue_labels, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1685,7 +1883,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/gitlab-e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/d/gitlab-e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-4"
             }
           ],
           "mappings": [],
@@ -1695,10 +1893,6 @@
             "steps": [
               {
                 "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 0
               }
             ]
           }
@@ -1733,18 +1927,33 @@
       "targets": [
         {
           "datasource": {
-            "type": "mysql",
-            "uid": "devlake-mysql"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "",
+          "panelId": 1,
           "refId": "A"
         }
       ],
       "title": "Bugs Done",
       "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "category",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "Bugs"
+                  }
+                }
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
         {
           "id": "filterFieldsByName",
           "options": {
@@ -1760,10 +1969,10 @@
     },
     {
       "datasource": {
-        "type": "mysql",
-        "uid": "devlake-mysql"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
-      "description": "Bugs not assigned to anyone.\n\rdatasource: issues, board_issues, project_mapping\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Bugs created in the period with no assignee, whatever the developer filter.\ndatasource: issues, issue_labels, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1814,25 +2023,52 @@
       "targets": [
         {
           "datasource": {
-            "type": "mysql",
-            "uid": "devlake-mysql"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "",
+          "panelId": 1,
           "refId": "A"
         }
       ],
       "title": "Unassigned Bugs",
-      "type": "stat"
+      "type": "stat",
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "category",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "Bugs"
+                  }
+                }
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Unassigned"
+              ]
+            }
+          }
+        }
+      ]
     },
     {
       "datasource": {
-        "type": "mysql",
-        "uid": "devlake-mysql"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
-      "description": "Average days to complete a task.\n\rdatasource: issues, board_issues, project_mapping\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Average days from creation to close for tasks closed in the period.\ndatasource: issues, issue_labels, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1883,25 +2119,52 @@
       "targets": [
         {
           "datasource": {
-            "type": "mysql",
-            "uid": "devlake-mysql"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "",
+          "panelId": 1,
           "refId": "A"
         }
       ],
       "title": "Average Task Completion Time (Days)",
-      "type": "stat"
+      "type": "stat",
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "category",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "Tasks"
+                  }
+                }
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Average Days"
+              ]
+            }
+          }
+        }
+      ]
     },
     {
       "datasource": {
-        "type": "mysql",
-        "uid": "devlake-mysql"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
-      "description": "Average days to resolve a bug.\n\rdatasource: issues, board_issues, project_mapping\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Average days from creation to close for bugs closed in the period.\ndatasource: issues, issue_labels, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1952,18 +2215,45 @@
       "targets": [
         {
           "datasource": {
-            "type": "mysql",
-            "uid": "devlake-mysql"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "",
+          "panelId": 1,
           "refId": "A"
         }
       ],
       "title": "Average Bug Resolution Time (Days)",
-      "type": "stat"
+      "type": "stat",
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "category",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "Bugs"
+                  }
+                }
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Average Days"
+              ]
+            }
+          }
+        }
+      ]
     },
     {
       "collapsed": false,
@@ -1983,7 +2273,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Share of pipeline runs by result (success, failure, etc.).\n\rdatasource: cicd_pipelines\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Pipelines in the period by result, by finished date (created date while they have none). Unknown = no final result yet (manual, running, pending, skipped); Failure includes canceled pipelines. A pipeline belongs to its commit's author; unmatched authors count under Unassigned. All counts every pipeline, bots included. Child pipelines are left out.\ndatasource: cicd_pipelines, cicd_pipeline_commits, commits, pull_request_commits, accounts, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2001,38 +2291,13 @@
             {
               "targetBlank": true,
               "title": "Detail",
-              "url": "/d/gitlab-i-classic?orgId=1&${__all_variables}&${__url_time_range}&var-interval=DAYOFMONTH&viewPanel=panel-109"
+              "url": "/d/gitlab-i-classic?orgId=1&${__all_variables}&${__url_time_range}&var-interval=DAYOFMONTH&viewPanel=panel-105"
             }
           ],
           "mappings": [],
           "unit": "none"
         },
         "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "build_count",
-                  "ABORT"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          },
           {
             "matcher": {
               "id": "byName",
@@ -2066,7 +2331,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "ABORT"
+              "options": "Unknown"
             },
             "properties": [
               {
@@ -2126,7 +2391,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Pipelines in the range by result: by finished date, or by created date while they have none (a pipeline waiting on a\n-- manual job, or still running). Unknown = no final result yet (manual, running, pending, skipped); FAILURE includes\n-- canceled pipelines.\n-- A pipeline belongs to the author of its commit, from commits or else the MR commit, matched to GitLab accounts as on\n-- dashboard B; pipelines whose author is unknown or unmatched count under Unassigned.\n-- All counts every author, whether or not they are in the developer list. Bot accounts count like any other author: under\n-- All, and under the bot when issues are assigned to it (so it is in the list), the same as in Commits Raised.\n-- Child pipelines (is_child) are left out: they run as part of their parent pipeline.\nWITH mr_commit_authors AS (\n  -- MR commit authors grouped once per commit: pull_request_commits has no index on commit_sha\n  SELECT prc.commit_sha,\n         MAX(prc.commit_author_email)  AS author_email,\n         MAX(prc.commit_author_name)   AS author_name\n  FROM pull_request_commits prc\n  WHERE prc.pull_request_id LIKE 'gitlab:%'\n  GROUP BY prc.commit_sha\n),\npipelines AS (\n  SELECT cp.id,\n         cp.result,\n         MAX(COALESCE(c.author_email, mca.author_email)) AS author_email,\n         MAX(COALESCE(c.author_name,  mca.author_name))  AS author_name\n  FROM cicd_pipelines cp\n  LEFT JOIN cicd_pipeline_commits cpc ON cpc.pipeline_id = cp.id\n  LEFT JOIN commits c                 ON c.sha = cpc.commit_sha\n  LEFT JOIN mr_commit_authors mca     ON mca.commit_sha = cpc.commit_sha\n  WHERE cp.id LIKE 'gitlab:%'\n    AND COALESCE(cp.is_child, 0) = 0\n    AND COALESCE(cp.finished_date, cp.created_date) BETWEEN $__timeFrom() AND $__timeTo()\n    AND cp.cicd_scope_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = cp.cicd_scope_id\n                   AND pm.`table` = 'cicd_scopes'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  GROUP BY cp.id, cp.result\n),\ngitlab_accounts AS (\n  SELECT a.id, LOWER(a.user_name) AS login, LOWER(TRIM(a.full_name)) AS name\n  FROM accounts a\n  WHERE a.id LIKE 'gitlab:GitlabAccount:%' AND a.id NOT LIKE 'gitlab:GitlabAccount:%:0'\n),\ncommit_authors AS (\n  -- GitLab accounts carry no email, so a commit author is matched to a GitLab account by the email's local part\n  -- against the username, then by the author name against the username, then by a unique full name.\n  SELECT e.author_email,\n         e.author_name,\n         COALESCE(\n           MIN(by_email.id),\n           MIN(by_login.id),\n           CASE WHEN COUNT(DISTINCT by_name.id) = 1 THEN MIN(by_name.id) END\n         ) AS account_id\n  FROM (SELECT DISTINCT author_email, author_name FROM pipelines) e\n  LEFT JOIN gitlab_accounts by_email ON by_email.login = LOWER(SUBSTRING_INDEX(e.author_email, '@', 1))\n  LEFT JOIN gitlab_accounts by_login ON by_login.login = LOWER(TRIM(e.author_name))\n  LEFT JOIN gitlab_accounts by_name  ON by_name.name   = LOWER(TRIM(e.author_name))\n  GROUP BY e.author_email, e.author_name\n)\nSELECT IF(p.result = '', 'Unknown', p.result) AS result,\n       COUNT(*)                               AS build_count\nFROM pipelines p\nLEFT JOIN commit_authors ca ON ca.author_email <=> p.author_email AND ca.author_name <=> p.author_name\nWHERE ('__all__' IN ( ${developer_id} ) OR ca.account_id IN ( ${developer_id} ) OR (ca.account_id IS NULL AND 'unassigned' IN ( ${developer_id} )))\nGROUP BY 1\nORDER BY 2 DESC;",
           "refId": "A"
         }
       ],
@@ -2135,10 +2400,10 @@
     },
     {
       "datasource": {
-        "type": "mysql",
-        "uid": "devlake-mysql"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
-      "description": "Total pipeline runs (builds) in the selected period.\n\rdatasource: cicd_pipelines\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Pipelines in the period, Unknown included, by finished date (created date while they have none).\ndatasource: cicd_pipelines, cicd_pipeline_commits, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2148,7 +2413,7 @@
             {
               "targetBlank": true,
               "title": "Detail",
-              "url": "/d/gitlab-i-classic?orgId=1&${__all_variables}&${__url_time_range}&var-interval=DAYOFMONTH&viewPanel=panel-109"
+              "url": "/d/gitlab-i-classic?orgId=1&${__all_variables}&${__url_time_range}&var-interval=DAYOFMONTH&viewPanel=panel-105"
             }
           ],
           "mappings": [],
@@ -2159,7 +2424,8 @@
                 "color": "green"
               }
             ]
-          }
+          },
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -2191,25 +2457,34 @@
       "targets": [
         {
           "datasource": {
-            "type": "mysql",
-            "uid": "devlake-mysql"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "",
+          "panelId": 31,
           "refId": "A"
         }
       ],
       "title": "Total Builds",
-      "type": "stat"
+      "type": "stat",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "build_count"
+              ]
+            }
+          }
+        }
+      ]
     },
     {
       "datasource": {
-        "type": "mysql",
-        "uid": "devlake-mysql"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
-      "description": "Workflow runs that succeeded.\n\rdatasource: cicd_pipelines\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Pipelines in the period that succeeded.\ndatasource: cicd_pipelines, cicd_pipeline_commits, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2230,7 +2505,8 @@
                 "color": "green"
               }
             ]
-          }
+          },
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -2249,7 +2525,7 @@
         "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
-            "first"
+            "lastNotNull"
           ],
           "fields": "",
           "values": false
@@ -2262,25 +2538,52 @@
       "targets": [
         {
           "datasource": {
-            "type": "mysql",
-            "uid": "devlake-mysql"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "",
+          "panelId": 31,
           "refId": "A"
         }
       ],
       "title": "Successful Builds",
-      "type": "stat"
+      "type": "stat",
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "result",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "SUCCESS"
+                  }
+                }
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "build_count"
+              ]
+            }
+          }
+        }
+      ]
     },
     {
       "datasource": {
-        "type": "mysql",
-        "uid": "devlake-mysql"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
-      "description": "Workflow runs that failed.\n\rdatasource: cicd_pipelines\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Pipelines in the period that failed or were canceled.\ndatasource: cicd_pipelines, cicd_pipeline_commits, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2305,7 +2608,8 @@
                 "value": 1
               }
             ]
-          }
+          },
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -2324,7 +2628,7 @@
         "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
-            "last"
+            "lastNotNull"
           ],
           "fields": "",
           "values": false
@@ -2337,25 +2641,52 @@
       "targets": [
         {
           "datasource": {
-            "type": "mysql",
-            "uid": "devlake-mysql"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "",
+          "panelId": 31,
           "refId": "A"
         }
       ],
       "title": "Failed Builds",
-      "type": "stat"
+      "type": "stat",
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "result",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "FAILURE"
+                  }
+                }
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "build_count"
+              ]
+            }
+          }
+        }
+      ]
     },
     {
       "datasource": {
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "MRs whose commits triggered failed pipeline runs.\n\rdatasource: pull_requests, accounts, pull_request_commits, cicd_pipeline_commits, cicd_pipelines\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "MRs whose commits had a pipeline fail or get canceled in the period, latest failure first (100 most recent). MRs imported from GitHub, bot-authored MRs and environment promotion MRs (e.g. dev -> stage) are left out. Child pipelines are left out.\ndatasource: pull_requests, pull_request_commits, cicd_pipeline_commits, cicd_pipelines, accounts, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2413,7 +2744,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- MRs by the selected developers with a commit whose pipeline failed (or was canceled) in the range, latest failure first.\n-- Bot-authored MRs are left out. GitLab leaves merged_by_id empty, so there is no Merged By column.\n-- MRs imported from GitHub are left out (the not_imported_mr constant).\n-- Environment promotion MRs (from a branch that at least 20 MRs target, e.g. dev -> stage) are left out, as in Average\n-- MR Size: they carry every commit of the source branch, so they collect every failure on it.\n-- The selected MRs come first and reach their commits through pull_request_commits' primary key; that table has no index\n-- on commit_sha, so starting from the failed pipelines scans all of it.\n-- Child pipelines (is_child) are left out: they run as part of their parent pipeline.\nWITH long_lived_branches AS (\n  SELECT lb.base_repo_id, lb.base_ref\n  FROM pull_requests lb\n  WHERE lb.id LIKE 'gitlab:%'\n  GROUP BY lb.base_repo_id, lb.base_ref\n  HAVING COUNT(*) >= 20\n),\nselected_mrs AS (\n  SELECT pr.id\n  FROM pull_requests pr\n  WHERE pr.id LIKE 'gitlab:%'\n    AND ${not_imported_mr:raw}\n    AND ('__all__' IN ( ${developer_id} ) OR pr.author_id IN ( ${developer_id} ))\n    AND NOT EXISTS (SELECT 1 FROM accounts ba WHERE ba.id = pr.author_id AND ba.user_name REGEXP '^(project|group)_[0-9]+_bot_')\n    AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n    AND NOT EXISTS (SELECT 1 FROM long_lived_branches llb WHERE llb.base_repo_id = pr.base_repo_id AND llb.base_ref = pr.head_ref)\n),\nfailed_commits AS (\n  -- commits of the pipelines that failed in the range; grouped, so MySQL materializes this small set once\n  SELECT cpc.commit_sha,\n         cp.id                  AS pipeline_id,\n         MAX(cp.finished_date)  AS finished_date\n  FROM cicd_pipelines cp\n  JOIN cicd_pipeline_commits cpc ON cpc.pipeline_id = cp.id\n  WHERE cp.id LIKE 'gitlab:%'\n    AND COALESCE(cp.is_child, 0) = 0\n    AND cp.result = 'FAILURE'\n    AND $__timeFilter(cp.finished_date)\n    AND cp.cicd_scope_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = cp.cicd_scope_id\n                   AND pm.`table` = 'cicd_scopes'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  GROUP BY cpc.commit_sha, cp.id\n),\nmr_commits AS (\n  -- the selected MRs' commits, through pull_request_commits' primary key; DISTINCT keeps this a separate step\n  SELECT DISTINCT prc.pull_request_id, prc.commit_sha\n  FROM selected_mrs sm\n  JOIN pull_request_commits prc ON prc.pull_request_id = sm.id\n),\nmr_failures AS (\n  SELECT mc.pull_request_id,\n         COUNT(DISTINCT fc.pipeline_id)  AS failed_pipelines,\n         MAX(fc.finished_date)           AS last_failure\n  FROM mr_commits mc\n  JOIN failed_commits fc ON fc.commit_sha = mc.commit_sha\n  GROUP BY mc.pull_request_id\n)\nSELECT pr.title                                 AS Title,\n       pr.base_ref                              AS `Target Branch`,\n       pr.head_ref                              AS `Source Branch`,\n       COALESCE(REPLACE(COALESCE(NULLIF(TRIM(REPLACE(a.full_name, _utf8mb4 X'E2808B', '')), ''), NULLIF(TRIM(a.user_name), '')), '-', ' '), '(unmapped)') AS Author,\n       mf.failed_pipelines                      AS `Failed Pipelines`,\n       mf.last_failure                          AS `Last Failure`,\n       pr.url                                   AS URL\nFROM mr_failures mf\nJOIN pull_requests pr ON pr.id = mf.pull_request_id\nLEFT JOIN accounts a  ON a.id = pr.author_id\nORDER BY `Last Failure` DESC\nLIMIT 100;",
           "refId": "A"
         }
       ],
@@ -2438,7 +2769,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Top 10 developers by issues assigned and their share of total team work.\n\rdatasource: issues, board_issues, project_mapping, accounts\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Top 10 assignees by issues created in the period (an issue with several assignees counts for each), their share of the team's issues, and how far they are from the fair share (Overloaded above 125%, Underloaded below 75%).\ndatasource: issues, board_issues, project_mapping, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2497,7 +2828,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "",
+          "rawSql": "-- Issues created in the range per assignee, top 10, against the team's fair share. An issue with several assignees counts\n-- once for each, as on dashboards E and H; unassigned issues are left out. The fair share is\n-- total issues divided by the number of assignees. Over 125% of the fair share is Overloaded, under 75% Underloaded.\n-- Team Workload Overview reads this panel's result.\nWITH issue_owners AS (\n  -- an issue's assignees from issue_assignees, or its issues.assignee_id when it has none (NULL when unassigned);\n  -- the :0 placeholder account means unassigned\n  SELECT ia.issue_id, ia.assignee_id, ia.assignee_name\n  FROM issue_assignees ia\n  WHERE ia.issue_id LIKE 'gitlab:%'\n    AND ia.assignee_id NOT LIKE 'gitlab:GitlabAccount:%:0'\n  UNION ALL\n  SELECT i.id, CASE WHEN COALESCE(i.assignee_id, '') = '' OR i.assignee_id LIKE 'gitlab:GitlabAccount:%:0' THEN NULL ELSE i.assignee_id END, NULLIF(TRIM(i.assignee_name), '')\n  FROM issues i\n  WHERE i.id LIKE 'gitlab:%'\n    AND NOT EXISTS (SELECT 1 FROM issue_assignees ia WHERE ia.issue_id = i.id AND ia.assignee_id NOT LIKE 'gitlab:GitlabAccount:%:0')\n),\nper_member AS (\n  SELECT io.assignee_id          AS member_id,\n         MAX(io.assignee_name)   AS assignee_name,\n         COUNT(*)                AS tasks\n  FROM issues i\n  JOIN issue_owners io ON io.issue_id = i.id\n  WHERE i.id LIKE 'gitlab:%'\n    AND io.assignee_id IS NOT NULL\n    AND ('__all__' IN ( ${developer_id} ) OR io.assignee_id IN ( ${developer_id} ))\n    AND $__timeFilter(i.created_date)\n    AND EXISTS (SELECT 1 FROM board_issues bi2 JOIN project_mapping pm2 ON pm2.row_id = bi2.board_id AND pm2.`table` = 'boards' WHERE bi2.issue_id = i.id AND bi2.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) AND pm2.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  GROUP BY io.assignee_id\n),\ntotals AS (\n  SELECT SUM(tasks) AS total_tasks, COUNT(*) AS headcount FROM per_member\n)\nSELECT COALESCE(REPLACE(COALESCE(NULLIF(TRIM(REPLACE(a.full_name, _utf8mb4 X'E2808B', '')), ''), NULLIF(TRIM(a.user_name), '')), '-', ' '), REPLACE(NULLIF(TRIM(REPLACE(p.assignee_name, _utf8mb4 X'E2808B', '')), ''), '-', ' '), p.member_id)                                                 AS Developer,\n       p.tasks                                                   AS `Issues Assigned`,\n       ROUND(100.0 * p.tasks / t.total_tasks, 1)                 AS `Workload Percentage`,\n       ROUND(t.total_tasks / t.headcount, 1)                     AS `Fair Share`,\n       ROUND(p.tasks - t.total_tasks / t.headcount, 1)           AS Deviation,\n       CASE\n         WHEN p.tasks > (t.total_tasks / t.headcount) * 1.25 THEN 'Overloaded'\n         WHEN p.tasks < (t.total_tasks / t.headcount) * 0.75 THEN 'Underloaded'\n         ELSE 'Balanced'\n       END                                                       AS Status,\n       t.total_tasks                                             AS `Total Team Work`\nFROM per_member p\nLEFT JOIN accounts a ON a.id = p.member_id\nCROSS JOIN totals t\nORDER BY p.tasks DESC\nLIMIT 10;",
           "refId": "A"
         }
       ],
@@ -2506,10 +2837,10 @@
     },
     {
       "datasource": {
-        "type": "mysql",
-        "uid": "devlake-mysql"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
-      "description": "Issues assigned vs remaining team load for the top 10 developers.\n\rdatasource: issues, board_issues, project_mapping, accounts\n\nNot built yet: the GitLab query for this panel is added by US-14.",
+      "description": "Issues assigned vs the rest of the team's issues for the top 10 assignees, from the Team Workload panel.\ndatasource: issues, board_issues, project_mapping, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2582,18 +2913,41 @@
       "targets": [
         {
           "datasource": {
-            "type": "mysql",
-            "uid": "devlake-mysql"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "",
+          "panelId": 12,
           "refId": "A"
         }
       ],
       "title": "Team Workload Overview",
-      "type": "barchart"
+      "type": "barchart",
+      "transformations": [
+        {
+          "id": "calculateField",
+          "options": {
+            "mode": "binary",
+            "alias": "Remaining Load",
+            "binary": {
+              "left": "Total Team Work",
+              "operator": "-",
+              "right": "Issues Assigned"
+            }
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Developer",
+                "Issues Assigned",
+                "Remaining Load"
+              ]
+            }
+          }
+        }
+      ]
     }
   ],
   "preload": false,
@@ -2658,17 +3012,78 @@
           "type": "mysql",
           "uid": "devlake-mysql"
         },
-        "definition": "SELECT Name FROM (\n  WITH scoped_repos AS (\n    SELECT r.id\n    FROM repos r\n    WHERE r.id LIKE 'gitlab:%'\n      AND r.deleted = 0\n      AND r.id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n      AND EXISTS (SELECT 1 FROM project_mapping pm\n                   WHERE pm.row_id  = r.id\n                     AND pm.`table` = 'repos'\n                     AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  ),\n  scoped_issues AS (\n    -- gitlab board ids match repo ids\n    SELECT bi.issue_id\n    FROM board_issues bi\n    WHERE bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n      AND EXISTS (SELECT 1 FROM project_mapping pm\n                   WHERE pm.row_id  = bi.board_id\n                     AND pm.`table` = 'boards'\n                     AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  ),\n  scoped_accounts AS (\n    -- MR authors\n    SELECT pr.author_id AS account_id, NULL AS fallback_name, 0 AS assignee\n    FROM pull_requests pr\n    JOIN scoped_repos sr ON sr.id = pr.base_repo_id\n    WHERE pr.author_id LIKE 'gitlab:%'\n    UNION\n    -- MR reviewers and commenters\n    SELECT cmt.account_id, NULL, 0\n    FROM pull_request_comments cmt\n    JOIN pull_requests pr ON pr.id = cmt.pull_request_id\n    JOIN scoped_repos sr  ON sr.id = pr.base_repo_id\n    WHERE cmt.account_id LIKE 'gitlab:%'\n    UNION\n    -- issue assignees, from issue_assignees and issues.assignee_id (the :0 placeholder means unassigned)\n    SELECT ia.assignee_id, ia.assignee_name, 1\n    FROM issue_assignees ia\n    JOIN scoped_issues si ON si.issue_id = ia.issue_id\n    WHERE ia.assignee_id LIKE 'gitlab:%'\n    UNION\n    SELECT i.assignee_id, i.assignee_name, 1\n    FROM issues i\n    JOIN scoped_issues si ON si.issue_id = i.id\n    WHERE i.assignee_id LIKE 'gitlab:%'\n      AND i.assignee_id NOT LIKE 'gitlab:GitlabAccount:%:0'\n  )\n  -- assignees with no account row keep their GitLab username; bots are left out, unless issues are assigned to them\n  SELECT CONCAT(COALESCE(REPLACE(COALESCE(NULLIF(TRIM(REPLACE(a.full_name, _utf8mb4 X'E2808B', '')), ''), NULLIF(TRIM(a.user_name), '')), '-', ' '), REPLACE(NULLIF(TRIM(REPLACE(MAX(sa.fallback_name), _utf8mb4 X'E2808B', '')), ''), '-', ' '), sa.account_id), '--', sa.account_id) AS Name\n  FROM scoped_accounts sa\n  LEFT JOIN accounts a ON a.id = sa.account_id\n  GROUP BY sa.account_id, a.full_name, a.user_name\n  HAVING MAX(sa.assignee) = 1 OR NOT COALESCE(a.user_name, '') LIKE 'project\\_%\\_bot\\_%'\n  UNION ALL\n  SELECT 'Unassigned--unassigned'\n) all_developers\nORDER BY Name",
+        "definition": "SELECT Name FROM (\n  WITH scoped_repos AS (\n    SELECT r.id\n    FROM repos r\n    WHERE r.id LIKE 'gitlab:%'\n      AND r.deleted = 0\n      AND r.id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n      AND EXISTS (SELECT 1 FROM project_mapping pm\n                   WHERE pm.row_id  = r.id\n                     AND pm.`table` = 'repos'\n                     AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  ),\n  scoped_issues AS (\n    -- gitlab board ids match repo ids\n    SELECT bi.issue_id\n    FROM board_issues bi\n    WHERE bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n      AND EXISTS (SELECT 1 FROM project_mapping pm\n                   WHERE pm.row_id  = bi.board_id\n                     AND pm.`table` = 'boards'\n                     AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  ),\n  scoped_accounts AS (\n    -- MR authors\n    SELECT pr.author_id AS account_id, NULL AS fallback_name, 0 AS assignee\n    FROM pull_requests pr\n    JOIN scoped_repos sr ON sr.id = pr.base_repo_id\n    WHERE pr.author_id LIKE 'gitlab:%'\n    UNION\n    -- MR reviewers and commenters\n    SELECT cmt.account_id, NULL, 0\n    FROM pull_request_comments cmt\n    JOIN pull_requests pr ON pr.id = cmt.pull_request_id\n    JOIN scoped_repos sr  ON sr.id = pr.base_repo_id\n    WHERE cmt.account_id LIKE 'gitlab:%'\n    UNION\n    -- issue assignees, from issue_assignees and issues.assignee_id (the :0 placeholder means unassigned)\n    SELECT ia.assignee_id, ia.assignee_name, 1\n    FROM issue_assignees ia\n    JOIN scoped_issues si ON si.issue_id = ia.issue_id\n    WHERE ia.assignee_id LIKE 'gitlab:%'\n    UNION\n    SELECT i.assignee_id, i.assignee_name, 1\n    FROM issues i\n    JOIN scoped_issues si ON si.issue_id = i.id\n    WHERE i.assignee_id LIKE 'gitlab:%'\n      AND i.assignee_id NOT LIKE 'gitlab:GitlabAccount:%:0'\n  )\n  -- assignees with no account row keep their GitLab username; bots are left out, unless issues are assigned to them\n  SELECT CONCAT(COALESCE(REPLACE(COALESCE(NULLIF(TRIM(REPLACE(a.full_name, _utf8mb4 X'E2808B', '')), ''), NULLIF(TRIM(a.user_name), '')), '-', ' '), REPLACE(NULLIF(TRIM(REPLACE(MAX(sa.fallback_name), _utf8mb4 X'E2808B', '')), ''), '-', ' '), sa.account_id), '--', sa.account_id) AS Name\n  FROM scoped_accounts sa\n  LEFT JOIN accounts a ON a.id = sa.account_id\n  GROUP BY sa.account_id, a.full_name, a.user_name\n  HAVING MAX(sa.assignee) = 1 OR NOT COALESCE(a.user_name, '') REGEXP '^(project|group)_[0-9]+_bot_'\n  UNION ALL\n  SELECT 'Unassigned--unassigned'\n) all_developers\nORDER BY Name",
         "description": "",
         "includeAll": true,
         "label": "Developer",
         "multi": true,
         "name": "developer_id",
         "options": [],
-        "query": "SELECT Name FROM (\n  WITH scoped_repos AS (\n    SELECT r.id\n    FROM repos r\n    WHERE r.id LIKE 'gitlab:%'\n      AND r.deleted = 0\n      AND r.id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n      AND EXISTS (SELECT 1 FROM project_mapping pm\n                   WHERE pm.row_id  = r.id\n                     AND pm.`table` = 'repos'\n                     AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  ),\n  scoped_issues AS (\n    -- gitlab board ids match repo ids\n    SELECT bi.issue_id\n    FROM board_issues bi\n    WHERE bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n      AND EXISTS (SELECT 1 FROM project_mapping pm\n                   WHERE pm.row_id  = bi.board_id\n                     AND pm.`table` = 'boards'\n                     AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  ),\n  scoped_accounts AS (\n    -- MR authors\n    SELECT pr.author_id AS account_id, NULL AS fallback_name, 0 AS assignee\n    FROM pull_requests pr\n    JOIN scoped_repos sr ON sr.id = pr.base_repo_id\n    WHERE pr.author_id LIKE 'gitlab:%'\n    UNION\n    -- MR reviewers and commenters\n    SELECT cmt.account_id, NULL, 0\n    FROM pull_request_comments cmt\n    JOIN pull_requests pr ON pr.id = cmt.pull_request_id\n    JOIN scoped_repos sr  ON sr.id = pr.base_repo_id\n    WHERE cmt.account_id LIKE 'gitlab:%'\n    UNION\n    -- issue assignees, from issue_assignees and issues.assignee_id (the :0 placeholder means unassigned)\n    SELECT ia.assignee_id, ia.assignee_name, 1\n    FROM issue_assignees ia\n    JOIN scoped_issues si ON si.issue_id = ia.issue_id\n    WHERE ia.assignee_id LIKE 'gitlab:%'\n    UNION\n    SELECT i.assignee_id, i.assignee_name, 1\n    FROM issues i\n    JOIN scoped_issues si ON si.issue_id = i.id\n    WHERE i.assignee_id LIKE 'gitlab:%'\n      AND i.assignee_id NOT LIKE 'gitlab:GitlabAccount:%:0'\n  )\n  -- assignees with no account row keep their GitLab username; bots are left out, unless issues are assigned to them\n  SELECT CONCAT(COALESCE(REPLACE(COALESCE(NULLIF(TRIM(REPLACE(a.full_name, _utf8mb4 X'E2808B', '')), ''), NULLIF(TRIM(a.user_name), '')), '-', ' '), REPLACE(NULLIF(TRIM(REPLACE(MAX(sa.fallback_name), _utf8mb4 X'E2808B', '')), ''), '-', ' '), sa.account_id), '--', sa.account_id) AS Name\n  FROM scoped_accounts sa\n  LEFT JOIN accounts a ON a.id = sa.account_id\n  GROUP BY sa.account_id, a.full_name, a.user_name\n  HAVING MAX(sa.assignee) = 1 OR NOT COALESCE(a.user_name, '') LIKE 'project\\_%\\_bot\\_%'\n  UNION ALL\n  SELECT 'Unassigned--unassigned'\n) all_developers\nORDER BY Name",
+        "query": "SELECT Name FROM (\n  WITH scoped_repos AS (\n    SELECT r.id\n    FROM repos r\n    WHERE r.id LIKE 'gitlab:%'\n      AND r.deleted = 0\n      AND r.id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n      AND EXISTS (SELECT 1 FROM project_mapping pm\n                   WHERE pm.row_id  = r.id\n                     AND pm.`table` = 'repos'\n                     AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  ),\n  scoped_issues AS (\n    -- gitlab board ids match repo ids\n    SELECT bi.issue_id\n    FROM board_issues bi\n    WHERE bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n      AND EXISTS (SELECT 1 FROM project_mapping pm\n                   WHERE pm.row_id  = bi.board_id\n                     AND pm.`table` = 'boards'\n                     AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  ),\n  scoped_accounts AS (\n    -- MR authors\n    SELECT pr.author_id AS account_id, NULL AS fallback_name, 0 AS assignee\n    FROM pull_requests pr\n    JOIN scoped_repos sr ON sr.id = pr.base_repo_id\n    WHERE pr.author_id LIKE 'gitlab:%'\n    UNION\n    -- MR reviewers and commenters\n    SELECT cmt.account_id, NULL, 0\n    FROM pull_request_comments cmt\n    JOIN pull_requests pr ON pr.id = cmt.pull_request_id\n    JOIN scoped_repos sr  ON sr.id = pr.base_repo_id\n    WHERE cmt.account_id LIKE 'gitlab:%'\n    UNION\n    -- issue assignees, from issue_assignees and issues.assignee_id (the :0 placeholder means unassigned)\n    SELECT ia.assignee_id, ia.assignee_name, 1\n    FROM issue_assignees ia\n    JOIN scoped_issues si ON si.issue_id = ia.issue_id\n    WHERE ia.assignee_id LIKE 'gitlab:%'\n    UNION\n    SELECT i.assignee_id, i.assignee_name, 1\n    FROM issues i\n    JOIN scoped_issues si ON si.issue_id = i.id\n    WHERE i.assignee_id LIKE 'gitlab:%'\n      AND i.assignee_id NOT LIKE 'gitlab:GitlabAccount:%:0'\n  )\n  -- assignees with no account row keep their GitLab username; bots are left out, unless issues are assigned to them\n  SELECT CONCAT(COALESCE(REPLACE(COALESCE(NULLIF(TRIM(REPLACE(a.full_name, _utf8mb4 X'E2808B', '')), ''), NULLIF(TRIM(a.user_name), '')), '-', ' '), REPLACE(NULLIF(TRIM(REPLACE(MAX(sa.fallback_name), _utf8mb4 X'E2808B', '')), ''), '-', ' '), sa.account_id), '--', sa.account_id) AS Name\n  FROM scoped_accounts sa\n  LEFT JOIN accounts a ON a.id = sa.account_id\n  GROUP BY sa.account_id, a.full_name, a.user_name\n  HAVING MAX(sa.assignee) = 1 OR NOT COALESCE(a.user_name, '') REGEXP '^(project|group)_[0-9]+_bot_'\n  UNION ALL\n  SELECT 'Unassigned--unassigned'\n) all_developers\nORDER BY Name",
         "refresh": 1,
         "regex": "/^(?<text>.*)--(?<value>.*)$/",
-        "type": "query"
+        "type": "query",
+        "allValue": "'__all__'"
+      },
+      {
+        "name": "not_imported_mr",
+        "label": "SQL: MR not imported from GitHub (alias pr)",
+        "type": "constant",
+        "hide": 2,
+        "skipUrlSync": true,
+        "query": "(COALESCE(pr.description, '') NOT LIKE '*Created by%' AND NOT EXISTS (SELECT 1 FROM pull_request_comments ic WHERE ic.pull_request_id = pr.id AND ic.body LIKE '*Created by%') AND NOT (pr.created_date < '2021-07-01' AND EXISTS (SELECT 1 FROM accounts ia WHERE ia.id = pr.author_id AND ia.user_name = 'tayyab-razzaq')))",
+        "current": {
+          "text": "(COALESCE(pr.description, '') NOT LIKE '*Created by%' AND NOT EXISTS (SELECT 1 FROM pull_request_comments ic WHERE ic.pull_request_id = pr.id AND ic.body LIKE '*Created by%') AND NOT (pr.created_date < '2021-07-01' AND EXISTS (SELECT 1 FROM accounts ia WHERE ia.id = pr.author_id AND ia.user_name = 'tayyab-razzaq')))",
+          "value": "(COALESCE(pr.description, '') NOT LIKE '*Created by%' AND NOT EXISTS (SELECT 1 FROM pull_request_comments ic WHERE ic.pull_request_id = pr.id AND ic.body LIKE '*Created by%') AND NOT (pr.created_date < '2021-07-01' AND EXISTS (SELECT 1 FROM accounts ia WHERE ia.id = pr.author_id AND ia.user_name = 'tayyab-razzaq')))"
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "(COALESCE(pr.description, '') NOT LIKE '*Created by%' AND NOT EXISTS (SELECT 1 FROM pull_request_comments ic WHERE ic.pull_request_id = pr.id AND ic.body LIKE '*Created by%') AND NOT (pr.created_date < '2021-07-01' AND EXISTS (SELECT 1 FROM accounts ia WHERE ia.id = pr.author_id AND ia.user_name = 'tayyab-razzaq')))",
+            "value": "(COALESCE(pr.description, '') NOT LIKE '*Created by%' AND NOT EXISTS (SELECT 1 FROM pull_request_comments ic WHERE ic.pull_request_id = pr.id AND ic.body LIKE '*Created by%') AND NOT (pr.created_date < '2021-07-01' AND EXISTS (SELECT 1 FROM accounts ia WHERE ia.id = pr.author_id AND ia.user_name = 'tayyab-razzaq')))"
+          }
+        ],
+        "description": "Org-specific. An MR counts as imported from GitHub when its description or a comment starts with \"*Created by\", or when the import account (tayyab-razzaq) created it before 2021-07-01. Admins should change the account and date to their own import, or drop that part, and keep this the same on every dashboard that has it."
+      },
+      {
+        "name": "bug_issue",
+        "label": "SQL: issue is a bug (alias i)",
+        "type": "constant",
+        "hide": 2,
+        "skipUrlSync": true,
+        "query": "(i.original_type = 'INCIDENT' OR EXISTS (SELECT 1 FROM issue_labels ilb WHERE ilb.issue_id = i.id AND LOWER(ilb.label_name) IN ('bug', 'minorbug', 'regression issue', 'prod issue', 'qa issues', 'hotfix', 'sentry', 'prod-sentry', 'existing issue', 'data-issue', 'validation-issue', 'logic-issue', 'deployment issues', 'security', 'show-stopper', 'debug')))",
+        "current": {
+          "text": "(i.original_type = 'INCIDENT' OR EXISTS (SELECT 1 FROM issue_labels ilb WHERE ilb.issue_id = i.id AND LOWER(ilb.label_name) IN ('bug', 'minorbug', 'regression issue', 'prod issue', 'qa issues', 'hotfix', 'sentry', 'prod-sentry', 'existing issue', 'data-issue', 'validation-issue', 'logic-issue', 'deployment issues', 'security', 'show-stopper', 'debug')))",
+          "value": "(i.original_type = 'INCIDENT' OR EXISTS (SELECT 1 FROM issue_labels ilb WHERE ilb.issue_id = i.id AND LOWER(ilb.label_name) IN ('bug', 'minorbug', 'regression issue', 'prod issue', 'qa issues', 'hotfix', 'sentry', 'prod-sentry', 'existing issue', 'data-issue', 'validation-issue', 'logic-issue', 'deployment issues', 'security', 'show-stopper', 'debug')))"
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "(i.original_type = 'INCIDENT' OR EXISTS (SELECT 1 FROM issue_labels ilb WHERE ilb.issue_id = i.id AND LOWER(ilb.label_name) IN ('bug', 'minorbug', 'regression issue', 'prod issue', 'qa issues', 'hotfix', 'sentry', 'prod-sentry', 'existing issue', 'data-issue', 'validation-issue', 'logic-issue', 'deployment issues', 'security', 'show-stopper', 'debug')))",
+            "value": "(i.original_type = 'INCIDENT' OR EXISTS (SELECT 1 FROM issue_labels ilb WHERE ilb.issue_id = i.id AND LOWER(ilb.label_name) IN ('bug', 'minorbug', 'regression issue', 'prod issue', 'qa issues', 'hotfix', 'sentry', 'prod-sentry', 'existing issue', 'data-issue', 'validation-issue', 'logic-issue', 'deployment issues', 'security', 'show-stopper', 'debug')))"
+          }
+        ],
+        "description": "Org-specific. An issue is a bug when its type is INCIDENT or it has one of these labels. Admins should edit the label list to their own bug labels (e.g. type::bug) and keep it the same on every dashboard that has it."
+      },
+      {
+        "name": "in_progress_issue",
+        "label": "SQL: open issue is in progress (alias i)",
+        "type": "constant",
+        "hide": 2,
+        "skipUrlSync": true,
+        "query": "(EXISTS (SELECT 1 FROM issue_labels ilp WHERE ilp.issue_id = i.id AND LOWER(ilp.label_name) IN ('in progress', 'in review', 'in qa', 'ready to be merged (approved)', 'ready for deployment')))",
+        "current": {
+          "text": "(EXISTS (SELECT 1 FROM issue_labels ilp WHERE ilp.issue_id = i.id AND LOWER(ilp.label_name) IN ('in progress', 'in review', 'in qa', 'ready to be merged (approved)', 'ready for deployment')))",
+          "value": "(EXISTS (SELECT 1 FROM issue_labels ilp WHERE ilp.issue_id = i.id AND LOWER(ilp.label_name) IN ('in progress', 'in review', 'in qa', 'ready to be merged (approved)', 'ready for deployment')))"
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "(EXISTS (SELECT 1 FROM issue_labels ilp WHERE ilp.issue_id = i.id AND LOWER(ilp.label_name) IN ('in progress', 'in review', 'in qa', 'ready to be merged (approved)', 'ready for deployment')))",
+            "value": "(EXISTS (SELECT 1 FROM issue_labels ilp WHERE ilp.issue_id = i.id AND LOWER(ilp.label_name) IN ('in progress', 'in review', 'in qa', 'ready to be merged (approved)', 'ready for deployment')))"
+          }
+        ],
+        "description": "Org-specific. An open issue is In Progress when it has one of these labels (GitLab issues are only open or closed). Admins should edit the list to their own workflow labels (e.g. workflow::in progress) and keep it the same on every dashboard that has it."
       }
     ]
   },
@@ -2680,6 +3095,5 @@
   "timezone": "utc",
   "title": "A. GitLab High Level Summary",
   "uid": "gitlab-a-high-level-summary",
-  "version": 1,
-  "description": "GitLab shell from US-13; panels are implemented in US-14."
+  "version": 1
 }
