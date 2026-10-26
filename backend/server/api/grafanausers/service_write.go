@@ -24,6 +24,7 @@ import (
 	"net/mail"
 	"sort"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/apache/incubator-devlake/core/errors"
@@ -135,7 +136,27 @@ func checkPasswordRule(password string) errors.Error {
 	if len(password) > passwordMaximumBytes {
 		return errors.BadInput.New(fmt.Sprintf("password must be at most %d bytes", passwordMaximumBytes))
 	}
+	if !hasEveryPasswordClass(password) {
+		return codedError(errors.BadInput, "password must include an uppercase letter, a lowercase letter, a digit and a symbol", ErrCodePasswordWeak)
+	}
 	return nil
+}
+
+func hasEveryPasswordClass(password string) bool {
+	var upper, lower, digit, symbol bool
+	for _, r := range password {
+		switch {
+		case unicode.IsUpper(r):
+			upper = true
+		case unicode.IsLower(r):
+			lower = true
+		case unicode.IsNumber(r):
+			digit = true
+		case !unicode.IsLetter(r):
+			symbol = true
+		}
+	}
+	return upper && lower && digit && symbol
 }
 
 // validateProjects de-duplicates the names and rejects unknown ones.

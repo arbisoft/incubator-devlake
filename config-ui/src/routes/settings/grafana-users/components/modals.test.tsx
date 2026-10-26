@@ -56,7 +56,7 @@ const projectList = vi.mocked(API.project.list);
 const ORPHAN_EMAIL = 'gone@example.com';
 const MODAL_SELECTOR = '.ant-modal';
 const project = (name: string): IProject => ({ name, description: '', blueprint: null, metrics: [] });
-const PASSWORD = 'a-long-enough-password';
+const PASSWORD = 'A-long-enough-passw0rd';
 
 const TemporaryPasswordHarness = () => {
   const [open, setOpen] = useState(true);

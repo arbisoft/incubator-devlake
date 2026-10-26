@@ -22,7 +22,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GRAFANA_ERROR_CODE } from '@/api/grafana-users/constants';
 
-import { COPY, PASSWORD_MIN_LENGTH } from '../constants';
+import { COPY } from '../constants';
 
 import {
   cleanupAddUserMocks,
@@ -55,9 +55,9 @@ describe('AddUserModal initial form', () => {
     fireEvent.click(submit(COPY.add.submit));
     expect(grafana.createUser).not.toHaveBeenCalled();
 
-    fillAdd({ password: 'x'.repeat(PASSWORD_MIN_LENGTH - 1) });
+    fillAdd({ password: 'Abcdefghijkl1!' });
     expect(submit(COPY.add.submit).getAttribute(ARIA_DISABLED_ATTRIBUTE)).toBe(ARIA_DISABLED_VALUE.TRUE);
-    fillAdd({ password: 'x'.repeat(PASSWORD_MIN_LENGTH) });
+    fillAdd({ password: 'Abcdefghijklm1!' });
     expect(submit(COPY.add.submit).getAttribute(ARIA_DISABLED_ATTRIBUTE)).toBe(ARIA_DISABLED_VALUE.FALSE);
     await waitFor(() => expect(projectList).toHaveBeenCalled());
   });

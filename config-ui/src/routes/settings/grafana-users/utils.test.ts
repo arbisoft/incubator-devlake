@@ -22,13 +22,7 @@ import { ACCESS_ROLE, ACCESS_STATUS, type AccessUser } from '@/api/access';
 import { GRAFANA_ERROR_CODE, GRAFANA_ROLE } from '@/api/grafana-users/constants';
 import type { GrafanaUser } from '@/api/grafana-users/types';
 
-import {
-  COPY,
-  GENERATED_PASSWORD_LENGTH,
-  GRAFANA_MENU_ACTION,
-  PASSWORD_ALPHABET,
-  PASSWORD_MIN_LENGTH,
-} from './constants';
+import { COPY, GENERATED_PASSWORD_LENGTH, GRAFANA_MENU_ACTION, PASSWORD_ALPHABET } from './constants';
 import {
   buildCreateBody,
   buildDetailsPatch,
@@ -41,6 +35,7 @@ import {
   hasPatchChanges,
   isUserNotFoundError,
   isValidNewUser,
+  isValidPassword,
   toDevlakeUserOption,
   toGrafanaListParams,
   toUserStatus,
@@ -118,6 +113,11 @@ describe('generatePassword', () => {
     expect(GENERATED_PASSWORD_LENGTH).toBe(24);
     expect([...password].every((char) => PASSWORD_ALPHABET.includes(char)) === true).toBeTruthy();
     expect(PASSWORD_ALPHABET).not.toMatch(/[0O1lI]/);
+    expect(PASSWORD_ALPHABET).not.toMatch(/['"\\ ]/);
+  });
+
+  it('always meets the password rule', () => {
+    for (let i = 0; i < 200; i++) expect(isValidPassword(generatePassword())).toBe(true);
   });
 
   it('draws from crypto.getRandomValues and rejects values that would skew the choice', () => {
@@ -130,11 +130,11 @@ describe('generatePassword', () => {
     const spy = vi
       .spyOn(crypto, 'getRandomValues')
       .mockImplementationOnce(fillWith(2 ** 32 - 1))
-      .mockImplementationOnce(fillWith(0));
-    const password = generatePassword(4, 'abc');
-    expect(spy).toHaveBeenCalledTimes(2);
+      .mockImplementation(fillWith(0));
+    const password = generatePassword(4);
+    expect(spy).toHaveBeenCalledTimes(8);
     spy.mockRestore();
-    expect(password).toBe('aaaa');
+    expect(password).toBe('a2!A');
   });
 
   it('gives a different password each time', () => {
@@ -143,13 +143,20 @@ describe('generatePassword', () => {
 });
 
 describe('isValidNewUser', () => {
-  const valid = { email: EMAIL, name: 'Ann', password: 'x'.repeat(PASSWORD_MIN_LENGTH) };
+  const valid = { email: EMAIL, name: 'Ann', password: 'Abcdefghijklm1!' };
 
   it('needs a valid email, a name and a long enough password', () => {
     expect(isValidNewUser(valid) === true).toBeTruthy();
     expect(isValidNewUser({ ...valid, email: 'ann' }) === false).toBeTruthy();
     expect(isValidNewUser({ ...valid, name: '  ' }) === false).toBeTruthy();
-    expect(isValidNewUser({ ...valid, password: 'x'.repeat(PASSWORD_MIN_LENGTH - 1) }) === false).toBeTruthy();
+    expect(isValidNewUser({ ...valid, password: 'Abcdefghijkl1!' }) === false).toBeTruthy();
+  });
+
+  it('needs an uppercase letter, a lowercase letter, a digit and a symbol', () => {
+    expect(isValidNewUser({ ...valid, password: 'abcdefghijklm1!' }) === false).toBeTruthy();
+    expect(isValidNewUser({ ...valid, password: 'ABCDEFGHIJKLM1!' }) === false).toBeTruthy();
+    expect(isValidNewUser({ ...valid, password: 'Abcdefghijklmn!' }) === false).toBeTruthy();
+    expect(isValidNewUser({ ...valid, password: 'Abcdefghijklm12' }) === false).toBeTruthy();
   });
 });
 

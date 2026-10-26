@@ -34,6 +34,8 @@ import {
   GRAFANA_ERROR_MAP,
   GRAFANA_MENU_ACTION,
   PASSWORD_ALPHABET,
+  PASSWORD_CHARACTER_CLASSES,
+  PASSWORD_CHARACTER_GROUPS,
   PASSWORD_MIN_LENGTH,
 } from './constants';
 import type { DevlakeUserOption, GrafanaMenuAction, ProjectOption } from './types';
@@ -62,19 +64,28 @@ export const getFlowError = (map: Record<string, string>) => (error: unknown) =>
 const UINT32_RANGE = 2 ** 32;
 
 // Rejection sampling keeps every character equally likely.
-export const generatePassword = (length = GENERATED_PASSWORD_LENGTH, alphabet = PASSWORD_ALPHABET) => {
-  const limit = UINT32_RANGE - (UINT32_RANGE % alphabet.length);
-  let password = '';
-  while (password.length < length) {
-    const draw = crypto.getRandomValues(new Uint32Array(length));
-    for (const value of draw) {
-      if (value < limit && password.length < length) password += alphabet[value % alphabet.length];
-    }
-  }
-  return password;
+const randomIndex = (size: number) => {
+  const limit = UINT32_RANGE - (UINT32_RANGE % size);
+  let value: number;
+  do {
+    [value] = crypto.getRandomValues(new Uint32Array(1));
+  } while (value >= limit);
+  return value % size;
 };
 
-export const isValidPassword = (password: string) => password.length >= PASSWORD_MIN_LENGTH;
+export const generatePassword = (length = GENERATED_PASSWORD_LENGTH) => {
+  const groups = Object.values(PASSWORD_CHARACTER_GROUPS);
+  const chars = groups.map((group) => group[randomIndex(group.length)]);
+  while (chars.length < length) chars.push(PASSWORD_ALPHABET[randomIndex(PASSWORD_ALPHABET.length)]);
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = randomIndex(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join('');
+};
+
+export const isValidPassword = (password: string) =>
+  [...password].length >= PASSWORD_MIN_LENGTH && PASSWORD_CHARACTER_CLASSES.every((pattern) => pattern.test(password));
 
 export const isValidNewUser = ({ email, name, password }: { email: string; name: string; password: string }) =>
   isValidEmail(email) && name.trim() !== '' && isValidPassword(password);

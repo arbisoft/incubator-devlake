@@ -46,8 +46,16 @@ export const GRAFANA_MENU_ACTION = { DETAILS: 'details', PASSWORD: 'password' } 
 
 export const PASSWORD_MIN_LENGTH = 15;
 export const GENERATED_PASSWORD_LENGTH = 24;
-// No 0, O, 1, l or I, so a shared password can be read aloud or typed from a screen.
-export const PASSWORD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+// No 0, O, 1, l or I, and no quotes, backslash or space, so a shared password can be read aloud or typed from a screen.
+export const PASSWORD_CHARACTER_GROUPS = {
+  UPPER: 'ABCDEFGHJKLMNPQRSTUVWXYZ',
+  LOWER: 'abcdefghijkmnopqrstuvwxyz',
+  DIGIT: '23456789',
+  SYMBOL: '!#$%*+-=?@^_',
+} as const;
+export const PASSWORD_ALPHABET = Object.values(PASSWORD_CHARACTER_GROUPS).join('');
+// Same classes as Grafana's password policy; a symbol is anything that is not a letter or digit.
+export const PASSWORD_CHARACTER_CLASSES = [/\p{Lu}/u, /\p{Ll}/u, /\p{N}/u, /[^\p{L}\p{N}]/u] as const;
 
 export const SEARCH_DEBOUNCE_MS = 300;
 export const DEVLAKE_USER_SEARCH_PAGE_SIZE = 25;
@@ -76,6 +84,8 @@ const ERROR_COPY: Record<GrafanaErrorCode, string> = {
     'This account signs in with SSO, so its name, email and password are managed by the identity provider.',
   [GRAFANA_ERROR_CODE.LAST_ADMIN]: 'This is the last Grafana admin. Make someone else an Admin first.',
   [GRAFANA_ERROR_CODE.PASSWORD_TOO_SHORT]: 'The password must be at least 15 characters.',
+  [GRAFANA_ERROR_CODE.PASSWORD_WEAK]:
+    'The password needs an uppercase letter, a lowercase letter, a digit and a symbol.',
   [GRAFANA_ERROR_CODE.PASSWORD_REJECTED]: 'Grafana rejected this password. Try a longer or more varied one.',
   [GRAFANA_ERROR_CODE.PROJECT_NOT_FOUND]: 'One of the selected projects no longer exists. Refresh and try again.',
   [GRAFANA_ERROR_CODE.PARTIAL]: "The account was created, but its role or projects weren't saved. Retry to finish.",
@@ -161,7 +171,7 @@ export const COPY = {
   },
   password: {
     label: 'Password',
-    rule: 'At least 15 characters.',
+    rule: 'At least 15 characters, with an uppercase letter, a lowercase letter, a digit and a symbol.',
     generate: 'Generate',
     copy: 'Copy password',
     oneTime: {

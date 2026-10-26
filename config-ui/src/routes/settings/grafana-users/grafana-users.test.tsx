@@ -175,7 +175,7 @@ describe('GrafanaUsers', () => {
   });
 
   it('shows the one-time password after a password change, then clears it when the dialog closes', async () => {
-    const password = 'a-long-enough-password';
+    const password = 'A-long-enough-passw0rd';
     setup();
     fireEvent.click(await screen.findByRole('button', { name: COPY.actions.moreFor(EMAIL) }));
     fireEvent.click(await screen.findByText(COPY.actions.setPassword));

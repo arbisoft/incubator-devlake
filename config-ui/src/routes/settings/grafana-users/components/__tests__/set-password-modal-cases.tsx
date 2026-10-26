@@ -31,7 +31,8 @@ import { SetPasswordModal } from '../set-password-modal';
 import { expectPasswordRetained, makePasswordError, waitForPasswordFormReady } from './password-error';
 
 const EMAIL = 'ann@example.com';
-const PASSWORD = 'a-long-enough-password';
+const PASSWORD = 'A-long-enough-passw0rd';
+const ARIA_DISABLED = 'aria-disabled';
 const ARIA_TRUE = 'true';
 const grafana = vi.mocked(API.grafanaUsers);
 const user = (): GrafanaUser => ({
@@ -57,11 +58,17 @@ const submitPassword = (password: string) => {
 };
 
 describe('SetPasswordModal', () => {
+  it('keeps submit disabled for a long password missing a character class', () => {
+    renderWithTheme(<SetPasswordModal open user={user()} {...callbacks()} />);
+    typePassword('abcdefghijklmnopq');
+    expect(submit().getAttribute(ARIA_DISABLED)).toBe(ARIA_TRUE);
+  });
+
   it('needs a long enough password, then sets it and hands it to the one-time dialog', async () => {
     const props = callbacks();
     renderWithTheme(<SetPasswordModal open user={user()} {...props} />);
     typePassword('short');
-    expect(submit().getAttribute('aria-disabled')).toBe(ARIA_TRUE);
+    expect(submit().getAttribute(ARIA_DISABLED)).toBe(ARIA_TRUE);
     fireEvent.click(submit());
     expect(grafana.setPassword).not.toHaveBeenCalled();
 
@@ -90,7 +97,7 @@ describe('SetPasswordModal', () => {
     expectPasswordRetained(password, PASSWORD);
     expect(props.onClose).not.toHaveBeenCalled();
 
-    await waitFor(() => expect(submit().getAttribute('aria-disabled')).not.toBe(ARIA_TRUE));
+    await waitFor(() => expect(submit().getAttribute(ARIA_DISABLED)).not.toBe(ARIA_TRUE));
     await waitForPasswordFormReady(submit());
     fireEvent.click(submit());
     await waitFor(() => expect(props.onPassword).toHaveBeenCalledOnce());

@@ -27,7 +27,7 @@ vi.mock('@/utils', () => ({ request: vi.fn().mockResolvedValue(undefined) }));
 const requestMock = vi.mocked(request);
 const { signal } = new AbortController();
 const EMAIL = 'ann@example.com';
-const PASSWORD = 'a-long-enough-password';
+const PASSWORD = 'A-long-enough-passw0rd';
 
 describe('grafana users API', () => {
   beforeEach(() => requestMock.mockClear());

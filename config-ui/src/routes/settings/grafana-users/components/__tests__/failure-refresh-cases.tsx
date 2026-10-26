@@ -31,7 +31,7 @@ import { callbacks, expectRejectedAndKept, submit, type, USER_NOT_FOUND_ERROR, u
 import { waitForPasswordFormReady } from './password-error';
 
 const grafana = vi.mocked(API.grafanaUsers);
-const PASSWORD = 'a-long-enough-password';
+const PASSWORD = 'A-long-enough-passw0rd';
 const EDITED_NAME = 'Anna';
 const SELECTED_ITEM = '.ant-select-selection-item-content';
 
