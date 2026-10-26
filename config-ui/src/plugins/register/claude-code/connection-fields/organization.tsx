@@ -16,51 +16,31 @@
  *
  */
 
-import { Input } from 'antd';
-import { useEffect, useMemo, type ChangeEvent } from 'react';
+import { IdentityField } from '@/plugins/components/connection-form/fields/identity-field';
+import type { ConnectionFieldRenderProps } from '@/types';
 
-import { Block } from '@/components';
+import type { ClaudeCodeConnectionValues } from '../types';
 
-import * as S from './styled';
+type Props = Pick<
+  ConnectionFieldRenderProps<ClaudeCodeConnectionValues>,
+  'type' | 'initialValues' | 'values' | 'setValues' | 'setErrors'
+>;
 
-interface Props {
-  type: 'create' | 'update';
-  initialValues: any;
-  values: any;
-  setValues: (value: any) => void;
-  setErrors: (value: any) => void;
-}
+const validate = (values: ClaudeCodeConnectionValues) =>
+  values.organization?.trim() ? '' : 'Anthropic Organization ID is required';
 
-export const Organization = ({ type, initialValues, values, setValues, setErrors }: Props) => {
-  useEffect(() => {
-    setValues({ organization: initialValues.organization ?? '' });
-  }, [initialValues.organization]);
-
-  const error = useMemo(() => {
-    return values.organization?.trim() ? '' : 'Anthropic Organization ID is required';
-  }, [values.organization]);
-
-  useEffect(() => {
-    setErrors({ organization: error });
-  }, [error]);
-
-  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setValues({ organization: e.target.value });
-  };
-
-  return (
-    <Block
-      title="Anthropic Organization"
-      description="Enter the Anthropic organization from your Anthropic admin settings. DevLake uses it to scope Claude Code usage reporting."
-      required
-    >
-      <Input
-        placeholder="e.g. org_123456789"
-        status={error ? 'error' : ''}
-        value={values.organization ?? ''}
-        onChange={handleChange}
-      />
-      {error && <S.ErrorText>{error}</S.ErrorText>}
-    </Block>
-  );
-};
+export const Organization = ({ initialValues, values, setValues, setErrors }: Props) => (
+  <IdentityField<ClaudeCodeConnectionValues>
+    fieldKey="organization"
+    errorKey="organization"
+    title="Anthropic Organization"
+    description="Enter the Anthropic organization from your Anthropic admin settings. DevLake uses it to scope Claude Code usage reporting."
+    placeholder="e.g. org_123456789"
+    required
+    validate={validate}
+    initialValues={initialValues}
+    values={values}
+    setValues={setValues}
+    setErrors={setErrors}
+  />
+);

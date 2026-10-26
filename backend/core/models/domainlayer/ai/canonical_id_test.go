@@ -51,6 +51,7 @@ func TestCanonicalIDsAreStable(t *testing.T) {
 		{CanonicalKey{IDKindToolDecision, "claude", "org", []string{"acct:user_1", day, "Edit"}}, "ai:tool_decision:8e7b0334781fd9933ffcbf9d1c18eac50565d9a87a7a69994e8593e6b56f7446"},
 		{CanonicalKey{IDKindPrompt, "claude", "org", []string{"p1"}}, "ai:prompt:68348a1d4f972e89b9616c34bcfa999d1e395e44c1740e7ac3439a35e189ec3a"},
 		{CanonicalKey{IDKindPromptSkill, "claude", "org", []string{"p1", "code-review"}}, "ai:prompt_skill:5eeafb7dd9b45af2bf5dc4c6bcc7c45ddfb2615c2aba8f0addc211a79364bd99"},
+		{CanonicalKey{IDKindPromptFailure, "claude", "org", []string{"p1", "0a1b2c"}}, "ai:prompt_failure:bb04f75f6bd4f65dedd7bafd1d6b2cd0669f86af58c114869cdd2d7058cc1e34"},
 		{CanonicalKey{IDKindPermissionModeChange, "claude", "org", []string{"sess-1", changedAt, "default", "plan"}}, "ai:permission_mode_change:01e42eb011fa31c6ee416aadcf7b08277010ce76ea6656ab808f37b7454a61e5"},
 	}
 	for _, test := range tests {

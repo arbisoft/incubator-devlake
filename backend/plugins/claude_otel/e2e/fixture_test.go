@@ -20,6 +20,8 @@ package e2e
 import (
 	"crypto/sha256"
 	"strconv"
+	"strings"
+	"testing"
 	"time"
 
 	"github.com/apache/incubator-devlake/core/models/common"
@@ -65,6 +67,22 @@ func (a actor) userKey() string   { return "acct:" + a.accountID() }
 
 // logUserKey is the key log events carry, since they send no user.account_id.
 func (a actor) logUserKey() string { return "uuid:uuid-" + a.name }
+
+// promptIDPrefix starts the prompt.id of every log resource the actor sends.
+func (a actor) promptIDPrefix() string { return "p-" + a.team + "-" + a.name + "-" }
+
+// promptID is the prompt.id the actor's log resource for the seed carries.
+func (a actor) promptID(seed int) string { return a.promptIDPrefix() + strconv.Itoa(seed) }
+
+// promptSeed is the seed of the actor's log resource that carried promptID.
+func (a actor) promptSeed(t *testing.T, promptID string) int {
+	t.Helper()
+	suffix, found := strings.CutPrefix(promptID, a.promptIDPrefix())
+	require.True(t, found, "prompt %s is not %s's", promptID, a.name)
+	seed, err := strconv.Atoi(suffix)
+	require.NoError(t, err, promptID)
+	return seed
+}
 
 var (
 	a1      = actor{"alpha1", "alpha", orgR, 1}
@@ -243,6 +261,12 @@ func (w *world) slot(day time.Time, batchIdx int) time.Time {
 	return day.Add(time.Duration(hours[batchIdx])*time.Hour + time.Duration(minutes[batchIdx])*time.Minute)
 }
 
+// resourceSeed is the seed seedBatches and seedLogBatches give an actor's resource in one
+// day's batch.
+func resourceSeed(who actor, dayIdx, batchIdx int) int {
+	return who.idx*37 + dayIdx*11 + batchIdx*3 + 1
+}
+
 // seedBatches stores three mixed-team batches for each of the given days.
 func (w *world) seedBatches(layout [][]actor, days ...time.Time) []*models.OtelMetricBatch {
 	batches := make([]*models.OtelMetricBatch, 0, len(days)*len(layout))
@@ -251,7 +275,7 @@ func (w *world) seedBatches(layout [][]actor, days ...time.Time) []*models.OtelM
 			specs := make([]resourceSpec, 0, len(actors))
 			for resIdx, who := range actors {
 				at := w.slot(day, batchIdx).Add(time.Duration(resIdx) * 20 * time.Second)
-				specs = append(specs, resourceSpec{who: who, at: at, seed: who.idx*37 + dayIdx*11 + batchIdx*3 + 1})
+				specs = append(specs, resourceSpec{who: who, at: at, seed: resourceSeed(who, dayIdx, batchIdx)})
 			}
 			batches = append(batches, w.insertBatch(specs))
 		}
@@ -267,11 +291,52 @@ func doubleAttr(key string, value float64) *commonv1.KeyValue {
 	return &commonv1.KeyValue{Key: key, Value: &commonv1.AnyValue{Value: &commonv1.AnyValue_DoubleValue{DoubleValue: value}}}
 }
 
-// logResource builds one Claude Code client's log export for a session: a prompt, its API request, a tool decision and result, and the response.
+// fxMainThreadQuerySource is the query_source of the conversation's own API requests.
+const fxMainThreadQuerySource = "repl_main_thread"
+
+// fxHasMainThreadRequest reports whether the seed's prompt makes a main-thread API request
+// besides its background one.
+func fxHasMainThreadRequest(seed int) bool { return seed%2 == 0 }
+
+// fxMainThreadFirst reports whether the seed's main-thread request comes before its
+// background one. Both orders are sent, so neither the first nor the last request's effort
+// matches the main-thread effort for every prompt.
+func fxMainThreadFirst(seed int) bool { return seed%4 == 0 }
+
+// fxHasEffort reports whether the seed's API requests report an effort. A prompt whose
+// requests report none converts to a NULL effort.
+func fxHasEffort(seed int) bool { return seed%5 != 1 }
+
+// fxHasAPIError reports whether the seed's prompt reports an api_error.
+func fxHasAPIError(seed int) bool { return seed%3 == 0 }
+
+// fxHasToolError reports whether the seed's tool call fails.
+func fxHasToolError(seed int) bool { return seed%2 == 1 }
+
+// fxMainThreadEffort is the effort of the seed's main-thread request, which differs from
+// its background request's.
+func fxMainThreadEffort(seed int) string { return fxEfforts[(seed+1)%len(fxEfforts)] }
+
+// fxPromptEffort is the effort the seed's prompt converts to: the main-thread request's
+// when it makes one, otherwise its only request's, and "" when its requests report none.
+func fxPromptEffort(seed int) string {
+	if !fxHasEffort(seed) {
+		return ""
+	}
+	if fxHasMainThreadRequest(seed) {
+		return fxMainThreadEffort(seed)
+	}
+	return fxEfforts[seed%len(fxEfforts)]
+}
+
+// logResource builds one Claude Code client's log export for a session: a prompt, its API
+// requests and errors, a tool decision and result, and the response. See the fxHas* helpers
+// for which seeds add a main-thread request, an api_error or a failed tool call, and
+// fxMainThreadFirst for the order of the API requests.
 func (a actor) logResource(at time.Time, seed int) *logsv1.ResourceLogs {
 	session := "sess-" + a.team + "-" + a.name + "-" + strconv.Itoa(seed)
-	prompt := "p-" + a.team + "-" + a.name + "-" + strconv.Itoa(seed)
-	model, query := fxModels[seed%len(fxModels)], fxQueries[seed%len(fxQueries)]
+	prompt := a.promptID(seed)
+	model, query, effort := fxModels[seed%len(fxModels)], fxQueries[seed%len(fxQueries)], fxEfforts[seed%len(fxEfforts)]
 	tool := fxTools[seed%len(fxTools)]
 	toolUse := "tu-" + strconv.Itoa(seed)
 	sequence := int64(0)
@@ -293,14 +358,42 @@ func (a actor) logResource(at time.Time, seed int) *logsv1.ResourceLogs {
 		return &logsv1.LogRecord{Body: &commonv1.AnyValue{Value: &commonv1.AnyValue_StringValue{StringValue: "claude_code." + name}}, Attributes: withAttrs(base, extra...)}
 	}
 	f := int64(seed)
+	withEffort := func(effort string, attrs ...*commonv1.KeyValue) []*commonv1.KeyValue {
+		if fxHasEffort(seed) {
+			attrs = append(attrs, strAttr("effort", effort))
+		}
+		return attrs
+	}
+	backgroundRequest := func() *logsv1.LogRecord {
+		return record("api_request", withEffort(effort, strAttr("model", model), intAttr("input_tokens", f*113), intAttr("output_tokens", f*29+7), intAttr("cache_read_tokens", f*457),
+			intAttr("cache_creation_tokens", f*61+3), doubleAttr("cost_usd", float64(seed)*0.0125+0.0003), intAttr("duration_ms", 900+f*7), strAttr("query_source", query), strAttr("request_id", "req-"+strconv.Itoa(seed)))...)
+	}
+	mainThreadRequest := func() *logsv1.LogRecord {
+		return record("api_request", withEffort(fxMainThreadEffort(seed), strAttr("model", model), intAttr("input_tokens", f*17), intAttr("output_tokens", f*5+3), intAttr("cache_read_tokens", f*71),
+			intAttr("cache_creation_tokens", f*9+1), doubleAttr("cost_usd", float64(seed)*0.002+0.0001), intAttr("duration_ms", 600+f*3), strAttr("query_source", fxMainThreadQuerySource),
+			strAttr("request_id", "req-main-"+strconv.Itoa(seed)))...)
+	}
 	records := []*logsv1.LogRecord{
 		record("user_prompt", intAttr("prompt_length", 20+f%50), strAttr("prompt_text", "synthetic prompt "+strconv.Itoa(seed))),
-		record("api_request", strAttr("model", model), intAttr("input_tokens", f*113), intAttr("output_tokens", f*29+7), intAttr("cache_read_tokens", f*457),
-			intAttr("cache_creation_tokens", f*61+3), doubleAttr("cost_usd", float64(seed)*0.0125+0.0003), intAttr("duration_ms", 900+f*7), strAttr("query_source", query), strAttr("request_id", "req-"+strconv.Itoa(seed))),
-		record("tool_decision", strAttr("tool_name", tool), strAttr("tool_use_id", toolUse), strAttr("decision", []string{"accept", "reject"}[seed%2]), strAttr("source", fxSources[seed%len(fxSources)])),
-		record("tool_result", strAttr("tool_name", tool), strAttr("tool_use_id", toolUse), strAttr("success", []string{"true", "false"}[seed%2]), intAttr("duration_ms", 10+f)),
-		record("assistant_response", intAttr("response_length", 100+f*3), strAttr("model", model)),
 	}
+	// record numbers events in the order it is called, so the requests are built in send order.
+	switch {
+	case fxHasMainThreadRequest(seed) && fxMainThreadFirst(seed):
+		records = append(records, mainThreadRequest(), backgroundRequest())
+	case fxHasMainThreadRequest(seed):
+		records = append(records, backgroundRequest(), mainThreadRequest())
+	default:
+		records = append(records, backgroundRequest())
+	}
+	if fxHasAPIError(seed) {
+		records = append(records, record("api_error", strAttr("model", model), strAttr("error", "overloaded"), intAttr("status_code", 529), intAttr("attempt", 1),
+			intAttr("duration_ms", 2000+f), strAttr("query_source", query)))
+	}
+	records = append(records,
+		record("tool_decision", strAttr("tool_name", tool), strAttr("tool_use_id", toolUse), strAttr("decision", []string{"accept", "reject"}[seed%2]), strAttr("source", fxSources[seed%len(fxSources)])),
+		record("tool_result", strAttr("tool_name", tool), strAttr("tool_use_id", toolUse), strAttr("success", strconv.FormatBool(!fxHasToolError(seed))), intAttr("duration_ms", 10+f)),
+		record("assistant_response", intAttr("response_length", 100+f*3), strAttr("model", model)),
+	)
 	return &logsv1.ResourceLogs{
 		Resource: &resourcev1.Resource{Attributes: []*commonv1.KeyValue{
 			strAttr("service.name", "claude-code"),
@@ -357,6 +450,35 @@ func (w *world) insertLogBatch(specs []resourceSpec) *models.OtelLogBatch {
 	return batch
 }
 
+// logExpectation is what an actor set's seeded log resources should convert to.
+type logExpectation struct {
+	events, toolErrors, apiErrors int
+}
+
+// expectLogs tallies the events and failures of the resources seedLogBatches stores over
+// the given number of days for the actors include accepts.
+func expectLogs(layout [][]actor, days int, include func(actor) bool) logExpectation {
+	var want logExpectation
+	for dayIdx := 0; dayIdx < days; dayIdx++ {
+		for batchIdx, actors := range layout {
+			for _, who := range actors {
+				if !include(who) {
+					continue
+				}
+				seed := resourceSeed(who, dayIdx, batchIdx)
+				want.events += len(who.logResource(time.Time{}, seed).ScopeLogs[0].LogRecords)
+				if fxHasToolError(seed) {
+					want.toolErrors++
+				}
+				if fxHasAPIError(seed) {
+					want.apiErrors++
+				}
+			}
+		}
+	}
+	return want
+}
+
 // seedLogBatches stores one mixed-team log batch per layout entry for each of the given days.
 func (w *world) seedLogBatches(layout [][]actor, days ...time.Time) []*models.OtelLogBatch {
 	batches := make([]*models.OtelLogBatch, 0, len(days)*len(layout))
@@ -365,7 +487,7 @@ func (w *world) seedLogBatches(layout [][]actor, days ...time.Time) []*models.Ot
 			specs := make([]resourceSpec, 0, len(actors))
 			for resIdx, who := range actors {
 				at := w.slot(day, batchIdx).Add(time.Duration(resIdx) * 20 * time.Second)
-				specs = append(specs, resourceSpec{who: who, at: at, seed: who.idx*37 + dayIdx*11 + batchIdx*3 + 1})
+				specs = append(specs, resourceSpec{who: who, at: at, seed: resourceSeed(who, dayIdx, batchIdx)})
 			}
 			batches = append(batches, w.insertLogBatch(specs))
 		}

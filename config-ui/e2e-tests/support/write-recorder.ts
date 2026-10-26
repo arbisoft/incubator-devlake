@@ -58,6 +58,11 @@ const isKeyedObject = (item: unknown): item is Record<string, unknown> =>
   typeof item === 'object' &&
   typeof (item as Record<string, unknown>)[GOLDEN_UNORDERED_BY_KEY] === 'string';
 
+const compareText = (a: string, b: string): number => {
+  if (a < b) return -1;
+  return a > b ? 1 : 0;
+};
+
 function sortUnordered(items: unknown[]): unknown[] {
   if (items.length === 0 || !items.every(isKeyedObject)) {
     return items;
@@ -66,7 +71,7 @@ function sortUnordered(items: unknown[]): unknown[] {
     `${String(item[GOLDEN_UNORDERED_BY_KEY])}|${JSON.stringify(item)}`;
   return [...items].sort((a, b) => {
     const [keyA, keyB] = [sortKey(a as Record<string, unknown>), sortKey(b as Record<string, unknown>)];
-    return keyA < keyB ? -1 : keyA > keyB ? 1 : 0;
+    return compareText(keyA, keyB);
   });
 }
 
@@ -83,7 +88,7 @@ function normaliseValue(value: unknown, key?: string): unknown {
   if (value !== null && typeof value === 'object') {
     return Object.fromEntries(
       Object.entries(value)
-        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .sort(([a], [b]) => compareText(a, b))
         .map(([k, v]) => [k, normaliseValue(v, k)]),
     );
   }

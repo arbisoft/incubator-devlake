@@ -16,10 +16,12 @@
  *
  */
 
-import styled from 'styled-components';
-
-export const ErrorText = styled.div`
-  margin-top: ${({ theme }) => theme.space.xxs}px;
-  color: ${({ theme }) => theme.colors.error};
-  font-size: ${({ theme }) => theme.typography.scale.caption.fontSize}px;
-`;
+export type QDevConnectionValues = {
+  authType?: 'access_key' | 'iam_role';
+  accessKeyId?: string;
+  secretAccessKey?: string;
+  region?: string;
+  bucket?: string;
+  identityStoreId?: string;
+  identityStoreRegion?: string;
+};

@@ -45,7 +45,7 @@ interface Props {
   proxy: string;
   initialValue: string;
   value: string;
-  error: string;
+  error: unknown;
   setValue: (value: string) => void;
   setError: (error?: string) => void;
 }

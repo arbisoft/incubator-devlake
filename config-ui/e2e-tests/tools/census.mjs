@@ -113,6 +113,18 @@ function bindingNames(name, into) {
   else name.elements.forEach((el) => !ts.isOmittedExpression(el) && bindingNames(el.name, into));
 }
 
+const objectMemberExpr = (p) => {
+  if (ts.isPropertyAssignment(p)) return p.initializer;
+  return ts.isShorthandPropertyAssignment(p) ? p.name : p;
+};
+
+function isBackendCall(node, ctx) {
+  const callee = unwrap(node.expression);
+  if (PURE_GLOBAL_CALLEES.test(callee.getText())) return node.arguments.some((n) => isBackendValue(n, ctx));
+  if (ts.isIdentifier(callee)) return ctx.backendNames.has(callee.text);
+  return ts.isPropertyAccessExpression(callee) && isBackendValue(callee.expression, ctx);
+}
+
 // True when the expression's value is derived from a backend read (see the header for the rule).
 function isBackendValue(expr, ctx) {
   const node = unwrap(expr);
@@ -120,25 +132,14 @@ function isBackendValue(expr, ctx) {
   if (ts.isIdentifier(node)) return ctx.backendNames.has(node.text) || ctx.tainted.has(node.text);
   if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node))
     return isBackendValue(node.expression, ctx);
-  if (ts.isCallExpression(node)) {
-    const callee = unwrap(node.expression);
-    if (PURE_GLOBAL_CALLEES.test(callee.getText())) return any(node.arguments);
-    if (ts.isIdentifier(callee)) return ctx.backendNames.has(callee.text);
-    return ts.isPropertyAccessExpression(callee) && isBackendValue(callee.expression, ctx);
-  }
+  if (ts.isCallExpression(node)) return isBackendCall(node, ctx);
   if (ts.isNewExpression(node)) return node.expression.getText() === 'Date' && any(node.arguments ?? []);
   if (ts.isBinaryExpression(node)) return any([node.left, node.right]);
   if (ts.isPrefixUnaryExpression(node)) return isBackendValue(node.operand, ctx);
   if (ts.isConditionalExpression(node)) return any([node.whenTrue, node.whenFalse]);
   if (ts.isTemplateExpression(node)) return any(node.templateSpans.map((span) => span.expression));
   if (ts.isArrayLiteralExpression(node)) return any(node.elements);
-  if (ts.isObjectLiteralExpression(node)) {
-    return any(
-      node.properties.map((p) =>
-        ts.isPropertyAssignment(p) ? p.initializer : ts.isShorthandPropertyAssignment(p) ? p.name : p,
-      ),
-    );
-  }
+  if (ts.isObjectLiteralExpression(node)) return any(node.properties.map(objectMemberExpr));
   return false;
 }
 
@@ -258,26 +259,29 @@ function buildGroups(baselineSpecs, currentSpecs, moves) {
   return [...groups.values()].map((names) => [...names].sort());
 }
 
+function compareGroup(names, baseline, current) {
+  const inBaseline = names.some((n) => baseline.specs[n]);
+  const label = names.length === 1 ? names[0] : names.join(' + ');
+  if (inBaseline && names.length === 1 && !current[names[0]]) {
+    return [`${label}: spec missing (add it to "moves" if it was renamed or split)`];
+  }
+  if (!inBaseline) return [];
+  const before = sumCounts(names.map((n) => baseline.specs[n]));
+  const after = sumCounts(names.map((n) => current[n]));
+  return METRICS.filter((m) => (LOWER_IS_BETTER.includes(m) ? after[m] > before[m] : after[m] < before[m])).map(
+    (m) => `${label}: ${m} ${before[m]} -> ${after[m]}`,
+  );
+}
+
 function compare(baseline, current) {
   const moves = baseline.moves ?? {};
-  const violations = [];
-  for (const names of buildGroups(baseline.specs, current, moves)) {
-    const before = sumCounts(names.map((n) => baseline.specs[n]));
-    const inBaseline = names.some((n) => baseline.specs[n]);
-    const after = sumCounts(names.map((n) => current[n]));
-    const label = names.length === 1 ? names[0] : names.join(' + ');
-    if (inBaseline && names.length === 1 && !current[names[0]]) {
-      violations.push(`${label}: spec missing (add it to "moves" if it was renamed or split)`);
-      continue;
-    }
-    if (!inBaseline) continue;
-    for (const m of METRICS) {
-      const worse = LOWER_IS_BETTER.includes(m) ? after[m] > before[m] : after[m] < before[m];
-      if (worse) violations.push(`${label}: ${m} ${before[m]} -> ${after[m]}`);
-    }
-  }
-  return violations;
+  return buildGroups(baseline.specs, current, moves).flatMap((names) => compareGroup(names, baseline, current));
 }
+
+const formatTotals = (specs) => {
+  const base = sumCounts(Object.values(specs));
+  return METRICS.map((m) => `${m}=${base[m]}`).join(' ');
+};
 
 function printTable(specs, baseline) {
   const rows = Object.entries(specs).map(([name, c]) => [name, ...METRICS.map((m) => String(c[m]))]);
@@ -292,10 +296,7 @@ function printTable(specs, baseline) {
     if (i === rows.length - 1) out(widths.map((w) => '-'.repeat(w)).join('  '));
     out(line(row));
   });
-  if (baseline) {
-    const base = sumCounts(Object.values(baseline.specs));
-    out(`baseline totals: ${METRICS.map((m) => `${m}=${base[m]}`).join(' ')}`);
-  }
+  if (baseline) out(`baseline totals: ${formatTotals(baseline.specs)}`);
 }
 
 function collectTests(suite, into) {

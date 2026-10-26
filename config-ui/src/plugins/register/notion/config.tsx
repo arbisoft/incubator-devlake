@@ -16,12 +16,16 @@
  *
  */
 
-import { CopyOutlined } from '@ant-design/icons';
-import { Button, Checkbox, Input, Space, message } from 'antd';
+import { Input } from 'antd';
 
 import { Block } from '@/components/block';
 import Icon from '@/images/plugin-icon.svg?react';
-import { IPluginConfig } from '@/types';
+import { webhookIngestionFields } from '@/plugins/components/connection-form/fields/webhook-ingestion';
+import type { ConnectionFieldRenderProps, IPluginConfig } from '@/types';
+
+import type { NotionConnectionValues } from './types';
+
+type RenderProps = ConnectionFieldRenderProps<NotionConnectionValues>;
 
 export const NotionConfig: IPluginConfig = {
   plugin: 'notion',
@@ -47,7 +51,7 @@ export const NotionConfig: IPluginConfig = {
         key: 'token',
         label: 'Internal Integration Token',
       },
-      ({ values, setValues }: any) => (
+      ({ values, setValues }: RenderProps) => (
         <Block key="workspaceId" title="Workspace ID">
           <Input
             placeholder="Notion workspace ID"
@@ -56,7 +60,7 @@ export const NotionConfig: IPluginConfig = {
           />
         </Block>
       ),
-      ({ values, setValues }: any) => (
+      ({ values, setValues }: RenderProps) => (
         <Block key="apiVersion" title="Notion API Version">
           <Input
             placeholder="2026-03-11"
@@ -65,66 +69,11 @@ export const NotionConfig: IPluginConfig = {
           />
         </Block>
       ),
-      ({ values, setValues, setErrors }: any) => (
-        <Block key="enableWebhook" title="Webhook Ingestion">
-          <Checkbox
-            checked={!!values.enableWebhook}
-            onChange={(e) => {
-              const enabled = e.target.checked;
-              setValues({ enableWebhook: enabled });
-              setErrors({ webhookSharedKey: enabled && !(values.webhookSharedKey ?? '').trim() ? 'required' : '' });
-            }}
-          >
-            Enable webhook ingestion in addition to polling
-          </Checkbox>
-        </Block>
-      ),
-      ({ values, errors, setValues, setErrors }: any) => (
-        <Block
-          key="webhookSharedKey"
-          title="Webhook Shared Key"
-          description="Use Notion webhook verification_token for HMAC signature validation."
-        >
-          <Input.Password
-            placeholder="Notion verification token"
-            value={values.webhookSharedKey ?? ''}
-            status={values.enableWebhook && errors.webhookSharedKey ? 'error' : undefined}
-            onChange={(e) => {
-              setValues({ webhookSharedKey: e.target.value });
-              setErrors({ webhookSharedKey: values.enableWebhook && !e.target.value.trim() ? 'required' : '' });
-            }}
-          />
-          {values.enableWebhook && errors.webhookSharedKey && (
-            <p style={{ color: '#ff4d4f', marginTop: 8 }}>Webhook shared key is required when webhook is enabled.</p>
-          )}
-          {!values.enableWebhook && (
-            <p style={{ marginTop: 8 }}>Turn on webhook ingestion to enforce webhook shared key validation.</p>
-          )}
-        </Block>
-      ),
-      ({ values }: any) => {
-        const webhookUrl = `${window.location.origin}/plugins/notion/connections/{connectionId}/scopes/{scopeId}/webhook`;
-        return (
-          <Block
-            key="webhookUrl"
-            title="Webhook URL Template"
-            description="Replace {connectionId} and {scopeId} after creating connection and scope."
-          >
-            <Space.Compact style={{ width: '100%' }}>
-              <Input readOnly value={webhookUrl} disabled={!values.enableWebhook} />
-              <Button
-                type="text"
-                icon={<CopyOutlined />}
-                disabled={!values.enableWebhook}
-                onClick={() => {
-                  void navigator.clipboard.writeText(webhookUrl);
-                  void message.success('Webhook URL copied.');
-                }}
-              />
-            </Space.Compact>
-          </Block>
-        );
-      },
+      ...webhookIngestionFields({
+        plugin: 'notion',
+        sharedKeyDescription: 'Use Notion webhook verification_token for HMAC signature validation.',
+        sharedKeyPlaceholder: 'Notion verification token',
+      }),
       'proxy',
       {
         key: 'rateLimitPerHour',

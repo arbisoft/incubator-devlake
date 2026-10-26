@@ -16,16 +16,17 @@
  *
  */
 
-import { IWebhookAPI } from '@/types';
+import type { IWebhookAPI, WebhookPayload } from '@/types';
 
 import * as connection from '../../connection';
 
-export const list = (): Promise<IWebhookAPI[]> => connection.list('webhook') as any;
+export const list = (): Promise<IWebhookAPI[]> => connection.list<IWebhookAPI>('webhook');
 
-export const get = (id: ID): Promise<IWebhookAPI> => connection.get('webhook', id) as any;
+export const get = (id: ID): Promise<IWebhookAPI> => connection.get<IWebhookAPI>('webhook', id);
 
-export const create = (payload: any): Promise<IWebhookAPI> => connection.create('webhook', payload) as any;
+export const create = (payload: WebhookPayload): Promise<IWebhookAPI> =>
+  connection.create<IWebhookAPI, WebhookPayload>('webhook', payload);
 
 export const remove = (id: ID) => connection.remove('webhook', id);
 
-export const update = (id: ID, payload: any) => connection.update('webhook', id, payload);
+export const update = (id: ID, payload: WebhookPayload) => connection.update<WebhookPayload>('webhook', id, payload);

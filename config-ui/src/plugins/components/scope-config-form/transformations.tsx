@@ -33,42 +33,36 @@ import { JenkinsTransformation } from '@/plugins/register/jenkins';
 import { JiraTransformation } from '@/plugins/register/jira';
 import { SalesforceTransformation } from '@/plugins/register/salesforce';
 import { TapdTransformation } from '@/plugins/register/tapd';
+import type { TapdTransformationValues } from '@/plugins/register/tapd/types';
 import { YoutrackTransformation } from '@/plugins/register/youtrack';
 
-import type { TransformationProps } from './types';
+import type { TransformationComponent, TransformationProps } from './types';
 
-const base = ({ entities, transformation, setTransformation }: TransformationProps) => ({
-  entities,
-  transformation,
-  setTransformation,
+const TapdRenderer = ({ scopeId, ...props }: TransformationProps<TapdTransformationValues>) =>
+  scopeId ? <TapdTransformation {...props} scopeId={scopeId} /> : null;
+
+// resolved at call time: the plugin modules are still mid-evaluation when this module loads (import cycle)
+const getRenderers = (): Record<string, TransformationComponent> => ({
+  argocd: ArgoCDTransformation,
+  clickup: ClickUpTransformation,
+  azuredevops: AzureTransformation,
+  azuredevops_go: AzureTransformation,
+  bamboo: BambooTransformation,
+  bitbucket: BitbucketTransformation,
+  bitbucket_server: BitbucketServerTransformation,
+  circleci: CircleCITransformation,
+  github: GitHubTransformation,
+  'gh-copilot': GhCopilotTransformation,
+  salesforce: SalesforceTransformation,
+  gitlab: GitLabTransformation,
+  jenkins: JenkinsTransformation,
+  jira: JiraTransformation,
+  asana: AsanaTransformation,
+  tapd: TapdRenderer,
+  youtrack: YoutrackTransformation,
 });
 
-const azure = (props: TransformationProps) => <AzureTransformation {...base(props)} />;
-
-const RENDERERS: Record<string, (props: TransformationProps) => ReactNode> = {
-  argocd: (props) => <ArgoCDTransformation {...base(props)} />,
-  clickup: (props) => <ClickUpTransformation {...base(props)} connectionId={props.connectionId} />,
-  azuredevops: azure,
-  azuredevops_go: azure,
-  bamboo: (props) => <BambooTransformation {...base(props)} />,
-  bitbucket: (props) => <BitbucketTransformation {...base(props)} />,
-  bitbucket_server: (props) => <BitbucketServerTransformation {...base(props)} />,
-  circleci: (props) => <CircleCITransformation {...base(props)} />,
-  github: (props) => <GitHubTransformation {...base(props)} setHasError={props.setHasError} />,
-  'gh-copilot': (props) => <GhCopilotTransformation {...base(props)} />,
-  salesforce: (props) => <SalesforceTransformation {...base(props)} />,
-  gitlab: (props) => <GitLabTransformation {...base(props)} setHasError={props.setHasError} />,
-  jenkins: (props) => <JenkinsTransformation {...base(props)} />,
-  jira: (props) => <JiraTransformation {...base(props)} connectionId={props.connectionId} />,
-  asana: (props) => <AsanaTransformation {...base(props)} connectionId={props.connectionId} />,
-  tapd: (props) =>
-    props.scopeId ? (
-      <TapdTransformation {...base(props)} connectionId={props.connectionId} scopeId={props.scopeId} />
-    ) : null,
-  youtrack: (props) => (
-    <YoutrackTransformation {...base(props)} connectionId={props.connectionId} scopeConfigId={props.scopeConfigId} />
-  ),
+export const renderTransformation = (plugin: string, props: TransformationProps): ReactNode => {
+  const Component = getRenderers()[plugin];
+  return Component ? <Component {...props} /> : null;
 };
-
-export const renderTransformation = (plugin: string, props: TransformationProps): ReactNode =>
-  RENDERERS[plugin]?.(props) ?? null;

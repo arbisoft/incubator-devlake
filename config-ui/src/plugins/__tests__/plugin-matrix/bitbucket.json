@@ -1,0 +1,131 @@
+{
+  "plugin": "bitbucket",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "endpoint": "https://api.bitbucket.org/2.0/",
+      "usesApiToken": true,
+      "proxy": "",
+      "rateLimitPerHour": 0
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "https://api.bitbucket.org/2.0/"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "user@example.com"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Your API Token"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.Endpoint URL*Provide the Bitbucket instance API endpoint. For Bitbucket Cloud, use https://api.bitbucket.org/2.0/. Please note that the endpoint URL should end with /.Credential Type*API Token (Recommended)App Password (Deprecated)Username*Your Atlassian account email address (e.g., user@example.com)API Token*Learn about how to create an API TokenProxyAdd a proxy if you cannot access Bitbucket Cloud directly.Custom Rate LimitBy default, DevLake uses dynamic rate limit for optimized data collection for Bitbucket. But you can adjust the collection speed by entering a fixed value. Learn more",
+    "typed": {
+      "name": "v0",
+      "endpoint": "https://api.bitbucket.org/2.0/",
+      "usesApiToken": true,
+      "username": "v1",
+      "password": "v2",
+      "proxy": "v3",
+      "rateLimitPerHour": 0
+    }
+  },
+  "scopeConfig": {
+    "mounted": {
+      "issueStatusTodo": "new,open",
+      "issueStatusInProgress": "",
+      "issueStatusDone": "closed",
+      "issueStatusOther": "on hold,wontfix,duplicate,invalid",
+      "deploymentPattern": "",
+      "productionPattern": "",
+      "refdiff": {
+        "tagsLimit": 10,
+        "tagsPattern": "/v\\d+\\.\\d+(\\.\\d+(-rc)*\\d*)*$/"
+      }
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "role": "combobox"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "role": "combobox"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "role": "combobox"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "role": "combobox"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "(deploy|push-image)"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "prod(.*)"
+      }
+    ],
+    "text": "Issue Status MappingTODOnewopenIN-PROGRESSDONEclosedOTHERon holdwontfixduplicateinvalidCI/CDDeploymentDORAUse Regular Expression to define Deployments in DevLake in order to measure DORA metrics. Learn moreConvert a Bitbucket Deployment to a DevLake DeploymentConvert a Bitbucket Pipeline to a DevLake Deployment when its branch/tag namematches.If the name also matches, this Deployment is a ‘Production Deployment’Additional Settings",
+    "typed": {
+      "issueStatusTodo": "new,open",
+      "issueStatusInProgress": "",
+      "issueStatusDone": "closed",
+      "issueStatusOther": "on hold,wontfix,duplicate,invalid",
+      "deploymentPattern": "v4",
+      "productionPattern": "v5",
+      "refdiff": {
+        "tagsLimit": 10,
+        "tagsPattern": "/v\\d+\\.\\d+(\\.\\d+(-rc)*\\d*)*$/"
+      }
+    }
+  },
+  "consoleErrors": [],
+  "requests": []
+}

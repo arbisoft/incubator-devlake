@@ -22,10 +22,10 @@ import { ChangeEvent, useEffect } from 'react';
 import { Block } from '@/components';
 
 interface Props {
-  initialValue: number;
-  value: number;
-  error: string;
-  setValue: (value: number) => void;
+  initialValue?: number;
+  value?: number;
+  error: unknown;
+  setValue: (value?: number) => void;
   setError: (value: string) => void;
 }
 

@@ -24,7 +24,17 @@ import { IPluginConfig } from '@/types';
 import { pluginConfigs } from './register';
 export { getPluginScopeId } from './scope-id';
 
-export const getPluginScopeName = (plugin: string, scope: any) => {
+type ScopeNameInput = {
+  data?: Record<string, unknown>;
+  organization?: string;
+  fullName?: string;
+  name?: string;
+  id?: ID;
+  enterprise?: string;
+  pathWithNamespace?: string;
+};
+
+export const getPluginScopeName = (plugin: string, scope: ScopeNameInput) => {
   if (!scope) {
     return '';
   }

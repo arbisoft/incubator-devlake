@@ -18,17 +18,16 @@
 
 import { CaretRightOutlined } from '@ant-design/icons';
 import { theme, Collapse, Tag, Input, Checkbox } from 'antd';
+import type { CheckboxChangeEvent } from 'antd/lib/checkbox';
 import { useState, useEffect } from 'react';
 
 import { ExternalLink, HelpTooltip } from '@/components';
+import type { TransformationProps } from '@/plugins/components/scope-config-form/types';
 import { DOC_URL } from '@/release';
 
-interface Props {
-  entities: string[];
-  transformation: any;
-  setTransformation: React.Dispatch<React.SetStateAction<any>>;
-  setHasError: React.Dispatch<React.SetStateAction<boolean>>;
-}
+import type { GitLabTransformationValues } from './types';
+
+type Props = TransformationProps<GitLabTransformationValues>;
 
 export const GitLabTransformation = ({ entities, transformation, setTransformation, setHasError }: Props) => {
   const [useCustom, setUseCustom] = useState(false);
@@ -45,8 +44,8 @@ export const GitLabTransformation = ({ entities, transformation, setTransformati
     setHasError(useCustom && !transformation.deploymentPattern);
   }, [useCustom, transformation]);
 
-  const handleChangeUseCustom = (e: React.FormEvent<HTMLInputElement>) => {
-    const checked = (e.target as HTMLInputElement).checked;
+  const handleChangeUseCustom = (e: CheckboxChangeEvent) => {
+    const { checked } = e.target;
 
     if (!checked) {
       setTransformation({
@@ -97,10 +96,10 @@ const renderCollapseItems = ({
 }: {
   entities: string[];
   panelStyle: React.CSSProperties;
-  transformation: any;
-  onChangeTransformation: any;
+  transformation: GitLabTransformationValues;
+  onChangeTransformation: (next: GitLabTransformationValues) => void;
   useCustom: boolean;
-  onChangeUseCustom: any;
+  onChangeUseCustom: (e: CheckboxChangeEvent) => void;
 }) =>
   [
     {

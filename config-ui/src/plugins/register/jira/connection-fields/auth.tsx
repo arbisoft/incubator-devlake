@@ -16,12 +16,14 @@
  *
  */
 
-import type { RadioChangeEvent } from 'antd';
-import { Radio, Input } from 'antd';
+import { Input, Radio, type RadioChangeEvent } from 'antd';
 import { useState, useEffect } from 'react';
 
 import { Block, ExternalLink } from '@/components';
 import { DOC_URL } from '@/release';
+import type { ConnectionFieldRenderProps } from '@/types';
+
+import type { JiraConnectionValues } from '../types';
 
 const JIRA_CLOUD_REGEX = /^https:\/\/\w+\.atlassian\.net\/rest\/$/;
 const JIRA_GATEWAY_REGEX = /^https:\/\/api\.atlassian\.com\/ex\/jira\/[^/]+\/rest\/$/;
@@ -30,14 +32,26 @@ type JiraVersion = 'cloud' | 'gateway' | 'server';
 type Method = 'BasicAuth' | 'AccessToken' | 'OAuth2';
 type GatewayMethod = 'AccessToken' | 'OAuth2';
 
-interface Props {
-  type: 'create' | 'update';
-  initialValues: any;
-  values: any;
-  errors: any;
-  setValues: (value: any) => void;
-  setErrors: (value: any) => void;
-}
+type Props = Pick<
+  ConnectionFieldRenderProps<JiraConnectionValues>,
+  'type' | 'initialValues' | 'values' | 'errors' | 'setValues' | 'setErrors'
+>;
+
+const versionOptions = [
+  { label: 'Jira Cloud', value: 'cloud' },
+  { label: 'Jira Cloud (Atlassian API Gateway)', value: 'gateway' },
+  { label: 'Jira Server / Jira Data Center', value: 'server' },
+];
+
+const gatewayMethodOptions = [
+  { label: 'Scoped API Token', value: 'AccessToken' },
+  { label: 'OAuth 2.0 (Service Account)', value: 'OAuth2' },
+];
+
+const serverMethodOptions = [
+  { label: 'Basic Authentication', value: 'BasicAuth' },
+  { label: 'Using Personal Access Token', value: 'AccessToken' },
+];
 
 export const Auth = ({ type, initialValues, values, setValues, setErrors }: Props) => {
   const [version, setVersion] = useState<JiraVersion>('cloud');
@@ -183,11 +197,7 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
   return (
     <>
       <Block title="Jira Version" required>
-        <Radio.Group value={version} onChange={handleChangeVersion}>
-          <Radio value="cloud">Jira Cloud</Radio>
-          <Radio value="gateway">Jira Cloud (Atlassian API Gateway)</Radio>
-          <Radio value="server">Jira Server / Jira Data Center</Radio>
-        </Radio.Group>
+        <Radio.Group value={version} options={versionOptions} onChange={handleChangeVersion} />
 
         {version !== 'gateway' && (
           <Block
@@ -224,10 +234,11 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
             />
           </Block>
           <Block title="Authentication Method" required>
-            <Radio.Group value={gatewayAuthMethod} onChange={handleChangeGatewayMethod}>
-              <Radio value="AccessToken">Scoped API Token</Radio>
-              <Radio value="OAuth2">OAuth 2.0 (Service Account)</Radio>
-            </Radio.Group>
+            <Radio.Group
+              value={gatewayAuthMethod}
+              options={gatewayMethodOptions}
+              onChange={handleChangeGatewayMethod}
+            />
           </Block>
           {gatewayAuthMethod === 'AccessToken' && (
             <Block
@@ -287,10 +298,7 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
       {version === 'server' && (
         <>
           <Block title="Authentication Method" required>
-            <Radio.Group value={values.authMethod} onChange={handleChangeMethod}>
-              <Radio value="BasicAuth">Basic Authentication</Radio>
-              <Radio value="AccessToken">Using Personal Access Token</Radio>
-            </Radio.Group>
+            <Radio.Group value={values.authMethod} options={serverMethodOptions} onChange={handleChangeMethod} />
           </Block>
           {values.authMethod === 'BasicAuth' && (
             <>

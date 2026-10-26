@@ -19,6 +19,7 @@ package service
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -599,6 +600,79 @@ func TestBuildPromptRollupMergesSkillSourcesAndCounts(t *testing.T) {
 	}
 }
 
+// Each api_error and failed tool_result becomes one failure row with its reason. A tool
+// error's message is stripped at ingest, so only its error type reaches the row; successful
+// tool calls add none.
+func TestBuildPromptRollupRecordsFailureReasons(t *testing.T) {
+	events := fixturePromptEvents(t, "p2")
+	rollup := buildPromptRollup(testOrganizationID, "p2", events)
+	prompt := rollup.prompt
+	if int64(len(rollup.failures)) != prompt.ApiErrorCount+prompt.ToolFailureCount || len(rollup.failures) != 2 {
+		t.Fatalf("failures = %d, want one per api error (%d) and tool failure (%d)", len(rollup.failures), prompt.ApiErrorCount, prompt.ToolFailureCount)
+	}
+	byKind := make(map[string]*ai.AiPromptFailure)
+	for _, failure := range rollup.failures {
+		byKind[failure.FailureKind] = failure
+		if failure.AiPromptId != prompt.Id || failure.PromptId != "p2" || failure.SessionId != "sess-1" || failure.UserKey != prompt.UserKey || failure.WorkspaceKey != testOrganizationID {
+			t.Fatalf("failure identity = %#v, want prompt %q", failure, prompt.Id)
+		}
+	}
+
+	api := byKind[ai.FailureKindApiError]
+	if api == nil || api.Model != "claude-opus-5-5" || api.QuerySource != mainThreadQuerySource || api.ErrorMessage != "overloaded" ||
+		int64Value(api.StatusCode) != 529 || int64Value(api.Attempt) != 1 || int64Value(api.DurationMs) != 2100 || api.ToolName != "" {
+		t.Fatalf("api failure = %#v", api)
+	}
+	tool := byKind[ai.FailureKindToolError]
+	if tool == nil || tool.ToolName != "Bash" || tool.ErrorType != "ShellError" || tool.ErrorMessage != "" || int64Value(tool.DurationMs) != 340 ||
+		tool.StatusCode != nil || tool.QuerySource != "" {
+		t.Fatalf("tool failure = %#v", tool)
+	}
+	for _, check := range []struct {
+		failure *ai.AiPromptFailure
+		event   *models.OtelEvent
+	}{
+		{failure: api, event: firstEventNamed(t, events, eventAPIError)},
+		{failure: tool, event: failedToolResult(t, events)},
+	} {
+		wantID := ai.CanonicalKey{Kind: ai.IDKindPromptFailure, Provider: aiProviderClaude, WorkspaceKey: testOrganizationID, Grain: []string{"p2", hex.EncodeToString(check.event.EventKey)}}.ID()
+		if check.failure.Id != wantID || !check.failure.OccurredAt.Equal(check.event.EventTimestamp) {
+			t.Fatalf("%s failure id/time = %q %s, want %q %s", check.failure.FailureKind, check.failure.Id, check.failure.OccurredAt, wantID, check.event.EventTimestamp)
+		}
+	}
+	if api.Id == tool.Id {
+		t.Fatalf("api and tool failures share id %q", api.Id)
+	}
+
+	if failures := buildPromptRollup(testOrganizationID, "p1", fixturePromptEvents(t, "p1")).failures; len(failures) != 0 {
+		t.Fatalf("p1 failures = %d, want none", len(failures))
+	}
+}
+
+// A tool error's message never reaches its row, even from events that kept the error
+// attribute, so the rollup does not depend on ingest having stripped it.
+func TestBuildPromptRollupNeverCopiesToolErrorMessage(t *testing.T) {
+	events := promptEvents(t, loadLogEventsFixture(t), "p2")
+	toolEvent := failedToolResult(t, events)
+	if eventString(eventAttributes(toolEvent), "error") == "" {
+		t.Fatal("unstripped tool_result has no error attribute; the fixture no longer exercises this case")
+	}
+	toolFailures := 0
+	for _, failure := range buildPromptRollup(testOrganizationID, "p2", events).failures {
+		if failure.FailureKind != ai.FailureKindToolError {
+			continue
+		}
+		toolFailures++
+		if failure.ErrorMessage != "" {
+			t.Fatalf("tool failure error_message = %q, want empty", failure.ErrorMessage)
+		}
+	}
+	// Without a tool failure row the check above would pass without checking anything.
+	if toolFailures != 1 {
+		t.Fatalf("tool failures = %d, want 1", toolFailures)
+	}
+}
+
 // The repository URL comes from the prompt's events. A prompt without one, or with one that
 // does not fit its column, stores NULL instead of failing or truncating.
 func TestPromptRollupRecordsRepositoryURL(t *testing.T) {
@@ -628,6 +702,156 @@ func TestPromptRollupRecordsRepositoryURL(t *testing.T) {
 			t.Fatalf("%s repository = %q, want nil", promptID, *got)
 		}
 	}
+}
+
+// The api_request effort attribute is kept on the stored event and becomes the prompt's
+// effort. A prompt whose requests report no effort, or that made none, has none.
+func TestPromptRollupRecordsEffort(t *testing.T) {
+	request := loadLogEventsFixture(t)
+	stripContentAttributes(request)
+	records := resourceLogRecords(request.GetResourceLogs()[0])
+	setStringAttribute(records[1], "effort", "high") // p1's api_request
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
+	prepared, err := newRawConverter(database, nil).prepareEvents(request, 1)
+	if err != nil {
+		t.Fatalf("prepareEvents() error = %v", err)
+	}
+	byPrompt := make(map[string][]*models.OtelEvent)
+	for _, item := range prepared.events {
+		byPrompt[item.event.PromptId] = append(byPrompt[item.event.PromptId], item.event)
+	}
+
+	if got := eventString(eventAttributes(firstEventNamed(t, byPrompt["p1"], eventAPIRequest)), "effort"); got != "high" {
+		t.Fatalf("stored p1 api_request effort = %q, want %q", got, "high")
+	}
+	for _, test := range []struct {
+		promptID string
+		want     string
+	}{
+		{"p1", "high"},
+		{"p2", ""}, // its api_request reports no effort
+		{"p3", ""}, // no api_request
+	} {
+		t.Run(test.promptID, func(t *testing.T) {
+			got := buildPromptRollup(testOrganizationID, test.promptID, byPrompt[test.promptID]).prompt.Effort
+			if gotValue := stringValue(got); gotValue != test.want || (test.want == "") != (got == nil) {
+				t.Fatalf("%s effort = %v, want %q", test.promptID, got, test.want)
+			}
+		})
+	}
+}
+
+// The main conversation's effort wins over background requests such as session titles,
+// which may run at another level. Background effort is used only while the prompt has no
+// main-thread effort.
+func TestPromptBuilderApplyEffort(t *testing.T) {
+	type request struct{ querySource, effort string }
+	for _, test := range []struct {
+		name     string
+		requests []request
+		want     string
+	}{
+		{"main thread after background", []request{{"generate_session_title", "low"}, {mainThreadQuerySource, "high"}, {mainThreadQuerySource, "max"}}, "high"},
+		{"main thread before background", []request{{mainThreadQuerySource, "xhigh"}, {"generate_session_title", "low"}}, "xhigh"},
+		{"background only", []request{{"generate_session_title", "low"}, {"away_summary", "medium"}}, "low"},
+		{"main thread without effort", []request{{mainThreadQuerySource, ""}, {"away_summary", "medium"}}, "medium"},
+		{"no query source", []request{{"", "medium"}}, "medium"},
+		{"no effort", []request{{mainThreadQuerySource, ""}}, ""},
+		{"no requests", nil, ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			builder := &promptBuilder{prompt: &ai.AiPrompt{}}
+			for _, r := range test.requests {
+				builder.applyEffort(r.querySource, r.effort)
+			}
+			got := builder.prompt.Effort
+			if gotValue := stringValue(got); gotValue != test.want || (test.want == "") != (got == nil) {
+				t.Fatalf("effort = %v, want %q", got, test.want)
+			}
+		})
+	}
+}
+
+// models_used is what dashboards group prompts by, so a prompt's models are recorded as
+// sorted base model IDs: the same models in another order, a dated snapshot or a [1m] variant
+// must not make a separate group.
+func TestBuildPromptRollupRecordsModelsUsedAsBaseModelIDs(t *testing.T) {
+	start := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
+	for _, test := range []struct {
+		name   string
+		models []string
+		want   string
+	}{
+		{"one model", []string{"claude-opus-5-5"}, "claude-opus-5-5"},
+		{"sorted whatever the order", []string{"claude-opus-5-5", "claude-haiku-4-5"}, "claude-haiku-4-5,claude-opus-5-5"},
+		{"snapshot date dropped", []string{"claude-sonnet-4-20250514", "claude-sonnet-4"}, "claude-sonnet-4"},
+		{"variant dropped", []string{"claude-sonnet-4-5[1m]", "claude-sonnet-4-5-20250929"}, "claude-sonnet-4-5"},
+		{"empty model skipped", []string{"", " ", "claude-haiku-4-5"}, "claude-haiku-4-5"},
+		{"no requests", nil, ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			events := make([]*models.OtelEvent, 0, len(test.models))
+			for index, model := range test.models {
+				events = append(events, &models.OtelEvent{EventName: eventAPIRequest, Model: model, EventTimestamp: start.Add(time.Duration(index) * time.Second)})
+			}
+			if got := buildPromptRollup(testOrganizationID, "p1", events).prompt.ModelsUsed; got != test.want {
+				t.Fatalf("models used = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
+// The rollup reloads a prompt's stored events with rollupEventColumns, so every column it
+// reads must be in it. Without query_source, every reloaded request looks like background
+// work and a session-title request could decide the prompt's effort. Without event_key,
+// every failure of a prompt gets the same id and only one row survives.
+func TestRollupEventColumnsLoadRollupInputs(t *testing.T) {
+	columns := make(map[string]struct{})
+	for _, column := range strings.Split(strings.ReplaceAll(rollupEventColumnsSQL(), " ", ""), ",") {
+		columns[column] = struct{}{}
+	}
+	for _, test := range []struct {
+		reader string
+		column string
+	}{
+		{"effort", "query_source"},
+		{"effort", "attributes"},
+		{"failure id", "event_key"},
+		{"tool failure", "success"},
+		{"tool failure", "tool_name"},
+		{"api failure", "model"},
+		{"failure duration", "duration_ms"},
+	} {
+		t.Run(test.reader+"/"+test.column, func(t *testing.T) {
+			if _, found := columns[test.column]; !found {
+				t.Errorf("rollup event columns = %q, missing %s", rollupEventColumnsSQL(), test.column)
+			}
+		})
+	}
+}
+
+// firstEventNamed returns the first of a prompt's events with the given name.
+func firstEventNamed(t *testing.T, events []*models.OtelEvent, eventName string) *models.OtelEvent {
+	t.Helper()
+	for _, event := range events {
+		if event.EventName == eventName {
+			return event
+		}
+	}
+	t.Fatalf("no %s event among %d events", eventName, len(events))
+	return nil
+}
+
+// failedToolResult returns the first tool_result among events that reports success=false.
+func failedToolResult(t *testing.T, events []*models.OtelEvent) *models.OtelEvent {
+	t.Helper()
+	for _, event := range events {
+		if event.EventName == eventToolResult && event.Success != nil && !*event.Success {
+			return event
+		}
+	}
+	t.Fatalf("no failed %s event among %d events", eventToolResult, len(events))
+	return nil
 }
 
 func TestPromptRollupNeverCarriesPromptText(t *testing.T) {
@@ -742,12 +966,18 @@ func newOtelLogsHTTPRequest(t *testing.T, logs *collectorlogs.ExportLogsServiceR
 	return request
 }
 
-// fixturePromptEvents converts the fixture and returns one prompt's events, as the rollup
-// loads them from storage.
+// fixturePromptEvents returns the fixture's events of one prompt as ingest stores them, with
+// content attributes stripped.
 func fixturePromptEvents(t *testing.T, promptID string) []*models.OtelEvent {
 	t.Helper()
 	request := loadLogEventsFixture(t)
 	stripContentAttributes(request)
+	return promptEvents(t, request, promptID)
+}
+
+// promptEvents prepares request and returns the events of one prompt.
+func promptEvents(t *testing.T, request *collectorlogs.ExportLogsServiceRequest, promptID string) []*models.OtelEvent {
+	t.Helper()
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
 	prepared, err := newRawConverter(database, nil).prepareEvents(request, 1)
 	if err != nil {

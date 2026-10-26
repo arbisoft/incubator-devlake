@@ -1,0 +1,77 @@
+{
+  "plugin": "tapd",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "endpoint": "https://api.tapd.cn",
+      "username": "",
+      "password": "",
+      "proxy": "",
+      "rateLimitPerHour": 0
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Endpoint URL"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your API Account"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Your API Token"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Company ID"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.Endpoint URL*You do not need to enter the endpoint URL, because all versions use the same URL.API Account*Please follow the instruction here to find your API account information.API Token*Company ID*ProxyAdd a proxy if you cannot access TAPD directly.Custom Rate LimitBy default, DevLake uses 3,000 requests/hour for data collection for TAPD. But you can adjust the collection speed by setting up your desirable rate limit. Learn more",
+    "typed": {
+      "name": "v0",
+      "endpoint": "https://api.tapd.cn",
+      "username": "v1",
+      "password": "v2",
+      "proxy": "v4",
+      "rateLimitPerHour": 0
+    }
+  },
+  "scopeConfig": {
+    "mounted": {
+      "typeMappings": {},
+      "statusMappings": {}
+    },
+    "controls": [],
+    "text": "Loading...",
+    "typed": {
+      "typeMappings": {},
+      "statusMappings": {}
+    }
+  },
+  "consoleErrors": [],
+  "requests": [
+    "/plugins/tapd/connections/1/proxy/rest/story_categories?workspace_id=e2e-scope",
+    "/plugins/tapd/connections/1/proxy/rest/workflows/status_map?workspace_id=e2e-scope&system=bug",
+    "/plugins/tapd/connections/1/proxy/rest/workflows/status_map?workspace_id=e2e-scope&system=story"
+  ]
+}

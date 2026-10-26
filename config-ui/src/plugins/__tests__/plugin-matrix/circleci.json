@@ -1,0 +1,72 @@
+{
+  "plugin": "circleci",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "endpoint": "https://circleci.com/api/",
+      "token": "",
+      "proxy": "",
+      "rateLimitPerHour": 0
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Your Token"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.CircleCI*CircleCI CloudCircleCI Server (v4.x+)If you are using CircleCI Cloud, you do not need to enter the endpoint URL, which is https://circleci.com/api/.Token*ProxyAdd a proxy if you cannot access CircleCI directly.Custom Rate LimitBy default, DevLake uses 10,000 requests/hour for data collection for CircleCI. But you can adjust the collection speed by setting up your desirable rate limit. Learn more",
+    "typed": {
+      "name": "v0",
+      "endpoint": "https://circleci.com/api/",
+      "token": "v1",
+      "proxy": "v2",
+      "rateLimitPerHour": 0
+    }
+  },
+  "scopeConfig": {
+    "mounted": {},
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "(deploy|push-image)"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "prod(.*)"
+      }
+    ],
+    "text": "CI/CDDeploymentDORAUse Regular Expression to define Deployments in DevLake in order to measure DORA metrics. Learn moreConvert a CircleCI Workflow Run as a DevLake Deployment when: The name of the CircleCI workflow or one of its jobs matches*If the name also matches, this Deployment is a ‘Production Deployment’Additional Settings",
+    "typed": {
+      "deploymentPattern": "v0",
+      "productionPattern": "v1"
+    }
+  },
+  "consoleErrors": [],
+  "requests": []
+}

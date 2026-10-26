@@ -144,6 +144,7 @@ func TestRollupSessionWithoutSessionIDSkipsModeQueries(t *testing.T) {
 		written = entity.(*ai.AiPrompt)
 	}).Return(nil).Once()
 	tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptSkill"), mock.Anything).Return(nil).Once()
+	tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptFailure"), mock.Anything).Return(nil).Once()
 	expectStoredAccount(tx, &crossdomain.Account{})
 
 	target := &sessionTarget{connectionID: 1, userKey: "uuid:u1", promptIDs: map[string]struct{}{"p1": {}}}
@@ -177,6 +178,7 @@ func TestRollupSessionLoadsAndWritesModesOnlyWhenNeeded(t *testing.T) {
 			}).Return(nil)
 			tx.EXPECT().CreateOrUpdate(mock.AnythingOfType("*ai.AiPrompt")).Return(nil).Once()
 			tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptSkill"), mock.Anything).Return(nil).Once()
+			tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptFailure"), mock.Anything).Return(nil).Once()
 			expectStoredAccount(tx, &crossdomain.Account{})
 			if modeChanged {
 				tx.EXPECT().CreateOrUpdate(mock.AnythingOfType("*ai.AiPermissionModeChange")).Return(nil).Once()
@@ -621,5 +623,66 @@ func TestConvertLogBatchReportsLostLease(t *testing.T) {
 	_, err := newRawConverter(database, nil).convertLogBatch(newSkippedRecordsLogBatch(t), &batchLease{table: &models.OtelLogBatch{}, id: 8, attempts: 1, owner: "worker"})
 	if code, _, _ := classifyConversionError(err); code != errorLeaseLost {
 		t.Fatalf("convertLogBatch() error = %v, want %s", err, errorLeaseLost)
+	}
+}
+
+// writePromptRollup replaces a prompt's failure rows: it clears the stored ones before
+// inserting the rebuilt ones in batches, so a replay neither duplicates rows nor keeps rows
+// for failures that no longer exist. A storage error stops the write and names the step
+// that failed.
+func TestWritePromptRollupReplacesFailures(t *testing.T) {
+	prompt := &ai.AiPrompt{DomainEntity: domainlayer.DomainEntity{Id: "prompt-p1"}, WorkspaceKey: testOrganizationID, PromptId: "p1"}
+	failures := func(count int) []*ai.AiPromptFailure {
+		rows := make([]*ai.AiPromptFailure, 0, count)
+		for index := 1; index <= count; index++ {
+			rows = append(rows, &ai.AiPromptFailure{DomainEntity: domainlayer.DomainEntity{Id: fmt.Sprintf("f%d", index)}, WorkspaceKey: testOrganizationID, PromptId: "p1"})
+		}
+		return rows
+	}
+	full, overflow := promptFailureInsertBatchSize, promptFailureInsertBatchSize+1
+	for _, test := range []struct {
+		name      string
+		failures  []*ai.AiPromptFailure
+		clearErr  errors.Error
+		writeErr  errors.Error
+		wantCalls []string
+		wantErr   string
+	}{
+		{name: "writes failures after clearing", failures: failures(2), wantCalls: []string{"clear", "f1..f2"}},
+		{name: "a full batch is one insert", failures: failures(full), wantCalls: []string{"clear", fmt.Sprintf("f1..f%d", full)}},
+		{name: "rows past a batch go in the next insert", failures: failures(overflow), wantCalls: []string{"clear", fmt.Sprintf("f1..f%d", full), fmt.Sprintf("f%d..f%d", overflow, overflow)}},
+		{name: "no failures clears stale rows", wantCalls: []string{"clear"}},
+		{name: "clear error", failures: failures(1), clearErr: errors.Default.New("db down"), wantCalls: []string{"clear"}, wantErr: "clear Claude Code prompt failures"},
+		{name: "write error stops at the failed batch", failures: failures(overflow), writeErr: errors.Default.New("db down"), wantCalls: []string{"clear", fmt.Sprintf("f1..f%d", full)}, wantErr: "write Claude Code prompt failures"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			tx := dalmocks.NewTransaction(t)
+			calls := make([]string, 0)
+			tx.EXPECT().CreateOrUpdate(mock.AnythingOfType("*ai.AiPrompt")).Return(nil).Once()
+			tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptSkill"), mock.Anything).Return(nil).Once()
+			tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptFailure"), mock.Anything).Run(func(_ interface{}, clauses ...dal.Clause) {
+				if params := whereParams(clauses, 0); !reflect.DeepEqual(params, []interface{}{testOrganizationID, "p1"}) {
+					t.Errorf("failure clear params = %v, want the prompt's workspace and id", params)
+				}
+				calls = append(calls, "clear")
+			}).Return(test.clearErr).Once()
+			for range test.wantCalls[1:] {
+				tx.EXPECT().Create(mock.AnythingOfType("[]*ai.AiPromptFailure")).Run(func(entity interface{}, _ ...dal.Clause) {
+					batch := entity.([]*ai.AiPromptFailure)
+					calls = append(calls, batch[0].Id+".."+batch[len(batch)-1].Id)
+				}).Return(test.writeErr).Once()
+			}
+
+			err := writePromptRollup(tx, promptRollup{prompt: prompt, failures: test.failures})
+			if test.wantErr == "" && err != nil {
+				t.Fatalf("writePromptRollup() error = %v", err)
+			}
+			if test.wantErr != "" && (err == nil || !strings.Contains(err.Error(), test.wantErr)) {
+				t.Fatalf("writePromptRollup() error = %v, want %q", err, test.wantErr)
+			}
+			if !reflect.DeepEqual(calls, test.wantCalls) {
+				t.Fatalf("failure calls = %v, want %v", calls, test.wantCalls)
+			}
+		})
 	}
 }

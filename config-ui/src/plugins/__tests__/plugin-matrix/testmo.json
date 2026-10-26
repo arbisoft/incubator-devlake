@@ -1,0 +1,55 @@
+{
+  "plugin": "testmo",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "endpoint": "https://yourorganization.testmo.net/api/v1",
+      "token": "",
+      "proxy": "",
+      "rateLimitPerHour": 0
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Endpoint URL"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Your Token"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.Endpoint URL*Provide the Testmo instance URL (e.g., https://yourorganization.testmo.net/api/v1)API Token*Generate an API token from your Testmo account settings: Settings → APIProxyAdd a proxy if you cannot access Testmo directly.Custom Rate LimitBy default, DevLake will not limit API requests per hour. But you can set a number if you want to. Learn more",
+    "typed": {
+      "name": "v0",
+      "endpoint": "v1",
+      "token": "v2",
+      "proxy": "v3",
+      "rateLimitPerHour": 0
+    }
+  },
+  "scopeConfig": {
+    "mounted": {},
+    "controls": [],
+    "text": "",
+    "typed": {}
+  },
+  "consoleErrors": [],
+  "requests": []
+}

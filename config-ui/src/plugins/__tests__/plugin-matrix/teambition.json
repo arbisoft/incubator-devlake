@@ -1,0 +1,75 @@
+{
+  "plugin": "teambition",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "endpoint": "https://open.teambition.com/api/",
+      "appId": "",
+      "secretKey": "",
+      "tenantType": "organization",
+      "proxy": "",
+      "rateLimitPerHour": 0
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Endpoint URL"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your AppId"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Your SecretKey"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Tenant Id"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Tenant type"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.Endpoint URL*Your Teambition endpoint URL.Application App Id*Your teambition application App Id.Application Secret Key*Your teambition application App Secret.Tenant Id*Tenant type*ProxyAdd a proxy if you cannot access Teambition directly.Custom Rate LimitBy default, DevLake uses dynamic rate limit for optimized data collection for Teambition. But you can adjust the collection speed by entering a fixed value. Please note: the rate limit setting applies to all tokens you have entered above. Learn more",
+    "typed": {
+      "name": "v0",
+      "endpoint": "v1",
+      "appId": "v2",
+      "secretKey": "v3",
+      "tenantId": "v4",
+      "tenantType": "v5",
+      "proxy": "v6",
+      "rateLimitPerHour": 0
+    }
+  },
+  "scopeConfig": {
+    "mounted": {},
+    "controls": [],
+    "text": "",
+    "typed": {}
+  },
+  "consoleErrors": [],
+  "requests": []
+}

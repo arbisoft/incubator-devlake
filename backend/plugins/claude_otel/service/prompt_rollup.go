@@ -18,8 +18,10 @@ limitations under the License.
 package service
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -34,7 +36,7 @@ import (
 // rollupEventColumns are the event columns the rollup reads. prompt_text is left out, so
 // prompt text can never reach ai_* tables and large texts are not loaded per rollup.
 var rollupEventColumns = dal.Select("event_key, connection_id, user_key, user_account_id, user_email, session_id, prompt_id, " +
-	"event_name, event_sequence, event_timestamp, command_name, model, tool_name, skill_name, plugin_name, success, cost_usd, " +
+	"event_name, event_sequence, event_timestamp, command_name, model, query_source, tool_name, skill_name, plugin_name, success, duration_ms, cost_usd, " +
 	"input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, attributes")
 
 const (
@@ -43,6 +45,9 @@ const (
 	skillToolName       = "Skill"
 	toolDecisionReject  = "reject"
 	maxModelsUsedLength = 1024
+	// mainThreadQuerySource is the api_request query_source of the conversation itself,
+	// as opposed to background work such as session titles and summaries.
+	mainThreadQuerySource = "repl_main_thread"
 	// Widths of ai_* columns filled straight from event attributes, which have no typed
 	// event column to bound them. The rollup rereads stored events, so an oversized value
 	// would otherwise fail every later batch that touches its prompt or session.
@@ -51,6 +56,18 @@ const (
 	// maxRepositoryURLLength is the width of ai_prompts.repository_url. A longer URL is left
 	// out rather than truncated, because a truncated URL would name a different repository.
 	maxRepositoryURLLength = 255
+	// maxErrorMessageLength is the width of ai_prompt_failures.error_message.
+	maxErrorMessageLength = 1024
+	// promptFailureInsertBatchSize is the most failure rows one INSERT writes, which keeps a
+	// long agentic prompt's insert far below MySQL's 65,535 placeholder limit.
+	promptFailureInsertBatchSize = 500
+)
+
+// modelSnapshotDate and modelVariantSuffix match a model ID's -YYYYMMDD snapshot date and
+// trailing variant such as [1m], which baseModelID drops.
+var (
+	modelSnapshotDate  = regexp.MustCompile(`-[0-9]{8}`)
+	modelVariantSuffix = regexp.MustCompile(`\[[^\]]*\]$`)
 )
 
 // subagentToolNames launch a subagent; Task is the legacy name of Agent.
@@ -206,12 +223,13 @@ func lessEventOrder(leftAt time.Time, leftSequence int64, rightAt time.Time, rig
 
 // promptRollup is one prompt's facts derived from its events.
 type promptRollup struct {
-	prompt *ai.AiPrompt
-	skills []*ai.AiPromptSkill
+	prompt   *ai.AiPrompt
+	skills   []*ai.AiPromptSkill
+	failures []*ai.AiPromptFailure
 }
 
-// buildPromptRollup derives one prompt row and its skills from the prompt's events. The
-// caller sets the permission mode and the DevLake account.
+// buildPromptRollup derives one prompt row, its skills and its failures from the prompt's
+// events. The caller sets the permission mode and the DevLake account.
 func buildPromptRollup(workspaceKey, promptID string, events []*models.OtelEvent) promptRollup {
 	sort.SliceStable(events, func(i, j int) bool {
 		return lessEventOrder(events[i].EventTimestamp, int64Value(events[i].EventSequence), events[j].EventTimestamp, int64Value(events[j].EventSequence))
@@ -225,9 +243,8 @@ func buildPromptRollup(workspaceKey, promptID string, events []*models.OtelEvent
 			EstimatedCostUsd: "0.00000000",
 			SourceType:       aiSourceOtel,
 		},
-		skills:     newSkillCollector(workspaceKey, promptID),
-		modelNames: make([]string, 0),
-		seenModels: make(map[string]struct{}),
+		skills: newSkillCollector(workspaceKey, promptID),
+		models: make(map[string]struct{}),
 	}
 	prompt := builder.prompt
 	for index, event := range events {
@@ -244,19 +261,29 @@ func buildPromptRollup(workspaceKey, promptID string, events []*models.OtelEvent
 			apply(builder, event, attributes)
 		}
 	}
-	prompt.ModelsUsed = truncate(strings.Join(builder.modelNames, ","), maxModelsUsedLength)
+	// Sorted, so prompts that used the same models group together whatever order they used them in.
+	prompt.ModelsUsed = truncate(strings.Join(sortedKeys(builder.models), ","), maxModelsUsedLength)
 	collected := builder.skills.result(prompt)
 	prompt.SkillCount = int64(len(collected))
 	prompt.UsedSkill = len(collected) > 0
-	return promptRollup{prompt: prompt, skills: collected}
+	for _, failure := range builder.failures {
+		failure.AiPromptId = prompt.Id
+		failure.UserKey = prompt.UserKey
+		failure.UserEmail = prompt.UserEmail
+		failure.SessionId = prompt.SessionId
+	}
+	return promptRollup{prompt: prompt, skills: collected, failures: builder.failures}
 }
 
-// promptBuilder accumulates one prompt's row, skills and models from its ordered events.
+// promptBuilder accumulates one prompt's row, skills, failures and models from its ordered events.
 type promptBuilder struct {
-	prompt     *ai.AiPrompt
-	skills     *skillCollector
-	modelNames []string
-	seenModels map[string]struct{}
+	prompt   *ai.AiPrompt
+	skills   *skillCollector
+	models   map[string]struct{}
+	failures []*ai.AiPromptFailure
+	// mainThreadEffort is set once a main-thread request has given the prompt its effort,
+	// so a later request cannot replace it.
+	mainThreadEffort bool
 }
 
 // promptEventApplier adds one event's contribution to the prompt being built.
@@ -283,8 +310,9 @@ func (b *promptBuilder) applyUserPrompt(event *models.OtelEvent, attributes map[
 	b.prompt.CommandSource = truncate(eventString(attributes, "command_source"), maxCommandSourceLength)
 }
 
-func (b *promptBuilder) applyAPIRequest(event *models.OtelEvent, _ map[string]interface{}) {
+func (b *promptBuilder) applyAPIRequest(event *models.OtelEvent, attributes map[string]interface{}) {
 	b.prompt.ApiRequestCount++
+	b.applyEffort(event.QuerySource, truncate(eventString(attributes, "effort"), maxAiLabelLength))
 	b.prompt.InputTokens += event.InputTokens
 	b.prompt.OutputTokens += event.OutputTokens
 	b.prompt.CacheReadTokens += event.CacheReadTokens
@@ -294,21 +322,45 @@ func (b *promptBuilder) applyAPIRequest(event *models.OtelEvent, _ map[string]in
 			b.prompt.EstimatedCostUsd = total
 		}
 	}
-	if _, seen := b.seenModels[event.Model]; event.Model != "" && !seen {
-		b.seenModels[event.Model] = struct{}{}
-		b.modelNames = append(b.modelNames, event.Model)
+	if model := baseModelID(event.Model); model != "" {
+		b.models[model] = struct{}{}
 	}
 	b.skills.add(event.SkillName, ai.SkillDetectedViaApiRequest, "", "", event.PluginName, event.EventTimestamp)
 }
 
-func (b *promptBuilder) applyAPIError(_ *models.OtelEvent, _ map[string]interface{}) {
-	b.prompt.ApiErrorCount++
+// applyEffort records one api_request's effort on the prompt. The first main-thread
+// request that reports an effort decides it. Until one does, the first request of any
+// source does, so a prompt whose only requests were background work still gets a value.
+// An empty effort changes nothing.
+func (b *promptBuilder) applyEffort(querySource, effort string) {
+	if effort == "" || b.mainThreadEffort {
+		return
+	}
+	if querySource == mainThreadQuerySource {
+		b.prompt.Effort = &effort
+		b.mainThreadEffort = true
+		return
+	}
+	if b.prompt.Effort == nil {
+		b.prompt.Effort = &effort
+	}
 }
 
-func (b *promptBuilder) applyToolResult(event *models.OtelEvent, _ map[string]interface{}) {
+func (b *promptBuilder) applyAPIError(event *models.OtelEvent, attributes map[string]interface{}) {
+	b.prompt.ApiErrorCount++
+	failure := b.newFailure(event, ai.FailureKindApiError, attributes)
+	failure.Model = event.Model
+	failure.QuerySource = event.QuerySource
+	failure.ErrorMessage = truncate(eventString(attributes, "error"), maxErrorMessageLength)
+	failure.StatusCode = eventNumber(attributes, "status_code")
+	failure.Attempt = eventNumber(attributes, "attempt")
+}
+
+func (b *promptBuilder) applyToolResult(event *models.OtelEvent, attributes map[string]interface{}) {
 	b.prompt.ToolCallCount++
 	if event.Success != nil && !*event.Success {
 		b.prompt.ToolFailureCount++
+		b.newFailure(event, ai.FailureKindToolError, attributes).ToolName = event.ToolName
 	}
 	if _, subagent := subagentToolNames[event.ToolName]; subagent {
 		b.prompt.SubagentCount++
@@ -316,6 +368,26 @@ func (b *promptBuilder) applyToolResult(event *models.OtelEvent, _ map[string]in
 	if event.ToolName == skillToolName {
 		b.skills.add(event.SkillName, ai.SkillDetectedViaSkillTool, "", "", "", event.EventTimestamp)
 	}
+}
+
+// newFailure adds a failure row for event to the prompt and returns it. buildPromptRollup
+// fills in the prompt's identity once all events are applied.
+func (b *promptBuilder) newFailure(event *models.OtelEvent, kind string, attributes map[string]interface{}) *ai.AiPromptFailure {
+	failure := &ai.AiPromptFailure{
+		DomainEntity: domainlayer.NewDomainEntity(ai.CanonicalKey{
+			Kind: ai.IDKindPromptFailure, Provider: aiProviderClaude, WorkspaceKey: b.prompt.WorkspaceKey,
+			Grain: []string{b.prompt.PromptId, hex.EncodeToString(event.EventKey)},
+		}.ID()),
+		Provider:     aiProviderClaude,
+		WorkspaceKey: b.prompt.WorkspaceKey,
+		PromptId:     b.prompt.PromptId,
+		FailureKind:  kind,
+		OccurredAt:   event.EventTimestamp,
+		ErrorType:    truncate(eventString(attributes, "error_type"), eventNamedColumnLength),
+		DurationMs:   event.DurationMs,
+	}
+	b.failures = append(b.failures, failure)
+	return failure
 }
 
 func (b *promptBuilder) applyToolDecision(_ *models.OtelEvent, attributes map[string]interface{}) {
@@ -514,6 +586,20 @@ func writePromptRollup(tx dal.Transaction, rollup promptRollup) error {
 			return fmt.Errorf("write Claude Code prompt skill: %w", err)
 		}
 	}
+	if err := tx.Delete(&ai.AiPromptFailure{}, dal.Where("workspace_key = ? AND prompt_id = ?", rollup.prompt.WorkspaceKey, rollup.prompt.PromptId)); err != nil {
+		return fmt.Errorf("clear Claude Code prompt failures: %w", err)
+	}
+	// The prompt's rows were just deleted and failure ids are scoped to the prompt, so the
+	// rebuilt rows are inserted in batches rather than upserted one at a time.
+	for start := 0; start < len(rollup.failures); start += promptFailureInsertBatchSize {
+		end := start + promptFailureInsertBatchSize
+		if end > len(rollup.failures) {
+			end = len(rollup.failures)
+		}
+		if err := tx.Create(rollup.failures[start:end]); err != nil {
+			return fmt.Errorf("write Claude Code prompt failures: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -629,6 +715,13 @@ func stringValue(value *string) string {
 		return ""
 	}
 	return *value
+}
+
+// baseModelID drops a model ID's snapshot date and variant suffix, so that
+// claude-sonnet-4-20250514 and claude-sonnet-4-5[1m] count as claude-sonnet-4 and claude-sonnet-4-5.
+// The models_used migration in models/migrationscripts keeps a frozen copy of this rule.
+func baseModelID(model string) string {
+	return modelVariantSuffix.ReplaceAllString(modelSnapshotDate.ReplaceAllString(strings.TrimSpace(model), ""), "")
 }
 
 func sortedKeys(values map[string]struct{}) []string {

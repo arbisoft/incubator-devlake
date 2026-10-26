@@ -30,3 +30,9 @@ export const RateLimit = styled.div`
 export const RateLimitInfo = styled.p`
   white-space: pre-line;
 `;
+
+export const ErrorText = styled.div`
+  margin-top: ${({ theme }) => theme.space.xxs}px;
+  color: ${({ theme }) => theme.colors.error};
+  font-size: ${({ theme }) => theme.typography.scale.caption.fontSize}px;
+`;

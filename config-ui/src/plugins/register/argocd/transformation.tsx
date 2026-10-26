@@ -20,12 +20,11 @@ import { CaretRightOutlined } from '@ant-design/icons';
 import { theme, Collapse, Tag, Input } from 'antd';
 
 import { HelpTooltip } from '@/components';
+import type { TransformationProps } from '@/plugins/components/scope-config-form/types';
 
-interface Props {
-  entities: string[];
-  transformation: any;
-  setTransformation: React.Dispatch<React.SetStateAction<any>>;
-}
+import type { ArgoCDTransformationValues } from './types';
+
+type Props = TransformationProps<ArgoCDTransformationValues>;
 
 export const ArgoCDTransformation = ({ entities, transformation, setTransformation }: Props) => {
   const { token } = theme.useToken();
@@ -62,10 +61,12 @@ const renderCollapseItems = ({
 }: {
   entities: string[];
   panelStyle: React.CSSProperties;
-  transformation: any;
-  onChangeTransformation: any;
-}) =>
-  [
+  transformation: ArgoCDTransformationValues;
+  onChangeTransformation: (next: ArgoCDTransformationValues) => void;
+}) => {
+  const { envNamePattern, deploymentPattern, productionPattern } = transformation;
+
+  return [
     {
       key: 'CICD',
       label: 'CI/CD',
@@ -86,11 +87,13 @@ const renderCollapseItems = ({
             <strong>Environment Detection</strong>
           </div>
           <div style={{ margin: '8px 0', paddingLeft: 28 }}>
-            <span>An ArgoCD sync operation is a 'Production Deployment' when the application name matches</span>
+            <span>
+              An ArgoCD sync operation is a &apos;Production Deployment&apos; when the application name matches
+            </span>
             <Input
               style={{ width: 200, margin: '0 8px' }}
               placeholder="(?i)prod(.*)"
-              value={transformation.envNamePattern ?? '(?i)prod(.*)'}
+              value={envNamePattern ?? '(?i)prod(.*)'}
               onChange={(e) =>
                 onChangeTransformation({
                   ...transformation,
@@ -109,7 +112,7 @@ const renderCollapseItems = ({
             <Input
               style={{ width: 200, margin: '0 8px' }}
               placeholder=".*"
-              value={transformation.deploymentPattern ?? ''}
+              value={deploymentPattern ?? ''}
               onChange={(e) =>
                 onChangeTransformation({
                   ...transformation,
@@ -124,7 +127,7 @@ const renderCollapseItems = ({
             <Input
               style={{ width: 200, margin: '0 8px' }}
               placeholder=""
-              value={transformation.productionPattern ?? ''}
+              value={productionPattern ?? ''}
               onChange={(e) =>
                 onChangeTransformation({
                   ...transformation,
@@ -143,3 +146,4 @@ const renderCollapseItems = ({
       ),
     },
   ].filter((it) => entities.includes(it.key));
+};

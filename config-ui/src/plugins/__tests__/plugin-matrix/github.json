@@ -1,0 +1,158 @@
+{
+  "plugin": "github",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "endpoint": "https://api.github.com/",
+      "authMethod": "AccessToken",
+      "token": "",
+      "proxy": "",
+      "rateLimitPerHour": 0
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "radio"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Token"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.GitHub*GitHub CloudGitHub Server If you are using GitHub Cloud, you do not need to enter the endpoint URL, which is https://api.github.com/.Authentication type*Github Access TokenGithub AppPersonal Access Token(s)*Add one or more personal token(s) for authentication from you and your organization members. Multiple tokens (from different GitHub accounts, NOT from one account) can help speed up the data collection process. Learn how to create a personal access tokenAnother TokenProxyAdd a proxy if you cannot access GitHub directly.Custom Rate LimitBy default, DevLake uses dynamic rate limit for optimized data collection for GitHub. But you can adjust the collection speed by entering a fixed value. Please note: the rate limit setting applies to all tokens you have entered above. Learn more",
+    "typed": {
+      "name": "v0",
+      "endpoint": "https://api.github.com/",
+      "authMethod": "AccessToken",
+      "token": "v1",
+      "proxy": "v2",
+      "rateLimitPerHour": 0
+    }
+  },
+  "scopeConfig": {
+    "mounted": {
+      "issueTypeRequirement": "(feat|feature|proposal|requirement)",
+      "issueTypeBug": "(bug|broken)",
+      "issueTypeIncident": "(incident|failure)",
+      "issuePriority": "(highest|high|medium|low|p0|p1|p2|p3)",
+      "issueComponent": "component(.*)",
+      "issueSeverity": "severity(.*)",
+      "envNamePattern": "(?i)prod(.*)",
+      "deploymentPattern": "",
+      "productionPattern": "",
+      "prType": "type(.*)",
+      "prComponent": "component(.*)",
+      "prBodyClosePattern": "(?mi)(fix|close|resolve|fixes|closes|resolves|fixed|closed|resolved)[\\s]*.*(((and )?(#|https:\\/\\/github.com\\/%s\\/issues\\/)\\d+[ ]*)+)",
+      "refdiff": {
+        "tagsLimit": 10,
+        "tagsPattern": "/v\\d+\\.\\d+(\\.\\d+(-rc)*\\d*)*$/"
+      },
+      "prSizeExcludedFileExtensions": []
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "(feat|feature|proposal|requirement)"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "(bug|broken)"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "(incident|failure)"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "(highest|high|medium|low|p0|p1|p2|p3)"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "component(.*)"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "severity(.*)"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "(?i)prod(.*)"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "(deploy|push-image)"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "prod(.*)"
+      }
+    ],
+    "text": "Issue TrackingTell DevLake what your issue labels mean to view metrics such as Bug Age, DORA - Median Time to Restore Service, etc.DevLake defines three standard types of issues: FEATURE, BUG and INCIDENT. Set your issues to these three types with issue labels that match the RegEx.RequirementBugIncidentDORAIssue PriorityIssue ComponentIssue SeverityCI/CDDeploymentDORAUse Regular Expression to define Deployments in DevLake in order to measure DORA metrics. Learn moreConvert a GitHub Deployment to a DevLake DeploymentIf its environment name matches, this deployment is a ‘Production Deployment’Convert a GitHub workflow run as a DevLake Deployment when:The name of the GitHub workflow run or one of its jobs matches*If the name or its branch’s name also matches, this deployment is a ‘Production Deployment’Code ReviewCross-domainAdditional Settings",
+    "typed": {
+      "issueTypeRequirement": "v0",
+      "issueTypeBug": "v1",
+      "issueTypeIncident": "v2",
+      "issuePriority": "v3",
+      "issueComponent": "v4",
+      "issueSeverity": "v5",
+      "envNamePattern": "v6",
+      "deploymentPattern": "v7",
+      "productionPattern": "v8",
+      "prType": "type(.*)",
+      "prComponent": "component(.*)",
+      "prBodyClosePattern": "(?mi)(fix|close|resolve|fixes|closes|resolves|fixed|closed|resolved)[\\s]*.*(((and )?(#|https:\\/\\/github.com\\/%s\\/issues\\/)\\d+[ ]*)+)",
+      "refdiff": {
+        "tagsLimit": 10,
+        "tagsPattern": "/v\\d+\\.\\d+(\\.\\d+(-rc)*\\d*)*$/"
+      },
+      "prSizeExcludedFileExtensions": []
+    }
+  },
+  "consoleErrors": [],
+  "requests": []
+}

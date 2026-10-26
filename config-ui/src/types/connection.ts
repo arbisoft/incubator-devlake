@@ -88,39 +88,9 @@ export enum IConnectionStatus {
   OFFLINE = 'offline',
 }
 
-export interface IConnection {
-  [key: string]: unknown;
+export interface IConnection extends IConnectionAPI {
   unique: string;
   plugin: string;
   pluginName: string;
-  id: ID;
-  name: string;
   status: IConnectionStatus;
-  endpoint: string;
-  apiKey?: string;
-  authMethod?: string;
-  authMode?: string;
-  token?: string;
-  accessToken?: string;
-  refreshToken?: string;
-  adminApiKey?: string;
-  username?: string;
-  password?: string;
-  appId?: string;
-  clientId?: string;
-  secretKey?: string;
-  cloudId?: string;
-  clientSecret?: string;
-  dbUrl?: string;
-  companyId?: number;
-  proxy: string;
-  rateLimitPerHour?: number;
-  organization?: string;
-  organizationId?: string;
-  org?: string;
-  loginUrl?: string;
-  instanceUrl?: string;
-  apiVersion?: string;
-  workspaceSlug?: string;
-  customHeaders?: ICustomHeader[];
 }

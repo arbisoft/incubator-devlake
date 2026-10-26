@@ -25,10 +25,9 @@ import { COPY } from '../constants';
 
 import { NewProjectModal } from './new-project-modal';
 
-vi.mock('antd', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('antd')>()),
-  message: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
-}));
+vi.mock('antd', async (importOriginal) =>
+  (await import('@/ui/__tests__/mock-message')).withMockedMessage(await importOriginal<typeof import('antd')>()),
+);
 
 vi.mock('@/api', () => ({ default: { project: { create: vi.fn() } } }));
 

@@ -23,8 +23,8 @@ import { Block } from '@/components';
 
 interface Props {
   type: 'create' | 'update';
-  label?: string;
-  subLabel?: string;
+  label?: React.ReactNode;
+  subLabel?: React.ReactNode;
   placeholder?: string;
   name: string;
   initialValue: string;
@@ -57,7 +57,7 @@ export const ConnectionSecretKey = ({
   };
 
   return (
-    <Block title={label ?? 'SecretKey'} description={subLabel ? subLabel : null} required>
+    <Block title={label ?? 'SecretKey'} description={subLabel} required>
       <Input.Password placeholder={placeholder ?? 'Your SecretKey'} value={value} onChange={handleChange} />
     </Block>
   );

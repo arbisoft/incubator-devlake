@@ -1,0 +1,100 @@
+{
+  "plugin": "salesforce",
+  "connection": {
+    "mounted": {
+      "name": "",
+      "proxy": "",
+      "rateLimitPerHour": 5000
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "Your Connection Name"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "role": "combobox"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "https://your-instance.my.salesforce.com"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "placeholder": "Salesforce access token"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "v61.0"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "placeholder": "e.g. http://proxy.localhost:8080"
+      },
+      {
+        "tag": "button",
+        "type": "button",
+        "role": "switch"
+      },
+      {
+        "tag": "input",
+        "role": "spinbutton"
+      }
+    ],
+    "text": "Connection Name*Give your connection a unique name to help you identify it in the future.Authentication Mode*Access TokenInstance URL*Access Token*API VersionProxyAdd a proxy if you cannot access Salesforce directly.Custom Rate Limit requests/hour",
+    "typed": {
+      "name": "v0",
+      "proxy": "v4",
+      "rateLimitPerHour": 5000,
+      "instanceUrl": "v1",
+      "accessToken": "v2",
+      "apiVersion": "v3"
+    }
+  },
+  "scopeConfig": {
+    "mounted": {
+      "objectTypes": [
+        "Account",
+        "Contact",
+        "Lead",
+        "Opportunity",
+        "Case",
+        "Task",
+        "Event"
+      ],
+      "useCdc": false
+    },
+    "controls": [
+      {
+        "tag": "input",
+        "type": "text",
+        "role": "combobox"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox"
+      }
+    ],
+    "text": "User ActivitySelect which Salesforce CRM objects DevLake should poll and convert into cross-domain user activity.Object TypesCROSSAccountContactLeadOpportunityCaseTaskEventChange Data CaptureEnable CDC for near-real-time updatesCDC is not available in the current Salesforce implementation yet, so this option stays disabled.",
+    "typed": {
+      "objectTypes": [
+        "Account",
+        "Contact",
+        "Lead",
+        "Opportunity",
+        "Case",
+        "Task",
+        "Event"
+      ],
+      "useCdc": false
+    }
+  },
+  "consoleErrors": [],
+  "requests": []
+}

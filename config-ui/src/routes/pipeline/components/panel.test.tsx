@@ -32,7 +32,7 @@ import { COPY, LOGS_FILE_NAME } from '../constants';
 import { PipelinePanel } from './panel';
 
 vi.mock('antd', async (importOriginal) =>
-  (await import('@/ui/__tests__/antd-message-mock')).loadMockedMessage(importOriginal),
+  (await import('@/ui/__tests__/mock-message')).loadMockedMessage(importOriginal),
 );
 
 vi.mock('@/plugins', () => ({

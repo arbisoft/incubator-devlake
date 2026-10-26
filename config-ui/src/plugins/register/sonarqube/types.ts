@@ -16,13 +16,7 @@
  *
  */
 
-import { vi } from 'vitest';
-
-// Replaces antd's static message so code that toasts through operator() stays out of the jsdom teardown.
-export const withMockedMessage = <T extends object>(actual: T): T => ({
-  ...actual,
-  message: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
-});
-
-export const loadMockedMessage = async (importOriginal: () => Promise<typeof import('antd')>) =>
-  withMockedMessage(await importOriginal());
+export type SonarQubeConnectionValues = {
+  endpoint?: string;
+  org?: string;
+};

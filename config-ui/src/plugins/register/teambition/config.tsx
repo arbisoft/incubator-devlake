@@ -17,10 +17,13 @@
  */
 
 import { DOC_URL } from '@/release';
-import { IPluginConfig } from '@/types';
+import type { ConnectionFieldRenderProps, IPluginConfig } from '@/types';
 
 import Icon from './assets/icon.svg?react';
 import { ConnectionTenantId, ConnectionTenantType } from './connection-fields';
+import type { TeambitionConnectionValues } from './types';
+
+type RenderProps = ConnectionFieldRenderProps<TeambitionConnectionValues>;
 
 export const TeambitionConfig: IPluginConfig = {
   plugin: 'teambition',
@@ -50,7 +53,7 @@ export const TeambitionConfig: IPluginConfig = {
         label: 'Application Secret Key',
         subLabel: 'Your teambition application App Secret.',
       },
-      ({ initialValues, values, errors, setValues, setErrors }: any) => (
+      ({ initialValues, values, errors, setValues, setErrors }: RenderProps) => (
         <ConnectionTenantId
           key="tenantId"
           initialValue={initialValues.tenantId}
@@ -60,7 +63,7 @@ export const TeambitionConfig: IPluginConfig = {
           setError={(error) => setErrors({ tenantId: error })}
         />
       ),
-      ({ initialValues, values, errors, setValues, setErrors }: any) => (
+      ({ initialValues, values, errors, setValues, setErrors }: RenderProps) => (
         <ConnectionTenantType
           key="tenantType"
           initialValue={initialValues.tenantType}
