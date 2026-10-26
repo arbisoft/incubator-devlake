@@ -1716,13 +1716,10 @@
             "steps": [
               {
                 "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
-          }
+          },
+          "unit": "d"
         },
         "overrides": []
       },
@@ -1787,7 +1784,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Average days from creation to close (merged or not) of MRs created in the period; a merged MR closes at its merge date, and a few old MRs (created before 2022) with no close date are left out. MRs imported from GitHub and bot-authored MRs are left out.\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
+      "description": "Average days from creation to close (merged or not) of MRs created in the period; a merged MR closes at its merge date, and MRs with no close date are left out. MRs imported from GitHub and bot-authored MRs are left out.\ndatasource: pull_requests, pull_request_comments, accounts, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1850,7 +1847,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "-- Average days from creation to close (merged or not) of MRs created in the range.\n-- GitLab leaves closed_date empty on merged MRs, so a merged MR closes at its merge date. A few old MRs\n-- (created before 2022) have no close date at all and are left out.\n-- MRs imported from GitHub (the not_imported_mr constant, shared with dashboards A and C) and bot-authored MRs are left out.\nSELECT ROUND(AVG(TIMESTAMPDIFF(MINUTE, pr.created_date, COALESCE(pr.closed_date, pr.merged_date)) / 1440), 1) AS time_to_close\nFROM pull_requests pr\nWHERE pr.id LIKE 'gitlab:%'\n  AND $__timeFilter(pr.created_date)\n  AND pr.status IN ('CLOSED', 'MERGED')\n  AND COALESCE(pr.closed_date, pr.merged_date) IS NOT NULL\n  AND ${not_imported_mr:raw}\n  AND NOT EXISTS (SELECT 1 FROM accounts ba WHERE ba.id = pr.author_id AND ba.user_name LIKE 'project\\_%\\_bot\\_%')\n  AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
+          "rawSql": "-- Average days from creation to close (merged or not) of MRs created in the range.\n-- GitLab leaves closed_date empty on merged MRs, so a merged MR closes at its merge date. MRs with no close date at\n-- all are left out.\n-- MRs imported from GitHub (the not_imported_mr constant, shared with dashboards A and C) and bot-authored MRs are left out.\nSELECT ROUND(AVG(TIMESTAMPDIFF(MINUTE, pr.created_date, COALESCE(pr.closed_date, pr.merged_date)) / 1440), 1) AS time_to_close\nFROM pull_requests pr\nWHERE pr.id LIKE 'gitlab:%'\n  AND $__timeFilter(pr.created_date)\n  AND pr.status IN ('CLOSED', 'MERGED')\n  AND COALESCE(pr.closed_date, pr.merged_date) IS NOT NULL\n  AND ${not_imported_mr:raw}\n  AND NOT EXISTS (SELECT 1 FROM accounts ba WHERE ba.id = pr.author_id AND ba.user_name LIKE 'project\\_%\\_bot\\_%')\n  AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n  AND EXISTS (SELECT 1 FROM project_mapping pm\n               WHERE pm.row_id = pr.base_repo_id\n                 AND pm.`table` = 'repos'\n                 AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})));",
           "refId": "A"
         }
       ],
@@ -1896,13 +1893,10 @@
             "steps": [
               {
                 "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
-          }
+          },
+          "unit": "d"
         },
         "overrides": []
       },
@@ -1955,7 +1949,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "-- Average days from creation to close (merged or not) of MRs created per month or week.\n-- GitLab leaves closed_date empty on merged MRs, so a merged MR closes at its merge date. A few old MRs\n-- (created before 2022) have no close date at all and are left out.\n-- MRs imported from GitHub (the not_imported_mr constant, shared with dashboards A and C) and bot-authored MRs are left out.\nWITH buckets AS (\n  SELECT CASE WHEN '$interval' = 'WEEKDAY' THEN DATE_SUB(DATE(pr.created_date), INTERVAL WEEKDAY(pr.created_date) DAY) ELSE DATE_SUB(DATE(pr.created_date), INTERVAL DAYOFMONTH(pr.created_date) - 1 DAY) END AS time,\n         AVG(TIMESTAMPDIFF(MINUTE, pr.created_date, COALESCE(pr.closed_date, pr.merged_date)) / 1440) AS time_to_close\n  FROM pull_requests pr\n  WHERE pr.id LIKE 'gitlab:%'\n    AND $__timeFilter(pr.created_date)\n    AND pr.status IN ('CLOSED', 'MERGED')\n    AND COALESCE(pr.closed_date, pr.merged_date) IS NOT NULL\n    AND ${not_imported_mr:raw}\n    AND NOT EXISTS (SELECT 1 FROM accounts ba WHERE ba.id = pr.author_id AND ba.user_name LIKE 'project\\_%\\_bot\\_%')\n    AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  GROUP BY time\n)\nSELECT CASE WHEN '$interval' = 'DAYOFMONTH' THEN DATE_FORMAT(time, '%M %Y') ELSE DATE_FORMAT(time, 'W%v %x') END AS _time,\n       ROUND(time_to_close, 1) AS \"Time to Close\"\nFROM buckets\nORDER BY time;",
+          "rawSql": "-- Average days from creation to close (merged or not) of MRs created per month or week.\n-- GitLab leaves closed_date empty on merged MRs, so a merged MR closes at its merge date. MRs with no close date at\n-- all are left out.\n-- MRs imported from GitHub (the not_imported_mr constant, shared with dashboards A and C) and bot-authored MRs are left out.\nWITH buckets AS (\n  SELECT CASE WHEN '$interval' = 'WEEKDAY' THEN DATE_SUB(DATE(pr.created_date), INTERVAL WEEKDAY(pr.created_date) DAY) ELSE DATE_SUB(DATE(pr.created_date), INTERVAL DAYOFMONTH(pr.created_date) - 1 DAY) END AS time,\n         AVG(TIMESTAMPDIFF(MINUTE, pr.created_date, COALESCE(pr.closed_date, pr.merged_date)) / 1440) AS time_to_close\n  FROM pull_requests pr\n  WHERE pr.id LIKE 'gitlab:%'\n    AND $__timeFilter(pr.created_date)\n    AND pr.status IN ('CLOSED', 'MERGED')\n    AND COALESCE(pr.closed_date, pr.merged_date) IS NOT NULL\n    AND ${not_imported_mr:raw}\n    AND NOT EXISTS (SELECT 1 FROM accounts ba WHERE ba.id = pr.author_id AND ba.user_name LIKE 'project\\_%\\_bot\\_%')\n    AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  GROUP BY time\n)\nSELECT CASE WHEN '$interval' = 'DAYOFMONTH' THEN DATE_FORMAT(time, '%M %Y') ELSE DATE_FORMAT(time, 'W%v %x') END AS _time,\n       ROUND(time_to_close, 1) AS \"Time to Close\"\nFROM buckets\nORDER BY time;",
           "refId": "A"
         }
       ],
