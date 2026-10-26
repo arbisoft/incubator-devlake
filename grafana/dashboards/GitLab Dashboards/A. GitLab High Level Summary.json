@@ -974,7 +974,7 @@
             {
               "targetBlank": true,
               "title": "Detail",
-              "url": "/d/gitlab-e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/d/gitlab-e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-4"
             }
           ],
           "mappings": []
@@ -1074,7 +1074,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/gitlab-d-issue-overview?orgId=1&var-interval=1w&timezone=browser&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/d/gitlab-d-issue-overview?orgId=1&var-interval=1w&timezone=browser&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
             }
           ],
           "mappings": [],
@@ -1177,7 +1177,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/gitlab-d-issue-overview?orgId=1&var-interval=1w&timezone=browser&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/d/gitlab-d-issue-overview?orgId=1&var-interval=1w&timezone=browser&${__all_variables}&${__url_time_range}&viewPanel=panel-2"
             }
           ],
           "mappings": [],
@@ -1486,7 +1486,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/gitlab-e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/d/gitlab-e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-4"
             }
           ],
           "mappings": [],
@@ -1589,7 +1589,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/gitlab-e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/d/gitlab-e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-4"
             }
           ],
           "mappings": [],
@@ -1891,7 +1891,7 @@
             {
               "targetBlank": true,
               "title": "Details",
-              "url": "/d/gitlab-e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-1"
+              "url": "/d/gitlab-e-issues-per-developer?orgId=1&timezone=browser&var-interval=1w&${__all_variables}&${__url_time_range}&viewPanel=panel-4"
             }
           ],
           "mappings": [],
