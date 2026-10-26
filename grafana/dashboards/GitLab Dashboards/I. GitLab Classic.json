@@ -3266,7 +3266,8 @@
             "text": "(COALESCE(pr.description, '') NOT LIKE '*Created by%' AND NOT EXISTS (SELECT 1 FROM pull_request_comments ic WHERE ic.pull_request_id = pr.id AND ic.body LIKE '*Created by%') AND NOT (pr.created_date < '2021-07-01' AND EXISTS (SELECT 1 FROM accounts ia WHERE ia.id = pr.author_id AND ia.user_name = 'tayyab-razzaq')))",
             "value": "(COALESCE(pr.description, '') NOT LIKE '*Created by%' AND NOT EXISTS (SELECT 1 FROM pull_request_comments ic WHERE ic.pull_request_id = pr.id AND ic.body LIKE '*Created by%') AND NOT (pr.created_date < '2021-07-01' AND EXISTS (SELECT 1 FROM accounts ia WHERE ia.id = pr.author_id AND ia.user_name = 'tayyab-razzaq')))"
           }
-        ]
+        ],
+        "description": "Org-specific. An MR counts as imported from GitHub when its description or a comment starts with \"*Created by\", or when the import account (tayyab-razzaq) created it before 2021-07-01. Admins should change the account and date to their own import, or drop that part, and keep this the same on every dashboard that has it."
       }
     ]
   },

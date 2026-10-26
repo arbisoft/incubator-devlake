@@ -2253,7 +2253,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "-- Issues created in the range by status. GitLab leaves original_status empty and issues are only open or closed, so an\n-- open issue is In Progress when it has an In Progress, In Review, In QA, Ready to be Merged or Ready For Deployment label,\n-- as on dashboards A and E.\nSELECT CASE WHEN i.status = 'DONE' THEN 'Done' WHEN EXISTS (SELECT 1 FROM issue_labels ilp WHERE ilp.issue_id = i.id AND LOWER(ilp.label_name) IN ('in progress', 'in review', 'in qa', 'ready to be merged (approved)', 'ready for deployment')) THEN 'In Progress' ELSE 'To Do' END AS status,\n       COUNT(*) AS issue_count\nFROM issues i\nWHERE i.id LIKE 'gitlab:%'\n  AND $__timeFilter(i.created_date)\n  AND EXISTS (SELECT 1 FROM board_issues bi2 JOIN project_mapping pm2 ON pm2.row_id = bi2.board_id AND pm2.`table` = 'boards' WHERE bi2.issue_id = i.id AND bi2.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) AND pm2.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\nGROUP BY 1\nORDER BY issue_count DESC;",
+          "rawSql": "-- Issues created in the range by status. GitLab leaves original_status empty and issues are only open or closed, so an\n-- open issue is In Progress when it has an in-progress label (the in_progress_issue constant, shared with dashboards A\n-- and E).\nSELECT CASE WHEN i.status = 'DONE' THEN 'Done' WHEN ${in_progress_issue:raw} THEN 'In Progress' ELSE 'To Do' END AS status,\n       COUNT(*) AS issue_count\nFROM issues i\nWHERE i.id LIKE 'gitlab:%'\n  AND $__timeFilter(i.created_date)\n  AND EXISTS (SELECT 1 FROM board_issues bi2 JOIN project_mapping pm2 ON pm2.row_id = bi2.board_id AND pm2.`table` = 'boards' WHERE bi2.issue_id = i.id AND bi2.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) AND pm2.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\nGROUP BY 1\nORDER BY issue_count DESC;",
           "refId": "A"
         }
       ],
@@ -2404,7 +2404,28 @@
             "text": "(COALESCE(pr.description, '') NOT LIKE '*Created by%' AND NOT EXISTS (SELECT 1 FROM pull_request_comments ic WHERE ic.pull_request_id = pr.id AND ic.body LIKE '*Created by%') AND NOT (pr.created_date < '2021-07-01' AND EXISTS (SELECT 1 FROM accounts ia WHERE ia.id = pr.author_id AND ia.user_name = 'tayyab-razzaq')))",
             "value": "(COALESCE(pr.description, '') NOT LIKE '*Created by%' AND NOT EXISTS (SELECT 1 FROM pull_request_comments ic WHERE ic.pull_request_id = pr.id AND ic.body LIKE '*Created by%') AND NOT (pr.created_date < '2021-07-01' AND EXISTS (SELECT 1 FROM accounts ia WHERE ia.id = pr.author_id AND ia.user_name = 'tayyab-razzaq')))"
           }
-        ]
+        ],
+        "description": "Org-specific. An MR counts as imported from GitHub when its description or a comment starts with \"*Created by\", or when the import account (tayyab-razzaq) created it before 2021-07-01. Admins should change the account and date to their own import, or drop that part, and keep this the same on every dashboard that has it."
+      },
+      {
+        "name": "in_progress_issue",
+        "label": "SQL: open issue is in progress (alias i)",
+        "type": "constant",
+        "hide": 2,
+        "skipUrlSync": true,
+        "query": "(EXISTS (SELECT 1 FROM issue_labels ilp WHERE ilp.issue_id = i.id AND LOWER(ilp.label_name) IN ('in progress', 'in review', 'in qa', 'ready to be merged (approved)', 'ready for deployment')))",
+        "current": {
+          "text": "(EXISTS (SELECT 1 FROM issue_labels ilp WHERE ilp.issue_id = i.id AND LOWER(ilp.label_name) IN ('in progress', 'in review', 'in qa', 'ready to be merged (approved)', 'ready for deployment')))",
+          "value": "(EXISTS (SELECT 1 FROM issue_labels ilp WHERE ilp.issue_id = i.id AND LOWER(ilp.label_name) IN ('in progress', 'in review', 'in qa', 'ready to be merged (approved)', 'ready for deployment')))"
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "(EXISTS (SELECT 1 FROM issue_labels ilp WHERE ilp.issue_id = i.id AND LOWER(ilp.label_name) IN ('in progress', 'in review', 'in qa', 'ready to be merged (approved)', 'ready for deployment')))",
+            "value": "(EXISTS (SELECT 1 FROM issue_labels ilp WHERE ilp.issue_id = i.id AND LOWER(ilp.label_name) IN ('in progress', 'in review', 'in qa', 'ready to be merged (approved)', 'ready for deployment')))"
+          }
+        ],
+        "description": "Org-specific. An open issue is In Progress when it has one of these labels (GitLab issues are only open or closed). Admins should edit the list to their own workflow labels (e.g. workflow::in progress) and keep it the same on every dashboard that has it."
       }
     ]
   },

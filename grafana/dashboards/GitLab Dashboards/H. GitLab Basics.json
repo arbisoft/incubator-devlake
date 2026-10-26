@@ -394,7 +394,8 @@
             "text": "(i.original_type = 'INCIDENT' OR EXISTS (SELECT 1 FROM issue_labels ilb WHERE ilb.issue_id = i.id AND LOWER(ilb.label_name) IN ('bug', 'minorbug', 'regression issue', 'prod issue', 'qa issues', 'hotfix', 'sentry', 'prod-sentry', 'existing issue', 'data-issue', 'validation-issue', 'logic-issue', 'deployment issues', 'security', 'show-stopper', 'debug')))",
             "value": "(i.original_type = 'INCIDENT' OR EXISTS (SELECT 1 FROM issue_labels ilb WHERE ilb.issue_id = i.id AND LOWER(ilb.label_name) IN ('bug', 'minorbug', 'regression issue', 'prod issue', 'qa issues', 'hotfix', 'sentry', 'prod-sentry', 'existing issue', 'data-issue', 'validation-issue', 'logic-issue', 'deployment issues', 'security', 'show-stopper', 'debug')))"
           }
-        ]
+        ],
+        "description": "Org-specific. An issue is a bug when its type is INCIDENT or it has one of these labels. Admins should edit the label list to their own bug labels (e.g. type::bug) and keep it the same on every dashboard that has it."
       }
     ]
   },
