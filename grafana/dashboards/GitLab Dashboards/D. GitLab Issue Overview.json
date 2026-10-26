@@ -52,7 +52,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Issues created vs issues closed over time.\nDeveloper filter uses the current assignee; Closed counts issues resolved within the selected range. About 1,100 issues created before 2021 have no resolution date and are not counted as closed, and about 1,000 were closed in one bulk clean-up on 2021-09-22.\ndatasource: issues, board_issues, project_mapping",
+      "description": "Issues created vs issues closed over time.\nDeveloper filter uses the current assignee; Closed counts issues resolved within the selected range. Closed issues with no resolution date are not counted as closed.\ndatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {

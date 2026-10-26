@@ -26,7 +26,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Merged MRs per author classified as Light (<50 lines), Standard (<500) or Heavy by size, merge commits excluded. MRs whose commits were not collected (most MRs before 2024, about 1 in 5 since), environment promotion MRs and MRs imported from GitHub are left out.\ndatasource: pull_requests, pull_request_commits, commits, commit_parents, accounts",
+      "description": "Merged MRs per author classified as Light (<50 lines), Standard (<500) or Heavy by size, merge commits excluded. MRs whose commits were not collected, environment promotion MRs and MRs imported from GitHub are left out.\ndatasource: pull_requests, pull_request_commits, commits, commit_parents, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {

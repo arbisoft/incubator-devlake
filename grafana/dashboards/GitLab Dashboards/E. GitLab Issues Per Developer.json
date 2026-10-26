@@ -252,7 +252,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Issues closed by the selected developers over time. About 1,100 issues created before 2021 have no resolution date and are left out, and about 1,000 were closed in one bulk clean-up on 2021-09-22.\ndatasource: issues, board_issues, project_mapping",
+      "description": "Issues closed by the selected developers over time. Closed issues with no resolution date are left out.\ndatasource: issues, board_issues, project_mapping",
       "fieldConfig": {
         "defaults": {
           "color": {
