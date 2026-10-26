@@ -4,6 +4,9 @@ GitLab ports of the `GitHub Dashboards` folder. Each dashboard keeps its GitHub 
 reads only GitLab rows (`id LIKE 'gitlab:%'`). Every query is scoped through `project_mapping` and the viewer's
 `user_project_mapping` rows.
 
+Known issues and design decisions that are accepted as they are, plus deferred follow-ups, are listed in
+[KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+
 | File | uid |
 | --- | --- |
 | A. GitLab High Level Summary | `gitlab-a-high-level-summary` |
