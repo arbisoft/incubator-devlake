@@ -126,37 +126,48 @@ func normalizeName(raw string) (string, errors.Error) {
 	return name, nil
 }
 
+type passwordRule struct {
+	valid   func(string) bool
+	message string
+	code    string
+}
+
+// passwordRules run in order, so the length checks only see valid UTF-8.
+var passwordRules = []passwordRule{
+	{utf8.ValidString, "password must be valid UTF-8", ""},
+	{func(p string) bool { return utf8.RuneCountInString(p) >= passwordMinimumCharacters }, fmt.Sprintf("password must be at least %d characters", passwordMinimumCharacters), ErrCodePasswordShort},
+	{func(p string) bool { return len(p) <= passwordMaximumBytes }, fmt.Sprintf("password must be at most %d bytes", passwordMaximumBytes), ""},
+	{hasEveryPasswordClass, "password must include an uppercase letter, a lowercase letter, a digit and a symbol", ErrCodePasswordWeak},
+}
+
+// passwordClasses match Grafana's password policy; a symbol is anything that is not a letter or digit.
+var passwordClasses = []func(rune) bool{
+	unicode.IsUpper,
+	unicode.IsLower,
+	unicode.IsNumber,
+	func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsNumber(r) },
+}
+
 func checkPasswordRule(password string) errors.Error {
-	if !utf8.ValidString(password) {
-		return errors.BadInput.New("password must be valid UTF-8")
-	}
-	if utf8.RuneCountInString(password) < passwordMinimumCharacters {
-		return codedError(errors.BadInput, fmt.Sprintf("password must be at least %d characters", passwordMinimumCharacters), ErrCodePasswordShort)
-	}
-	if len(password) > passwordMaximumBytes {
-		return errors.BadInput.New(fmt.Sprintf("password must be at most %d bytes", passwordMaximumBytes))
-	}
-	if !hasEveryPasswordClass(password) {
-		return codedError(errors.BadInput, "password must include an uppercase letter, a lowercase letter, a digit and a symbol", ErrCodePasswordWeak)
+	for _, rule := range passwordRules {
+		if rule.valid(password) {
+			continue
+		}
+		if rule.code == "" {
+			return errors.BadInput.New(rule.message)
+		}
+		return codedError(errors.BadInput, rule.message, rule.code)
 	}
 	return nil
 }
 
 func hasEveryPasswordClass(password string) bool {
-	var upper, lower, digit, symbol bool
-	for _, r := range password {
-		switch {
-		case unicode.IsUpper(r):
-			upper = true
-		case unicode.IsLower(r):
-			lower = true
-		case unicode.IsNumber(r):
-			digit = true
-		case !unicode.IsLetter(r):
-			symbol = true
+	for _, inClass := range passwordClasses {
+		if strings.IndexFunc(password, inClass) < 0 {
+			return false
 		}
 	}
-	return upper && lower && digit && symbol
+	return true
 }
 
 // validateProjects de-duplicates the names and rejects unknown ones.
