@@ -1192,12 +1192,12 @@
           "value": "$__all"
         },
         "datasource": "mysql",
-        "definition": "select distinct type from issues",
+        "definition": "SELECT DISTINCT i.type FROM issues i JOIN board_issues bi ON i.id = bi.issue_id WHERE bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${board_id})) ORDER BY 1",
         "includeAll": true,
         "label": "Issue Type",
         "name": "type",
         "options": [],
-        "query": "select distinct type from issues",
+        "query": "SELECT DISTINCT i.type FROM issues i JOIN board_issues bi ON i.id = bi.issue_id WHERE bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${board_id})) ORDER BY 1",
         "refresh": 1,
         "regex": "",
         "type": "query"

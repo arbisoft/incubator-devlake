@@ -26,7 +26,7 @@ import (
 	"github.com/apache/incubator-devlake/core/models"
 )
 
-const testPassword = "correct-horse-battery-staple"
+const testPassword = "Correct-Horse-Battery-Staple-9"
 
 type fixture struct {
 	f *fakeGrafana
@@ -256,6 +256,7 @@ func TestCreateUserValidationMakesNoRequests(t *testing.T) {
 		{"empty name", CreateUserInput{Email: "b@example.com", Name: "  ", Role: "Viewer", Password: testPassword}, errors.BadInput, ""},
 		{"bad role", CreateUserInput{Email: "b@example.com", Name: "N", Role: "None", Password: testPassword}, errors.BadInput, ""},
 		{"short password", CreateUserInput{Email: "b@example.com", Name: "N", Role: "Viewer", Password: "short"}, errors.BadInput, ErrCodePasswordShort},
+		{"no symbol", CreateUserInput{Email: "b@example.com", Name: "N", Role: "Viewer", Password: "Abcdefghijklmnop1"}, errors.BadInput, ErrCodePasswordWeak},
 		{"14 characters", CreateUserInput{Email: "b@example.com", Name: "N", Role: "Viewer", Password: "12345678901234"}, errors.BadInput, ErrCodePasswordShort},
 		{"too long", CreateUserInput{Email: "b@example.com", Name: "N", Role: "Viewer", Password: long}, errors.BadInput, ""},
 		{"unknown project", CreateUserInput{Email: "b@example.com", Name: "N", Role: "Viewer", Password: testPassword, ProjectNames: []string{"alpha", "nope"}}, errors.BadInput, ErrCodeProjectMissing},
@@ -272,7 +273,7 @@ func TestCreateUserValidationMakesNoRequests(t *testing.T) {
 	}
 	t.Run("15 characters counted by runes", func(t *testing.T) {
 		fx := newFixture(t)
-		if _, err := fx.s.CreateUser(t.Context(), customerAdmin(), "a", CreateUserInput{Email: "b@example.com", Name: "N", Role: "Viewer", Password: strings.Repeat("é", 15)}); err != nil {
+		if _, err := fx.s.CreateUser(t.Context(), customerAdmin(), "a", CreateUserInput{Email: "b@example.com", Name: "N", Role: "Viewer", Password: "Éé1!" + strings.Repeat("é", 11)}); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -661,6 +662,11 @@ func TestSetUserPasswordRules(t *testing.T) {
 		wantCode(t, fx.s.SetUserPassword(t.Context(), customerAdmin(), "a", 2, PasswordInput{Password: "short"}), errors.BadInput, ErrCodePasswordShort)
 		fx.noWrites(t)
 	})
+	t.Run("missing a character class", func(t *testing.T) {
+		fx := newFixture(t)
+		wantCode(t, fx.s.SetUserPassword(t.Context(), customerAdmin(), "a", 2, PasswordInput{Password: "abcdefghijklmnopq1!"}), errors.BadInput, ErrCodePasswordWeak)
+		fx.noWrites(t)
+	})
 	t.Run("too long", func(t *testing.T) {
 		fx := newFixture(t)
 		wantCode(t, fx.s.SetUserPassword(t.Context(), customerAdmin(), "a", 2, PasswordInput{Password: strings.Repeat("x", passwordMaximumBytes+1)}), errors.BadInput, "")
@@ -926,6 +932,32 @@ func TestLastVisibleAdminExcludesManagementIdentity(t *testing.T) {
 			if err := attempt(fx); err != nil {
 				t.Fatal(err)
 			}
+		})
+	}
+}
+
+func TestCheckPasswordRuleClasses(t *testing.T) {
+	for _, tc := range []struct {
+		name, password, code string
+	}{
+		{"all classes", "Abcdefghijklm1!", ""},
+		{"space is the symbol", "Abcdefghijklm1 ", ""},
+		{"arabic-indic digit", "Abcdefghijklm١!", ""},
+		{"no upper", "abcdefghijklm1!", ErrCodePasswordWeak},
+		{"no lower", "ABCDEFGHIJKLM1!", ErrCodePasswordWeak},
+		{"no digit", "Abcdefghijklmn!", ErrCodePasswordWeak},
+		{"no symbol", "Abcdefghijklm12", ErrCodePasswordWeak},
+		{"accented letter is not a symbol", "Abcdefghijklm1é", ErrCodePasswordWeak},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := checkPasswordRule(tc.password)
+			if tc.code == "" {
+				if err != nil {
+					t.Fatalf("checkPasswordRule(%q) = %v, want nil", tc.password, err)
+				}
+				return
+			}
+			wantCode(t, err, errors.BadInput, tc.code)
 		})
 	}
 }

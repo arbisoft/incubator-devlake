@@ -44,12 +44,12 @@ ENV GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH="/etc/grafana/dashboards/AI Impact
 ENV PROMETHEUS_URL=http://host.docker.internal:9090
 # Keep bundled plugin versions instead of re-downloading them on every start.
 ENV GF_PLUGINS_PREINSTALL_AUTO_UPDATE=false
+# At least 12 characters with upper, lower, digit and symbol for every local password.
+ENV GF_AUTH_BASIC_PASSWORD_POLICY=true
+# Grafana's default CSP plus frame-ancestors; Grafana's own bundle still evaluates strings, so 'unsafe-eval' stays.
+ENV GF_SECURITY_CONTENT_SECURITY_POLICY=true
+ENV GF_SECURITY_CONTENT_SECURITY_POLICY_TEMPLATE="script-src 'self' 'unsafe-eval' 'unsafe-inline' 'strict-dynamic' \$NONCE;object-src 'none';font-src 'self';style-src 'self' 'unsafe-inline' blob:;img-src * data:;base-uri 'self';connect-src 'self' grafana.com *.cartocdn.com ws://\$ROOT_PATH wss://\$ROOT_PATH;manifest-src 'self';media-src 'none';form-action 'self' \$FORM_ACTION_ADDITIONAL_HOSTS;frame-ancestors 'none';"
 USER root
-# volkovlabs-form-panel (Business Forms) backs the Add/Remove panels in
-# dashboards/admin/AdminUserProjectAccess.json. Version is pinned: the dashboard
-# JSON targets the v6 panel schema, so an unpinned install would silently break
-# those panels on the next image build.
-RUN grafana cli plugins install volkovlabs-form-panel 6.3.5
 RUN chgrp -R 0 /etc/grafana /usr/share/grafana /var/lib/grafana && \
     chmod -R g=u /etc/grafana /usr/share/grafana /var/lib/grafana
 USER 101

@@ -20,32 +20,32 @@ import { describe, expect, it } from 'vitest';
 
 import { GRAFANA_ERROR_CODE } from '@/api/grafana-users/constants';
 
-import { COPY, GRAFANA_ERROR_MAP, GRAFANA_FLOW_ERRORS } from './constants';
+import { COPY, GRAFANA_FLOW_ERRORS, PASSWORD_MIN_LENGTH } from './constants';
 
 describe('Grafana error copy', () => {
   it.each(Object.values(GRAFANA_ERROR_CODE))('maps %s to its copy', (code) => {
-    expect(GRAFANA_ERROR_MAP[code]).toBe(COPY.errors[code]);
-    expect(GRAFANA_ERROR_MAP[code]).not.toBe('');
-  });
-
-  it('keeps flow overrides after the base map spread', () => {
-    const override = 'Flow specific copy.';
-    const flowMap: Record<string, string> = { ...GRAFANA_ERROR_MAP, [GRAFANA_ERROR_CODE.USER_EXISTS]: override };
-    expect(flowMap[GRAFANA_ERROR_CODE.USER_EXISTS]).toBe(override);
-    expect(flowMap[GRAFANA_ERROR_CODE.UNAVAILABLE]).toBe(COPY.errors[GRAFANA_ERROR_CODE.UNAVAILABLE]);
+    expect(COPY.errors[code]).toBeTruthy();
   });
 
   it('lets each flow override the base map after the spread and keep the other codes', () => {
     const code = GRAFANA_ERROR_CODE.USER_PROTECTED;
-    expect(GRAFANA_FLOW_ERRORS.ROLE[code]).not.toBe(GRAFANA_ERROR_MAP[code]);
-    expect(GRAFANA_FLOW_ERRORS.ROLE[GRAFANA_ERROR_CODE.UNAVAILABLE]).toBe(
-      GRAFANA_ERROR_MAP[GRAFANA_ERROR_CODE.UNAVAILABLE],
-    );
-    expect(GRAFANA_FLOW_ERRORS.CREATE).toEqual(GRAFANA_ERROR_MAP);
+    expect(GRAFANA_FLOW_ERRORS.ROLE[code]).not.toBe(COPY.errors[code]);
+    expect(GRAFANA_FLOW_ERRORS.ROLE[GRAFANA_ERROR_CODE.UNAVAILABLE]).toBe(COPY.errors[GRAFANA_ERROR_CODE.UNAVAILABLE]);
+    expect(GRAFANA_FLOW_ERRORS.CREATE).toEqual(COPY.errors);
+  });
+
+  it('states the same password minimum everywhere', () => {
+    const minimum = `at least ${PASSWORD_MIN_LENGTH} characters`;
+    [
+      COPY.errors[GRAFANA_ERROR_CODE.PASSWORD_TOO_SHORT],
+      COPY.password.rule,
+      COPY.add.disabledReason,
+      COPY.setPassword.disabledReason,
+    ].forEach((text) => expect(text).toContain(minimum));
   });
 
   it('never says username or login', () => {
-    const copy = JSON.stringify([COPY, GRAFANA_ERROR_MAP]).toLowerCase();
+    const copy = JSON.stringify(COPY).toLowerCase();
     expect(copy).not.toContain('username');
     expect(copy).not.toContain('login');
   });
