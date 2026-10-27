@@ -76,6 +76,7 @@ describe('AddUserModal initial form', () => {
     expectPasswordRetained(password, PASSWORD);
     expect(email.value === EMAIL).toBeTruthy();
     expect(props.onClose).not.toHaveBeenCalled();
+    expect(props.onPassword).not.toHaveBeenCalled();
     await waitForPasswordFormReady(submit(COPY.add.submit));
 
     fireEvent.click(submit(COPY.add.submit));

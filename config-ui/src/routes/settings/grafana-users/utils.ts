@@ -30,8 +30,8 @@ import { toUserMessage } from '@/ui/utils';
 import { isValidEmail, toAccessPagination } from '../utils';
 
 import {
+  COPY,
   GENERATED_PASSWORD_LENGTH,
-  GRAFANA_ERROR_MAP,
   GRAFANA_MENU_ACTION,
   PASSWORD_ALPHABET,
   PASSWORD_CHARACTER_CLASSES,
@@ -57,7 +57,7 @@ export const getUserIdentity = ({ name, email }: GrafanaUser) =>
   name ? { primary: name, secondary: email } : { primary: email, secondary: undefined };
 
 export const getUnavailableMessage = (source: unknown) =>
-  toUserMessage(source, GRAFANA_ERROR_MAP, GRAFANA_ERROR_MAP[GRAFANA_ERROR_CODE.UNAVAILABLE]);
+  toUserMessage(source, COPY.errors, COPY.errors[GRAFANA_ERROR_CODE.UNAVAILABLE]);
 
 export const getFlowError = (map: Record<string, string>) => (error: unknown) => toUserMessage(error, map);
 
