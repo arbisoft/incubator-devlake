@@ -1,0 +1,474 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Claude Code usage time per user, repository and workday from OTel prompt events: total and net prompt time, overlapping prompts, and when each workday started and ended.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Claude Prompts",
+      "tooltip": "Back to the Claude Prompts dashboard",
+      "type": "link",
+      "url": "/d/claude_prompts_mysql"
+    }
+  ],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": "mysql",
+      "description": "How long Claude Code was working for each user, per repository and workday. A workday is a run of the user's prompts, in any repository, with no break of ${workday_gap_hours} hours or more, and Date is the day it began. Only workdays that began in the time range are shown. Claude Usage Time adds up every prompt's duration (started_at to ended_at); Net Claude Usage Time counts time when prompts in the same row overlapped once, and Overlapping Prompts counts the prompts that ran alongside another one in the row. Prompts in different repositories never count as overlapping, so the footer's net total can be more than a user's active time across repositories. Times are shown in your browser's timezone. Repositories show as GH:, GL: or BB: (GitHub, GitLab or Bitbucket, cloud or self-hosted) followed by their path, as on the Claude Prompts dashboards; other hosts show their host name. Repository 'Unknown' means the session had no origin remote; Projects is every DevLake project that collects the repository, 'Unmapped' when none does.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false,
+            "wrapHeaderText": true
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "User"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 160
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repository"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 179
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Open repository",
+                    "url": "${__data.fields.repository_link}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Projects"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 105
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Date"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              },
+              {
+                "id": "unit",
+                "value": "time:YYYY-MM-DD"
+              },
+              {
+                "id": "description",
+                "value": "Date the user's workday began, in your browser's timezone. A workday is a run of prompts with no long break (see the panel description), so it can cross midnight."
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "First Prompt Started"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 178
+              },
+              {
+                "id": "unit",
+                "value": "time:hh:mm:ss A [UTC]Z"
+              },
+              {
+                "id": "description",
+                "value": "When the row's first prompt started, in your browser's timezone, with its offset from UTC. The Date column has the day."
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Last Prompt Completed"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 178
+              },
+              {
+                "id": "unit",
+                "value": "time:hh:mm:ss A [UTC]Z"
+              },
+              {
+                "id": "description",
+                "value": "When the row's last prompt finished, in your browser's timezone, with its offset from UTC. A workday can cross midnight, so this can be on the day after Date."
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Claude Usage Time"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 170
+              },
+              {
+                "id": "unit",
+                "value": "dtdurations"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.footer.reducers",
+                "value": [
+                  "sum"
+                ]
+              },
+              {
+                "id": "description",
+                "value": "Sum of the row's prompt durations. Prompts that ran at the same time are each counted in full."
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Overlapping Prompts"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 95
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.footer.reducers",
+                "value": [
+                  "sum"
+                ]
+              },
+              {
+                "id": "description",
+                "value": "Prompts that ran while another prompt in this row was running."
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Net Claude Usage Time"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 170
+              },
+              {
+                "id": "unit",
+                "value": "dtdurations"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.footer.reducers",
+                "value": [
+                  "sum"
+                ]
+              },
+              {
+                "id": "description",
+                "value": "Time when at least one prompt was running; overlapping prompts count once."
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "repository_link"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom.viz",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 16,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Date"
+          }
+        ]
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- base is every prompt the panel may count. workdays splits each user's prompts into workdays,\n-- islands groups each user, repository and workday's prompts into stretches of continuous\n-- activity, i has one row per island, and d one row per user, repository and workday.\nWITH base AS (\n  SELECT p.id,\n    COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    NULLIF(TRIM(a.full_name), '') AS full_name,\n    p.repository_url,\n    p.started_at,\n    p.ended_at\n  FROM ai_prompts p\n  -- account_id is the user's DevLake account, whose full_name the plugin copies from\n  -- another account with the same email.\n  LEFT JOIN accounts a ON a.id = p.account_id\n  -- One day before the range too, so a workday that began the evening before isn't taken to\n  -- start at its first prompt inside the range.\n  WHERE p.started_at >= DATE_ADD($__timeFrom(), INTERVAL -1 DAY) AND p.started_at < $__timeTo()\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n), gaps AS (\n  -- user_prev_end is the latest end among the user's earlier prompts, in any repository.\n  SELECT base.*,\n    MAX(ended_at) OVER (PARTITION BY user ORDER BY started_at, id\n      ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS user_prev_end\n  FROM base\n), workdays AS (\n  -- A prompt that starts workday_gap_hours or more after the user's earlier prompts ended\n  -- begins a new workday.\n  SELECT gaps.*,\n    SUM(CASE WHEN user_prev_end IS NULL OR started_at >= DATE_ADD(user_prev_end, INTERVAL ${workday_gap_hours} HOUR) THEN 1 ELSE 0 END)\n      OVER (PARTITION BY user ORDER BY started_at, id) AS workday\n  FROM gaps\n), w AS (\n  SELECT workdays.*, MIN(started_at) OVER (PARTITION BY user, workday) AS workday_start\n  FROM workdays\n), ordered AS (\n  -- prev_max_end is the latest end among the prompts that started before this one in its row.\n  -- id breaks ties between prompts that started at the same instant.\n  SELECT w.*,\n    MAX(ended_at) OVER (PARTITION BY user, repository_url, workday ORDER BY started_at, id\n      ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS prev_max_end\n  FROM w\n  -- Only workdays that began in the range. The Repository filter applies here, after workdays\n  -- are found, so it doesn't move their boundaries.\n  WHERE w.workday_start >= $__timeFrom()\n    AND COALESCE(w.repository_url, 'Unknown') IN (${repository:sqlstring})\n), islands AS (\n  -- A prompt that starts at or after every earlier prompt has ended begins a new island. A\n  -- prompt that starts while an earlier one is still running joins that island.\n  SELECT ordered.*,\n    SUM(CASE WHEN prev_max_end IS NULL OR started_at >= prev_max_end THEN 1 ELSE 0 END)\n      OVER (PARTITION BY user, repository_url, workday ORDER BY started_at, id) AS island\n  FROM ordered\n), i AS (\n  SELECT user, repository_url, workday, island,\n    MAX(full_name) AS full_name,\n    MIN(workday_start) AS workday_start,\n    COUNT(*) AS prompts,\n    MIN(started_at) AS island_start,\n    MAX(ended_at) AS island_end,\n    SUM(TIMESTAMPDIFF(MICROSECOND, started_at, ended_at)) / 1000000 AS secs\n  FROM islands\n  GROUP BY user, repository_url, workday, island\n), d AS (\n  SELECT user, repository_url, workday,\n    MAX(full_name) AS full_name,\n    MIN(workday_start) AS workday_start,\n    MIN(island_start) AS first_start,\n    MAX(island_end) AS last_end,\n    SUM(secs) AS secs,\n    -- Every prompt in an island of two or more overlaps at least one other prompt.\n    SUM(CASE WHEN prompts > 1 THEN prompts ELSE 0 END) AS overlapping,\n    SUM(TIMESTAMPDIFF(MICROSECOND, island_start, island_end)) / 1000000 AS net_secs\n  FROM i\n  GROUP BY user, repository_url, workday\n)\nSELECT COALESCE(d.full_name, d.user) AS \"User\",\n  -- Labelled as on the Claude Prompts dashboards: GH:, GL: or BB: and the path, or the host for other servers.\n  CASE\n    WHEN d.repository_url IS NULL THEN 'Unknown'\n    WHEN d.repository_url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(d.repository_url, '^https?://[^/]+/', 'GH: ')\n    WHEN d.repository_url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(d.repository_url, '^https?://[^/]+/', 'GL: ')\n    WHEN d.repository_url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(d.repository_url, '^https?://[^/]+/', 'BB: ')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN d.repository_url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(d.repository_url, '^https?://[^/]+/(scm/)?', 'BB: ')\n    ELSE REGEXP_REPLACE(d.repository_url, '^https?://', '')\n  END AS \"Repository\",\n  CASE WHEN d.repository_url IS NULL THEN 'No repository' ELSE COALESCE(dl.projects, 'Unmapped') END AS \"Projects\",\n  -- A timestamp, not DATE(...): the panel formats it as a date in the browser's timezone.\n  d.workday_start AS \"Date\",\n  d.first_start AS \"First Prompt Started\",\n  d.last_end AS \"Last Prompt Completed\",\n  d.secs AS \"Claude Usage Time\",\n  d.overlapping AS \"Overlapping Prompts\",\n  d.net_secs AS \"Net Claude Usage Time\",\n  -- repository_link is empty for prompts without a repository, so their Repository cell has no link.\n  COALESCE(d.repository_url, '') AS repository_link\nFROM d\nLEFT JOIN (\n  -- repository_url is lowercased with the .git suffix dropped, so normalize repos.url the same way.\n  SELECT TRIM(TRAILING '.git' FROM LOWER(rp.url)) AS url,\n    GROUP_CONCAT(DISTINCT pm.project_name ORDER BY pm.project_name SEPARATOR ', ') AS projects\n  FROM repos rp\n  JOIN project_mapping pm ON pm.row_id = rp.id AND pm.`table` = 'repos'\n  GROUP BY TRIM(TRAILING '.git' FROM LOWER(rp.url))\n) dl ON dl.url = d.repository_url\nORDER BY d.workday_start DESC, d.secs DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Claude Usage Time",
+      "type": "table"
+    }
+  ],
+  "preload": false,
+  "refresh": "",
+  "schemaVersion": 42,
+  "tags": [
+    "claude",
+    "anthropic",
+    "devlake",
+    "ai"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nINNER JOIN user_project_mapping upm ON upm.project_name = p.name\nWHERE c.status = 'active'\n  AND upm.user_login = ${__user.login:sqlstring}\nORDER BY p.name;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nINNER JOIN user_project_mapping upm ON upm.project_name = p.name\nWHERE c.status = 'active'\n  AND upm.user_login = ${__user.login:sqlstring}\nORDER BY p.name;",
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND (cp.project_name REGEXP '^(${project:regex})$' AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring}))\nORDER BY c.team_slug;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Claude Code OTel teams",
+        "multi": true,
+        "name": "otel_teams",
+        "options": [],
+        "query": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND (cp.project_name REGEXP '^(${project:regex})$' AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring}))\nORDER BY c.team_slug;",
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "-- The label is the person's full name from their DevLake account, falling back to the email; the value stays the\n-- email (or user key) that every panel filters on.\nSELECT COALESCE(u.full_name, u.user) AS __text, u.user AS __value\nFROM (\n  SELECT COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  GROUP BY 1\n) u\nORDER BY 1;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "User",
+        "multi": true,
+        "name": "user",
+        "options": [],
+        "query": "-- The label is the person's full name from their DevLake account, falling back to the email; the value stays the\n-- email (or user key) that every panel filters on.\nSELECT COALESCE(u.full_name, u.user) AS __text, u.user AS __value\nFROM (\n  SELECT COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  GROUP BY 1\n) u\nORDER BY 1;",
+        "refresh": 2,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "-- Repositories the selected users' prompts ran in, labelled as on Token Usage by Repository.\n-- 'Unknown' stands for prompts without a repository; a real repository_url is always an\n-- https URL, so it cannot clash.\nSELECT CASE\n    WHEN r.url = 'Unknown' THEN 'Unknown'\n    WHEN r.url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GH: ')\n    WHEN r.url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GL: ')\n    WHEN r.url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'BB: ')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN r.url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/(scm/)?', 'BB: ')\n    ELSE REGEXP_REPLACE(r.url, '^https?://', '')\n  END AS __text, r.url AS __value\nFROM (\n  SELECT DISTINCT COALESCE(p.repository_url, 'Unknown') AS url\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n) r\nORDER BY r.url = 'Unknown', 1;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Repository",
+        "multi": true,
+        "name": "repository",
+        "options": [],
+        "query": "-- Repositories the selected users' prompts ran in, labelled as on Token Usage by Repository.\n-- 'Unknown' stands for prompts without a repository; a real repository_url is always an\n-- https URL, so it cannot clash.\nSELECT CASE\n    WHEN r.url = 'Unknown' THEN 'Unknown'\n    WHEN r.url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GH: ')\n    WHEN r.url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GL: ')\n    WHEN r.url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'BB: ')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN r.url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/(scm/)?', 'BB: ')\n    ELSE REGEXP_REPLACE(r.url, '^https?://', '')\n  END AS __text, r.url AS __value\nFROM (\n  SELECT DISTINCT COALESCE(p.repository_url, 'Unknown') AS url\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n) r\nORDER BY r.url = 'Unknown', 1;",
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "6",
+          "value": "6"
+        },
+        "description": "Hours without a prompt that start a new workday. A 7–12 hour workday leaves at least 12 hours off, so 6 separates days without splitting one at a lunch or meeting break.",
+        "hide": 2,
+        "label": "Workday gap (hours)",
+        "name": "workday_gap_hours",
+        "options": [
+          {
+            "selected": true,
+            "text": "6",
+            "value": "6"
+          }
+        ],
+        "query": "6",
+        "skipUrlSync": true,
+        "type": "constant"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ]
+  },
+  "timezone": "browser",
+  "title": "Claude Usage Time",
+  "uid": "claude_usage_time_mysql"
+}
