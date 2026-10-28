@@ -38,7 +38,7 @@
   "panels": [
     {
       "datasource": "mysql",
-      "description": "One row per Claude Code session. Each session's prompts are drawn in that session's own colour. Grey is time between prompts while the session was open. Shows the 30 most recently active sessions in the range. Colours are assigned in the order sessions started, so they can change with the time range or filters. Rows are labelled with the session's repository (GH:, GL: or BB: and its path, or Unknown) and the first 8 characters of its session ID. Times are shown in your browser's timezone.",
+      "description": "One row per Claude Code session, drawn as one solid bar in the session's own colour from its first prompt's start to its last prompt's end. Idle time between prompts is included, even if the session was closed and resumed. Hover a bar for the session's prompt count and tokens (input, output, cache read and cache write together). Shows the 30 most recently active sessions in the range. Colours are assigned in the order sessions started, so they can change with the time range or filters. Rows are labelled with the session's repository (GH:, GL: or BB: and its path, or Unknown) and the first 8 characters of its session ID. Times are shown in your browser's timezone.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -46,7 +46,7 @@
             "mode": "fixed"
           },
           "custom": {
-            "fillOpacity": 85,
+            "fillOpacity": 70,
             "hideFrom": {
               "legend": false,
               "tooltip": false,
@@ -60,170 +60,340 @@
           "mappings": [
             {
               "options": {
-                "0": {
-                  "color": "rgba(128,128,128,0.25)",
-                  "index": 0,
-                  "text": "Idle (session open)"
-                },
-                "1": {
+                "pattern": "^1\\|(.*)$",
+                "result": {
                   "color": "#7EB26D",
-                  "index": 1,
-                  "text": "Prompt running"
-                },
-                "10": {
-                  "color": "#CCA300",
-                  "index": 10,
-                  "text": "Prompt running"
-                },
-                "11": {
-                  "color": "#447EBC",
-                  "index": 11,
-                  "text": "Prompt running"
-                },
-                "12": {
-                  "color": "#C15C17",
-                  "index": 12,
-                  "text": "Prompt running"
-                },
-                "13": {
-                  "color": "#890F02",
-                  "index": 13,
-                  "text": "Prompt running"
-                },
-                "14": {
-                  "color": "#0A437C",
-                  "index": 14,
-                  "text": "Prompt running"
-                },
-                "15": {
-                  "color": "#6D1F62",
-                  "index": 15,
-                  "text": "Prompt running"
-                },
-                "16": {
-                  "color": "#584477",
-                  "index": 16,
-                  "text": "Prompt running"
-                },
-                "17": {
-                  "color": "#B7DBAB",
-                  "index": 17,
-                  "text": "Prompt running"
-                },
-                "18": {
-                  "color": "#F4D598",
-                  "index": 18,
-                  "text": "Prompt running"
-                },
-                "19": {
-                  "color": "#70DBED",
-                  "index": 19,
-                  "text": "Prompt running"
-                },
-                "2": {
-                  "color": "#EAB839",
-                  "index": 2,
-                  "text": "Prompt running"
-                },
-                "20": {
-                  "color": "#F9BA8F",
-                  "index": 20,
-                  "text": "Prompt running"
-                },
-                "21": {
-                  "color": "#F29191",
-                  "index": 21,
-                  "text": "Prompt running"
-                },
-                "22": {
-                  "color": "#82B5D8",
-                  "index": 22,
-                  "text": "Prompt running"
-                },
-                "23": {
-                  "color": "#E5A8E2",
-                  "index": 23,
-                  "text": "Prompt running"
-                },
-                "24": {
-                  "color": "#AEA2E0",
-                  "index": 24,
-                  "text": "Prompt running"
-                },
-                "25": {
-                  "color": "#629E51",
-                  "index": 25,
-                  "text": "Prompt running"
-                },
-                "26": {
-                  "color": "#E5AC0E",
-                  "index": 26,
-                  "text": "Prompt running"
-                },
-                "27": {
-                  "color": "#64B0C8",
-                  "index": 27,
-                  "text": "Prompt running"
-                },
-                "28": {
-                  "color": "#E0752D",
-                  "index": 28,
-                  "text": "Prompt running"
-                },
-                "29": {
-                  "color": "#BF1B00",
-                  "index": 29,
-                  "text": "Prompt running"
-                },
-                "3": {
-                  "color": "#6ED0E0",
-                  "index": 3,
-                  "text": "Prompt running"
-                },
-                "30": {
-                  "color": "#0A50A1",
-                  "index": 30,
-                  "text": "Prompt running"
-                },
-                "4": {
-                  "color": "#EF843C",
-                  "index": 4,
-                  "text": "Prompt running"
-                },
-                "5": {
-                  "color": "#E24D42",
-                  "index": 5,
-                  "text": "Prompt running"
-                },
-                "6": {
-                  "color": "#1F78C1",
-                  "index": 6,
-                  "text": "Prompt running"
-                },
-                "7": {
-                  "color": "#BA43A6",
-                  "index": 7,
-                  "text": "Prompt running"
-                },
-                "8": {
-                  "color": "#705DA0",
-                  "index": 8,
-                  "text": "Prompt running"
-                },
-                "9": {
-                  "color": "#508642",
-                  "index": 9,
-                  "text": "Prompt running"
+                  "index": 0,
+                  "text": "$1"
                 }
               },
-              "type": "value"
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^2\\|(.*)$",
+                "result": {
+                  "color": "#EAB839",
+                  "index": 1,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^3\\|(.*)$",
+                "result": {
+                  "color": "#6ED0E0",
+                  "index": 2,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^4\\|(.*)$",
+                "result": {
+                  "color": "#EF843C",
+                  "index": 3,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^5\\|(.*)$",
+                "result": {
+                  "color": "#E24D42",
+                  "index": 4,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^6\\|(.*)$",
+                "result": {
+                  "color": "#1F78C1",
+                  "index": 5,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^7\\|(.*)$",
+                "result": {
+                  "color": "#BA43A6",
+                  "index": 6,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^8\\|(.*)$",
+                "result": {
+                  "color": "#705DA0",
+                  "index": 7,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^9\\|(.*)$",
+                "result": {
+                  "color": "#508642",
+                  "index": 8,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^10\\|(.*)$",
+                "result": {
+                  "color": "#CCA300",
+                  "index": 9,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^11\\|(.*)$",
+                "result": {
+                  "color": "#447EBC",
+                  "index": 10,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^12\\|(.*)$",
+                "result": {
+                  "color": "#C15C17",
+                  "index": 11,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^13\\|(.*)$",
+                "result": {
+                  "color": "#890F02",
+                  "index": 12,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^14\\|(.*)$",
+                "result": {
+                  "color": "#0A437C",
+                  "index": 13,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^15\\|(.*)$",
+                "result": {
+                  "color": "#6D1F62",
+                  "index": 14,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^16\\|(.*)$",
+                "result": {
+                  "color": "#584477",
+                  "index": 15,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^17\\|(.*)$",
+                "result": {
+                  "color": "#B7DBAB",
+                  "index": 16,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^18\\|(.*)$",
+                "result": {
+                  "color": "#F4D598",
+                  "index": 17,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^19\\|(.*)$",
+                "result": {
+                  "color": "#70DBED",
+                  "index": 18,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^20\\|(.*)$",
+                "result": {
+                  "color": "#F9BA8F",
+                  "index": 19,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^21\\|(.*)$",
+                "result": {
+                  "color": "#F29191",
+                  "index": 20,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^22\\|(.*)$",
+                "result": {
+                  "color": "#82B5D8",
+                  "index": 21,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^23\\|(.*)$",
+                "result": {
+                  "color": "#E5A8E2",
+                  "index": 22,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^24\\|(.*)$",
+                "result": {
+                  "color": "#AEA2E0",
+                  "index": 23,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^25\\|(.*)$",
+                "result": {
+                  "color": "#629E51",
+                  "index": 24,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^26\\|(.*)$",
+                "result": {
+                  "color": "#E5AC0E",
+                  "index": 25,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^27\\|(.*)$",
+                "result": {
+                  "color": "#64B0C8",
+                  "index": 26,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^28\\|(.*)$",
+                "result": {
+                  "color": "#E0752D",
+                  "index": 27,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^29\\|(.*)$",
+                "result": {
+                  "color": "#BF1B00",
+                  "index": 28,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
+            },
+            {
+              "options": {
+                "pattern": "^30\\|(.*)$",
+                "result": {
+                  "color": "#0A50A1",
+                  "index": 29,
+                  "text": "$1"
+                }
+              },
+              "type": "regex"
             },
             {
               "options": {
                 "match": "null",
                 "result": {
                   "color": "transparent",
-                  "index": 31,
+                  "index": 30,
                   "text": ""
                 }
               },
@@ -257,7 +427,7 @@
           "showLegend": false
         },
         "mergeValues": true,
-        "rowHeight": 0.8,
+        "rowHeight": 0.75,
         "showValue": "never",
         "tooltip": {
           "hideZeros": false,
@@ -272,7 +442,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "-- base is every prompt the panel may show, s labels and ranks each session, shown keeps the 30\n-- most recently active sessions and numbers them for their colours, and prompts adds the start\n-- of the session's next prompt. The outer query turns each prompt into a start point and an\n-- end point.\nWITH base AS (\n  SELECT p.id, p.workspace_key, p.session_id, p.started_at, p.ended_at, p.repository_url\n  FROM ai_prompts p\n  -- Prompts that overlap the time range, so a prompt that began before the range still shows.\n  WHERE p.started_at < $__timeTo() AND p.ended_at > $__timeFrom()\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.status = 'active' AND upm_g.user_login = ${__user.login:sqlstring})\n    -- user is single-select, so this is one user.\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) = ${user:sqlstring}\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n), s AS (\n  SELECT workspace_key, session_id,\n    MAX(repository_url) AS repository_url,\n    MIN(started_at) AS first_start,\n    -- 1 is the session that was active most recently.\n    DENSE_RANK() OVER (ORDER BY MAX(ended_at) DESC, workspace_key, session_id) AS recency\n  FROM base\n  GROUP BY workspace_key, session_id\n), shown AS (\n  -- colour numbers the shown sessions 1, 2, 3… in the order they started; each number maps to\n  -- its own colour in the panel's value mappings.\n  SELECT s.*, ROW_NUMBER() OVER (ORDER BY first_start, workspace_key, session_id) AS colour,\n    -- The repository is labelled as on the Claude Prompts dashboards: GH:, GL: or BB: and the path,\n    -- or the host for other servers.\n    CONCAT(CASE\n        WHEN s.repository_url IS NULL THEN 'Unknown'\n        WHEN s.repository_url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(s.repository_url, '^https?://[^/]+/', 'GH: ')\n        WHEN s.repository_url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(s.repository_url, '^https?://[^/]+/', 'GL: ')\n        WHEN s.repository_url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(s.repository_url, '^https?://[^/]+/', 'BB: ')\n        -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n        WHEN s.repository_url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(s.repository_url, '^https?://[^/]+/(scm/)?', 'BB: ')\n        ELSE REGEXP_REPLACE(s.repository_url, '^https?://', '')\n      END, ' · ', LEFT(s.session_id, 8)) AS session_label\n  FROM s\n  -- More rows than this can't be read in one panel, and the panel maps 30 colours. Narrow the\n  -- User or Repository filter instead.\n  WHERE s.recency <= 30\n), prompts AS (\n  SELECT b.*, sh.session_label, sh.colour,\n    LEAD(b.started_at) OVER (PARTITION BY b.workspace_key, b.session_id ORDER BY b.started_at, b.id) AS next_start\n  FROM base b\n  JOIN shown sh ON sh.workspace_key = b.workspace_key AND sh.session_id = b.session_id\n)\nSELECT t AS time, session_label AS session, state\nFROM (\n  SELECT started_at AS t, started_at AS sort_start, id, 0 AS kind, session_label, colour AS state\n  FROM prompts\n  UNION ALL\n  -- After the session's last prompt the state is NULL, so the row shows nothing until the range ends.\n  SELECT ended_at, started_at, id, 1, session_label,\n    CASE WHEN next_start IS NULL THEN NULL ELSE 0 END\n  FROM prompts\n) pts\n-- When one prompt ends at the instant the next starts, the earlier prompt's end sorts first, so\n-- the later prompt's start wins.\nORDER BY t, sort_start, id, kind",
+          "rawSql": "-- base is every prompt the panel may show, s spans and ranks each session, and shown keeps the 30\n-- most recently active sessions and numbers them for their colours. The outer query turns each\n-- session into a start point and an end point, so it draws as one solid bar.\nWITH base AS (\n  SELECT p.id, p.workspace_key, p.session_id, p.started_at, p.ended_at, p.repository_url,\n    p.input_tokens + p.output_tokens + p.cache_read_tokens + p.cache_creation_tokens AS tokens\n  FROM ai_prompts p\n  -- Prompts that overlap the time range, so a prompt that began before the range still shows.\n  WHERE p.started_at < $__timeTo() AND p.ended_at > $__timeFrom()\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.status = 'active' AND upm_g.user_login = ${__user.login:sqlstring})\n    -- user is single-select, so this is one user.\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) = ${user:sqlstring}\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n), s AS (\n  SELECT workspace_key, session_id,\n    MAX(repository_url) AS repository_url,\n    MIN(started_at) AS first_start,\n    MAX(ended_at) AS last_end,\n    -- Shown in the bar's tooltip. Tokens are input, output, cache read and cache write together.\n    COUNT(*) AS prompts,\n    SUM(tokens) AS tokens,\n    -- 1 is the session that was active most recently.\n    DENSE_RANK() OVER (ORDER BY MAX(ended_at) DESC, workspace_key, session_id) AS recency\n  FROM base\n  GROUP BY workspace_key, session_id\n), shown AS (\n  -- colour numbers the shown sessions 1, 2, 3… in the order they started; each number maps to\n  -- its own colour in the panel's value mappings.\n  SELECT s.*, ROW_NUMBER() OVER (ORDER BY first_start, workspace_key, session_id) AS colour,\n    -- The repository is labelled as on the Claude Prompts dashboards: GH:, GL: or BB: and the path,\n    -- or the host for other servers.\n    CONCAT(CASE\n        WHEN s.repository_url IS NULL THEN 'Unknown'\n        WHEN s.repository_url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(s.repository_url, '^https?://[^/]+/', 'GH: ')\n        WHEN s.repository_url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(s.repository_url, '^https?://[^/]+/', 'GL: ')\n        WHEN s.repository_url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(s.repository_url, '^https?://[^/]+/', 'BB: ')\n        -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n        WHEN s.repository_url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(s.repository_url, '^https?://[^/]+/(scm/)?', 'BB: ')\n        ELSE REGEXP_REPLACE(s.repository_url, '^https?://', '')\n      END, ' · ', LEFT(s.session_id, 8)) AS session_label\n  FROM s\n  -- More rows than this can't be read in one panel, and the panel maps 30 colours. Narrow the\n  -- User or Repository filter instead.\n  WHERE s.recency <= 30\n)\nSELECT t AS time, session_label AS session, state\nFROM (\n  -- The session's bar runs from its first prompt's start to its last prompt's end, idle time included.\n  -- state is \"<colour number>|<tooltip text>\": the panel's regex mappings colour the bar by the number\n  -- and show the text, the session's prompt count and tokens, in the tooltip.\n  SELECT first_start AS t, 0 AS kind, session_label,\n    CONCAT(colour, '|', prompts, IF(prompts = 1, ' prompt', ' prompts'), ' · ',\n      CASE\n        WHEN tokens >= 1000000000 THEN CONCAT(ROUND(tokens / 1000000000, 1), 'B')\n        WHEN tokens >= 1000000 THEN CONCAT(ROUND(tokens / 1000000, 1), 'M')\n        WHEN tokens >= 1000 THEN CONCAT(ROUND(tokens / 1000, 1), 'K')\n        ELSE tokens\n      END, ' tokens') AS state\n  FROM shown\n  UNION ALL\n  -- After the last prompt the state is NULL, so the row shows nothing until the range ends.\n  SELECT last_end, 1, session_label, NULL\n  FROM shown\n) pts\nORDER BY t, kind",
           "refId": "A"
         }
       ],
