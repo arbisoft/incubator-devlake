@@ -430,7 +430,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
+            "barWidthFactor": 0.75,
             "drawStyle": "bars",
             "fillOpacity": 80,
             "gradientMode": "none",
@@ -561,7 +561,7 @@
       "id": 9,
       "options": {
         "barRadius": 0,
-        "barWidth": 0.97,
+        "barWidth": 0.75,
         "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
@@ -766,7 +766,7 @@
       "id": 12,
       "options": {
         "barRadius": 0,
-        "barWidth": 0.97,
+        "barWidth": 0.75,
         "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
@@ -1498,7 +1498,7 @@
       "id": 22,
       "options": {
         "barRadius": 0,
-        "barWidth": 0.97,
+        "barWidth": 0.75,
         "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
@@ -1587,7 +1587,7 @@
       "id": 23,
       "options": {
         "barRadius": 0,
-        "barWidth": 0.97,
+        "barWidth": 0.75,
         "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
@@ -2560,7 +2560,7 @@
       "id": 46,
       "options": {
         "barRadius": 0,
-        "barWidth": 0.97,
+        "barWidth": 0.75,
         "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
