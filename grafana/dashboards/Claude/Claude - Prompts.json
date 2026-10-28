@@ -714,7 +714,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "How many prompts made N API requests, and how many made N tool calls.",
+      "description": "Each bar is the number of prompts that made that many API requests (calls to the model), counting the prompt's subagents and background calls such as session titles. For example, the bar over 2-3 is how many prompts took 2 or 3 model calls to finish. 0 means the prompt never reached the model, such as /exit or another local slash command. Prompts by Tool Call Count beside it buckets the same prompts by tool calls.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -724,7 +724,7 @@
             "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
-            "axisLabel": "",
+            "axisLabel": "Prompts",
             "axisPlacement": "auto",
             "fillOpacity": 80,
             "gradientMode": "none",
@@ -755,11 +755,25 @@
             ]
           },
           "unit": "short"
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "API requests per prompt"
+            },
+            "properties": [
+              {
+                "id": "custom.axisLabel",
+                "value": "API requests per prompt"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 9,
-        "w": 24,
+        "w": 12,
         "x": 0,
         "y": 32
       },
@@ -773,17 +787,17 @@
           "calcs": [],
           "displayMode": "list",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": false
         },
         "orientation": "auto",
         "showValue": "auto",
-        "stacking": "normal",
+        "stacking": "none",
         "tooltip": {
           "hideZeros": false,
           "mode": "multi",
           "sort": "none"
         },
-        "xField": "Calls per prompt",
+        "xField": "API requests per prompt",
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
@@ -794,11 +808,115 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT b.label AS \"Calls per prompt\",\n  SUM(CASE WHEN p.api_request_count BETWEEN b.lo AND b.hi THEN 1 ELSE 0 END) AS \"API requests\",\n  SUM(CASE WHEN p.tool_call_count BETWEEN b.lo AND b.hi THEN 1 ELSE 0 END) AS \"Tool calls\"\nFROM (\n  SELECT 0 AS ord, '0' AS label, 0 AS lo, 0 AS hi\n  UNION ALL SELECT 1, '1', 1, 1\n  UNION ALL SELECT 2, '2-3', 2, 3\n  UNION ALL SELECT 3, '4-7', 4, 7\n  UNION ALL SELECT 4, '8-15', 8, 15\n  UNION ALL SELECT 5, '16-31', 16, 31\n  UNION ALL SELECT 6, '32+', 32, 1000000000\n) AS b\nCROSS JOIN ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\nGROUP BY b.ord, b.label\nORDER BY b.ord",
+          "rawSql": "SELECT b.label AS \"API requests per prompt\",\n  SUM(CASE WHEN p.api_request_count BETWEEN b.lo AND b.hi THEN 1 ELSE 0 END) AS \"Prompts\"\nFROM (\n  SELECT 0 AS ord, '0' AS label, 0 AS lo, 0 AS hi\n  UNION ALL SELECT 1, '1', 1, 1\n  UNION ALL SELECT 2, '2-3', 2, 3\n  UNION ALL SELECT 3, '4-7', 4, 7\n  UNION ALL SELECT 4, '8-15', 8, 15\n  UNION ALL SELECT 5, '16-31', 16, 31\n  UNION ALL SELECT 6, '32+', 32, 1000000000\n) AS b\nCROSS JOIN ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\nGROUP BY b.ord, b.label\nORDER BY b.ord",
           "refId": "A"
         }
       ],
-      "title": "Prompt Size Distribution",
+      "title": "Prompts by API Request Count",
+      "type": "barchart"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Each bar is the number of prompts that made that many tool calls (Bash, Read, Edit and the other tools Claude ran), counting the prompt's subagents. A call counts once it finishes, whether it succeeded or failed; a tool use the user rejected is not counted. For example, the bar over 4-7 is how many prompts ran 4 to 7 tools. 0 means Claude answered without running a tool. Prompts by API Request Count beside it buckets the same prompts by API requests.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#EAB839",
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Prompts",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 0,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tool calls per prompt"
+            },
+            "properties": [
+              {
+                "id": "custom.axisLabel",
+                "value": "Tool calls per prompt"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "id": 47,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.75,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xField": "Tool calls per prompt",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT b.label AS \"Tool calls per prompt\",\n  SUM(CASE WHEN p.tool_call_count BETWEEN b.lo AND b.hi THEN 1 ELSE 0 END) AS \"Prompts\"\nFROM (\n  SELECT 0 AS ord, '0' AS label, 0 AS lo, 0 AS hi\n  UNION ALL SELECT 1, '1', 1, 1\n  UNION ALL SELECT 2, '2-3', 2, 3\n  UNION ALL SELECT 3, '4-7', 4, 7\n  UNION ALL SELECT 4, '8-15', 8, 15\n  UNION ALL SELECT 5, '16-31', 16, 31\n  UNION ALL SELECT 6, '32+', 32, 1000000000\n) AS b\nCROSS JOIN ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\nGROUP BY b.ord, b.label\nORDER BY b.ord",
+          "refId": "A"
+        }
+      ],
+      "title": "Prompts by Tool Call Count",
       "type": "barchart"
     },
     {
