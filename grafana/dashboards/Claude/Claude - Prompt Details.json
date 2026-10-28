@@ -472,12 +472,151 @@
       "type": "table"
     },
     {
+      "datasource": "mysql",
+      "description": "Input, output, cache read and cache write tokens per repository and user. Repositories carry the labels from Token Usage by Repository on Claude Prompts, and a repository's rows add up to that chart's bar. GH, GL and BB stand for GitHub, GitLab and Bitbucket, cloud or self-hosted; other hosts show their host name. Repository 'Unknown' means the session had no origin remote or the client did not report one. Project is the DevLake project that also collects the repository, 'Unmapped' when none does, or 'No repository' for prompts without one. User is the person's full name from their DevLake account, or their email when it has none. Click a repository to open it in a new tab.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repository"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Open repository",
+                    "url": "${__data.fields.repository_link}"
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 320
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Input"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Output"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cache read"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cache write"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "repository_link"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom.viz",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 19
+      },
+      "id": 14,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- base sums every prompt the panel counts per repository URL and user; the labels are applied once per row.\nWITH base AS (\n  SELECT p.repository_url AS url,\n    COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    -- account_id is the user's DevLake account, whose full_name the plugin copies from\n    -- another account with the same email.\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name,\n    SUM(p.input_tokens) AS input_tokens,\n    SUM(p.output_tokens) AS output_tokens,\n    SUM(p.cache_read_tokens) AS cache_read_tokens,\n    SUM(p.cache_creation_tokens) AS cache_creation_tokens\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  GROUP BY p.repository_url, 2\n)\n-- The Repository label is the one Token Usage by Repository on Claude Prompts uses, so a bar's rows carry its label.\nSELECT CASE\n    WHEN b.url IS NULL THEN 'Unknown'\n    WHEN b.url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(b.url, '^https?://[^/]+/', 'GH: ')\n    WHEN b.url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(b.url, '^https?://[^/]+/', 'GL: ')\n    WHEN b.url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(b.url, '^https?://[^/]+/', 'BB: ')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN b.url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(b.url, '^https?://[^/]+/(scm/)?', 'BB: ')\n    ELSE REGEXP_REPLACE(b.url, '^https?://', '')\n  END AS \"Repository\",\n  CASE WHEN b.url IS NULL THEN 'No repository' ELSE COALESCE(dl.projects, 'Unmapped') END AS \"Project\",\n  COALESCE(b.full_name, b.user) AS \"User\",\n  b.input_tokens AS \"Input\",\n  b.output_tokens AS \"Output\",\n  b.cache_read_tokens AS \"Cache read\",\n  b.cache_creation_tokens AS \"Cache write\",\n  -- repository_link is empty for prompts without a repository, so their Repository cell has no link.\n  COALESCE(b.url, '') AS repository_link\nFROM base b\nLEFT JOIN (\n  -- repository_url is lowercased with the .git suffix dropped, so normalize repos.url the same way.\n  SELECT TRIM(TRAILING '.git' FROM LOWER(rp.url)) AS url,\n    GROUP_CONCAT(DISTINCT pm.project_name ORDER BY pm.project_name SEPARATOR ', ') AS projects\n  FROM repos rp\n  JOIN project_mapping pm ON pm.row_id = rp.id AND pm.`table` = 'repos'\n  GROUP BY TRIM(TRAILING '.git' FROM LOWER(rp.url))\n) dl ON dl.url = b.url\nORDER BY b.url IS NULL, 1, b.input_tokens + b.output_tokens + b.cache_read_tokens + b.cache_creation_tokens DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Token Usage by Repository and User",
+      "type": "table"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 19
+        "y": 28
       },
       "id": 13,
       "title": "Failures",
@@ -512,7 +651,7 @@
         "h": 4,
         "w": 5,
         "x": 0,
-        "y": 20
+        "y": 29
       },
       "id": 3,
       "options": {
@@ -575,7 +714,7 @@
         "h": 4,
         "w": 4,
         "x": 5,
-        "y": 20
+        "y": 29
       },
       "id": 4,
       "options": {
@@ -639,7 +778,7 @@
         "h": 4,
         "w": 5,
         "x": 9,
-        "y": 20
+        "y": 29
       },
       "id": 5,
       "options": {
@@ -703,7 +842,7 @@
         "h": 4,
         "w": 5,
         "x": 14,
-        "y": 20
+        "y": 29
       },
       "id": 6,
       "options": {
@@ -767,7 +906,7 @@
         "h": 4,
         "w": 5,
         "x": 19,
-        "y": 20
+        "y": 29
       },
       "id": 11,
       "options": {
@@ -865,7 +1004,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 24
+        "y": 33
       },
       "id": 7,
       "options": {
@@ -1036,7 +1175,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 33
+        "y": 42
       },
       "id": 8,
       "options": {
@@ -1198,7 +1337,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 42
+        "y": 51
       },
       "id": 9,
       "options": {
@@ -1402,7 +1541,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 50
+        "y": 59
       },
       "id": 10,
       "options": {

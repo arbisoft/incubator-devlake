@@ -2482,6 +2482,121 @@
     },
     {
       "datasource": "mysql",
+      "description": "Input, output, cache read and cache write tokens used by prompts in each repository the prompt ran in, from the origin remote Claude Code reports. GH, GL and BB stand for GitHub, GitLab and Bitbucket, cloud or self-hosted; other hosts show their host name. The same path on two instances of one provider shares a bar. Repository 'Unknown' means the session had no origin remote or the client did not report one. Click a bar to open its repository's users and token totals on Claude Prompt Details in a new tab, keeping the time range, project, team and user filters.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 0,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short",
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Open Details",
+              "url": "/d/claude_prompts_repository?${__url_time_range}&${project:queryparam}&${otel_teams:queryparam}&${user:queryparam}&${__data.fields.Details}&viewPanel=panel-14"
+            }
+          ]
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Details"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": true,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 171
+      },
+      "id": 46,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "never",
+        "stacking": "normal",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xField": "Repository",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- r sums every prompt the panel counts per repository URL; the label is applied once per URL,\n-- and URLs that share a label (github.com and www.github.com) are summed into one bar.\n-- A host is a provider's when one of its labels starts with the provider name, so self-hosted\n-- GitLab, Bitbucket and GitHub Enterprise get the same prefix as the cloud services.\nSELECT CASE\n    WHEN r.url IS NULL THEN 'Unknown'\n    WHEN r.url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GH: ')\n    WHEN r.url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GL: ')\n    WHEN r.url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'BB: ')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN r.url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/(scm/)?', 'BB: ')\n    ELSE REGEXP_REPLACE(r.url, '^https?://', '')\n  END AS \"Repository\",\n  SUM(r.input_tokens) AS \"Input\",\n  SUM(r.output_tokens) AS \"Output\",\n  SUM(r.cache_read_tokens) AS \"Cache read\",\n  SUM(r.cache_creation_tokens) AS \"Cache write\",\n  -- Details holds the bar's Repository filter values as URL query parameters for its link. A bar can\n  -- merge several URLs with one label, so each gets its own var-repository. The Repository filter calls\n  -- a prompt without a repository 'Unknown'. MySQL has no URL encoder, so the characters that would\n  -- break a query string are escaped by hand.\n  GROUP_CONCAT(CONCAT('var-repository=', REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(r.url, 'Unknown'), '%', '%25'), '+', '%2B'), '&', '%26'), '#', '%23'), ' ', '%20'))\n    ORDER BY r.url SEPARATOR '&') AS \"Details\"\nFROM (\n  SELECT p.repository_url AS url,\n    SUM(p.input_tokens) AS input_tokens,\n    SUM(p.output_tokens) AS output_tokens,\n    SUM(p.cache_read_tokens) AS cache_read_tokens,\n    SUM(p.cache_creation_tokens) AS cache_creation_tokens\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  GROUP BY p.repository_url\n) r\nGROUP BY 1\nORDER BY SUM(r.input_tokens + r.output_tokens + r.cache_read_tokens + r.cache_creation_tokens) DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Token Usage by Repository",
+      "type": "barchart"
+    },
+    {
+      "datasource": "mysql",
       "description": "Prompts, sessions, cost and average tokens per prompt (input, output, cache read and cache write together) for each repository the prompt ran in, from the origin remote Claude Code reports, split by user. The Claude Prompt Details dashboard breaks this down further by model and mode. Share is the repository's share of all prompts shown, repeated on each of its user rows. Repository 'Unknown' means the session had no origin remote or the client did not report one. Project is the DevLake project that also collects the repository, 'Unmapped' when none does, or 'No repository' for prompts without one. Details opens this repository and user on Claude Prompt Details in a new tab, keeping the time range, project and team filters.",
       "fieldConfig": {
         "defaults": {
@@ -2705,7 +2820,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 171
+        "y": 181
       },
       "id": 38,
       "links": [
@@ -2756,7 +2871,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 180
+        "y": 190
       },
       "id": 45,
       "title": "Users",
@@ -2945,7 +3060,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 181
+        "y": 191
       },
       "id": 37,
       "links": [
