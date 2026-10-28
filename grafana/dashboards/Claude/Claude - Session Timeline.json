@@ -1,0 +1,386 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Gantt-style timeline of one user's Claude Code sessions from OTel prompt events: when each session was open and when its prompts ran.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Claude Usage Time",
+      "tooltip": "Open the Claude Usage Time dashboard",
+      "type": "link",
+      "url": "/d/claude_usage_time_mysql"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Claude Prompts",
+      "tooltip": "Back to the Claude Prompts dashboard",
+      "type": "link",
+      "url": "/d/claude_prompts_mysql"
+    }
+  ],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": "mysql",
+      "description": "One row per Claude Code session. Each session's prompts are drawn in that session's own colour. Grey is time between prompts while the session was open. Shows the 30 most recently active sessions in the range. Colours are assigned in the order sessions started, so they can change with the time range or filters. Rows are labelled with the session's repository (GH:, GL: or BB: and its path, or Unknown) and the first 8 characters of its session ID. Times are shown in your browser's timezone.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "text",
+            "mode": "fixed"
+          },
+          "custom": {
+            "fillOpacity": 85,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineWidth": 0,
+            "spanNulls": false
+          },
+          "displayName": "${__series.name}",
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "rgba(128,128,128,0.25)",
+                  "index": 0,
+                  "text": "Idle (session open)"
+                },
+                "1": {
+                  "color": "#7EB26D",
+                  "index": 1,
+                  "text": "Prompt running"
+                },
+                "10": {
+                  "color": "#CCA300",
+                  "index": 10,
+                  "text": "Prompt running"
+                },
+                "11": {
+                  "color": "#447EBC",
+                  "index": 11,
+                  "text": "Prompt running"
+                },
+                "12": {
+                  "color": "#C15C17",
+                  "index": 12,
+                  "text": "Prompt running"
+                },
+                "13": {
+                  "color": "#890F02",
+                  "index": 13,
+                  "text": "Prompt running"
+                },
+                "14": {
+                  "color": "#0A437C",
+                  "index": 14,
+                  "text": "Prompt running"
+                },
+                "15": {
+                  "color": "#6D1F62",
+                  "index": 15,
+                  "text": "Prompt running"
+                },
+                "16": {
+                  "color": "#584477",
+                  "index": 16,
+                  "text": "Prompt running"
+                },
+                "17": {
+                  "color": "#B7DBAB",
+                  "index": 17,
+                  "text": "Prompt running"
+                },
+                "18": {
+                  "color": "#F4D598",
+                  "index": 18,
+                  "text": "Prompt running"
+                },
+                "19": {
+                  "color": "#70DBED",
+                  "index": 19,
+                  "text": "Prompt running"
+                },
+                "2": {
+                  "color": "#EAB839",
+                  "index": 2,
+                  "text": "Prompt running"
+                },
+                "20": {
+                  "color": "#F9BA8F",
+                  "index": 20,
+                  "text": "Prompt running"
+                },
+                "21": {
+                  "color": "#F29191",
+                  "index": 21,
+                  "text": "Prompt running"
+                },
+                "22": {
+                  "color": "#82B5D8",
+                  "index": 22,
+                  "text": "Prompt running"
+                },
+                "23": {
+                  "color": "#E5A8E2",
+                  "index": 23,
+                  "text": "Prompt running"
+                },
+                "24": {
+                  "color": "#AEA2E0",
+                  "index": 24,
+                  "text": "Prompt running"
+                },
+                "25": {
+                  "color": "#629E51",
+                  "index": 25,
+                  "text": "Prompt running"
+                },
+                "26": {
+                  "color": "#E5AC0E",
+                  "index": 26,
+                  "text": "Prompt running"
+                },
+                "27": {
+                  "color": "#64B0C8",
+                  "index": 27,
+                  "text": "Prompt running"
+                },
+                "28": {
+                  "color": "#E0752D",
+                  "index": 28,
+                  "text": "Prompt running"
+                },
+                "29": {
+                  "color": "#BF1B00",
+                  "index": 29,
+                  "text": "Prompt running"
+                },
+                "3": {
+                  "color": "#6ED0E0",
+                  "index": 3,
+                  "text": "Prompt running"
+                },
+                "30": {
+                  "color": "#0A50A1",
+                  "index": 30,
+                  "text": "Prompt running"
+                },
+                "4": {
+                  "color": "#EF843C",
+                  "index": 4,
+                  "text": "Prompt running"
+                },
+                "5": {
+                  "color": "#E24D42",
+                  "index": 5,
+                  "text": "Prompt running"
+                },
+                "6": {
+                  "color": "#1F78C1",
+                  "index": 6,
+                  "text": "Prompt running"
+                },
+                "7": {
+                  "color": "#BA43A6",
+                  "index": 7,
+                  "text": "Prompt running"
+                },
+                "8": {
+                  "color": "#705DA0",
+                  "index": 8,
+                  "text": "Prompt running"
+                },
+                "9": {
+                  "color": "#508642",
+                  "index": 9,
+                  "text": "Prompt running"
+                }
+              },
+              "type": "value"
+            },
+            {
+              "options": {
+                "match": "null",
+                "result": {
+                  "color": "transparent",
+                  "index": 31,
+                  "text": ""
+                }
+              },
+              "type": "special"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 17,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "alignValue": "left",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "mergeValues": true,
+        "rowHeight": 0.8,
+        "showValue": "never",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- base is every prompt the panel may show, s labels and ranks each session, shown keeps the 30\n-- most recently active sessions and numbers them for their colours, and prompts adds the start\n-- of the session's next prompt. The outer query turns each prompt into a start point and an\n-- end point.\nWITH base AS (\n  SELECT p.id, p.workspace_key, p.session_id, p.started_at, p.ended_at, p.repository_url\n  FROM ai_prompts p\n  -- Prompts that overlap the time range, so a prompt that began before the range still shows.\n  WHERE p.started_at < $__timeTo() AND p.ended_at > $__timeFrom()\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.status = 'active' AND upm_g.user_login = ${__user.login:sqlstring})\n    -- user is single-select, so this is one user.\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) = ${user:sqlstring}\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n), s AS (\n  SELECT workspace_key, session_id,\n    MAX(repository_url) AS repository_url,\n    MIN(started_at) AS first_start,\n    -- 1 is the session that was active most recently.\n    DENSE_RANK() OVER (ORDER BY MAX(ended_at) DESC, workspace_key, session_id) AS recency\n  FROM base\n  GROUP BY workspace_key, session_id\n), shown AS (\n  -- colour numbers the shown sessions 1, 2, 3… in the order they started; each number maps to\n  -- its own colour in the panel's value mappings.\n  SELECT s.*, ROW_NUMBER() OVER (ORDER BY first_start, workspace_key, session_id) AS colour,\n    -- The repository is labelled as on the Claude Prompts dashboards: GH:, GL: or BB: and the path,\n    -- or the host for other servers.\n    CONCAT(CASE\n        WHEN s.repository_url IS NULL THEN 'Unknown'\n        WHEN s.repository_url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(s.repository_url, '^https?://[^/]+/', 'GH: ')\n        WHEN s.repository_url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(s.repository_url, '^https?://[^/]+/', 'GL: ')\n        WHEN s.repository_url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(s.repository_url, '^https?://[^/]+/', 'BB: ')\n        -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n        WHEN s.repository_url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(s.repository_url, '^https?://[^/]+/(scm/)?', 'BB: ')\n        ELSE REGEXP_REPLACE(s.repository_url, '^https?://', '')\n      END, ' · ', LEFT(s.session_id, 8)) AS session_label\n  FROM s\n  -- More rows than this can't be read in one panel, and the panel maps 30 colours. Narrow the\n  -- User or Repository filter instead.\n  WHERE s.recency <= 30\n), prompts AS (\n  SELECT b.*, sh.session_label, sh.colour,\n    LEAD(b.started_at) OVER (PARTITION BY b.workspace_key, b.session_id ORDER BY b.started_at, b.id) AS next_start\n  FROM base b\n  JOIN shown sh ON sh.workspace_key = b.workspace_key AND sh.session_id = b.session_id\n)\nSELECT t AS time, session_label AS session, state\nFROM (\n  SELECT started_at AS t, started_at AS sort_start, id, 0 AS kind, session_label, colour AS state\n  FROM prompts\n  UNION ALL\n  -- After the session's last prompt the state is NULL, so the row shows nothing until the range ends.\n  SELECT ended_at, started_at, id, 1, session_label,\n    CASE WHEN next_start IS NULL THEN NULL ELSE 0 END\n  FROM prompts\n) pts\n-- When one prompt ends at the instant the next starts, the earlier prompt's end sorts first, so\n-- the later prompt's start wins.\nORDER BY t, sort_start, id, kind",
+          "refId": "A"
+        }
+      ],
+      "title": "Session Timeline",
+      "transformations": [
+        {
+          "id": "partitionByValues",
+          "options": {
+            "fields": [
+              "session"
+            ],
+            "keepFields": false,
+            "naming": {
+              "asLabels": false
+            }
+          }
+        }
+      ],
+      "type": "state-timeline"
+    }
+  ],
+  "preload": false,
+  "refresh": "",
+  "schemaVersion": 42,
+  "tags": [
+    "claude",
+    "anthropic",
+    "devlake",
+    "ai"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allowCustomValue": false,
+        "current": {},
+        "datasource": "mysql",
+        "definition": "-- The label is the person's full name from their DevLake account, falling back to the email; the value stays the\n-- email (or user key) that every panel filters on.\nSELECT COALESCE(u.full_name, u.user) AS __text, u.user AS __value\nFROM (\n  SELECT COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.status = 'active' AND upm_g.user_login = ${__user.login:sqlstring})\n  GROUP BY 1\n) u\n-- The viewer's own email sorts first, so the dashboard opens on their sessions.\nORDER BY u.user = ${__user.email:sqlstring} DESC, 1;",
+        "hide": 0,
+        "includeAll": false,
+        "label": "User",
+        "multi": false,
+        "name": "user",
+        "options": [],
+        "query": "-- The label is the person's full name from their DevLake account, falling back to the email; the value stays the\n-- email (or user key) that every panel filters on.\nSELECT COALESCE(u.full_name, u.user) AS __text, u.user AS __value\nFROM (\n  SELECT COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.status = 'active' AND upm_g.user_login = ${__user.login:sqlstring})\n  GROUP BY 1\n) u\n-- The viewer's own email sorts first, so the dashboard opens on their sessions.\nORDER BY u.user = ${__user.email:sqlstring} DESC, 1;",
+        "refresh": 2,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "-- Repositories the selected user's prompts ran in during the time range, labelled as on Token Usage by Repository.\n-- 'Unknown' stands for prompts without a repository; a real repository_url is always an\n-- https URL, so it cannot clash.\nSELECT CASE\n    WHEN r.url = 'Unknown' THEN 'Unknown'\n    WHEN r.url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GH: ')\n    WHEN r.url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GL: ')\n    WHEN r.url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'BB: ')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN r.url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/(scm/)?', 'BB: ')\n    ELSE REGEXP_REPLACE(r.url, '^https?://', '')\n  END AS __text, r.url AS __value\nFROM (\n  SELECT DISTINCT COALESCE(p.repository_url, 'Unknown') AS url\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.status = 'active' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND $__timeFilter(p.started_at)\n) r\nORDER BY r.url = 'Unknown', 1;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Repository",
+        "multi": true,
+        "name": "repository",
+        "options": [],
+        "query": "-- Repositories the selected user's prompts ran in during the time range, labelled as on Token Usage by Repository.\n-- 'Unknown' stands for prompts without a repository; a real repository_url is always an\n-- https URL, so it cannot clash.\nSELECT CASE\n    WHEN r.url = 'Unknown' THEN 'Unknown'\n    WHEN r.url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GH: ')\n    WHEN r.url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GL: ')\n    WHEN r.url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'BB: ')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN r.url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/(scm/)?', 'BB: ')\n    ELSE REGEXP_REPLACE(r.url, '^https?://', '')\n  END AS __text, r.url AS __value\nFROM (\n  SELECT DISTINCT COALESCE(p.repository_url, 'Unknown') AS url\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.status = 'active' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND $__timeFilter(p.started_at)\n) r\nORDER BY r.url = 'Unknown', 1;",
+        "refresh": 2,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ]
+  },
+  "timezone": "browser",
+  "title": "Claude Session Timeline",
+  "uid": "claude_session_timeline_mysql"
+}
