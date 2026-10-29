@@ -28,6 +28,18 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
+      "title": "Claude Working Time",
+      "tooltip": "How long Claude Code worked for each user, per repository and workday",
+      "type": "link",
+      "url": "/d/claude_usage_time_mysql"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
       "title": "Claude Prompts",
       "tooltip": "Back to the Claude Prompts dashboard",
       "type": "link",
