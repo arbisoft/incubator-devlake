@@ -52,7 +52,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Issues per developer split into To Do, In Progress and Done.\n\rdatasource: issue_assignees, issues, board_issues, accounts",
+      "description": "Bugs are excluded; Issue Type Mix shows them.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -114,7 +114,7 @@
           "showLegend": true
         },
         "orientation": "horizontal",
-        "showValue": "auto",
+        "showValue": "never",
         "stacking": "normal",
         "tooltip": {
           "hideZeros": false,
@@ -156,7 +156,7 @@
           }
         }
       ],
-      "title": "Issues By Status",
+      "title": "Tasks by Status",
       "type": "barchart"
     },
     {
@@ -164,7 +164,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Issues currently open per developer.\n\rdatasource: issues, accounts",
+      "description": "Open issues per assignee. GitHub issues have no in-progress state unless a scope config maps one.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -175,7 +175,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
@@ -244,7 +245,7 @@
           }
         }
       ],
-      "title": "Current Work In Progress",
+      "title": "Open Issues per Developer",
       "type": "table"
     },
     {
@@ -374,7 +375,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {

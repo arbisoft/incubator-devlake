@@ -93,7 +93,68 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Open"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Merged"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Closed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Draft"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "purple"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 11,
@@ -114,7 +175,7 @@
           "showLegend": true
         },
         "orientation": "horizontal",
-        "showValue": "auto",
+        "showValue": "never",
         "stacking": "normal",
         "tooltip": {
           "hideZeros": false,
@@ -201,7 +262,68 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Approved"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Changes requested"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Commented only"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "No review"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -222,7 +344,7 @@
           "showLegend": true
         },
         "orientation": "auto",
-        "showValue": "auto",
+        "showValue": "never",
         "stacking": "normal",
         "tooltip": {
           "hideZeros": false,
@@ -313,7 +435,38 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Merged"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Closed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 12,
@@ -425,7 +578,57 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Approved"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Rejected"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Changes requested"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Commented"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 12,
@@ -446,7 +649,7 @@
           "showLegend": true
         },
         "orientation": "horizontal",
-        "showValue": "auto",
+        "showValue": "never",
         "stacking": "normal",
         "tooltip": {
           "hideZeros": false,
@@ -751,7 +954,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "PRs grouped into size bands by lines changed.\n\rdatasource: pull_requests, pull_request_commits, commits, project_mapping, accounts",
+      "description": "PRs grouped into size bands by lines changed.\n\rdatasource: pull_requests, project_mapping, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -811,7 +1014,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH pr_size AS (\n  SELECT pr.id,\n         SUM(c.additions + c.deletions) AS lines_changed\n  FROM pull_requests pr\n  JOIN pull_request_commits prc ON prc.pull_request_id = pr.id\n  JOIN commits c                ON c.sha = prc.commit_sha\n  WHERE pr.id LIKE 'github:%'\n    AND $__timeFilter(pr.created_date)\n    AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n    AND EXISTS (\n      SELECT 1\n      FROM accounts a where a.id IN ( $developer_id  )\n      OR a.id = c.author_email or a.email = c.author_email\n    )\n  GROUP BY pr.id\n),\nbucketed AS (\n  SELECT CASE\n           WHEN lines_changed <  200 THEN '1. < 200 LOC'\n           WHEN lines_changed <  500 THEN '2. 200-499 LOC'\n           WHEN lines_changed < 1000 THEN '3. 500-999 LOC'\n           ELSE                           '4. 1000+ LOC'\n         END      AS bucket,\n         COUNT(*) AS prs\n  FROM pr_size\n  GROUP BY bucket\n)\nSELECT bucket,\n       prs AS 'PR Count',\n       CONCAT(ROUND(100.0 * prs / SUM(prs) OVER (), 1), '%') AS Percentage\nFROM bucketed\nORDER BY bucket;",
+          "rawSql": "WITH pr_size AS (\n  SELECT pr.id,\n         pr.additions + pr.deletions AS lines_changed\n  FROM pull_requests pr\n  WHERE pr.id LIKE 'github:%'\n    AND $__timeFilter(pr.created_date)\n    AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND EXISTS (SELECT 1 FROM project_mapping pm\n                 WHERE pm.row_id = pr.base_repo_id\n                   AND pm.`table` = 'repos'\n                   AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n    AND pr.author_id IN ( $developer_id )\n),\nbucketed AS (\n  SELECT CASE\n           WHEN lines_changed <  200 THEN '1. < 200 LOC'\n           WHEN lines_changed <  500 THEN '2. 200-499 LOC'\n           WHEN lines_changed < 1000 THEN '3. 500-999 LOC'\n           ELSE                           '4. 1000+ LOC'\n         END      AS bucket,\n         COUNT(*) AS prs\n  FROM pr_size\n  GROUP BY bucket\n)\nSELECT bucket,\n       prs AS 'PR Count',\n       CONCAT(ROUND(100.0 * prs / SUM(prs) OVER (), 1), '%') AS Percentage\nFROM bucketed\nORDER BY bucket;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -852,7 +1055,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "links": [],
           "mappings": [],
@@ -973,7 +1177,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {

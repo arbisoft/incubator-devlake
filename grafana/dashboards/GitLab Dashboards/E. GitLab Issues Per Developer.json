@@ -52,7 +52,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Non-bug issues per assignee split into To Do, In Progress (open with an in-progress label) and Done. An issue with several assignees counts for each; the other panels use the issue's main assignee.\ndatasource: issue_assignees, issues, issue_labels, board_issues, accounts",
+      "description": "Bugs are excluded; Issue Type Mix shows them. Non-bug issues per assignee split into To Do, In Progress (open with an in-progress label) and Done. An issue with several assignees counts for each; the other panels use the issue's main assignee.\ndatasource: issue_assignees, issues, issue_labels, board_issues, accounts",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -156,7 +156,7 @@
           }
         }
       ],
-      "title": "Issues By Status",
+      "title": "Tasks by Status",
       "type": "barchart"
     },
     {

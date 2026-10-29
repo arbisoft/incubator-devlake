@@ -169,7 +169,7 @@
           ]
         }
       ],
-      "title": "3.1 Number of New Pull Requests",
+      "title": "3.1 New Pull Requests (excluding drafts) (total)",
       "type": "stat"
     },
     {
@@ -320,7 +320,7 @@
           ]
         }
       ],
-      "title": "3.2 Number of New Pull Requests",
+      "title": "3.2 New Pull Requests (excluding drafts) (trend)",
       "type": "barchart"
     },
     {
@@ -368,7 +368,20 @@
           },
           "unit": "none"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "merged_pull_request_count"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Merged PRs"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 10,
@@ -509,7 +522,65 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "approved"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Approved"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "rejected"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Changes requested"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "commented"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Commented"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 10,
@@ -530,7 +601,7 @@
           "showLegend": true
         },
         "orientation": "horizontal",
-        "showValue": "auto",
+        "showValue": "never",
         "stacking": "normal",
         "tooltip": {
           "hideZeros": false,
@@ -641,7 +712,7 @@
           "showLegend": true
         },
         "orientation": "horizontal",
-        "showValue": "auto",
+        "showValue": "never",
         "stacking": "normal",
         "tooltip": {
           "hideZeros": false,
@@ -731,7 +802,20 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "commit_count"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Commits"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 10,
@@ -752,7 +836,7 @@
           "showLegend": true
         },
         "orientation": "auto",
-        "showValue": "auto",
+        "showValue": "never",
         "stacking": "normal",
         "tooltip": {
           "hideZeros": false,
@@ -916,7 +1000,7 @@
           ]
         }
       ],
-      "title": "4.1 Ratio of unmerged PRs of All Closed PRs",
+      "title": "4.1 Ratio of unmerged PRs of All Closed PRs (total)",
       "type": "stat"
     },
     {
@@ -968,8 +1052,8 @@
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "blue",
-                  "mode": "fixed"
+                  "mode": "fixed",
+                  "fixedColor": "text"
                 }
               }
             ]
@@ -983,8 +1067,8 @@
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "red",
-                  "mode": "fixed"
+                  "mode": "fixed",
+                  "fixedColor": "red"
                 }
               }
             ]
@@ -998,8 +1082,8 @@
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "green",
-                  "mode": "fixed"
+                  "mode": "fixed",
+                  "fixedColor": "green"
                 }
               }
             ]
@@ -1032,7 +1116,7 @@
           "showLegend": true
         },
         "orientation": "auto",
-        "showValue": "auto",
+        "showValue": "never",
         "stacking": "normal",
         "text": {
           "valueSize": 12
@@ -1340,7 +1424,7 @@
           ]
         }
       ],
-      "title": "4.4 Ratio of unmerged PRs of All Closed PRs",
+      "title": "4.4 Ratio of unmerged PRs of All Closed PRs (trend)",
       "type": "timeseries"
     },
     {
@@ -1663,7 +1747,7 @@
           ]
         }
       ],
-      "title": "4.7 Mean Time to Close of Pull Requests in Days",
+      "title": "4.7 Mean Time to Close of Pull Requests in Days (total)",
       "type": "stat"
     },
     {
@@ -1802,7 +1886,7 @@
           ]
         }
       ],
-      "title": "4.8 Mean Time to Close of Pull Requests in Days",
+      "title": "4.8 Mean Time to Close of Pull Requests in Days (trend)",
       "type": "barchart"
     },
     {
@@ -2086,6 +2170,10 @@
                   "fixedColor": "green",
                   "mode": "fixed"
                 }
+              },
+              {
+                "id": "displayName",
+                "value": "Successful runs"
               }
             ]
           },
@@ -2101,6 +2189,10 @@
                   "fixedColor": "red",
                   "mode": "fixed"
                 }
+              },
+              {
+                "id": "displayName",
+                "value": "Failed runs"
               }
             ]
           }
@@ -2132,7 +2224,7 @@
           "showLegend": true
         },
         "orientation": "auto",
-        "showValue": "auto",
+        "showValue": "never",
         "stacking": "normal",
         "text": {
           "valueSize": 12
@@ -2644,7 +2736,7 @@
           ]
         }
       ],
-      "title": "5.6 Mean Workflow Runs Duration",
+      "title": "5.6 Mean Workflow Runs Duration (total)",
       "type": "stat"
     },
     {
@@ -2705,6 +2797,10 @@
                   "fixedColor": "light-orange",
                   "mode": "fixed"
                 }
+              },
+              {
+                "id": "displayName",
+                "value": "Mean duration (sec)"
               }
             ]
           }
@@ -2800,7 +2896,7 @@
           ]
         }
       ],
-      "title": "5.7 Mean Workflow Runs Duration",
+      "title": "5.7 Mean Workflow Runs Duration (trend)",
       "type": "barchart"
     },
     {
