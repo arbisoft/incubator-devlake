@@ -48,7 +48,7 @@ func claudeAccountID(workspaceKey, userKey string) string {
 // ensureClaudeAccount writes the Claude user's row in accounts and returns its ID, applying
 // the batch's values with mergeClaudeAccount. An unchanged account is not rewritten.
 // Claude sends no display name, so full_name is copied from another DevLake account with
-// the same email and stays NULL when none has one.
+// the same email and stays NULL when none has one. Daily re-checks only take a GitHub or Jira name.
 func ensureClaudeAccount(tx dal.Transaction, workspaceKey, userKey string, userAccountID *string, email string) (string, error) {
 	id := claudeAccountID(workspaceKey, userKey)
 	stored := crossdomain.Account{}
@@ -61,12 +61,18 @@ func ensureClaudeAccount(tx dal.Transaction, workspaceKey, userKey string, userA
 	}
 	merged, needsName := mergeClaudeAccount(stored, stringValue(userAccountID), email)
 	stale := found && accountNameIsStale(stored.UpdatedAt, accountNameNow())
-	if needsName || stale {
+	if needsName {
 		name, err := fullNameForEmail(tx, merged.Email)
 		if err != nil {
 			return "", err
 		}
-		if name != "" || !stale {
+		merged.FullName = name
+	} else if stale {
+		name, err := trustedFullNameForEmail(tx, merged.Email)
+		if err != nil {
+			return "", err
+		}
+		if name != "" {
 			merged.FullName = name
 		}
 	}
@@ -121,13 +127,22 @@ func sameClaudeAccount(stored, merged crossdomain.Account) bool {
 // The match ignores case: accounts.email is utf8mb4_bin, and other plugins store the
 // email as their source sent it, while Claude emails are lowercased.
 func fullNameForEmail(tx dal.Transaction, email string) (string, error) {
+	return lookupFullName(tx, email, "", "CASE WHEN id LIKE 'github:%' THEN 0 WHEN id LIKE 'jira:%' THEN 1 WHEN id LIKE '%:%' THEN 2 ELSE 3 END, id ASC")
+}
+
+// trustedFullNameForEmail is fullNameForEmail limited to GitHub and Jira accounts, GitHub first.
+func trustedFullNameForEmail(tx dal.Transaction, email string) (string, error) {
+	return lookupFullName(tx, email, " AND (id LIKE 'github:%' OR id LIKE 'jira:%')", "CASE WHEN id LIKE 'github:%' THEN 0 ELSE 1 END, id ASC")
+}
+
+func lookupFullName(tx dal.Transaction, email, extraCondition, order string) (string, error) {
 	if email == "" {
 		return "", nil
 	}
 	account := &crossdomain.Account{}
 	err := tx.First(account,
-		dal.Where("LOWER(email) = ? AND id NOT LIKE ? AND full_name IS NOT NULL AND full_name <> ''", strings.ToLower(email), "claude:%"),
-		dal.Orderby("CASE WHEN id LIKE 'github:%' THEN 0 WHEN id LIKE 'jira:%' THEN 1 WHEN id LIKE '%:%' THEN 2 ELSE 3 END, id ASC"),
+		dal.Where("LOWER(email) = ? AND id NOT LIKE ? AND full_name IS NOT NULL AND full_name <> ''"+extraCondition, strings.ToLower(email), "claude:%"),
+		dal.Orderby(order),
 	)
 	if err != nil {
 		if tx.IsErrorNotFound(err) {

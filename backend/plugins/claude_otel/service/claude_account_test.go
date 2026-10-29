@@ -60,6 +60,22 @@ func expectNameLookup(transaction *dalmocks.Transaction, fullName string) {
 	}).Return(nil).Once()
 }
 
+func expectTrustedNameLookup(transaction *dalmocks.Transaction, fullName string) {
+	trusted := mock.MatchedBy(func(clause dal.Clause) bool {
+		where, ok := clause.Data.(dal.DalClause)
+		return ok && clause.Type == dal.WhereClause && strings.Contains(where.Expr, "id LIKE 'github:%' OR id LIKE 'jira:%'")
+	})
+	if fullName == "" {
+		notFound := errors.NotFound.New("trusted account not found")
+		transaction.On("First", mock.AnythingOfType("*crossdomain.Account"), trusted, mock.Anything).Return(notFound).Once()
+		transaction.On("IsErrorNotFound", notFound).Return(true).Once()
+		return
+	}
+	transaction.On("First", mock.AnythingOfType("*crossdomain.Account"), trusted, mock.Anything).Run(func(args mock.Arguments) {
+		args.Get(0).(*crossdomain.Account).FullName = fullName
+	}).Return(nil).Once()
+}
+
 func expectAccountWrite(transaction *dalmocks.Transaction, email, userName, fullName string) {
 	transaction.On("Exec", mock.MatchedBy(func(query string) bool {
 		return strings.HasPrefix(query, "INSERT INTO accounts ") && strings.Contains(query, "NULLIF(?, '')")
@@ -216,7 +232,7 @@ func TestEnsureClaudeAccountRefreshesStaleName(t *testing.T) {
 	setAccountNameNow(t, now)
 	transaction := dalmocks.NewTransaction(t)
 	expectStoredAccount(transaction, staleStoredAccount(25*time.Hour, now))
-	expectNameLookup(transaction, "New Kaleem")
+	expectTrustedNameLookup(transaction, "New Kaleem")
 	expectAccountWrite(transaction, "dev@example.com", "user_1", "New Kaleem")
 
 	userAccountID := "user_1"
@@ -230,7 +246,7 @@ func TestEnsureClaudeAccountRewritesStaleUnchangedAccount(t *testing.T) {
 	setAccountNameNow(t, now)
 	transaction := dalmocks.NewTransaction(t)
 	expectStoredAccount(transaction, staleStoredAccount(25*time.Hour, now))
-	expectNameLookup(transaction, "Old kaleem")
+	expectTrustedNameLookup(transaction, "Old kaleem")
 	expectAccountWrite(transaction, "dev@example.com", "user_1", "Old kaleem")
 
 	userAccountID := "user_1"
@@ -244,7 +260,22 @@ func TestEnsureClaudeAccountStaleKeepsNameWhenNoneFound(t *testing.T) {
 	setAccountNameNow(t, now)
 	transaction := dalmocks.NewTransaction(t)
 	expectStoredAccount(transaction, staleStoredAccount(25*time.Hour, now))
-	expectNameLookup(transaction, "")
+	expectTrustedNameLookup(transaction, "")
+	expectAccountWrite(transaction, "dev@example.com", "user_1", "Old kaleem")
+
+	userAccountID := "user_1"
+	if _, err := ensureClaudeAccount(transaction, testOrganizationID, testUserKey, &userAccountID, "dev@example.com"); err != nil {
+		t.Fatalf("ensureClaudeAccount() error = %v", err)
+	}
+}
+
+func TestEnsureClaudeAccountStaleIgnoresUntrustedSources(t *testing.T) {
+	now := time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
+	setAccountNameNow(t, now)
+	transaction := dalmocks.NewTransaction(t)
+	expectStoredAccount(transaction, staleStoredAccount(25*time.Hour, now))
+	// Only git or SonarQube accounts carry another name, so the trusted lookup finds nothing.
+	expectTrustedNameLookup(transaction, "")
 	expectAccountWrite(transaction, "dev@example.com", "user_1", "Old kaleem")
 
 	userAccountID := "user_1"
@@ -331,6 +362,28 @@ func TestFullNameForEmailSkipsClaudeAndUnnamedAccounts(t *testing.T) {
 	// emails stored by other plugins.
 	if got, err := fullNameForEmail(transaction, "Dev@Example.com"); err != nil || got != "Dev Name" {
 		t.Fatalf("fullNameForEmail() = %q, %v", got, err)
+	}
+}
+
+func TestTrustedFullNameForEmailQueriesGitHubAndJiraOnly(t *testing.T) {
+	transaction := dalmocks.NewTransaction(t)
+	transaction.On("First", mock.AnythingOfType("*crossdomain.Account"),
+		mock.MatchedBy(func(clause dal.Clause) bool {
+			where, ok := clause.Data.(dal.DalClause)
+			return ok && clause.Type == dal.WhereClause &&
+				strings.Contains(where.Expr, "LOWER(email) = ?") && strings.Contains(where.Expr, "id NOT LIKE ?") &&
+				strings.HasSuffix(where.Expr, " AND (id LIKE 'github:%' OR id LIKE 'jira:%')") &&
+				len(where.Params) == 2 && where.Params[0] == "dev@example.com" && where.Params[1] == "claude:%"
+		}),
+		mock.MatchedBy(func(clause dal.Clause) bool {
+			return clause.Type == dal.OrderbyClause && clause.Data == "CASE WHEN id LIKE 'github:%' THEN 0 ELSE 1 END, id ASC"
+		}),
+	).Run(func(args mock.Arguments) {
+		args.Get(0).(*crossdomain.Account).FullName = "Dev Name"
+	}).Return(nil).Once()
+
+	if got, err := trustedFullNameForEmail(transaction, "Dev@Example.com"); err != nil || got != "Dev Name" {
+		t.Fatalf("trustedFullNameForEmail() = %q, %v", got, err)
 	}
 }
 
