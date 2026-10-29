@@ -3031,7 +3031,7 @@
         "multi": true,
         "name": "project",
         "options": [],
-        "query": "select distinct upm.project_name\nfrom user_project_mapping upm\njoin project_mapping pm ON upm.project_name = pm.project_name\nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name",
+        "query": "SELECT p.project_name AS __text, p.project_name AS __value FROM (\nselect distinct upm.project_name\nfrom user_project_mapping upm\njoin project_mapping pm ON upm.project_name = pm.project_name\nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nand upm.user_login = ${__user.login:sqlstring}\n) p\nUNION ALL\nSELECT '(no projects with GitHub data)' AS __text, '__none__' AS __value FROM DUAL WHERE NOT EXISTS (\nselect distinct upm.project_name\nfrom user_project_mapping upm\njoin project_mapping pm ON upm.project_name = pm.project_name\nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nand upm.user_login = ${__user.login:sqlstring}\n)\nORDER BY __text",
         "refresh": 1,
         "regex": "",
         "type": "query"
@@ -3050,7 +3050,7 @@
         "multi": true,
         "name": "repo_id",
         "options": [],
-        "query": "SELECT concat(r.name, '--', r.id) as text FROM repos r JOIN project_mapping pm ON pm.row_id = r.id AND pm.table = 'repos' WHERE r.id LIKE 'github%' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project}))",
+        "query": "SELECT concat(r.name, '--', r.id) as text FROM repos r JOIN project_mapping pm ON pm.row_id = r.id AND pm.table = 'repos' WHERE r.id LIKE 'github%' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project}))\nUNION ALL\nSELECT '(no GitHub repositories)--__none__' FROM DUAL WHERE NOT EXISTS (\nSELECT concat(r.name, '--', r.id) as text FROM repos r JOIN project_mapping pm ON pm.row_id = r.id AND pm.table = 'repos' WHERE r.id LIKE 'github%' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project}))\n)",
         "refresh": 1,
         "regex": "/^(?<text>.*)--(?<value>.*)$/",
         "type": "query"

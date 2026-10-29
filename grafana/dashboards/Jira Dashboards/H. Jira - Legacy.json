@@ -1193,7 +1193,7 @@
         "multi": true,
         "name": "project",
         "options": [],
-        "query": "select distinct upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'boards' AND pm.row_id like 'jira:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name ",
+        "query": "SELECT p.project_name AS __text, p.project_name AS __value FROM (\nselect distinct upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'boards' AND pm.row_id like 'jira:%'\nand upm.user_login = ${__user.login:sqlstring}\n) p\nUNION ALL\nSELECT '(no projects with Jira data)' AS __text, '__none__' AS __value FROM DUAL WHERE NOT EXISTS (\nselect distinct upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'boards' AND pm.row_id like 'jira:%'\nand upm.user_login = ${__user.login:sqlstring}\n)\nORDER BY __text",
         "refresh": 1,
         "regex": "",
         "type": "query"
@@ -1210,7 +1210,7 @@
         "multi": true,
         "name": "board_id",
         "options": [],
-        "query": "SELECT concat(b.name, '--', b.id) FROM boards b JOIN project_mapping pm ON pm.row_id = b.id AND pm.table = 'boards' WHERE b.id LIKE 'jira%' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project}))",
+        "query": "SELECT concat(b.name, '--', b.id) FROM boards b JOIN project_mapping pm ON pm.row_id = b.id AND pm.table = 'boards' WHERE b.id LIKE 'jira%' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project}))\nUNION ALL\nSELECT '(no Jira boards)--__none__' FROM DUAL WHERE NOT EXISTS (\nSELECT concat(b.name, '--', b.id) FROM boards b JOIN project_mapping pm ON pm.row_id = b.id AND pm.table = 'boards' WHERE b.id LIKE 'jira%' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project}))\n)",
         "refresh": 1,
         "regex": "/^(?<text>.*)--(?<value>.*)$/",
         "type": "query"
