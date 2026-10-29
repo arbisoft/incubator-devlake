@@ -87,14 +87,16 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "fixed",
+            "fixedColor": "text"
           },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "text",
+                "value": null
               }
             ]
           }
@@ -191,14 +193,16 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "fixed",
+            "fixedColor": "text"
           },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "text",
+                "value": null
               }
             ]
           },
@@ -387,7 +391,7 @@
           "metricColumn": "none",
           "queryType": "randomWalk",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  DATE_ADD(date(i.created_date), INTERVAL -DAYOFMONTH(date(i.created_date))+1 DAY) as time,\r\n  count(distinct case when status != 'DONE' then i.id else null end) as \"Number of Open Issues\",\r\n  count(distinct case when status = 'DONE' then i.id else null end) as \"Number of Delivered Issues\"\r\nFROM issues i\r\n\tjoin board_issues bi on i.id = bi.issue_id\r\n\tjoin boards b on bi.board_id = b.id\r\nwhere \r\n  i.type in (${type})\r\n  and $__timeFilter(i.created_date)\r\n  and bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${board_id}))\n  and bi.board_id in (select pm.row_id from project_mapping pm where pm.table = 'boards' and pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\r\n  and (i.assignee_name in (${assignee}) or (COALESCE(i.assignee_name, '') = '' and 'Unassigned' in (${assignee})))\r\ngroup by 1",
+          "rawSql": "SELECT\r\n  GREATEST(DATE_ADD(date(i.created_date), INTERVAL -DAYOFMONTH(date(i.created_date))+1 DAY), $__timeFrom()) as time,\r\n  count(distinct case when status != 'DONE' then i.id else null end) as \"Number of Open Issues\",\r\n  count(distinct case when status = 'DONE' then i.id else null end) as \"Number of Delivered Issues\"\r\nFROM issues i\r\n\tjoin board_issues bi on i.id = bi.issue_id\r\n\tjoin boards b on bi.board_id = b.id\r\nwhere \r\n  i.type in (${type})\r\n  and $__timeFilter(i.created_date)\r\n  and bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${board_id}))\n  and bi.board_id in (select pm.row_id from project_mapping pm where pm.table = 'boards' and pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\r\n  and (i.assignee_name in (${assignee}) or (COALESCE(i.assignee_name, '') = '' and 'Unassigned' in (${assignee})))\r\ngroup by 1",
           "refId": "A",
           "select": [
             [
@@ -435,7 +439,20 @@
           },
           "unit": "percentunit"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "requirement_delivery_rate"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Delivery rate"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 6,
@@ -559,7 +576,20 @@
           },
           "unit": "percentunit"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "delivered_rate"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Delivered rate"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 6,
@@ -598,7 +628,7 @@
           "metricColumn": "none",
           "queryType": "randomWalk",
           "rawQuery": true,
-          "rawSql": "with _requirements as(\r\n  select\r\n    DATE_ADD(date(i.created_date), INTERVAL -DAYOFMONTH(date(i.created_date))+1 DAY) as time,\r\n    1.0 * count(distinct case when i.status = 'DONE' then i.id else null end)/count(distinct i.id) as delivered_rate\r\n  from issues i\r\n    join board_issues bi on i.id = bi.issue_id\r\n  where \r\n    i.type in (${type})\r\n    and $__timeFilter(i.created_date)\r\n    and bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${board_id}))\n  and bi.board_id in (select pm.row_id from project_mapping pm where pm.table = 'boards' and pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\r\n    and (i.assignee_name in (${assignee}) or (COALESCE(i.assignee_name, '') = '' and 'Unassigned' in (${assignee})))\r\n  group by 1\r\n)\r\n\r\nselect\r\n  time,\r\n  delivered_rate\r\nfrom _requirements\r\norder by time",
+          "rawSql": "with _requirements as(\r\n  select\r\n    GREATEST(DATE_ADD(date(i.created_date), INTERVAL -DAYOFMONTH(date(i.created_date))+1 DAY), $__timeFrom()) as time,\r\n    1.0 * count(distinct case when i.status = 'DONE' then i.id else null end)/count(distinct i.id) as delivered_rate\r\n  from issues i\r\n    join board_issues bi on i.id = bi.issue_id\r\n  where \r\n    i.type in (${type})\r\n    and $__timeFilter(i.created_date)\r\n    and bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${board_id}))\n  and bi.board_id in (select pm.row_id from project_mapping pm where pm.table = 'boards' and pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\r\n    and (i.assignee_name in (${assignee}) or (COALESCE(i.assignee_name, '') = '' and 'Unassigned' in (${assignee})))\r\n  group by 1\r\n)\r\n\r\nselect\r\n  time,\r\n  delivered_rate\r\nfrom _requirements\r\norder by time",
           "refId": "A",
           "select": [
             [
@@ -647,14 +677,16 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 14
+                "color": "text",
+                "value": null
               }
             ]
-          }
+          },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "unit": "d"
         },
         "overrides": []
       },
@@ -753,14 +785,17 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 21
+                "color": "text",
+                "value": null
               }
             ]
-          }
+          },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "unit": "d",
+          "decimals": 1
         },
         "overrides": []
       },
@@ -874,9 +909,23 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "d",
+          "decimals": 1
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mean_lead_time"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Mean lead time"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 6,

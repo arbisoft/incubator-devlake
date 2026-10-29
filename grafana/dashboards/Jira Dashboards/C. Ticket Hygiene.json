@@ -174,7 +174,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
@@ -330,7 +331,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
@@ -558,7 +560,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT DATE_FORMAT(ts, '%b %y') AS `Month`,\n  Compliant, `No Estimates`\nFROM\n(\n  SELECT \n    DATE_FORMAT(i.created_date, '%y-%m-01') as ts,\n    SUM(CASE WHEN i.original_estimate_minutes IS NOT NULL AND i.original_estimate_minutes > 0 THEN 1 ELSE 0 END) AS `Compliant`,\n    SUM(CASE WHEN i.original_estimate_minutes IS NULL OR i.original_estimate_minutes = 0 THEN 1 ELSE 0 END) AS `No Estimates`\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date)\n    AND i.type <> 'EPIC'\n    AND i.story_point = 0\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    ) \n  GROUP BY ts\n  ORDER BY ts DESC\n) base",
+          "rawSql": "SELECT DATE_FORMAT(ts, '%b %Y') AS `Month`,\n  Compliant, `No Estimates`\nFROM\n(\n  SELECT \n    DATE_FORMAT(i.created_date, '%y-%m-01') as ts,\n    SUM(CASE WHEN i.original_estimate_minutes IS NOT NULL AND i.original_estimate_minutes > 0 THEN 1 ELSE 0 END) AS `Compliant`,\n    SUM(CASE WHEN i.original_estimate_minutes IS NULL OR i.original_estimate_minutes = 0 THEN 1 ELSE 0 END) AS `No Estimates`\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date)\n    AND i.type <> 'EPIC'\n    AND i.story_point = 0\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    ) \n  GROUP BY ts\n  ORDER BY ts DESC\n) base",
           "refId": "A",
           "sql": {
             "columns": [
@@ -598,7 +600,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
@@ -754,7 +757,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
@@ -982,7 +986,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT DATE_FORMAT(ts, '%b %y') AS `Month`, SUM(Compliant) AS `Compliant`, SUM(Orphan) AS `Orphan`, Sum(Stale) AS Stale\nFROM\n(\n  SELECT DATE_FORMAT(i.created_date, '%Y-%m-01') as ts,\n    COUNT(1) AS `Compliant`,\n    0 AS `Stale`,\n    0 AS `Orphan`\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date) \n    AND (i.assignee_id IN ($developer_id) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ($developer_id)))\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n    AND i.assignee_id IS NOT NULL\n    AND TRIM(i.assignee_id) <> ''\n    AND i.status LIKE 'IN_PROGRESS'\n    AND i.type <> 'EPIC'\n    AND DATEDIFF(CURDATE(), i.updated_date) <= 14\n  GROUP BY ts\n  UNION\n  SELECT DATE_FORMAT(i.created_date, '%Y-%m-01') as ts,\n    0 AS `Compliant`,\n    COUNT(1) AS `Stale`,\n    0 AS `Orphan`\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date) \n    AND (i.assignee_id IN ($developer_id) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ($developer_id)))\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n    AND i.assignee_id IS NOT NULL\n    AND TRIM(i.assignee_id) <> ''\n    AND i.status = 'IN_PROGRESS'\n    AND i.type <> 'EPIC'\n    AND DATEDIFF(CURDATE(), i.updated_date) > 14\n  GROUP BY ts\n  UNION\n  SELECT DATE_FORMAT(i.created_date, '%Y-%m-01') as ts,\n    0 AS `Compliant`,\n    0 AS `Stale`,\n    COUNT(1) AS `Orphan`\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date)\n    AND i.type NOT IN ('EPIC', 'BUG')\n    AND i.status = 'IN_PROGRESS'\n    AND (i.assignee_id IS NULL OR TRIM(i.assignee_id) = '')\n    AND 'unassigned' IN ($developer_id)\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    ) \n  GROUP BY ts\n) base\nGROUP BY ts\nORDER BY ts DESC",
+          "rawSql": "SELECT DATE_FORMAT(ts, '%b %Y') AS `Month`, SUM(Compliant) AS `Compliant`, SUM(Orphan) AS `Orphan`, Sum(Stale) AS Stale\nFROM\n(\n  SELECT DATE_FORMAT(i.created_date, '%Y-%m-01') as ts,\n    COUNT(1) AS `Compliant`,\n    0 AS `Stale`,\n    0 AS `Orphan`\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date) \n    AND (i.assignee_id IN ($developer_id) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ($developer_id)))\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n    AND i.assignee_id IS NOT NULL\n    AND TRIM(i.assignee_id) <> ''\n    AND i.status LIKE 'IN_PROGRESS'\n    AND i.type <> 'EPIC'\n    AND DATEDIFF(CURDATE(), i.updated_date) <= 14\n  GROUP BY ts\n  UNION\n  SELECT DATE_FORMAT(i.created_date, '%Y-%m-01') as ts,\n    0 AS `Compliant`,\n    COUNT(1) AS `Stale`,\n    0 AS `Orphan`\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date) \n    AND (i.assignee_id IN ($developer_id) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ($developer_id)))\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n    AND i.assignee_id IS NOT NULL\n    AND TRIM(i.assignee_id) <> ''\n    AND i.status = 'IN_PROGRESS'\n    AND i.type <> 'EPIC'\n    AND DATEDIFF(CURDATE(), i.updated_date) > 14\n  GROUP BY ts\n  UNION\n  SELECT DATE_FORMAT(i.created_date, '%Y-%m-01') as ts,\n    0 AS `Compliant`,\n    0 AS `Stale`,\n    COUNT(1) AS `Orphan`\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date)\n    AND i.type NOT IN ('EPIC', 'BUG')\n    AND i.status = 'IN_PROGRESS'\n    AND (i.assignee_id IS NULL OR TRIM(i.assignee_id) = '')\n    AND 'unassigned' IN ($developer_id)\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    ) \n  GROUP BY ts\n) base\nGROUP BY ts\nORDER BY ts DESC",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1022,7 +1026,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
@@ -1190,7 +1195,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
@@ -1306,7 +1312,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "select i.issue_key as `Issue Key`, i.title AS `Title`, i.type AS `Type`, i.creator_name AS `Creator`, i.assignee_name AS `Assigned To`, i.updated_date AS `Last Update On`, i.url AS `Link`\nfrom issues i\nWHERE i.id LIKE '%jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.type NOT IN ('EPIC', 'BUG')\n  AND i.status = 'IN_PROGRESS'\n  AND (i.assignee_id IS NULL OR TRIM(i.assignee_id) = '')\n  AND 'unassigned' IN ($developer_id)\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${board_id}))\n  )\nORDER BY i.updated_date ASC;",
+          "rawSql": "select i.issue_key as `Issue Key`, i.title AS `Title`, i.type AS `Type`, i.creator_name AS `Creator`, i.assignee_name AS `Assigned To`, i.updated_date AS `Last Update On`, i.url AS `Link`\nfrom issues i\nWHERE i.id LIKE '%jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.type <> 'EPIC'\n  AND i.status = 'IN_PROGRESS'\n  AND (i.assignee_id IS NULL OR TRIM(i.assignee_id) = '')\n  AND 'unassigned' IN ($developer_id)\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${board_id}))\n  )\nORDER BY i.updated_date ASC;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1419,7 +1425,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT DATE_FORMAT(num_month, '%b %y') as `Month`, \n  SUM(Compliant) AS Compliant,\n  SUM(`No Description`) as `No Description`,\n  SUM(`Under Threshold`) AS `Under Threshold`\nFROM\n(\n  SELECT DATE_FORMAT(i.created_date, '%Y-%m-01') as `num_month`,\n    COUNT(1) AS `No Description`,\n    0 AS `Under Threshold`,\n    0 AS `Compliant`\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date)\n    AND (i.assignee_id IN ($developer_id) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ($developer_id)))\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n    AND (i.description IS NULL OR TRIM(i.description) = '') \n    GROUP BY `num_month`\n  UNION\n  SELECT DATE_FORMAT(i.created_date, '%Y-%m-01') as `num_month`,\n    0 AS `No Description`,\n    COUNT(1) AS `Under Threshold`,\n    0 AS `Compliant`\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date)\n    AND (i.assignee_id IN ($developer_id) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ($developer_id)))\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n    AND i.description IS NOT NULL \n    AND CHAR_LENGTH(TRIM(i.description)) < 100\n  GROUP BY `num_month`\n  UNION\n  SELECT DATE_FORMAT(i.created_date, '%Y-%m-01') as `num_month`,\n    0 AS `No Description`,\n    0 AS `Under Threshold`,\n    COUNT(1) AS `Compliant`\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date)\n    AND (i.assignee_id IN ($developer_id) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ($developer_id)))\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n    AND i.description IS NOT NULL \n    AND CHAR_LENGTH(TRIM(i.description)) >= 100\n  GROUP BY `num_month`\n) base\nGROUP BY `num_month`\nORDER BY `num_month` DESC",
+          "rawSql": "SELECT DATE_FORMAT(num_month, '%b %Y') as `Month`, \n  SUM(Compliant) AS Compliant,\n  SUM(`No Description`) as `No Description`,\n  SUM(`Under Threshold`) AS `Under Threshold`\nFROM\n(\n  SELECT DATE_FORMAT(i.created_date, '%Y-%m-01') as `num_month`,\n    COUNT(1) AS `No Description`,\n    0 AS `Under Threshold`,\n    0 AS `Compliant`\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date)\n    AND (i.assignee_id IN ($developer_id) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ($developer_id)))\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n    AND (i.description IS NULL OR TRIM(i.description) = '') \n    GROUP BY `num_month`\n  UNION\n  SELECT DATE_FORMAT(i.created_date, '%Y-%m-01') as `num_month`,\n    0 AS `No Description`,\n    COUNT(1) AS `Under Threshold`,\n    0 AS `Compliant`\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date)\n    AND (i.assignee_id IN ($developer_id) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ($developer_id)))\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n    AND TRIM(COALESCE(i.description, '')) <> '' \n    AND CHAR_LENGTH(TRIM(i.description)) < 100\n  GROUP BY `num_month`\n  UNION\n  SELECT DATE_FORMAT(i.created_date, '%Y-%m-01') as `num_month`,\n    0 AS `No Description`,\n    0 AS `Under Threshold`,\n    COUNT(1) AS `Compliant`\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date)\n    AND (i.assignee_id IN ($developer_id) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ($developer_id)))\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n    AND i.description IS NOT NULL \n    AND CHAR_LENGTH(TRIM(i.description)) >= 100\n  GROUP BY `num_month`\n) base\nGROUP BY `num_month`\nORDER BY `num_month` DESC",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1459,7 +1465,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
@@ -1566,7 +1573,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
@@ -1633,7 +1641,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "select i.issue_key as `Issue Key`, i.title AS `Title`, i.type AS `Type`, i.creator_name AS `Creator`, i.assignee_name AS `Assigned To`, i.updated_date AS `Last Update On`, i.url AS `Link`\nfrom issues i\nWHERE i.id LIKE '%jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.type <> 'EPIC'\n  AND i.description IS NOT NULL \n  AND CHAR_LENGTH(TRIM(i.description)) < 100\n  AND (i.assignee_id IN ($developer_id) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ($developer_id)))\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${board_id}))\n  )\nORDER BY i.updated_date ASC;",
+          "rawSql": "select i.issue_key as `Issue Key`, i.title AS `Title`, i.type AS `Type`, i.creator_name AS `Creator`, i.assignee_name AS `Assigned To`, i.updated_date AS `Last Update On`, i.url AS `Link`\nfrom issues i\nWHERE i.id LIKE '%jira:%'\n  AND $__timeFilter(i.created_date)\n  AND i.type <> 'EPIC'\n  AND TRIM(COALESCE(i.description, '')) <> '' \n  AND CHAR_LENGTH(TRIM(i.description)) < 100\n  AND (i.assignee_id IN ($developer_id) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ($developer_id)))\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi where bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${board_id}))\n  )\nORDER BY i.updated_date ASC;",
           "refId": "A",
           "sql": {
             "columns": [

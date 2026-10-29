@@ -29,18 +29,16 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "fixed",
+            "fixedColor": "text"
           },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 0.0006
+                "color": "text",
+                "value": null
               }
             ]
           }
@@ -174,7 +172,7 @@
         },
         "orientation": "horizontal",
         "showValue": "auto",
-        "stacking": "normal",
+        "stacking": "none",
         "tooltip": {
           "hideZeros": false,
           "mode": "single",
@@ -194,7 +192,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT DATE_FORMAT(ts, '%b %y') as `Month`, `No Context`, `No User Story`, `No Acceptance Criteria`\nFROM(\n  SELECT \n    DATE_FORMAT(i.created_date, '%Y-%m-01') as ts,\n    SUM(CASE WHEN i.description NOT LIKE '%context%' THEN 1 ELSE 0 END) AS `No Context`,\n    SUM(CASE WHEN i.description NOT LIKE '%user story%' THEN 1 ELSE 0 END) AS `No User Story`,\n    SUM(CASE WHEN i.description NOT LIKE '%acceptance criteria%' THEN 1 ELSE 0 END) AS `No Acceptance Criteria`\n  FROM issues i \n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date) \n  AND ('__all' IN ($developer_id) OR i.assignee_id IN ($developer_id) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ($developer_id)))\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n  GROUP BY ts\n  ORDER BY ts desc\n) base",
+          "rawSql": "SELECT DATE_FORMAT(ts, '%b %Y') as `Month`, `No Context`, `No User Story`, `No Acceptance Criteria`\nFROM(\n  SELECT \n    DATE_FORMAT(i.created_date, '%Y-%m-01') as ts,\n    SUM(CASE WHEN i.description NOT LIKE '%context%' THEN 1 ELSE 0 END) AS `No Context`,\n    SUM(CASE WHEN i.description NOT LIKE '%user story%' THEN 1 ELSE 0 END) AS `No User Story`,\n    SUM(CASE WHEN i.description NOT LIKE '%acceptance criteria%' THEN 1 ELSE 0 END) AS `No Acceptance Criteria`\n  FROM issues i \n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date) \n  AND ('__all' IN ($developer_id) OR i.assignee_id IN ($developer_id) OR (COALESCE(i.assignee_id, '') = '' AND 'unassigned' IN ($developer_id)))\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n  GROUP BY ts\n  ORDER BY ts desc\n) base",
           "refId": "A",
           "sql": {
             "columns": [
@@ -217,7 +215,7 @@
       ],
       "title": "Ticket with Grooming Issues Distribution",
       "type": "barchart",
-      "description": "Monthly tickets missing context, user story or acceptance criteria.\n\rdatasource: issues, board_issues"
+      "description": "Each ticket is checked for context, user story and acceptance criteria separately, so one ticket can appear in more than one bar."
     },
     {
       "datasource": {
@@ -234,7 +232,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
@@ -402,7 +401,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
@@ -570,7 +570,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
