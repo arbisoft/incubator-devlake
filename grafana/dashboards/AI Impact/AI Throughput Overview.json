@@ -49,7 +49,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Total estimated AI spend, Claude Code OTel-only, scoped to the selected project(s)/team(s) (`SUM(ai_model_usages.estimated_cost_usd)`).",
+      "description": "Total estimated AI spend, Claude Code OTel-only, scoped to the selected project(s)/team(s) (`SUM(ai_model_usages.estimated_cost_usd)`). Daily totals: a range that ends during a day includes that whole day.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -737,7 +737,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Weekly totals for Claude Code OTel estimated cost, merged PRs, resolved non-defect/non-epic issues, distinct name-deduplicated PR authors, and classified issues opened within 14 days after successful production deployments. Cost uses the selected Project and OTel Teams; delivery metrics use Project only. Issue classification is based on `type`/`original_type`, not labels. Each cell shows the raw weekly value plus its change from the previous week; an upward change in escaped defects is adverse, while the arrows are not metric-aware. Weeks begin Monday, and weeks with no data show as zero. The Developer filter applies to the AI Cost, PRs Merged and Contributors columns; Tasks Done and Escaped Defects stay project-wide.",
+      "description": "Weekly totals for Claude Code OTel estimated cost, merged PRs, resolved non-defect/non-epic issues, distinct name-deduplicated PR authors, and classified issues opened within 14 days after successful production deployments. Cost uses the selected Project and OTel Teams; delivery metrics use Project only. Issue classification is based on `type`/`original_type`, not labels. Each cell shows the raw weekly value plus its change from the previous week; an upward change in escaped defects is adverse, while the arrows are not metric-aware. Weeks begin Monday, and weeks with no data show as zero. The Developer filter applies to the AI Cost, PRs Merged and Contributors columns; Tasks Done and Escaped Defects stay project-wide. Daily totals: a range that ends during a day includes that whole day.",
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -745,7 +745,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
@@ -1087,7 +1088,10 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "custom": {
+            "minWidth": 110
+          }
         },
         "overrides": []
       },
@@ -1137,7 +1141,10 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "custom": {
+            "minWidth": 110
+          }
         },
         "overrides": []
       },

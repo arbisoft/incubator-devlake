@@ -113,7 +113,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Distinct Claude Code sessions that sent at least one prompt.",
+      "description": "Distinct sessions that sent at least one prompt.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -171,7 +171,7 @@
           "refId": "A"
         }
       ],
-      "title": "Sessions",
+      "title": "Sessions with prompts",
       "type": "stat"
     },
     {
@@ -431,7 +431,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Prompts per day, split by the permission mode they ran in and the model or combination of models they used. 'Agentic' is Claude Code's default mode and includes sessions that never reported a mode change. Prompts that made no API call, such as local slash commands, are left out.",
+      "description": "Prompts per day, split by the permission mode they ran in and the model or combination of models they used. \"Default\" is Claude Code's default mode. \"Not reported (assumed default)\" marks prompts whose mode Claude Code didn't report; it only reports a mode after it changes. Prompts without a model (slash commands and failed requests) show as \"No model (command or failed request)\".",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -455,7 +455,7 @@
             },
             "insertNulls": false,
             "lineInterpolation": "linear",
-            "lineWidth": 0,
+            "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
@@ -514,7 +514,7 @@
           "editorMode": "code",
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT UNIX_TIMESTAMP(DATE(p.started_at)) AS time,\n  CONCAT(CASE p.permission_mode WHEN 'default' THEN 'Agentic' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE p.permission_mode END, ' · ', REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(p.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ')) AS metric,\n  COUNT(*) AS value\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  AND p.models_used <> ''\nGROUP BY 1, 2\nORDER BY time",
+          "rawSql": "SELECT UNIX_TIMESTAMP(DATE(p.started_at)) AS time,\n  CONCAT(CASE WHEN p.permission_mode = 'default' AND p.permission_mode_inferred = 1 THEN 'Not reported (assumed default)' WHEN p.permission_mode = 'default' THEN 'Default' WHEN p.permission_mode = 'bypassPermissions' THEN 'Bypass Permissions' WHEN p.permission_mode = 'plan' THEN 'Plan' WHEN p.permission_mode = 'acceptEdits' THEN 'Accept Edits' WHEN p.permission_mode = 'auto' THEN 'Auto' ELSE p.permission_mode END, ' · ', CASE WHEN COALESCE(p.models_used, '') = '' THEN 'No model (command or failed request)' ELSE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(p.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') END) AS metric,\n  COUNT(*) AS value\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\nGROUP BY 1, 2\nORDER BY time",
           "refId": "A"
         }
       ],
@@ -602,7 +602,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT m.`Mode`, m.`Models`, m.`Cost`\nFROM (\n  SELECT CASE p.permission_mode WHEN 'default' THEN 'Agentic' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE p.permission_mode END AS \"Mode\",\n    REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(p.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') AS \"Models\",\n    SUM(p.estimated_cost_usd) AS \"Cost\"\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n    AND p.models_used <> ''\n  GROUP BY 1, 2\n) m\nORDER BY SUM(m.`Cost`) OVER (PARTITION BY m.`Mode`) DESC, m.`Mode`, m.`Cost` DESC",
+          "rawSql": "SELECT m.`Mode`, m.`Models`, m.`Cost`\nFROM (\n  SELECT CASE WHEN p.permission_mode = 'default' AND p.permission_mode_inferred = 1 THEN 'Not reported (assumed default)' WHEN p.permission_mode = 'default' THEN 'Default' WHEN p.permission_mode = 'bypassPermissions' THEN 'Bypass Permissions' WHEN p.permission_mode = 'plan' THEN 'Plan' WHEN p.permission_mode = 'acceptEdits' THEN 'Accept Edits' WHEN p.permission_mode = 'auto' THEN 'Auto' ELSE p.permission_mode END AS \"Mode\",\n    CASE WHEN COALESCE(p.models_used, '') = '' THEN 'No model (command or failed request)' ELSE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(p.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') END AS \"Models\",\n    SUM(p.estimated_cost_usd) AS \"Cost\"\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  GROUP BY 1, 2\n) m\nORDER BY SUM(m.`Cost`) OVER (PARTITION BY m.`Mode`) DESC, m.`Mode`, m.`Cost` DESC",
           "refId": "A"
         }
       ],
@@ -636,8 +636,8 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 10,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -646,7 +646,7 @@
             },
             "insertNulls": false,
             "lineInterpolation": "smooth",
-            "lineWidth": 2,
+            "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
@@ -949,8 +949,8 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 10,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -959,7 +959,7 @@
             },
             "insertNulls": false,
             "lineInterpolation": "smooth",
-            "lineWidth": 2,
+            "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
@@ -1049,8 +1049,8 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 10,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -1059,7 +1059,7 @@
             },
             "insertNulls": false,
             "lineInterpolation": "smooth",
-            "lineWidth": 2,
+            "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
@@ -1127,7 +1127,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Which model or combination of models each prompt used. Prompts that made no API call, such as local slash commands, are left out. A combination lists its models alphabetically, and dated snapshots and [1m] variants count as their base model, so prompts that used the same models share a slice whatever order they used them in.",
+      "description": "Which model or combination of models each prompt used. Prompts without a model (slash commands and failed requests) show as \"No model (command or failed request)\". A combination lists its models alphabetically, and dated snapshots and [1m] variants count as their base model, so prompts that used the same models share a slice whatever order they used them in.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1185,7 +1185,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(p.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') AS \"Models\",\n  COUNT(*) AS \"Prompts\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  AND p.models_used <> ''\nGROUP BY REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(p.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ')\nORDER BY COUNT(*) DESC",
+          "rawSql": "SELECT CASE WHEN COALESCE(p.models_used, '') = '' THEN 'No model (command or failed request)' ELSE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(p.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') END AS \"Models\",\n  COUNT(*) AS \"Prompts\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\nGROUP BY CASE WHEN COALESCE(p.models_used, '') = '' THEN 'No model (command or failed request)' ELSE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(p.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') END\nORDER BY COUNT(*) DESC",
           "refId": "A"
         }
       ],
@@ -1205,7 +1205,8 @@
             "footer": {
               "reducers": []
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "thresholds": {
             "mode": "absolute",
@@ -1250,7 +1251,7 @@
               },
               {
                 "id": "decimals",
-                "value": 2
+                "value": 3
               }
             ]
           },
@@ -1770,8 +1771,8 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 10,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -1780,7 +1781,7 @@
             },
             "insertNulls": false,
             "lineInterpolation": "smooth",
-            "lineWidth": 2,
+            "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
@@ -1861,7 +1862,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Prompts, cost and tokens per repository, user and permission mode, split by the model or combination of models the prompt used and its reasoning effort. Share is of all prompts shown. Prompts that made no API call, such as local slash commands, are left out. Effort 'N/A' means the client sent no effort. Repositories show as GH:, GL: or BB: (GitHub, GitLab or Bitbucket, cloud or self-hosted) followed by their path; other hosts show their host name, and 'Unknown' means the session had no origin remote or the client did not report one. Project is the DevLake project you can access that also collects the repository, 'Unmapped' when none does, or 'No repository' for prompts without one. User is the person's full name from their DevLake account, or their email when it has none. Click a repository to open it in a new tab.",
+      "description": "Prompts, cost and tokens per repository, user and permission mode, split by the model or combination of models the prompt used and its reasoning effort. Share is of all prompts shown. Prompts without a model (slash commands and failed requests) show as \"No model (command or failed request)\". Effort 'N/A' means the client sent no effort. Repositories show as GH:, GL: or BB: (GitHub, GitLab or Bitbucket, cloud or self-hosted) followed by their path; other hosts show their host name, and 'Unknown' means the session had no origin remote or the client did not report one. Project is the DevLake project you can access that also collects the repository, 'Unmapped' when none does, or 'No repository' for prompts without one. User is the person's full name from their DevLake account, or their email when it has none. Click a repository to open it in a new tab.",
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -1872,7 +1873,8 @@
             "footer": {
               "reducers": []
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "thresholds": {
             "mode": "absolute",
@@ -1955,7 +1957,7 @@
               },
               {
                 "id": "decimals",
-                "value": 2
+                "value": 3
               }
             ]
           },
@@ -2019,7 +2021,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "-- r groups every prompt the panel counts on the raw columns; the labels are applied once per row.\nWITH r AS (\n  SELECT p.repository_url,\n    COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    -- account_id is the user's DevLake account, whose full_name the plugin copies from\n    -- another account with the same email.\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name,\n    p.permission_mode, p.models_used, p.effort,\n    COUNT(*) AS prompts,\n    SUM(p.estimated_cost_usd) AS cost,\n    SUM(p.input_tokens + p.output_tokens + p.cache_read_tokens + p.cache_creation_tokens) AS tokens,\n    SUM(p.tool_call_count) AS tool_calls\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n    AND p.models_used <> ''\n  GROUP BY p.repository_url, 2, p.permission_mode, p.models_used, p.effort\n)\nSELECT CASE\n    WHEN r.repository_url IS NULL THEN 'Unknown'\n    WHEN r.repository_url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.repository_url, '^https?://[^/]+/', 'GH: ')\n    WHEN r.repository_url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.repository_url, '^https?://[^/]+/', 'GL: ')\n    WHEN r.repository_url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(r.repository_url, '^https?://[^/]+/', 'BB: ')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN r.repository_url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.repository_url, '^https?://[^/]+/(scm/)?', 'BB: ')\n    ELSE REGEXP_REPLACE(r.repository_url, '^https?://', '')\n  END AS \"Repository\",\n  CASE WHEN r.repository_url IS NULL THEN 'No repository' ELSE COALESCE(dl.projects, 'Unmapped') END AS \"Project\",\n  COALESCE(r.full_name, r.user) AS \"User\",\n  CASE r.permission_mode WHEN 'default' THEN 'Agentic' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE r.permission_mode END AS \"Mode\",\n  REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(r.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') AS \"Model\",\n  CASE r.effort WHEN 'low' THEN 'Low' WHEN 'medium' THEN 'Medium' WHEN 'high' THEN 'High' WHEN 'xhigh' THEN 'XHigh' WHEN 'max' THEN 'Max' ELSE COALESCE(CONCAT(UPPER(LEFT(r.effort, 1)), SUBSTRING(r.effort, 2)), 'N/A') END AS \"Effort\",\n  r.prompts AS \"Prompts\",\n  r.prompts / SUM(r.prompts) OVER () AS \"Share\",\n  r.cost AS \"Cost\",\n  r.cost / r.prompts AS \"Cost per prompt\",\n  r.tokens / r.prompts AS \"Tokens per prompt\",\n  r.tool_calls / r.prompts AS \"Tool calls per prompt\",\n  -- repository_link is empty for prompts without a repository, so their Repository cell has no link.\n  COALESCE(r.repository_url, '') AS repository_link\nFROM r\nLEFT JOIN (\n  -- repository_url drops one trailing / and then one .git suffix, and is lowercased, so normalize\n  -- repos.url the same way.\n  SELECT LOWER(REGEXP_REPLACE(REGEXP_REPLACE(rp.url, '/$', ''), '[.]git$', '')) AS url,\n    GROUP_CONCAT(DISTINCT pm.project_name ORDER BY pm.project_name SEPARATOR ', ') AS projects\n  FROM repos rp\n  -- Only projects the viewer can access, so a repository shared with another project doesn't\n  -- reveal its name.\n  JOIN project_mapping pm ON pm.row_id = rp.id AND pm.`table` = 'repos'\n    AND pm.project_name IN (SELECT upm_p.project_name FROM user_project_mapping upm_p WHERE upm_p.user_login = ${__user.login:sqlstring})\n  GROUP BY LOWER(REGEXP_REPLACE(REGEXP_REPLACE(rp.url, '/$', ''), '[.]git$', ''))\n) dl ON dl.url = r.repository_url\nORDER BY r.repository_url IS NULL, 1, 3, 4, r.prompts DESC",
+          "rawSql": "-- r groups every prompt the panel counts on the raw columns; the labels are applied once per row.\nWITH r AS (\n  SELECT p.repository_url,\n    COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    -- account_id is the user's DevLake account, whose full_name the plugin copies from\n    -- another account with the same email.\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name,\n    p.permission_mode, p.permission_mode_inferred, p.models_used, p.effort,\n    COUNT(*) AS prompts,\n    SUM(p.estimated_cost_usd) AS cost,\n    SUM(p.input_tokens + p.output_tokens + p.cache_read_tokens + p.cache_creation_tokens) AS tokens,\n    SUM(p.tool_call_count) AS tool_calls\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  GROUP BY p.repository_url, 2, p.permission_mode, p.permission_mode_inferred, p.models_used, p.effort\n)\nSELECT CASE\n    WHEN r.repository_url IS NULL THEN 'Unknown'\n    WHEN r.repository_url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.repository_url, '^https?://[^/]+/', 'GH: ')\n    WHEN r.repository_url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.repository_url, '^https?://[^/]+/', 'GL: ')\n    WHEN r.repository_url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(r.repository_url, '^https?://[^/]+/', 'BB: ')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN r.repository_url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.repository_url, '^https?://[^/]+/(scm/)?', 'BB: ')\n    ELSE REGEXP_REPLACE(r.repository_url, '^https?://', '')\n  END AS \"Repository\",\n  CASE WHEN r.repository_url IS NULL THEN 'No repository' ELSE COALESCE(dl.projects, 'Unmapped') END AS \"Project\",\n  COALESCE(r.full_name, r.user) AS \"User\",\n  CASE WHEN r.permission_mode = 'default' AND r.permission_mode_inferred = 1 THEN 'Not reported (assumed default)' WHEN r.permission_mode = 'default' THEN 'Default' WHEN r.permission_mode = 'bypassPermissions' THEN 'Bypass Permissions' WHEN r.permission_mode = 'plan' THEN 'Plan' WHEN r.permission_mode = 'acceptEdits' THEN 'Accept Edits' WHEN r.permission_mode = 'auto' THEN 'Auto' ELSE r.permission_mode END AS \"Mode\",\n  CASE WHEN COALESCE(r.models_used, '') = '' THEN 'No model (command or failed request)' ELSE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(r.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') END AS \"Model\",\n  CASE r.effort WHEN 'low' THEN 'Low' WHEN 'medium' THEN 'Medium' WHEN 'high' THEN 'High' WHEN 'xhigh' THEN 'XHigh' WHEN 'max' THEN 'Max' ELSE COALESCE(CONCAT(UPPER(LEFT(r.effort, 1)), SUBSTRING(r.effort, 2)), 'N/A') END AS \"Effort\",\n  r.prompts AS \"Prompts\",\n  r.prompts / SUM(r.prompts) OVER () AS \"Share\",\n  r.cost AS \"Cost\",\n  r.cost / r.prompts AS \"Cost per prompt\",\n  r.tokens / r.prompts AS \"Tokens per prompt\",\n  r.tool_calls / r.prompts AS \"Tool calls per prompt\",\n  -- repository_link is empty for prompts without a repository, so their Repository cell has no link.\n  COALESCE(r.repository_url, '') AS repository_link\nFROM r\nLEFT JOIN (\n  -- repository_url drops one trailing / and then one .git suffix, and is lowercased, so normalize\n  -- repos.url the same way.\n  SELECT LOWER(REGEXP_REPLACE(REGEXP_REPLACE(rp.url, '/$', ''), '[.]git$', '')) AS url,\n    GROUP_CONCAT(DISTINCT pm.project_name ORDER BY pm.project_name SEPARATOR ', ') AS projects\n  FROM repos rp\n  -- Only projects the viewer can access, so a repository shared with another project doesn't\n  -- reveal its name.\n  JOIN project_mapping pm ON pm.row_id = rp.id AND pm.`table` = 'repos'\n    AND pm.project_name IN (SELECT upm_p.project_name FROM user_project_mapping upm_p WHERE upm_p.user_login = ${__user.login:sqlstring})\n  GROUP BY LOWER(REGEXP_REPLACE(REGEXP_REPLACE(rp.url, '/$', ''), '[.]git$', ''))\n) dl ON dl.url = r.repository_url\nORDER BY r.repository_url IS NULL, 1, 3, 4, r.prompts DESC",
           "refId": "A"
         }
       ],
@@ -2039,7 +2041,8 @@
             "footer": {
               "reducers": []
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "thresholds": {
             "mode": "absolute",
@@ -2074,7 +2077,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(NULLIF(CASE m.from_mode WHEN 'default' THEN 'Agentic' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE m.from_mode END, ''), '(session start)') AS \"From\",\n  CASE m.to_mode WHEN 'default' THEN 'Agentic' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE m.to_mode END AS \"To\",\n  CASE WHEN pr.models_used IS NULL THEN '(no prompt)' WHEN pr.models_used = '' THEN 'N/A' ELSE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(pr.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') END AS \"Model\",\n  CASE pr.effort WHEN 'low' THEN 'Low' WHEN 'medium' THEN 'Medium' WHEN 'high' THEN 'High' WHEN 'xhigh' THEN 'XHigh' WHEN 'max' THEN 'Max' ELSE COALESCE(CONCAT(UPPER(LEFT(pr.effort, 1)), SUBSTRING(pr.effort, 2)), 'N/A') END AS \"Effort\",\n  m.`trigger` AS \"Trigger\",\n  COUNT(*) AS \"Changes\",\n  COUNT(DISTINCT m.session_id) AS \"Sessions\"\nFROM ai_permission_mode_changes m\n-- The prompt running when the mode changed: the session's latest prompt started at or before the change.\nLEFT JOIN LATERAL (\n  SELECT p2.models_used, p2.effort\n  FROM ai_prompts p2\n  WHERE p2.workspace_key = m.workspace_key AND p2.session_id = m.session_id AND p2.started_at <= m.changed_at\n  ORDER BY p2.started_at DESC, p2.prompt_id DESC\n  LIMIT 1\n) pr ON TRUE\nWHERE $__timeFilter(m.changed_at)\n  AND m.session_id IN (SELECT p.session_id FROM ai_prompts p WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring}) AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring}))\n  AND COALESCE(NULLIF(m.user_email, ''), m.user_key) IN (${user:sqlstring})\nGROUP BY 1, 2, 3, 4, 5\nORDER BY COUNT(*) DESC",
+          "rawSql": "SELECT COALESCE(NULLIF(CASE m.from_mode WHEN 'default' THEN 'Default' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE m.from_mode END, ''), '(session start)') AS \"From\",\n  CASE m.to_mode WHEN 'default' THEN 'Default' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE m.to_mode END AS \"To\",\n  CASE WHEN pr.models_used IS NULL THEN '(no prompt)' WHEN pr.models_used = '' THEN 'N/A' ELSE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(pr.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') END AS \"Model\",\n  CASE pr.effort WHEN 'low' THEN 'Low' WHEN 'medium' THEN 'Medium' WHEN 'high' THEN 'High' WHEN 'xhigh' THEN 'XHigh' WHEN 'max' THEN 'Max' ELSE COALESCE(CONCAT(UPPER(LEFT(pr.effort, 1)), SUBSTRING(pr.effort, 2)), 'N/A') END AS \"Effort\",\n  m.`trigger` AS \"Trigger\",\n  COUNT(*) AS \"Changes\",\n  COUNT(DISTINCT m.session_id) AS \"Sessions\"\nFROM ai_permission_mode_changes m\n-- The prompt running when the mode changed: the session's latest prompt started at or before the change.\nLEFT JOIN LATERAL (\n  SELECT p2.models_used, p2.effort\n  FROM ai_prompts p2\n  WHERE p2.workspace_key = m.workspace_key AND p2.session_id = m.session_id AND p2.started_at <= m.changed_at\n  ORDER BY p2.started_at DESC, p2.prompt_id DESC\n  LIMIT 1\n) pr ON TRUE\nWHERE $__timeFilter(m.changed_at)\n  AND m.session_id IN (SELECT p.session_id FROM ai_prompts p WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring}) AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring}))\n  AND COALESCE(NULLIF(m.user_email, ''), m.user_key) IN (${user:sqlstring})\nGROUP BY 1, 2, 3, 4, 5\nORDER BY COUNT(*) DESC",
           "refId": "A"
         }
       ],
@@ -2172,8 +2175,8 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 10,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -2182,7 +2185,7 @@
             },
             "insertNulls": false,
             "lineInterpolation": "smooth",
-            "lineWidth": 2,
+            "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
@@ -2251,7 +2254,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Prompts, model requests, cost and tokens by the model or combination of models each prompt used, split by permission mode and reasoning effort. Prompts that never reached a model, such as local slash commands, are left out. Effort 'N/A' means the client sent no effort.",
+      "description": "Prompts, model requests, cost and tokens by the model or combination of models each prompt used, split by permission mode and reasoning effort. Prompts without a model (slash commands and failed requests) show as \"No model (command or failed request)\". Effort 'N/A' means the client sent no effort.",
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -2262,7 +2265,8 @@
             "footer": {
               "reducers": []
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "thresholds": {
             "mode": "absolute",
@@ -2307,7 +2311,7 @@
               },
               {
                 "id": "decimals",
-                "value": 2
+                "value": 3
               }
             ]
           },
@@ -2347,7 +2351,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(p.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') AS \"Models\",\n  CASE p.permission_mode WHEN 'default' THEN 'Agentic' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE p.permission_mode END AS \"Mode\",\n  CASE p.effort WHEN 'low' THEN 'Low' WHEN 'medium' THEN 'Medium' WHEN 'high' THEN 'High' WHEN 'xhigh' THEN 'XHigh' WHEN 'max' THEN 'Max' ELSE COALESCE(CONCAT(UPPER(LEFT(p.effort, 1)), SUBSTRING(p.effort, 2)), 'N/A') END AS \"Effort\",\n  COUNT(*) AS \"Prompts\",\n  SUM(p.api_request_count) AS \"API requests\",\n  SUM(p.api_error_count) AS \"API errors\",\n  SUM(p.estimated_cost_usd) AS \"Cost\",\n  SUM(p.estimated_cost_usd) / COUNT(*) AS \"Cost per prompt\",\n  AVG(p.input_tokens + p.output_tokens + p.cache_read_tokens + p.cache_creation_tokens) AS \"Tokens per prompt\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  AND p.models_used <> ''\nGROUP BY 1, 2, 3\nORDER BY 1, COUNT(*) DESC",
+          "rawSql": "SELECT CASE WHEN COALESCE(p.models_used, '') = '' THEN 'No model (command or failed request)' ELSE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(p.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') END AS \"Models\",\n  CASE WHEN p.permission_mode = 'default' AND p.permission_mode_inferred = 1 THEN 'Not reported (assumed default)' WHEN p.permission_mode = 'default' THEN 'Default' WHEN p.permission_mode = 'bypassPermissions' THEN 'Bypass Permissions' WHEN p.permission_mode = 'plan' THEN 'Plan' WHEN p.permission_mode = 'acceptEdits' THEN 'Accept Edits' WHEN p.permission_mode = 'auto' THEN 'Auto' ELSE p.permission_mode END AS \"Mode\",\n  CASE p.effort WHEN 'low' THEN 'Low' WHEN 'medium' THEN 'Medium' WHEN 'high' THEN 'High' WHEN 'xhigh' THEN 'XHigh' WHEN 'max' THEN 'Max' ELSE COALESCE(CONCAT(UPPER(LEFT(p.effort, 1)), SUBSTRING(p.effort, 2)), 'N/A') END AS \"Effort\",\n  COUNT(*) AS \"Prompts\",\n  SUM(p.api_request_count) AS \"API requests\",\n  SUM(p.api_error_count) AS \"API errors\",\n  SUM(p.estimated_cost_usd) AS \"Cost\",\n  SUM(p.estimated_cost_usd) / COUNT(*) AS \"Cost per prompt\",\n  AVG(p.input_tokens + p.output_tokens + p.cache_read_tokens + p.cache_creation_tokens) AS \"Tokens per prompt\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\nGROUP BY 1, 2, 3\nORDER BY 1, COUNT(*) DESC",
           "refId": "A"
         }
       ],
@@ -2370,8 +2374,8 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 10,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -2380,7 +2384,7 @@
             },
             "insertNulls": false,
             "lineInterpolation": "smooth",
-            "lineWidth": 2,
+            "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
@@ -2464,8 +2468,8 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 10,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -2474,7 +2478,7 @@
             },
             "insertNulls": false,
             "lineInterpolation": "smooth",
-            "lineWidth": 2,
+            "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
@@ -2557,8 +2561,8 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 10,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -2567,7 +2571,7 @@
             },
             "insertNulls": false,
             "lineInterpolation": "smooth",
-            "lineWidth": 2,
+            "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
@@ -2774,7 +2778,8 @@
             "footer": {
               "reducers": []
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "thresholds": {
             "mode": "absolute",
@@ -2861,7 +2866,7 @@
               },
               {
                 "id": "decimals",
-                "value": 2
+                "value": 3
               },
               {
                 "id": "custom.width",
@@ -3056,7 +3061,8 @@
             "footer": {
               "reducers": []
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "thresholds": {
             "mode": "absolute",
@@ -3105,7 +3111,7 @@
               },
               {
                 "id": "decimals",
-                "value": 2
+                "value": 3
               }
             ]
           },

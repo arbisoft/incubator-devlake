@@ -103,7 +103,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Total Claude Code OTel sessions, scoped to the selected project(s)/team(s) (`SUM(ai_activities.num_sessions)`).",
+      "description": "Session ids Claude Code reported in metrics, including the extra ids that --continue creates.",
       "fieldConfig": {
         "defaults": {
           "mappings": [],
@@ -152,7 +152,7 @@
           "refId": "A"
         }
       ],
-      "title": "Claude Sessions",
+      "title": "Claude Sessions (incl. resumed)",
       "type": "stat"
     },
     {
@@ -933,7 +933,10 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "custom": {
+            "minWidth": 110
+          }
         },
         "overrides": []
       },

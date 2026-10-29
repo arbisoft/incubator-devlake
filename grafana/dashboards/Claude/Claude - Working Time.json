@@ -50,7 +50,8 @@
               "reducers": []
             },
             "inspect": false,
-            "wrapHeaderText": true
+            "wrapHeaderText": true,
+            "minWidth": 110
           },
           "thresholds": {
             "mode": "absolute",
