@@ -20,7 +20,7 @@ import { describe, expect, it } from 'vitest';
 
 import { IPipelineStatus, type IPipeline, type ITask } from '@/types';
 
-import { STAGE_STATE, TASK_CELL } from './constants';
+import { COPY, STAGE_STATE, TASK_CELL } from './constants';
 import {
   areTasksSettled,
   buildPipelineQuery,
@@ -29,6 +29,7 @@ import {
   getStageState,
   getStageTimes,
   getTaskCell,
+  getTaskFailureHint,
   groupStages,
   isPipelineFinished,
   pickConfig,
@@ -222,5 +223,21 @@ describe('areTasksSettled', () => {
   it('is true only when no task is pending or running', () => {
     expect(areTasksSettled([task({}), task({ status: IPipelineStatus.FAILED })])).toBe(true);
     expect(areTasksSettled([task({}), task({ status: IPipelineStatus.RUNNING })])).toBe(false);
+  });
+});
+
+describe('getTaskFailureHint', () => {
+  const PROD_ERROR = 'subtask Collect Deployments ended unexpectedly\ncaused by: graphql query got error';
+
+  it('explains the token permissions for a github_graphql GraphQL failure', () => {
+    expect(getTaskFailureHint('github_graphql', PROD_ERROR)).toBe(COPY.task.githubPermissionHint);
+  });
+
+  it('gives no hint for another plugin with the same message', () => {
+    expect(getTaskFailureHint('gitlab', PROD_ERROR)).toBeUndefined();
+  });
+
+  it('gives no hint for an unrelated github_graphql failure', () => {
+    expect(getTaskFailureHint('github_graphql', 'connection reset by peer')).toBeUndefined();
   });
 });

@@ -42,7 +42,7 @@ vi.mock('@/plugins/utils', () => ({
 
 const scopeConfig = vi.mocked(API.scopeConfig);
 
-const DEFAULT_NAME = 'shared-config-<0>';
+const DEFAULT_NAME = 'Scope config';
 
 const setup = (options: Partial<Parameters<typeof useScopeConfigForm>[0]> = {}) => {
   const onSubmit = vi.fn();

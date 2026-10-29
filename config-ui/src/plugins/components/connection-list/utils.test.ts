@@ -23,7 +23,7 @@ import { IConnectionStatus, type IConnection } from '@/types';
 import { SORT_ORDER } from '@/ui';
 
 import { CONNECTION_FILTER, COPY } from './constants';
-import { buildFilterTabs, filterConnections, pageOf, sortConnections, toRepoCount } from './utils';
+import { buildFilterTabs, filterConnections, getScopeTitle, pageOf, sortConnections, toRepoCount } from './utils';
 
 const connection = (id: number, name: string) => ({ id, name, unique: `github-${id}` }) as IConnection;
 const entry = (status: ConnectionHealthEntry['status']): ConnectionHealthEntry => ({ status, testedAt: 1 });
@@ -112,5 +112,18 @@ describe('toRepoCount', () => {
   it('reads anything else as unknown', () => {
     expect(toRepoCount({})).toBeNull();
     expect(toRepoCount({ count: '7' })).toBeNull();
+  });
+});
+
+describe('getScopeTitle', () => {
+  it('names the column after the plugin data scope', () => {
+    expect(getScopeTitle('jira')).toBe('Boards');
+    expect(getScopeTitle('github')).toBe('Repositories');
+    expect(getScopeTitle('gitlab')).toBe('Projects');
+  });
+
+  it('falls back to Scopes for a plugin without a data scope title', () => {
+    expect(getScopeTitle('claude_otel')).toBe(COPY.columns.scopes);
+    expect(COPY.columns.scopes).toBe('Scopes');
   });
 });

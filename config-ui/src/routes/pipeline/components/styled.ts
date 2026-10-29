@@ -254,6 +254,10 @@ export const TaskFailed = styled.span`
   color: ${({ theme }) => theme.colors.errorActive};
 `;
 
+export const TaskFailureHint = styled.div`
+  margin-top: ${({ theme }) => theme.space.xs}px;
+`;
+
 export const TaskAction = styled.div`
   flex: none;
   min-width: ${({ theme }) => theme.layout.avatarSize}px;
