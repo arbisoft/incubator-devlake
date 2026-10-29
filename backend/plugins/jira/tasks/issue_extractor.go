@@ -18,6 +18,7 @@ limitations under the License.
 package tasks
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -30,6 +31,11 @@ import (
 	"github.com/apache/incubator-devlake/plugins/jira/models"
 	"github.com/apache/incubator-devlake/plugins/jira/tasks/apiv2models"
 )
+
+const sprintFieldSchema = "com.pyxis.greenhopper.jira:gh-sprint"
+
+// Jira's standard type for epics, which the ticket package doesn't define.
+const stdTypeEpic = "EPIC"
 
 var _ plugin.SubTaskEntryPoint = ExtractIssues
 
@@ -62,6 +68,10 @@ func ExtractIssues(subtaskCtx plugin.SubTaskContext) errors.Error {
 	if err != nil {
 		return err
 	}
+	sprintFieldIds, err := getSprintFieldIds(db, connectionId)
+	if err != nil {
+		return err
+	}
 	extractor, err := api.NewStatefulApiExtractor(&api.StatefulApiExtractorArgs[apiv2models.Issue]{
 		SubtaskCommonArgs: &api.SubtaskCommonArgs{
 			SubTaskContext: subtaskCtx,
@@ -75,6 +85,7 @@ func ExtractIssues(subtaskCtx plugin.SubTaskContext) errors.Error {
 				"storyPointField": data.Options.ScopeConfig.StoryPointField,
 				"dueDateField":    data.Options.ScopeConfig.DueDateField,
 				"epicKeyField":    data.Options.ScopeConfig.EpicKeyField,
+				"sprintFields":    sprintFieldIds,
 			},
 		},
 		BeforeExtract: func(apiIssue *apiv2models.Issue, stateManager *api.SubtaskStateManager) errors.Error {
@@ -97,7 +108,7 @@ func ExtractIssues(subtaskCtx plugin.SubTaskContext) errors.Error {
 			return nil
 		},
 		Extract: func(apiIssue *apiv2models.Issue, row *api.RawData) ([]interface{}, errors.Error) {
-			return extractIssues(data, mappings, apiIssue, row, userFieldMap)
+			return extractIssues(data, mappings, apiIssue, row, userFieldMap, sprintFieldIds)
 		},
 	})
 	if err != nil {
@@ -106,7 +117,7 @@ func ExtractIssues(subtaskCtx plugin.SubTaskContext) errors.Error {
 	return extractor.Execute()
 }
 
-func extractIssues(data *JiraTaskData, mappings *typeMappings, apiIssue *apiv2models.Issue, row *api.RawData, userFieldMaps map[string]struct{}) ([]interface{}, errors.Error) {
+func extractIssues(data *JiraTaskData, mappings *typeMappings, apiIssue *apiv2models.Issue, row *api.RawData, userFieldMaps map[string]struct{}, sprintFieldIds []string) ([]interface{}, errors.Error) {
 	err := apiIssue.SetAllFields(row.Data)
 	if err != nil {
 		return nil, err
@@ -117,6 +128,7 @@ func extractIssues(data *JiraTaskData, mappings *typeMappings, apiIssue *apiv2mo
 		return results, nil
 	}
 	sprints, issue, comments, worklogs, changelogs, changelogItems, users := apiIssue.ExtractEntities(data.Options.ConnectionId, userFieldMaps)
+	sprints = applySprintFields(issue, sprints, apiIssue, sprintFieldIds)
 	for _, sprintId := range sprints {
 		sprintIssue := &models.JiraSprintIssue{
 			ConnectionId:     data.Options.ConnectionId,
@@ -162,6 +174,9 @@ func extractIssues(data *JiraTaskData, mappings *typeMappings, apiIssue *apiv2mo
 		case nil:
 			// Field is not set; keep EpicKey from the standard epic field.
 		}
+	}
+	if issue.EpicKey == "" && parentIsEpic(apiIssue, mappings) {
+		issue.EpicKey = apiIssue.Fields.Parent.Key
 	}
 	// default due date field is "duedate"
 	dueDateField := "duedate"
@@ -295,4 +310,103 @@ func getTypeMappings(data *JiraTaskData, db dal.Dal) (*typeMappings, errors.Erro
 		StdTypeMappings:        stdTypeMappings,
 		StandardStatusMappings: standardStatusMappings,
 	}, nil
+}
+
+func getSprintFieldIds(db dal.Dal, connectionId uint64) ([]string, errors.Error) {
+	var fields []models.JiraIssueField
+	err := db.All(
+		&fields,
+		dal.From(&models.JiraIssueField{}),
+		dal.Where("connection_id = ? AND schema_custom = ?", connectionId, sprintFieldSchema),
+	)
+	if err != nil {
+		return nil, err
+	}
+	seen := make(map[string]struct{}, len(fields))
+	var ids []string
+	for _, field := range fields {
+		if _, ok := seen[field.ID]; ok {
+			continue
+		}
+		seen[field.ID] = struct{}{}
+		ids = append(ids, field.ID)
+	}
+	sort.Strings(ids)
+	return ids, nil
+}
+
+func sprintsFromField(value interface{}) []apiv2models.Sprint {
+	items, ok := value.([]interface{})
+	if !ok {
+		return nil
+	}
+	var sprints []apiv2models.Sprint
+	for _, item := range items {
+		m, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		id, ok := m["id"].(float64)
+		if !ok || id <= 0 {
+			continue
+		}
+		name, _ := m["name"].(string)
+		state, _ := m["state"].(string)
+		sprints = append(sprints, apiv2models.Sprint{ID: uint64(id), Name: name, State: state})
+	}
+	return sprints
+}
+
+// applySprintFields merges sprints from the custom sprint fields into ids and fills the issue's current sprint.
+func applySprintFields(issue *models.JiraIssue, ids []uint64, apiIssue *apiv2models.Issue, sprintFieldIds []string) []uint64 {
+	seen := make(map[uint64]struct{}, len(ids))
+	for _, id := range ids {
+		seen[id] = struct{}{}
+	}
+	var current []apiv2models.Sprint
+	for _, fieldId := range sprintFieldIds {
+		sprints := sprintsFromField(apiIssue.Fields.AllFields[fieldId])
+		if len(sprints) == 0 {
+			continue
+		}
+		if current == nil {
+			current = sprints
+		}
+		for _, sprint := range sprints {
+			if _, ok := seen[sprint.ID]; ok {
+				continue
+			}
+			seen[sprint.ID] = struct{}{}
+			ids = append(ids, sprint.ID)
+		}
+	}
+	if issue.SprintId != 0 || len(current) == 0 {
+		return ids
+	}
+	pick := current[len(current)-1]
+	for _, sprint := range current {
+		if sprint.State == "active" {
+			pick = sprint
+			break
+		}
+	}
+	issue.SprintId = pick.ID
+	issue.SprintName = pick.Name
+	return ids
+}
+
+func parentIsEpic(apiIssue *apiv2models.Issue, mappings *typeMappings) bool {
+	parent := apiIssue.Fields.Parent
+	if parent == nil || parent.Key == "" || parent.Fields == nil {
+		return false
+	}
+	if level := parent.Fields.Issuetype.HierarchyLevel; level != nil {
+		return *level == 1
+	}
+	name := parent.Fields.Issuetype.Name
+	std := mappings.StdTypeMappings[name]
+	if std == "" {
+		std = strings.ToUpper(name)
+	}
+	return std == stdTypeEpic
 }
