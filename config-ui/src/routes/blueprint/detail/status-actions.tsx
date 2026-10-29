@@ -43,7 +43,6 @@ export const StatusActions = ({ context, blueprint, onRefresh }: StatusActionsPr
     [STATUS_ACTION.RE_TRANSFORM]: (
       <Tooltip placement="top" title={COPY.actions.reTransformHint}>
         <Button
-          type="primary"
           disabled={disabled}
           loading={operating}
           onClick={() => trigger({ skipCollectors: true, fullSync: true })}
@@ -53,7 +52,7 @@ export const StatusActions = ({ context, blueprint, onRefresh }: StatusActionsPr
       </Tooltip>
     ),
     [STATUS_ACTION.COLLECT]: (
-      <Button disabled={disabled} loading={operating} onClick={() => trigger()}>
+      <Button type="primary" disabled={disabled} loading={operating} onClick={() => trigger()}>
         {COPY.actions.collect}
       </Button>
     ),

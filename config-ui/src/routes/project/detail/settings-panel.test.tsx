@@ -135,9 +135,21 @@ describe('SettingsPanel', () => {
     expect(onRefresh).not.toHaveBeenCalled();
   });
 
+  it('enables Save only while the form differs from the saved project', async () => {
+    setup();
+    const save = await screen.findByRole<HTMLButtonElement>('button', { name: COPY.settings.save });
+    expect(save.disabled).toBe(true);
+    const name = screen.getByRole('textbox', { name: COPY.settings.name.label });
+    fireEvent.change(name, { target: { value: 'Other' } });
+    expect(save.disabled).toBe(false);
+    fireEvent.change(name, { target: { value: PROJECT.name } });
+    expect(save.disabled).toBe(true);
+  });
+
   it('refreshes in place when the name did not change', async () => {
     const { onRefresh } = setup();
-    fireEvent.click(await screen.findByRole('button', { name: COPY.settings.save }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: COPY.settings.issueTrace.label }));
+    fireEvent.click(screen.getByRole('button', { name: COPY.settings.save }));
     await waitFor(() => expect(onRefresh).toHaveBeenCalledOnce());
     expect(project.update.mock.calls[0][1]).toMatchObject({ description: PROJECT.description });
     expect(navigate).not.toHaveBeenCalled();

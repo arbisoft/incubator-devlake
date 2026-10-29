@@ -178,7 +178,7 @@ export const COMPOSITES_COPY = {
   brandBlock: {
     note: 'Always on the dark sidebar background.',
     customTitle: 'Acme Analytics',
-    versionLine: 'Version v1.0.2@3a9c1f2',
+    versionLine: 'Version v1.0.2-arbisoft.14@3a9c1f2d8b7e4c6a',
   },
   accountBlock: {
     name: 'Jane Admin',

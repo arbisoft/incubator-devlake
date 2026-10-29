@@ -23,7 +23,7 @@ import '@/routes';
 
 import { ACCESS_ROLE } from '../../api/access';
 
-import { canManageAccess } from './guard';
+import { canManageAccess, canManageAdminFeatures } from './guard';
 
 describe('routes/settings/guard', () => {
   it('allows only enabled customer administrators into access management', () => {
@@ -31,5 +31,12 @@ describe('routes/settings/guard', () => {
     expect(canManageAccess({ enabled: true, role: ACCESS_ROLE.MEMBER })).toBe(false);
     expect(canManageAccess({ enabled: false })).toBe(false);
     expect(canManageAccess(null)).toBe(false);
+  });
+
+  it('hides admin features only from an enabled non-administrator', () => {
+    expect(canManageAdminFeatures(null)).toBe(true);
+    expect(canManageAdminFeatures({ enabled: false })).toBe(true);
+    expect(canManageAdminFeatures({ enabled: true, role: ACCESS_ROLE.MEMBER })).toBe(false);
+    expect(canManageAdminFeatures({ enabled: true, role: ACCESS_ROLE.CUSTOMER_ADMIN })).toBe(true);
   });
 });

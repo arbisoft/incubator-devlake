@@ -16,11 +16,16 @@
  *
  */
 
-import styled from 'styled-components';
+import { describe, expect, it } from 'vitest';
 
-import { textStyle } from '@/ui/style-helpers';
+import { cronPresets } from './cron';
 
-export const Version = styled.span`
-  ${textStyle('caption')}
-  color: ${({ theme }) => theme.sidebar.textMuted};
-`;
+describe('cronPresets', () => {
+  it('describes each schedule in UTC with a zero-padded time', () => {
+    expect(cronPresets.map((preset) => preset.description)).toEqual([
+      '(daily at 00:00 UTC)',
+      '(Mondays at 00:00 UTC)',
+      '(on the 1st at 00:00 UTC)',
+    ]);
+  });
+});
