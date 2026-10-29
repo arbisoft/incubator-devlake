@@ -150,7 +150,7 @@ func CreateProject(projectInput *models.ApiInputProject) (*models.ApiOutputProje
 	err = db.Create(project)
 	if err != nil {
 		if db.IsDuplicationError(err) {
-			return nil, errors.BadInput.New(fmt.Sprintf("A project with name [%s] already exists", project.Name))
+			return nil, errors.Conflict.New(fmt.Sprintf("A project named \"%s\" already exists.", project.Name))
 		}
 		return nil, errors.Default.Wrap(err, "error creating DB project")
 	}

@@ -80,13 +80,8 @@ func testConnection(ctx context.Context, connection models.JiraConn) (*JiraTestC
 		restUrl := endpointUrl.ResolveReference(refUrl)
 		return nil, errors.NotFound.New(fmt.Sprintf("Seems like an invalid Endpoint URL, please try %s", restUrl.String()))
 	}
-	if res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusForbidden {
-		// 400 not 401: Config UI treats HTTP 401 as a DevLake session expiry and
-		// navigates to /login, wiping the connection form.
-		return nil, errors.BadInput.New(withJiraHTTPDetail(res, "Please check your credential"))
-	}
-	if res.StatusCode != http.StatusOK {
-		return nil, errors.HttpStatus(res.StatusCode).New(withJiraHTTPDetail(res, fmt.Sprintf("%s unexpected status code: %d", serverInfoFail, res.StatusCode)))
+	if err := jiraStatusError(res, connection); err != nil {
+		return nil, err
 	}
 
 	resBody := &models.JiraServerInfo{}
@@ -108,18 +103,8 @@ func testConnection(ctx context.Context, connection models.JiraConn) (*JiraTestC
 	if err != nil {
 		return nil, errors.Default.Wrap(err, getStatusFail)
 	}
-	getStatusFail += ": [ " + res.Request.URL.String() + " ]"
-
-	if res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusForbidden {
-		return nil, errors.BadInput.New(withJiraHTTPDetail(res, fmt.Sprintf(
-			"Jira accepted the connection (serverInfo OK) but GET %s returned %d",
-			res.Request.URL.String(),
-			res.StatusCode,
-		)))
-	}
-
-	if res.StatusCode != http.StatusOK {
-		return nil, errors.HttpStatus(res.StatusCode).New(withJiraHTTPDetail(res, fmt.Sprintf("%s Unexpected [%s] status code: %d", getStatusFail, res.Request.URL, res.StatusCode)))
+	if err := jiraStatusError(res, connection); err != nil {
+		return nil, err
 	}
 	connection = connection.Sanitize()
 	body := JiraTestConnResponse{}
@@ -235,11 +220,38 @@ func GetConnection(input *plugin.ApiResourceInput) (*plugin.ApiResourceOutput, e
 	return dsHelper.ConnApi.GetDetail(input)
 }
 
-func withJiraHTTPDetail(res *http.Response, msg string) string {
-	if detail := jiraHTTPErrorDetail(res); detail != "" {
-		return msg + ": " + detail
+// jiraCredentialHint names the credential fields to re-check for the connection's auth method.
+func jiraCredentialHint(connection models.JiraConn) string {
+	if connection.IsOAuth2() {
+		return "Check the client ID, client secret and cloud ID."
 	}
-	return msg
+	if connection.AuthMethod == plugin.AUTH_METHOD_TOKEN {
+		return "Check the personal access token."
+	}
+	return "Check the email and API token."
+}
+
+// logJiraRejection keeps Jira's response detail in the server log, out of the client message.
+func logJiraRejection(res *http.Response) {
+	basicRes.GetLogger().Warn(nil, "jira test connection: %s returned %d: %s", res.Request.URL.String(), res.StatusCode, jiraHTTPErrorDetail(res))
+}
+
+// jiraStatusError maps a non-200 Jira response to a client-safe error, or nil on 200.
+func jiraStatusError(res *http.Response, connection models.JiraConn) errors.Error {
+	switch res.StatusCode {
+	case http.StatusOK:
+		return nil
+	case http.StatusUnauthorized:
+		logJiraRejection(res)
+		// 400 not 401: Config UI treats HTTP 401 as a DevLake session expiry and navigates to /login.
+		return errors.BadInput.New("Jira rejected these credentials (401). " + jiraCredentialHint(connection))
+	case http.StatusForbidden:
+		logJiraRejection(res)
+		return errors.BadInput.New("Jira refused access (403). Check that this account can view Jira boards.")
+	default:
+		logJiraRejection(res)
+		return errors.HttpStatus(res.StatusCode).New(fmt.Sprintf("Jira returned an unexpected status (%d) while testing the connection.", res.StatusCode))
+	}
 }
 
 // jiraHTTPErrorDetail reads Jira's error payload. Classic REST uses
