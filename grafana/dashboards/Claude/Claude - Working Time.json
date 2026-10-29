@@ -358,7 +358,7 @@
           "refId": "A"
         }
       ],
-      "title": "Claude Usage Time",
+      "title": "Claude Working Time",
       "type": "table"
     }
   ],
@@ -514,6 +514,6 @@
     ]
   },
   "timezone": "browser",
-  "title": "Claude Usage Time",
+  "title": "Claude Working Time",
   "uid": "claude_usage_time_mysql"
 }

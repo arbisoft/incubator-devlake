@@ -28,7 +28,7 @@
       "keepTime": true,
       "tags": [],
       "targetBlank": false,
-      "title": "Claude Usage Time",
+      "title": "Claude Working Time",
       "tooltip": "How long Claude Code worked for each user, per repository and workday. That dashboard uses your browser's timezone where this one uses UTC, so a relative range such as Today covers your local day there",
       "type": "link",
       "url": "/d/claude_usage_time_mysql"
