@@ -20,10 +20,16 @@ package service
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/crossdomain"
 )
+
+const accountNameRefreshInterval = 24 * time.Hour
+
+// accountNameNow is the clock for name staleness; tests replace it.
+var accountNameNow = time.Now
 
 const (
 	claudeAccountIDPrefix = "claude:ClaudeAccount:"
@@ -54,14 +60,17 @@ func ensureClaudeAccount(tx dal.Transaction, workspaceKey, userKey string, userA
 		found = false
 	}
 	merged, needsName := mergeClaudeAccount(stored, stringValue(userAccountID), email)
-	if needsName {
+	stale := found && accountNameIsStale(stored.UpdatedAt, accountNameNow())
+	if needsName || stale {
 		name, err := fullNameForEmail(tx, merged.Email)
 		if err != nil {
 			return "", err
 		}
-		merged.FullName = name
+		if name != "" || !stale {
+			merged.FullName = name
+		}
 	}
-	if found && sameClaudeAccount(stored, merged) {
+	if found && !stale && sameClaudeAccount(stored, merged) {
 		return id, nil
 	}
 	// The model's FullName is a plain string, so the row is written directly to store an
@@ -76,6 +85,14 @@ func ensureClaudeAccount(tx dal.Transaction, workspaceKey, userKey string, userA
 		return "", fmt.Errorf("write Claude OTel domain account: %w", err)
 	}
 	return id, nil
+}
+
+// accountNameIsStale reports that the stored name was last written a refresh interval ago or more.
+func accountNameIsStale(updatedAt, now time.Time) bool {
+	if updatedAt.IsZero() {
+		return false
+	}
+	return now.Sub(updatedAt) >= accountNameRefreshInterval
 }
 
 // mergeClaudeAccount applies one batch's Claude account ID and email to the stored account.
@@ -99,7 +116,8 @@ func sameClaudeAccount(stored, merged crossdomain.Account) bool {
 }
 
 // fullNameForEmail returns the name on another DevLake account (Jira, GitHub, git, ...) with
-// this email, or "" when there is none. Lowest ID wins when several sources have a name.
+// this email, or "" when there is none. GitHub wins, then Jira, then other tool accounts,
+// then git authors (ids without a prefix), with the lowest id winning within a source.
 // The match ignores case: accounts.email is utf8mb4_bin, and other plugins store the
 // email as their source sent it, while Claude emails are lowercased.
 func fullNameForEmail(tx dal.Transaction, email string) (string, error) {
@@ -109,7 +127,7 @@ func fullNameForEmail(tx dal.Transaction, email string) (string, error) {
 	account := &crossdomain.Account{}
 	err := tx.First(account,
 		dal.Where("LOWER(email) = ? AND id NOT LIKE ? AND full_name IS NOT NULL AND full_name <> ''", strings.ToLower(email), "claude:%"),
-		dal.Orderby("id ASC"),
+		dal.Orderby("CASE WHEN id LIKE 'github:%' THEN 0 WHEN id LIKE 'jira:%' THEN 1 WHEN id LIKE '%:%' THEN 2 ELSE 3 END, id ASC"),
 	)
 	if err != nil {
 		if tx.IsErrorNotFound(err) {
