@@ -444,7 +444,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
+            "barWidthFactor": 0.75,
             "drawStyle": "bars",
             "fillOpacity": 80,
             "gradientMode": "none",
@@ -575,7 +575,7 @@
       "id": 9,
       "options": {
         "barRadius": 0,
-        "barWidth": 0.97,
+        "barWidth": 0.75,
         "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
@@ -728,7 +728,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "How many prompts made N API requests, and how many made N tool calls.",
+      "description": "Each bar is the number of prompts that made that many API requests (calls to the model), counting the prompt's subagents and background calls such as session titles. For example, the bar over 2-3 is how many prompts took 2 or 3 model calls to finish. 0 means the prompt never reached the model, such as /exit or another local slash command. Prompts by Tool Call Count beside it buckets the same prompts by tool calls.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -738,7 +738,7 @@
             "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
-            "axisLabel": "",
+            "axisLabel": "Prompts",
             "axisPlacement": "auto",
             "fillOpacity": 80,
             "gradientMode": "none",
@@ -769,35 +769,49 @@
             ]
           },
           "unit": "short"
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "API requests per prompt"
+            },
+            "properties": [
+              {
+                "id": "custom.axisLabel",
+                "value": "API requests per prompt"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 9,
-        "w": 24,
+        "w": 12,
         "x": 0,
         "y": 32
       },
       "id": 12,
       "options": {
         "barRadius": 0,
-        "barWidth": 0.97,
+        "barWidth": 0.75,
         "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
           "calcs": [],
           "displayMode": "list",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": false
         },
         "orientation": "auto",
         "showValue": "auto",
-        "stacking": "normal",
+        "stacking": "none",
         "tooltip": {
           "hideZeros": false,
           "mode": "multi",
           "sort": "none"
         },
-        "xField": "Calls per prompt",
+        "xField": "API requests per prompt",
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
@@ -808,11 +822,115 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT b.label AS \"Calls per prompt\",\n  SUM(CASE WHEN p.api_request_count BETWEEN b.lo AND b.hi THEN 1 ELSE 0 END) AS \"API requests\",\n  SUM(CASE WHEN p.tool_call_count BETWEEN b.lo AND b.hi THEN 1 ELSE 0 END) AS \"Tool calls\"\nFROM (\n  SELECT 0 AS ord, '0' AS label, 0 AS lo, 0 AS hi\n  UNION ALL SELECT 1, '1', 1, 1\n  UNION ALL SELECT 2, '2-3', 2, 3\n  UNION ALL SELECT 3, '4-7', 4, 7\n  UNION ALL SELECT 4, '8-15', 8, 15\n  UNION ALL SELECT 5, '16-31', 16, 31\n  UNION ALL SELECT 6, '32+', 32, 1000000000\n) AS b\nCROSS JOIN ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\nGROUP BY b.ord, b.label\nORDER BY b.ord",
+          "rawSql": "SELECT b.label AS \"API requests per prompt\",\n  SUM(CASE WHEN p.api_request_count BETWEEN b.lo AND b.hi THEN 1 ELSE 0 END) AS \"Prompts\"\nFROM (\n  SELECT 0 AS ord, '0' AS label, 0 AS lo, 0 AS hi\n  UNION ALL SELECT 1, '1', 1, 1\n  UNION ALL SELECT 2, '2-3', 2, 3\n  UNION ALL SELECT 3, '4-7', 4, 7\n  UNION ALL SELECT 4, '8-15', 8, 15\n  UNION ALL SELECT 5, '16-31', 16, 31\n  UNION ALL SELECT 6, '32+', 32, 1000000000\n) AS b\nCROSS JOIN ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\nGROUP BY b.ord, b.label\nORDER BY b.ord",
           "refId": "A"
         }
       ],
-      "title": "Prompt Size Distribution",
+      "title": "Prompts by API Request Count",
+      "type": "barchart"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Each bar is the number of prompts that made that many tool calls (Bash, Read, Edit and the other tools Claude ran), counting the prompt's subagents. A call counts once it finishes, whether it succeeded or failed; a tool use the user rejected is not counted. For example, the bar over 4-7 is how many prompts ran 4 to 7 tools. 0 means Claude answered without running a tool. Prompts by API Request Count beside it buckets the same prompts by API requests.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#EAB839",
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Prompts",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 0,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tool calls per prompt"
+            },
+            "properties": [
+              {
+                "id": "custom.axisLabel",
+                "value": "Tool calls per prompt"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "id": 47,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.75,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xField": "Tool calls per prompt",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT b.label AS \"Tool calls per prompt\",\n  SUM(CASE WHEN p.tool_call_count BETWEEN b.lo AND b.hi THEN 1 ELSE 0 END) AS \"Prompts\"\nFROM (\n  SELECT 0 AS ord, '0' AS label, 0 AS lo, 0 AS hi\n  UNION ALL SELECT 1, '1', 1, 1\n  UNION ALL SELECT 2, '2-3', 2, 3\n  UNION ALL SELECT 3, '4-7', 4, 7\n  UNION ALL SELECT 4, '8-15', 8, 15\n  UNION ALL SELECT 5, '16-31', 16, 31\n  UNION ALL SELECT 6, '32+', 32, 1000000000\n) AS b\nCROSS JOIN ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\nGROUP BY b.ord, b.label\nORDER BY b.ord",
+          "refId": "A"
+        }
+      ],
+      "title": "Prompts by Tool Call Count",
       "type": "barchart"
     },
     {
@@ -1512,7 +1630,7 @@
       "id": 22,
       "options": {
         "barRadius": 0,
-        "barWidth": 0.97,
+        "barWidth": 0.75,
         "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
@@ -1601,7 +1719,7 @@
       "id": 23,
       "options": {
         "barRadius": 0,
-        "barWidth": 0.97,
+        "barWidth": 0.75,
         "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
@@ -1743,7 +1861,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Prompts, cost and tokens per permission mode, split by the model or combination of models the prompt used and its reasoning effort. Share is of all prompts shown. Prompts that made no API call, such as local slash commands, are left out. Effort 'N/A' means the client sent no effort.",
+      "description": "Prompts, cost and tokens per repository, user and permission mode, split by the model or combination of models the prompt used and its reasoning effort. Share is of all prompts shown. Prompts that made no API call, such as local slash commands, are left out. Effort 'N/A' means the client sent no effort. Repositories show as GH:, GL: or BB: (GitHub, GitLab or Bitbucket, cloud or self-hosted) followed by their path; other hosts show their host name, and 'Unknown' means the session had no origin remote or the client did not report one. Project is the DevLake project that also collects the repository, 'Unmapped' when none does, or 'No repository' for prompts without one. User is the person's full name from their DevLake account, or their email when it has none. Click a repository to open it in a new tab.",
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -1771,6 +1889,28 @@
           }
         },
         "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repository"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Open repository",
+                    "url": "${__data.fields.repository_link}"
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 320
+              }
+            ]
+          },
           {
             "matcher": {
               "id": "byName",
@@ -1846,6 +1986,18 @@
                 "value": 1
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "repository_link"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom.viz",
+                "value": true
+              }
+            ]
           }
         ]
       },
@@ -1867,7 +2019,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT CASE p.permission_mode WHEN 'default' THEN 'Agentic' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE p.permission_mode END AS \"Mode\",\n  REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(p.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') AS \"Model\",\n  CASE p.effort WHEN 'low' THEN 'Low' WHEN 'medium' THEN 'Medium' WHEN 'high' THEN 'High' WHEN 'xhigh' THEN 'XHigh' WHEN 'max' THEN 'Max' ELSE COALESCE(CONCAT(UPPER(LEFT(p.effort, 1)), SUBSTRING(p.effort, 2)), 'N/A') END AS \"Effort\",\n  COUNT(*) AS \"Prompts\",\n  COUNT(*) / SUM(COUNT(*)) OVER () AS \"Share\",\n  SUM(p.estimated_cost_usd) AS \"Cost\",\n  SUM(p.estimated_cost_usd) / COUNT(*) AS \"Cost per prompt\",\n  AVG(p.input_tokens + p.output_tokens + p.cache_read_tokens + p.cache_creation_tokens) AS \"Tokens per prompt\",\n  AVG(p.tool_call_count) AS \"Tool calls per prompt\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  AND p.models_used <> ''\nGROUP BY 1, 2, 3\nORDER BY 1, COUNT(*) DESC",
+          "rawSql": "-- r groups every prompt the panel counts on the raw columns; the labels are applied once per row.\nWITH r AS (\n  SELECT p.repository_url,\n    COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    -- account_id is the user's DevLake account, whose full_name the plugin copies from\n    -- another account with the same email.\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name,\n    p.permission_mode, p.models_used, p.effort,\n    COUNT(*) AS prompts,\n    SUM(p.estimated_cost_usd) AS cost,\n    SUM(p.input_tokens + p.output_tokens + p.cache_read_tokens + p.cache_creation_tokens) AS tokens,\n    SUM(p.tool_call_count) AS tool_calls\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n    AND p.models_used <> ''\n  GROUP BY p.repository_url, 2, p.permission_mode, p.models_used, p.effort\n)\nSELECT CASE\n    WHEN r.repository_url IS NULL THEN 'Unknown'\n    WHEN r.repository_url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.repository_url, '^https?://[^/]+/', 'GH: ')\n    WHEN r.repository_url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.repository_url, '^https?://[^/]+/', 'GL: ')\n    WHEN r.repository_url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(r.repository_url, '^https?://[^/]+/', 'BB: ')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN r.repository_url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.repository_url, '^https?://[^/]+/(scm/)?', 'BB: ')\n    ELSE REGEXP_REPLACE(r.repository_url, '^https?://', '')\n  END AS \"Repository\",\n  CASE WHEN r.repository_url IS NULL THEN 'No repository' ELSE COALESCE(dl.projects, 'Unmapped') END AS \"Project\",\n  COALESCE(r.full_name, r.user) AS \"User\",\n  CASE r.permission_mode WHEN 'default' THEN 'Agentic' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE r.permission_mode END AS \"Mode\",\n  REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(r.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') AS \"Model\",\n  CASE r.effort WHEN 'low' THEN 'Low' WHEN 'medium' THEN 'Medium' WHEN 'high' THEN 'High' WHEN 'xhigh' THEN 'XHigh' WHEN 'max' THEN 'Max' ELSE COALESCE(CONCAT(UPPER(LEFT(r.effort, 1)), SUBSTRING(r.effort, 2)), 'N/A') END AS \"Effort\",\n  r.prompts AS \"Prompts\",\n  r.prompts / SUM(r.prompts) OVER () AS \"Share\",\n  r.cost AS \"Cost\",\n  r.cost / r.prompts AS \"Cost per prompt\",\n  r.tokens / r.prompts AS \"Tokens per prompt\",\n  r.tool_calls / r.prompts AS \"Tool calls per prompt\",\n  -- repository_link is empty for prompts without a repository, so their Repository cell has no link.\n  COALESCE(r.repository_url, '') AS repository_link\nFROM r\nLEFT JOIN (\n  -- repository_url is lowercased with the .git suffix dropped, so normalize repos.url the same way.\n  SELECT TRIM(TRAILING '.git' FROM LOWER(rp.url)) AS url,\n    GROUP_CONCAT(DISTINCT pm.project_name ORDER BY pm.project_name SEPARATOR ', ') AS projects\n  FROM repos rp\n  JOIN project_mapping pm ON pm.row_id = rp.id AND pm.`table` = 'repos'\n  GROUP BY TRIM(TRAILING '.git' FROM LOWER(rp.url))\n) dl ON dl.url = r.repository_url\nORDER BY r.repository_url IS NULL, 1, 3, 4, r.prompts DESC",
           "refId": "A"
         }
       ],
@@ -2719,7 +2871,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 171
+        "y": 181
       },
       "id": 38,
       "links": [
@@ -2770,7 +2922,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 180
+        "y": 190
       },
       "id": 45,
       "title": "Users",
@@ -2959,7 +3111,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 181
+        "y": 191
       },
       "id": 37,
       "links": [
@@ -3080,14 +3232,14 @@
           ]
         },
         "datasource": "mysql",
-        "definition": "-- Repositories the selected users' prompts ran in. 'Unknown' stands for prompts without a repository; a real\n-- repository_url is always an https URL, so it cannot clash.\nSELECT CASE WHEN r.url = 'Unknown' THEN 'Unknown' ELSE REGEXP_REPLACE(r.url, '^https?://', '') END AS __text, r.url AS __value\nFROM (\n  SELECT DISTINCT COALESCE(p.repository_url, 'Unknown') AS url\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n) r\nORDER BY r.url = 'Unknown', 1;",
+        "definition": "-- Repositories the selected users' prompts ran in, labelled as on Token Usage by Repository.\n-- 'Unknown' stands for prompts without a repository; a real repository_url is always an\n-- https URL, so it cannot clash.\nSELECT CASE\n    WHEN r.url = 'Unknown' THEN 'Unknown'\n    WHEN r.url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GH: ')\n    WHEN r.url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GL: ')\n    WHEN r.url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'BB: ')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN r.url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/(scm/)?', 'BB: ')\n    ELSE REGEXP_REPLACE(r.url, '^https?://', '')\n  END AS __text, r.url AS __value\nFROM (\n  SELECT DISTINCT COALESCE(p.repository_url, 'Unknown') AS url\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n) r\nORDER BY r.url = 'Unknown', 1;",
         "hide": 0,
         "includeAll": true,
         "label": "Repository",
         "multi": true,
         "name": "repository",
         "options": [],
-        "query": "-- Repositories the selected users' prompts ran in. 'Unknown' stands for prompts without a repository; a real\n-- repository_url is always an https URL, so it cannot clash.\nSELECT CASE WHEN r.url = 'Unknown' THEN 'Unknown' ELSE REGEXP_REPLACE(r.url, '^https?://', '') END AS __text, r.url AS __value\nFROM (\n  SELECT DISTINCT COALESCE(p.repository_url, 'Unknown') AS url\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n) r\nORDER BY r.url = 'Unknown', 1;",
+        "query": "-- Repositories the selected users' prompts ran in, labelled as on Token Usage by Repository.\n-- 'Unknown' stands for prompts without a repository; a real repository_url is always an\n-- https URL, so it cannot clash.\nSELECT CASE\n    WHEN r.url = 'Unknown' THEN 'Unknown'\n    WHEN r.url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GH: ')\n    WHEN r.url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GL: ')\n    WHEN r.url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'BB: ')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN r.url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/(scm/)?', 'BB: ')\n    ELSE REGEXP_REPLACE(r.url, '^https?://', '')\n  END AS __text, r.url AS __value\nFROM (\n  SELECT DISTINCT COALESCE(p.repository_url, 'Unknown') AS url\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n) r\nORDER BY r.url = 'Unknown', 1;",
         "refresh": 1,
         "regex": "",
         "regexApplyTo": "value",
