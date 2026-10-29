@@ -51,9 +51,9 @@ describe('adminFeaturesLoader', () => {
     expect(await adminFeaturesLoader()).toBeNull();
   });
 
-  it('lets the page through when the access lookup fails', async () => {
+  it('redirects when the access lookup fails', async () => {
     current.mockRejectedValue(new Error('offline'));
-    expect(await adminFeaturesLoader()).toBeNull();
+    expect(redirectLocation(await adminFeaturesLoader())).toBe(PATHS.ROOT());
   });
 });
 

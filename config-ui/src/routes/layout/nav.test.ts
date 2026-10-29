@@ -80,9 +80,9 @@ describe('getNavItems', () => {
     });
   });
 
-  it('shows API Keys to an administrator and when access is disabled, but not to an enabled member', () => {
-    [ADMIN, { enabled: false }, null].forEach((access) => expect(visibleKeys(access)).toContain(NAV_KEY.API_KEYS));
-    expect(visibleKeys(MEMBER)).not.toContain(NAV_KEY.API_KEYS);
+  it('shows API Keys to an administrator and when access is disabled, but not to a member or a failed lookup', () => {
+    [ADMIN, { enabled: false }].forEach((access) => expect(visibleKeys(access)).toContain(NAV_KEY.API_KEYS));
+    [MEMBER, null].forEach((access) => expect(visibleKeys(access)).not.toContain(NAV_KEY.API_KEYS));
   });
 
   it('lists Users, Authentication and Recent Activities under Settings, in that order', () => {

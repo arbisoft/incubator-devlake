@@ -33,8 +33,8 @@ describe('routes/settings/guard', () => {
     expect(canManageAccess(null)).toBe(false);
   });
 
-  it('hides admin features only from an enabled non-administrator', () => {
-    expect(canManageAdminFeatures(null)).toBe(true);
+  it('hides admin features from an enabled non-administrator and when the access lookup failed', () => {
+    expect(canManageAdminFeatures(null)).toBe(false);
     expect(canManageAdminFeatures({ enabled: false })).toBe(true);
     expect(canManageAdminFeatures({ enabled: true, role: ACCESS_ROLE.MEMBER })).toBe(false);
     expect(canManageAdminFeatures({ enabled: true, role: ACCESS_ROLE.CUSTOMER_ADMIN })).toBe(true);
