@@ -41,3 +41,22 @@ Raised by @ubaidkhalidarbisoft in the re-review of [PR #111](https://github.com/
 - **Problem:** with no `permissions:` block the job gets the repository's default `GITHUB_TOKEN` scope, although it only reads files.
 - **Suggested fix:** add `permissions: contents: read`, as `codespell.yml` does.
 - **Nit:** also run the check on `push` to `main-arbisoft` with the same `paths`, so direct pushes and merges are checked too.
+
+## Claude dashboards variable injection
+
+Raised by @ubaidkhalidarbisoft as T08 in the review of [PR #125](https://github.com/arbisoft/incubator-devlake/pull/125) on 2026-10-28, and again in the follow-up review on 2026-10-29. It affects every dashboard in `grafana/dashboards/Claude`.
+
+### Crafted filter values bypass the project scoping
+
+- **Where:** the `user`, `repository`, `project` and `otel_teams` filters, wherever they're interpolated with `${x:sqlstring}` or `${x:regex}` ([thread](https://github.com/arbisoft/incubator-devlake/pull/125#discussion_r4410711256), [original thread](https://github.com/arbisoft/incubator-devlake/pull/125#discussion_r4403817598)).
+- **Problem:** Grafana's `:sqlstring` only doubles `'`, but MySQL treats `\` as an escape. A URL with `var-user=a\` and `var-user=)) OR 1=1 -- ` produces `'a\',')) OR 1=1 -- '`, which closes the filter and adds `OR 1=1` at the top level. A viewer with no `user_project_mapping` rows then sees every team's rows. `:regex` has the same problem with `'`.
+- **Tried, and why it doesn't work** (tested on Grafana 13.2.2 and MySQL 8.4):
+  - `allowCustomValue: false` on the filters: the variable keeps the crafted URL values on first load, and the panels run with them. Grafana drops them only on a later variable refresh.
+  - Other Grafana formats: `:singlequote` and `:doublequote` leave `\` alone. `:json` and `:lucene` escape it, but wrap a multi-value in `[...]` or `( ... OR ... )`, which MySQL can't use as an `IN` list.
+  - `/*+ SET_VAR(sql_mode='NO_BACKSLASH_ESCAPES') */`: the hint applies after the statement is lexed, so `'a\'` is still unterminated.
+  - A `SET SESSION sql_mode = ...;` prefix: the MySQL datasource rejects multiple statements.
+- **Limit:** any viewer can POST raw SQL to `/api/ds/query`, so the `user_project_mapping` filter in dashboard SQL limits what each panel shows but isn't an access boundary. Closing this breakout wouldn't make it one.
+- **Possible fixes:**
+  - Give Grafana its own MySQL user whose sessions run with `NO_BACKSLASH_ESCAPES` (for example through `init_connect`). Before that, rewrite the backslashes in other dashboards' SQL, about 224 of them in the GitLab dashboards, which would change meaning.
+  - Pass the filters as `${x:percentencode}`, whose output is safe inside `'...'`, and decode it in SQL. This needs a decoder in every panel and variable query.
+  - For a real boundary, enforce access outside the dashboard JSON: restrict datasource queries per user, or give each viewer a database user that can only read their projects' rows.
