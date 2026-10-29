@@ -64,6 +64,18 @@ func TestExtractIssuesEpicKeyField(t *testing.T) {
 			wantEpicKey:  "LEGACY-1",
 		},
 		{
+			name:         "empty string custom field keeps legacy epic",
+			epicKeyField: customField,
+			fieldsJSON:   fmt.Sprintf(`"epic": {"key": "LEGACY-1"}, "%s": ""`, customField),
+			wantEpicKey:  "LEGACY-1",
+		},
+		{
+			name:         "object custom field with empty key keeps legacy epic",
+			epicKeyField: customField,
+			fieldsJSON:   fmt.Sprintf(`"epic": {"key": "LEGACY-1"}, "%s": {"key": ""}`, customField),
+			wantEpicKey:  "LEGACY-1",
+		},
+		{
 			name:         "empty EpicKeyField does not apply custom field",
 			epicKeyField: "",
 			fieldsJSON:   fmt.Sprintf(`"%s": "EPIC-1"`, customField),

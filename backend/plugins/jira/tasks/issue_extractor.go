@@ -166,9 +166,11 @@ func extractIssues(data *JiraTaskData, mappings *typeMappings, apiIssue *apiv2mo
 		unknownEpicKey := apiIssue.Fields.AllFields[data.Options.ScopeConfig.EpicKeyField]
 		switch ek := unknownEpicKey.(type) {
 		case string:
-			issue.EpicKey = ek
+			if ek != "" {
+				issue.EpicKey = ek
+			}
 		case map[string]interface{}:
-			if key, ok := ek["key"].(string); ok {
+			if key, ok := ek["key"].(string); ok && key != "" {
 				issue.EpicKey = key
 			}
 		case nil:
