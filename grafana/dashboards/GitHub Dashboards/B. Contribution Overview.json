@@ -93,7 +93,23 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Distinct PRs Reviewed"
+            },
+            "properties": [
+              {
+                "id": "custom.stacking",
+                "value": {
+                  "group": "prs",
+                  "mode": "normal"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 12,
@@ -114,7 +130,7 @@
           "showLegend": true
         },
         "orientation": "horizontal",
-        "showValue": "auto",
+        "showValue": "never",
         "stacking": "normal",
         "tooltip": {
           "hideZeros": false,
@@ -164,7 +180,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Approved PRs vs changes requested received per PR author (top 20).\n\rdatasource: pull_request_comments, pull_requests, accounts, project_mapping",
+      "description": "Each pull request counted once, by its latest review (dismissed reviews ignored).",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -205,7 +221,68 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Approved"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Changes requested"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Commented"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "No review"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 11,
@@ -226,7 +303,7 @@
           "showLegend": true
         },
         "orientation": "horizontal",
-        "showValue": "auto",
+        "showValue": "never",
         "stacking": "normal",
         "tooltip": {
           "hideZeros": false,
@@ -247,7 +324,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "\n  SELECT \n    Developer,\n    SUM(base1._approved) as `Approved`,\n    SUM(base1._change_requests) as `Change Requests`\n  FROM\n  (\n    SELECT \n      REPLACE(\n        COALESCE(\n          NULLIF(TRIM(a.full_name), ''),\n          NULLIF(TRIM(a.user_name), ''),\n          pr.author_name,\n          NULLIF(TRIM(a.email),     ''),\n          '(unmapped)'\n      ), '-', ' ') AS Developer,\n      (CASE WHEN pr.status = 'MERGED' THEN 1 ELSE 0 END) AS _approved,\n      (\n        SELECT COUNT(prc.id) \n        FROM pull_request_comments prc \n        WHERE prc.pull_request_id = pr.id \n        AND prc.status = 'CHANGES_REQUESTED'\n      ) AS _change_requests\n    \n    FROM pull_requests pr\n    JOIN accounts a ON a.id = pr.author_id AND a.id IN ( $developer_id )\n    WHERE pr.base_repo_id like 'github:%'\n      AND $__timeFilter(pr.created_date)\n      AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($repo_id))\n      AND pr.base_repo_id in (\n        SELECT pm.row_id\n        FROM project_mapping pm\n        WHERE pm.table = 'repos'\n        AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n      )\n  ) base1\n  group by base1.Developer\n  order by (`Approved` + `Change Requests`) desc\n  limit 20;",
+          "rawSql": "WITH authored AS (\n  SELECT pr.id, pr.author_id,\n         REPLACE(COALESCE(NULLIF(TRIM(a.full_name), ''), NULLIF(TRIM(a.user_name), ''), pr.author_name, NULLIF(TRIM(a.email), ''), '(unmapped)'), '-', ' ') AS Developer\n  FROM pull_requests pr\n  JOIN accounts a ON a.id = pr.author_id AND a.id IN ( $developer_id )\n  WHERE pr.base_repo_id like 'github:%'\n    AND $__timeFilter(pr.created_date)\n    AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($repo_id))\n    AND pr.base_repo_id in (\n      SELECT pm.row_id\n      FROM project_mapping pm\n      WHERE pm.table = 'repos'\n      AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n    )\n),\nlatest AS (\n  SELECT prc.pull_request_id, prc.status,\n         ROW_NUMBER() OVER (PARTITION BY prc.pull_request_id ORDER BY prc.created_date DESC, prc.id DESC) AS rn\n  FROM pull_request_comments prc\n  JOIN authored au ON au.id = prc.pull_request_id\n  WHERE prc.type = 'REVIEW' AND prc.status IN ('APPROVED', 'CHANGES_REQUESTED', 'COMMENTED')\n)\nSELECT au.Developer,\n       COALESCE(SUM(l.status = 'APPROVED'), 0)          AS `Approved`,\n       COALESCE(SUM(l.status = 'CHANGES_REQUESTED'), 0) AS `Changes requested`,\n       COALESCE(SUM(l.status = 'COMMENTED'), 0)         AS `Commented`,\n       COALESCE(SUM(l.status IS NULL), 0)               AS `No review`\nFROM authored au\nLEFT JOIN latest l ON l.pull_request_id = au.id AND l.rn = 1\nGROUP BY au.Developer\nORDER BY COUNT(*) DESC\nLIMIT 20;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -276,7 +353,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Lines added and deleted per contributor, excluding merge commits (top 20).\n\rdatasource: commits, repo_commits, project_mapping, accounts, commit_parents",
+      "description": "Lines added and deleted on the selected repositories in the range, excluding merge commits. People are matched to their GitHub account when GitHub links any of their commits.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -339,7 +416,7 @@
           "showLegend": true
         },
         "orientation": "horizontal",
-        "showValue": "auto",
+        "showValue": "never",
         "stacking": "normal",
         "tooltip": {
           "hideZeros": false,
@@ -360,7 +437,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH dedup AS (\n  SELECT DISTINCT\n    COALESCE(a.full_name, a.user_name, c.author_name) AS contributor,\n    c.sha, c.additions, c.deletions\n  FROM commits c\n  JOIN repo_commits rc       ON rc.commit_sha = c.sha \n    AND rc.repo_id like 'github:%'\n    AND rc.repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) \n    AND rc.repo_id in (\n      select pm.row_id \n      from project_mapping pm \n      where pm.table = 'repos' \n      AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  JOIN accounts a ON a.email = c.author_email\n  WHERE $__timeFilter(c.authored_date)\n  AND NOT EXISTS (\n      SELECT 1 FROM commit_parents cp\n      WHERE cp.commit_sha = c.sha\n      GROUP BY cp.commit_sha HAVING COUNT(*) > 1\n    )\n)\nSELECT\n  contributor,\n  SUM(additions)      AS 'Lines Added',\n  SUM(deletions)     AS 'Lines Removed'\nFROM dedup\nGROUP BY contributor\nORDER BY SUM(additions) + SUM(deletions) DESC\nLIMIT 20;",
+          "rawSql": "WITH cm AS (\n  SELECT DISTINCT c.sha, c.additions, c.deletions,\n         LOWER(c.author_email)           AS em,\n         NULLIF(TRIM(c.author_name), '') AS git_name,\n         NULLIF(gc.author_id, 0)         AS gid\n  FROM commits c\n  JOIN repo_commits rc       ON rc.commit_sha = c.sha \n    AND rc.repo_id like 'github:%'\n    AND rc.repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) \n    AND rc.repo_id in (\n      select pm.row_id \n      from project_mapping pm \n      where pm.table = 'repos' \n      AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project})))\n  JOIN accounts a ON a.email = c.author_email\n  LEFT JOIN _tool_github_commits gc ON gc.sha = c.sha\n  WHERE $__timeFilter(c.authored_date)\n  AND NOT EXISTS (\n      SELECT 1 FROM commit_parents cp\n      WHERE cp.commit_sha = c.sha\n      GROUP BY cp.commit_sha HAVING COUNT(*) > 1\n    )\n),\nwho AS (SELECT em, COALESCE(MAX(gid), MAX(CASE WHEN em LIKE '%@users.noreply.github.com' AND SUBSTRING_INDEX(em, '+', 1) REGEXP '^[0-9]+$' THEN CAST(SUBSTRING_INDEX(em, '+', 1) AS UNSIGNED) END)) AS gid FROM cm GROUP BY em),\ngh AS (\n  SELECT ga.id, MAX(NULLIF(TRIM(ga.name), '')) AS name, MAX(ga.login) AS login\n  FROM _tool_github_accounts ga\n  WHERE ga.id IN (SELECT gid FROM who WHERE gid IS NOT NULL)\n  GROUP BY ga.id\n)\n,\nacc AS (\n  SELECT LOWER(email) AS em, MAX(COALESCE(full_name, user_name)) AS name\n  FROM accounts\n  WHERE LOWER(email) IN (SELECT em FROM cm)\n  GROUP BY LOWER(email)\n),\nnamed AS (\n  SELECT cm.*,\n         REPLACE(COALESCE(gh.name, gh.login, acc.name, cm.git_name, cm.em), '-', ' ') AS person\n  FROM cm\n  JOIN who ON who.em <=> cm.em\n  LEFT JOIN gh ON gh.id = who.gid\n  LEFT JOIN acc ON acc.em = cm.em\n)\nSELECT person AS contributor,\n  SUM(additions)      AS 'Lines Added',\n  SUM(deletions)     AS 'Lines Removed'\nFROM named\nGROUP BY person\nORDER BY SUM(additions) + SUM(deletions) DESC\nLIMIT 20;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -389,7 +466,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "Number of commits per contributor (top 20).\n\rdatasource: commits, repo_commits, project_mapping, accounts",
+      "description": "Commits on the selected repositories in the range, excluding merge commits. People are matched to their GitHub account when GitHub links any of their commits.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -473,7 +550,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  COALESCE(a.full_name, c.author_name, a.email) AS contributor,\n  COUNT(DISTINCT c.sha)           AS commits\nFROM commits c\nJOIN repo_commits rc      ON rc.commit_sha = c.sha \n    AND rc.repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) \n    AND rc.repo_id in (\n        select pm.row_id \n        from project_mapping pm \n        where pm.table = 'repos' and pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project}))\n        )\nJOIN accounts a       ON a.id = c.author_email\nWHERE $__timeFilter(c.authored_date)\nGROUP BY contributor\nORDER BY commits DESC\nLIMIT 20;",
+          "rawSql": "WITH cm AS (\n  SELECT DISTINCT c.sha,\n         LOWER(c.author_email)           AS em,\n         NULLIF(TRIM(c.author_name), '') AS git_name,\n         a.full_name                     AS acc_name,\n         NULLIF(gc.author_id, 0)         AS gid\n  FROM commits c\nJOIN repo_commits rc      ON rc.commit_sha = c.sha \n    AND rc.repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id})) \n    AND rc.repo_id in (\n        select pm.row_id \n        from project_mapping pm \n        where pm.table = 'repos' and pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project}))\n        )\nJOIN accounts a       ON a.id = c.author_email\nLEFT JOIN _tool_github_commits gc ON gc.sha = c.sha\n  WHERE $__timeFilter(c.authored_date)\n    AND (SELECT COUNT(*) FROM commit_parents cp WHERE cp.commit_sha = c.sha) < 2\n),\nwho AS (SELECT em, COALESCE(MAX(gid), MAX(CASE WHEN em LIKE '%@users.noreply.github.com' AND SUBSTRING_INDEX(em, '+', 1) REGEXP '^[0-9]+$' THEN CAST(SUBSTRING_INDEX(em, '+', 1) AS UNSIGNED) END)) AS gid FROM cm GROUP BY em),\ngh AS (\n  SELECT ga.id, MAX(NULLIF(TRIM(ga.name), '')) AS name, MAX(ga.login) AS login\n  FROM _tool_github_accounts ga\n  WHERE ga.id IN (SELECT gid FROM who WHERE gid IS NOT NULL)\n  GROUP BY ga.id\n),\nnamed AS (\n  SELECT cm.*,\n         REPLACE(COALESCE(gh.name, gh.login, cm.acc_name, cm.git_name, cm.em), '-', ' ') AS person\n  FROM cm\n  JOIN who ON who.em <=> cm.em\n  LEFT JOIN gh ON gh.id = who.gid\n)\nSELECT person AS contributor,\n       COUNT(DISTINCT sha) AS commits\nFROM named\nGROUP BY person\nORDER BY COUNT(DISTINCT sha) DESC\nLIMIT 20;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -502,7 +579,7 @@
         "type": "mysql",
         "uid": "devlake-mysql"
       },
-      "description": "PR commits per developer that landed (merged) vs were abandoned.\n\rdatasource: pull_request_commits, pull_requests, project_mapping, commits, accounts",
+      "description": "Commits on pull requests, by the pull request's outcome.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -564,7 +641,7 @@
           "showLegend": true
         },
         "orientation": "horizontal",
-        "showValue": "auto",
+        "showValue": "never",
         "stacking": "normal",
         "tooltip": {
           "hideZeros": false,
@@ -585,7 +662,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "-- Counts each PR commit once per author, marking it Landed if any of its PRs merged and Abandoned if the PR closed unmerged, top 20 developers.\nWITH _commit_logs AS (\n    SELECT prc.commit_sha,\n           MAX(CASE WHEN pr.status = 'MERGED'\n                     AND pr.merged_date IS NOT NULL\n                     AND pr.base_repo_id IS NOT NULL\n                    THEN 1 ELSE 0 END) AS landed,\n           MAX(CASE WHEN pr.status = 'CLOSED'\n                     AND pr.merged_date IS NULL\n                    THEN 1 ELSE 0 END) AS closed_unmerged,\n           c.author_id as author_id,\n           c.author_name as author_name\n    FROM pull_request_commits prc\n    JOIN pull_requests pr\n      ON pr.id = prc.pull_request_id\n      AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    JOIN project_mapping pm \n      ON pm.row_id = pr.base_repo_id\n      AND pm.table = 'repos'\n      AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project}))\n    JOIN commits c ON c.sha = prc.commit_sha\n    WHERE prc.pull_request_id like 'github:%' \n      AND $__timeFilter(prc.commit_authored_date)\n    GROUP BY prc.commit_sha, c.author_id, c.author_name\n)\n\nSELECT developer,\n       SUM(_landed) AS Landed,\n       SUM(_closed) AS Abandoned\nFROM (\n   SELECT \n      REPLACE(\n          COALESCE(a.full_name, \n                   a.user_name,\n                   cl.author_name, \n                   '(unmapped)'), '-', ' ') AS developer,\n      COALESCE(cl.landed, 0) AS _landed,\n      COALESCE(cl.closed_unmerged, 0) AS _closed\n    FROM _commit_logs cl\n    JOIN accounts a ON a.id = cl.author_id\n) base\nGROUP BY developer\nORDER BY (Abandoned + Landed) desc\nLIMIT 20;\n",
+          "rawSql": "-- Counts each PR commit once per author, marking it Landed if any of its PRs merged and Abandoned if the PR closed unmerged, top 20 developers.\nWITH _commit_logs AS (\n    SELECT prc.commit_sha,\n           MAX(CASE WHEN pr.status = 'MERGED'\n                     AND pr.merged_date IS NOT NULL\n                     AND pr.base_repo_id IS NOT NULL\n                    THEN 1 ELSE 0 END) AS landed,\n           MAX(CASE WHEN pr.status = 'CLOSED'\n                     AND pr.merged_date IS NULL\n                    THEN 1 ELSE 0 END) AS closed_unmerged,\n           c.author_id as author_id,\n           c.author_email as author_email,\n           c.author_name as author_name\n    FROM pull_request_commits prc\n    JOIN pull_requests pr\n      ON pr.id = prc.pull_request_id\n      AND pr.base_repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    JOIN project_mapping pm \n      ON pm.row_id = pr.base_repo_id\n      AND pm.table = 'repos'\n      AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project}))\n    JOIN commits c ON c.sha = prc.commit_sha\n    WHERE prc.pull_request_id like 'github:%' \n      AND $__timeFilter(prc.commit_authored_date)\n    GROUP BY prc.commit_sha, c.author_id, c.author_email, c.author_name\n),\ncm AS (\n  SELECT cl.commit_sha AS sha, cl.landed, cl.closed_unmerged,\n         LOWER(cl.author_email)              AS em,\n         NULLIF(TRIM(cl.author_name), '')    AS git_name,\n         COALESCE(a.full_name, a.user_name)  AS acc_name,\n         NULLIF(gc.author_id, 0)             AS gid\n  FROM _commit_logs cl\n  JOIN accounts a ON a.id = cl.author_id\n  LEFT JOIN _tool_github_commits gc ON gc.sha = cl.commit_sha\n),\nwho AS (SELECT em, COALESCE(MAX(gid), MAX(CASE WHEN em LIKE '%@users.noreply.github.com' AND SUBSTRING_INDEX(em, '+', 1) REGEXP '^[0-9]+$' THEN CAST(SUBSTRING_INDEX(em, '+', 1) AS UNSIGNED) END)) AS gid FROM cm GROUP BY em),\ngh AS (\n  SELECT ga.id, MAX(NULLIF(TRIM(ga.name), '')) AS name, MAX(ga.login) AS login\n  FROM _tool_github_accounts ga\n  WHERE ga.id IN (SELECT gid FROM who WHERE gid IS NOT NULL)\n  GROUP BY ga.id\n),\nnamed AS (\n  SELECT cm.*,\n         REPLACE(COALESCE(gh.name, gh.login, cm.acc_name, cm.git_name, '(unmapped)'), '-', ' ') AS person\n  FROM cm\n  JOIN who ON who.em <=> cm.em\n  LEFT JOIN gh ON gh.id = who.gid\n)\nSELECT person AS developer,\n       SUM(landed) AS Landed,\n       SUM(closed_unmerged) AS Abandoned\nFROM named\nGROUP BY person\nORDER BY SUM(closed_unmerged) + SUM(landed) DESC\nLIMIT 20;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -606,7 +683,7 @@
           }
         }
       ],
-      "title": "Commits Outcome",
+      "title": "Commits Outcome (PR commits)",
       "type": "barchart"
     },
     {
@@ -625,7 +702,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
@@ -771,7 +849,7 @@
         "multi": true,
         "name": "project",
         "options": [],
-        "query": "select DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name ",
+        "query": "SELECT p.project_name AS __text, p.project_name AS __value FROM (\nselect DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nand upm.user_login = ${__user.login:sqlstring}\n) p\nUNION ALL\nSELECT '(no projects with GitHub data)' AS __text, '__none__' AS __value FROM DUAL WHERE NOT EXISTS (\nselect DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nand upm.user_login = ${__user.login:sqlstring}\n)\nORDER BY __text",
         "refresh": 1,
         "regex": "",
         "type": "query"
@@ -793,7 +871,7 @@
         "multi": true,
         "name": "repo_id",
         "options": [],
-        "query": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nAND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\nORDER BY text",
+        "query": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nAND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\nUNION ALL\nSELECT '(no GitHub repositories)--__none__' FROM DUAL WHERE NOT EXISTS (\nSELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nAND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\nORDER BY text",
         "refresh": 1,
         "regex": "/^(?<text>.*)--(?<value>.*)$/",
         "type": "query"

@@ -624,7 +624,10 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "custom": {
+            "minWidth": 110
+          }
         },
         "overrides": []
       },
