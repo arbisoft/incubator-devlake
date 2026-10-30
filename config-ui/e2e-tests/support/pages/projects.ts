@@ -267,6 +267,10 @@ export class ProjectPage extends BasePage {
     await this.settings.save();
   }
 
+  async toggleIssueTrace(): Promise<void> {
+    await this.settings.issueTrace.click();
+  }
+
   async renameProject(newName: string): Promise<void> {
     await this.settings.rename(newName);
   }

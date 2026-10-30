@@ -460,18 +460,60 @@ func (c *skillCollector) add(name, detectedVia, trigger, source, plugin string, 
 		c.skills[name] = skill
 		c.order = append(c.order, name)
 	}
-	if skillSourceRank[detectedVia] > skillSourceRank[skill.DetectedVia] {
-		skill.DetectedVia = detectedVia
+	mergeSkillFacts(skill, detectedVia, trigger, source, plugin, at)
+}
+
+// mergeSkillFacts folds one observation of a skill into its row.
+func mergeSkillFacts(into *ai.AiPromptSkill, detectedVia, trigger, source, plugin string, at time.Time) {
+	if skillSourceRank[detectedVia] > skillSourceRank[into.DetectedVia] {
+		into.DetectedVia = detectedVia
 	}
-	if at.Before(skill.FirstUsedAt) {
-		skill.FirstUsedAt = at
+	if at.Before(into.FirstUsedAt) {
+		into.FirstUsedAt = at
 	}
-	skill.InvocationTrigger = firstNonEmpty(skill.InvocationTrigger, trigger)
-	skill.SkillSource = firstNonEmpty(skill.SkillSource, source)
-	skill.PluginName = firstNonEmpty(skill.PluginName, plugin)
+	into.InvocationTrigger = firstNonEmpty(into.InvocationTrigger, trigger)
+	into.SkillSource = firstNonEmpty(into.SkillSource, source)
+	into.PluginName = firstNonEmpty(into.PluginName, plugin)
+}
+
+// mergeNamespaced folds a plain skill name into its one plugin-namespaced twin and fills a missing plugin name from the prefix.
+func (c *skillCollector) mergeNamespaced() {
+	merged := make(map[string]bool)
+	for _, name := range c.order {
+		if strings.Contains(name, ":") {
+			continue
+		}
+		var match string
+		matches := 0
+		for _, other := range c.order {
+			if strings.HasSuffix(other, ":"+name) {
+				match = other
+				matches++
+			}
+		}
+		if matches != 1 {
+			continue
+		}
+		plain, target := c.skills[name], c.skills[match]
+		mergeSkillFacts(target, plain.DetectedVia, plain.InvocationTrigger, plain.SkillSource, plain.PluginName, plain.FirstUsedAt)
+		merged[name] = true
+	}
+	kept := c.order[:0]
+	for _, name := range c.order {
+		if merged[name] {
+			delete(c.skills, name)
+			continue
+		}
+		kept = append(kept, name)
+		if prefix, _, ok := strings.Cut(name, ":"); ok && prefix != "" {
+			c.skills[name].PluginName = firstNonEmpty(c.skills[name].PluginName, prefix)
+		}
+	}
+	c.order = kept
 }
 
 func (c *skillCollector) result(prompt *ai.AiPrompt) []*ai.AiPromptSkill {
+	c.mergeNamespaced()
 	skills := make([]*ai.AiPromptSkill, 0, len(c.order))
 	for _, name := range c.order {
 		skill := c.skills[name]

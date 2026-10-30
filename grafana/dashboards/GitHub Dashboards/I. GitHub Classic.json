@@ -169,7 +169,7 @@
           ]
         }
       ],
-      "title": "1.1 Number of New Issues",
+      "title": "1.1 Number of New Issues (total)",
       "type": "stat"
     },
     {
@@ -306,7 +306,7 @@
           ]
         }
       ],
-      "title": "1.2 Number of New Issues",
+      "title": "1.2 Number of New Issues (trend)",
       "type": "barchart"
     },
     {
@@ -463,8 +463,31 @@
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "green",
-                  "mode": "fixed"
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Closed issues"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "open_issue_count"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Open issues"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
                 }
               }
             ]
@@ -497,7 +520,7 @@
           "showLegend": true
         },
         "orientation": "auto",
-        "showValue": "auto",
+        "showValue": "never",
         "stacking": "normal",
         "text": {
           "valueSize": 12
@@ -654,7 +677,7 @@
           ]
         }
       ],
-      "title": "2.3 Mean Issue Lead Time by issue resolution time",
+      "title": "2.3 Mean Issue Lead Time by issue resolution time (total)",
       "type": "stat"
     },
     {
@@ -794,7 +817,7 @@
           ]
         }
       ],
-      "title": "2.4 Mean issue lead time by issue resolution time",
+      "title": "2.4 Mean issue lead time by issue resolution time (trend)",
       "type": "barchart"
     },
     {
@@ -842,7 +865,20 @@
           },
           "unit": "d"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "queue_time_in_days"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Queue time (days)"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 6,
@@ -946,7 +982,8 @@
               "type": "auto"
             },
             "filterable": false,
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
@@ -973,6 +1010,10 @@
               {
                 "id": "custom.width",
                 "value": 110
+              },
+              {
+                "id": "displayName",
+                "value": "Issue"
               }
             ]
           },
@@ -985,6 +1026,10 @@
               {
                 "id": "custom.width",
                 "value": 718
+              },
+              {
+                "id": "displayName",
+                "value": "Title"
               }
             ]
           },
@@ -997,6 +1042,10 @@
               {
                 "id": "custom.width",
                 "value": 149
+              },
+              {
+                "id": "displayName",
+                "value": "Created"
               }
             ]
           },
@@ -1009,6 +1058,10 @@
               {
                 "id": "custom.width",
                 "value": 155
+              },
+              {
+                "id": "displayName",
+                "value": "Queue time (days)"
               }
             ]
           },
@@ -1021,6 +1074,10 @@
               {
                 "id": "custom.width",
                 "value": 256
+              },
+              {
+                "id": "displayName",
+                "value": "Repository"
               }
             ]
           },
@@ -1039,6 +1096,10 @@
                     "url": "${__data.fields.url}"
                   }
                 ]
+              },
+              {
+                "id": "displayName",
+                "value": "URL"
               }
             ]
           }
@@ -1216,7 +1277,7 @@
           ]
         }
       ],
-      "title": "3.1 Number of New Pull Requests",
+      "title": "3.1 New Pull Requests (excluding drafts) (total)",
       "type": "stat"
     },
     {
@@ -1367,7 +1428,7 @@
           ]
         }
       ],
-      "title": "3.2 Number of New Pull Requests",
+      "title": "3.2 New Pull Requests (excluding drafts) (trend)",
       "type": "barchart"
     },
     {
@@ -1415,7 +1476,20 @@
           },
           "unit": "none"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "merged_pull_request_count"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Merged PRs"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 6,
@@ -1629,7 +1703,7 @@
           ]
         }
       ],
-      "title": "4.1 Ratio of unmerged PRs of All Closed PRs",
+      "title": "4.1 Ratio of unmerged PRs of All Closed PRs (total)",
       "type": "stat"
     },
     {
@@ -1681,8 +1755,8 @@
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "blue",
-                  "mode": "fixed"
+                  "mode": "fixed",
+                  "fixedColor": "text"
                 }
               }
             ]
@@ -1696,8 +1770,8 @@
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "red",
-                  "mode": "fixed"
+                  "mode": "fixed",
+                  "fixedColor": "red"
                 }
               }
             ]
@@ -1711,8 +1785,8 @@
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "green",
-                  "mode": "fixed"
+                  "mode": "fixed",
+                  "fixedColor": "green"
                 }
               }
             ]
@@ -1745,7 +1819,7 @@
           "showLegend": true
         },
         "orientation": "auto",
-        "showValue": "auto",
+        "showValue": "never",
         "stacking": "normal",
         "text": {
           "valueSize": 12
@@ -2053,7 +2127,7 @@
           ]
         }
       ],
-      "title": "4.4 Ratio of unmerged PRs of All Closed PRs",
+      "title": "4.4 Ratio of unmerged PRs of All Closed PRs (trend)",
       "type": "timeseries"
     },
     {
@@ -2376,7 +2450,7 @@
           ]
         }
       ],
-      "title": "4.7 Mean Time to Close of Pull Requests in Days",
+      "title": "4.7 Mean Time to Close of Pull Requests in Days (total)",
       "type": "stat"
     },
     {
@@ -2515,7 +2589,7 @@
           ]
         }
       ],
-      "title": "4.8 Mean Time to Close of Pull Requests in Days",
+      "title": "4.8 Mean Time to Close of Pull Requests in Days (trend)",
       "type": "barchart"
     },
     {
@@ -2799,6 +2873,10 @@
                   "fixedColor": "green",
                   "mode": "fixed"
                 }
+              },
+              {
+                "id": "displayName",
+                "value": "Successful runs"
               }
             ]
           },
@@ -2814,6 +2892,10 @@
                   "fixedColor": "red",
                   "mode": "fixed"
                 }
+              },
+              {
+                "id": "displayName",
+                "value": "Failed runs"
               }
             ]
           }
@@ -2845,7 +2927,7 @@
           "showLegend": true
         },
         "orientation": "auto",
-        "showValue": "auto",
+        "showValue": "never",
         "stacking": "normal",
         "text": {
           "valueSize": 12
@@ -3357,7 +3439,7 @@
           ]
         }
       ],
-      "title": "5.6 Mean Workflow Runs Duration",
+      "title": "5.6 Mean Workflow Runs Duration (total)",
       "type": "stat"
     },
     {
@@ -3418,6 +3500,10 @@
                   "fixedColor": "light-orange",
                   "mode": "fixed"
                 }
+              },
+              {
+                "id": "displayName",
+                "value": "Mean duration (sec)"
               }
             ]
           }
@@ -3513,7 +3599,7 @@
           ]
         }
       ],
-      "title": "5.7 Mean Workflow Runs Duration",
+      "title": "5.7 Mean Workflow Runs Duration (trend)",
       "type": "barchart"
     },
     {
@@ -3735,7 +3821,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
@@ -3940,7 +4027,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
@@ -4115,7 +4203,7 @@
         "multi": true,
         "name": "project",
         "options": [],
-        "query": "select DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name ",
+        "query": "SELECT p.project_name AS __text, p.project_name AS __value FROM (\nselect DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nand upm.user_login = ${__user.login:sqlstring}\n) p\nUNION ALL\nSELECT '(no projects with GitHub data)' AS __text, '__none__' AS __value FROM DUAL WHERE NOT EXISTS (\nselect DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nand upm.user_login = ${__user.login:sqlstring}\n)\nORDER BY __text",
         "refresh": 1,
         "regex": "",
         "type": "query"
@@ -4135,7 +4223,7 @@
         "multi": true,
         "name": "repo_id",
         "options": [],
-        "query": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nAND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\nORDER BY text",
+        "query": "SELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nAND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\nUNION ALL\nSELECT '(no GitHub repositories)--__none__' FROM DUAL WHERE NOT EXISTS (\nSELECT CONCAT(r.name, '--', r.id) AS text \nFROM project_mapping pm \nJOIN repos r ON r.id = pm.row_id \nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nAND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\nORDER BY text",
         "refresh": 1,
         "regex": "/^(?<text>.*)--(?<value>.*)$/",
         "type": "query"

@@ -109,7 +109,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Distinct Claude Code sessions that sent at least one prompt.",
+      "description": "Distinct sessions that sent at least one prompt.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -175,7 +175,7 @@
           "refId": "A"
         }
       ],
-      "title": "Sessions",
+      "title": "Sessions with prompts",
       "type": "stat"
     },
     {
@@ -1208,8 +1208,8 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 10,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -1218,7 +1218,7 @@
             },
             "insertNulls": false,
             "lineInterpolation": "smooth",
-            "lineWidth": 2,
+            "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"

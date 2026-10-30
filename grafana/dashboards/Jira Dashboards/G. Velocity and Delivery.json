@@ -137,7 +137,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n  $__timeGroup(i.created_date, $interval) AS time, \n  COUNT(DISTINCT i.assignee_id) AS `Headcount`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date) \n  AND i.type <> 'EPIC'\n  AND i.status = 'DONE'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n  )\nGROUP BY time\nORDER BY time ASC",
+          "rawSql": "SELECT \n  GREATEST($__timeGroup(i.created_date, $interval), $__timeFrom()) AS time, \n  COUNT(DISTINCT i.assignee_id) AS `Headcount`\nFROM issues i\nWHERE i.id LIKE 'jira:%'\n  AND $__timeFilter(i.created_date) \n  AND i.type <> 'EPIC'\n  AND i.status = 'DONE'\n  AND EXISTS (\n    SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n  )\nGROUP BY time\nORDER BY time ASC",
           "refId": "A",
           "sql": {
             "columns": [
@@ -252,7 +252,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT `time`, (Delivered / (CASE WHEN People = 0 THEN 1 ELSE People END)) AS `Throughput per Person`\nFROM\n(\n  SELECT \n    $__timeGroup(i.created_date, $interval) as time,\n    SUM(CASE WHEN i.status = 'DONE' THEN 1 ELSE 0 END) AS Delivered,\n    COUNT(DISTINCT assignee_id) AS People\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date) \n    AND i.type <> 'EPIC'\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n  GROUP BY time\n  ORDER BY time ASC\n) base",
+          "rawSql": "SELECT `time`, (Delivered / (CASE WHEN People = 0 THEN 1 ELSE People END)) AS `Throughput per Person`\nFROM\n(\n  SELECT \n    GREATEST($__timeGroup(i.created_date, $interval), $__timeFrom()) as time,\n    SUM(CASE WHEN i.status = 'DONE' THEN 1 ELSE 0 END) AS Delivered,\n    COUNT(DISTINCT assignee_id) AS People\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date) \n    AND i.type <> 'EPIC'\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n  GROUP BY time\n  ORDER BY time ASC\n) base",
           "refId": "A",
           "sql": {
             "columns": [
@@ -367,7 +367,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  `time`,\n  SUM(`Headcount`) as `Headcount`,\n  SUM(`Throughput per Person`) AS `Throughput per Person`\nFROM\n(\n  SELECT \n    $__timeGroup(i.created_date, $interval) AS time, \n    COUNT(DISTINCT i.assignee_id) AS `Headcount`,\n    0 as `Throughput per Person`\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date) \n    AND i.type <> 'EPIC'\n    AND i.status = 'DONE'\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n  GROUP BY time \n  UNION\n  SELECT `time`, 0 AS Headcount, (Delivered / (CASE WHEN People = 0 THEN 1 ELSE People END)) AS `Throughput per Person`\n  FROM\n  (\n    SELECT \n      $__timeGroup(i.created_date, $interval) as time,\n      SUM(CASE WHEN i.status = 'DONE' THEN 1 ELSE 0 END) AS Delivered,\n      COUNT(DISTINCT assignee_id) AS People\n    FROM issues i\n    WHERE i.id LIKE 'jira:%'\n      AND $__timeFilter(i.created_date) \n      AND i.type <> 'EPIC'\n      AND EXISTS (\n        SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n      )\n    GROUP BY time\n  ) base\n) base2\nGROUP BY time",
+          "rawSql": "SELECT\n  `time`,\n  SUM(`Headcount`) as `Headcount`,\n  SUM(`Throughput per Person`) AS `Throughput per Person`\nFROM\n(\n  SELECT \n    GREATEST($__timeGroup(i.created_date, $interval), $__timeFrom()) AS time, \n    COUNT(DISTINCT i.assignee_id) AS `Headcount`,\n    0 as `Throughput per Person`\n  FROM issues i\n  WHERE i.id LIKE 'jira:%'\n    AND $__timeFilter(i.created_date) \n    AND i.type <> 'EPIC'\n    AND i.status = 'DONE'\n    AND EXISTS (\n      SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n    )\n  GROUP BY time \n  UNION\n  SELECT `time`, 0 AS Headcount, (Delivered / (CASE WHEN People = 0 THEN 1 ELSE People END)) AS `Throughput per Person`\n  FROM\n  (\n    SELECT \n      GREATEST($__timeGroup(i.created_date, $interval), $__timeFrom()) as time,\n      SUM(CASE WHEN i.status = 'DONE' THEN 1 ELSE 0 END) AS Delivered,\n      COUNT(DISTINCT assignee_id) AS People\n    FROM issues i\n    WHERE i.id LIKE 'jira:%'\n      AND $__timeFilter(i.created_date) \n      AND i.type <> 'EPIC'\n      AND EXISTS (\n        SELECT 1 FROM board_issues bi WHERE bi.issue_id = i.id AND bi.board_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN ($board_id))\n      )\n    GROUP BY time\n  ) base\n) base2\nGROUP BY time",
           "refId": "A",
           "sql": {
             "columns": [
@@ -407,7 +407,8 @@
             "cellOptions": {
               "type": "auto"
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "mappings": [],
           "thresholds": {
@@ -758,7 +759,7 @@
         "multi": true,
         "name": "project",
         "options": [],
-        "query": "select DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'boards' AND pm.row_id like 'jira:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name ",
+        "query": "SELECT p.project_name AS __text, p.project_name AS __value FROM (\nselect DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'boards' AND pm.row_id like 'jira:%'\nand upm.user_login = ${__user.login:sqlstring}\n) p\nUNION ALL\nSELECT '(no projects with Jira data)' AS __text, '__none__' AS __value FROM DUAL WHERE NOT EXISTS (\nselect DISTINCT upm.project_name\nfrom user_project_mapping upm \njoin project_mapping pm ON upm.project_name = pm.project_name \nWHERE pm.`table` = 'boards' AND pm.row_id like 'jira:%'\nand upm.user_login = ${__user.login:sqlstring}\n)\nORDER BY __text",
         "refresh": 1,
         "regex": "",
         "type": "query"
@@ -780,7 +781,7 @@
         "multi": true,
         "name": "board_id",
         "options": [],
-        "query": "SELECT CONCAT(b.name, '--', b.id) AS text\nFROM project_mapping pm\nJOIN boards b ON b.id = pm.row_id\nWHERE pm.`table` = 'boards' AND pm.row_id LIKE 'jira:%'\n  AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\nORDER BY text",
+        "query": "SELECT CONCAT(b.name, '--', b.id) AS text\nFROM project_mapping pm\nJOIN boards b ON b.id = pm.row_id\nWHERE pm.`table` = 'boards' AND pm.row_id LIKE 'jira:%'\n  AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\nUNION ALL\nSELECT '(no Jira boards)--__none__' FROM DUAL WHERE NOT EXISTS (\nSELECT CONCAT(b.name, '--', b.id) AS text\nFROM project_mapping pm\nJOIN boards b ON b.id = pm.row_id\nWHERE pm.`table` = 'boards' AND pm.row_id LIKE 'jira:%'\n  AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\nORDER BY text",
         "refresh": 1,
         "regex": "/^(?<text>.*)--(?<value>.*)$/",
         "type": "query"

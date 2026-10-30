@@ -49,6 +49,16 @@ func Test_convertURL(t *testing.T) {
 			args{"http://8.142.68.162:8080/prefix1/prefix2/rest/agile/1.0/issue/10003", "TEST-4"},
 			"http://8.142.68.162:8080/prefix1/prefix2/browse/TEST-4",
 		},
+		{
+			"v3 self link",
+			args{"https://x.atlassian.net/rest/api/3/issue/10001", "KEY-1"},
+			"https://x.atlassian.net/browse/KEY-1",
+		},
+		{
+			"context path api v2 link",
+			args{"https://jira.example.com/jira/rest/api/2/issue/1", "KEY-1"},
+			"https://jira.example.com/jira/browse/KEY-1",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

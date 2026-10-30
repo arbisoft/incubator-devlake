@@ -195,10 +195,7 @@ func convertURL(api, issueKey string) string {
 	if err != nil {
 		return api
 	}
-	before, _, found := strings.Cut(u.Path, "/rest/agile/1.0/issue")
-	if !found {
-		before, _, _ = strings.Cut(u.Path, "/rest/api/2/issue")
-	}
+	before, _, _ := strings.Cut(u.Path, "/rest/")
 	u.Path = filepath.Join(before, "browse", issueKey)
 	return u.String()
 }

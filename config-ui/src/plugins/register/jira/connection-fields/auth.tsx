@@ -286,8 +286,8 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
             }
             required
           >
-            <Input
-              placeholder={type === 'update' ? '********' : 'Your PAT'}
+            <Input.Password
+              placeholder={type === 'update' ? '********' : 'Your API token'}
               value={values.password}
               onChange={handleChangePassword}
             />
@@ -325,7 +325,7 @@ export const Auth = ({ type, initialValues, values, setValues, setErrors }: Prop
               required
             >
               <Input.Password
-                placeholder={type === 'update' ? '********' : 'Your Password'}
+                placeholder={type === 'update' ? '********' : 'Your personal access token'}
                 value={values.token}
                 onChange={handleChangeToken}
               />

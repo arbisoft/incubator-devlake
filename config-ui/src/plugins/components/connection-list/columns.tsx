@@ -29,6 +29,7 @@ import { RepoCountCell } from './repo-count-cell';
 import type { RepoCounts } from './types';
 
 type ColumnOptions = {
+  scopeTitle: string;
   counts: RepoCounts;
   onLoadCount: (connection: IConnection) => void;
   onDetails: (connection: IConnection) => void;
@@ -36,6 +37,7 @@ type ColumnOptions = {
 };
 
 export const getColumns = ({
+  scopeTitle,
   counts,
   onLoadCount,
   onDetails,
@@ -49,7 +51,7 @@ export const getColumns = ({
   },
   {
     key: COLUMN_KEY.REPOS,
-    title: COPY.columns.repos,
+    title: scopeTitle,
     render: (_, connection) => (
       <RepoCountCell connection={connection} count={counts[connection.unique]} onVisible={onLoadCount} />
     ),

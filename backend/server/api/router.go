@@ -26,6 +26,7 @@ import (
 	"github.com/apache/incubator-devlake/core/errors"
 	"github.com/apache/incubator-devlake/impls/logruslog"
 	"github.com/apache/incubator-devlake/server/api/access"
+	"github.com/apache/incubator-devlake/server/api/adminonly"
 	"github.com/apache/incubator-devlake/server/api/apikeys"
 	"github.com/apache/incubator-devlake/server/api/auth"
 	"github.com/apache/incubator-devlake/server/api/store"
@@ -34,7 +35,6 @@ import (
 	"github.com/apache/incubator-devlake/server/api/blueprints"
 	compliancescorecard "github.com/apache/incubator-devlake/server/api/compliance_scorecard"
 	"github.com/apache/incubator-devlake/server/api/domainlayer"
-	"github.com/apache/incubator-devlake/server/api/grafanarole"
 	"github.com/apache/incubator-devlake/server/api/grafanausers"
 	"github.com/apache/incubator-devlake/server/api/pipelines"
 	"github.com/apache/incubator-devlake/server/api/plugininfo"
@@ -89,11 +89,12 @@ func RegisterRouter(r *gin.Engine, basicRes context.BasicRes) {
 	r.GET("/store/:storeKey", store.GetStore)
 	r.PUT("/store/:storeKey", store.PutStore)
 
-	// api keys api
-	r.GET("/api-keys", apikeys.GetApiKeys)
-	r.POST("/api-keys", apikeys.PostApiKey)
-	r.PUT("/api-keys/:apiKeyId", apikeys.PutApiKey)
-	r.DELETE("/api-keys/:apiKeyId", apikeys.DeleteApiKey)
+	// api keys api (admin-only)
+	admin := adminonly.Require()
+	r.GET("/api-keys", admin, apikeys.GetApiKeys)
+	r.POST("/api-keys", admin, apikeys.PostApiKey)
+	r.PUT("/api-keys/:apiKeyId", admin, apikeys.PutApiKey)
+	r.DELETE("/api-keys/:apiKeyId", admin, apikeys.DeleteApiKey)
 
 	// auth (OIDC and local user login)
 	auth.RegisterRoutes(r)
@@ -103,17 +104,11 @@ func RegisterRouter(r *gin.Engine, basicRes context.BasicRes) {
 	grafanausers.RegisterRoutes(r)
 
 	// user project mapping api
-	//
-	// Reachable from config-ui with a session, and from the Grafana admin dashboard
-	// through Grafana's datasource proxy with a scoped API key. RequireGrafanaAdmin
-	// constrains only the latter: that proxy admits any signed-in Grafana user, so
-	// without it a Viewer could grant themselves any project. Session callers are
-	// unaffected; gating those is tracked separately.
-	grafanaAdmin := grafanarole.RequireGrafanaAdmin()
-	r.GET("/user-project-mappings", grafanaAdmin, userprojectmapping.GetAllMappings)
-	r.GET("/user-project-mappings/:userLogin", grafanaAdmin, userprojectmapping.GetMappingsByUser)
-	r.POST("/user-project-mappings/:userLogin", grafanaAdmin, userprojectmapping.PostMapping)
-	r.DELETE("/user-project-mappings/:userLogin/:projectName", grafanaAdmin, userprojectmapping.DeleteMapping)
+	// admin-only: customer-admin sessions; API keys can't manage keys or project access
+	r.GET("/user-project-mappings", admin, userprojectmapping.GetAllMappings)
+	r.GET("/user-project-mappings/:userLogin", admin, userprojectmapping.GetMappingsByUser)
+	r.POST("/user-project-mappings/:userLogin", admin, userprojectmapping.PostMapping)
+	r.DELETE("/user-project-mappings/:userLogin/:projectName", admin, userprojectmapping.DeleteMapping)
 
 	// mount all api resources for all plugins
 	resources, err := services.GetPluginsApiResources()

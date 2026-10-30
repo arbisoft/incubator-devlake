@@ -19,14 +19,19 @@
 import { redirect } from 'react-router-dom';
 
 import API from '@/api';
+import type { AccessCurrent } from '@/api/access';
 import { PATHS } from '@/config';
 
-import { canManageAccess } from './guard';
+import { canManageAccess, canManageAdminFeatures } from './guard';
 
-export const accessLoader = async () => {
+const guardLoader = (allowed: (access: AccessCurrent | null) => boolean) => async () => {
   const access = await API.access.current().catch(() => null);
-  if (canManageAccess(access)) {
+  if (allowed(access)) {
     return null;
   }
   return redirect(PATHS.ROOT());
 };
+
+export const accessLoader = guardLoader(canManageAccess);
+
+export const adminFeaturesLoader = guardLoader(canManageAdminFeatures);

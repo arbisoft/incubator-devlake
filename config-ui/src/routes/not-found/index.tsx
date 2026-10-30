@@ -25,24 +25,30 @@ import { useDocumentTitle } from '@/ui/hooks';
 
 import { COPY } from './constants';
 
-export const NotFound = () => {
+const NotFoundState = () => {
   useDocumentTitle(COPY.title);
 
   const navigate = useNavigate();
 
   return (
-    <StandalonePage>
-      <EmptyState
-        illustration={EMPTY_ILLUSTRATION.EMPTY}
-        title={COPY.heading}
-        description={COPY.description}
-        size={EMPTY_STATE_SIZE.PAGE}
-        action={
-          <Button type="primary" onClick={() => navigate(PATHS.ROOT())}>
-            {COPY.home}
-          </Button>
-        }
-      />
-    </StandalonePage>
+    <EmptyState
+      illustration={EMPTY_ILLUSTRATION.EMPTY}
+      title={COPY.heading}
+      description={COPY.description}
+      size={EMPTY_STATE_SIZE.PAGE}
+      action={
+        <Button type="primary" onClick={() => navigate(PATHS.ROOT())}>
+          {COPY.home}
+        </Button>
+      }
+    />
   );
 };
+
+export const NotFound = () => (
+  <StandalonePage>
+    <NotFoundState />
+  </StandalonePage>
+);
+
+export const ShellNotFound = NotFoundState;

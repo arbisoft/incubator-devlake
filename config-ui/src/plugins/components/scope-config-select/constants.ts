@@ -29,5 +29,5 @@ export const COPY = {
     title: 'No scope configs yet',
     description: 'Add a scope config to associate it with data scopes.',
   },
-  defaultName: (count: number) => `shared-config-<${count}>`,
+  defaultName: (connectionName?: string) => (connectionName ? `${connectionName} config` : 'Scope config'),
 };

@@ -26,11 +26,18 @@ import { init, selectStatus, selectThemeMode, setMode } from '@/features';
 import { useAppDispatch, useAppSelector } from '@/hooks';
 import { OnboardCard } from '@/routes/onboard/components';
 import { OtelAttention } from '@/routes/otel/attention';
-import { AccountBlock, AppShell, BrandBlock, PoweredByRow, SidebarNav, useSidebarCollapsed } from '@/ui';
+import {
+  AccountBlock,
+  AppShell,
+  BrandBlock,
+  PoweredByDetail,
+  PoweredByRow,
+  SidebarNav,
+  useSidebarCollapsed,
+} from '@/ui';
 
 import { COPY, INIT_STATUS } from './constants';
 import { getNavItems } from './nav';
-import { Version } from './styled';
 import type { LayoutData } from './types';
 import { useAccountMenu, useIdentityLinkNotification } from './use-account-menu';
 import { getAccountLabels } from './utils';
@@ -96,9 +103,6 @@ export const Layout = () => {
           header={<BrandBlock collapsed={collapsed} />}
           footer={
             <>
-              {!collapsed && (
-                <PoweredByRow>{version && <Version>{COPY.account.version(version)}</Version>}</PoweredByRow>
-              )}
               <AccountBlock
                 name={name}
                 secondary={secondary}
@@ -106,6 +110,11 @@ export const Layout = () => {
                 menu={accountMenuItems}
                 onOpenChange={loadLinkableProviders}
               />
+              {!collapsed && (
+                <PoweredByRow>
+                  {version && <PoweredByDetail>{COPY.account.version(version)}</PoweredByDetail>}
+                </PoweredByRow>
+              )}
             </>
           }
         />

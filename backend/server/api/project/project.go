@@ -134,7 +134,7 @@ func PostProject(c *gin.Context) {
 
 	projectOutput, err := services.CreateProject(projectInput)
 	if err != nil {
-		shared.ApiOutputError(c, errors.Default.Wrap(err, "error creating project"))
+		shared.ApiOutputError(c, err)
 		return
 	}
 

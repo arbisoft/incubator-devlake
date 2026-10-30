@@ -434,7 +434,8 @@
             "footer": {
               "reducers": []
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "thresholds": {
             "mode": "absolute",
@@ -479,7 +480,7 @@
               },
               {
                 "id": "decimals",
-                "value": 2
+                "value": 3
               }
             ]
           },
@@ -519,7 +520,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(p.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') AS \"Models\",\n  CASE p.permission_mode WHEN 'default' THEN 'Agentic' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE p.permission_mode END AS \"Mode\",\n  CASE p.effort WHEN 'low' THEN 'Low' WHEN 'medium' THEN 'Medium' WHEN 'high' THEN 'High' WHEN 'xhigh' THEN 'XHigh' WHEN 'max' THEN 'Max' ELSE COALESCE(CONCAT(UPPER(LEFT(p.effort, 1)), SUBSTRING(p.effort, 2)), 'N/A') END AS \"Effort\",\n  COUNT(*) AS \"Prompts\",\n  SUM(p.api_request_count) AS \"API requests\",\n  SUM(p.api_error_count) AS \"API errors\",\n  SUM(p.estimated_cost_usd) AS \"Cost\",\n  SUM(p.estimated_cost_usd) / COUNT(*) AS \"Cost per prompt\",\n  AVG(p.input_tokens + p.output_tokens + p.cache_read_tokens + p.cache_creation_tokens) AS \"Tokens per prompt\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  AND p.models_used <> ''\nGROUP BY 1, 2, 3\nORDER BY 1, COUNT(*) DESC",
+          "rawSql": "SELECT CASE WHEN COALESCE(p.models_used, '') = '' THEN 'No model (command or failed request)' ELSE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(p.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') END AS \"Models\",\n  CASE WHEN p.permission_mode = 'default' AND p.permission_mode_inferred = 1 THEN 'Not reported (assumed default)' WHEN p.permission_mode = 'default' THEN 'Default' WHEN p.permission_mode = 'bypassPermissions' THEN 'Bypass Permissions' WHEN p.permission_mode = 'plan' THEN 'Plan' WHEN p.permission_mode = 'acceptEdits' THEN 'Accept Edits' WHEN p.permission_mode = 'auto' THEN 'Auto' ELSE p.permission_mode END AS \"Mode\",\n  CASE p.effort WHEN 'low' THEN 'Low' WHEN 'medium' THEN 'Medium' WHEN 'high' THEN 'High' WHEN 'xhigh' THEN 'XHigh' WHEN 'max' THEN 'Max' ELSE COALESCE(CONCAT(UPPER(LEFT(p.effort, 1)), SUBSTRING(p.effort, 2)), 'N/A') END AS \"Effort\",\n  COUNT(*) AS \"Prompts\",\n  SUM(p.api_request_count) AS \"API requests\",\n  SUM(p.api_error_count) AS \"API errors\",\n  SUM(p.estimated_cost_usd) AS \"Cost\",\n  SUM(p.estimated_cost_usd) / COUNT(*) AS \"Cost per prompt\",\n  AVG(p.input_tokens + p.output_tokens + p.cache_read_tokens + p.cache_creation_tokens) AS \"Tokens per prompt\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\nGROUP BY 1, 2, 3\nORDER BY 1, COUNT(*) DESC",
           "refId": "A"
         }
       ],
@@ -542,8 +543,8 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 10,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -552,7 +553,7 @@
             },
             "insertNulls": false,
             "lineInterpolation": "smooth",
-            "lineWidth": 2,
+            "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
@@ -635,8 +636,8 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 10,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -645,7 +646,7 @@
             },
             "insertNulls": false,
             "lineInterpolation": "smooth",
-            "lineWidth": 2,
+            "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
@@ -729,8 +730,8 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 10,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -739,7 +740,7 @@
             },
             "insertNulls": false,
             "lineInterpolation": "smooth",
-            "lineWidth": 2,
+            "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
@@ -822,8 +823,8 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 10,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -832,7 +833,7 @@
             },
             "insertNulls": false,
             "lineInterpolation": "smooth",
-            "lineWidth": 2,
+            "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"

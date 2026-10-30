@@ -169,7 +169,7 @@
           ]
         }
       ],
-      "title": "3.1 Number of New Pull Requests",
+      "title": "3.1 New Pull Requests (excluding drafts) (total)",
       "type": "stat"
     },
     {
@@ -320,7 +320,7 @@
           ]
         }
       ],
-      "title": "3.2 Number of New Pull Requests",
+      "title": "3.2 New Pull Requests (excluding drafts) (trend)",
       "type": "barchart"
     },
     {
@@ -368,7 +368,20 @@
           },
           "unit": "none"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "merged_pull_request_count"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Merged PRs"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 10,
@@ -509,7 +522,65 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "approved"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Approved"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "rejected"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Changes requested"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "commented"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Commented"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 10,
@@ -530,7 +601,7 @@
           "showLegend": true
         },
         "orientation": "horizontal",
-        "showValue": "auto",
+        "showValue": "never",
         "stacking": "normal",
         "tooltip": {
           "hideZeros": false,
@@ -641,7 +712,7 @@
           "showLegend": true
         },
         "orientation": "horizontal",
-        "showValue": "auto",
+        "showValue": "never",
         "stacking": "normal",
         "tooltip": {
           "hideZeros": false,
@@ -662,7 +733,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH dedup AS (\n  SELECT DISTINCT\n    REPLACE(\n      COALESCE(\n        NULLIF(TRIM(a.full_name), ''),\n        NULLIF(TRIM(u.name), ''),\n        c.author_name\n      ), '-', ' '\n    ) AS contributor,\n    c.sha, c.additions, c.deletions\n  FROM commits c\n  JOIN repo_commits rc       ON rc.commit_sha = c.sha\n  JOIN repos r                ON r.id = rc.repo_id AND r.deleted = 0\n  LEFT JOIN accounts a        ON a.id = c.author_id\n  LEFT JOIN user_accounts ua  ON ua.account_id = c.author_id\n  LEFT JOIN users u           ON u.id = ua.user_id\n  WHERE\n    $__timeFilter(c.authored_date)\n    AND rc.repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND rc.repo_id IN (\n      SELECT pm.row_id FROM project_mapping pm\n      WHERE pm.table = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project}))\n    )\n    AND COALESCE(NULLIF(TRIM(a.full_name), ''), NULLIF(TRIM(u.name), ''), c.author_name) IS NOT NULL\n)\nSELECT\n  contributor,\n  SUM(additions) AS 'Lines Added',\n  SUM(deletions) AS 'Lines Removed'\nFROM dedup\nGROUP BY contributor\nORDER BY SUM(additions) + SUM(deletions) DESC\nLIMIT 20;",
+          "rawSql": "WITH cm AS (\n  SELECT DISTINCT c.sha, c.additions, c.deletions,\n    LOWER(c.author_email)           AS em,\n    NULLIF(TRIM(c.author_name), '') AS git_name,\n    COALESCE(NULLIF(TRIM(a.full_name), ''), NULLIF(TRIM(u.name), '')) AS acc_name,\n    NULLIF(gc.author_id, 0)         AS gid\n  FROM commits c\n  JOIN repo_commits rc       ON rc.commit_sha = c.sha\n  JOIN repos r                ON r.id = rc.repo_id AND r.deleted = 0\n  LEFT JOIN accounts a        ON a.id = c.author_id\n  LEFT JOIN user_accounts ua  ON ua.account_id = c.author_id\n  LEFT JOIN users u           ON u.id = ua.user_id\n  LEFT JOIN _tool_github_commits gc ON gc.sha = c.sha\n  WHERE\n    $__timeFilter(c.authored_date)\n    AND rc.repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\n    AND rc.repo_id IN (\n      SELECT pm.row_id FROM project_mapping pm\n      WHERE pm.table = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project}))\n    )\n    AND COALESCE(NULLIF(TRIM(a.full_name), ''), NULLIF(TRIM(u.name), ''), c.author_name) IS NOT NULL\n),\nwho AS (SELECT em, COALESCE(MAX(gid), MAX(CASE WHEN em LIKE '%@users.noreply.github.com' AND SUBSTRING_INDEX(em, '+', 1) REGEXP '^[0-9]+$' THEN CAST(SUBSTRING_INDEX(em, '+', 1) AS UNSIGNED) END)) AS gid FROM cm GROUP BY em),\ngh AS (\n  SELECT ga.id, MAX(NULLIF(TRIM(ga.name), '')) AS name, MAX(ga.login) AS login\n  FROM _tool_github_accounts ga\n  WHERE ga.id IN (SELECT gid FROM who WHERE gid IS NOT NULL)\n  GROUP BY ga.id\n),\nnamed AS (\n  SELECT cm.*,\n         REPLACE(COALESCE(gh.name, gh.login, cm.acc_name, cm.git_name, cm.em), '-', ' ') AS person\n  FROM cm\n  JOIN who ON who.em <=> cm.em\n  LEFT JOIN gh ON gh.id = who.gid\n)\nSELECT person AS contributor,\n  SUM(additions) AS 'Lines Added',\n  SUM(deletions) AS 'Lines Removed'\nFROM named\nGROUP BY person\nORDER BY SUM(additions) + SUM(deletions) DESC\nLIMIT 20;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -731,7 +802,20 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "commit_count"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Commits"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 10,
@@ -752,7 +836,7 @@
           "showLegend": true
         },
         "orientation": "auto",
-        "showValue": "auto",
+        "showValue": "never",
         "stacking": "normal",
         "tooltip": {
           "hideZeros": false,
@@ -773,7 +857,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  REPLACE(\n    COALESCE(\n      NULLIF(TRIM(a.full_name), ''),\n      NULLIF(TRIM(u.name), ''),\n      c.author_name\n    ), '-', ' '\n  ) AS contributor,\n  COUNT(DISTINCT c.sha) AS commit_count\nFROM commits c\nJOIN repo_commits rc        ON rc.commit_sha = c.sha AND rc.repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\nJOIN repos r                 ON r.id = rc.repo_id AND r.deleted = 0\nLEFT JOIN accounts a         ON a.id = c.author_id\nLEFT JOIN user_accounts ua   ON ua.account_id = c.author_id\nLEFT JOIN users u            ON u.id = ua.user_id\nWHERE\n  $__timeFilter(c.authored_date)\n  AND rc.repo_id IN (\n    SELECT pm.row_id FROM project_mapping pm\n    WHERE pm.table = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project}))\n  )\nGROUP BY 1\nORDER BY commit_count DESC\nLIMIT 20;",
+          "rawSql": "WITH cm AS (\n  SELECT DISTINCT c.sha,\n    LOWER(c.author_email)           AS em,\n    NULLIF(TRIM(c.author_name), '') AS git_name,\n    COALESCE(NULLIF(TRIM(a.full_name), ''), NULLIF(TRIM(u.name), '')) AS acc_name,\n    NULLIF(gc.author_id, 0)         AS gid\n  FROM commits c\nJOIN repo_commits rc        ON rc.commit_sha = c.sha AND rc.repo_id IN (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.row_id IN (${repo_id}))\nJOIN repos r                 ON r.id = rc.repo_id AND r.deleted = 0\nLEFT JOIN accounts a         ON a.id = c.author_id\nLEFT JOIN user_accounts ua   ON ua.account_id = c.author_id\nLEFT JOIN users u            ON u.id = ua.user_id\nLEFT JOIN _tool_github_commits gc ON gc.sha = c.sha\n  WHERE\n  $__timeFilter(c.authored_date)\n  AND rc.repo_id IN (\n    SELECT pm.row_id FROM project_mapping pm\n    WHERE pm.table = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project}))\n  )\n),\nwho AS (SELECT em, COALESCE(MAX(gid), MAX(CASE WHEN em LIKE '%@users.noreply.github.com' AND SUBSTRING_INDEX(em, '+', 1) REGEXP '^[0-9]+$' THEN CAST(SUBSTRING_INDEX(em, '+', 1) AS UNSIGNED) END)) AS gid FROM cm GROUP BY em),\ngh AS (\n  SELECT ga.id, MAX(NULLIF(TRIM(ga.name), '')) AS name, MAX(ga.login) AS login\n  FROM _tool_github_accounts ga\n  WHERE ga.id IN (SELECT gid FROM who WHERE gid IS NOT NULL)\n  GROUP BY ga.id\n),\nnamed AS (\n  SELECT cm.*,\n         REPLACE(COALESCE(gh.name, gh.login, cm.acc_name, cm.git_name, cm.em), '-', ' ') AS person\n  FROM cm\n  JOIN who ON who.em <=> cm.em\n  LEFT JOIN gh ON gh.id = who.gid\n)\nSELECT person AS contributor,\n  COUNT(DISTINCT sha) AS commit_count\nFROM named\nGROUP BY person\nORDER BY COUNT(DISTINCT sha) DESC\nLIMIT 20;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -916,7 +1000,7 @@
           ]
         }
       ],
-      "title": "4.1 Ratio of unmerged PRs of All Closed PRs",
+      "title": "4.1 Ratio of unmerged PRs of All Closed PRs (total)",
       "type": "stat"
     },
     {
@@ -968,8 +1052,8 @@
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "blue",
-                  "mode": "fixed"
+                  "mode": "fixed",
+                  "fixedColor": "text"
                 }
               }
             ]
@@ -983,8 +1067,8 @@
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "red",
-                  "mode": "fixed"
+                  "mode": "fixed",
+                  "fixedColor": "red"
                 }
               }
             ]
@@ -998,8 +1082,8 @@
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "green",
-                  "mode": "fixed"
+                  "mode": "fixed",
+                  "fixedColor": "green"
                 }
               }
             ]
@@ -1032,7 +1116,7 @@
           "showLegend": true
         },
         "orientation": "auto",
-        "showValue": "auto",
+        "showValue": "never",
         "stacking": "normal",
         "text": {
           "valueSize": 12
@@ -1340,7 +1424,7 @@
           ]
         }
       ],
-      "title": "4.4 Ratio of unmerged PRs of All Closed PRs",
+      "title": "4.4 Ratio of unmerged PRs of All Closed PRs (trend)",
       "type": "timeseries"
     },
     {
@@ -1663,7 +1747,7 @@
           ]
         }
       ],
-      "title": "4.7 Mean Time to Close of Pull Requests in Days",
+      "title": "4.7 Mean Time to Close of Pull Requests in Days (total)",
       "type": "stat"
     },
     {
@@ -1802,7 +1886,7 @@
           ]
         }
       ],
-      "title": "4.8 Mean Time to Close of Pull Requests in Days",
+      "title": "4.8 Mean Time to Close of Pull Requests in Days (trend)",
       "type": "barchart"
     },
     {
@@ -2086,6 +2170,10 @@
                   "fixedColor": "green",
                   "mode": "fixed"
                 }
+              },
+              {
+                "id": "displayName",
+                "value": "Successful runs"
               }
             ]
           },
@@ -2101,6 +2189,10 @@
                   "fixedColor": "red",
                   "mode": "fixed"
                 }
+              },
+              {
+                "id": "displayName",
+                "value": "Failed runs"
               }
             ]
           }
@@ -2132,7 +2224,7 @@
           "showLegend": true
         },
         "orientation": "auto",
-        "showValue": "auto",
+        "showValue": "never",
         "stacking": "normal",
         "text": {
           "valueSize": 12
@@ -2644,7 +2736,7 @@
           ]
         }
       ],
-      "title": "5.6 Mean Workflow Runs Duration",
+      "title": "5.6 Mean Workflow Runs Duration (total)",
       "type": "stat"
     },
     {
@@ -2705,6 +2797,10 @@
                   "fixedColor": "light-orange",
                   "mode": "fixed"
                 }
+              },
+              {
+                "id": "displayName",
+                "value": "Mean duration (sec)"
               }
             ]
           }
@@ -2800,7 +2896,7 @@
           ]
         }
       ],
-      "title": "5.7 Mean Workflow Runs Duration",
+      "title": "5.7 Mean Workflow Runs Duration (trend)",
       "type": "barchart"
     },
     {
@@ -2935,7 +3031,7 @@
         "multi": true,
         "name": "project",
         "options": [],
-        "query": "select distinct upm.project_name\nfrom user_project_mapping upm\njoin project_mapping pm ON upm.project_name = pm.project_name\nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nand upm.user_login = ${__user.login:sqlstring}\nORDER BY upm.project_name",
+        "query": "SELECT p.project_name AS __text, p.project_name AS __value FROM (\nselect distinct upm.project_name\nfrom user_project_mapping upm\njoin project_mapping pm ON upm.project_name = pm.project_name\nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nand upm.user_login = ${__user.login:sqlstring}\n) p\nUNION ALL\nSELECT '(no projects with GitHub data)' AS __text, '__none__' AS __value FROM DUAL WHERE NOT EXISTS (\nselect distinct upm.project_name\nfrom user_project_mapping upm\njoin project_mapping pm ON upm.project_name = pm.project_name\nWHERE pm.`table` = 'repos' AND pm.row_id like 'github:%'\nand upm.user_login = ${__user.login:sqlstring}\n)\nORDER BY __text",
         "refresh": 1,
         "regex": "",
         "type": "query"
@@ -2954,7 +3050,7 @@
         "multi": true,
         "name": "repo_id",
         "options": [],
-        "query": "SELECT concat(r.name, '--', r.id) as text FROM repos r JOIN project_mapping pm ON pm.row_id = r.id AND pm.table = 'repos' WHERE r.id LIKE 'github%' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project}))",
+        "query": "SELECT concat(r.name, '--', r.id) as text FROM repos r JOIN project_mapping pm ON pm.row_id = r.id AND pm.table = 'repos' WHERE r.id LIKE 'github%' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project}))\nUNION ALL\nSELECT '(no GitHub repositories)--__none__' FROM DUAL WHERE NOT EXISTS (\nSELECT concat(r.name, '--', r.id) as text FROM repos r JOIN project_mapping pm ON pm.row_id = r.id AND pm.table = 'repos' WHERE r.id LIKE 'github%' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN (${project}))\n)",
         "refresh": 1,
         "regex": "/^(?<text>.*)--(?<value>.*)$/",
         "type": "query"

@@ -440,7 +440,8 @@
             "footer": {
               "reducers": []
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "thresholds": {
             "mode": "absolute",
@@ -523,7 +524,7 @@
               },
               {
                 "id": "decimals",
-                "value": 2
+                "value": 3
               }
             ]
           },
@@ -607,7 +608,8 @@
             "footer": {
               "reducers": []
             },
-            "inspect": false
+            "inspect": false,
+            "minWidth": 110
           },
           "thresholds": {
             "mode": "absolute",
@@ -642,7 +644,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(NULLIF(CASE m.from_mode WHEN 'default' THEN 'Agentic' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE m.from_mode END, ''), '(session start)') AS \"From\",\n  CASE m.to_mode WHEN 'default' THEN 'Agentic' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE m.to_mode END AS \"To\",\n  CASE WHEN pr.models_used IS NULL THEN '(no prompt)' WHEN pr.models_used = '' THEN 'N/A' ELSE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(pr.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') END AS \"Model\",\n  CASE pr.effort WHEN 'low' THEN 'Low' WHEN 'medium' THEN 'Medium' WHEN 'high' THEN 'High' WHEN 'xhigh' THEN 'XHigh' WHEN 'max' THEN 'Max' ELSE COALESCE(CONCAT(UPPER(LEFT(pr.effort, 1)), SUBSTRING(pr.effort, 2)), 'N/A') END AS \"Effort\",\n  m.`trigger` AS \"Trigger\",\n  COUNT(*) AS \"Changes\",\n  COUNT(DISTINCT m.session_id) AS \"Sessions\"\nFROM ai_permission_mode_changes m\n-- The prompt running when the mode changed: the session's latest prompt started at or before the change.\nLEFT JOIN LATERAL (\n  SELECT p2.models_used, p2.effort\n  FROM ai_prompts p2\n  WHERE p2.workspace_key = m.workspace_key AND p2.session_id = m.session_id AND p2.started_at <= m.changed_at\n  ORDER BY p2.started_at DESC, p2.prompt_id DESC\n  LIMIT 1\n) pr ON TRUE\nWHERE $__timeFilter(m.changed_at)\n  AND m.session_id IN (SELECT p.session_id FROM ai_prompts p WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring}) AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring}))\n  AND COALESCE(NULLIF(m.user_email, ''), m.user_key) IN (${user:sqlstring})\nGROUP BY 1, 2, 3, 4, 5\nORDER BY COUNT(*) DESC",
+          "rawSql": "SELECT COALESCE(NULLIF(CASE m.from_mode WHEN 'default' THEN 'Default' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE m.from_mode END, ''), '(session start)') AS \"From\",\n  CASE m.to_mode WHEN 'default' THEN 'Default' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE m.to_mode END AS \"To\",\n  CASE WHEN pr.models_used IS NULL THEN '(no prompt)' WHEN pr.models_used = '' THEN 'N/A' ELSE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(pr.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') END AS \"Model\",\n  CASE pr.effort WHEN 'low' THEN 'Low' WHEN 'medium' THEN 'Medium' WHEN 'high' THEN 'High' WHEN 'xhigh' THEN 'XHigh' WHEN 'max' THEN 'Max' ELSE COALESCE(CONCAT(UPPER(LEFT(pr.effort, 1)), SUBSTRING(pr.effort, 2)), 'N/A') END AS \"Effort\",\n  m.`trigger` AS \"Trigger\",\n  COUNT(*) AS \"Changes\",\n  COUNT(DISTINCT m.session_id) AS \"Sessions\"\nFROM ai_permission_mode_changes m\n-- The prompt running when the mode changed: the session's latest prompt started at or before the change.\nLEFT JOIN LATERAL (\n  SELECT p2.models_used, p2.effort\n  FROM ai_prompts p2\n  WHERE p2.workspace_key = m.workspace_key AND p2.session_id = m.session_id AND p2.started_at <= m.changed_at\n  ORDER BY p2.started_at DESC, p2.prompt_id DESC\n  LIMIT 1\n) pr ON TRUE\nWHERE $__timeFilter(m.changed_at)\n  AND m.session_id IN (SELECT p.session_id FROM ai_prompts p WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring}) AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring}))\n  AND COALESCE(NULLIF(m.user_email, ''), m.user_key) IN (${user:sqlstring})\nGROUP BY 1, 2, 3, 4, 5\nORDER BY COUNT(*) DESC",
           "refId": "A"
         }
       ],

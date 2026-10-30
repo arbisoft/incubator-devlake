@@ -27,6 +27,7 @@ import {
   getConnection,
   uniqueName,
 } from '../support/api';
+import { CONNECTION_FORM_COPY } from '../support/app-copy';
 import { ConnectionDetailPage, ConnectionsPage, PLUGINS } from '../support/pages/connections';
 
 const GITHUB_TOKEN = process.env.E2E_GITHUB_TOKEN;
@@ -63,7 +64,7 @@ test.describe('GitHub connection lifecycle through the UI', () => {
     await expect(form.validFrom).toBeVisible();
 
     await form.test();
-    await expect(connections.toast('Test Connection Successfully.')).toBeVisible();
+    await expect(connections.toast(CONNECTION_FORM_COPY.test.success)).toBeVisible();
 
     await form.save();
     await expect(page).toHaveURL(detail.urlPattern);
@@ -90,7 +91,7 @@ test.describe('GitHub connection lifecycle through the UI', () => {
     await expect(editForm.validFrom).toBeVisible();
     await editForm.fillName(renamed);
     await editForm.save();
-    await expect(connections.toast('Update Connection Successful.')).toBeVisible();
+    await expect(connections.toast(CONNECTION_FORM_COPY.save.updated)).toBeVisible();
 
     await connections.reload();
     expect((await getConnection(api, 'github', id))?.name).toBe(renamed);
@@ -165,7 +166,7 @@ test('a rejected remote credential shows an error and does not sign the user out
 
   expect(await form.testAndGetStatus()).toBe(400);
 
-  await expect(connections.toast(/error when testing connection/i)).toBeVisible();
+  await expect(connections.toast(/GitHub rejected the token \(401\)/i)).toBeVisible();
   await expect(form.dialog).toBeVisible();
   await expect(page).toHaveURL(connections.urlPattern);
   const userinfo = await page.request.get('/api/auth/userinfo');
