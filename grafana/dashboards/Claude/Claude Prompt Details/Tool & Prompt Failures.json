@@ -1,0 +1,1380 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Tool and API failures of Claude Code prompts, from OTel log events: counts, reasons, error statuses and the latest failures.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Claude Working Time",
+      "tooltip": "How long Claude Code worked for each engineer, per repository and workday. That dashboard uses your browser's timezone where this one uses UTC, so a relative range such as Today covers your local day there",
+      "type": "link",
+      "url": "/d/claude_usage_time_mysql"
+    }
+  ],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": "mysql",
+      "description": "Number of failed tool calls (tool results that reported an error) that happened in the time range.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 0,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS \"Tool failures\"\nFROM ai_prompt_failures f\nJOIN ai_prompts p ON p.id = f.ai_prompt_id\nWHERE $__timeFilter(f.occurred_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  AND f.failure_kind = 'tool_error'",
+          "refId": "A"
+        }
+      ],
+      "title": "Tool Failures",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Number of model API requests that returned an error in the time range.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 5,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS \"API errors\"\nFROM ai_prompt_failures f\nJOIN ai_prompts p ON p.id = f.ai_prompt_id\nWHERE $__timeFilter(f.occurred_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  AND f.failure_kind = 'api_error'",
+          "refId": "A"
+        }
+      ],
+      "title": "API Errors",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Share of active prompts with at least one API error or failed tool call. A prompt counts as active if it started in the time range or had a failure in it; failures count by when they happened.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percentunit"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 9,
+        "y": 0
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Failures count by when they happened, like the other failure panels. The share is of the\n-- prompts active in the range: those that started in it or had a failure in it. The two halves\n-- of the UNION each use their own time index; an OR across the two tables would scan every prompt.\nSELECT COALESCE(SUM(a.failed) / NULLIF(COUNT(*), 0), 0) AS \"Prompts with a failure\"\nFROM (\n  SELECT u.id, MAX(u.failed) AS failed\n  FROM (\n    SELECT p.id, 0 AS failed FROM ai_prompts p WHERE $__timeFilter(p.started_at)\n    UNION ALL\n    SELECT f.ai_prompt_id, 1 FROM ai_prompt_failures f WHERE $__timeFilter(f.occurred_at)\n  ) u\n  GROUP BY u.id\n) a\nJOIN ai_prompts p ON p.id = a.id\nWHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})",
+          "refId": "A"
+        }
+      ],
+      "title": "Failed Prompts",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "The most frequent failure reason in the time range, across tool failures and API errors; the count is not shown. Tool failures are labelled by tool and error type, API errors by HTTP status, or by error type or the start of the message (request ids removed) when there is no status.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "noValue": "None",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 14,
+        "y": 0
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Top failure reason$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT r.reason AS \"Top failure reason\"\nFROM (\n  SELECT CASE f.failure_kind WHEN 'api_error' THEN CONCAT('API ', COALESCE(CONCAT(f.status_code, ' ', CASE f.status_code WHEN 400 THEN 'Bad request' WHEN 401 THEN 'Unauthorized' WHEN 403 THEN 'Forbidden' WHEN 404 THEN 'Not found' WHEN 413 THEN 'Request too large' WHEN 429 THEN 'Rate limited' WHEN 500 THEN 'Server error' WHEN 503 THEN 'Unavailable' WHEN 529 THEN 'Overloaded' ELSE 'Error' END), NULLIF(f.error_type, ''), NULLIF(TRIM(LEFT(TRIM(REGEXP_REPLACE(f.error_message, 'req_[A-Za-z0-9]+', '')), 60)), ''), 'Unknown')) ELSE CONCAT(f.tool_name, ' \u00b7 ', COALESCE(NULLIF(f.error_type, ''), 'Unknown')) END AS reason, COUNT(*) AS failures\n  FROM ai_prompt_failures f\n  JOIN ai_prompts p ON p.id = f.ai_prompt_id\n  WHERE $__timeFilter(f.occurred_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  GROUP BY 1\n  ORDER BY failures DESC, reason\n  LIMIT 1\n) r",
+          "refId": "A"
+        }
+      ],
+      "title": "Top Failure",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "The most frequent API error in the time range; the count is not shown. Labelled by HTTP status, or by error type or the start of the message (request ids removed) when there is no status. 429 is a rate limit, 529 an overloaded service.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "noValue": "None",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 19,
+        "y": 0
+      },
+      "id": 11,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Top API error$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT r.label AS \"Top API error\"\nFROM (\n  SELECT COALESCE(CONCAT(f.status_code, ' ', CASE f.status_code WHEN 400 THEN 'Bad request' WHEN 401 THEN 'Unauthorized' WHEN 403 THEN 'Forbidden' WHEN 404 THEN 'Not found' WHEN 413 THEN 'Request too large' WHEN 429 THEN 'Rate limited' WHEN 500 THEN 'Server error' WHEN 503 THEN 'Unavailable' WHEN 529 THEN 'Overloaded' ELSE 'Error' END), NULLIF(f.error_type, ''), NULLIF(TRIM(LEFT(TRIM(REGEXP_REPLACE(f.error_message, 'req_[A-Za-z0-9]+', '')), 60)), ''), 'Unknown') AS label,\n    COUNT(*) AS errors\n  FROM ai_prompt_failures f\n  JOIN ai_prompts p ON p.id = f.ai_prompt_id\n  WHERE $__timeFilter(f.occurred_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n    AND f.failure_kind = 'api_error'\n  GROUP BY 1\n  ORDER BY errors DESC, label\n  LIMIT 1\n) r",
+          "refId": "A"
+        }
+      ],
+      "title": "Top API Error",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Failures per UTC day, stacked by reason. Tool failures are labelled by tool and error type; API errors by HTTP status, or by error type or the start of the message when there is no status.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 4
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT UNIX_TIMESTAMP(DATE(f.occurred_at)) AS time,\n  CASE f.failure_kind WHEN 'api_error' THEN CONCAT('API ', COALESCE(CONCAT(f.status_code, ' ', CASE f.status_code WHEN 400 THEN 'Bad request' WHEN 401 THEN 'Unauthorized' WHEN 403 THEN 'Forbidden' WHEN 404 THEN 'Not found' WHEN 413 THEN 'Request too large' WHEN 429 THEN 'Rate limited' WHEN 500 THEN 'Server error' WHEN 503 THEN 'Unavailable' WHEN 529 THEN 'Overloaded' ELSE 'Error' END), NULLIF(f.error_type, ''), NULLIF(TRIM(LEFT(TRIM(REGEXP_REPLACE(f.error_message, 'req_[A-Za-z0-9]+', '')), 60)), ''), 'Unknown')) ELSE CONCAT(f.tool_name, ' \u00b7 ', COALESCE(NULLIF(f.error_type, ''), 'Unknown')) END AS metric,\n  COUNT(*) AS value\nFROM ai_prompt_failures f\nJOIN ai_prompts p ON p.id = f.ai_prompt_id\nWHERE $__timeFilter(f.occurred_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\nGROUP BY 1, 2\nORDER BY 1, 2",
+          "refId": "A"
+        }
+      ],
+      "title": "Failures per Day by Reason",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "description": "API errors grouped by model and error, with failure, prompt and engineer counts and when each last happened, most frequent first. Error is the HTTP status, or the error type or start of the message (request ids removed) when there is no status. Example message is one stored message for that group.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false,
+            "minWidth": 80
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Model"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 120
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Error"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 210
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Example message"
+            },
+            "properties": [
+              {
+                "id": "custom.minWidth",
+                "value": 200
+              },
+              {
+                "id": "custom.wrapText",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Failures"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Prompts"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Engineers"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Last seen"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 165
+              },
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 13
+      },
+      "id": 8,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT CONCAT(UPPER(LEFT(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(f.model, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 1)), SUBSTRING(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(f.model, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 2)) AS \"Model\",\n  COALESCE(CONCAT(f.status_code, ' ', CASE f.status_code WHEN 400 THEN 'Bad request' WHEN 401 THEN 'Unauthorized' WHEN 403 THEN 'Forbidden' WHEN 404 THEN 'Not found' WHEN 413 THEN 'Request too large' WHEN 429 THEN 'Rate limited' WHEN 500 THEN 'Server error' WHEN 503 THEN 'Unavailable' WHEN 529 THEN 'Overloaded' ELSE 'Error' END), NULLIF(f.error_type, ''), NULLIF(TRIM(LEFT(TRIM(REGEXP_REPLACE(f.error_message, 'req_[A-Za-z0-9]+', '')), 60)), ''), 'Unknown') AS \"Error\",\n  -- Messages can carry request ids, so one example stands in for the reason's messages.\n  MAX(NULLIF(f.error_message, '')) AS \"Example message\",\n  COUNT(*) AS \"Failures\",\n  COUNT(DISTINCT f.ai_prompt_id) AS \"Prompts\",\n  COUNT(DISTINCT COALESCE(NULLIF(p.user_email, ''), p.user_key)) AS \"Engineers\",\n  MAX(f.occurred_at) AS \"Last seen\"\nFROM ai_prompt_failures f\nJOIN ai_prompts p ON p.id = f.ai_prompt_id\nWHERE $__timeFilter(f.occurred_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  AND f.failure_kind = 'api_error'\nGROUP BY 1, 2\nORDER BY 4 DESC, 1, 2",
+          "refId": "A"
+        }
+      ],
+      "title": "Top API Failure Reasons",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Tool failures grouped by tool and error type, with failure, prompt and engineer counts and when each last happened, most frequent first. Tool error messages are not stored, because they can contain file contents.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false,
+            "minWidth": 80
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tool"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 120
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Error"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 210
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Failures"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Prompts"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Engineers"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Last seen"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 165
+              },
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 13
+      },
+      "id": 36,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT f.tool_name AS \"Tool\",\n  COALESCE(NULLIF(f.error_type, ''), 'Unknown') AS \"Error\",\n  COUNT(*) AS \"Failures\",\n  COUNT(DISTINCT f.ai_prompt_id) AS \"Prompts\",\n  COUNT(DISTINCT COALESCE(NULLIF(p.user_email, ''), p.user_key)) AS \"Engineers\",\n  MAX(f.occurred_at) AS \"Last seen\"\nFROM ai_prompt_failures f\nJOIN ai_prompts p ON p.id = f.ai_prompt_id\nWHERE $__timeFilter(f.occurred_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  AND f.failure_kind <> 'api_error'\nGROUP BY 1, 2\nORDER BY 3 DESC, 1, 2",
+          "refId": "A"
+        }
+      ],
+      "title": "Top Tool Failure Reasons",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "API errors grouped by HTTP status (N/A when there was none), model and source, with error and prompt counts, the average and highest retry attempt that failed, and when each last happened. Source is the main conversation, a subagent, or background work such as session titles.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false,
+            "minWidth": 80
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Model"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 130
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Source"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 260
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Errors"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Prompts"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Max attempt"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 105
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Avg attempt"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 105
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Last seen"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 165
+              },
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
+      "id": 9,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(CAST(f.status_code AS CHAR), 'N/A') AS \"Status\",\n  CASE WHEN f.model LIKE 'claude-%' THEN CONCAT(UPPER(LEFT(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(f.model, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 1)), SUBSTRING(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(f.model, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 2)) ELSE f.model END AS \"Model\",\n  CASE WHEN f.failure_kind <> 'api_error' THEN '' WHEN f.query_source = 'repl_main_thread' THEN 'Main conversation' WHEN f.query_source LIKE 'agent:%' THEN CONCAT('Subagent (', SUBSTRING_INDEX(f.query_source, ':', -1), ')') WHEN f.query_source = '' THEN 'Unknown' ELSE CONCAT('Background (', f.query_source, ')') END AS \"Source\",\n  COUNT(*) AS \"Errors\",\n  COUNT(DISTINCT f.ai_prompt_id) AS \"Prompts\",\n  AVG(f.attempt) AS \"Avg attempt\",\n  MAX(f.attempt) AS \"Max attempt\",\n  MAX(f.occurred_at) AS \"Last seen\"\nFROM ai_prompt_failures f\nJOIN ai_prompts p ON p.id = f.ai_prompt_id\nWHERE $__timeFilter(f.occurred_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  AND f.failure_kind = 'api_error'\nGROUP BY 1, 2, 3\nORDER BY 4 DESC, 1, 2, 3",
+          "refId": "A"
+        }
+      ],
+      "title": "API Errors by Status and Model",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "The latest 200 API errors in the time range, newest first, with engineer, repository, model, error, full message, source and request duration. Repository is gh/, gl/ or bb/ plus owner/repo (other hosts keep their host name) and links to the repository.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false,
+            "minWidth": 80
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Time"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 165
+              },
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Engineer"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 130
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repository"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 200
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Open repository",
+                    "url": "${__data.fields.repository_link}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Model"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Error"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Message"
+            },
+            "properties": [
+              {
+                "id": "custom.minWidth",
+                "value": 200
+              },
+              {
+                "id": "custom.wrapText",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Source"
+            },
+            "properties": [
+              {
+                "id": "custom.minWidth",
+                "value": 150
+              },
+              {
+                "id": "custom.wrapText",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Duration"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              },
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "repository_link"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom.viz",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 30
+      },
+      "id": 10,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT f.occurred_at AS \"Time\",\n  COALESCE(NULLIF(TRIM(a.full_name), ''), NULLIF(p.user_email, ''), p.user_key) AS \"Engineer\",\n  CASE\n    WHEN p.repository_url IS NULL THEN 'Unknown'\n    WHEN p.repository_url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(p.repository_url, '^https?://[^/]+/', 'gh/')\n    WHEN p.repository_url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(p.repository_url, '^https?://[^/]+/', 'gl/')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN p.repository_url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(p.repository_url, '^https?://[^/]+/(scm/)?', 'bb/')\n    -- Any other host keeps its host name in front of the path.\n    ELSE REGEXP_REPLACE(p.repository_url, '^https?://', '')\n  END AS \"Repository\",\n  CONCAT(UPPER(LEFT(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(f.model, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 1)), SUBSTRING(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(f.model, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 2)) AS \"Model\",\n  COALESCE(CONCAT(f.status_code, ' ', CASE f.status_code WHEN 400 THEN 'Bad request' WHEN 401 THEN 'Unauthorized' WHEN 403 THEN 'Forbidden' WHEN 404 THEN 'Not found' WHEN 413 THEN 'Request too large' WHEN 429 THEN 'Rate limited' WHEN 500 THEN 'Server error' WHEN 503 THEN 'Unavailable' WHEN 529 THEN 'Overloaded' ELSE 'Error' END), NULLIF(f.error_type, ''), NULLIF(TRIM(LEFT(TRIM(REGEXP_REPLACE(f.error_message, 'req_[A-Za-z0-9]+', '')), 60)), ''), 'Unknown') AS \"Error\",\n  NULLIF(f.error_message, '') AS \"Message\",\n  CASE WHEN f.query_source = 'repl_main_thread' THEN 'Main conversation' WHEN f.query_source LIKE 'agent:%' THEN CONCAT('Subagent (', SUBSTRING_INDEX(f.query_source, ':', -1), ')') WHEN f.query_source = '' THEN 'Unknown' ELSE CONCAT('Background (', f.query_source, ')') END AS \"Source\",\n  f.duration_ms AS \"Duration\",\n  -- repository_link is empty for prompts without a repository, so their Repository cell has no link.\n  COALESCE(p.repository_url, '') AS repository_link\nFROM ai_prompt_failures f\nJOIN ai_prompts p ON p.id = f.ai_prompt_id\n-- account_id is the user's DevLake account, which carries the full name.\nLEFT JOIN accounts a ON a.id = p.account_id\nWHERE $__timeFilter(f.occurred_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  AND f.failure_kind = 'api_error'\nORDER BY f.occurred_at DESC\nLIMIT 200",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent API Failures",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "The latest 200 tool failures in the time range, newest first, with engineer, repository, tool, error type and how long the call ran. Messages are not stored, because they can contain file contents. Repository is gh/, gl/ or bb/ plus owner/repo (other hosts keep their host name) and links to the repository.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false,
+            "minWidth": 80
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Time"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 165
+              },
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Engineer"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 130
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repository"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 200
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Open repository",
+                    "url": "${__data.fields.repository_link}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tool"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Error"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Duration"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              },
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "repository_link"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom.viz",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 30
+      },
+      "id": 37,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT f.occurred_at AS \"Time\",\n  COALESCE(NULLIF(TRIM(a.full_name), ''), NULLIF(p.user_email, ''), p.user_key) AS \"Engineer\",\n  CASE\n    WHEN p.repository_url IS NULL THEN 'Unknown'\n    WHEN p.repository_url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(p.repository_url, '^https?://[^/]+/', 'gh/')\n    WHEN p.repository_url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(p.repository_url, '^https?://[^/]+/', 'gl/')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN p.repository_url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(p.repository_url, '^https?://[^/]+/(scm/)?', 'bb/')\n    -- Any other host keeps its host name in front of the path.\n    ELSE REGEXP_REPLACE(p.repository_url, '^https?://', '')\n  END AS \"Repository\",\n  f.tool_name AS \"Tool\",\n  COALESCE(NULLIF(f.error_type, ''), 'Unknown') AS \"Error\",\n  f.duration_ms AS \"Duration\",\n  -- repository_link is empty for prompts without a repository, so their Repository cell has no link.\n  COALESCE(p.repository_url, '') AS repository_link\nFROM ai_prompt_failures f\nJOIN ai_prompts p ON p.id = f.ai_prompt_id\n-- account_id is the user's DevLake account, which carries the full name.\nLEFT JOIN accounts a ON a.id = p.account_id\nWHERE $__timeFilter(f.occurred_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  AND f.failure_kind <> 'api_error'\nORDER BY f.occurred_at DESC\nLIMIT 200",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent Tool Failures",
+      "type": "table"
+    }
+  ],
+  "preload": false,
+  "refresh": "",
+  "schemaVersion": 42,
+  "tags": [
+    "claude",
+    "anthropic",
+    "devlake",
+    "ai"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nINNER JOIN user_project_mapping upm ON upm.project_name = p.name\nWHERE c.status = 'active'\n  AND upm.user_login = ${__user.login:sqlstring}\nORDER BY p.name;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nINNER JOIN user_project_mapping upm ON upm.project_name = p.name\nWHERE c.status = 'active'\n  AND upm.user_login = ${__user.login:sqlstring}\nORDER BY p.name;",
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND (cp.project_name REGEXP '^(${project:regex})$' AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring}))\nORDER BY c.team_slug;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Claude Code OTel teams",
+        "multi": true,
+        "name": "otel_teams",
+        "options": [],
+        "query": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND (cp.project_name REGEXP '^(${project:regex})$' AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring}))\nORDER BY c.team_slug;",
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "-- The label is the person's full name from their DevLake account, falling back to the email; the value stays the\n-- email (or user key) that every panel filters on.\nSELECT COALESCE(u.full_name, u.user) AS __text, u.user AS __value\nFROM (\n  SELECT COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  GROUP BY 1\n) u\nORDER BY 1;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Engineer",
+        "multi": true,
+        "name": "user",
+        "options": [],
+        "query": "-- The label is the person's full name from their DevLake account, falling back to the email; the value stays the\n-- email (or user key) that every panel filters on.\nSELECT COALESCE(u.full_name, u.user) AS __text, u.user AS __value\nFROM (\n  SELECT COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  GROUP BY 1\n) u\nORDER BY 1;",
+        "refresh": 2,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "-- Repositories the selected users' prompts ran in, labelled as on Token Usage by Repository.\n-- 'Unknown' stands for prompts without a repository; a real repository_url is always an\n-- https URL, so it cannot clash.\nSELECT CASE\n    WHEN r.url = 'Unknown' THEN 'Unknown'\n    WHEN r.url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GH: ')\n    WHEN r.url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GL: ')\n    WHEN r.url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'BB: ')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN r.url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/(scm/)?', 'BB: ')\n    ELSE REGEXP_REPLACE(r.url, '^https?://', '')\n  END AS __text, r.url AS __value\nFROM (\n  SELECT DISTINCT COALESCE(p.repository_url, 'Unknown') AS url\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n) r\nORDER BY r.url = 'Unknown', 1;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Repository",
+        "multi": true,
+        "name": "repository",
+        "options": [],
+        "query": "-- Repositories the selected users' prompts ran in, labelled as on Token Usage by Repository.\n-- 'Unknown' stands for prompts without a repository; a real repository_url is always an\n-- https URL, so it cannot clash.\nSELECT CASE\n    WHEN r.url = 'Unknown' THEN 'Unknown'\n    WHEN r.url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GH: ')\n    WHEN r.url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GL: ')\n    WHEN r.url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'BB: ')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN r.url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/(scm/)?', 'BB: ')\n    ELSE REGEXP_REPLACE(r.url, '^https?://', '')\n  END AS __text, r.url AS __value\nFROM (\n  SELECT DISTINCT COALESCE(p.repository_url, 'Unknown') AS url\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n) r\nORDER BY r.url = 'Unknown', 1;",
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ]
+  },
+  "timezone": "utc",
+  "title": "Tool & Prompt Failures",
+  "uid": "claude_prompts_failures_mysql"
+}

@@ -1,0 +1,1237 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "How Claude Code prompts are shaped: API requests and tool calls per prompt, error and rejection rates, durations, models and subagents.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Claude Working Time",
+      "tooltip": "How long Claude Code worked for each engineer, per repository and workday. That dashboard uses your browser's timezone where this one uses UTC, so a relative range such as Today covers your local day there",
+      "type": "link",
+      "url": "/d/claude_usage_time_mysql"
+    }
+  ],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": "mysql",
+      "description": "Share of prompts that launched at least one subagent (an Agent or Task tool call).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percentunit",
+          "decimals": 1,
+          "min": 0,
+          "max": 1
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 0,
+        "y": 0
+      },
+      "id": 48,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT SUM(p.subagent_count > 0) / NULLIF(COUNT(*), 0) AS \"Share\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})",
+          "refId": "A"
+        }
+      ],
+      "title": "Prompts Using Subagents",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Median prompt duration: half of prompts finished faster than this. Duration runs from the prompt to its last recorded event; prompts that made no API request, such as local slash commands, are excluded.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "s",
+          "decimals": 1
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 5,
+        "y": 0
+      },
+      "id": 49,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Only prompts that made a model request, as on Prompt Duration (p50 / p90).\nWITH d AS (\n  SELECT TIMESTAMPDIFF(MICROSECOND, p.started_at, p.ended_at) / 1000000 AS secs\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n    AND p.api_request_count > 0\n    AND p.ended_at IS NOT NULL\n), r AS (\n  SELECT secs, CUME_DIST() OVER (ORDER BY secs) AS pr FROM d\n)\nSELECT MIN(CASE WHEN pr >= 0.5 THEN secs END) AS \"Median\"\nFROM r",
+          "refId": "A"
+        }
+      ],
+      "title": "Median Prompt Duration",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "90th percentile prompt duration: nine in ten prompts finished faster than this. Same duration and exclusions as Median Prompt Duration; a few long-running prompts pull it up.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "s",
+          "decimals": 1
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 10,
+        "y": 0
+      },
+      "id": 50,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Only prompts that made a model request, as on Prompt Duration (p50 / p90).\nWITH d AS (\n  SELECT TIMESTAMPDIFF(MICROSECOND, p.started_at, p.ended_at) / 1000000 AS secs\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n    AND p.api_request_count > 0\n    AND p.ended_at IS NOT NULL\n), r AS (\n  SELECT secs, CUME_DIST() OVER (ORDER BY secs) AS pr FROM d\n)\nSELECT MIN(CASE WHEN pr >= 0.9 THEN secs END) AS \"p90\"\nFROM r",
+          "refId": "A"
+        }
+      ],
+      "title": "p90 Prompt Duration",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Average prompt text length, in characters.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 15,
+        "y": 0
+      },
+      "id": 51,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT AVG(p.prompt_length) AS \"Characters\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})",
+          "refId": "A"
+        }
+      ],
+      "title": "Avg Prompt Length",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "The model called by the most prompts. A prompt that called several models counts once for each; prompts that called no model are left out.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short",
+          "noValue": "None"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 19,
+        "y": 0
+      },
+      "id": 52,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Most used model$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- models_used lists every model a prompt called, comma-separated; JSON_TABLE splits it so each\n-- model is counted once per prompt that used it, alone or with others.\nWITH prompts AS (\n  SELECT p.models_used\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n    AND p.models_used <> ''\n), models AS (\n  SELECT TRIM(j.model) AS model, COUNT(*) AS prompts\n  FROM prompts\n  JOIN JSON_TABLE(CONCAT('[\"', REPLACE(prompts.models_used, ',', '\",\"'), '\"]'), '$[*]' COLUMNS (model VARCHAR(255) PATH '$')) j\n  GROUP BY TRIM(j.model)\n)\nSELECT REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(m.model, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable ') AS \"Most used model\"\nFROM models m\nORDER BY m.prompts DESC, m.model\nLIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Most Used Model",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Prompts split into those that launched at least one subagent and those that did not. Per group: prompt count, share of all prompts, average cost per prompt (USD), and average API requests and tool calls per prompt.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false,
+            "minWidth": 110
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Share"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cost per prompt"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 3
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "API requests per prompt"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tool calls per prompt"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 4
+      },
+      "id": 15,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT CASE WHEN p.subagent_count > 0 THEN 'With subagents' ELSE 'No subagents' END AS \"Prompts\",\n  COUNT(*) AS \"Count\",\n  COUNT(*) / SUM(COUNT(*)) OVER () AS \"Share\",\n  SUM(p.estimated_cost_usd) / COUNT(*) AS \"Cost per prompt\",\n  AVG(p.api_request_count) AS \"API requests per prompt\",\n  AVG(p.tool_call_count) AS \"Tool calls per prompt\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\nGROUP BY CASE WHEN p.subagent_count > 0 THEN 'With subagents' ELSE 'No subagents' END\nORDER BY COUNT(*) DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Prompts With and Without Subagents",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Median (p50) and 90th percentile prompt duration per day, by the day the prompt started. Duration runs from the prompt to its last recorded event; prompts that made no API request, such as local slash commands, are excluded.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 13,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "WITH durations AS (\n  SELECT DATE(p.started_at) AS day,\n    TIMESTAMPDIFF(MICROSECOND, p.started_at, p.ended_at) / 1000000 AS secs\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n    AND p.api_request_count > 0\n), ranked AS (\n  SELECT day, secs, CUME_DIST() OVER (PARTITION BY day, secs IS NULL ORDER BY secs) AS pr\n  FROM durations\n)\nSELECT UNIX_TIMESTAMP(day) AS time,\n  MIN(CASE WHEN pr >= 0.5 THEN secs END) AS \"p50\",\n  MIN(CASE WHEN pr >= 0.9 THEN secs END) AS \"p90\"\nFROM ranked\nGROUP BY day\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "title": "Prompt Duration (p50 / p90)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Prompts grouped by how many API requests (model calls) they made, including calls by their subagents and background calls such as session titles. 0 means the prompt never reached the model, as with /exit or other local slash commands.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Prompts",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 0,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "API requests per prompt"
+            },
+            "properties": [
+              {
+                "id": "custom.axisLabel",
+                "value": "API requests per prompt"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 21
+      },
+      "id": 12,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.75,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xField": "API requests per prompt",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT b.label AS \"API requests per prompt\",\n  SUM(CASE WHEN p.api_request_count BETWEEN b.lo AND b.hi THEN 1 ELSE 0 END) AS \"Prompts\"\nFROM (\n  SELECT 0 AS ord, '0' AS label, 0 AS lo, 0 AS hi\n  UNION ALL SELECT 1, '1', 1, 1\n  UNION ALL SELECT 2, '2-3', 2, 3\n  UNION ALL SELECT 3, '4-7', 4, 7\n  UNION ALL SELECT 4, '8-15', 8, 15\n  UNION ALL SELECT 5, '16-31', 16, 31\n  UNION ALL SELECT 6, '32+', 32, 1000000000\n) AS b\nCROSS JOIN ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\nGROUP BY b.ord, b.label\nORDER BY b.ord",
+          "refId": "A"
+        }
+      ],
+      "title": "Prompts by API Request Count",
+      "type": "barchart"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Prompts grouped by how many tool calls they made, including calls by their subagents. A call counts when it finishes, whether it succeeded or failed; tool uses the engineer rejected are not counted. 0 means Claude answered without running a tool.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#EAB839",
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Prompts",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 0,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tool calls per prompt"
+            },
+            "properties": [
+              {
+                "id": "custom.axisLabel",
+                "value": "Tool calls per prompt"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 21
+      },
+      "id": 47,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.75,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xField": "Tool calls per prompt",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT b.label AS \"Tool calls per prompt\",\n  SUM(CASE WHEN p.tool_call_count BETWEEN b.lo AND b.hi THEN 1 ELSE 0 END) AS \"Prompts\"\nFROM (\n  SELECT 0 AS ord, '0' AS label, 0 AS lo, 0 AS hi\n  UNION ALL SELECT 1, '1', 1, 1\n  UNION ALL SELECT 2, '2-3', 2, 3\n  UNION ALL SELECT 3, '4-7', 4, 7\n  UNION ALL SELECT 4, '8-15', 8, 15\n  UNION ALL SELECT 5, '16-31', 16, 31\n  UNION ALL SELECT 6, '32+', 32, 1000000000\n) AS b\nCROSS JOIN ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\nGROUP BY b.ord, b.label\nORDER BY b.ord",
+          "refId": "A"
+        }
+      ],
+      "title": "Prompts by Tool Call Count",
+      "type": "barchart"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Prompts grouped by the length of their text, in characters.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Prompts",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 0,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Prompt length (characters)"
+            },
+            "properties": [
+              {
+                "id": "custom.axisLabel",
+                "value": "Prompt length (characters)"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 30
+      },
+      "id": 57,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.75,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xField": "Prompt length (characters)",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT b.label AS \"Prompt length (characters)\",\n  SUM(CASE WHEN p.prompt_length BETWEEN b.lo AND b.hi THEN 1 ELSE 0 END) AS \"Prompts\"\nFROM (\n  SELECT 0 AS ord, '<50' AS label, 0 AS lo, 49 AS hi\n  UNION ALL SELECT 1, '50-199', 50, 199\n  UNION ALL SELECT 2, '200-999', 200, 999\n  UNION ALL SELECT 3, '1k-5k', 1000, 4999\n  UNION ALL SELECT 4, '5k+', 5000, 1000000000\n) AS b\nCROSS JOIN ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\nGROUP BY b.ord, b.label\nORDER BY b.ord",
+          "refId": "A"
+        }
+      ],
+      "title": "Prompts by Length",
+      "type": "barchart"
+    },
+    {
+      "datasource": "mysql",
+      "description": "One row per model, or combination of models, used by prompts: prompt count, median and p90 duration, average API requests and tool calls per prompt, and average cost per prompt (USD). Prompts that called no model are left out.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "API requests per prompt"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tool calls per prompt"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Median duration"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p90 duration"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cost per prompt"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 30
+      },
+      "id": 56,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- base is every prompt the panel counts; secs is its duration, kept only for prompts that made a\n-- model request, as on Prompt Duration (p50 / p90).\nWITH base AS (\n  SELECT p.models_used AS grp, p.api_request_count, p.tool_call_count, p.subagent_count, p.estimated_cost_usd,\n    CASE WHEN p.api_request_count > 0 THEN TIMESTAMPDIFF(MICROSECOND, p.started_at, p.ended_at) / 1000000 END AS secs\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n    AND p.models_used <> ''\n), ranked AS (\n  SELECT grp, secs, CUME_DIST() OVER (PARTITION BY grp, secs IS NULL ORDER BY secs) AS pr\n  FROM base\n), durations AS (\n  SELECT grp, MIN(CASE WHEN secs IS NOT NULL AND pr >= 0.5 THEN secs END) AS p50,\n    MIN(CASE WHEN secs IS NOT NULL AND pr >= 0.9 THEN secs END) AS p90\n  FROM ranked\n  GROUP BY grp\n)\nSELECT REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(b.grp, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') AS \"Model\",\n  COUNT(*) AS \"Prompts\",\n  MAX(d.p50) AS \"Median duration\",\n  MAX(d.p90) AS \"p90 duration\",\n  AVG(b.api_request_count) AS \"API requests per prompt\",\n  AVG(b.tool_call_count) AS \"Tool calls per prompt\",\n  SUM(b.estimated_cost_usd) / COUNT(*) AS \"Cost per prompt\"\nFROM base b\nJOIN durations d ON d.grp = b.grp\nGROUP BY b.grp\nORDER BY COUNT(*) DESC, 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Prompt Duration by Model",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Daily rates, by the day the prompt started. API error rate = API errors / (API requests + API errors); tool failure rate = failed tool calls / tool calls; tool rejection rate = rejected tool uses / (tool calls + rejected tool uses). Click a point to open Tool & Prompt Failures in a new tab with the same time range and filters.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "links": [
+            {
+              "targetBlank": true,
+              "title": "Open failure details",
+              "url": "/d/claude_prompts_failures_mysql?${__url_time_range}&${__all_variables}"
+            }
+          ],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percentunit"
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 39
+      },
+      "id": 14,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT UNIX_TIMESTAMP(DATE(p.started_at)) AS time,\n  SUM(p.api_error_count) / NULLIF(SUM(p.api_request_count + p.api_error_count), 0) AS \"API error rate\",\n  SUM(p.tool_failure_count) / NULLIF(SUM(p.tool_call_count), 0) AS \"Tool failure rate\",\n  SUM(p.tool_reject_count) / NULLIF(SUM(p.tool_call_count + p.tool_reject_count), 0) AS \"Tool rejection rate\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\nGROUP BY UNIX_TIMESTAMP(DATE(p.started_at))\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "title": "Error and Rejection Rates",
+      "type": "timeseries"
+    }
+  ],
+  "preload": false,
+  "refresh": "",
+  "schemaVersion": 42,
+  "tags": [
+    "claude",
+    "anthropic",
+    "devlake",
+    "ai"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nINNER JOIN user_project_mapping upm ON upm.project_name = p.name\nWHERE c.status = 'active'\n  AND upm.user_login = ${__user.login:sqlstring}\nORDER BY p.name;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nINNER JOIN user_project_mapping upm ON upm.project_name = p.name\nWHERE c.status = 'active'\n  AND upm.user_login = ${__user.login:sqlstring}\nORDER BY p.name;",
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND (cp.project_name REGEXP '^(${project:regex})$' AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring}))\nORDER BY c.team_slug;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Claude Code OTel teams",
+        "multi": true,
+        "name": "otel_teams",
+        "options": [],
+        "query": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND (cp.project_name REGEXP '^(${project:regex})$' AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring}))\nORDER BY c.team_slug;",
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "-- The label is the person's full name from their DevLake account, falling back to the email; the value stays the\n-- email (or user key) that every panel filters on.\nSELECT COALESCE(u.full_name, u.user) AS __text, u.user AS __value\nFROM (\n  SELECT COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  GROUP BY 1\n) u\nORDER BY 1;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Engineer",
+        "multi": true,
+        "name": "user",
+        "options": [],
+        "query": "-- The label is the person's full name from their DevLake account, falling back to the email; the value stays the\n-- email (or user key) that every panel filters on.\nSELECT COALESCE(u.full_name, u.user) AS __text, u.user AS __value\nFROM (\n  SELECT COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  GROUP BY 1\n) u\nORDER BY 1;",
+        "refresh": 2,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "-- Repositories the selected users' prompts ran in, labelled as on Token Usage by Repository.\n-- 'Unknown' stands for prompts without a repository; a real repository_url is always an\n-- https URL, so it cannot clash.\nSELECT CASE\n    WHEN r.url = 'Unknown' THEN 'Unknown'\n    WHEN r.url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GH: ')\n    WHEN r.url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GL: ')\n    WHEN r.url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'BB: ')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN r.url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/(scm/)?', 'BB: ')\n    ELSE REGEXP_REPLACE(r.url, '^https?://', '')\n  END AS __text, r.url AS __value\nFROM (\n  SELECT DISTINCT COALESCE(p.repository_url, 'Unknown') AS url\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n) r\nORDER BY r.url = 'Unknown', 1;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Repository",
+        "multi": true,
+        "name": "repository",
+        "options": [],
+        "query": "-- Repositories the selected users' prompts ran in, labelled as on Token Usage by Repository.\n-- 'Unknown' stands for prompts without a repository; a real repository_url is always an\n-- https URL, so it cannot clash.\nSELECT CASE\n    WHEN r.url = 'Unknown' THEN 'Unknown'\n    WHEN r.url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GH: ')\n    WHEN r.url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GL: ')\n    WHEN r.url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'BB: ')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN r.url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/(scm/)?', 'BB: ')\n    ELSE REGEXP_REPLACE(r.url, '^https?://', '')\n  END AS __text, r.url AS __value\nFROM (\n  SELECT DISTINCT COALESCE(p.repository_url, 'Unknown') AS url\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n) r\nORDER BY r.url = 'Unknown', 1;",
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ]
+  },
+  "timezone": "utc",
+  "title": "Prompts Shape",
+  "uid": "claude_prompts_shape_mysql"
+}

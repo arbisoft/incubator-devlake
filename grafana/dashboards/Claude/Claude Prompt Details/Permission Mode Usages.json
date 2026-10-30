@@ -1,0 +1,786 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Claude Code prompts by permission mode and the transitions between modes, from OTel log events.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Claude Working Time",
+      "tooltip": "How long Claude Code worked for each engineer, per repository and workday. That dashboard uses your browser's timezone where this one uses UTC, so a relative range such as Today covers your local day there",
+      "type": "link",
+      "url": "/d/claude_usage_time_mysql"
+    }
+  ],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": "mysql",
+      "description": "The permission mode used by the most prompts in the selected time range, projects, engineers and repositories. 'Agentic' is Claude Code's default mode. Counts every prompt, including ones that made no model request.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short",
+          "noValue": "None"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "id": 28,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Most used mode$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT CASE m.mode WHEN 'default' THEN 'Agentic' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE m.mode END AS \"Most used mode\"\nFROM (\n  SELECT p.permission_mode AS mode, COUNT(*) AS prompts\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  GROUP BY p.permission_mode\n) m\nORDER BY m.prompts DESC, m.mode\nLIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Most Used Mode",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "The reasoning effort used by the most prompts in the selected time range, projects, engineers and repositories. Only prompts that made at least one model request count; 'N/A' means no effort was reported.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short",
+          "noValue": "None"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      },
+      "id": 31,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Most used effort$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT CASE m.effort WHEN 'low' THEN 'Low' WHEN 'medium' THEN 'Medium' WHEN 'high' THEN 'High' WHEN 'xhigh' THEN 'XHigh' WHEN 'max' THEN 'Max' WHEN '' THEN 'N/A' ELSE CONCAT(UPPER(LEFT(m.effort, 1)), SUBSTRING(m.effort, 2)) END AS \"Most used effort\"\nFROM (\n  SELECT COALESCE(p.effort, '') AS effort, COUNT(*) AS prompts\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n    AND p.api_request_count > 0\n  GROUP BY COALESCE(p.effort, '')\n) m\nORDER BY m.prompts DESC, m.effort\nLIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Most Used Effort",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Percentage of prompts that ran in plan mode, out of all prompts in the selected time range, projects, engineers and repositories. Counts every prompt, including ones that made no model request, such as /plan itself.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percentunit",
+          "decimals": 1,
+          "min": 0,
+          "max": 1
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "id": 29,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT SUM(p.permission_mode = 'plan') / NULLIF(COUNT(*), 0) AS \"Plan mode share\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})",
+          "refId": "A"
+        }
+      ],
+      "title": "Plan Mode Share",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Percentage of prompts that ran with permission checks bypassed, so Claude could run tools without asking. Out of all prompts in the selected time range, projects, engineers and repositories, including ones that made no model request.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percentunit",
+          "decimals": 1,
+          "min": 0,
+          "max": 1
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
+      "id": 30,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT SUM(p.permission_mode = 'bypassPermissions') / NULLIF(COUNT(*), 0) AS \"Bypass permissions share\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})",
+          "refId": "A"
+        }
+      ],
+      "title": "Bypass Permissions Share",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Percentage of sessions with at least one prompt in the selected filters that also switched permission mode at least once in the time range. The mode a session starts in does not count as a switch.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percentunit",
+          "decimals": 1,
+          "min": 0,
+          "max": 1
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 0
+      },
+      "id": 32,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- switched holds the sessions with at least one switch in the time range.\nSELECT COUNT(DISTINCT s.session_id) / NULLIF(COUNT(DISTINCT p.session_id), 0) AS \"Sessions with a switch\"\nFROM ai_prompts p\nLEFT JOIN (\n  SELECT DISTINCT m.session_id\n  FROM ai_permission_mode_changes m\n  WHERE $__timeFilter(m.changed_at)\n    AND m.from_mode <> ''\n) s ON s.session_id = p.session_id\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})",
+          "refId": "A"
+        }
+      ],
+      "title": "Sessions With a Mode Switch",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Percentage of engineers with at least one prompt in the selected filters who sent at least one prompt in plan mode.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percentunit",
+          "decimals": 1,
+          "min": 0,
+          "max": 1
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "id": 33,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT AVG(e.used_plan) AS \"Engineers using plan mode\"\nFROM (\n  SELECT MAX(p.permission_mode = 'plan') AS used_plan\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  GROUP BY COALESCE(NULLIF(p.user_email, ''), p.user_key)\n) e",
+          "refId": "A"
+        }
+      ],
+      "title": "Engineers Using Plan Mode",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Prompts, share of prompts, total cost, and cost, tokens and tool calls per prompt, for each permission mode, model (or model combination), effort, repository and engineer. Prompts that made no model request, such as local slash commands, are left out, so Share is out of the remaining prompts. Repository 'Unknown' / Project 'No repository' means the prompt ran outside a repository; 'Unmapped' means no DevLake project you can access collects that repository.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false,
+            "minWidth": 110
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repository"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Open repository",
+                    "url": "${__data.fields.repository_link}"
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Share"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cost"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cost per prompt"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 3
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tokens per prompt"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tool calls per prompt"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "repository_link"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom.viz",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 4
+      },
+      "id": 26,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- r groups every prompt the panel counts on the raw columns; the labels are applied once per row.\nWITH r AS (\n  SELECT p.repository_url,\n    COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    -- account_id is the user's DevLake account, whose full_name the plugin copies from\n    -- another account with the same email.\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name,\n    p.permission_mode, p.models_used, p.effort,\n    COUNT(*) AS prompts,\n    SUM(p.estimated_cost_usd) AS cost,\n    SUM(p.input_tokens + p.output_tokens + p.cache_read_tokens + p.cache_creation_tokens) AS tokens,\n    SUM(p.tool_call_count) AS tool_calls\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n    AND p.models_used <> ''\n  GROUP BY p.repository_url, 2, p.permission_mode, p.models_used, p.effort\n)\nSELECT CASE r.permission_mode WHEN 'default' THEN 'Agentic' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE r.permission_mode END AS \"Mode\",\n  REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(r.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') AS \"Model\",\n  CASE r.effort WHEN 'low' THEN 'Low' WHEN 'medium' THEN 'Medium' WHEN 'high' THEN 'High' WHEN 'xhigh' THEN 'XHigh' WHEN 'max' THEN 'Max' ELSE COALESCE(CONCAT(UPPER(LEFT(r.effort, 1)), SUBSTRING(r.effort, 2)), 'N/A') END AS \"Effort\",\n  CASE\n    WHEN r.repository_url IS NULL THEN 'Unknown'\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN r.repository_url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.repository_url, '^https?://[^/]+/(scm/)?', '')\n    -- CodeCommit URLs have no owner, only v1/repos/ before the repository name.\n    WHEN r.repository_url REGEXP '^https?://git-codecommit[.][^/]+[.]amazonaws[.]com/' THEN REGEXP_REPLACE(r.repository_url, '^https?://[^/]+/v1/repos/', '')\n    -- Azure DevOps puts _git/ between the project and the repository.\n    ELSE REPLACE(REGEXP_REPLACE(r.repository_url, '^https?://[^/]+/', ''), '/_git/', '/')\n  END AS \"Repository\",\n  CASE\n    WHEN r.repository_url IS NULL THEN 'Unknown'\n    WHEN r.repository_url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN 'GitHub'\n    WHEN r.repository_url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN 'GitLab'\n    WHEN r.repository_url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN 'Bitbucket'\n    WHEN r.repository_url REGEXP '^https?://(dev[.]azure[.]com|[^/]+[.]visualstudio[.]com)/' THEN 'Azure DevOps'\n    WHEN r.repository_url REGEXP '^https?://git-codecommit[.][^/]+[.]amazonaws[.]com/' THEN 'AWS CodeCommit'\n    WHEN r.repository_url REGEXP '^https?://source[.]developers[.]google[.]com/' THEN 'Google Cloud Source'\n    WHEN r.repository_url REGEXP '^https?://(www[.])?codeberg[.]org/' THEN 'Codeberg'\n    WHEN r.repository_url REGEXP '^https?://git[.]sr[.]ht/' THEN 'SourceHut'\n    -- Any other host, such as a self-hosted Gitea, is shown by its host name.\n    ELSE REGEXP_REPLACE(r.repository_url, '^https?://([^/]+).*$', '$1')\n  END AS \"Repo Source\",\n  CASE WHEN r.repository_url IS NULL THEN 'No repository' ELSE COALESCE(dl.projects, 'Unmapped') END AS \"Project\",\n  COALESCE(r.full_name, r.user) AS \"Engineer\",\n  r.prompts AS \"Prompts\",\n  r.prompts / SUM(r.prompts) OVER () AS \"Share\",\n  r.cost AS \"Cost\",\n  r.cost / r.prompts AS \"Cost per prompt\",\n  r.tokens / r.prompts AS \"Tokens per prompt\",\n  r.tool_calls / r.prompts AS \"Tool calls per prompt\",\n  -- repository_link is empty for prompts without a repository, so their Repository cell has no link.\n  COALESCE(r.repository_url, '') AS repository_link\nFROM r\nLEFT JOIN (\n  -- repository_url drops one trailing / and then one .git suffix, and is lowercased, so normalize\n  -- repos.url the same way.\n  SELECT LOWER(REGEXP_REPLACE(REGEXP_REPLACE(rp.url, '/$', ''), '[.]git$', '')) AS url,\n    GROUP_CONCAT(DISTINCT pm.project_name ORDER BY pm.project_name SEPARATOR ', ') AS projects\n  FROM repos rp\n  -- Only projects the viewer can access, so a repository shared with another project doesn't\n  -- reveal its name.\n  JOIN project_mapping pm ON pm.row_id = rp.id AND pm.`table` = 'repos'\n    AND pm.project_name IN (SELECT upm_p.project_name FROM user_project_mapping upm_p WHERE upm_p.user_login = ${__user.login:sqlstring})\n  GROUP BY LOWER(REGEXP_REPLACE(REGEXP_REPLACE(rp.url, '/$', ''), '[.]git$', ''))\n) dl ON dl.url = r.repository_url\nORDER BY 1, r.repository_url IS NULL, 5, 4, 7, r.prompts DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Permission Mode Breakdown",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Permission mode changes in the time range, counted as changes and distinct sessions, by from mode, to mode, trigger, and the model and effort of the session's latest prompt at the time of the change. '(session start)' is a session's starting mode and '(no prompt)' a change before the session's first prompt. Model 'N/A' means that prompt made no model request (for example /plan); Effort 'N/A' means no effort was reported.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false,
+            "minWidth": 110
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
+      "id": 27,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(NULLIF(CASE m.from_mode WHEN 'default' THEN 'Default' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE m.from_mode END, ''), '(session start)') AS \"From\",\n  CASE m.to_mode WHEN 'default' THEN 'Default' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE m.to_mode END AS \"To\",\n  CASE WHEN pr.models_used IS NULL THEN '(no prompt)' WHEN pr.models_used = '' THEN 'N/A' ELSE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(pr.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') END AS \"Model\",\n  CASE pr.effort WHEN 'low' THEN 'Low' WHEN 'medium' THEN 'Medium' WHEN 'high' THEN 'High' WHEN 'xhigh' THEN 'XHigh' WHEN 'max' THEN 'Max' ELSE COALESCE(CONCAT(UPPER(LEFT(pr.effort, 1)), SUBSTRING(pr.effort, 2)), 'N/A') END AS \"Effort\",\n  m.`trigger` AS \"Trigger\",\n  COUNT(*) AS \"Changes\",\n  COUNT(DISTINCT m.session_id) AS \"Sessions\"\nFROM ai_permission_mode_changes m\n-- The prompt running when the mode changed: the session's latest prompt started at or before the change.\nLEFT JOIN LATERAL (\n  SELECT p2.models_used, p2.effort\n  FROM ai_prompts p2\n  WHERE p2.workspace_key = m.workspace_key AND p2.session_id = m.session_id AND p2.started_at <= m.changed_at\n  ORDER BY p2.started_at DESC, p2.prompt_id DESC\n  LIMIT 1\n) pr ON TRUE\nWHERE $__timeFilter(m.changed_at)\n  AND m.session_id IN (SELECT p.session_id FROM ai_prompts p WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring}) AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring}))\n  AND COALESCE(NULLIF(m.user_email, ''), m.user_key) IN (${user:sqlstring})\nGROUP BY 1, 2, 3, 4, 5\nORDER BY COUNT(*) DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Mode Transitions",
+      "type": "table"
+    }
+  ],
+  "preload": false,
+  "refresh": "",
+  "schemaVersion": 42,
+  "tags": [
+    "claude",
+    "anthropic",
+    "devlake",
+    "ai"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nINNER JOIN user_project_mapping upm ON upm.project_name = p.name\nWHERE c.status = 'active'\n  AND upm.user_login = ${__user.login:sqlstring}\nORDER BY p.name;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nINNER JOIN user_project_mapping upm ON upm.project_name = p.name\nWHERE c.status = 'active'\n  AND upm.user_login = ${__user.login:sqlstring}\nORDER BY p.name;",
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND (cp.project_name REGEXP '^(${project:regex})$' AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring}))\nORDER BY c.team_slug;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Claude Code OTel teams",
+        "multi": true,
+        "name": "otel_teams",
+        "options": [],
+        "query": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND (cp.project_name REGEXP '^(${project:regex})$' AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring}))\nORDER BY c.team_slug;",
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "-- The label is the person's full name from their DevLake account, falling back to the email; the value stays the\n-- email (or user key) that every panel filters on.\nSELECT COALESCE(u.full_name, u.user) AS __text, u.user AS __value\nFROM (\n  SELECT COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  GROUP BY 1\n) u\nORDER BY 1;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Engineer",
+        "multi": true,
+        "name": "user",
+        "options": [],
+        "query": "-- The label is the person's full name from their DevLake account, falling back to the email; the value stays the\n-- email (or user key) that every panel filters on.\nSELECT COALESCE(u.full_name, u.user) AS __text, u.user AS __value\nFROM (\n  SELECT COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  GROUP BY 1\n) u\nORDER BY 1;",
+        "refresh": 2,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "-- Repositories the selected users' prompts ran in, labelled as on Token Usage by Repository.\n-- 'Unknown' stands for prompts without a repository; a real repository_url is always an\n-- https URL, so it cannot clash.\nSELECT CASE\n    WHEN r.url = 'Unknown' THEN 'Unknown'\n    WHEN r.url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GH: ')\n    WHEN r.url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GL: ')\n    WHEN r.url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'BB: ')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN r.url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/(scm/)?', 'BB: ')\n    ELSE REGEXP_REPLACE(r.url, '^https?://', '')\n  END AS __text, r.url AS __value\nFROM (\n  SELECT DISTINCT COALESCE(p.repository_url, 'Unknown') AS url\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n) r\nORDER BY r.url = 'Unknown', 1;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Repository",
+        "multi": true,
+        "name": "repository",
+        "options": [],
+        "query": "-- Repositories the selected users' prompts ran in, labelled as on Token Usage by Repository.\n-- 'Unknown' stands for prompts without a repository; a real repository_url is always an\n-- https URL, so it cannot clash.\nSELECT CASE\n    WHEN r.url = 'Unknown' THEN 'Unknown'\n    WHEN r.url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GH: ')\n    WHEN r.url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GL: ')\n    WHEN r.url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'BB: ')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN r.url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/(scm/)?', 'BB: ')\n    ELSE REGEXP_REPLACE(r.url, '^https?://', '')\n  END AS __text, r.url AS __value\nFROM (\n  SELECT DISTINCT COALESCE(p.repository_url, 'Unknown') AS url\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n) r\nORDER BY r.url = 'Unknown', 1;",
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ]
+  },
+  "timezone": "utc",
+  "title": "Permission Mode Usages",
+  "uid": "claude_prompts_permission_modes_mysql",
+  "id": null
+}
