@@ -17,6 +17,7 @@
  */
 
 import type { ConnectionHealthMap } from '@/features/connections';
+import { getPluginConfig } from '@/plugins/utils';
 import { IConnectionStatus, type IConnection } from '@/types';
 import { SORT_ORDER, type FilterTabItem, type SortState } from '@/ui';
 
@@ -52,3 +53,5 @@ export const pageOf = <T>(items: T[], page: number, pageSize: number) =>
   items.slice((page - 1) * pageSize, page * pageSize);
 
 export const toRepoCount = ({ count }: { count?: unknown }) => (typeof count === 'number' ? count : null);
+
+export const getScopeTitle = (plugin: string) => getPluginConfig(plugin).dataScope?.title || COPY.columns.scopes;

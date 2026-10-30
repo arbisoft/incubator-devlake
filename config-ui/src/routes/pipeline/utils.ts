@@ -22,7 +22,7 @@ import type { ListParams } from '@/api/pipeline';
 import { type IBlueprint, type IPipeline, IPipelineStatus, type ITask } from '@/types';
 import type { ListQuery } from '@/ui';
 
-import { PICKED_CONFIG_FIELDS, STAGE_STATE, TASK_CELL } from './constants';
+import { PICKED_CONFIG_FIELDS, STAGE_STATE, TASK_CELL, TASK_FAILURE_HINTS } from './constants';
 import type { PipelineFilters, PipelineSortKey, PipelineStage, StageState, TaskCell } from './types';
 
 const { ACTIVE, RUNNING, RERUN, CREATED, PENDING, COMPLETED, PARTIAL, FAILED, CANCELLED } = IPipelineStatus;
@@ -110,3 +110,8 @@ export const toBlueprintOptions = (blueprints: BlueprintSummary[] = [], selected
 };
 
 export const pickConfig = (pipeline: IPipeline) => pick(pipeline, PICKED_CONFIG_FIELDS);
+
+export const getTaskFailureHint = (plugin: string, errorName: string): string | undefined =>
+  TASK_FAILURE_HINTS.find(
+    (item) => (item.plugins as readonly string[]).includes(plugin) && item.pattern.test(errorName),
+  )?.hint;

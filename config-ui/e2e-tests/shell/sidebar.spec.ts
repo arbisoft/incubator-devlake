@@ -23,6 +23,7 @@ import { adminApi, createProject, deleteProject, findAccessUserByLogin, uniqueNa
 import { fetchAuthMethods } from '../support/auth-state';
 import { resetLocalAuthState } from '../support/db';
 import { APP_URL, E2E_USER_PREFIX } from '../support/env';
+import { ApiKeysPage } from '../support/pages/api-keys';
 import { LoginPage } from '../support/pages/login';
 import { PATHS } from '../support/pages/paths';
 import { PipelinesPage } from '../support/pages/pipelines';
@@ -159,6 +160,7 @@ test.describe('sidebar', () => {
     const usersPage = new SettingsUsersPage(page);
     await usersPage.open();
     await expect(adminShell.navItemByLabel(adminShell.navLabels.settings)).toBeVisible();
+    await expect(adminShell.navItemByLabel(adminShell.navLabels.apiKeys)).toBeVisible();
 
     const testLogin = `${E2E_USER_PREFIX}sidebar_${Date.now()}`;
     const otpDialog = await usersPage.createLocalUser(testLogin, { role: /^Member$/ });
@@ -178,6 +180,11 @@ test.describe('sidebar', () => {
     await expect(memberShell.navItemByLabel(memberShell.navLabels.projects)).toBeVisible();
     await expect(memberShell.navItemByLabel(memberShell.navLabels.settings)).toHaveCount(0);
     await expect(memberShell.usersMenuItem).toHaveCount(0);
+    await expect(memberShell.navItemByLabel(memberShell.navLabels.apiKeys)).toHaveCount(0);
+
+    const memberKeys = new ApiKeysPage(memberPage);
+    await memberKeys.open();
+    await memberShell.waitUntilUrl(memberKeys.barredLandingPattern);
 
     await memberContext.close();
     resetLocalAuthState();

@@ -59,6 +59,7 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: ConnectionFo
   const [errors, setErrors] = useState<Record<string, unknown>>({});
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [failedTestValues, setFailedTestValues] = useState<ConnectionFormValues>();
   const [connectionDetail, setConnectionDetail] = useState<IConnectionAPI>();
 
   const dispatch = useAppDispatch();
@@ -141,6 +142,8 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: ConnectionFo
       },
     );
 
+    setFailedTestValues(success ? undefined : values);
+
     if (showTestResultMessage) {
       if (success) message.success(res?.message || COPY.test.success);
       else message.error(toConnectionActionErrorMessage(res));
@@ -219,7 +222,7 @@ export const ConnectionForm = ({ plugin, connectionId, onSuccess }: ConnectionFo
           htmlType="button"
           type="primary"
           loading={saving}
-          disabled={disabled || testing || detailsBlocked}
+          disabled={disabled || testing || detailsBlocked || failedTestValues === values}
           onClick={handleSave}
         >
           {COPY.save.label}

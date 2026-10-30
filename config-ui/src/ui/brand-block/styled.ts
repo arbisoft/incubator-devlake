@@ -97,6 +97,16 @@ export const PoweredByText = styled.div`
   }
 `;
 
+export const PoweredByDetail = styled.span`
+  && {
+    color: ${({ theme }) => theme.sidebar.textMuted};
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+  }
+`;
+
 export const PoweredByMark = styled(DevlakeMark)`
   flex: none;
   width: ${({ theme }) => theme.layout.poweredByMarkSize}px;

@@ -23,7 +23,7 @@
             }
           },
           {
-            "enable": false,
+            "enable": true,
             "pluginName": "issue_trace",
             "pluginOption": {}
           }
@@ -50,7 +50,7 @@
             }
           },
           {
-            "enable": false,
+            "enable": true,
             "pluginName": "issue_trace",
             "pluginOption": {}
           }

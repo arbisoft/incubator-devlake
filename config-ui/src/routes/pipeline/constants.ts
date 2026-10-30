@@ -115,6 +115,8 @@ export const COPY = {
     cancelled: 'Cancelled',
     subtasks: (finished: number, total: number) => `${finished} of ${total} subtasks`,
     rerun: 'Rerun task',
+    githubPermissionHint:
+      'GitHub refused part of this collection. Check that the token has Read access to Actions, Contents, Deployments, Discussions, Issues, Metadata and Pull requests for these repositories.',
   },
   detail: { title: (id: string | number) => `Pipeline ${id} details` },
   loading: 'Loading pipeline',
@@ -148,3 +150,11 @@ export const TASK_CELL = {
   FAILED: 'failed',
   CANCELLED: 'cancelled',
 } as const;
+
+export const TASK_FAILURE_HINTS = [
+  {
+    plugins: ['github', 'github_graphql'],
+    pattern: /graphql query got error|Resource not accessible/i,
+    hint: COPY.task.githubPermissionHint,
+  },
+] as const;

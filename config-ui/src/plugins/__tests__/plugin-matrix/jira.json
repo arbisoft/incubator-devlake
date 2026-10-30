@@ -37,8 +37,8 @@
       },
       {
         "tag": "input",
-        "type": "text",
-        "placeholder": "Your PAT"
+        "type": "password",
+        "placeholder": "Your API token"
       },
       {
         "tag": "input",

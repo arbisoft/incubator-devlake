@@ -80,6 +80,16 @@ describe('StatusActions', () => {
       expect(screen.queryByRole('button', { name: COPY.actions.runNow })).toBeNull();
     });
 
+    it('makes Collect the primary action and Re-transform a default button', () => {
+      setup(BLUEPRINT_CONTEXT.PROJECT);
+      expect(screen.getByRole('button', { name: COPY.actions.collect }).classList.contains('ant-btn-primary')).toBe(
+        true,
+      );
+      expect(screen.getByRole('button', { name: COPY.actions.reTransform }).classList.contains('ant-btn-primary')).toBe(
+        false,
+      );
+    });
+
     it('collects data, then refreshes', async () => {
       const { onRefresh } = setup(BLUEPRINT_CONTEXT.PROJECT);
       fireEvent.click(screen.getByRole('button', { name: COPY.actions.collect }));
