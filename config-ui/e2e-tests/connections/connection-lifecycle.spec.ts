@@ -165,7 +165,7 @@ test('a rejected remote credential shows an error and does not sign the user out
 
   expect(await form.testAndGetStatus()).toBe(400);
 
-  await expect(connections.toast(/error when testing connection/i)).toBeVisible();
+  await expect(connections.toast(/GitHub rejected the token \(401\)/i)).toBeVisible();
   await expect(form.dialog).toBeVisible();
   await expect(page).toHaveURL(connections.urlPattern);
   const userinfo = await page.request.get('/api/auth/userinfo');

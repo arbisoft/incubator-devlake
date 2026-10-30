@@ -568,6 +568,86 @@ func TestSessionModesInferEachPromptMode(t *testing.T) {
 	}
 }
 
+func collectSkills(adds func(c *skillCollector)) []*ai.AiPromptSkill {
+	collector := newSkillCollector(testOrganizationID, "p1")
+	adds(collector)
+	return collector.result(&ai.AiPrompt{UserKey: "u1", SessionId: "s1"})
+}
+
+func TestSkillCollectorMergesPlainIntoNamespaced(t *testing.T) {
+	t1 := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
+	t2 := t1.Add(time.Minute)
+	skills := collectSkills(func(c *skillCollector) {
+		c.add("pdf", ai.SkillDetectedViaApiRequest, "", "", "", t2)
+		c.add("anthropic-skills:pdf", ai.SkillDetectedViaActivation, "user", "plugin", "", t1)
+	})
+	if len(skills) != 1 {
+		t.Fatalf("got %d skills, want 1", len(skills))
+	}
+	got := skills[0]
+	if got.SkillName != "anthropic-skills:pdf" || got.DetectedVia != ai.SkillDetectedViaActivation || !got.FirstUsedAt.Equal(t1) ||
+		got.PluginName != "anthropic-skills" || got.InvocationTrigger != "user" || got.UserKey != "u1" || got.SessionId != "s1" {
+		t.Fatalf("merged skill = %+v", got)
+	}
+}
+
+func TestSkillCollectorMergeKeepsEarliestTimeInEitherOrder(t *testing.T) {
+	t1 := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
+	t2 := t1.Add(time.Minute)
+	skills := collectSkills(func(c *skillCollector) {
+		c.add("anthropic-skills:pdf", ai.SkillDetectedViaActivation, "user", "plugin", "", t2)
+		c.add("pdf", ai.SkillDetectedViaApiRequest, "", "", "", t1)
+	})
+	if len(skills) != 1 || skills[0].SkillName != "anthropic-skills:pdf" || !skills[0].FirstUsedAt.Equal(t1) {
+		t.Fatalf("skills = %+v, want one namespaced row first used at %v", skills, t1)
+	}
+}
+
+func TestSkillCollectorKeepsAmbiguousNames(t *testing.T) {
+	at := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
+	skills := collectSkills(func(c *skillCollector) {
+		c.add("docs", ai.SkillDetectedViaApiRequest, "", "", "", at)
+		c.add("a:docs", ai.SkillDetectedViaActivation, "", "", "", at)
+		c.add("b:docs", ai.SkillDetectedViaActivation, "", "", "", at)
+	})
+	if len(skills) != 3 {
+		t.Fatalf("got %d skills, want 3", len(skills))
+	}
+}
+
+func TestSkillCollectorLeavesUnmatchedPlainSkill(t *testing.T) {
+	at := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
+	skills := collectSkills(func(c *skillCollector) {
+		c.add("code-review", ai.SkillDetectedViaApiRequest, "", "", "", at)
+	})
+	if len(skills) != 1 || skills[0].SkillName != "code-review" || skills[0].PluginName != "" {
+		t.Fatalf("skills = %+v", skills)
+	}
+}
+
+func TestSkillCollectorKeepsOwnPluginName(t *testing.T) {
+	at := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
+	skills := collectSkills(func(c *skillCollector) {
+		c.add("skill-creator:skill-creator", ai.SkillDetectedViaActivation, "", "", "skill-creator", at)
+	})
+	if len(skills) != 1 || skills[0].SkillName != "skill-creator:skill-creator" || skills[0].PluginName != "skill-creator" {
+		t.Fatalf("skills = %+v", skills)
+	}
+}
+
+func TestSkillCollectorMergesEachPlainSkillIntoItsOwnMatch(t *testing.T) {
+	at := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
+	skills := collectSkills(func(c *skillCollector) {
+		c.add("pdf", ai.SkillDetectedViaApiRequest, "", "", "", at)
+		c.add("docs", ai.SkillDetectedViaApiRequest, "", "", "", at)
+		c.add("anthropic-skills:pdf", ai.SkillDetectedViaActivation, "", "", "", at)
+		c.add("anthropic-skills:docs", ai.SkillDetectedViaActivation, "", "", "", at)
+	})
+	if len(skills) != 2 || skills[0].SkillName != "anthropic-skills:pdf" || skills[1].SkillName != "anthropic-skills:docs" {
+		t.Fatalf("skills = %+v, want the two namespaced rows in first-seen order", skills)
+	}
+}
+
 func TestBuildPromptRollupMergesSkillSourcesAndCounts(t *testing.T) {
 	events := fixturePromptEvents(t, "p2")
 	rollup := buildPromptRollup(testOrganizationID, "p2", events)

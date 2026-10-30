@@ -27,6 +27,7 @@ import (
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/helpers/pluginhelper/services"
 	dalmocks "github.com/apache/incubator-devlake/mocks/core/dal"
+	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -457,5 +458,30 @@ func TestPatchProject_RollsBackOnRenameHookVeto(t *testing.T) {
 	tx.AssertNotCalled(t, "Commit")
 	for _, call := range tx.Calls {
 		assert.NotEqual(t, "UpdateColumn", call.Method, "no table may be renamed after a hook veto")
+	}
+}
+
+func TestCreateProjectDuplicateNameIsConflict(t *testing.T) {
+	dataDal := dalmocks.NewDal(t)
+	projectTx := dalmocks.NewTransaction(t)
+
+	previousDAL, previousValidator := db, vld
+	db = dataDal
+	vld = validator.New()
+	t.Cleanup(func() {
+		db, vld = previousDAL, previousValidator
+	})
+
+	duplicateErr := errors.Default.New("duplicate entry")
+	dataDal.On("Begin").Return(projectTx).Once()
+	dataDal.On("Create", mock.Anything).Return(duplicateErr).Once()
+	dataDal.On("IsDuplicationError", duplicateErr).Return(true).Once()
+	projectTx.On("Rollback").Return(nil).Once()
+
+	_, err := CreateProject(&models.ApiInputProject{BaseProject: models.BaseProject{Name: "dup"}})
+
+	if assert.NotNil(t, err) {
+		assert.Equal(t, 409, err.GetType().GetHttpCode())
+		assert.Equal(t, `A project named "dup" already exists. (409)`, err.Messages().Get())
 	}
 }

@@ -200,3 +200,88 @@ func TestJiraHTTPErrorDetail(t *testing.T) {
 		})
 	}
 }
+
+// newJiraStatusServer answers serverInfo and board with the given statuses; boardHeader/body apply to the board reply.
+func newJiraStatusServer(t *testing.T, serverInfoStatus, boardStatus int, boardHeader, boardBody string) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/api/2/serverInfo"):
+			w.WriteHeader(serverInfoStatus)
+			if serverInfoStatus == http.StatusOK {
+				json.NewEncoder(w).Encode(serverInfoResponse{DeploymentType: "Cloud", Version: "1001.0.0", VersionNumbers: []int{1001, 0, 0}})
+			}
+		case strings.Contains(r.URL.Path, "/agile/1.0/board"):
+			if boardHeader != "" {
+				w.Header().Set("WWW-Authenticate", boardHeader)
+			}
+			w.WriteHeader(boardStatus)
+			_, _ = w.Write([]byte(boardBody))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func basicAuthConn(endpoint string) models.JiraConn {
+	conn := models.JiraConn{}
+	conn.Endpoint = endpoint + "/rest/"
+	conn.AuthMethod = "BasicAuth"
+	conn.Username = "user@example.com"
+	conn.Password = "api-token-value"
+	return conn
+}
+
+func TestTestConnection_BoardUnauthorizedIsSafe(t *testing.T) {
+	initTestDeps(t)
+	srv := newJiraStatusServer(t, http.StatusOK, http.StatusUnauthorized,
+		`OAuth realm="https://x.atlassian.net"`, `{"errorMessages":["Client must be authenticated"]}`)
+
+	_, err := testConnection(context.Background(), basicAuthConn(srv.URL))
+	require.NotNil(t, err)
+	msg := err.Messages().Get()
+	assert.Equal(t, "Jira rejected these credentials (401). Check the email and API token. (400)", msg)
+	for _, leaked := range []string{srv.URL, "realm", "Client must be authenticated", "accepted"} {
+		assert.NotContains(t, msg, leaked)
+	}
+}
+
+func TestTestConnection_ServerInfoUnauthorizedUsesTokenHint(t *testing.T) {
+	initTestDeps(t)
+	srv := newJiraStatusServer(t, http.StatusUnauthorized, http.StatusOK, "", "")
+
+	conn := models.JiraConn{}
+	conn.Endpoint = srv.URL + "/rest/"
+	conn.AuthMethod = "AccessToken"
+	conn.Token = "my-token"
+
+	_, err := testConnection(context.Background(), conn)
+	require.NotNil(t, err)
+	assert.Equal(t, "Jira rejected these credentials (401). Check the personal access token. (400)", err.Messages().Get())
+}
+
+func TestTestConnection_BoardForbiddenIsSafe(t *testing.T) {
+	initTestDeps(t)
+	srv := newJiraStatusServer(t, http.StatusOK, http.StatusForbidden, "", `{"errorMessages":["secret detail"]}`)
+
+	_, err := testConnection(context.Background(), basicAuthConn(srv.URL))
+	require.NotNil(t, err)
+	msg := err.Messages().Get()
+	assert.Equal(t, "Jira refused access (403). Check that this account can view Jira boards. (400)", msg)
+	assert.NotContains(t, msg, "secret detail")
+}
+
+func TestTestConnection_UnexpectedStatusIsSafe(t *testing.T) {
+	initTestDeps(t)
+	srv := newJiraStatusServer(t, http.StatusOK, http.StatusInternalServerError, "", `{"errorMessages":["stack trace here"]}`)
+
+	_, err := testConnection(context.Background(), basicAuthConn(srv.URL))
+	require.NotNil(t, err)
+	msg := err.Messages().Get()
+	assert.Equal(t, "Jira returned an unexpected status (500) while testing the connection. (500)", msg)
+	assert.NotContains(t, msg, srv.URL)
+	assert.NotContains(t, msg, "stack trace here")
+}

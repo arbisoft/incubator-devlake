@@ -172,8 +172,15 @@ type Issue struct {
 			AvatarID    int    `json:"avatarId"`
 		} `json:"issuetype"`
 		Parent *struct {
-			ID  uint64 `json:"id,string"`
-			Key string `json:"key"`
+			ID     uint64 `json:"id,string"`
+			Key    string `json:"key"`
+			Fields *struct {
+				Issuetype struct {
+					ID             string `json:"id"`
+					Name           string `json:"name"`
+					HierarchyLevel *int   `json:"hierarchyLevel"`
+				} `json:"issuetype"`
+			} `json:"fields"`
 		} `json:"parent"`
 		Timespent     *int64   `json:"timespent"`
 		Sprint        *Sprint  `json:"sprint"`
