@@ -22,4 +22,5 @@ export type IdentityCellProps = {
   primary: string;
   secondary?: string;
   adornment?: ReactNode;
+  wrap?: boolean;
 };

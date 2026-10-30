@@ -532,7 +532,7 @@ export async function findOidcProvider(
 }
 
 export interface ApiOtelConnection {
-  connection: { id: number; teamName: string; status: string; organizationId?: string | null };
+  connection: { id: number; name: string; teamName: string; status: string; organizationId?: string | null };
   credentials: { id: number; status: string }[];
   projects: { name: string }[];
 }

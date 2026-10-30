@@ -22,9 +22,9 @@ import { useMemo, useState } from 'react';
 
 import API from '@/api';
 import { useRefreshData } from '@/hooks';
-import { FormField } from '@/ui';
+import { FormField, SEARCH_DEBOUNCE_MS } from '@/ui';
 
-import { COPY, PROJECT_SEARCH_PAGE_SIZE, SEARCH_DEBOUNCE_MS } from '../constants';
+import { COPY, PROJECT_SEARCH_PAGE_SIZE } from '../constants';
 import { buildProjectOptions } from '../utils';
 
 import type { ProjectsPickerProps } from './types';

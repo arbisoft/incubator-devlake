@@ -28,10 +28,18 @@ export const Cell = styled.div`
   min-width: 0;
 `;
 
-const Line = styled.span`
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+const Line = styled.span<{ $wrap?: boolean }>`
+  ${({ $wrap }) =>
+    $wrap
+      ? `
+    white-space: normal;
+    overflow-wrap: anywhere;
+  `
+      : `
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  `}
 `;
 
 export const Primary = styled(Line)`

@@ -18,6 +18,7 @@
 
 import { useTheme } from 'styled-components';
 
+import { getConnectorLogo } from '@/config';
 import { getPluginConfig } from '@/plugins/utils';
 import { MODAL_WIDTH, PluginIcon } from '@/ui';
 
@@ -46,7 +47,7 @@ export const ConnectionModal = ({
       width={layout.modalWidth[width]}
       title={
         <TitleRow>
-          <PluginIcon icon={icon} size="md" />
+          <PluginIcon icon={icon} size="md" logo={getConnectorLogo(plugin)} />
           {title ?? COPY.title(name)}
         </TitleRow>
       }

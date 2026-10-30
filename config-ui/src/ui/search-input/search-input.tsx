@@ -17,10 +17,12 @@
  */
 
 import { CloseCircleFilled, SearchOutlined } from '@ant-design/icons';
+import { useDebounceFn } from 'ahooks';
 import { Button, Input } from 'antd';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-import { COMMON_COPY } from '@/ui/constants';
+import { COMMON_COPY, SEARCH_DEBOUNCE_MS, SEARCH_TRIGGER } from '@/ui/constants';
+import type { SearchTrigger } from '@/ui/types';
 
 import { Compact } from './styled';
 import type { SearchInputProps } from './types';
@@ -28,13 +30,29 @@ import type { SearchInputProps } from './types';
 export const SearchInput = ({ value, placeholder, onSearch, allowClear }: SearchInputProps) => {
   const [draft, setDraft] = useState(value ?? '');
   const [synced, setSynced] = useState(value);
+  const lastEmitted = useRef(value ?? '');
 
   if (value !== synced) {
     setSynced(value);
     setDraft(value ?? '');
   }
 
-  const submit = () => onSearch(draft.trim());
+  useEffect(() => {
+    lastEmitted.current = value ?? '';
+  }, [value]);
+
+  const emit = (keyword: string, trigger: SearchTrigger) => {
+    if (trigger === SEARCH_TRIGGER.TYPING && keyword === lastEmitted.current) return;
+    lastEmitted.current = keyword;
+    onSearch(keyword, trigger);
+  };
+
+  const { run: emitTyping, cancel } = useDebounceFn(emit, { wait: SEARCH_DEBOUNCE_MS });
+
+  const submit = (keyword: string) => {
+    cancel();
+    emit(keyword.trim(), SEARCH_TRIGGER.SUBMIT);
+  };
 
   return (
     <Compact size="large">
@@ -43,18 +61,21 @@ export const SearchInput = ({ value, placeholder, onSearch, allowClear }: Search
         placeholder={placeholder}
         aria-label={placeholder}
         allowClear={allowClear && { clearIcon: <CloseCircleFilled aria-label={COMMON_COPY.clear} /> }}
-        onChange={(event) => setDraft(event.target.value)}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          emitTyping(event.target.value.trim(), SEARCH_TRIGGER.TYPING);
+        }}
         onClear={
           allowClear
             ? () => {
                 setDraft('');
-                onSearch('');
+                submit('');
               }
             : undefined
         }
-        onPressEnter={submit}
+        onPressEnter={() => submit(draft)}
       />
-      <Button type="primary" icon={<SearchOutlined />} aria-label={COMMON_COPY.search} onClick={submit} />
+      <Button type="primary" icon={<SearchOutlined />} aria-label={COMMON_COPY.search} onClick={() => submit(draft)} />
     </Compact>
   );
 };

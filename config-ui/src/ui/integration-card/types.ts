@@ -23,6 +23,7 @@ import type { PluginIconProps } from '@/ui/plugin-icon';
 
 export type IntegrationCardProps = {
   icon: PluginIconProps['icon'];
+  logo?: PluginIconProps['logo'];
   name: string;
   category: string;
   beta?: boolean;

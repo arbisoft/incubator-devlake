@@ -151,6 +151,7 @@ describe('active item', () => {
     [PATHS.PROJECT_BLUEPRINT_CONNECTION('x', 'github-1'), NAV_KEY.PROJECTS],
     [PATHS.CONNECTIONS(), NAV_KEY.CONNECTIONS],
     [PATHS.CONNECTION('github', 1), NAV_KEY.CONNECTIONS],
+    [PATHS.OTEL(), NAV_KEY.CONNECTIONS],
     [PATHS.BLUEPRINTS(), NAV_KEY.BLUEPRINTS],
     [PATHS.BLUEPRINT(3), NAV_KEY.BLUEPRINTS],
     [PATHS.BLUEPRINT_CONNECTION(3, 'github', 1), NAV_KEY.BLUEPRINTS],
@@ -164,7 +165,7 @@ describe('active item', () => {
   });
 
   it('highlights nothing for a path outside the sidebar, or Users when Settings is hidden', () => {
-    expect(activeKey(PATHS.OTEL())).toBeUndefined();
+    expect(activeKey(PATHS.DB_MIGRATE())).toBeUndefined();
     expect(activeKey(PATHS.SETTINGS_USERS(), MEMBER)).toBeUndefined();
   });
 

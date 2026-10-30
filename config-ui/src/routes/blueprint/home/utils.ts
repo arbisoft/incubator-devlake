@@ -20,9 +20,9 @@ import type { ListParams } from '@/api/blueprint';
 import { getCronOptions } from '@/config';
 import { IBPMode } from '@/types';
 import type { BlueprintCreatePayload } from '@/types/blueprint';
-import type { ListQuery } from '@/ui';
+import type { ListFilterOption, ListQuery } from '@/ui';
 
-import { STATUS_FILTER, TYPE_FILTER_ALL, COPY } from './constants';
+import { STATUS_FILTER } from './constants';
 import type { BlueprintFilters, BlueprintSortKey } from './types';
 
 export const buildBlueprintCreatePayload = (
@@ -59,14 +59,14 @@ export const toStatusKey = (enable: boolean) => (enable ? STATUS_FILTER.ENABLED 
 
 export const buildBlueprintQuery = (
   query: ListQuery<BlueprintSortKey>,
-  { type, status }: BlueprintFilters,
+  { connection, type, projectName, status }: BlueprintFilters,
 ): ListParams => ({
   ...query,
-  type: type.toLocaleUpperCase(),
+  type: type.length ? type.map((item) => item.toLocaleUpperCase()) : undefined,
+  connection,
+  projectName,
   enable: toEnableParam(status),
 });
 
-export const getTypeOptions = () => [
-  { value: TYPE_FILTER_ALL, label: COPY.allTypes },
-  ...getCronOptions().map(({ label }) => ({ value: label, label })),
-];
+export const getTypeOptions = (): ListFilterOption[] =>
+  getCronOptions().map(({ label }) => ({ text: label, value: label }));

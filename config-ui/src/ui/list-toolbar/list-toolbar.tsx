@@ -16,6 +16,7 @@
  *
  */
 
+import { SEARCH_TRIGGER } from '@/ui/constants';
 import { SearchInput } from '@/ui/search-input';
 import { Toolbar } from '@/ui/toolbar';
 
@@ -25,7 +26,12 @@ export const ListToolbar = ({ list, searchPlaceholder, filters, end }: ListToolb
   <Toolbar
     start={
       <>
-        <SearchInput value={list.keyword} placeholder={searchPlaceholder} onSearch={list.setKeyword} allowClear />
+        <SearchInput
+          value={list.keyword}
+          placeholder={searchPlaceholder}
+          onSearch={(keyword, trigger) => list.setKeyword(keyword, { replace: trigger === SEARCH_TRIGGER.TYPING })}
+          allowClear
+        />
         {filters}
       </>
     }
