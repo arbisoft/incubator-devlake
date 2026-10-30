@@ -1,0 +1,917 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Claude Code prompt usage and tokens per repository and engineer, split by model and mode, from OTel log events.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Claude Working Time",
+      "tooltip": "How long Claude Code worked for each engineer, per repository and workday. That dashboard uses your browser's timezone where this one uses UTC, so a relative range such as Today covers your local day there",
+      "type": "link",
+      "url": "/d/claude_usage_time_mysql"
+    }
+  ],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": "mysql",
+      "description": "Number of distinct repositories that prompts ran in. Prompts without a repository ('Unknown') are not counted.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "id": 15,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT p.repository_url) AS \"Repositories\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})",
+          "refId": "A"
+        }
+      ],
+      "title": "Repositories",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Repository with the most prompts, shown as its path, such as owner/repo. Prompts without a repository are ignored.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "noValue": "None",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 4,
+        "y": 0
+      },
+      "id": 16,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Most active repository$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT CASE\n    WHEN m.url IS NULL THEN 'Unknown'\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN m.url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(m.url, '^https?://[^/]+/(scm/)?', '')\n    -- CodeCommit URLs have no owner, only v1/repos/ before the repository name.\n    WHEN m.url REGEXP '^https?://git-codecommit[.][^/]+[.]amazonaws[.]com/' THEN REGEXP_REPLACE(m.url, '^https?://[^/]+/v1/repos/', '')\n    -- Azure DevOps puts _git/ between the project and the repository.\n    ELSE REPLACE(REGEXP_REPLACE(m.url, '^https?://[^/]+/', ''), '/_git/', '/')\n  END AS \"Most active repository\"\nFROM (\n  SELECT p.repository_url AS url, COUNT(*) AS prompts\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n    AND p.repository_url IS NOT NULL\n  GROUP BY p.repository_url\n) m\nORDER BY m.prompts DESC, m.url\nLIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Most Active Repository",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Total estimated cost of prompts that ran in a repository, divided by the number of distinct repositories. Prompts without a repository are left out.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "currencyUSD"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
+      "id": 17,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT SUM(p.estimated_cost_usd) / NULLIF(COUNT(DISTINCT p.repository_url), 0) AS \"Cost per repository\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  AND p.repository_url IS NOT NULL",
+          "refId": "A"
+        }
+      ],
+      "title": "Cost per Repository",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Total tokens (input, output, cache read and cache write) of prompts that ran in a repository, divided by the number of distinct repositories. Prompts without a repository are left out.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 0
+      },
+      "id": 18,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT SUM(p.input_tokens + p.output_tokens + p.cache_read_tokens + p.cache_creation_tokens) / NULLIF(COUNT(DISTINCT p.repository_url), 0) AS \"Tokens per repository\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  AND p.repository_url IS NOT NULL",
+          "refId": "A"
+        }
+      ],
+      "title": "Tokens per Repository",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Share of prompts with no repository, because the session had no origin remote or the client did not report one. They show as 'Unknown' in the tables below, and this reads 0% when the Repository filter excludes 'Unknown'.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "decimals": 1,
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percentunit"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "id": 20,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT SUM(p.repository_url IS NULL) / NULLIF(COUNT(*), 0) AS \"Without a repository\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n  AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})",
+          "refId": "A"
+        }
+      ],
+      "title": "Prompts Without a Repository",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "One row per repository, engineer, model and permission mode, with prompts, their share of all prompts in the table, sessions, estimated cost in total and per prompt, and average input, output, cache read and cache write tokens per prompt. Skill Usage is the share of the row's prompts that used a skill, and Skills lists the skills used. Repository 'Unknown' means no origin remote was reported, Project is 'Unmapped' when no DevLake project you can access collects the repository, and Model 'N/A' means the prompt made no model request, such as a local slash command; click a repository to open it in a new tab.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repository"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Open repository",
+                    "url": "${__data.fields.repository_link}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Share"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.width",
+                "value": 79
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cost"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.width",
+                "value": 84
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cost per prompt"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.width",
+                "value": 134
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Input Tokens per Prompt"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.width",
+                "value": 182
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Output Tokens per Prompt"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.width",
+                "value": 193
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cache Read Tokens per Prompt"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.width",
+                "value": 229
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cache Write Tokens per Prompt"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.width",
+                "value": 230
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Skill Usage"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Prompts",
+              "scope": "series"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 71
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sessions",
+              "scope": "series"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 83
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "repository_link"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom.viz",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 4
+      },
+      "id": 1,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- base is every prompt the panel counts.\nWITH base AS (\n  SELECT p.workspace_key, p.session_id, p.prompt_id, p.repository_url,\n    COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    -- Grouping on the raw columns keeps the sort keys narrow; the labels are applied once per row at the end.\n    p.models_used, p.permission_mode,\n    NULLIF(TRIM(a.full_name), '') AS full_name,\n    p.estimated_cost_usd, p.input_tokens, p.output_tokens, p.cache_read_tokens, p.cache_creation_tokens, p.used_skill\n  FROM ai_prompts p\n  -- account_id is the user's DevLake account, whose full_name the plugin copies from\n  -- another account with the same email.\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n), prompt_rows AS (\n  -- A prompt row carries the prompt's metrics, and a skill row only a skill name, so one\n  -- grouping gives both without joining skills to the metrics: the aggregates skip NULLs.\n  SELECT repository_url, user, models_used, permission_mode, full_name, 1 AS prompt, session_id,\n    estimated_cost_usd, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, used_skill, NULL AS skill_name\n  FROM base\n  UNION ALL\n  SELECT b.repository_url, b.user, b.models_used, b.permission_mode, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, s.skill_name\n  FROM base b\n  JOIN ai_prompt_skills s ON s.workspace_key = b.workspace_key AND s.session_id = b.session_id AND s.prompt_id = b.prompt_id\n), r AS (\n  SELECT repository_url, user, models_used, permission_mode,\n    MAX(full_name) AS full_name,\n    COUNT(prompt) AS prompts,\n    COUNT(DISTINCT session_id) AS sessions,\n    SUM(estimated_cost_usd) AS cost,\n    SUM(input_tokens) AS input_tokens,\n    SUM(output_tokens) AS output_tokens,\n    SUM(cache_read_tokens) AS cache_read_tokens,\n    SUM(cache_creation_tokens) AS cache_creation_tokens,\n    AVG(used_skill) AS skill_share,\n    GROUP_CONCAT(DISTINCT skill_name ORDER BY skill_name SEPARATOR ', ') AS skills\n  FROM prompt_rows\n  GROUP BY repository_url, user, models_used, permission_mode\n)\n-- The hint lifts GROUP_CONCAT's 1024-character default for this query, so a repository in many\n-- projects isn't cut off in Project.\nSELECT /*+ SET_VAR(group_concat_max_len = 1048576) */ CASE\n    WHEN r.repository_url IS NULL THEN 'Unknown'\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN r.repository_url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.repository_url, '^https?://[^/]+/(scm/)?', '')\n    -- CodeCommit URLs have no owner, only v1/repos/ before the repository name.\n    WHEN r.repository_url REGEXP '^https?://git-codecommit[.][^/]+[.]amazonaws[.]com/' THEN REGEXP_REPLACE(r.repository_url, '^https?://[^/]+/v1/repos/', '')\n    -- Azure DevOps puts _git/ between the project and the repository.\n    ELSE REPLACE(REGEXP_REPLACE(r.repository_url, '^https?://[^/]+/', ''), '/_git/', '/')\n  END AS \"Repository\",\n  CASE\n    WHEN r.repository_url IS NULL THEN 'Unknown'\n    WHEN r.repository_url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN 'GitHub'\n    WHEN r.repository_url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN 'GitLab'\n    WHEN r.repository_url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN 'Bitbucket'\n    WHEN r.repository_url REGEXP '^https?://(dev[.]azure[.]com|[^/]+[.]visualstudio[.]com)/' THEN 'Azure DevOps'\n    WHEN r.repository_url REGEXP '^https?://git-codecommit[.][^/]+[.]amazonaws[.]com/' THEN 'AWS CodeCommit'\n    WHEN r.repository_url REGEXP '^https?://source[.]developers[.]google[.]com/' THEN 'Google Cloud Source'\n    WHEN r.repository_url REGEXP '^https?://(www[.])?codeberg[.]org/' THEN 'Codeberg'\n    WHEN r.repository_url REGEXP '^https?://git[.]sr[.]ht/' THEN 'SourceHut'\n    -- Any other host, such as a self-hosted Gitea, is shown by its host name.\n    ELSE REGEXP_REPLACE(r.repository_url, '^https?://([^/]+).*$', '$1')\n  END AS \"Repo Source\",\n  CASE WHEN r.repository_url IS NULL THEN 'No repository' ELSE COALESCE(dl.projects, 'Unmapped') END AS \"Project\",\n  COALESCE(r.full_name, r.user) AS \"Engineer\",\n  CASE WHEN r.models_used = '' THEN 'N/A' ELSE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(r.models_used, '-[0-9]{8}', ''), 'claude-([a-z]+)-([0-9]+)-([0-9]+)', '$1 $2.$3'), 'claude-([a-z]+)-([0-9]+)', '$1 $2'), 'opus ', 'Opus '), 'sonnet ', 'Sonnet '), 'haiku ', 'Haiku '), 'fable ', 'Fable '), ',', ', ') END AS \"Model\",\n  CASE r.permission_mode WHEN 'default' THEN 'Agentic' WHEN 'bypassPermissions' THEN 'Bypass Permissions' WHEN 'plan' THEN 'Plan' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'auto' THEN 'Auto' ELSE r.permission_mode END AS \"Mode\",\n  r.prompts AS \"Prompts\",\n  r.prompts / SUM(r.prompts) OVER () AS \"Share\",\n  r.sessions AS \"Sessions\",\n  r.cost AS \"Cost\",\n  r.cost / r.prompts AS \"Cost per prompt\",\n  r.input_tokens / r.prompts AS \"Input Tokens per Prompt\",\n  r.output_tokens / r.prompts AS \"Output Tokens per Prompt\",\n  r.cache_read_tokens / r.prompts AS \"Cache Read Tokens per Prompt\",\n  r.cache_creation_tokens / r.prompts AS \"Cache Write Tokens per Prompt\",\n  r.skill_share AS \"Skill Usage\",\n  COALESCE(r.skills, '') AS \"Skills\",\n  -- repository_link is empty for prompts without a repository, so their Repository cell has no link.\n  COALESCE(r.repository_url, '') AS repository_link\nFROM r\nLEFT JOIN (\n  -- repository_url drops one trailing / and then one .git suffix, and is lowercased, so normalize\n  -- repos.url the same way.\n  SELECT LOWER(REGEXP_REPLACE(REGEXP_REPLACE(rp.url, '/$', ''), '[.]git$', '')) AS url,\n    GROUP_CONCAT(DISTINCT pm.project_name ORDER BY pm.project_name SEPARATOR ', ') AS projects\n  FROM repos rp\n  -- Only projects the viewer can access, so a repository shared with another project doesn't\n  -- reveal its name.\n  JOIN project_mapping pm ON pm.row_id = rp.id AND pm.`table` = 'repos'\n    AND pm.project_name IN (SELECT upm_p.project_name FROM user_project_mapping upm_p WHERE upm_p.user_login = ${__user.login:sqlstring})\n  GROUP BY LOWER(REGEXP_REPLACE(REGEXP_REPLACE(rp.url, '/$', ''), '[.]git$', ''))\n) dl ON dl.url = r.repository_url\nORDER BY r.repository_url IS NULL, 2, 1, 4, r.prompts DESC",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Prompt Usage by Repository",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Total input, output, cache read and cache write tokens for each repository and engineer; a repository's rows add up to its bar in Token Usage by Repository on the Claude Prompts dashboard. Repository 'Unknown' means no origin remote was reported, and Project is 'Unmapped' when no DevLake project you can access collects the repository. Click a repository to open it in a new tab.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repository"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Open repository",
+                    "url": "${__data.fields.repository_link}"
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 320
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Input"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Output"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cache read"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cache write"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "repository_link"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom.viz",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
+      "id": 14,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- base sums every prompt the panel counts per repository URL and user; the labels are applied once per row.\nWITH base AS (\n  SELECT p.repository_url AS url,\n    COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    -- account_id is the user's DevLake account, whose full_name the plugin copies from\n    -- another account with the same email.\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name,\n    SUM(p.input_tokens) AS input_tokens,\n    SUM(p.output_tokens) AS output_tokens,\n    SUM(p.cache_read_tokens) AS cache_read_tokens,\n    SUM(p.cache_creation_tokens) AS cache_creation_tokens\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  GROUP BY p.repository_url, 2\n)\nSELECT CASE\n    WHEN b.url IS NULL THEN 'Unknown'\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN b.url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(b.url, '^https?://[^/]+/(scm/)?', '')\n    -- CodeCommit URLs have no owner, only v1/repos/ before the repository name.\n    WHEN b.url REGEXP '^https?://git-codecommit[.][^/]+[.]amazonaws[.]com/' THEN REGEXP_REPLACE(b.url, '^https?://[^/]+/v1/repos/', '')\n    -- Azure DevOps puts _git/ between the project and the repository.\n    ELSE REPLACE(REGEXP_REPLACE(b.url, '^https?://[^/]+/', ''), '/_git/', '/')\n  END AS \"Repository\",\n  CASE\n    WHEN b.url IS NULL THEN 'Unknown'\n    WHEN b.url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN 'GitHub'\n    WHEN b.url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN 'GitLab'\n    WHEN b.url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN 'Bitbucket'\n    WHEN b.url REGEXP '^https?://(dev[.]azure[.]com|[^/]+[.]visualstudio[.]com)/' THEN 'Azure DevOps'\n    WHEN b.url REGEXP '^https?://git-codecommit[.][^/]+[.]amazonaws[.]com/' THEN 'AWS CodeCommit'\n    WHEN b.url REGEXP '^https?://source[.]developers[.]google[.]com/' THEN 'Google Cloud Source'\n    WHEN b.url REGEXP '^https?://(www[.])?codeberg[.]org/' THEN 'Codeberg'\n    WHEN b.url REGEXP '^https?://git[.]sr[.]ht/' THEN 'SourceHut'\n    -- Any other host, such as a self-hosted Gitea, is shown by its host name.\n    ELSE REGEXP_REPLACE(b.url, '^https?://([^/]+).*$', '$1')\n  END AS \"Repo Source\",\n  CASE WHEN b.url IS NULL THEN 'No repository' ELSE COALESCE(dl.projects, 'Unmapped') END AS \"Project\",\n  COALESCE(b.full_name, b.user) AS \"Engineer\",\n  b.input_tokens AS \"Input\",\n  b.output_tokens AS \"Output\",\n  b.cache_read_tokens AS \"Cache read\",\n  b.cache_creation_tokens AS \"Cache write\",\n  -- repository_link is empty for prompts without a repository, so their Repository cell has no link.\n  COALESCE(b.url, '') AS repository_link\nFROM base b\nLEFT JOIN (\n  -- repository_url drops one trailing / and then one .git suffix, and is lowercased, so normalize\n  -- repos.url the same way.\n  SELECT LOWER(REGEXP_REPLACE(REGEXP_REPLACE(rp.url, '/$', ''), '[.]git$', '')) AS url,\n    GROUP_CONCAT(DISTINCT pm.project_name ORDER BY pm.project_name SEPARATOR ', ') AS projects\n  FROM repos rp\n  -- Only projects the viewer can access, so a repository shared with another project doesn't\n  -- reveal its name.\n  JOIN project_mapping pm ON pm.row_id = rp.id AND pm.`table` = 'repos'\n    AND pm.project_name IN (SELECT upm_p.project_name FROM user_project_mapping upm_p WHERE upm_p.user_login = ${__user.login:sqlstring})\n  GROUP BY LOWER(REGEXP_REPLACE(REGEXP_REPLACE(rp.url, '/$', ''), '[.]git$', ''))\n) dl ON dl.url = b.url\nORDER BY b.url IS NULL, 2, 1, b.input_tokens + b.output_tokens + b.cache_read_tokens + b.cache_creation_tokens DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Token Usage by Repository and Engineer",
+      "type": "table"
+    }
+  ],
+  "preload": false,
+  "refresh": "",
+  "schemaVersion": 42,
+  "tags": [
+    "claude",
+    "anthropic",
+    "devlake",
+    "ai"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nINNER JOIN user_project_mapping upm ON upm.project_name = p.name\nWHERE c.status = 'active'\n  AND upm.user_login = ${__user.login:sqlstring}\nORDER BY p.name;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nINNER JOIN user_project_mapping upm ON upm.project_name = p.name\nWHERE c.status = 'active'\n  AND upm.user_login = ${__user.login:sqlstring}\nORDER BY p.name;",
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND (cp.project_name REGEXP '^(${project:regex})$' AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring}))\nORDER BY c.team_slug;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Claude Code OTel teams",
+        "multi": true,
+        "name": "otel_teams",
+        "options": [],
+        "query": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND (cp.project_name REGEXP '^(${project:regex})$' AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring}))\nORDER BY c.team_slug;",
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "-- The label is the person's full name from their DevLake account, falling back to the email; the value stays the\n-- email (or user key) that every panel filters on.\nSELECT COALESCE(u.full_name, u.user) AS __text, u.user AS __value\nFROM (\n  SELECT COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  GROUP BY 1\n) u\nORDER BY 1;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Engineer",
+        "multi": true,
+        "name": "user",
+        "options": [],
+        "query": "-- The label is the person's full name from their DevLake account, falling back to the email; the value stays the\n-- email (or user key) that every panel filters on.\nSELECT COALESCE(u.full_name, u.user) AS __text, u.user AS __value\nFROM (\n  SELECT COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  GROUP BY 1\n) u\nORDER BY 1;",
+        "refresh": 2,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "-- Repositories the selected users' prompts ran in, labelled as on Token Usage by Repository.\n-- 'Unknown' stands for prompts without a repository; a real repository_url is always an\n-- https URL, so it cannot clash.\nSELECT CASE\n    WHEN r.url = 'Unknown' THEN 'Unknown'\n    WHEN r.url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GH: ')\n    WHEN r.url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GL: ')\n    WHEN r.url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'BB: ')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN r.url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/(scm/)?', 'BB: ')\n    ELSE REGEXP_REPLACE(r.url, '^https?://', '')\n  END AS __text, r.url AS __value\nFROM (\n  SELECT DISTINCT COALESCE(p.repository_url, 'Unknown') AS url\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n) r\nORDER BY r.url = 'Unknown', 1;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Repository",
+        "multi": true,
+        "name": "repository",
+        "options": [],
+        "query": "-- Repositories the selected users' prompts ran in, labelled as on Token Usage by Repository.\n-- 'Unknown' stands for prompts without a repository; a real repository_url is always an\n-- https URL, so it cannot clash.\nSELECT CASE\n    WHEN r.url = 'Unknown' THEN 'Unknown'\n    WHEN r.url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GH: ')\n    WHEN r.url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GL: ')\n    WHEN r.url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'BB: ')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN r.url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/(scm/)?', 'BB: ')\n    ELSE REGEXP_REPLACE(r.url, '^https?://', '')\n  END AS __text, r.url AS __value\nFROM (\n  SELECT DISTINCT COALESCE(p.repository_url, 'Unknown') AS url\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n) r\nORDER BY r.url = 'Unknown', 1;",
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ]
+  },
+  "timezone": "utc",
+  "title": "Usage by Repositories",
+  "uid": "claude_prompts_repositories_mysql",
+  "id": null
+}
