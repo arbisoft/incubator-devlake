@@ -23,12 +23,18 @@
 #While incubation status is not necessarily a reflection of the completeness or stability of the code,
 #it does indicate that the project has yet to be fully endorsed by the ASF.
 
+FROM golang:1.26.5-bookworm AS query-gate
+WORKDIR /src
+COPY query-gate/ ./
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/grafana-query-gate .
+
 FROM grafana/grafana:13.2.2
 COPY ./provisioning/dashboards /etc/grafana/provisioning/dashboards
 COPY ./provisioning/datasources /etc/grafana/provisioning/datasources
 COPY ./dashboards /etc/grafana/dashboards
 COPY ./img/grafana_icon.svg /usr/share/grafana/public/img/grafana_icon.svg
 COPY ./img /usr/share/grafana/public/img/lake
+COPY --from=query-gate /out/grafana-query-gate /usr/local/bin/grafana-query-gate
 ENV GF_USERS_ALLOW_SIGN_UP=false
 ENV GF_SERVER_SERVE_FROM_SUB_PATH=true
 ENV GF_DASHBOARDS_JSON_ENABLED=true
