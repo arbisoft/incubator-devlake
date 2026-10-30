@@ -1,0 +1,32 @@
+{
+  "title": "Synthetic Jira Board",
+  "templating": {
+    "list": [
+      {
+        "name": "board",
+        "type": "query",
+        "query": {"rawSql": "SELECT name AS __text, id AS __value FROM boards WHERE id IN (SELECT board_id FROM board_access WHERE login = ${__user.login:sqlstring})"}
+      },
+      {"name": "assignee", "type": "query", "multi": true, "includeAll": true, "query": "SELECT DISTINCT assignee_name FROM issues WHERE owner = ${__user.login:sqlstring}"},
+      {"name": "search", "type": "textbox", "query": ""}
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Collapsed row",
+      "collapsed": true,
+      "panels": [
+        {
+          "title": "Open tickets",
+          "targets": [
+            {
+              "refId": "A",
+              "rawSql": "SELECT i.issue_key, i.summary FROM issues i JOIN board_issues bi ON bi.issue_id = i.id WHERE bi.board_id = ${board:sqlstring} AND i.assignee_name IN (${assignee:sqlstring}) AND i.summary LIKE '%${search}%' AND bi.board_id IN (SELECT board_id FROM board_access WHERE login = ${__user.login:sqlstring})"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
