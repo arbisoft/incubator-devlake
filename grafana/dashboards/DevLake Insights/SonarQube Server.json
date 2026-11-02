@@ -152,7 +152,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  count(distinct id) as 'Bugs'\nFROM cq_issues\nWHERE\n  project_key in (${project_id})\n  and type = 'BUG'\n  and severity in (${severity})",
+          "rawSql": "SELECT\n  count(distinct id) as 'Bugs'\nFROM cq_issues\nWHERE\n  project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}))\n  and type = 'BUG'\n  and severity in (${severity})",
           "refId": "A",
           "sql": {
             "columns": [
@@ -240,7 +240,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  count(distinct id) as 'Vulnerabilities'\nFROM cq_issues\nWHERE\n  project_key in (${project_id})\n  and type = 'VULNERABILITY'\n  and severity in (${severity})",
+          "rawSql": "SELECT\n  count(distinct id) as 'Vulnerabilities'\nFROM cq_issues\nWHERE\n  project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}))\n  and type = 'VULNERABILITY'\n  and severity in (${severity})",
           "refId": "A",
           "sql": {
             "columns": [
@@ -329,7 +329,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  COUNT(distinct id) AS 'Security Hotspots'\nFROM cq_issues\nWHERE\n  project_key in (${project_id})\n  and type = 'HOTSPOTS'\n  and severity in (${severity})\n",
+          "rawSql": "SELECT\n  COUNT(distinct id) AS 'Security Hotspots'\nFROM cq_issues\nWHERE\n  project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}))\n  and type = 'HOTSPOTS'\n  and severity in (${severity})\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -417,7 +417,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  CONCAT(ROUND(COUNT(IF(status != 'TO_REVIEW', id, NULL)) / COUNT(distinct id) * 100, 2), '%') AS 'Reviewed'\nFROM cq_issues\nWHERE\n  project_key in (${project_id})\n  and type = 'HOTSPOTS'\n  and severity in (${severity})",
+          "rawSql": "SELECT\n  CONCAT(ROUND(COUNT(IF(status != 'TO_REVIEW', id, NULL)) / COUNT(distinct id) * 100, 2), '%') AS 'Reviewed'\nFROM cq_issues\nWHERE\n  project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}))\n  and type = 'HOTSPOTS'\n  and severity in (${severity})",
           "refId": "A",
           "sql": {
             "columns": [
@@ -531,7 +531,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  CONCAT(ROUND((sum(lines_to_cover) - sum(uncovered_lines)) / sum(lines_to_cover) * 100, 1), '% ', 'Coverage on ', ROUND(sum(lines_to_cover) / 1000, 0),'k Lines to cover')\nFROM cq_file_metrics\nWHERE\n  project_key in (${project_id})\n",
+          "rawSql": "SELECT\n  CONCAT(ROUND((sum(lines_to_cover) - sum(uncovered_lines)) / sum(lines_to_cover) * 100, 1), '% ', 'Coverage on ', ROUND(sum(lines_to_cover) / 1000, 0),'k Lines to cover')\nFROM cq_file_metrics\nWHERE\n  project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}))\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -620,7 +620,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  concat(FLOOR(SUM(debt)/8/60), \" day(s) \", FLOOR((SUM(debt)%480)/60), \" hour(s) \") AS 'Debt'\nFROM cq_issues\nWHERE\n  project_key in (${project_id})\n  and type = 'CODE_SMELL'\n  and severity in (${severity})",
+          "rawSql": "SELECT\n  concat(FLOOR(SUM(debt)/8/60), \" day(s) \", FLOOR((SUM(debt)%480)/60), \" hour(s) \") AS 'Debt'\nFROM cq_issues\nWHERE\n  project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}))\n  and type = 'CODE_SMELL'\n  and severity in (${severity})",
           "refId": "A",
           "sql": {
             "columns": [
@@ -709,7 +709,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n\tCOUNT(distinct id) as 'Code Smells'\nFROM cq_issues\nWHERE\n  project_key in (${project_id})\n  and type = 'CODE_SMELL'\n  and severity in (${severity})",
+          "rawSql": "SELECT\n\tCOUNT(distinct id) as 'Code Smells'\nFROM cq_issues\nWHERE\n  project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}))\n  and type = 'CODE_SMELL'\n  and severity in (${severity})",
           "refId": "A",
           "sql": {
             "columns": [
@@ -823,7 +823,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  sum(duplicated_blocks)\nFROM cq_file_metrics\nWHERE\n  project_key in (${project_id})",
+          "rawSql": "SELECT\n  sum(duplicated_blocks)\nFROM cq_file_metrics\nWHERE\n  project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}))",
           "refId": "A",
           "sql": {
             "columns": [
@@ -911,7 +911,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  CONCAT(ROUND(sum(duplicated_lines) / sum(num_of_lines) * 100, 1), '% ', 'Duplications on ', ROUND(sum(ncloc) / 1000, 0),'k Lines')\nFROM cq_file_metrics\nWHERE\n  project_key in (${project_id})",
+          "rawSql": "SELECT\n  CONCAT(ROUND(sum(duplicated_lines) / sum(num_of_lines) * 100, 1), '% ', 'Duplications on ', ROUND(sum(ncloc) / 1000, 0),'k Lines')\nFROM cq_file_metrics\nWHERE\n  project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}))",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1001,7 +1001,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n\tfile_name, num_of_lines as 'Lines of Code', bugs as 'Bugs', vulnerabilities as 'Vulnerabilities', code_smells as 'Code Smells', \n\tsecurity_hotspots as 'Security Hotspots', CONCAT(ROUND(coverage, 2), '%') as 'Coverage', CONCAT(ROUND(duplicated_lines_density, 2), '%') as 'Duplications'\nFROM cq_file_metrics\nWHERE\n  project_key in (${project_id})\nORDER BY bugs desc\nlimit 20",
+          "rawSql": "SELECT\n\tfile_name, num_of_lines as 'Lines of Code', bugs as 'Bugs', vulnerabilities as 'Vulnerabilities', code_smells as 'Code Smells', \n\tsecurity_hotspots as 'Security Hotspots', CONCAT(ROUND(coverage, 2), '%') as 'Coverage', CONCAT(ROUND(duplicated_lines_density, 2), '%') as 'Duplications'\nFROM cq_file_metrics\nWHERE\n  project_key in (SELECT pm_g.row_id FROM project_mapping pm_g JOIN user_project_mapping upm_g ON upm_g.project_name = pm_g.project_name WHERE upm_g.user_login = ${__user.login:sqlstring} AND pm_g.`table` = 'cq_projects' AND pm_g.row_id IN (${project_id}))\nORDER BY bugs desc\nlimit 20",
           "refId": "A",
           "sql": {
             "columns": [
@@ -1045,14 +1045,14 @@
           ]
         },
         "datasource": "mysql",
-        "definition": "select concat(name, '--', id) as text from cq_projects",
+        "definition": "select distinct concat(c.name, '--', c.id) as text from cq_projects c join project_mapping pm on pm.row_id = c.id and pm.`table` = 'cq_projects' join user_project_mapping upm on upm.project_name = pm.project_name where upm.user_login = ${__user.login:sqlstring}",
         "hide": 0,
         "includeAll": true,
         "label": "SonarQube Project",
         "multi": true,
         "name": "project_id",
         "options": [],
-        "query": "select concat(name, '--', id) as text from cq_projects",
+        "query": "select distinct concat(c.name, '--', c.id) as text from cq_projects c join project_mapping pm on pm.row_id = c.id and pm.`table` = 'cq_projects' join user_project_mapping upm on upm.project_name = pm.project_name where upm.user_login = ${__user.login:sqlstring}",
         "refresh": 1,
         "regex": "/^(?<text>.*)--(?<value>.*)$/",
         "skipUrlSync": false,
@@ -1070,14 +1070,14 @@
           ]
         },
         "datasource": "mysql",
-        "definition": "select distinct severity from cq_issues where id like 'sonar%'",
+        "definition": "select distinct severity from cq_issues where id like 'sonar%' and EXISTS (SELECT 1 FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring})",
         "hide": 0,
         "includeAll": true,
         "label": "Severity",
         "multi": true,
         "name": "severity",
         "options": [],
-        "query": "select distinct severity from cq_issues where id like 'sonar%'",
+        "query": "select distinct severity from cq_issues where id like 'sonar%' and EXISTS (SELECT 1 FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring})",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
