@@ -5,6 +5,16 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      devlake_ref:
+        description: "DevLake tag to build"
+        required: true
+        type: string
+      devlake_sha:
+        description: "Commit the tag points at"
+        required: true
+        type: string
 
 jobs:
   trigger-build-and-push:
@@ -27,6 +37,8 @@ jobs:
           OWNER: ${{ secrets.GH_TRIGGER_OWNER }}
           REPO: ${{ secrets.GH_TRIGGER_REPO }}
           WORKFLOW_ID: ${{ secrets.GH_TRIGGER_WORKFLOW_ID }}
+          DEVLAKE_REF: ${{ inputs.devlake_ref || github.ref_name }}
+          DEVLAKE_SHA: ${{ inputs.devlake_sha || github.sha }}
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
@@ -36,7 +48,7 @@ jobs:
                 workflow_id: process.env.WORKFLOW_ID,
                 ref: 'main',
                 inputs: {
-                  'devlake_ref': '${{ github.ref_name }}',
-                  'devlake_sha': '${{ github.sha }}'
+                  'devlake_ref': process.env.DEVLAKE_REF,
+                  'devlake_sha': process.env.DEVLAKE_SHA
                 }
               });
