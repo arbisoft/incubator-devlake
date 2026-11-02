@@ -46,6 +46,7 @@ type Template struct {
 	AllProjects bool
 	re          *regexp.Regexp
 	groups      [fieldCount][]int
+	inner       [fieldCount][]bool
 }
 
 // Set is an ordered collection of compiled templates.
@@ -61,7 +62,7 @@ type MatchResult struct {
 }
 
 func newTemplate(location, sql string, vars map[string]Variable) (*Template, error) {
-	pattern, counts, err := compile(sql, vars)
+	pattern, counts, inner, err := compile(sql, vars)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +70,7 @@ func newTemplate(location, sql string, vars map[string]Variable) (*Template, err
 	if err != nil {
 		return nil, fmt.Errorf("compiled pattern is invalid: %w", err)
 	}
-	t := &Template{Location: location, HasLogin: counts[fieldLogin] > 0, re: re}
+	t := &Template{Location: location, HasLogin: counts[fieldLogin] > 0, re: re, inner: inner}
 	for field, cs := range callerSlots {
 		for n := 0; n < counts[field]; n++ {
 			t.groups[field] = append(t.groups[field], re.SubexpIndex(fmt.Sprintf("%s%d", cs.group, n)))
@@ -118,6 +119,7 @@ func rank(r Reason) int {
 // Match accepts sql only when a template matches it with every login and email slot holding the caller's values.
 func (s *Set) Match(sql string, c Caller) MatchResult {
 	want := [fieldCount]string{fieldLogin: quoteSQL(c.Login), fieldEmail: quoteSQL(c.Email)}
+	wantInner := [fieldCount]string{fieldLogin: doubleQuotes(c.Login), fieldEmail: doubleQuotes(c.Email)}
 	reasons := [fieldCount]Reason{fieldLogin: ReasonLoginMismatch, fieldEmail: ReasonEmailMismatch}
 	best := MatchResult{Reason: ReasonNoMatch}
 	for _, t := range s.templates {
@@ -130,7 +132,7 @@ func (s *Set) Match(sql string, c Caller) MatchResult {
 		}
 		reason := ReasonNoLoginSlot
 		if t.HasLogin {
-			reason = firstMismatch(sql, m, t, want, reasons)
+			reason = firstMismatch(sql, m, t, want, wantInner, reasons)
 			if reason == "" {
 				return MatchResult{Accepted: true, Location: t.Location}
 			}
@@ -143,10 +145,14 @@ func (s *Set) Match(sql string, c Caller) MatchResult {
 }
 
 // firstMismatch checks login groups before email groups and returns the reason for the first wrong one, or "".
-func firstMismatch(sql string, m []int, t *Template, want [fieldCount]string, reasons [fieldCount]Reason) Reason {
+func firstMismatch(sql string, m []int, t *Template, want, wantInner [fieldCount]string, reasons [fieldCount]Reason) Reason {
 	for field, groups := range t.groups {
-		for _, g := range groups {
-			if sql[m[2*g]:m[2*g+1]] != want[field] {
+		for n, g := range groups {
+			w := want[field]
+			if t.inner[field][n] {
+				w = wantInner[field]
+			}
+			if sql[m[2*g]:m[2*g+1]] != w {
 				return reasons[field]
 			}
 		}
