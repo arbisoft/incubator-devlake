@@ -139,7 +139,7 @@ jobs:
           done <<< "$runs"
 
           [ "$total" -gt 0 ] || fail "commit $SHA has no workflow runs, so staging never built it; retarget the draft to a commit with a green staging build"
-          [ -z "$bad" ] || fail "workflow runs on $SHA are not all green: ${bad#, }; re-run them for this commit, or retarget the draft to a commit where they passed"
+          [ -z "$bad" ] || fail "workflow runs on $SHA are not all green: ${bad#, }; use Re-run on the existing run (dispatching a new one won't clear it), or retarget the draft to a commit where they passed"
           echo "All $total workflow runs on \`$SHA\` passed." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish draft
