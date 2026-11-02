@@ -23,13 +23,15 @@
 #While incubation status is not necessarily a reflection of the completeness or stability of the code,
 #it does indicate that the project has yet to be fully endorsed by the ASF.
 
+# amd64 only: the original arm64 lines are commented out and marked "[arm64]". To build arm64 again,
+# restore them in place of the amd64-only lines beside them and add QEMU to the build jobs.
 FROM --platform=linux/amd64 debian:bookworm as debian-amd64
 RUN apt-get update
 RUN apt-get install -y libssh2-1-dev libssl-dev zlib1g-dev
 
-FROM --platform=linux/arm64 debian:bookworm as debian-arm64
-RUN apt-get update
-RUN apt-get install -y libssh2-1-dev libssl-dev zlib1g-dev
+# [arm64] FROM --platform=linux/arm64 debian:bookworm as debian-arm64
+# [arm64] RUN apt-get update
+# [arm64] RUN apt-get install -y libssh2-1-dev libssl-dev zlib1g-dev
 
 FROM --platform=$BUILDPLATFORM golang:1.20.5-bookworm as builder
 
@@ -42,9 +44,9 @@ ARG HTTPS_PROXY=
 RUN apt-get update
 RUN apt-get install -y gcc binutils libfindbin-libs-perl cmake libssh2-1-dev libssl-dev zlib1g-dev
 
-RUN if [ "$(arch)" != "aarch64" ] ; then \
-        apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu ; \
-    fi
+# [arm64] RUN if [ "$(arch)" != "aarch64" ] ; then \
+# [arm64]         apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu ; \
+# [arm64]     fi
 RUN if [ "$(arch)" != "x86_64" ] ; then \
         apt-get install -y gcc-x86-64-linux-gnu binutils-x86-64-linux-gnu ; \
     fi
@@ -56,23 +58,25 @@ COPY --from=debian-amd64 /usr/include /rootfs-amd64/usr/include
 COPY --from=debian-amd64 /usr/lib/x86_64-linux-gnu /rootfs-amd64/usr/lib/x86_64-linux-gnu
 COPY --from=debian-amd64 /lib/x86_64-linux-gnu /rootfs-amd64/lib/x86_64-linux-gnu
 
-COPY --from=debian-arm64 /usr/include /rootfs-arm64/usr/include
-COPY --from=debian-arm64 /usr/lib/aarch64-linux-gnu /rootfs-arm64/usr/lib/aarch64-linux-gnu
-COPY --from=debian-arm64 /lib/aarch64-linux-gnu /rootfs-arm64/lib/aarch64-linux-gnu
+# [arm64] COPY --from=debian-arm64 /usr/include /rootfs-arm64/usr/include
+# [arm64] COPY --from=debian-arm64 /usr/lib/aarch64-linux-gnu /rootfs-arm64/usr/lib/aarch64-linux-gnu
+# [arm64] COPY --from=debian-arm64 /lib/aarch64-linux-gnu /rootfs-arm64/lib/aarch64-linux-gnu
 
 
-RUN for arch in aarch64 x86_64 ; do \
+# [arm64] RUN for arch in aarch64 x86_64 ; do \
+RUN for arch in x86_64 ; do \
         mkdir -p /tmp/build/${arch} && cd /tmp/build/${arch} && \
         wget https://github.com/libgit2/libgit2/archive/refs/tags/v1.3.2.tar.gz -O - | tar -xz && \
         cd libgit2-1.3.2 && \
         mkdir build && cd build && \
-        if [ "$arch" = "aarch64" ] ; then \
-            cmake .. -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
-                -DBUILD_SHARED_LIBS=ON -DCMAKE_SYSROOT=/rootfs-arm64 \
-                -DZLIB_LIBRARY=/rootfs-arm64/usr/lib/aarch64-linux-gnu/libz.so.1 \
-                -DZLIB_INCLUDE_DIR=/rootfs-arm64/usr/include \
-                -DCMAKE_INSTALL_PREFIX=/usr/local/deps/${arch} ; \
-        elif [ "$arch" = "x86_64" ] ; then \
+# [arm64]         if [ "$arch" = "aarch64" ] ; then \
+# [arm64]             cmake .. -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+# [arm64]                 -DBUILD_SHARED_LIBS=ON -DCMAKE_SYSROOT=/rootfs-arm64 \
+# [arm64]                 -DZLIB_LIBRARY=/rootfs-arm64/usr/lib/aarch64-linux-gnu/libz.so.1 \
+# [arm64]                 -DZLIB_INCLUDE_DIR=/rootfs-arm64/usr/include \
+# [arm64]                 -DCMAKE_INSTALL_PREFIX=/usr/local/deps/${arch} ; \
+# [arm64]         elif [ "$arch" = "x86_64" ] ; then \
+        if [ "$arch" = "x86_64" ] ; then \
             cmake .. -DCMAKE_C_COMPILER=x86_64-linux-gnu-gcc \
                 -DBUILD_SHARED_LIBS=ON -DCMAKE_SYSROOT=/rootfs-amd64 \
                 -DZLIB_LIBRARY=/rootfs-amd64/usr/lib/x86_64-linux-gnu/libz.so.1 \
@@ -95,15 +99,15 @@ ARG SHA=
 ARG GO_PLUGINS=
 
 RUN --mount=type=cache,target=/root/.cache/go-build \
-    if [ "$TARGETPLATFORM" = "linux/arm64" ] ; then \
-        ln -s /usr/local/deps/aarch64 /usr/local/deps/target && \
-        export CC=aarch64-linux-gnu-gcc && \
-        export GOARCH=arm64 ; \
-    else \
+# [arm64]     if [ "$TARGETPLATFORM" = "linux/arm64" ] ; then \
+# [arm64]         ln -s /usr/local/deps/aarch64 /usr/local/deps/target && \
+# [arm64]         export CC=aarch64-linux-gnu-gcc && \
+# [arm64]         export GOARCH=arm64 ; \
+# [arm64]     else \
         ln -s /usr/local/deps/x86_64 /usr/local/deps/target && \
         export CC=x86_64-linux-gnu-gcc && \
-        export GOARCH=amd64 ; \
-    fi && \
+        export GOARCH=amd64 && \
+# [arm64]     fi && \
     export PKG_CONFIG_PATH=/usr/local/deps/target/lib/pkgconfig && \
     export CGO_ENABLED=1 &&\
     DEVLAKE_PLUGINS="$GO_PLUGINS" make all
