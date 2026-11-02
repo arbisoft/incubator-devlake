@@ -84,6 +84,8 @@ func interpolate(t *testing.T, sql string, vars map[string]Variable, c Caller, v
 			out.WriteString(quoteSQL(c.Login))
 		case name == "__user.email":
 			out.WriteString(quoteSQL(c.Email))
+		case (name == "__from" || name == "__to") && format == "":
+			out.WriteString("1730000000000")
 		case !known:
 			out.WriteString(sql[i:end])
 		case v.Type == "constant":
@@ -101,6 +103,8 @@ func interpolate(t *testing.T, sql string, vars map[string]Variable, c Caller, v
 		case v.Multi || v.IncludeAll:
 			if format == "regex" {
 				out.WriteString(formatRegex(vals))
+			} else if format == "raw" || format == "csv" {
+				out.WriteString(strings.Join(vals, ","))
 			} else {
 				out.WriteString(quoteAll(vals))
 			}
@@ -110,6 +114,8 @@ func interpolate(t *testing.T, sql string, vars map[string]Variable, c Caller, v
 				out.WriteString(quoteSQL(vals[0]))
 			case "regex":
 				out.WriteString(regexEscape(vals[0]))
+			case "raw", "csv":
+				out.WriteString(vals[0])
 			default:
 				out.WriteString(strings.ReplaceAll(vals[0], "'", "''"))
 			}

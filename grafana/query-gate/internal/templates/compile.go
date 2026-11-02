@@ -34,6 +34,22 @@ const (
 	patRegexLst = `(?:\(` + patRegexAtm + `+(?:\|` + patRegexAtm + `+)*\)|` + patRegexAtm + `+)`
 	// patRegexAny adds the empty group Grafana sends for an All selection with no options.
 	patRegexAny = `(?:` + patRegexLst + `|\(\))`
+	// patNum is an unsigned decimal with no sign or exponent.
+	patNum = `[0-9]+(?:\.[0-9]+)?`
+	// patNumList is comma-separated unsigned decimals, the shape of a raw multi-value list.
+	patNumList = patNum + `(?:,` + patNum + `)*`
+	// patInnerDQ is a default-format value inside double quotes; Grafana doubles ', and " or \ are never allowed.
+	patInnerDQ = `(?:[^"'\\]|'')*`
+	// patRawSQ is a raw value inside single quotes.
+	patRawSQ = `[^'\\]*`
+	// patRawDQ is a raw value inside double quotes.
+	patRawDQ = `[^"\\]*`
+	// patEpochMs is a time-range bound in epoch milliseconds.
+	patEpochMs = `[0-9]{1,16}`
+	// patLineComment is a value in a line comment that cannot end the comment.
+	patLineComment = `[^\n\r]*`
+	// patBlockComment is a value in a block comment that cannot end the comment.
+	patBlockComment = `[^*/]*`
 )
 
 // Variable is the subset of a dashboard template variable the compiler needs.
@@ -93,6 +109,10 @@ type slotPlan struct {
 	text       string
 	options    []string
 	canBeEmpty bool
+	// byState picks the pattern by SQL context for single-value slots; a missing state is rejected.
+	byState map[lexState]string
+	// inner marks a caller slot that holds the unquoted, quote-doubled form inside single quotes.
+	inner bool
 }
 
 func parseSlot(s string, i int) (name, format string, end int, ok bool) {
@@ -132,14 +152,18 @@ func splitFormat(inner string) (string, string) {
 	return name, format
 }
 
-func quoteSQL(v string) string {
-	return "'" + strings.ReplaceAll(v, "'", "''") + "'"
+func doubleQuotes(v string) string {
+	return strings.ReplaceAll(v, "'", "''")
 }
 
-// compile turns template SQL into an anchored pattern, returning the number of caller slots per field.
-func compile(sql string, vars map[string]Variable) (pattern string, counts [fieldCount]int, err error) {
+func quoteSQL(v string) string {
+	return "'" + doubleQuotes(v) + "'"
+}
+
+// compile turns template SQL into an anchored pattern, returning the caller slots per field and whether each holds the inner form.
+func compile(sql string, vars map[string]Variable) (pattern string, counts [fieldCount]int, inner [fieldCount][]bool, err error) {
 	if containsExecutableComment(sql) {
-		return "", counts, errors.New("executable comment /*! is not allowed")
+		return "", counts, inner, errors.New("executable comment /*! is not allowed")
 	}
 	var pat, lit strings.Builder
 	var lx lexer
@@ -172,7 +196,7 @@ func compile(sql string, vars map[string]Variable) (pattern string, counts [fiel
 		}
 		plan, err := resolveSlot(name, format, vars)
 		if err != nil {
-			return "", counts, fmt.Errorf("%s: %w", slotText, err)
+			return "", counts, inner, fmt.Errorf("%s: %w", slotText, err)
 		}
 		if plan.kind == slotLiteral || plan.kind == slotUnknown {
 			if plan.kind == slotUnknown {
@@ -183,35 +207,62 @@ func compile(sql string, vars map[string]Variable) (pattern string, counts [fiel
 			continue
 		}
 		if plan.kind == slotPattern && plan.canBeEmpty && strings.HasSuffix(lit.String(), "-") && lx.state == stateNormal {
-			return "", counts, fmt.Errorf("%s: slot directly after a dash", slotText)
+			return "", counts, inner, fmt.Errorf("%s: slot directly after a dash", slotText)
 		}
 		flush()
 		if lx.pendingEsc {
-			return "", counts, fmt.Errorf("%s: slot directly after a backslash escape", slotText)
+			return "", counts, inner, fmt.Errorf("%s: slot directly after a backslash escape", slotText)
 		}
 		if plan.kind == slotOptions {
 			next, err := feedOptions(lx, plan.options)
 			if err != nil {
-				return "", counts, fmt.Errorf("%s: %w", slotText, err)
+				return "", counts, inner, fmt.Errorf("%s: %w", slotText, err)
 			}
 			lx = next
 			pat.WriteString(plan.pattern)
 			i = end
 			continue
 		}
+		if plan.kind == slotPattern && lx.state == stateLineComment {
+			pat.WriteString(patLineComment)
+			i = end
+			continue
+		}
+		if plan.kind == slotPattern && lx.state == stateBlockComment {
+			pat.WriteString(patBlockComment)
+			i = end
+			continue
+		}
+		if plan.byState != nil {
+			p, allowed := plan.byState[lx.state]
+			if !allowed {
+				return "", counts, inner, fmt.Errorf("%s: slot not allowed in this SQL context", slotText)
+			}
+			pat.WriteString(p)
+			i = end
+			continue
+		}
 		if lx.state != plan.need {
-			return "", counts, fmt.Errorf("%s: slot not allowed in this SQL context", slotText)
+			if plan.kind == slotCaller && plan.inner {
+				return "", counts, inner, fmt.Errorf("%s: %s requires the sqlstring format outside single quotes", slotText, callerSlots[plan.field].name)
+			}
+			return "", counts, inner, fmt.Errorf("%s: slot not allowed in this SQL context", slotText)
 		}
 		if plan.kind == slotCaller {
-			pat.WriteString(fmt.Sprintf("(?P<%s%d>%s)", callerSlots[plan.field].group, counts[plan.field], patQStr))
+			body := patQStr
+			if plan.inner {
+				body = patInner
+			}
+			pat.WriteString(fmt.Sprintf("(?P<%s%d>%s)", callerSlots[plan.field].group, counts[plan.field], body))
 			counts[plan.field]++
+			inner[plan.field] = append(inner[plan.field], plan.inner)
 		} else {
 			pat.WriteString(plan.pattern)
 		}
 		i = end
 	}
 	flush()
-	return "(?s)^" + pat.String() + "$", counts, nil
+	return "(?s)^" + pat.String() + "$", counts, inner, nil
 }
 
 // feedOptions feeds each literal option through a copy of the lexer and requires one common end state.
@@ -234,13 +285,22 @@ func resolveSlot(name, format string, vars map[string]Variable) (slotPlan, error
 		if name != cs.name {
 			continue
 		}
-		if format != "sqlstring" {
-			return slotPlan{}, fmt.Errorf("%s requires the sqlstring format", cs.name)
+		switch format {
+		case "sqlstring":
+			return slotPlan{kind: slotCaller, field: callerField(field), need: stateNormal}, nil
+		case "":
+			return slotPlan{kind: slotCaller, field: callerField(field), need: stateSingleQuoted, inner: true}, nil
 		}
-		return slotPlan{kind: slotCaller, field: callerField(field), need: stateNormal}, nil
+		return slotPlan{}, fmt.Errorf("%s requires the sqlstring format", cs.name)
 	}
 	v, found := vars[name]
 	if !found {
+		if name == "__all" {
+			return slotPlan{kind: slotUnknown}, nil
+		}
+		if (name == "__from" || name == "__to") && format == "" {
+			return slotPlan{kind: slotPattern, pattern: patEpochMs, need: stateNormal}, nil
+		}
 		if strings.HasPrefix(name, "__") {
 			return slotPlan{}, errors.New("unsupported built-in variable")
 		}
@@ -314,6 +374,10 @@ func customOptions(v Variable) []string {
 func resolveList(v Variable, format string) (slotPlan, error) {
 	var p slotPlan
 	switch format {
+	case "raw", "csv":
+		p = slotPlan{kind: slotPattern, byState: map[lexState]string{
+			stateNormal: patNumList, stateSingleQuoted: patRawSQ, stateDoubleQuoted: patRawDQ,
+		}}
 	case "", "sqlstring":
 		p = slotPlan{kind: slotPattern, pattern: patQList, need: stateNormal, canBeEmpty: true}
 	case "regex":
@@ -322,7 +386,11 @@ func resolveList(v Variable, format string) (slotPlan, error) {
 		return slotPlan{}, fmt.Errorf("unsupported format %q for a multi-value variable", format)
 	}
 	if v.AllValue != "" {
-		p.pattern = "(?:" + p.pattern + "|" + regexp.QuoteMeta(v.AllValue) + ")"
+		all := regexp.QuoteMeta(v.AllValue)
+		p.pattern = "(?:" + p.pattern + "|" + all + ")"
+		for st, bp := range p.byState {
+			p.byState[st] = "(?:" + bp + "|" + all + ")"
+		}
 	}
 	return p, nil
 }
@@ -334,7 +402,13 @@ func resolveSingle(v Variable, format string) (slotPlan, error) {
 	case "regex":
 		return slotPlan{kind: slotPattern, pattern: patRegexLst, need: stateSingleQuoted}, nil
 	case "":
-		return slotPlan{kind: slotPattern, pattern: patInner, need: stateSingleQuoted}, nil
+		return slotPlan{kind: slotPattern, byState: map[lexState]string{
+			stateNormal: patNum, stateSingleQuoted: patInner, stateDoubleQuoted: patInnerDQ,
+		}}, nil
+	case "raw", "csv":
+		return slotPlan{kind: slotPattern, byState: map[lexState]string{
+			stateNormal: patNum, stateSingleQuoted: patRawSQ, stateDoubleQuoted: patRawDQ,
+		}}, nil
 	}
 	return slotPlan{}, fmt.Errorf("unsupported format %q for variable %q", format, v.Name)
 }

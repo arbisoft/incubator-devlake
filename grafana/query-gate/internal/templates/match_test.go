@@ -167,6 +167,34 @@ func TestMatchQuotedLogin(t *testing.T) {
 	}
 }
 
+func TestMatchLoginInsideQuotesDefaultFormat(t *testing.T) {
+	set, errs := loadJSON(t, map[string]string{"d.json": `{"title": "D", "panels": [{"title": "P", "targets": [
+    {"refId": "A", "rawSql": "SELECT 1 WHERE user_login = '${__user.login}'"}]}]}`})
+	if len(errs) != 0 {
+		t.Fatalf("unexpected errors %v", errs)
+	}
+	tests := []struct {
+		name   string
+		sql    string
+		caller Caller
+		accept bool
+	}{
+		{"own login", "SELECT 1 WHERE user_login = 'alice'", Caller{Login: "alice"}, true},
+		{"other login", "SELECT 1 WHERE user_login = 'mallory'", Caller{Login: "alice"}, false},
+		{"login with injected tail", "SELECT 1 WHERE user_login = 'alice' OR '1'='1'", Caller{Login: "alice"}, false},
+		{"quoted login doubled", "SELECT 1 WHERE user_login = 'o''hara'", Caller{Login: "o'hara"}, true},
+		{"quoted login undoubled", "SELECT 1 WHERE user_login = 'o'hara'", Caller{Login: "o'hara"}, false},
+		{"wrapped in extra quotes", "SELECT 1 WHERE user_login = ''alice''", Caller{Login: "alice"}, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := set.Match(tc.sql, tc.caller); got.Accepted != tc.accept {
+				t.Fatalf("got %+v, want accepted=%v", got, tc.accept)
+			}
+		})
+	}
+}
+
 func TestMatchEmailSlot(t *testing.T) {
 	const tpl = "SELECT 1 FROM t WHERE owner = ${__user.login:sqlstring} ORDER BY e = ${__user.email:sqlstring}"
 	set, errs := loadJSON(t, map[string]string{"d.json": `{"title": "D", "panels": [{"title": "P", "targets": [
