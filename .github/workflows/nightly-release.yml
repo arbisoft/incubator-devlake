@@ -46,7 +46,6 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: write
-      checks: read
       actions: read
     outputs:
       published: ${{ steps.publish.outputs.published }}
@@ -125,15 +124,12 @@ jobs:
           status=$(gh api "repos/$REPO/compare/$SHA...$RELEASE_BRANCH" --jq .status)
           case "$status" in ahead|identical) ;; *) fail "commit $SHA is not on $RELEASE_BRANCH (compare status: $status)" ;; esac
 
-          # this workflow's own runs on the commit are not part of the gate
+          # scheduled runs (unit tests, stale) and this workflow's own runs are not part of the gate
           workflow_id=$(gh api "repos/$REPO/actions/runs/$GITHUB_RUN_ID" --jq .workflow_id)
-          own_suites=$(gh api "repos/$REPO/actions/workflows/$workflow_id/runs?head_sha=$SHA&per_page=100" --jq '.workflow_runs[].check_suite_id')
-          own_suites="$own_suites $(gh api "repos/$REPO/actions/runs/$GITHUB_RUN_ID" --jq .check_suite_id)"
-          runs=$(gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" --paginate --jq '.check_runs[] | [.check_suite.id, .name, .status, (.conclusion // "")] | @tsv')
+          runs=$(gh api "repos/$REPO/actions/runs?head_sha=$SHA&per_page=100" --paginate --jq ".workflow_runs[] | select(.event != \"schedule\" and .workflow_id != $workflow_id) | [.name, .status, (.conclusion // \"\")] | @tsv")
           total=0 bad=""
-          while IFS=$'\t' read -r suite name state conclusion; do
-            [ -n "$suite" ] || continue
-            if [[ " $own_suites " == *" $suite "* ]]; then continue; fi
+          while IFS=$'\t' read -r name state conclusion; do
+            [ -n "$name" ] || continue
             total=$((total + 1))
             if [ "$state" != "completed" ]; then
               bad="$bad, $name ($state)"
@@ -142,9 +138,9 @@ jobs:
             fi
           done <<< "$runs"
 
-          [ "$total" -gt 0 ] || fail "commit $SHA has no check runs, so staging never built it; retarget the draft to a commit with a green staging build"
-          [ -z "$bad" ] || fail "checks on $SHA are not all green: ${bad#, }; re-run the staging build for this commit, or retarget the draft to a commit with a green staging run"
-          echo "All $total check runs on \`$SHA\` passed." >> "$GITHUB_STEP_SUMMARY"
+          [ "$total" -gt 0 ] || fail "commit $SHA has no workflow runs, so staging never built it; retarget the draft to a commit with a green staging build"
+          [ -z "$bad" ] || fail "workflow runs on $SHA are not all green: ${bad#, }; re-run them for this commit, or retarget the draft to a commit where they passed"
+          echo "All $total workflow runs on \`$SHA\` passed." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish draft
         id: publish
