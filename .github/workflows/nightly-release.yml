@@ -105,6 +105,18 @@ jobs:
             echo "id=$id"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Create staging deploy read token
+        id: deploy-token
+        if: steps.select.outputs.tag != ''
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_PRIVATE_KEY }}
+          owner: ${{ vars.GH_STAGING_DEPLOY_OWNER || secrets.GH_STAGING_DEPLOY_OWNER }}
+          repositories: |
+            ${{ vars.GH_STAGING_DEPLOY_REPO || secrets.GH_STAGING_DEPLOY_REPO }}
+          permission-actions: read
+
       - name: Verify draft
         if: steps.select.outputs.tag != ''
         env:
@@ -112,6 +124,10 @@ jobs:
           REPO: ${{ github.repository }}
           TAG: ${{ steps.select.outputs.tag }}
           SHA: ${{ steps.select.outputs.sha }}
+          DEPLOY_TOKEN: ${{ steps.deploy-token.outputs.token }}
+          DEPLOY_OWNER: ${{ vars.GH_STAGING_DEPLOY_OWNER || secrets.GH_STAGING_DEPLOY_OWNER }}
+          DEPLOY_REPO: ${{ vars.GH_STAGING_DEPLOY_REPO || secrets.GH_STAGING_DEPLOY_REPO }}
+          DEPLOY_WORKFLOW: ${{ vars.GH_STAGING_DEPLOY_WORKFLOW_ID || secrets.GH_STAGING_DEPLOY_WORKFLOW_ID }}
         run: |
           set -euo pipefail
           fail() { echo "::error::$1"; echo "**Not published:** $1" >> "$GITHUB_STEP_SUMMARY"; exit 1; }
@@ -147,6 +163,20 @@ jobs:
           [ "$total" -gt 0 ] || fail "commit $SHA has no workflow runs, so staging never built it; retarget the draft to a commit with a green staging build"
           [ -z "$bad" ] || fail "workflows on $SHA have not passed: ${bad#, }; re-run them, or retarget the draft to a commit where they passed"
           echo "All $total workflows on \`$SHA\` passed." >> "$GITHUB_STEP_SUMMARY"
+
+          # staging deploys are titled "... @ <sha>"; they start after the commit is made, so older runs are skipped
+          since=$(gh api "repos/$REPO/commits/$SHA" --jq .commit.committer.date)
+          deploys=$(GH_TOKEN="$DEPLOY_TOKEN" gh api -X GET "repos/$DEPLOY_OWNER/$DEPLOY_REPO/actions/workflows/$DEPLOY_WORKFLOW/runs" -f created=">=$since" -F per_page=100 --paginate --jq ".workflow_runs[] | select(.display_title | endswith(\" @ $SHA\")) | [.status, .html_url, (.conclusion // \"\")] | @tsv" 2>"$RUNNER_TEMP/deploys.err") \
+            || fail "couldn't list staging deploys in $DEPLOY_REPO: $(cat "$RUNNER_TEMP/deploys.err")"
+          ok="" latest=""
+          while IFS=$'\t' read -r state url conclusion; do
+            [ -n "$state" ] || continue
+            [ -n "$latest" ] || latest="${conclusion:-$state}: $url"
+            [ "$state" = "completed" ] && [ "$conclusion" = "success" ] && { ok="$url"; break; }
+          done <<< "$deploys"
+          [ -n "$latest" ] || fail "no staging deploy of $SHA found in $DEPLOY_REPO; it was skipped or superseded, so retarget the draft to a commit that deployed, or re-run its Build and Push Staging GHCR run"
+          [ -n "$ok" ] || fail "staging deploy of $SHA has not succeeded (latest is $latest); re-run it, or retarget the draft to a commit that deployed"
+          echo "Staging deployed \`$SHA\`: $ok" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish draft
         id: publish
