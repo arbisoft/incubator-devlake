@@ -126,21 +126,27 @@ jobs:
 
           # scheduled runs (unit tests, stale) and this workflow's own runs are not part of the gate
           workflow_id=$(gh api "repos/$REPO/actions/runs/$GITHUB_RUN_ID" --jq .workflow_id)
-          runs=$(gh api "repos/$REPO/actions/runs?head_sha=$SHA&per_page=100" --paginate --jq ".workflow_runs[] | select(.event != \"schedule\" and .workflow_id != $workflow_id) | [.name, .status, (.conclusion // \"\")] | @tsv")
-          total=0 bad=""
-          while IFS=$'\t' read -r name state conclusion; do
-            [ -n "$name" ] || continue
+          runs=$(gh api "repos/$REPO/actions/runs?head_sha=$SHA&per_page=100" --paginate --jq ".workflow_runs[] | select(.event != \"schedule\" and .workflow_id != $workflow_id) | [.workflow_id, .created_at, .name, .status, (.conclusion // \"\")] | @tsv")
+          # a workflow passes if any of its runs passed; otherwise its newest run is reported
+          runs=$(sort -t $'\t' -k1,1 -k2,2r <<< "$runs")
+          total=0 bad="" passed=" "
+          while IFS=$'\t' read -r wf _ name state conclusion; do
+            [ -n "$wf" ] || continue
+            [ "$state" = "completed" ] && case "$conclusion" in success|skipped|neutral) passed="$passed$wf " ;; esac
+          done <<< "$runs"
+          seen=" "
+          while IFS=$'\t' read -r wf _ name state conclusion; do
+            [ -n "$wf" ] || continue
+            [[ "$seen" == *" $wf "* ]] && continue
+            seen="$seen$wf "
             total=$((total + 1))
-            if [ "$state" != "completed" ]; then
-              bad="$bad, $name ($state)"
-            else
-              case "$conclusion" in success|skipped|neutral) ;; *) bad="$bad, $name ($conclusion)" ;; esac
-            fi
+            [[ "$passed" == *" $wf "* ]] && continue
+            if [ "$state" != "completed" ]; then bad="$bad, $name ($state)"; else bad="$bad, $name ($conclusion)"; fi
           done <<< "$runs"
 
           [ "$total" -gt 0 ] || fail "commit $SHA has no workflow runs, so staging never built it; retarget the draft to a commit with a green staging build"
-          [ -z "$bad" ] || fail "workflow runs on $SHA are not all green: ${bad#, }; use Re-run on the existing run (dispatching a new one won't clear it), or retarget the draft to a commit where they passed"
-          echo "All $total workflow runs on \`$SHA\` passed." >> "$GITHUB_STEP_SUMMARY"
+          [ -z "$bad" ] || fail "workflows on $SHA have not passed: ${bad#, }; re-run them, or retarget the draft to a commit where they passed"
+          echo "All $total workflows on \`$SHA\` passed." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish draft
         id: publish
