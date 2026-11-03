@@ -20,16 +20,16 @@ As per my understanding, current DevLake system is the right hand side of the di
 ```mermaid
 architecture-beta
 
-    service integration_service(logos:aws-ecs)[Integration Service]
+    service integration_service(server)[Integration Service]
     service sophia(cloud)[Sophia]
-    service devlake(logos:aws-ecs)[DevLake Backend]
-    service integration_db(logos:aws-rds)[Integration DB]
-    service devlake_db(logos:aws-rds)[DevLake DB]
+    service devlake(server)[DevLake Backend]
+    service integration_db(database)[Integration DB]
+    service devlake_db(database)[DevLake DB]
     service erp(cloud)[Workstream]
-    service sqs(logos:aws-sqs)[AWS SQS]
-    service grafana(logos:aws-ecs)[Grafana]
-    service acl(logos:aws-ecs)[Access Control]
-    service devlake_fe(logos:aws-cloudfront)[DevLake Frontend]
+    service sqs(database)[Queue]
+    service grafana(server)[Grafana]
+    service acl(server)[Access Control]
+    service devlake_fe(internet)[DevLake Frontend]
     junction integrationJunction
     junction aclJunction
 
