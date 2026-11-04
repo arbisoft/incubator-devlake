@@ -1,5 +1,9 @@
 # Integration Service
-This integration service is to connect DevLake with 3rd party systems. All of the systems who want to take data from DevLake must interact only with Integration Service, not directly with DevLake.
+The Integration Service connects DevLake with third-party systems. Any system that needs DevLake data goes through the Integration Service and never calls DevLake directly.
+
+It handles two integrations for now. Sophia asks for an engineer's stats by their Arbisoft email. The service looks up the other emails that engineer commits with, collects their Jira, GitHub, AI usage and AI cost stats from DevLake, and posts the merged result to Sophia's Listener API. DevLake also uses the service to load projects and team lead data from Workstream.
+
+Clients authenticate with a Client ID and Secret to get a bearer token. Stats requests are queued in RabbitMQ and processed in the background, so a slow DevLake response doesn't time out the client's call.
 
 ## Technology Stack
 - Backend: .NET 10, I have selected this stack because I have better knowledge of managing multi-threaded operations.
