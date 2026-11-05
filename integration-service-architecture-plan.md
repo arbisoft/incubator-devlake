@@ -6,9 +6,10 @@ It handles two integrations for now. Sophia asks for an engineer's stats by thei
 Clients authenticate with a Client ID and Secret to get a bearer token. Stats requests are queued in RabbitMQ and processed in the background, so a slow DevLake response doesn't time out the client's call.
 
 ## Technology Stack
-- Backend: .NET 10, I have selected this stack because I have better knowledge of managing multi-threaded operations.
-- Database: MySQL.
-- Queuing System: RabbitMQ.
+- Backend: .NET 10, I have selected this stack because I have better knowledge of managing multi-threaded operations
+- Database: MySQL
+- ORM: Dapper
+- Queuing System: RabbitMQ
 
 ## Communication
 I have selected Asynchronous mode of communication for this service, such that if there are too many requests coming in from the client system then the service would simply push the request to queuing system, and would process it on its own processing time.
@@ -396,10 +397,17 @@ flowchart TD
 ```
 
 ## Project Structure
+The solution uses an N-Layer Architecture. Each layer references only the layer directly below it:
+
+- Presentation (`API`, `Web`): Controllers, authorization, background jobs and admin pages. References `Business`.
+- Business (`Business`): DTOs, services and token and encryption logic. References `DataAccess`.
+- Data Access (`DataAccess`): Models, repositories that run hand-written SQL through Dapper, SQL migration scripts, and clients for external APIs and RabbitMQ.
+
+Interfaces sit next to their implementations in the same layer.
 
 ```
 Arbisoft.DevLake.IntegrationService
-├──Arbisoft.DevLake.IntegrationService.Core
+├──Arbisoft.DevLake.IntegrationService.DataAccess
 │  ├──Models
 │  │  ├──EmailMapping.cs
 │  │  ├──Client.cs
@@ -413,67 +421,44 @@ Arbisoft.DevLake.IntegrationService
 │  │  ├──RequestResponseAttempt.cs
 │  │  ├──ClientConfig.cs
 │  │  └──ClientConfigOutboundUrl.cs
-│  └──Interfaces
-│     ├──Repositories
-│     │  ├──IEmailMappingRepository.cs
-│     │  ├──IClientRepository.cs
-│     │  ├──IScopeRepository.cs
-│     │  ├──ISigningKeyRepository.cs
-│     │  ├──IAccessTokenRepository.cs
-│     │  ├──IRequestLogRepository.cs
-│     │  └──IClientConfigRepository.cs
-│     ├──ExternalApis
-│     │  ├──IDevLakeClient.cs
-│     │  ├──ISophiaClient.cs
-│     │  └──IWorkstreamClient.cs
-│     ├──Messaging
-│     │  ├──IRequestQueuePublisher.cs
-│     │  └──IRequestQueueConsumer.cs
-│     └──Security
-│        ├──ISecretEncryptor.cs
-│        └──ITokenGenerator.cs
-├──Arbisoft.DevLake.IntegrationService.Infrastructure
 │  ├──Persistence
-│  │  ├──IntegrationDbContext.cs
-│  │  ├──Migrations
-│  │  └──Configurations
-│  │     ├──EmailMappingConfiguration.cs
-│  │     ├──ClientConfiguration.cs
-│  │     ├──ClientSecretConfiguration.cs
-│  │     ├──ClientScopeConfiguration.cs
-│  │     ├──ScopeConfiguration.cs
-│  │     ├──SigningKeyConfiguration.cs
-│  │     ├──AccessTokenConfiguration.cs
-│  │     ├──RequestLogConfiguration.cs
-│  │     ├──RequestLogJsonConfiguration.cs
-│  │     ├──RequestResponseAttemptConfiguration.cs
-│  │     ├──ClientConfigConfiguration.cs
-│  │     └──ClientConfigOutboundUrlConfiguration.cs
+│  │  ├──IDbConnectionFactory.cs
+│  │  ├──MySqlConnectionFactory.cs
+│  │  └──Migrations
+│  │     └──001_InitialSchema.sql
 │  ├──Repositories
+│  │  ├──IEmailMappingRepository.cs
 │  │  ├──EmailMappingRepository.cs
+│  │  ├──IClientRepository.cs
 │  │  ├──ClientRepository.cs
+│  │  ├──IScopeRepository.cs
 │  │  ├──ScopeRepository.cs
+│  │  ├──ISigningKeyRepository.cs
 │  │  ├──SigningKeyRepository.cs
+│  │  ├──IAccessTokenRepository.cs
 │  │  ├──AccessTokenRepository.cs
+│  │  ├──IRequestLogRepository.cs
 │  │  ├──RequestLogRepository.cs
+│  │  ├──IClientConfigRepository.cs
 │  │  └──ClientConfigRepository.cs
 │  ├──ExternalApis
 │  │  ├──DevLake
+│  │  │  ├──IDevLakeClient.cs
 │  │  │  └──DevLakeClient.cs
 │  │  ├──Sophia
+│  │  │  ├──ISophiaClient.cs
 │  │  │  └──SophiaClient.cs
 │  │  └──Workstream
+│  │     ├──IWorkstreamClient.cs
 │  │     └──WorkstreamClient.cs
 │  ├──Messaging
 │  │  ├──RabbitMqConnection.cs
+│  │  ├──IRequestQueuePublisher.cs
 │  │  ├──RequestQueuePublisher.cs
+│  │  ├──IRequestQueueConsumer.cs
 │  │  └──RequestQueueConsumer.cs
-│  ├──Security
-│  │  ├──SecretEncryptor.cs
-│  │  ├──JwtTokenGenerator.cs
-│  │  └──SigningKeyProvider.cs
 │  └──DependencyInjection.cs
-├──Arbisoft.DevLake.IntegrationService.Application
+├──Arbisoft.DevLake.IntegrationService.Business
 │  ├──Dtos
 │  │  ├──Auth
 │  │  │  ├──TokenRequest.cs
@@ -512,6 +497,12 @@ Arbisoft.DevLake.IntegrationService
 │  │     ├──EmailMappingService.cs
 │  │     ├──ClientConfigService.cs
 │  │     └──RequestLogService.cs
+│  ├──Security
+│  │  ├──ISecretEncryptor.cs
+│  │  ├──SecretEncryptor.cs
+│  │  ├──ITokenGenerator.cs
+│  │  ├──JwtTokenGenerator.cs
+│  │  └──SigningKeyProvider.cs
 │  └──DependencyInjection.cs
 ├──Arbisoft.DevLake.IntegrationService.API
 │  ├──Controllers
@@ -562,7 +553,7 @@ Arbisoft.DevLake.IntegrationService
 │  ├──Program.cs
 │  └──appsettings.json
 └──Arbisoft.DevLake.IntegrationService.UnitTests
-   ├──Application
+   ├──Business
    │  ├──Auth
    │  │  └──AuthServiceTests.cs
    │  ├──Projects
@@ -572,26 +563,26 @@ Arbisoft.DevLake.IntegrationService
    │  │  ├──RequestHandlerTests.cs
    │  │  ├──RequestServiceTests.cs
    │  │  └──RequestProcessorTests.cs
-   │  └──Admin
-   │     ├──ClientServiceTests.cs
-   │     ├──ScopeServiceTests.cs
-   │     ├──SigningKeyServiceTests.cs
-   │     ├──AccessTokenServiceTests.cs
-   │     ├──EmailMappingServiceTests.cs
-   │     ├──ClientConfigServiceTests.cs
-   │     └──RequestLogServiceTests.cs
-   ├──Infrastructure
-   │  ├──ExternalApis
-   │  │  ├──DevLakeClientTests.cs
-   │  │  ├──SophiaClientTests.cs
-   │  │  └──WorkstreamClientTests.cs
-   │  ├──Messaging
-   │  │  ├──RequestQueuePublisherTests.cs
-   │  │  └──RequestQueueConsumerTests.cs
+   │  ├──Admin
+   │  │  ├──ClientServiceTests.cs
+   │  │  ├──ScopeServiceTests.cs
+   │  │  ├──SigningKeyServiceTests.cs
+   │  │  ├──AccessTokenServiceTests.cs
+   │  │  ├──EmailMappingServiceTests.cs
+   │  │  ├──ClientConfigServiceTests.cs
+   │  │  └──RequestLogServiceTests.cs
    │  └──Security
    │     ├──SecretEncryptorTests.cs
    │     ├──JwtTokenGeneratorTests.cs
    │     └──SigningKeyProviderTests.cs
+   ├──DataAccess
+   │  ├──ExternalApis
+   │  │  ├──DevLakeClientTests.cs
+   │  │  ├──SophiaClientTests.cs
+   │  │  └──WorkstreamClientTests.cs
+   │  └──Messaging
+   │     ├──RequestQueuePublisherTests.cs
+   │     └──RequestQueueConsumerTests.cs
    ├──API
    │  ├──Controllers
    │  │  ├──AuthControllerTests.cs
