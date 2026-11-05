@@ -1,7 +1,7 @@
 # Integration Service
 The Integration Service connects DevLake with third-party systems. Any system that needs DevLake data goes through the Integration Service and never calls DevLake directly.
 
-It handles two integrations for now. Sophia asks for an engineer's stats by their Arbisoft email. The service looks up the other emails that engineer commits with, collects their Jira, GitHub, AI usage and AI cost stats from DevLake, and posts the merged result to Sophia's Listener API. DevLake also uses the service to load projects and team lead data from Workstream.
+It handles two integrations for now. Sophia asks for an engineer's stats by their Arbisoft email. The service looks up the other emails that engineer commits with, collects their Jira, GitHub, AI usage and AI cost stats from DevLake, and posts the merged result to Sophia's callback API. DevLake also uses the service to load projects and team lead data from Workstream.
 
 Clients authenticate with a Client ID and Secret to get a bearer token. Stats requests are queued in RabbitMQ and processed in the background, so a slow DevLake response doesn't time out the client's call.
 
@@ -17,8 +17,97 @@ I have selected Asynchronous mode of communication for this service, such that i
 
 Secondly, the data required from Sophia against single engineer can cause frequent API timeouts, hence async communication is the best option.
 
+The stats APIs are asynchronous: they return a `correlation_id` straight away, and the result is delivered to the client's callback API later. The poll API is synchronous and returns the current status of a request.
+
 ## Authentication
-I have selected OAuth2 Authentication Mode, the client will be first registered on the integration service. A Client ID and Secret will be created for the client, client will pass these 2 values to our systems auth API, and will receive a Bearer token to access the APIs.
+- Authentication protocol: OIDC
+- Authorization protocol: OAuth2
+
+The client will be first registered on the integration service. A Client ID and Secret will be created for the client and shared using Passbolt. The client will pass these 2 values to our systems auth API, and will receive a Bearer token to access the APIs.
+
+## API Contracts
+These are the APIs agreed with Sophia. Every API except the Auth API needs the header `Authorization: Bearer <Token>`.
+
+| API | Method and path | Mode | Rate limit | Other limits |
+|---|---|---|---|---|
+| Authentication | `POST [BASE_URL]/auth/token/` | Synchronous | None agreed | |
+| Get Stats by Email | `GET [BASE_URL]/api/v1/engineers/{email}/stats?tf=24h` | Asynchronous | 100 requests per minute | |
+| Get Stats by Email List | `POST [BASE_URL]/api/v1/engineers/stats/batch` | Asynchronous | 20 requests per minute | 20 emails per request |
+| Fetch Request Status | `GET [BASE_URL]/api/v1/requests/poll/{uuid}` | Synchronous | 100 requests per minute | |
+
+All APIs return a 2xx, 4xx or 5xx status code. Rate limits apply per client, and a client over a limit gets a 429 response.
+
+### Authentication
+Request headers:
+- `Content-Type: application/x-www-form-urlencoded`
+- `Authorization: Basic base64(client_id:client_secret)`
+
+Request body:
+```
+grant_type=client_credentials
+```
+
+Response body:
+```json
+{ "access_token": "abc123blablabla...", "token_type": "Bearer", "expires_in": 3600, "scope": "items.read" }
+```
+
+### Get Stats by Email
+- `email`: the engineer's Arbisoft email, for example `abc@arbisoft.com`.
+- `tf`: the time frame, for example `24h`, `1w`, `30d`, `11M` or `1y`. The units are `h` (hours), `d` (days), `w` (weeks), `M` (months) and `y` (years), and they are case-sensitive. The batch API's `timeFrame` uses the same format.
+- Result delivery: `[SOPHIA_BASE_URL]/api/v1/devlake/callback/`
+
+Response body:
+```json
+{ "status": "200", "email": "abc@arbisoft.com", "correlation_id": "<uuid>", "error": "" }
+```
+
+### Get Stats by Email List
+Result delivery: not available yet. Sophia still has to provide a callback API for this endpoint. Until then, batch requests are rejected with a 422 response and the error `Revoked - no callback URL`.
+
+Request body:
+```json
+{ "emails": ["abc@arbisoft.com", "def@arbisoft.com"], "timeFrame": "24h" }
+```
+
+Response body:
+```json
+{ "status": "200", "emails": ["abc@arbisoft.com", "def@arbisoft.com"], "correlation_id": "<uuid>", "error": "" }
+```
+
+### Request Rejected for No Callback
+Both stats APIs return HTTP 422 when no callback API is available for the request. The `correlation_id` can still be used with the poll API, which returns the status `Revoked`.
+
+Response body for Get Stats by Email (the batch API returns `emails` instead of `email`):
+```json
+{ "status": "422", "email": "abc@arbisoft.com", "correlation_id": "<uuid>", "error": "Revoked - no callback URL" }
+```
+
+### Fetch Request Status
+- `uuid`: the `correlation_id` received in the response of the original request.
+- `status`: the current status of the request: `Queued`, `Processing`, `Success`, `Failure` or `Revoked`. These values are case-sensitive and map to the `RequestLogs` statuses as follows:
+
+| `RequestLogs` status | Poll status |
+|---|---|
+| Received, Queued | `Queued` |
+| Processing, Processed | `Processing` |
+| Success | `Success` |
+| Failed | `Failure` |
+| Revoked - no callback URL | `Revoked` |
+
+Response body:
+```json
+{ "correlation_id": "<uuid>", "status": "Processing", "check_time": "2026-11-05T14:02:55Z" }
+```
+
+### Sophia APIs
+- Token API: `POST [SOPHIA_BASE_URL]/oauth2/token/`
+- Callback API for Get Stats by Email: `POST [SOPHIA_BASE_URL]/api/v1/devlake/callback/`
+
+### What we need from Sophia
+- Client ID and Secret for the Stage environment
+- Client ID and Secret for the Prod environment
+- A callback API to receive the data processed for requests on `[BASE_URL]/api/v1/engineers/stats/batch`
 
 ## Architecture Diagram
 As per my understanding, current DevLake system is the right hand side of the diagram. I have added the left side of the diagram for integration with Sophia and other systems.
@@ -140,7 +229,7 @@ erDiagram
     RequestLogs {
         bigint id PK
         bigint clientRefId FK
-        string correlationId
+        string correlationId UK
         string url
         string status
         string eventType
@@ -210,10 +299,10 @@ erDiagram
 - Scopes: The permissions a token can carry, such as `stats:read` or `projects:fetch`. Each API checks that the token has the scope it requires.
 - SigningKeys: The keys used to sign access tokens. The `kid` goes in the token header, so tokens signed before a key rotation can still be verified with the right key. The private key stays in the secret store and this table holds only a reference to it.
 - AccessTokens: Every bearer token the Auth API issues, with the client, the secret it was issued against, the signing key, the granted scopes, the issue and expiry times, and the caller's IP. Setting `revokedOn` invalidates a token before it expires.
-- RequestLogs: Requests received from clients and the status of each one: Received, Queued, Processed, Success or Failed.
+- RequestLogs: Requests received from clients and the status of each one: Received, Queued, Processing, Processed, Success, Failed or Revoked - no callback URL. The poll API looks a request up by its `correlationId`.
 - RequestLogJsons: The JSON body of each request log.
 - RequestResponseAttempts: Each attempt to deliver a response to the client's outbound URL, with the response JSON, the attempt status and the error when an attempt fails.
-- ClientConfigs: How the Integration Service authenticates when it sends data to a client. `authType` is either OAuth2 client credentials (token URL, outbound Client ID, encrypted secret and scope) or a static API token, which is what Sophia uses. Token expiry and rotation dates are tracked so a token can be replaced before it expires, and `maxAttempts` caps delivery retries.
+- ClientConfigs: How the Integration Service authenticates when it sends data to a client. `authType` is either OAuth2 client credentials (token URL, outbound Client ID, encrypted secret and scope), which is what Sophia uses, or a static API token. Token expiry and rotation dates are tracked so a token can be replaced before it expires, and `maxAttempts` caps delivery retries.
 - ClientConfigOutboundUrls: The endpoints the Integration Service sends data to for each client. Each row maps an event type to an HTTP method and a path relative to the config's base URL.
 
 ## Sequence Diagram
@@ -240,7 +329,7 @@ sequenceDiagram
 
     Ubaid->>+projectIngestion: Button Click
     projectIngestion->>+projectIngestionApi: /projects/load
-    projectIngestionApi->>+authApi: POST: /auth ClientID & Client Secret
+    projectIngestionApi->>+authApi: POST: /auth/token/ ClientID & Client Secret
     authApi-->>-projectIngestionApi: Bearer Token
     projectIngestionApi->>+erpIntegrationApi: GET: /fetch/projects
     erpIntegrationApi->>+erp_token_validity_api: GET: /is_valid
@@ -280,18 +369,19 @@ sequenceDiagram
         participant db@{ "type": "database" } as MySQL
     end
 
-    Sophia->>+authApi: POST ClientID & Client Secret
+    Sophia->>+authApi: POST: /auth/token/ ClientID & Client Secret
     authApi->>+authService:authenticate
     authService-->>-authApi:Bearer Token
     authApi-->>-Sophia:Bearer Token
 
-    Sophia->>+stats_api: GET: /employee/{email}/stats
+    Sophia->>+stats_api: GET: /api/v1/engineers/{email}/stats?tf=24h or POST: /api/v1/engineers/stats/batch
 
     stats_api->>+idempotency_check: Criteria based idempotency check
     idempotency_check-->>-stats_api: passed
     stats_api->>+request_handler: Handle Request JSON
 
     request_handler->>+request_service: Push & Log Request
+    Note over request_service: No active callback URL, log as Revoked - no callback URL, skip the queue and return 422
     request_service->>+rmq: Enqueue Request JSON
     rmq-->>-request_service: Success Status
     request_service->>+request_repository: Log JSON in DB
@@ -301,9 +391,37 @@ sequenceDiagram
     request_service-->>-request_handler: Success Status
     request_handler-->>-stats_api: Success Status
 
-    stats_api-->>-Sophia: Acknowledgement message
+    stats_api-->>-Sophia: Acknowledgement with correlation_id
 ```
-- DevLake does not support OAuth2, it works on manually generated API token which is sent in request header `Authentication: Bearer <API Token>`
+- DevLake does not support OAuth2, it works on manually generated API token which is sent in request header `Authorization: Bearer <API Token>`
+- A batch request carries up to 20 emails under one `correlation_id`.
+- Before queueing, the service checks `ClientConfigOutboundUrls` for an active callback URL for the request's event type. If there is none, the request is logged as `Revoked - no callback URL` and is not queued, and the API returns 422 with that reason in `error`. This applies to single and batch requests.
+- A revoked request is final. It does not count as a duplicate in the idempotency check, so the client can send the request again once the callback is available.
+
+#### Fetching Request Status
+```mermaid
+sequenceDiagram
+    box Sophia
+        participant Sophia
+    end
+    box Integration Service
+        participant requests_api@{ "type": "boundary" } as Requests API
+        participant request_status_service as RequestStatusService
+        participant request_repository as RequestLogRepository
+    end
+    box DB Container
+        participant db@{ "type": "database" } as MySQL
+    end
+
+    Sophia->>+requests_api: GET: /api/v1/requests/poll/{uuid}
+    requests_api->>+request_status_service: Get status by correlation_id
+    request_status_service->>+request_repository: Find request log
+    request_repository->>+db: select(correlationId)
+    db-->>-request_repository: Request log
+    request_repository-->>-request_status_service: Request log
+    request_status_service-->>-requests_api: Status
+    requests_api-->>-Sophia: correlation_id, status and check_time
+```
 
 #### Processing Requests
 ```mermaid
@@ -325,15 +443,15 @@ sequenceDiagram
         participant stats_api@{ "type": "boundary" } as Stats API
     end
     box Sophia
-        participant so_token_validity_api@{ "type": "boundary" } as Token Validity API
-        participant listener_api@{ "type": "boundary" } as Listener API
+        participant so_token_api@{ "type": "boundary" } as Token API
+        participant callback_api@{ "type": "boundary" } as Callback API
     end
 
     cron_job->>+request_handler: Process Requests in last X minutes
     request_handler->>+request_processor:Process Request JSONs
 
-    request_processor->>+so_token_validity_api: GET: /is_valid
-    so_token_validity_api-->>-request_processor: true if API Token is valid
+    request_processor->>+so_token_api: POST: /oauth2/token/ ClientID & Client Secret
+    so_token_api-->>-request_processor: Bearer Token
 
     request_processor->>+rmq:Read Enqueued Requests in last X minutes
     rmq-->>-request_processor: Request JSONs
@@ -346,25 +464,25 @@ sequenceDiagram
         par Parallel Execution
 
             par Parallel Execution for each mapped email
-                request_processor->>+stats_api: GET: /stats/{email}/jira
+                request_processor->>+stats_api: GET: /stats/{email}/jira?tf=24h
                 stats_api-->>-request_processor: response
             end
             par Parallel Execution for each mapped email
-                request_processor->>+stats_api: GET: /stats/{email}/github
+                request_processor->>+stats_api: GET: /stats/{email}/github?tf=24h
                 stats_api-->>-request_processor: response
             end
             par Parallel Execution for each mapped email
-                request_processor->>+stats_api: GET: /stats/{email}/ai_usage
+                request_processor->>+stats_api: GET: /stats/{email}/ai_usage?tf=24h
                 stats_api-->>-request_processor: response
             end
             par Parallel Execution for each mapped email
-                request_processor->>+stats_api: GET: /stats/{email}/ai_cost
+                request_processor->>+stats_api: GET: /stats/{email}/ai_cost?tf=24h
                 stats_api-->>-request_processor: response
             end
         end
 
-        request_processor->>+listener_api: POST: /stats/{email}/
-        listener_api-->>-request_processor: Success status
+        request_processor->>+callback_api: POST: /api/v1/devlake/callback/
+        callback_api-->>-request_processor: Success status
 
         request_processor->>+request_service: Update request log
         request_service->>+db: update(json)
@@ -374,8 +492,8 @@ sequenceDiagram
     
     request_processor-->>-request_handler: true
 ```
-- Sophia does not support OAuth2, it works on manually generated API Token which is sent in request header `Authentication: Bearer <API Token>`
-- Sophia manually revolves the API Token after 2 months 
+- The Integration Service authenticates to Sophia's callback API with OAuth2 client credentials, using the Client ID and Secret Sophia provides for each environment.
+- The processor checks for an active callback URL again before calling DevLake, in case it was removed while the request was queued. If there is none, the request is set to `Revoked - no callback URL`.
 
 ### 3. Sophia DevLake Flowchart
 ```mermaid
@@ -472,6 +590,9 @@ Arbisoft.DevLake.IntegrationService
 │  │  ├──Stats
 │  │  │  ├──StatsRequest.cs
 │  │  │  ├──StatsAcknowledgement.cs
+│  │  │  ├──BatchStatsRequest.cs
+│  │  │  ├──BatchStatsAcknowledgement.cs
+│  │  │  ├──RequestStatusResponse.cs
 │  │  │  └──EmployeeStatsDto.cs
 │  │  └──Admin
 │  │     ├──ClientDto.cs
@@ -492,7 +613,9 @@ Arbisoft.DevLake.IntegrationService
 │  │  │  ├──IdempotencyCheck.cs
 │  │  │  ├──RequestHandler.cs
 │  │  │  ├──RequestService.cs
-│  │  │  └──RequestProcessor.cs
+│  │  │  ├──RequestProcessor.cs
+│  │  │  ├──RequestStatusService.cs
+│  │  │  └──TimeFrame.cs
 │  │  └──Admin
 │  │     ├──ClientService.cs
 │  │     ├──ScopeService.cs
@@ -512,11 +635,14 @@ Arbisoft.DevLake.IntegrationService
 │  ├──Controllers
 │  │  ├──AuthController.cs
 │  │  ├──ErpIntegrationController.cs
-│  │  └──StatsController.cs
+│  │  ├──StatsController.cs
+│  │  └──RequestsController.cs
 │  ├──Authorization
 │  │  ├──ScopeRequirement.cs
 │  │  ├──ScopeAuthorizationHandler.cs
 │  │  └──TokenRevocationValidator.cs
+│  ├──RateLimiting
+│  │  └──RateLimitPolicies.cs
 │  ├──BackgroundJobs
 │  │  └──RequestProcessingJob.cs
 │  ├──Program.cs
@@ -566,7 +692,9 @@ Arbisoft.DevLake.IntegrationService
    │  │  ├──IdempotencyCheckTests.cs
    │  │  ├──RequestHandlerTests.cs
    │  │  ├──RequestServiceTests.cs
-   │  │  └──RequestProcessorTests.cs
+   │  │  ├──RequestProcessorTests.cs
+   │  │  ├──RequestStatusServiceTests.cs
+   │  │  └──TimeFrameTests.cs
    │  ├──Admin
    │  │  ├──ClientServiceTests.cs
    │  │  ├──ScopeServiceTests.cs
@@ -591,7 +719,8 @@ Arbisoft.DevLake.IntegrationService
    │  ├──Controllers
    │  │  ├──AuthControllerTests.cs
    │  │  ├──ErpIntegrationControllerTests.cs
-   │  │  └──StatsControllerTests.cs
+   │  │  ├──StatsControllerTests.cs
+   │  │  └──RequestsControllerTests.cs
    │  ├──Authorization
    │  │  ├──ScopeAuthorizationHandlerTests.cs
    │  │  └──TokenRevocationValidatorTests.cs
