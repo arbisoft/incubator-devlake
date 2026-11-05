@@ -9,6 +9,7 @@ Clients authenticate with a Client ID and Secret to get a bearer token. Stats re
 - Backend: .NET 10, I have selected this stack because I have better knowledge of managing multi-threaded operations
 - Database: MySQL
 - ORM: Dapper
+- Database Migrations: DbUp
 - Queuing System: RabbitMQ
 
 ## Communication
@@ -401,9 +402,11 @@ The solution uses an N-Layer Architecture. Each layer references only the layer 
 
 - Presentation (`API`, `Web`): Controllers, authorization, background jobs and admin pages. References `Business`.
 - Business (`Business`): DTOs, services and token and encryption logic. References `DataAccess`.
-- Data Access (`DataAccess`): Models, repositories that run hand-written SQL through Dapper, SQL migration scripts, and clients for external APIs and RabbitMQ.
+- Data Access (`DataAccess`): Models, repositories that run hand-written SQL through Dapper, SQL migration scripts applied by DbUp, and clients for external APIs and RabbitMQ.
 
 Interfaces sit next to their implementations in the same layer.
+
+DbUp runs the scripts in `Persistence/Migrations`, which are embedded in the `DataAccess` assembly, in filename order. It records each script in its journal table, so a script runs only once. `DatabaseMigrationService` is a hosted service that `DataAccess` registers, and it applies pending scripts at startup when `Database:RunMigrationsOnStartup` is on. Only `API` turns this setting on, and a failed script stops startup.
 
 ```
 Arbisoft.DevLake.IntegrationService
@@ -424,6 +427,7 @@ Arbisoft.DevLake.IntegrationService
 │  ├──Persistence
 │  │  ├──IDbConnectionFactory.cs
 │  │  ├──MySqlConnectionFactory.cs
+│  │  ├──DatabaseMigrationService.cs
 │  │  └──Migrations
 │  │     └──001_InitialSchema.sql
 │  ├──Repositories
