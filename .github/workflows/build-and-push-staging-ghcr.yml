@@ -411,6 +411,7 @@ jobs:
                   inputs: {
                     image_tag: process.env.IMAGE_TAG,
                     registry: process.env.REGISTRY,
+                    devlake_sha: process.env.GITHUB_SHA,
                   }
                 });
                 core.info(`Dispatched ${workflow_id} on ${owner}/${repo}@main (attempt ${attempt})`);
