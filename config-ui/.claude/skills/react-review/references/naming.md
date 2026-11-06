@@ -39,6 +39,22 @@ limitations under the License.
 
 The `SCREAMING_SNAKE_CASE` rule is for exported **constants** only — exported components stay PascalCase and exported functions/hooks stay camelCase.
 
+Check every top-level `const` in a changed file for `export`. Non-exported module constants are local, whatever they hold — an object, a map, a derived list or an alias:
+
+```ts
+// before
+const OPTION_COPY = { metrics: {...} };              // not exported
+const OPTIONS = Object.values(SETTINGS_OPTION);      // not exported
+const OPTIONS_COPY = COPY.snippet.options;           // local alias
+
+// after
+const optionCopy = { metrics: {...} };
+const options = Object.values(SETTINGS_OPTION);
+const { options: optionsCopy } = COPY.snippet;       // destructure the alias too
+```
+
+If the constant should be shared, export it (and keep the uppercase); otherwise lowercase it. Repo precedent for uppercase locals does not exempt new code.
+
 Also flag:
 - Generic names outside tiny scopes: `data`, `item`, `obj`, `temp`, `info`, `res`, `handle`, `doStuff`.
 - Abbreviations that aren't universal (`usr`, `cfg`, `btnTxt`).
