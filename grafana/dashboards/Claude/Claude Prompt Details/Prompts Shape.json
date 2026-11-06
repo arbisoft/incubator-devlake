@@ -66,7 +66,7 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 5,
+        "w": 4,
         "x": 0,
         "y": 0
       },
@@ -130,8 +130,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 5,
-        "x": 5,
+        "w": 4,
+        "x": 4,
         "y": 0
       },
       "id": 49,
@@ -194,8 +194,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 5,
-        "x": 10,
+        "w": 4,
+        "x": 8,
         "y": 0
       },
       "id": 50,
@@ -259,7 +259,7 @@
       "gridPos": {
         "h": 4,
         "w": 4,
-        "x": 15,
+        "x": 12,
         "y": 0
       },
       "id": 51,
@@ -296,6 +296,70 @@
     },
     {
       "datasource": "mysql",
+      "description": "Average context window usage per prompt, in tokens: how much of the model's context window a prompt filled. A prompt's usage is its largest main-thread API request (input + cache read + cache creation tokens). Subagent and background requests are left out, as are prompts that made no main-thread request.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 0
+      },
+      "id": 58,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- A request's context is everything sent to the model: input + cache read + cache creation tokens.\n-- Only main-thread requests count; subagents, title generation, prompt suggestions and away\n-- summaries run in their own contexts. A prompt's context is its largest main-thread request.\nWITH peaks AS (\n  SELECT p.id, MAX(e.input_tokens + e.cache_read_tokens + e.cache_creation_tokens) AS ctx\n  FROM ai_prompts p\n  JOIN _tool_claude_code_otel_events e\n    ON e.prompt_id = p.prompt_id AND e.connection_id = p.source_connection_id\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n    AND e.event_name = 'api_request'\n    AND e.query_source = 'repl_main_thread'\n  GROUP BY p.id\n)\nSELECT AVG(ctx) AS \"Tokens\"\nFROM peaks",
+          "refId": "A"
+        }
+      ],
+      "title": "Avg Context Size",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
       "description": "The model called by the most prompts. A prompt that called several models counts once for each; prompts that called no model are left out.",
       "fieldConfig": {
         "defaults": {
@@ -322,8 +386,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 5,
-        "x": 19,
+        "w": 4,
+        "x": 20,
         "y": 0
       },
       "id": 52,
@@ -876,6 +940,106 @@
     },
     {
       "datasource": "mysql",
+      "description": "Prompts grouped by their peak context window usage, in tokens: how much of the model's context window a prompt filled at its largest point. This is the largest main-thread API request the prompt made (input + cache read + cache creation tokens). Subagent and background requests are left out, as are prompts that made no main-thread request.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Prompts",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 0,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Peak context (tokens)"
+            },
+            "properties": [
+              {
+                "id": "custom.axisLabel",
+                "value": "Peak context (tokens)"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 30
+      },
+      "id": 59,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.75,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xField": "Peak context (tokens)",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- A request's context is everything sent to the model: input + cache read + cache creation tokens.\n-- Only main-thread requests count; subagents, title generation, prompt suggestions and away\n-- summaries run in their own contexts. A prompt's context is its largest main-thread request.\nWITH peaks AS (\n  SELECT p.id, MAX(e.input_tokens + e.cache_read_tokens + e.cache_creation_tokens) AS ctx\n  FROM ai_prompts p\n  JOIN _tool_claude_code_otel_events e\n    ON e.prompt_id = p.prompt_id AND e.connection_id = p.source_connection_id\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n    AND e.event_name = 'api_request'\n    AND e.query_source = 'repl_main_thread'\n  GROUP BY p.id\n)\nSELECT b.label AS \"Peak context (tokens)\",\n  SUM(CASE WHEN pk.ctx BETWEEN b.lo AND b.hi THEN 1 ELSE 0 END) AS \"Prompts\"\nFROM (\n  SELECT 0 AS ord, '<50k' AS label, 0 AS lo, 49999 AS hi\n  UNION ALL SELECT 1, '50k-100k', 50000, 99999\n  UNION ALL SELECT 2, '100k-200k', 100000, 199999\n  UNION ALL SELECT 3, '200k-500k', 200000, 499999\n  UNION ALL SELECT 4, '500k+', 500000, 1000000000000\n) AS b\nCROSS JOIN peaks pk\nGROUP BY b.ord, b.label\nORDER BY b.ord",
+          "refId": "A"
+        }
+      ],
+      "title": "Prompts by Peak Context",
+      "type": "barchart"
+    },
+    {
+      "datasource": "mysql",
       "description": "One row per model, or combination of models, used by prompts: prompt count, median and p90 duration, average API requests and tool calls per prompt, and average cost per prompt (USD). Prompts that called no model are left out.",
       "fieldConfig": {
         "defaults": {
@@ -980,9 +1144,9 @@
       },
       "gridPos": {
         "h": 9,
-        "w": 12,
-        "x": 12,
-        "y": 30
+        "w": 24,
+        "x": 0,
+        "y": 39
       },
       "id": 56,
       "options": {
@@ -1073,7 +1237,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 39
+        "y": 48
       },
       "id": 14,
       "options": {
