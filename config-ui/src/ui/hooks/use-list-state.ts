@@ -23,7 +23,7 @@ import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE, LIST_PARAMS, PAGE_SIZE_OPTIONS, SORT_O
 import type { SortOrder, SortState } from '@/ui/types';
 
 type ListSort<S extends string> = SortState<S>;
-type ListFilters = Record<string, string>;
+type ListFilters = Record<string, string | string[]>;
 
 export type ListDefaults<S extends string, F extends ListFilters> = {
   pageSize?: number;
@@ -51,6 +51,9 @@ export type ListQuery<S extends string> = {
 
 const isSortOrder = (value: string | null): value is SortOrder => value === SORT_ORDER.ASC || value === SORT_ORDER.DESC;
 
+const sameFilterValue = (a: string | string[] | undefined, b: string | string[] | undefined) =>
+  Array.isArray(a) && Array.isArray(b) ? [...a].sort().join('\0') === [...b].sort().join('\0') : a === b;
+
 const readList = <S extends string, F extends ListFilters>(
   params: URLSearchParams,
   defaults: ListDefaults<S, F>,
@@ -60,7 +63,11 @@ const readList = <S extends string, F extends ListFilters>(
   const sortBy = params.get(LIST_PARAMS.SORT_BY);
   const sortOrder = params.get(LIST_PARAMS.SORT_ORDER);
   const filters = Object.fromEntries(
-    Object.entries(defaults.filters).map(([name, fallback]) => [name, params.get(name) ?? fallback]),
+    Object.entries(defaults.filters).map(([name, fallback]) => {
+      if (!Array.isArray(fallback)) return [name, params.get(name) ?? fallback];
+      const all = params.getAll(name);
+      return [name, all.length ? all : fallback];
+    }),
   ) as F;
   return {
     page: Number.isInteger(page) && page > 0 ? page : DEFAULT_PAGE,
@@ -92,7 +99,13 @@ const writeList = <S extends string, F extends ListFilters>(
     values.sort?.sortBy === defaults.sort?.sortBy && values.sort?.sortOrder === defaults.sort?.sortOrder;
   put(LIST_PARAMS.SORT_BY, values.sort?.sortBy, isDefaultSort ? values.sort?.sortBy : undefined);
   put(LIST_PARAMS.SORT_ORDER, values.sort?.sortOrder, isDefaultSort ? values.sort?.sortOrder : undefined);
-  for (const [name, fallback] of Object.entries(defaults.filters)) put(name, values.filters[name], fallback);
+  for (const [name, fallback] of Object.entries(defaults.filters)) {
+    const value = values.filters[name];
+    if (Array.isArray(value)) {
+      next.delete(name);
+      if (!sameFilterValue(value, fallback)) value.forEach((item) => next.append(name, item));
+    } else put(name, value, fallback as string);
+  }
   return next;
 };
 
@@ -103,22 +116,39 @@ export const useListState = <S extends string, F extends ListFilters>(inlineDefa
   const values = useMemo(() => readList(params, defaults), [params, defaults]);
 
   const update = useCallback(
-    (patch: (current: ListValues<S, F>) => Partial<ListValues<S, F>>) =>
-      setParams((prev) => {
-        const current = readList(prev, defaults);
-        return writeList(prev, { ...current, ...patch(current) }, defaults);
-      }),
+    (patch: (current: ListValues<S, F>) => Partial<ListValues<S, F>>, options?: { replace?: boolean }) =>
+      setParams(
+        (prev) => {
+          const current = readList(prev, defaults);
+          return writeList(prev, { ...current, ...patch(current) }, defaults);
+        },
+        { replace: options?.replace },
+      ),
     [defaults, setParams],
   );
 
   const setPage = useCallback((page: number) => update(() => ({ page })), [update]);
   const setPageSize = useCallback((pageSize: number) => update(() => ({ pageSize, page: DEFAULT_PAGE })), [update]);
-  const setKeyword = useCallback((keyword: string) => update(() => ({ keyword, page: DEFAULT_PAGE })), [update]);
+  const setKeyword = useCallback(
+    (keyword: string, options?: { replace?: boolean }) => update(() => ({ keyword, page: DEFAULT_PAGE }), options),
+    [update],
+  );
   const setSort = useCallback((sort?: ListSort<S>) => update(() => ({ sort })), [update]);
   const setFilter = useCallback(
     <K extends keyof F>(name: K, value: F[K]) =>
       update((current) => ({ filters: { ...current.filters, [name]: value }, page: DEFAULT_PAGE })),
     [update],
+  );
+  const setFilters = useCallback(
+    (patch: { [K in keyof F]?: F[K] | undefined }) =>
+      update((current) => {
+        const filters = { ...current.filters };
+        for (const name of Object.keys(patch) as (keyof F)[]) {
+          filters[name] = patch[name] === undefined ? defaults.filters[name] : (patch[name] as F[keyof F]);
+        }
+        return { filters, page: DEFAULT_PAGE };
+      }),
+    [defaults, update],
   );
   const reset = useCallback(
     () =>
@@ -151,7 +181,7 @@ export const useListState = <S extends string, F extends ListFilters>(inlineDefa
 
   const toQuery = useCallback(() => {
     const { page, pageSize, keyword, sort, filters } = values;
-    const entries: [string, string | number | undefined][] = [
+    const entries: [string, string | number | string[] | undefined][] = [
       [LIST_PARAMS.PAGE, page],
       [LIST_PARAMS.PAGE_SIZE, pageSize],
       [LIST_PARAMS.KEYWORD, keyword],
@@ -159,11 +189,17 @@ export const useListState = <S extends string, F extends ListFilters>(inlineDefa
       [LIST_PARAMS.SORT_ORDER, sort?.sortOrder],
       ...Object.entries(filters),
     ];
-    return Object.fromEntries(entries.filter(([, value]) => value !== undefined && value !== '')) as Record<
-      string,
-      string | number
-    >;
+    return Object.fromEntries(
+      entries.filter(([, value]) => value !== undefined && value !== '' && !(Array.isArray(value) && !value.length)),
+    ) as Record<string, string | number | string[]>;
   }, [values]);
+
+  const isFiltered = useMemo(
+    () =>
+      values.keyword !== (defaults.keyword ?? '') ||
+      Object.entries(defaults.filters).some(([name, fallback]) => !sameFilterValue(values.filters[name], fallback)),
+    [values, defaults],
+  );
 
   return {
     ...values,
@@ -174,6 +210,8 @@ export const useListState = <S extends string, F extends ListFilters>(inlineDefa
     setKeyword,
     setSort,
     setFilter,
+    setFilters,
+    isFiltered,
     reset,
     toQuery,
   };

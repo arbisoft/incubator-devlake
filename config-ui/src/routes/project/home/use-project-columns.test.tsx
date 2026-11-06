@@ -31,8 +31,8 @@ import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
 import { COPY as READINESS_COPY, toReadinessMap } from '../readiness';
 
-import { COPY, MAX_VISIBLE_CONNECTIONS, PROJECT_COLUMN } from './constants';
-import type { ProjectRow } from './types';
+import { COPY, LAST_RUN_STATUS_OPTIONS, MAX_VISIBLE_CONNECTIONS, PROJECT_COLUMN } from './constants';
+import type { ProjectFilters, ProjectRow } from './types';
 import { useProjectColumns } from './use-project-columns';
 
 const ROW: ProjectRow = {
@@ -53,8 +53,16 @@ const SCORECARD_ROW: ComplianceScorecardRow = {
   Compliance: '⚠️ 66.6%',
 };
 
-const columnsFor = (onConfigure = vi.fn(), rows: ComplianceScorecardRow[] = [SCORECARD_ROW]) =>
-  renderHook(() => useProjectColumns(onConfigure, toReadinessMap(rows))).result.current.columns;
+const NO_FILTERS: ProjectFilters = { connection: [], lastRunStatus: [] };
+const CONNECTION_OPTIONS = [{ text: 'arbisoft/website (GitHub)', value: 'github:1' }];
+
+const columnsFor = (
+  onConfigure = vi.fn(),
+  rows: ComplianceScorecardRow[] = [SCORECARD_ROW],
+  filters: ProjectFilters = NO_FILTERS,
+) =>
+  renderHook(() => useProjectColumns(onConfigure, toReadinessMap(rows), filters, CONNECTION_OPTIONS)).result.current
+    .columns;
 
 const makeStore = () =>
   configureStore({
@@ -172,6 +180,29 @@ describe('useProjectColumns', () => {
     fireEvent.focus(screen.getByRole('button'));
     await waitFor(() => expect(screen.getByText(READINESS_COPY.title)).toBeTruthy());
     expect(screen.queryByRole('link', { name: READINESS_COPY.addConnection })).toBeNull();
+  });
+
+  it('puts the URL filters on the connections and last run status columns only', () => {
+    const columns = columnsFor(vi.fn(), [SCORECARD_ROW], { connection: ['github:1'], lastRunStatus: ['failed'] });
+    expect(find(columns, PROJECT_COLUMN.CONNECTIONS)).toMatchObject({
+      filters: CONNECTION_OPTIONS,
+      filteredValue: ['github:1'],
+      filterMultiple: true,
+      filterSearch: true,
+    });
+    expect(find(columns, PROJECT_COLUMN.LAST_RUN_STATUS)).toMatchObject({
+      filters: LAST_RUN_STATUS_OPTIONS,
+      filteredValue: ['failed'],
+      filterMultiple: true,
+      filterSearch: false,
+    });
+    expect(find(columns, PROJECT_COLUMN.NAME)).not.toHaveProperty('filters');
+  });
+
+  it('has no active filter value when nothing is selected', () => {
+    const columns = columnsFor();
+    expect(find(columns, PROJECT_COLUMN.CONNECTIONS)).toMatchObject({ filteredValue: null });
+    expect(find(columns, PROJECT_COLUMN.LAST_RUN_STATUS)).toMatchObject({ filteredValue: null });
   });
 
   it('keeps the readiness column unsortable', () => {

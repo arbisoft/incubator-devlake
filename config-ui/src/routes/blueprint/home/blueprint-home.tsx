@@ -24,48 +24,70 @@ import { useNavigate } from 'react-router-dom';
 import API from '@/api';
 import { BLUEPRINT_VIEW, PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
+import { useConnectionFilterOptions } from '@/routes/connection/use-connection-filter-options';
 import type { IBlueprint } from '@/types';
 import {
   DataTable,
-  FILTER_TABS_VARIANT,
-  FilterTabs,
   ListPage,
   ListToolbar,
   PageHeader,
   buildListEmpty,
+  toListFilterPatch,
   useListState,
   useRefreshVersion,
 } from '@/ui';
 
 import { getColumns } from './columns';
 import { NewBlueprintModal } from './components';
-import { COPY, LIST_FILTER, STATUS_FILTER, TYPE_FILTER_ALL } from './constants';
-import { TypeSelect } from './styled';
+import { BLUEPRINT_COLUMN, COPY, LIST_FILTER, PROJECT_FILTER_OPTIONS_LIMIT, STATUS_FILTER } from './constants';
 import type { BlueprintFilters, BlueprintSortKey } from './types';
-import { buildBlueprintQuery, getTypeOptions } from './utils';
+import { buildBlueprintQuery } from './utils';
 
 const DEFAULT_FILTERS: BlueprintFilters = {
-  [LIST_FILTER.TYPE]: TYPE_FILTER_ALL,
+  [LIST_FILTER.CONNECTION]: [],
+  [LIST_FILTER.TYPE]: [],
+  [LIST_FILTER.PROJECT]: [],
   [LIST_FILTER.STATUS]: STATUS_FILTER.ALL,
 };
-const TYPE_OPTIONS = getTypeOptions();
-const STATUS_ITEMS = Object.values(STATUS_FILTER).map((key) => ({ key, label: COPY.statusFilter[key] }));
+
+const FILTER_COLUMNS = {
+  [BLUEPRINT_COLUMN.CONNECTIONS]: { name: LIST_FILTER.CONNECTION, multiple: true },
+  [BLUEPRINT_COLUMN.FREQUENCY]: { name: LIST_FILTER.TYPE, multiple: true },
+  [BLUEPRINT_COLUMN.PROJECT]: { name: LIST_FILTER.PROJECT, multiple: true },
+  [BLUEPRINT_COLUMN.STATUS]: { name: LIST_FILTER.STATUS, multiple: false },
+};
 
 export const BlueprintHomePage = () => {
   const list = useListState<BlueprintSortKey, BlueprintFilters>({ filters: DEFAULT_FILTERS });
-  const { keyword, filters } = list;
+  const { filters } = list;
   const { version, refresh } = useRefreshVersion();
   const [creating, setCreating] = useState(false);
 
   const { data, ready, error } = useRefreshData(
     (signal) => API.blueprint.list(buildBlueprintQuery(list.query, filters), signal),
-    [version, list.query, filters.type, filters.status],
+    [version, list.query, filters.connection.join(), filters.type.join(), filters.projectName.join(), filters.status],
   );
+
+  const { data: projects } = useRefreshData(
+    (signal) => API.project.list({ page: 1, pageSize: PROJECT_FILTER_OPTIONS_LIMIT }, signal),
+    [],
+  );
+  const projectOptions = useMemo(
+    () => (projects?.projects ?? []).map(({ name }) => ({ text: name, value: name })),
+    [projects],
+  );
+  const connectionOptions = useConnectionFilterOptions({ includeOtel: false });
 
   const navigate = useNavigate();
   const columns = useMemo(
-    () => getColumns({ onConfigure: (id) => navigate(PATHS.BLUEPRINT_VIEW(id, BLUEPRINT_VIEW.CONFIGURATION)) }),
-    [navigate],
+    () =>
+      getColumns({
+        onConfigure: (id) => navigate(PATHS.BLUEPRINT_VIEW(id, BLUEPRINT_VIEW.CONFIGURATION)),
+        filters,
+        connectionOptions,
+        projectOptions,
+      }),
+    [navigate, filters, connectionOptions, projectOptions],
   );
 
   const handleCreated = () => {
@@ -83,7 +105,7 @@ export const BlueprintHomePage = () => {
   const empty = buildListEmpty({
     failed: error !== undefined,
     onRetry: refresh,
-    filtered: keyword !== '' || filters.type !== TYPE_FILTER_ALL || filters.status !== STATUS_FILTER.ALL,
+    filtered: list.isFiltered,
     empty: { ...COPY.empty, action: newBlueprintButton },
     noResults: COPY.noResults,
   });
@@ -95,29 +117,7 @@ export const BlueprintHomePage = () => {
         description={COPY.description}
         breadcrumbs={[{ label: COPY.breadcrumbAdvanced, path: PATHS.BLUEPRINTS() }, { label: COPY.title }]}
       />
-      <ListToolbar
-        list={list}
-        searchPlaceholder={COPY.searchPlaceholder}
-        filters={
-          <>
-            <FilterTabs
-              items={STATUS_ITEMS}
-              value={filters.status}
-              variant={FILTER_TABS_VARIANT.PILL}
-              onChange={(status) => list.setFilter(LIST_FILTER.STATUS, status)}
-            />
-            <TypeSelect
-              size="large"
-              value={filters.type}
-              prefix={COPY.typeFilterLabel}
-              aria-label={COPY.typeFilterLabel}
-              options={TYPE_OPTIONS}
-              onChange={(type) => list.setFilter(LIST_FILTER.TYPE, String(type))}
-            />
-          </>
-        }
-        end={newBlueprintButton}
-      />
+      <ListToolbar list={list} searchPlaceholder={COPY.searchPlaceholder} end={newBlueprintButton} />
       <DataTable<IBlueprint, BlueprintSortKey>
         rowKey="id"
         ariaLabel={COPY.tableLabel}
@@ -126,6 +126,7 @@ export const BlueprintHomePage = () => {
         dataSource={data?.blueprints ?? []}
         empty={empty}
         list={list}
+        onFilterChange={(changed) => list.setFilters(toListFilterPatch(changed, FILTER_COLUMNS))}
         total={data?.count ?? 0}
       />
       <NewBlueprintModal open={creating} onClose={() => setCreating(false)} onCreated={handleCreated} />

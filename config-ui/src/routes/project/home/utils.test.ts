@@ -19,11 +19,25 @@
 import { describe, expect, it } from 'vitest';
 
 import type { OtelConnectionResponse } from '@/api/otel';
+import { OTEL_INTEGRATION_KEY } from '@/routes/connection/constants';
+import { PIPELINE_STATUS_COPY } from '@/routes/pipeline/status-tone';
 import { IPipelineStatus, type IProject } from '@/types';
 
-import { CONNECTION_ENTRY_KIND, PROJECT_METRICS } from './constants';
+import {
+  CONNECTION_ENTRY_KIND,
+  LAST_RUN_STATUS_GROUP,
+  LAST_RUN_STATUS_GROUP_STATUSES,
+  LAST_RUN_STATUS_OPTIONS,
+  PROJECT_METRICS,
+} from './constants';
 import type { ProjectRow } from './types';
-import { buildNewProject, getConnectionEntries, toProjectRow } from './utils';
+import {
+  buildNewProject,
+  buildProjectQuery,
+  describeConnectionEntry,
+  getConnectionEntries,
+  toProjectRow,
+} from './utils';
 
 const otel = (id: number, projects: string[]) =>
   ({ connection: { id, name: `team-${id}` }, projects: projects.map((name) => ({ name })) }) as OtelConnectionResponse;
@@ -81,5 +95,62 @@ describe('getConnectionEntries', () => {
 
   it('is empty for a project with no connection of any kind', () => {
     expect(getConnectionEntries({ connections: [], otelConnections: [] } as unknown as ProjectRow)).toEqual([]);
+  });
+});
+
+describe('buildProjectQuery', () => {
+  const QUERY = { page: 2, pageSize: 20, keyword: 'a' };
+
+  it('leaves the filters out when none are selected', () => {
+    expect(buildProjectQuery(QUERY, { connection: [], lastRunStatus: [] })).toEqual({
+      ...QUERY,
+      connection: undefined,
+      lastRunStatus: undefined,
+    });
+  });
+
+  it('passes connections through and expands each status group to its statuses', () => {
+    const query = buildProjectQuery(QUERY, {
+      connection: ['github:1', 'claude_otel:4'],
+      lastRunStatus: [LAST_RUN_STATUS_GROUP.IN_PROGRESS, LAST_RUN_STATUS_GROUP.FAILED],
+    });
+    expect(query.connection).toEqual(['github:1', 'claude_otel:4']);
+    expect(query.lastRunStatus).toEqual([
+      ...LAST_RUN_STATUS_GROUP_STATUSES.inProgress,
+      ...LAST_RUN_STATUS_GROUP_STATUSES.failed,
+    ]);
+  });
+
+  it('dedupes statuses and ignores unknown groups', () => {
+    const query = buildProjectQuery(QUERY, {
+      connection: [],
+      lastRunStatus: [LAST_RUN_STATUS_GROUP.FAILED, LAST_RUN_STATUS_GROUP.FAILED, 'bogus'],
+    });
+    expect(query.lastRunStatus).toEqual([...LAST_RUN_STATUS_GROUP_STATUSES.failed]);
+  });
+});
+
+describe('LAST_RUN_STATUS_OPTIONS', () => {
+  it('offers one option per group, labelled like the status badge', () => {
+    expect(LAST_RUN_STATUS_OPTIONS.map(({ value }) => value)).toEqual(Object.values(LAST_RUN_STATUS_GROUP));
+    expect(LAST_RUN_STATUS_OPTIONS.find(({ value }) => value === LAST_RUN_STATUS_GROUP.IN_PROGRESS)?.text).toBe(
+      PIPELINE_STATUS_COPY[IPipelineStatus.RUNNING],
+    );
+  });
+});
+
+describe('describeConnectionEntry', () => {
+  it('carries the plugin key of a connector entry', () => {
+    const [entry] = getConnectionEntries({ ...toProjectRow(PROJECT) });
+    expect(describeConnectionEntry(entry, [], []).plugin).toBe('github');
+  });
+
+  it('uses the OTel integration key for an OTel entry', () => {
+    const [entry] = getConnectionEntries({
+      ...toProjectRow(PROJECT),
+      connections: [],
+      otelConnections: [otel(3, ['alpha'])],
+    });
+    expect(describeConnectionEntry(entry, [], []).plugin).toBe(OTEL_INTEGRATION_KEY);
   });
 });

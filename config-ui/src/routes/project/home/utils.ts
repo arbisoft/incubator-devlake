@@ -19,14 +19,24 @@
 import { createElement } from 'react';
 
 import type { OtelConnectionResponse } from '@/api/otel';
+import type { ListParams } from '@/api/project';
 import { WEBHOOK_PLUGIN } from '@/features/connections';
 import { getPluginConfig } from '@/plugins';
 import { INTEGRATION_CATEGORY, getCatalogEntry } from '@/plugins/catalog';
 import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?react';
+import { OTEL_INTEGRATION_KEY } from '@/routes/connection/constants';
 import type { IConnection, IProject, IWebhook } from '@/types';
+import type { ListQuery } from '@/ui';
 
-import { CONNECTION_ENTRY_KIND, COPY, PROJECT_METRICS } from './constants';
-import type { CategoryCount, ConnectionDetail, ConnectionEntry, ProjectRow } from './types';
+import { CONNECTION_ENTRY_KIND, COPY, LAST_RUN_STATUS_GROUP_STATUSES, PROJECT_METRICS } from './constants';
+import type {
+  CategoryCount,
+  ConnectionDetail,
+  ConnectionEntry,
+  ProjectFilters,
+  ProjectRow,
+  ProjectSortKey,
+} from './types';
 
 export const toProjectRow = (project: IProject, otelConnections: OtelConnectionResponse[] = []): ProjectRow => ({
   name: project.name,
@@ -40,6 +50,20 @@ export const toProjectRow = (project: IProject, otelConnections: OtelConnectionR
   lastRunCompletedAt: project.lastPipeline?.finishedAt,
   lastRunStatus: project.lastPipeline?.status,
 });
+
+const isStatusGroup = (group: string): group is keyof typeof LAST_RUN_STATUS_GROUP_STATUSES =>
+  group in LAST_RUN_STATUS_GROUP_STATUSES;
+
+export const buildProjectQuery = (query: ListQuery<ProjectSortKey>, filters: ProjectFilters): ListParams => {
+  const statuses = [
+    ...new Set(filters.lastRunStatus.filter(isStatusGroup).flatMap((group) => LAST_RUN_STATUS_GROUP_STATUSES[group])),
+  ];
+  return {
+    ...query,
+    connection: filters.connection.length ? filters.connection : undefined,
+    lastRunStatus: statuses.length ? statuses : undefined,
+  };
+};
 
 export const buildNewProject = (name: string) => ({
   name,
@@ -68,6 +92,7 @@ export const describeConnectionEntry = (
   if (entry.kind === CONNECTION_ENTRY_KIND.OTEL) {
     return {
       key: entry.key,
+      plugin: OTEL_INTEGRATION_KEY,
       name: entry.connection.connection.name,
       pluginLabel: COPY.otelPluginLabel,
       category: INTEGRATION_CATEGORY.AI_ANALYTICS,
@@ -81,6 +106,7 @@ export const describeConnectionEntry = (
   const webhook = pluginName === WEBHOOK_PLUGIN ? webhooks.find(({ id }) => id === connectionId) : undefined;
   return {
     key: entry.key,
+    plugin: pluginName,
     name: connection?.name ?? webhook?.name ?? `${pluginName}/connection/${connectionId}`,
     pluginLabel: config.name,
     category: getCatalogEntry(config).category,

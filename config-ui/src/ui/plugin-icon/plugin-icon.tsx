@@ -18,14 +18,28 @@
 
 import { useTheme } from 'styled-components';
 
+import type { AppThemeColors } from '@/theme';
+
+import { CONNECTOR_LOGO_KIND } from './constants';
 import { Icon } from './styled';
 import type { PluginIconProps } from './types';
 
-export const PluginIcon = ({ icon, size }: PluginIconProps) => {
+const renderMark = ({ icon, logo, colors }: Pick<PluginIconProps, 'icon' | 'logo'> & { colors: AppThemeColors }) => {
+  if (!logo) return icon({ color: colors.iconBrand });
+  if (logo.Svg) return <logo.Svg />;
+  return icon({ color: logo.kind === CONNECTOR_LOGO_KIND.TINT ? logo.color : colors.text });
+};
+
+export const PluginIcon = ({ icon, size, logo }: PluginIconProps) => {
   const { colors } = useTheme();
   return (
-    <Icon $size={size} aria-hidden>
-      {icon({ color: colors.iconBrand })}
+    <Icon
+      $size={size}
+      $mono={logo?.kind === CONNECTOR_LOGO_KIND.MONO}
+      $color={logo?.kind === CONNECTOR_LOGO_KIND.TINT ? logo.color : undefined}
+      aria-hidden
+    >
+      {renderMark({ icon, logo, colors })}
     </Icon>
   );
 };

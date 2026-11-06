@@ -25,7 +25,7 @@ import {
   READINESS_SIGNAL,
 } from '../app-copy';
 
-import { BasePage } from './common';
+import { BasePage, columnIndex } from './common';
 
 export type ReadinessSignalKey = (typeof READINESS_SIGNAL)[keyof typeof READINESS_SIGNAL];
 
@@ -40,9 +40,7 @@ const signalRow = (scope: Locator, key: ReadinessSignalKey): Locator =>
 // The readiness and data connection cells of the projects table, and the popovers they open.
 export class ProjectsReadiness extends BasePage {
   private async cell(row: Locator, column: string): Promise<Locator> {
-    const index = await this.page
-      .getByRole('columnheader', { name: column, exact: true })
-      .evaluate((element) => (element as HTMLTableCellElement).cellIndex);
+    const index = await columnIndex(this.page.locator('body'), column);
     return row.getByRole('cell').nth(index);
   }
 

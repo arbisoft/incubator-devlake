@@ -16,13 +16,15 @@
  *
  */
 
+import { EditOutlined, KeyOutlined } from '@ant-design/icons';
+
 import { ACCESS_STATUS, type AccessStatus } from '@/api/access/constants';
 import { GRAFANA_ERROR_CODE, GRAFANA_ROLE } from '@/api/grafana-users/constants';
 import type { GrafanaErrorCode } from '@/api/grafana-users/types';
 import { CONFIRM_TONE } from '@/ui/confirm-modal/constants';
 import type { ConfirmConfig } from '@/ui/types';
 
-export const MAX_VISIBLE_PROJECTS = 5;
+export const MAX_VISIBLE_PROJECTS = 2;
 
 export const GRAFANA_USER_COLUMN = {
   USER: 'user',
@@ -44,6 +46,11 @@ export const GRAFANA_ROW_ACTION = { ENABLE: 'enable', DISABLE: 'disable', DELETE
 
 export const GRAFANA_MENU_ACTION = { DETAILS: 'details', PASSWORD: 'password' } as const;
 
+export const MENU_ACTION_ICON = {
+  [GRAFANA_MENU_ACTION.DETAILS]: EditOutlined,
+  [GRAFANA_MENU_ACTION.PASSWORD]: KeyOutlined,
+} as const;
+
 export const PASSWORD_MIN_LENGTH = 15;
 export const GENERATED_PASSWORD_LENGTH = 24;
 // Left out of generated passwords so a shared one can be read aloud or typed from a screen; symbols also skip quotes, backslash and space.
@@ -61,7 +68,6 @@ export const PASSWORD_ALPHABET = Object.values(PASSWORD_CHARACTER_GROUPS).join('
 // Same classes as Grafana's password policy; a symbol is anything that is not a letter or digit.
 export const PASSWORD_CHARACTER_CLASSES = [/\p{Lu}/u, /\p{Ll}/u, /\p{N}/u, /[^\p{L}\p{N}]/u] as const;
 
-export const SEARCH_DEBOUNCE_MS = 300;
 export const DEVLAKE_USER_SEARCH_PAGE_SIZE = 25;
 export const PROJECT_SEARCH_PAGE_SIZE = 50;
 
@@ -137,6 +143,7 @@ export const COPY = {
     [ACCESS_STATUS.DISABLED]: 'Disabled',
   } as Record<AccessStatus, string>,
   sso: { tag: 'SSO', label: 'Signed in with SSO' },
+  noProjects: 'No projects',
   moreProjects: (count: number) => `+${count}`,
   empty: {
     title: 'No Grafana users yet',
@@ -166,7 +173,8 @@ export const COPY = {
     roleFor: (email: string) => `Role for ${email}`,
     roleLocked: 'Grafana server administrators keep their role.',
     editProjectsFor: (email: string) => `Edit projects for ${email}`,
-    moreFor: (email: string) => `More actions for ${email}`,
+    editDetailsFor: (email: string) => `Edit details for ${email}`,
+    setPasswordFor: (email: string) => `Set password for ${email}`,
     enableFor: (email: string) => `Enable ${email}`,
     disableFor: (email: string) => `Disable ${email}`,
     deleteFor: (email: string) => `Delete ${email}`,

@@ -44,6 +44,7 @@ export type ConnectionEntry =
 
 export type ConnectionDetail = {
   key: string;
+  plugin: string;
   name: string;
   pluginLabel: string;
   category: IntegrationCategory;
@@ -51,3 +52,5 @@ export type ConnectionDetail = {
 };
 
 export type CategoryCount = { category: IntegrationCategory; count: number };
+
+export type ProjectFilters = { connection: string[]; lastRunStatus: string[] };

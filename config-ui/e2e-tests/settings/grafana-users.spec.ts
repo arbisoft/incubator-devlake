@@ -411,6 +411,19 @@ test.describe('Grafana user management ordinary flows', () => {
     expect(matches.users.filter((user) => user.email.toLowerCase() === email.toLowerCase())).toHaveLength(1);
   });
 
+  test('row actions are icons and the table does not scroll sideways', async ({ page }) => {
+    const email = `${uniqueName('icons')}@example.com`;
+    await seedUser(email);
+    const users = new SettingsGrafanaUsersPage(page);
+    await users.resizeViewport(1280, 800);
+    await users.open();
+    const row = await users.openUser(email);
+    for (const button of [row.editDetailsButton, row.setPasswordButton, row.disableButton, row.deleteButton]) {
+      await expect(button).toBeVisible();
+    }
+    expect(await users.tableScrollsSideways()).toBe(false);
+  });
+
   test('changes the inline role from Viewer to Admin and back', async ({ page }) => {
     const email = `${uniqueName('role')}@example.com`;
     const seeded = await seedUser(email);
@@ -592,7 +605,8 @@ test.describe('Grafana user management ordinary flows', () => {
     await expect(realAdminRow.roleSelect).toBeDisabled();
     await expect(realAdminRow.disableButton).toHaveCount(0);
     await expect(realAdminRow.deleteButton).toHaveCount(0);
-    await expect(realAdminRow.moreActionsButton).toHaveCount(0);
+    await expect(realAdminRow.editDetailsButton).toHaveCount(0);
+    await expect(realAdminRow.setPasswordButton).toHaveCount(0);
 
     const row = await users.openUser(email);
     await expect.poll(() => visibleUser(email)).toMatchObject({ id: seeded.id, protected: true });
@@ -600,7 +614,8 @@ test.describe('Grafana user management ordinary flows', () => {
     await expect(row.disableButton).toHaveCount(0);
     await expect(row.enableButton).toHaveCount(0);
     await expect(row.deleteButton).toHaveCount(0);
-    await expect(row.moreActionsButton).toHaveCount(0);
+    await expect(row.editDetailsButton).toHaveCount(0);
+    await expect(row.setPasswordButton).toHaveCount(0);
 
     let dialog = await users.openProjects(email);
     await dialog.searchAndSelectProject(project);

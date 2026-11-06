@@ -18,25 +18,12 @@
 
 import styled from 'styled-components';
 
-import { ICON_SIZE_PX } from '@/ui/constants';
-
 export const Wrapper = styled.div`
   display: flex;
   align-items: center;
 
   span + span {
     margin-left: ${({ theme }) => theme.space.xxs}px;
-  }
-
-  .icon {
-    display: inline-block;
-    width: ${ICON_SIZE_PX.md}px;
-    height: ${ICON_SIZE_PX.md}px;
-
-    & > svg {
-      width: 100%;
-      height: 100%;
-    }
   }
 
   .name {

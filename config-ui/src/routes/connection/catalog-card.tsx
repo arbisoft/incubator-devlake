@@ -17,6 +17,7 @@
  */
 import { useEffect, useRef } from 'react';
 
+import { getConnectorLogo } from '@/config';
 import type { IConnection } from '@/types';
 import { IntegrationCard, StatusBadge, STATUS_BADGE_VARIANT } from '@/ui';
 import { useInView } from '@/ui/hooks';
@@ -53,6 +54,7 @@ export const CatalogCard = ({ item, connections, onCheck, onManage, onAdd }: Cat
     <Cell ref={ref}>
       <IntegrationCard
         icon={item.icon}
+        logo={getConnectorLogo(item.key)}
         name={item.name}
         category={item.category}
         beta={item.beta}

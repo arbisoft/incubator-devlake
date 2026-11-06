@@ -16,6 +16,9 @@
  *
  */
 
+import { PIPELINE_STATUS_COPY } from '@/routes/pipeline/status-tone';
+import { IPipelineStatus } from '@/types';
+
 export const PROJECT_COLUMN = {
   NAME: 'name',
   CONNECTIONS: 'connections',
@@ -26,6 +29,31 @@ export const PROJECT_COLUMN = {
   LAST_RUN_STATUS: 'lastRunStatus',
   ACTION: 'action',
 } as const;
+
+export const PROJECT_FILTER = { CONNECTION: 'connection', LAST_RUN_STATUS: 'lastRunStatus' } as const;
+
+export const LAST_RUN_STATUS_GROUP = {
+  PENDING: 'pending',
+  IN_PROGRESS: 'inProgress',
+  SUCCEEDED: 'succeeded',
+  PARTIAL: 'partial',
+  FAILED: 'failed',
+  CANCELLED: 'cancelled',
+} as const;
+
+export const LAST_RUN_STATUS_GROUP_STATUSES = {
+  [LAST_RUN_STATUS_GROUP.PENDING]: [IPipelineStatus.CREATED],
+  [LAST_RUN_STATUS_GROUP.IN_PROGRESS]: [IPipelineStatus.RUNNING, IPipelineStatus.RERUN],
+  [LAST_RUN_STATUS_GROUP.SUCCEEDED]: [IPipelineStatus.COMPLETED],
+  [LAST_RUN_STATUS_GROUP.PARTIAL]: [IPipelineStatus.PARTIAL],
+  [LAST_RUN_STATUS_GROUP.FAILED]: [IPipelineStatus.FAILED],
+  [LAST_RUN_STATUS_GROUP.CANCELLED]: [IPipelineStatus.CANCELLED],
+} as const;
+
+export const LAST_RUN_STATUS_OPTIONS = Object.values(LAST_RUN_STATUS_GROUP).map((group) => ({
+  text: PIPELINE_STATUS_COPY[LAST_RUN_STATUS_GROUP_STATUSES[group][0]],
+  value: group,
+}));
 
 export const PROJECT_METRICS = [
   { pluginName: 'dora', pluginOption: {}, enable: true },

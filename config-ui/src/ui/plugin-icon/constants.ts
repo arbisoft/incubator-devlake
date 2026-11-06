@@ -16,9 +16,4 @@
  *
  */
 
-import { Select } from 'antd';
-import styled from 'styled-components';
-
-export const TypeSelect = styled(Select)`
-  width: ${({ theme }) => theme.layout.sortSelectWidth}px;
-`;
+export const CONNECTOR_LOGO_KIND = { LOGO: 'logo', MONO: 'mono', TINT: 'tint' } as const;
