@@ -1,0 +1,31 @@
+{
+  "title": "Synthetic AI Impact",
+  "templating": {
+    "list": [
+      {
+        "name": "project",
+        "type": "query",
+        "multi": true,
+        "includeAll": true,
+        "allValue": "",
+        "query": "SELECT DISTINCT project_name FROM project_mapping WHERE project_name IN (SELECT project_name FROM user_project_access WHERE login = ${__user.login:sqlstring})"
+      },
+      {"name": "team", "type": "custom", "multi": true, "includeAll": true, "allValue": "__all", "query": "red, blue"}
+    ]
+  },
+  "panels": [
+    {
+      "title": "Merged PRs",
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT $__timeGroup(pr.created_date, '1d') AS time, COUNT(*) AS merged\nFROM pull_requests pr\nJOIN project_mapping pm ON pm.row_id = pr.base_repo_id\nWHERE pm.project_name REGEXP '^(${project:regex})$'\n  AND pm.project_name IN (SELECT project_name FROM user_project_access WHERE login = ${__user.login:sqlstring})\n  AND $__timeFilter(pr.created_date)\nGROUP BY 1"
+        },
+        {
+          "refId": "B",
+          "rawSql": "-- the team's merged volume\nSELECT pm.project_name, COUNT(*) AS prs FROM pull_requests pr JOIN project_mapping pm ON pm.row_id = pr.base_repo_id WHERE pm.project_name IN (${project}) AND pr.team IN (${team:sqlstring}) AND pm.project_name IN (SELECT project_name FROM user_project_access WHERE login = ${__user.login:sqlstring}) GROUP BY 1"
+        }
+      ]
+    }
+  ]
+}
