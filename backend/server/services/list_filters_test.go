@@ -121,6 +121,16 @@ func TestGetProjectsFilters(t *testing.T) {
 		}
 	})
 
+	t.Run("resuming is an accepted last run status", func(t *testing.T) {
+		captured := useCapturingDal(t)
+		_, _, err := GetProjects(&ProjectQuery{LastRunStatus: []string{"TASK_RESUME"}})
+		assert.NoError(t, err)
+		wheres := whereExprs(captured.list)
+		if assert.Len(t, wheres, 1) {
+			assert.Equal(t, []interface{}{[]string{"TASK_RESUME"}}, wheres[0].Params)
+		}
+	})
+
 	t.Run("invalid last run status is BadInput", func(t *testing.T) {
 		captured := useCapturingDal(t)
 		_, _, err := GetProjects(&ProjectQuery{LastRunStatus: []string{"TASK_FAILED", "bogus'; DROP"}})

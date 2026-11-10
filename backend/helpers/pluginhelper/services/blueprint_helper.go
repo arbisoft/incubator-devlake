@@ -148,7 +148,7 @@ func blueprintTypeClause(t string) (string, []interface{}, errors.Error) {
 	case BP_TYPE_CUSTOM:
 		return "is_manual = ? AND cron_config NOT IN ?", []interface{}{false, []string{BP_CRON_DAILY, BP_CRON_WEEKLY, BP_CRON_MONTHLY}}, nil
 	default:
-		return "", nil, errors.BadInput.New(fmt.Sprintf("invalid type %s", t))
+		return "", nil, errors.BadInput.New("invalid type filter")
 	}
 }
 
@@ -159,9 +159,10 @@ func blueprintTypesClause(query *GetBlueprintQuery) (string, []interface{}, erro
 	}
 	parts := make([]string, 0, len(query.Types))
 	params := make([]interface{}, 0)
+	hasAll := false
 	for _, t := range query.Types {
 		if t == BP_TYPE_ALL {
-			return "", nil, nil
+			hasAll = true
 		}
 		clause, clauseParams, err := blueprintTypeClause(t)
 		if err != nil {
@@ -171,6 +172,9 @@ func blueprintTypesClause(query *GetBlueprintQuery) (string, []interface{}, erro
 			parts = append(parts, clause)
 			params = append(params, clauseParams...)
 		}
+	}
+	if hasAll {
+		return "", nil, nil
 	}
 	if len(parts) > 1 {
 		for i := range parts {

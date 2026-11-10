@@ -56,7 +56,7 @@ type BlueprintQuery struct {
 	IsManual *bool  `form:"isManual"`
 	Label    string `form:"label"`
 	// isManual must be omitted or `null` for type to take effect
-	Type []string `form:"type" enums:"ALL,MANUAL,DAILY,WEEKLY,MONTHLY,CUSTOM" validate:"dive,oneof=ALL MANUAL DAILY WEEKLY MONTHLY CUSTOM"`
+	Type []string `form:"type" enums:"ALL,MANUAL,DAILY,WEEKLY,MONTHLY,CUSTOM"`
 	// Connection values are repeatable "plugin:connectionId"
 	Connection  []string `form:"connection"`
 	ProjectName []string `form:"projectName"`

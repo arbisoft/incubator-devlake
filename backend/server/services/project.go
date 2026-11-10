@@ -88,7 +88,7 @@ func projectFilterClauses(query *ProjectQuery) ([]dal.Clause, errors.Error) {
 		return nil, err
 	}
 	for _, status := range query.LastRunStatus {
-		if !slices.Contains(models.PendingTaskStatus, status) && !slices.Contains(models.FinishedTaskStatus, status) {
+		if status != models.TASK_RESUME && !slices.Contains(models.PendingTaskStatus, status) && !slices.Contains(models.FinishedTaskStatus, status) {
 			return nil, errors.BadInput.New("invalid last run status filter")
 		}
 	}

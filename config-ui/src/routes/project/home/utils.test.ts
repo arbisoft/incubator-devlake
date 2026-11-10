@@ -130,6 +130,12 @@ describe('buildProjectQuery', () => {
   });
 });
 
+describe('LAST_RUN_STATUS_GROUP_STATUSES', () => {
+  it('counts a resuming pipeline as in progress', () => {
+    expect(LAST_RUN_STATUS_GROUP_STATUSES[LAST_RUN_STATUS_GROUP.IN_PROGRESS]).toContain(IPipelineStatus.RESUME);
+  });
+});
+
 describe('LAST_RUN_STATUS_OPTIONS', () => {
   it('offers one option per group, labelled like the status badge', () => {
     expect(LAST_RUN_STATUS_OPTIONS.map(({ value }) => value)).toEqual(Object.values(LAST_RUN_STATUS_GROUP));
