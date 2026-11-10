@@ -49,9 +49,10 @@ const (
 	skillToolName         = "Skill"
 	toolDecisionReject    = "reject"
 	maxModelsUsedLength   = 1024
-	// mainThreadQuerySource is the api_request query_source of the conversation itself,
-	// as opposed to background work such as session titles and summaries.
+	// mainThreadQuerySource is the api_request query_source of an interactive conversation itself, as opposed to background work.
 	mainThreadQuerySource = "repl_main_thread"
+	// sdkQuerySource is the conversation's own query_source in headless (-p) and Agent SDK sessions.
+	sdkQuerySource = "sdk"
 	// Widths of ai_* columns filled straight from event attributes, which have no typed
 	// event column to bound them. The rollup rereads stored events, so an oversized value
 	// would otherwise fail every later batch that touches its prompt or session.
@@ -436,7 +437,7 @@ func (b *promptBuilder) applyAPIRequest(event *models.OtelEvent, attributes map[
 		b.models[model] = struct{}{}
 	}
 	b.skills.add(event.SkillName, ai.SkillDetectedViaApiRequest, "", "", event.PluginName, event.EventTimestamp)
-	if event.QuerySource == mainThreadQuerySource && b.firstMainRequestAt == nil {
+	if isMainThreadQuery(event.QuerySource) && b.firstMainRequestAt == nil {
 		at := event.EventTimestamp
 		b.firstMainRequestAt = &at
 		b.prompt.FirstRequestContextTokens = event.InputTokens + event.CacheReadTokens + event.CacheCreationTokens
@@ -501,7 +502,7 @@ func (b *promptBuilder) applyEffort(querySource, effort string) {
 	if effort == "" || b.mainThreadEffort {
 		return
 	}
-	if querySource == mainThreadQuerySource {
+	if isMainThreadQuery(querySource) {
 		b.prompt.Effort = &effort
 		b.mainThreadEffort = true
 		return
@@ -806,8 +807,8 @@ func rollupSession(tx dal.Transaction, workspaceKey string, target *sessionTarge
 func idleBeforeSeconds(tx dal.Transaction, target *sessionTarget, first time.Time) (*int64, error) {
 	previous := make([]*models.OtelEvent, 0, 1)
 	if err := tx.All(&previous, dal.Select("event_timestamp"), dal.Where(
-		"connection_id = ? AND user_key = ? AND session_id = ? AND event_name = ? AND query_source = ? AND event_timestamp < ?",
-		target.connectionID, target.userKey, target.sessionID, eventAPIRequest, mainThreadQuerySource, first),
+		"connection_id = ? AND user_key = ? AND session_id = ? AND event_name = ? AND query_source IN ? AND event_timestamp < ?",
+		target.connectionID, target.userKey, target.sessionID, eventAPIRequest, mainThreadQuerySources, first),
 		dal.Orderby("event_timestamp DESC"), dal.Limit(1)); err != nil {
 		return nil, fmt.Errorf("load Claude Code previous main-thread request: %w", err)
 	}
@@ -1131,4 +1132,12 @@ func createInBatches[T any](tx dal.Transaction, rows []T, what string) error {
 		}
 	}
 	return nil
+}
+
+// mainThreadQuerySources are the query_source values of a conversation's own requests.
+var mainThreadQuerySources = []string{mainThreadQuerySource, sdkQuerySource}
+
+// isMainThreadQuery reports whether an api_request came from the conversation itself.
+func isMainThreadQuery(querySource string) bool {
+	return querySource == mainThreadQuerySource || querySource == sdkQuerySource
 }

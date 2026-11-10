@@ -133,6 +133,15 @@ func TestBuildPromptRollupFirstMainThreadRequest(t *testing.T) {
 	require.Zero(t, none.prompt.FirstRequestContextTokens)
 	require.Nil(t, none.prompt.FirstRequestCostUsd)
 	require.Nil(t, none.firstMainRequestAt)
+
+	headless := buildPromptRollup(testOrganizationID, "p1", []*models.OtelEvent{
+		rollupEvent(eventUserPrompt, 0, nil, nil),
+		request(1, "agent:custom", 5, 5, 5, "1"),
+		request(2, sdkQuerySource, 40, 0, 2, "0.25"),
+	})
+	require.EqualValues(t, 42, headless.prompt.FirstRequestContextTokens)
+	require.NotNil(t, headless.firstMainRequestAt)
+	require.True(t, headless.firstMainRequestAt.Equal(time.Date(2026, 11, 11, 10, 2, 0, 0, time.UTC)))
 }
 
 func TestBuildSessionHooksGroupsRegistrations(t *testing.T) {
