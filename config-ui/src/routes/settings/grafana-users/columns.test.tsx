@@ -16,7 +16,7 @@
  *
  */
 
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { Table } from 'antd';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -89,6 +89,18 @@ describe('Grafana user columns', () => {
     expect(actions.onRemove).toHaveBeenCalled();
   });
 
+  it('lists every project in a popover whose Edit projects link opens the editor', async () => {
+    const actions = setup(user({ projects: ['alpha', 'beta', 'gamma'] }));
+    fireEvent.click(screen.getByRole('button', { name: COPY.moreProjects(1) }));
+    await waitFor(() => expect(screen.getAllByText('gamma').length).toBeGreaterThan(0));
+    const link = screen
+      .getAllByRole('button', { name: COPY.actions.editProjectsFor(EMAIL) })
+      .find((button) => button.textContent === COPY.actions.editProjects);
+    expect(link).toBeTruthy();
+    fireEvent.click(link as HTMLElement);
+    expect(actions.onEditProjects).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
+  });
+
   it('offers Enable for a disabled account', () => {
     const actions = setup(user({ disabled: true }));
     fireEvent.click(screen.getByRole('button', { name: COPY.actions.enableFor(EMAIL) }));
@@ -107,11 +119,14 @@ describe('Grafana user columns', () => {
     expect(screen.getByRole('button', { name: COPY.actions.editProjectsFor(EMAIL) })).toBeTruthy();
   });
 
-  it('keeps the actions of an SSO account, marked as SSO', () => {
-    setup(user({ sso: true }));
+  it('keeps the actions of an SSO account, marked as SSO, with Set password greyed out', () => {
+    const actions = setup(user({ sso: true }));
     expect(screen.getByRole('img', { name: COPY.sso.label })).toBeTruthy();
     expect(screen.getByRole('button', { name: COPY.actions.editDetailsFor(EMAIL) })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: COPY.actions.setPasswordFor(EMAIL) })).toBeNull();
+    const password = screen.getByRole('button', { name: COPY.actions.setPasswordFor(EMAIL) });
+    expect(password.getAttribute('aria-disabled')).toBe('true');
+    fireEvent.click(password);
+    expect(actions.onMenuAction).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: COPY.actions.deleteFor(EMAIL) })).toBeTruthy();
   });
 

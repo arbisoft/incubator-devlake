@@ -122,8 +122,8 @@ const renderIconActions = <T extends object>(record: T, options: ActionsColumnOp
   if (extras.length === 0 && !canToggle(record) && !canRemove(record)) return null;
   return (
     <Space size="small">
-      {extras.map(({ key, icon, label, onClick }) => (
-        <IconButton key={key} icon={icon} label={label} onClick={onClick} />
+      {extras.map(({ key, icon, label, disabledReason, onClick }) => (
+        <IconButton key={key} icon={icon} label={label} disabledReason={disabledReason} onClick={onClick} />
       ))}
       {canToggle(record) && (
         <IconButton

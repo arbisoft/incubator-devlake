@@ -104,8 +104,17 @@ export const COMPOSITES_COPY = {
   overflowList: {
     more: (count: number) => `+${count} more`,
     items: ['arbisoft-app-devlake', 'corey-systems', 'hirestream-platform', 'sophia-web', 'fixalert-mobile'],
+    title: 'Projects',
+    footer: 'Edit projects',
     inline: 'Inline chips',
     longItem: 'a-connection-with-an-extraordinarily-long-name-that-has-to-be-clipped-inside-the-cell',
+  },
+  listPopover: {
+    title: 'Projects',
+    items: ['arbisoft-app-devlake', 'corey-systems', 'hirestream-platform', 'sophia-web', 'fixalert-mobile'],
+    long: 'Long list that scrolls',
+    manyItems: (count: number) => `Project ${count}`,
+    footer: 'Edit projects',
   },
   formModal: {
     open: 'Open',

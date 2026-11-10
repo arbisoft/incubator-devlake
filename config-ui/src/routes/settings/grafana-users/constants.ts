@@ -72,6 +72,7 @@ export const DEVLAKE_USER_SEARCH_PAGE_SIZE = 25;
 export const PROJECT_SEARCH_PAGE_SIZE = 50;
 
 const SET_PASSWORD_LABEL = 'Set password';
+const EDIT_PROJECTS_LABEL = 'Edit projects';
 const PASSWORD_CLASSES_TEXT = 'an uppercase letter, a lowercase letter, a digit and a symbol';
 const PASSWORD_RULE_TEXT = `at least ${PASSWORD_MIN_LENGTH} characters, with ${PASSWORD_CLASSES_TEXT}`;
 
@@ -170,6 +171,7 @@ export const COPY = {
     columnLabel: 'Actions',
     roleFor: (email: string) => `Role for ${email}`,
     roleLocked: 'Grafana server administrators keep their role.',
+    editProjects: EDIT_PROJECTS_LABEL,
     editProjectsFor: (email: string) => `Edit projects for ${email}`,
     editDetailsFor: (email: string) => `Edit details for ${email}`,
     setPasswordFor: (email: string) => `Set password for ${email}`,
@@ -217,7 +219,7 @@ export const COPY = {
     },
   },
   projects: {
-    title: 'Edit projects',
+    title: EDIT_PROJECTS_LABEL,
     submit: 'Save',
     description: (email: string) => `Choose the projects ${email} can open in Grafana.`,
     label: 'Projects',

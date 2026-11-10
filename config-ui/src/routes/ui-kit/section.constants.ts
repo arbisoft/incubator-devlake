@@ -41,6 +41,7 @@ export const SECTION = {
   CONFIRM_MODAL: 'confirmModal',
   FORM_FIELD: 'formField',
   OVERFLOW_LIST: 'overflowList',
+  LIST_POPOVER: 'listPopover',
   LIST_PAGE: 'listPage',
   LIST_TOOLBAR: 'listToolbar',
   ROW_LINK: 'rowLink',

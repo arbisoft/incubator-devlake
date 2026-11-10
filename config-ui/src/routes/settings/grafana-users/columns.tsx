@@ -17,7 +17,7 @@
  */
 
 import { AppstoreOutlined } from '@ant-design/icons';
-import type { TableColumnsType } from 'antd';
+import { Button, type TableColumnsType } from 'antd';
 
 import { ACCESS_STATUS } from '@/api/access';
 import type { GrafanaRole, GrafanaUser } from '@/api/grafana-users';
@@ -65,6 +65,16 @@ const renderProjects = (user: GrafanaUser, onEditProjects: GrafanaColumnActions[
         <Muted>{COPY.noProjects}</Muted>
       ) : (
         <OverflowList
+          title={COPY.columns.projects}
+          footer={
+            <Button
+              type="link"
+              aria-label={COPY.actions.editProjectsFor(user.email)}
+              onClick={() => onEditProjects(user)}
+            >
+              {COPY.actions.editProjects}
+            </Button>
+          }
           max={MAX_VISIBLE_PROJECTS}
           layout={OVERFLOW_LAYOUT.INLINE}
           moreLabel={COPY.moreProjects}

@@ -48,7 +48,13 @@ export type StatusColumnOptions<T> = {
   filter?: StatusColumnFilter;
 };
 
-export type RowIconAction = { key: string; icon: ReactNode; label: string; onClick: () => void };
+export type RowIconAction = {
+  key: string;
+  icon: ReactNode;
+  label: string;
+  disabledReason?: string;
+  onClick: () => void;
+};
 
 export type ActionsColumnOptions<T> = {
   key: string;

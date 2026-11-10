@@ -19,12 +19,23 @@
 import { Button } from 'antd';
 import styled, { css } from 'styled-components';
 
-export const ToneButton = styled(Button)<{ $brand: boolean }>`
+export const ToneButton = styled(Button)<{ $brand: boolean; $blocked: boolean }>`
   ${({ $brand, theme }) =>
     $brand &&
     css`
       &:not(:disabled) {
         color: ${theme.colors.iconBrand};
+      }
+    `}
+
+  ${({ $blocked, theme }) =>
+    $blocked &&
+    css`
+      &&&,
+      &&&:hover {
+        color: ${theme.colors.textDisabled};
+        background: transparent;
+        cursor: not-allowed;
       }
     `}
 `;

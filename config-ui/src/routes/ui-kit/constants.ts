@@ -31,6 +31,7 @@ export const COPY = {
     brandLogos: 'Brand logos',
     default: 'Default',
     focusRestoration: 'Focus restoration',
+    disabledWithReason: 'Disabled with a reason',
     empty: 'Empty',
     loading: 'Loading',
     error: 'Error',
@@ -125,7 +126,12 @@ export const COPY = {
     long: 'A very long link label that keeps going past the edge of the narrow container',
   },
   codeBlock: { copy: 'Copy JSON', copyCommand: 'Copy command', plain: 'Plain log line that is not JSON' },
-  iconButton: { edit: 'Edit item', remove: 'Delete item', restoreFocus: 'Restore focus' },
+  iconButton: {
+    edit: 'Edit item',
+    remove: 'Delete item',
+    restoreFocus: 'Restore focus',
+    disabledReason: 'This item is managed elsewhere.',
+  },
   emptyState: {
     emptyTitle: 'Nothing here yet',
     emptyDescription: 'Items you add will show up in this list.',

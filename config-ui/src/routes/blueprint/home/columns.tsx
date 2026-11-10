@@ -50,6 +50,7 @@ const renderConnections = ({ mode, connections }: Pick<IBlueprint, 'mode' | 'con
   if (!connections.length) return COPY.notAvailable;
   return (
     <OverflowList
+      title={COPY.columns.connections}
       max={MAX_VISIBLE_CONNECTIONS}
       moreLabel={COPY.moreConnections}
       items={connections.map(({ pluginName, connectionId }) => ({

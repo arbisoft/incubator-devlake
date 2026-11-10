@@ -16,57 +16,41 @@
  *
  */
 
-import { useTheme } from 'styled-components';
-
 import { getConnectorVisual } from '@/plugins/utils';
-import { PluginIcon } from '@/ui';
+import { ListPopover, ListPopoverRow, PluginIcon } from '@/ui';
 
 import { COPY } from '../constants';
-import {
-  Chip,
-  ChipCount,
-  Chips,
-  PopoverBody,
-  PopoverCount,
-  PopoverHead,
-  PopoverList,
-  PopoverRow,
-  RowCopy,
-  RowSubtitle,
-  RowTitle,
-} from '../styled';
+import { Chip, ChipCount, Chips, RowCopy, RowSubtitle, RowTitle } from '../styled';
 import { countCategories } from '../utils';
 
 import type { ConnectionsPopoverProps } from './types';
 
 export const ConnectionsPopover = ({ details }: ConnectionsPopoverProps) => {
-  const { layout } = useTheme();
   const { connectionsPopover: text } = COPY;
   return (
-    <PopoverBody $width={layout.connectionsPopoverWidth}>
-      <PopoverHead>
-        {text.title}
-        <PopoverCount>{details.length}</PopoverCount>
-      </PopoverHead>
-      <PopoverList>
-        {details.map(({ key, plugin, name, pluginLabel, category, icon }) => (
-          <PopoverRow key={key}>
-            <PluginIcon icon={icon} size="sm" logo={getConnectorVisual(plugin).logo} />
-            <RowCopy>
-              <RowTitle title={name}>{name}</RowTitle>
-              <RowSubtitle>{text.subtitle(pluginLabel, category)}</RowSubtitle>
-            </RowCopy>
-          </PopoverRow>
-        ))}
-      </PopoverList>
-      <Chips>
-        {countCategories(details).map(({ category, count }) => (
-          <Chip key={category}>
-            {category}
-            <ChipCount>{count}</ChipCount>
-          </Chip>
-        ))}
-      </Chips>
-    </PopoverBody>
+    <ListPopover
+      title={text.title}
+      count={details.length}
+      footer={
+        <Chips>
+          {countCategories(details).map(({ category, count }) => (
+            <Chip key={category}>
+              {category}
+              <ChipCount>{count}</ChipCount>
+            </Chip>
+          ))}
+        </Chips>
+      }
+    >
+      {details.map(({ key, plugin, name, pluginLabel, category, icon }) => (
+        <ListPopoverRow key={key}>
+          <PluginIcon icon={icon} size="sm" logo={getConnectorVisual(plugin).logo} />
+          <RowCopy>
+            <RowTitle title={name}>{name}</RowTitle>
+            <RowSubtitle>{text.subtitle(pluginLabel, category)}</RowSubtitle>
+          </RowCopy>
+        </ListPopoverRow>
+      ))}
+    </ListPopover>
   );
 };

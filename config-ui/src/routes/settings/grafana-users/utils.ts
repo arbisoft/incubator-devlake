@@ -35,6 +35,7 @@ import { isValidEmail, toAccessPagination } from '../utils';
 import {
   COPY,
   GENERATED_PASSWORD_LENGTH,
+  GRAFANA_FLOW_ERRORS,
   GRAFANA_MENU_ACTION,
   MENU_ACTION_ICON,
   PASSWORD_ALPHABET,
@@ -153,13 +154,18 @@ export const isUserNotFoundError = (error: unknown): boolean =>
 
 export const getMenuActions = (user: GrafanaUser): GrafanaMenuAction[] => {
   if (user.protected) return [];
-  return user.sso ? [GRAFANA_MENU_ACTION.DETAILS] : [GRAFANA_MENU_ACTION.DETAILS, GRAFANA_MENU_ACTION.PASSWORD];
+  return [GRAFANA_MENU_ACTION.DETAILS, GRAFANA_MENU_ACTION.PASSWORD];
 };
 
 const MENU_ACTION_LABEL = {
   [GRAFANA_MENU_ACTION.DETAILS]: COPY.actions.editDetailsFor,
   [GRAFANA_MENU_ACTION.PASSWORD]: COPY.actions.setPasswordFor,
 };
+
+const SSO_PASSWORD_REASON = GRAFANA_FLOW_ERRORS.PASSWORD[GRAFANA_ERROR_CODE.USER_SSO_MANAGED];
+
+const isBlockedBySso = (user: GrafanaUser, action: GrafanaMenuAction) =>
+  user.sso && action === GRAFANA_MENU_ACTION.PASSWORD;
 
 export const getRowIconActions = (
   user: GrafanaUser,
@@ -169,5 +175,8 @@ export const getRowIconActions = (
     key: action,
     icon: createElement(MENU_ACTION_ICON[action]),
     label: MENU_ACTION_LABEL[action](user.email),
-    onClick: () => onMenuAction(user, action),
+    ...(isBlockedBySso(user, action) && { disabledReason: SSO_PASSWORD_REASON }),
+    onClick: () => {
+      if (!isBlockedBySso(user, action)) onMenuAction(user, action);
+    },
   }));

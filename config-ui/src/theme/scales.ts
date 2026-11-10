@@ -115,7 +115,7 @@ export type LayoutTokens = {
   meterSegment: { sm: MeterSegmentTokens; md: MeterSegmentTokens };
   readinessPopoverWidth: number;
   popoverListMaxHeight: number;
-  connectionsPopoverWidth: number;
+  listPopoverWidth: number;
   signalIconSize: { sm: number; md: number };
   segmentInset: number;
   segmentPaddingBlock: number;
@@ -243,7 +243,7 @@ export const LAYOUT: LayoutTokens = {
   meterSegment: { sm: { width: 13, height: 6, gap: 3 }, md: { width: 22, height: 8, gap: 4 } },
   readinessPopoverWidth: 380,
   popoverListMaxHeight: 456,
-  connectionsPopoverWidth: 370,
+  listPopoverWidth: 370,
   signalIconSize: { sm: 16, md: 20 },
   segmentInset: 2,
   segmentPaddingBlock: 3,

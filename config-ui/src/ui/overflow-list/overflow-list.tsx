@@ -16,16 +16,26 @@
  *
  */
 
-import { Tooltip } from 'antd';
+import { Popover } from 'antd';
+
+import { ListPopover, ListPopoverRow } from '@/ui/list-popover';
 
 import { OVERFLOW_LAYOUT } from './constants';
-import { HiddenList, List, MoreButton } from './styled';
+import { List, MoreButton } from './styled';
 import type { OverflowListProps } from './types';
 import { splitOverflow } from './utils';
 
-const TOOLTIP_TRIGGERS: ('hover' | 'focus')[] = ['hover', 'focus'];
+const POPOVER_TRIGGERS: ('hover' | 'focus' | 'click')[] = ['hover', 'focus', 'click'];
 
-export const OverflowList = ({ items, max, moreLabel, layout = OVERFLOW_LAYOUT.STACK, listRef }: OverflowListProps) => {
+export const OverflowList = ({
+  items,
+  title,
+  max,
+  moreLabel,
+  layout = OVERFLOW_LAYOUT.STACK,
+  listRef,
+  footer,
+}: OverflowListProps) => {
   const { visible, hidden } = splitOverflow(items, max);
 
   return (
@@ -35,20 +45,20 @@ export const OverflowList = ({ items, max, moreLabel, layout = OVERFLOW_LAYOUT.S
       ))}
       {hidden.length > 0 && (
         <li>
-          <Tooltip
-            trigger={TOOLTIP_TRIGGERS}
-            title={
-              <HiddenList>
-                {hidden.map(({ key, node }) => (
-                  <li key={key}>{node}</li>
+          <Popover
+            trigger={POPOVER_TRIGGERS}
+            content={
+              <ListPopover title={title} count={items.length} footer={footer}>
+                {items.map(({ key, node }) => (
+                  <ListPopoverRow key={key}>{node}</ListPopoverRow>
                 ))}
-              </HiddenList>
+              </ListPopover>
             }
           >
             <MoreButton type="button" $layout={layout}>
               {moreLabel(hidden.length)}
             </MoreButton>
-          </Tooltip>
+          </Popover>
         </li>
       )}
     </List>

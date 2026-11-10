@@ -26,8 +26,10 @@ type OverflowItem = { key: string; node: ReactNode };
 
 export type OverflowListProps = {
   items: OverflowItem[];
+  title: string;
   max: number;
   moreLabel: (count: number) => string;
   layout?: OverflowLayout;
   listRef?: Ref<HTMLUListElement>;
+  footer?: ReactNode;
 };

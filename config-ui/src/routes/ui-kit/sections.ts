@@ -37,6 +37,7 @@ import { IdentityCellDemo } from './identity-cell.demo';
 import { IntegrationCardDemo } from './integration-card.demo';
 import { KeyValueListDemo } from './key-value-list.demo';
 import { ListPageDemo } from './list-page.demo';
+import { ListPopoverDemo } from './list-popover.demo';
 import { ListToolbarDemo } from './list-toolbar.demo';
 import { MetricTileDemo } from './metric-tile.demo';
 import { OverflowListDemo } from './overflow-list.demo';
@@ -99,6 +100,7 @@ export const SECTIONS: SectionDefinition[] = [
   { id: SECTION.FORM_FIELD, Demo: FormFieldDemo },
   { id: SECTION.FORM_MODAL, Demo: FormModalDemo },
   { id: SECTION.OVERFLOW_LIST, Demo: OverflowListDemo },
+  { id: SECTION.LIST_POPOVER, Demo: ListPopoverDemo },
   { id: SECTION.LIST_PAGE, Demo: ListPageDemo },
   { id: SECTION.LIST_TOOLBAR, Demo: ListToolbarDemo },
   { id: SECTION.ROW_LINK, Demo: RowLinkDemo },
