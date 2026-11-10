@@ -44,6 +44,7 @@ const (
 	eventToolDecision          = "tool_decision"
 	eventSkillActivated        = "skill_activated"
 	eventPermissionModeChanged = "permission_mode_changed"
+	eventCompaction            = "compaction"
 )
 
 // Typed event column widths in characters, from models.OtelEvent.
@@ -53,6 +54,9 @@ const (
 	eventVersionColumnLength = 64  // app_version
 	eventLabelColumnLength   = 100 // terminal_type, query_source
 	eventNamedColumnLength   = 255 // model, tool, skill, agent, plugin, MCP server and command names
+
+	// maxStoredAttributeLength caps each stored string attribute so one value cannot grow an event row without bound.
+	maxStoredAttributeLength = 1024
 )
 
 // preparedEvent is one converted log record plus the connection binding it requires.
@@ -143,7 +147,7 @@ func (p *batchPreparer) prepareLogRecord(teamSlug string, resourceAttrs []*commo
 	attributes := mergedAttributeMap(resourceAttrs, recordAttrs)
 	// Prompt text gets its own column so the attributes JSON stays small to query.
 	promptText, _ := attributes[promptTextAttribute].(string)
-	encoded, err := json.Marshal(storedAttributes(attributes))
+	encoded, err := json.Marshal(storedAttributes(eventName, attributes))
 	if err != nil {
 		return nil, nil, permanentConversionError(errorInvalidValue, "OTLP log record attributes cannot be encoded")
 	}
@@ -288,9 +292,8 @@ var storedEventAttributes = map[string]struct{}{
 	repositoryURLAttribute: {}, "vcs.owner.name": {}, "vcs.repository.name": {}, "vcs.provider.name": {},
 	// user_prompt.
 	"prompt_length": {}, "command_name": {}, "command_source": {},
-	// api_request and api_error. On api_error, error is a service message; ingest drops
-	// the tool_result error, which can echo file contents. effort is the reasoning effort
-	// level an api_request ran at.
+	// api_request and api_error. error is kept only where it is a service message and is
+	// dropped on tool_result and compaction. effort is the reasoning effort level an api_request ran at.
 	"model": {}, "cost_usd": {}, "duration_ms": {}, "input_tokens": {}, "output_tokens": {},
 	"cache_read_tokens": {}, "cache_creation_tokens": {}, "request_id": {}, "query_source": {},
 	"speed": {}, "effort": {}, "error": {}, "error_type": {}, "status_code": {}, "attempt": {}, "response_length": {},
@@ -304,7 +307,7 @@ var storedEventAttributes = map[string]struct{}{
 	// tool_decision mode and auto-mode classifier.
 	"permission_mode": {}, "classifier_verdict": {}, "classifier_category": {},
 	// hook_execution_start/complete and hook_registered.
-	"hook_event": {}, "hook_name": {}, "hook_source": {}, "hook_type": {}, "hook_matcher": {},
+	"hook_event": {}, "hook_name": {}, "hook_source": {}, "hook_type": {},
 	"managed_only": {}, "num_hooks": {}, "num_success": {}, "num_blocking": {},
 	"num_non_blocking_error": {}, "num_cancelled": {}, "total_duration_ms": {},
 	// managed_settings_resolved; the resolved settings body is never kept.
@@ -322,12 +325,20 @@ var storedEventAttributes = map[string]struct{}{
 // storedAttributes returns the allowlisted subset of attributes, with the repository URL
 // normalized and blanked as ingest does. A raw batch stored before ingest normalized the URL,
 // or before a later normalization fix, is cleaned when it is replayed.
-func storedAttributes(attributes map[string]interface{}) map[string]interface{} {
+func storedAttributes(eventName string, attributes map[string]interface{}) map[string]interface{} {
+	content := eventContentAttributes[eventName]
 	stored := make(map[string]interface{}, len(attributes))
 	for key, value := range attributes {
-		if _, keep := storedEventAttributes[key]; keep {
-			stored[key] = value
+		if _, keep := storedEventAttributes[key]; !keep {
+			continue
 		}
+		if _, dropped := content[key]; dropped {
+			continue
+		}
+		if text, isString := value.(string); isString && key != toolParametersAttribute {
+			value = truncate(text, maxStoredAttributeLength)
+		}
+		stored[key] = value
 	}
 	if value, found := stored[repositoryURLAttribute]; found {
 		raw, _ := value.(string)

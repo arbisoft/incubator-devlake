@@ -413,6 +413,19 @@ func TestPrepareEventsStoresOnlyAllowlistedAttributes(t *testing.T) {
 		setStringAttribute(record, "anthropic.seat_type", "content from a future release")
 		setStringAttribute(record, "files_reviewed", "content from a future release")
 		setStringAttribute(record, "managed_settings.settings", "content from a future release")
+		setStringAttribute(record, "claude.deployment_mode", "content from a future release")
+		setStringAttribute(record, "ttft_ms", "content from a future release")
+		setStringAttribute(record, "cost_usd_micros", "content from a future release")
+		setStringAttribute(record, "client_request_id", "content from a future release")
+		setStringAttribute(record, "message.uuid", "content from a future release")
+		setStringAttribute(record, "plugin_id", "content from a future release")
+		setStringAttribute(record, "review_ms", "content from a future release")
+		setStringAttribute(record, "vulns_found", "content from a future release")
+		setStringAttribute(record, "hook_definitions", "content from a future release")
+		setStringAttribute(record, "workspace.host_paths", "content from a future release")
+		setStringAttribute(record, "managed_settings.resolved_sha", "content from a future release")
+		setStringAttribute(record, "managed_settings.helper.path", "content from a future release")
+		setStringAttribute(record, "hook_matcher", "content from a future release")
 		setStringAttribute(record, "permission_mode", "auto")
 		setStringAttribute(record, "hook_name", "PreToolUse:Bash")
 	}
@@ -440,7 +453,8 @@ func TestPrepareEventsStoresOnlyAllowlistedAttributes(t *testing.T) {
 				t.Fatalf("%s attributes = %v, want %s kept", item.event.EventName, attributes, key)
 			}
 		}
-		for _, key := range []string{"process.owner", "anthropic.seat_type", "files_reviewed", "managed_settings.settings"} {
+		for _, key := range []string{"process.owner", "anthropic.seat_type", "files_reviewed", "managed_settings.settings",
+			"claude.deployment_mode", "ttft_ms", "cost_usd_micros", "client_request_id", "message.uuid", "plugin_id", "review_ms", "vulns_found", "hook_definitions", "workspace.host_paths", "managed_settings.resolved_sha", "managed_settings.helper.path", "hook_matcher"} {
 			if _, kept := attributes[key]; kept {
 				t.Fatalf("%s attributes kept %q, want it dropped", item.event.EventName, key)
 			}
@@ -463,7 +477,7 @@ func TestStoredAttributesNormalizesTheRepositoryURL(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			stored := storedAttributes(map[string]interface{}{
+			stored := storedAttributes("", map[string]interface{}{
 				repositoryURLAttribute: test.value,
 				"vcs.repository.name":  "Repo",
 				"vcs.owner.name":       "Org",
@@ -481,7 +495,7 @@ func TestStoredAttributesNormalizesTheRepositoryURL(t *testing.T) {
 		})
 	}
 
-	stored := storedAttributes(map[string]interface{}{"vcs.repository.name": "Repo"})
+	stored := storedAttributes("", map[string]interface{}{"vcs.repository.name": "Repo"})
 	if _, added := stored[repositoryURLAttribute]; added || len(stored) != 1 {
 		t.Fatalf("stored = %v, want no repository url added", stored)
 	}
@@ -511,6 +525,74 @@ func TestPrepareEventsNormalizesTheStoredRepositoryURL(t *testing.T) {
 		if got := attributes[repositoryURLAttribute]; got != "https://github.com/example-org/example-repo" {
 			t.Fatalf("%s repository url = %v, want it normalized", item.event.EventName, got)
 		}
+	}
+}
+
+func TestStoredAttributesDropsEventContentAndCapsStrings(t *testing.T) {
+	longText := strings.Repeat("x", 3000)
+	tests := []struct {
+		name       string
+		event      string
+		attributes map[string]interface{}
+		check      func(t *testing.T, stored map[string]interface{})
+	}{
+		{"compaction error dropped", eventCompaction, map[string]interface{}{"error": longText, "pre_tokens": float64(1200)}, func(t *testing.T, stored map[string]interface{}) {
+			if _, kept := stored["error"]; kept || stored["pre_tokens"] != float64(1200) {
+				t.Fatalf("stored = %v, want error dropped and pre_tokens kept", stored)
+			}
+		}},
+		{"tool_result error dropped", eventToolResult, map[string]interface{}{"error": "file contents"}, func(t *testing.T, stored map[string]interface{}) {
+			if _, kept := stored["error"]; kept {
+				t.Fatalf("stored = %v, want error dropped", stored)
+			}
+		}},
+		{"api_error error kept", eventAPIError, map[string]interface{}{"error": "overloaded"}, func(t *testing.T, stored map[string]interface{}) {
+			if stored["error"] != "overloaded" {
+				t.Fatalf("stored = %v, want error kept", stored)
+			}
+		}},
+		{"long string capped by runes", "hook_execution_complete", map[string]interface{}{"hook_name": strings.Repeat("é", 5000)}, func(t *testing.T, stored map[string]interface{}) {
+			name, _ := stored["hook_name"].(string)
+			if utf8.RuneCountInString(name) != maxStoredAttributeLength || !utf8.ValidString(name) {
+				t.Fatalf("hook_name has %d runes, want %d", utf8.RuneCountInString(name), maxStoredAttributeLength)
+			}
+		}},
+		{"tool_parameters not capped", eventToolDecision, map[string]interface{}{toolParametersAttribute: longText}, func(t *testing.T, stored map[string]interface{}) {
+			if stored[toolParametersAttribute] != longText {
+				t.Fatalf("tool_parameters was changed, want it kept as is")
+			}
+		}},
+		{"number unchanged", eventAPIRequest, map[string]interface{}{"cost_usd": float64(0.25)}, func(t *testing.T, stored map[string]interface{}) {
+			if stored["cost_usd"] != float64(0.25) {
+				t.Fatalf("stored = %v, want cost_usd unchanged", stored)
+			}
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			test.check(t, storedAttributes(test.event, test.attributes))
+		})
+	}
+}
+
+func TestStripContentAttributesDropsCompactionError(t *testing.T) {
+	compaction := &logsv1.LogRecord{Attributes: []*commonv1.KeyValue{
+		stringAttribute("event.name", "compaction"), stringAttribute("error", "model output"), stringAttribute("pre_tokens", "1200"),
+	}}
+	apiError := &logsv1.LogRecord{Attributes: []*commonv1.KeyValue{
+		stringAttribute("event.name", "api_error"), stringAttribute("error", "overloaded"),
+	}}
+	request := &collectorlogs.ExportLogsServiceRequest{ResourceLogs: []*logsv1.ResourceLogs{{
+		ScopeLogs: []*logsv1.ScopeLogs{{LogRecords: []*logsv1.LogRecord{compaction, apiError}}},
+	}}}
+
+	stripContentAttributes(request)
+
+	if hasAttribute(compaction.GetAttributes(), "error") || !hasAttribute(compaction.GetAttributes(), "pre_tokens") {
+		t.Fatalf("compaction attributes = %v, want error dropped and pre_tokens kept", compaction.GetAttributes())
+	}
+	if !hasAttribute(apiError.GetAttributes(), "error") {
+		t.Fatalf("api_error attributes = %v, want error kept", apiError.GetAttributes())
 	}
 }
 
@@ -831,9 +913,14 @@ func TestBuildPromptRollupRecordsFailureReasons(t *testing.T) {
 func TestBuildPromptRollupNeverCopiesToolErrorMessage(t *testing.T) {
 	events := promptEvents(t, loadLogEventsFixture(t), "p2")
 	toolEvent := failedToolResult(t, events)
-	if eventString(eventAttributes(toolEvent), "error") == "" {
-		t.Fatal("unstripped tool_result has no error attribute; the fixture no longer exercises this case")
+	// Conversion drops the tool_result error, so the event is given one to prove the rollup ignores it too.
+	attributes := eventAttributes(toolEvent)
+	attributes["error"] = "cat: secrets.env: contents echoed"
+	encoded, err := json.Marshal(attributes)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
 	}
+	toolEvent.Attributes = encoded
 	toolFailures := 0
 	for _, failure := range buildPromptRollup(testOrganizationID, "p2", events).failures {
 		if failure.FailureKind != ai.FailureKindToolError {
