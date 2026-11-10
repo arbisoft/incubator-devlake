@@ -1034,6 +1034,10 @@
                   "mode": "none",
                   "group": "B"
                 }
+              },
+              {
+                "id": "max",
+                "value": 1
               }
             ]
           }
