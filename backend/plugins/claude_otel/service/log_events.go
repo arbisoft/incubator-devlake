@@ -292,8 +292,7 @@ var storedEventAttributes = map[string]struct{}{
 	repositoryURLAttribute: {}, "vcs.owner.name": {}, "vcs.repository.name": {}, "vcs.provider.name": {},
 	// user_prompt.
 	"prompt_length": {}, "command_name": {}, "command_source": {},
-	// api_request and api_error. error is kept only where it is a service message and is
-	// dropped on tool_result and compaction. effort is the reasoning effort level an api_request ran at.
+	// api_request and api_error; error is kept only as a service message, and effort is the request's reasoning effort level.
 	"model": {}, "cost_usd": {}, "duration_ms": {}, "input_tokens": {}, "output_tokens": {},
 	"cache_read_tokens": {}, "cache_creation_tokens": {}, "request_id": {}, "query_source": {},
 	"speed": {}, "effort": {}, "error": {}, "error_type": {}, "status_code": {}, "attempt": {}, "response_length": {},
