@@ -53,6 +53,8 @@ func TestCanonicalIDsAreStable(t *testing.T) {
 		{CanonicalKey{IDKindPromptSkill, "claude", "org", []string{"p1", "code-review"}}, "ai:prompt_skill:5eeafb7dd9b45af2bf5dc4c6bcc7c45ddfb2615c2aba8f0addc211a79364bd99"},
 		{CanonicalKey{IDKindPromptFailure, "claude", "org", []string{"p1", "0a1b2c"}}, "ai:prompt_failure:bb04f75f6bd4f65dedd7bafd1d6b2cd0669f86af58c114869cdd2d7058cc1e34"},
 		{CanonicalKey{IDKindPermissionModeChange, "claude", "org", []string{"sess-1", changedAt, "default", "plan"}}, "ai:permission_mode_change:01e42eb011fa31c6ee416aadcf7b08277010ce76ea6656ab808f37b7454a61e5"},
+		{CanonicalKey{IDKindPromptTool, "claude", "org", []string{"p1", "Bash", ""}}, "ai:prompt_tool:22ce8b12109e835cd732d16ceb2387274312bf5e9dfaab85a578eda6512dc0f6"},
+		{CanonicalKey{IDKindSessionHook, "claude", "org", []string{"sess-1", "settings", "PreToolUse", "lint"}}, "ai:session_hook:96ba86fcb7c6cab4d6b910073121ab72b2bd7cd83c1f3a1efcb3a916fa1355ff"},
 	}
 	for _, test := range tests {
 		if got := test.key.ID(); got != test.want {

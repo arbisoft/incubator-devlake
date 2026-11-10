@@ -36,7 +36,7 @@ import (
 // rollupEventColumns are the event columns the rollup reads. prompt_text is left out, so
 // prompt text can never reach ai_* tables and large texts are not loaded per rollup.
 var rollupEventColumns = dal.Select("event_key, connection_id, user_key, user_account_id, user_email, session_id, prompt_id, " +
-	"event_name, event_sequence, event_timestamp, command_name, model, query_source, tool_name, skill_name, plugin_name, success, duration_ms, cost_usd, " +
+	"event_name, event_sequence, event_timestamp, command_name, model, query_source, tool_name, mcp_server_name, skill_name, plugin_name, success, duration_ms, cost_usd, " +
 	"input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, attributes")
 
 const (
@@ -62,9 +62,13 @@ const (
 	maxRepositoryURLLength = 255
 	// maxErrorMessageLength is the width of ai_prompt_failures.error_message.
 	maxErrorMessageLength = 1024
-	// promptFailureInsertBatchSize is the most failure rows one INSERT writes, which keeps a
-	// long agentic prompt's insert far below MySQL's 65,535 placeholder limit.
-	promptFailureInsertBatchSize = 500
+	// rollupInsertBatchSize keeps each rebuilt-rows INSERT far below MySQL's 65,535 placeholder limit.
+	rollupInsertBatchSize = 500
+	// Widths of ai_session_hooks columns filled from hook_registered attributes.
+	maxHookSourceLength = 64
+	maxHookEventLength  = 64
+	maxHookNameLength   = 255
+	maxHookTypeLength   = 64
 )
 
 // modelSnapshotDate and modelVariantSuffix match a model ID's -YYYYMMDD snapshot date and
@@ -88,6 +92,8 @@ type sessionTarget struct {
 	// modeObserved is set when a tool_decision in the batch reported a mode, from earliestObserved on.
 	modeObserved     bool
 	earliestObserved time.Time
+	// hooksRegistered is set when the batch holds a hook_registered event of the session.
+	hooksRegistered bool
 }
 
 func sessionTargets(events []preparedEvent) []*sessionTarget {
@@ -102,6 +108,9 @@ func sessionTargets(events []preparedEvent) []*sessionTarget {
 		}
 		if event.PromptId != "" {
 			target.promptIDs[event.PromptId] = struct{}{}
+		}
+		if event.SessionId != "" && event.EventName == eventHookRegistered {
+			target.hooksRegistered = true
 		}
 		if event.SessionId != "" && isModeChangeEvent(event) {
 			target.modeChanged = true
@@ -304,6 +313,9 @@ type promptRollup struct {
 	prompt   *ai.AiPrompt
 	skills   []*ai.AiPromptSkill
 	failures []*ai.AiPromptFailure
+	tools    []*ai.AiPromptTool
+	// firstMainRequestAt is the time of the prompt's first main-thread request, nil when it made none.
+	firstMainRequestAt *time.Time
 }
 
 // buildPromptRollup derives one prompt row, its skills and its failures from the prompt's
@@ -323,6 +335,7 @@ func buildPromptRollup(workspaceKey, promptID string, events []*models.OtelEvent
 		},
 		skills: newSkillCollector(workspaceKey, promptID),
 		models: make(map[string]struct{}),
+		tools:  make(map[toolKey]*ai.AiPromptTool),
 	}
 	prompt := builder.prompt
 	for index, event := range events {
@@ -350,7 +363,15 @@ func buildPromptRollup(workspaceKey, promptID string, events []*models.OtelEvent
 		failure.UserEmail = prompt.UserEmail
 		failure.SessionId = prompt.SessionId
 	}
-	return promptRollup{prompt: prompt, skills: collected, failures: builder.failures}
+	tools := builder.sortedTools()
+	for _, tool := range tools {
+		tool.AiPromptId = prompt.Id
+		tool.UserKey = prompt.UserKey
+		tool.UserEmail = prompt.UserEmail
+		tool.SessionId = prompt.SessionId
+		tool.StartedAt = prompt.StartedAt
+	}
+	return promptRollup{prompt: prompt, skills: collected, failures: builder.failures, tools: tools, firstMainRequestAt: builder.firstMainRequestAt}
 }
 
 // promptBuilder accumulates one prompt's row, skills, failures and models from its ordered events.
@@ -359,9 +380,18 @@ type promptBuilder struct {
 	skills   *skillCollector
 	models   map[string]struct{}
 	failures []*ai.AiPromptFailure
+	tools    map[toolKey]*ai.AiPromptTool
+	// firstMainRequestAt is the time of the first main-thread request, which also supplies the first-request fields.
+	firstMainRequestAt *time.Time
 	// mainThreadEffort is set once a main-thread request has given the prompt its effort,
 	// so a later request cannot replace it.
 	mainThreadEffort bool
+}
+
+// toolKey names one tool row of a prompt.
+type toolKey struct {
+	toolName      string
+	mcpServerName string
 }
 
 // promptEventApplier adds one event's contribution to the prompt being built.
@@ -376,6 +406,8 @@ var promptEventAppliers = map[string]promptEventApplier{
 	eventToolResult:     (*promptBuilder).applyToolResult,
 	eventToolDecision:   (*promptBuilder).applyToolDecision,
 	eventSkillActivated: (*promptBuilder).applySkillActivated,
+
+	eventHookExecutionComplete: (*promptBuilder).applyHookExecution,
 }
 
 func (b *promptBuilder) applyUserPrompt(event *models.OtelEvent, attributes map[string]interface{}) {
@@ -404,6 +436,61 @@ func (b *promptBuilder) applyAPIRequest(event *models.OtelEvent, attributes map[
 		b.models[model] = struct{}{}
 	}
 	b.skills.add(event.SkillName, ai.SkillDetectedViaApiRequest, "", "", event.PluginName, event.EventTimestamp)
+	if event.QuerySource == mainThreadQuerySource && b.firstMainRequestAt == nil {
+		at := event.EventTimestamp
+		b.firstMainRequestAt = &at
+		b.prompt.FirstRequestContextTokens = event.InputTokens + event.CacheReadTokens + event.CacheCreationTokens
+		if event.CostUsd != nil {
+			cost := *event.CostUsd
+			if normalized, err := addDecimal("0", cost, 8); err == nil {
+				cost = normalized
+			}
+			b.prompt.FirstRequestCostUsd = &cost
+		}
+	}
+}
+
+func (b *promptBuilder) applyHookExecution(_ *models.OtelEvent, attributes map[string]interface{}) {
+	b.prompt.HookCount += int64Value(eventNumber(attributes, "num_hooks"))
+	b.prompt.HookBlockCount += int64Value(eventNumber(attributes, "num_blocking"))
+	b.prompt.HookErrorCount += int64Value(eventNumber(attributes, "num_non_blocking_error"))
+	b.prompt.HookDurationMs += int64Value(eventNumber(attributes, "total_duration_ms"))
+}
+
+// toolRow returns the prompt's row for a tool and MCP server, creating it on first use.
+func (b *promptBuilder) toolRow(toolName, mcpServerName string) *ai.AiPromptTool {
+	key := toolKey{toolName: toolName, mcpServerName: mcpServerName}
+	row := b.tools[key]
+	if row == nil {
+		row = &ai.AiPromptTool{
+			DomainEntity: domainlayer.NewDomainEntity(ai.CanonicalKey{
+				Kind: ai.IDKindPromptTool, Provider: aiProviderClaude, WorkspaceKey: b.prompt.WorkspaceKey,
+				Grain: []string{b.prompt.PromptId, toolName, mcpServerName},
+			}.ID()),
+			Provider:      aiProviderClaude,
+			WorkspaceKey:  b.prompt.WorkspaceKey,
+			PromptId:      b.prompt.PromptId,
+			ToolName:      toolName,
+			McpServerName: mcpServerName,
+		}
+		b.tools[key] = row
+	}
+	return row
+}
+
+// sortedTools returns the tool rows ordered by tool name, then MCP server.
+func (b *promptBuilder) sortedTools() []*ai.AiPromptTool {
+	rows := make([]*ai.AiPromptTool, 0, len(b.tools))
+	for _, row := range b.tools {
+		rows = append(rows, row)
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].ToolName != rows[j].ToolName {
+			return rows[i].ToolName < rows[j].ToolName
+		}
+		return rows[i].McpServerName < rows[j].McpServerName
+	})
+	return rows
 }
 
 // applyEffort records one api_request's effort on the prompt. The first main-thread
@@ -436,8 +523,12 @@ func (b *promptBuilder) applyAPIError(event *models.OtelEvent, attributes map[st
 
 func (b *promptBuilder) applyToolResult(event *models.OtelEvent, attributes map[string]interface{}) {
 	b.prompt.ToolCallCount++
+	row := b.toolRow(event.ToolName, event.McpServerName)
+	row.CallCount++
+	row.DurationMs += int64Value(event.DurationMs)
 	if event.Success != nil && !*event.Success {
 		b.prompt.ToolFailureCount++
+		row.FailureCount++
 		b.newFailure(event, ai.FailureKindToolError, attributes).ToolName = event.ToolName
 	}
 	if _, subagent := subagentToolNames[event.ToolName]; subagent {
@@ -468,9 +559,22 @@ func (b *promptBuilder) newFailure(event *models.OtelEvent, kind string, attribu
 	return failure
 }
 
-func (b *promptBuilder) applyToolDecision(_ *models.OtelEvent, attributes map[string]interface{}) {
-	if eventString(attributes, "decision") == toolDecisionReject {
+func (b *promptBuilder) applyToolDecision(event *models.OtelEvent, attributes map[string]interface{}) {
+	row := b.toolRow(event.ToolName, event.McpServerName)
+	reject := eventString(attributes, "decision") == toolDecisionReject
+	if reject {
 		b.prompt.ToolRejectCount++
+	}
+	user := strings.HasPrefix(eventString(attributes, "source"), "user")
+	switch {
+	case user && reject:
+		row.UserRejectCount++
+	case user:
+		row.UserAcceptCount++
+	case reject:
+		row.ConfigRejectCount++
+	default:
+		row.ConfigAcceptCount++
 	}
 }
 
@@ -657,6 +761,13 @@ func rollupSession(tx dal.Transaction, workspaceKey string, target *sessionTarge
 			continue
 		}
 		rollup := buildPromptRollup(workspaceKey, promptID, events)
+		if rollup.firstMainRequestAt != nil && target.sessionID != "" {
+			idle, idleErr := idleBeforeSeconds(tx, target, *rollup.firstMainRequestAt)
+			if idleErr != nil {
+				return idleErr
+			}
+			rollup.prompt.IdleBeforeSeconds = idle
+		}
 		own := firstObservedMode(events)
 		sequence := promptSequence(events)
 		var earlier *observedMode
@@ -680,10 +791,88 @@ func rollupSession(tx dal.Transaction, workspaceKey string, target *sessionTarge
 			return err
 		}
 	}
+	if target.hooksRegistered && target.sessionID != "" {
+		if err := writeSessionHooks(tx, workspaceKey, target); err != nil {
+			return err
+		}
+	}
 	if refresh {
 		return refreshSessionModes(tx, workspaceKey, target, modes, promptSequences, observed, observedLoaded)
 	}
 	return nil
+}
+
+// idleBeforeSeconds returns the whole seconds from the session's latest main-thread request before first to first, or nil when there is none.
+func idleBeforeSeconds(tx dal.Transaction, target *sessionTarget, first time.Time) (*int64, error) {
+	previous := make([]*models.OtelEvent, 0, 1)
+	if err := tx.All(&previous, dal.Select("event_timestamp"), dal.Where(
+		"connection_id = ? AND user_key = ? AND session_id = ? AND event_name = ? AND query_source = ? AND event_timestamp < ?",
+		target.connectionID, target.userKey, target.sessionID, eventAPIRequest, mainThreadQuerySource, first),
+		dal.Orderby("event_timestamp DESC"), dal.Limit(1)); err != nil {
+		return nil, fmt.Errorf("load Claude Code previous main-thread request: %w", err)
+	}
+	if len(previous) == 0 {
+		return nil, nil
+	}
+	seconds := int64(first.Sub(previous[0].EventTimestamp) / time.Second)
+	return &seconds, nil
+}
+
+// writeSessionHooks rebuilds the session's hook rows from its hook_registered events.
+func writeSessionHooks(tx dal.Transaction, workspaceKey string, target *sessionTarget) error {
+	events := make([]*models.OtelEvent, 0)
+	// The whole session is rebuilt whatever user key each event carries, matching the row id's scope.
+	if err := tx.All(&events, rollupEventColumns, dal.Where("connection_id = ? AND session_id = ? AND event_name = ?",
+		target.connectionID, target.sessionID, eventHookRegistered)); err != nil {
+		return fmt.Errorf("load Claude Code session hooks: %w", err)
+	}
+	if err := tx.Delete(&ai.AiSessionHook{}, dal.Where("workspace_key = ? AND session_id = ?", workspaceKey, target.sessionID)); err != nil {
+		return fmt.Errorf("clear Claude Code session hooks: %w", err)
+	}
+	return createInBatches(tx, buildSessionHooks(workspaceKey, target, events), "write Claude Code session hooks")
+}
+
+// buildSessionHooks groups hook_registered events into one row per hook source, event and name, keeping the earliest registration.
+func buildSessionHooks(workspaceKey string, target *sessionTarget, events []*models.OtelEvent) []*ai.AiSessionHook {
+	sort.SliceStable(events, func(i, j int) bool {
+		return lessEventOrder(events[i].EventTimestamp, int64Value(events[i].EventSequence), events[j].EventTimestamp, int64Value(events[j].EventSequence))
+	})
+	byKey := make(map[[3]string]*ai.AiSessionHook)
+	hooks := make([]*ai.AiSessionHook, 0)
+	for _, event := range events {
+		attributes := eventAttributes(event)
+		source := truncate(eventString(attributes, "hook_source"), maxHookSourceLength)
+		hookEvent := truncate(eventString(attributes, "hook_event"), maxHookEventLength)
+		name := truncate(eventString(attributes, "hook_name"), maxHookNameLength)
+		key := [3]string{source, hookEvent, name}
+		if existing := byKey[key]; existing != nil {
+			if event.EventTimestamp.Before(existing.FirstRegisteredAt) {
+				existing.FirstRegisteredAt = event.EventTimestamp
+			}
+			continue
+		}
+		hook := &ai.AiSessionHook{
+			DomainEntity: domainlayer.NewDomainEntity(ai.CanonicalKey{
+				Kind: ai.IDKindSessionHook, Provider: aiProviderClaude, WorkspaceKey: workspaceKey,
+				Grain: []string{target.sessionID, source, hookEvent, name},
+			}.ID()),
+			Provider:           aiProviderClaude,
+			WorkspaceKey:       workspaceKey,
+			SourceConnectionId: target.connectionID,
+			UserKey:            target.userKey,
+			UserEmail:          stringValue(event.UserEmail),
+			SessionId:          target.sessionID,
+			RepositoryUrl:      repositoryURL(attributes),
+			HookSource:         source,
+			HookEvent:          hookEvent,
+			HookName:           name,
+			HookType:           truncate(eventString(attributes, "hook_type"), maxHookTypeLength),
+			FirstRegisteredAt:  event.EventTimestamp,
+		}
+		byKey[key] = hook
+		hooks = append(hooks, hook)
+	}
+	return hooks
 }
 
 // earlierObservedMode returns the first decision of the latest earlier prompt that reported a mode, or nil.
@@ -770,16 +959,13 @@ func writePromptRollup(tx dal.Transaction, rollup promptRollup) error {
 	}
 	// The prompt's rows were just deleted and failure ids are scoped to the prompt, so the
 	// rebuilt rows are inserted in batches rather than upserted one at a time.
-	for start := 0; start < len(rollup.failures); start += promptFailureInsertBatchSize {
-		end := start + promptFailureInsertBatchSize
-		if end > len(rollup.failures) {
-			end = len(rollup.failures)
-		}
-		if err := tx.Create(rollup.failures[start:end]); err != nil {
-			return fmt.Errorf("write Claude Code prompt failures: %w", err)
-		}
+	if err := createInBatches(tx, rollup.failures, "write Claude Code prompt failures"); err != nil {
+		return err
 	}
-	return nil
+	if err := tx.Delete(&ai.AiPromptTool{}, dal.Where("workspace_key = ? AND prompt_id = ?", rollup.prompt.WorkspaceKey, rollup.prompt.PromptId)); err != nil {
+		return fmt.Errorf("clear Claude Code prompt tools: %w", err)
+	}
+	return createInBatches(tx, rollup.tools, "write Claude Code prompt tools")
 }
 
 func writeModeChanges(tx dal.Transaction, workspaceKey string, target *sessionTarget, events []*models.OtelEvent, modes sessionModes) error {
@@ -931,4 +1117,18 @@ func sortedKeys(values map[string]struct{}) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// createInBatches inserts freshly rebuilt rows rollupInsertBatchSize at a time.
+func createInBatches[T any](tx dal.Transaction, rows []T, what string) error {
+	for start := 0; start < len(rows); start += rollupInsertBatchSize {
+		end := start + rollupInsertBatchSize
+		if end > len(rows) {
+			end = len(rows)
+		}
+		if err := tx.Create(rows[start:end]); err != nil {
+			return fmt.Errorf("%s: %w", what, err)
+		}
+	}
+	return nil
 }

@@ -68,7 +68,7 @@ func newWorld(t *testing.T) *world {
 	for _, table := range models.GetTablesInfo() {
 		tester.FlushTabler(table)
 	}
-	for _, table := range []dal.Tabler{&ai.AiActivity{}, &ai.AiModelUsage{}, &ai.AiToolDecision{}, &ai.AiSourcePreference{}, &ai.AiPrompt{}, &ai.AiPromptSkill{}, &ai.AiPromptFailure{}, &ai.AiPermissionModeChange{}, &crossdomain.Account{}} {
+	for _, table := range []dal.Tabler{&ai.AiActivity{}, &ai.AiModelUsage{}, &ai.AiToolDecision{}, &ai.AiSourcePreference{}, &ai.AiPrompt{}, &ai.AiPromptSkill{}, &ai.AiPromptFailure{}, &ai.AiPermissionModeChange{}, &ai.AiPromptTool{}, &ai.AiSessionHook{}, &crossdomain.Account{}} {
 		tester.FlushTabler(table)
 	}
 	now := time.Now().UTC()
@@ -254,6 +254,8 @@ type logFacts struct {
 	Skill   []ai.AiPromptSkill
 	Failure []ai.AiPromptFailure
 	Mode    []ai.AiPermissionModeChange
+	Tool    []ai.AiPromptTool
+	Hook    []ai.AiSessionHook
 }
 
 // requireLogsOn asserts the connection has events, and the organization has prompts, for one user on one UTC day.
@@ -287,6 +289,8 @@ func (w *world) logFactsOf(connectionID uint64, org string) logFacts {
 		Skill:   snapshot[ai.AiPromptSkill](w, "workspace_key, prompt_id, skill_name", "workspace_key = ?", org),
 		Failure: snapshot[ai.AiPromptFailure](w, "workspace_key, prompt_id, id", "workspace_key = ?", org),
 		Mode:    snapshot[ai.AiPermissionModeChange](w, "workspace_key, session_id, changed_at", "workspace_key = ?", org),
+		Tool:    snapshot[ai.AiPromptTool](w, "workspace_key, prompt_id, tool_name, mcp_server_name", "workspace_key = ?", org),
+		Hook:    snapshot[ai.AiSessionHook](w, "workspace_key, session_id, hook_source, hook_event, hook_name", "workspace_key = ?", org),
 	}
 }
 
