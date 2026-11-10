@@ -92,7 +92,7 @@ export const BlueprintHomePage = () => {
 
   const handleCreated = () => {
     setCreating(false);
-    list.setKeyword('');
+    list.clearFilters();
     refresh();
   };
 

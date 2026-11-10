@@ -53,6 +53,13 @@ describe('ListToolbar', () => {
     expect(setKeyword).toHaveBeenCalledExactlyOnceWith('deploy', { replace: false });
   });
 
+  it('replaces the history entry when Enter repeats the current keyword', () => {
+    const setKeyword = vi.fn();
+    renderWithTheme(<ListToolbar list={{ keyword: 'ci', setKeyword }} searchPlaceholder={PLACEHOLDER} />);
+    fireEvent.keyDown(screen.getByRole('textbox', { name: PLACEHOLDER }), { key: 'Enter', code: 'Enter', keyCode: 13 });
+    expect(setKeyword).toHaveBeenCalledExactlyOnceWith('ci', { replace: true });
+  });
+
   it('renders the filters after the search and the end actions', () => {
     renderWithTheme(
       <ListToolbar

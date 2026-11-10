@@ -52,7 +52,7 @@ export const toProjectRow = (project: IProject, otelConnections: OtelConnectionR
 });
 
 const isStatusGroup = (group: string): group is keyof typeof LAST_RUN_STATUS_GROUP_STATUSES =>
-  group in LAST_RUN_STATUS_GROUP_STATUSES;
+  Object.hasOwn(LAST_RUN_STATUS_GROUP_STATUSES, group);
 
 export const buildProjectQuery = (query: ListQuery<ProjectSortKey>, filters: ProjectFilters): ListParams => {
   const statuses = [

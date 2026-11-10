@@ -125,12 +125,32 @@ describe('SearchInput', () => {
     expect(onSearch).not.toHaveBeenCalled();
   });
 
-  it('keeps the draft when the value prop echoes what was typed', () => {
+  it('keeps trailing whitespace when the value prop echoes the trimmed search', () => {
     const { input, onSearch, rerender } = setup();
-    fireEvent.change(input, { target: { value: 'ab' } });
+    fireEvent.change(input, { target: { value: 'my ' } });
     advance(SEARCH_DEBOUNCE_MS);
-    rerender(<SearchInput value="ab" placeholder={PLACEHOLDER} onSearch={onSearch} />);
-    expect(screen.getByRole<HTMLInputElement>('textbox', { name: PLACEHOLDER }).value).toBe('ab');
-    expect(onSearch).toHaveBeenCalledOnce();
+    rerender(<SearchInput value="my" placeholder={PLACEHOLDER} onSearch={onSearch} />);
+    expect(screen.getByRole<HTMLInputElement>('textbox', { name: PLACEHOLDER }).value).toBe('my ');
+    expect(onSearch).toHaveBeenCalledExactlyOnceWith('my', SEARCH_TRIGGER.TYPING);
+  });
+
+  it('drops a pending typed search when the keyword changes from outside', () => {
+    const { input, onSearch, rerender } = setup({ value: 'old' });
+    fireEvent.change(input, { target: { value: 'abc' } });
+    rerender(<SearchInput value="" placeholder={PLACEHOLDER} onSearch={onSearch} />);
+    advance(SEARCH_DEBOUNCE_MS * 2);
+    expect(onSearch).not.toHaveBeenCalled();
+  });
+
+  it('waits for the IME composition to end before searching', () => {
+    const { input, onSearch } = setup();
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: 'ni' } });
+    advance(SEARCH_DEBOUNCE_MS * 2);
+    expect(onSearch).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: ' 你好 ' } });
+    fireEvent.compositionEnd(input);
+    advance(SEARCH_DEBOUNCE_MS);
+    expect(onSearch).toHaveBeenCalledExactlyOnceWith('你好', SEARCH_TRIGGER.TYPING);
   });
 });

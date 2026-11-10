@@ -184,6 +184,23 @@ describe('useListState', () => {
     expect(result.current.location.search).toBe('?tab=a');
   });
 
+  it('clearFilters drops the keyword and filters, goes to page 1 and keeps sort and page size', () => {
+    const { result } = setup(
+      `/list?tab=a&${LIST_PARAMS.PAGE}=3&${LIST_PARAMS.PAGE_SIZE}=50&${LIST_PARAMS.KEYWORD}=x&${LIST_PARAMS.SORT_BY}=status&${LIST_PARAMS.SORT_ORDER}=asc&status=failed`,
+    );
+    act(() => result.current.list.clearFilters());
+    expect(result.current.list).toMatchObject({
+      page: 1,
+      pageSize: 50,
+      keyword: '',
+      sort: { sortBy: 'status', sortOrder: SORT_ORDER.ASC },
+      filters: { status: 'all' },
+    });
+    expect(result.current.location.search).toBe(
+      `?tab=a&${LIST_PARAMS.PAGE_SIZE}=50&${LIST_PARAMS.SORT_BY}=status&${LIST_PARAMS.SORT_ORDER}=asc`,
+    );
+  });
+
   it('exposes the typed API query, omitting an empty keyword', () => {
     const { result } = setup(`/list?${LIST_PARAMS.PAGE}=2&${LIST_PARAMS.PAGE_SIZE}=50`);
     expect(result.current.list.query).toEqual({

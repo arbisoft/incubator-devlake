@@ -150,6 +150,10 @@ export const useListState = <S extends string, F extends ListFilters>(inlineDefa
       }),
     [defaults, update],
   );
+  const clearFilters = useCallback(
+    () => update(() => ({ keyword: defaults.keyword ?? '', filters: defaults.filters, page: DEFAULT_PAGE })),
+    [defaults, update],
+  );
   const reset = useCallback(
     () =>
       setParams((prev) =>
@@ -212,6 +216,7 @@ export const useListState = <S extends string, F extends ListFilters>(inlineDefa
     setFilter,
     setFilters,
     isFiltered,
+    clearFilters,
     reset,
     toQuery,
   };

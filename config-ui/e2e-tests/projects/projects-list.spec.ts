@@ -111,8 +111,10 @@ test.describe.serial('Projects list search, sort and pagination', () => {
   test('searching while typing filters the list without Enter', async ({ page }) => {
     const projects = new ProjectsPage(page);
     await projects.open();
+    await expect(projects.projectRow(names[1])).toBeVisible();
     await projects.typeSearch(names[0]);
     await expect.poll(() => projects.urlParams.get('keyword')).toBe(names[0]);
+    await expect(projects.projectRow(names[1])).toBeHidden();
     await expect(projects.projectRow(names[0])).toBeVisible();
   });
 });

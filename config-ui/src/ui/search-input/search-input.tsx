@@ -19,7 +19,7 @@
 import { CloseCircleFilled, SearchOutlined } from '@ant-design/icons';
 import { useDebounceFn } from 'ahooks';
 import { Button, Input } from 'antd';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { COMMON_COPY, SEARCH_DEBOUNCE_MS, SEARCH_TRIGGER } from '@/ui/constants';
 import type { SearchTrigger } from '@/ui/types';
@@ -30,24 +30,25 @@ import type { SearchInputProps } from './types';
 export const SearchInput = ({ value, placeholder, onSearch, allowClear }: SearchInputProps) => {
   const [draft, setDraft] = useState(value ?? '');
   const [synced, setSynced] = useState(value);
-  const lastEmitted = useRef(value ?? '');
-
-  if (value !== synced) {
-    setSynced(value);
-    setDraft(value ?? '');
-  }
-
-  useEffect(() => {
-    lastEmitted.current = value ?? '';
-  }, [value]);
+  const [emitted, setEmitted] = useState(value ?? '');
+  const composing = useRef(false);
 
   const emit = (keyword: string, trigger: SearchTrigger) => {
-    if (trigger === SEARCH_TRIGGER.TYPING && keyword === lastEmitted.current) return;
-    lastEmitted.current = keyword;
+    if (trigger === SEARCH_TRIGGER.TYPING && keyword === emitted) return;
+    setEmitted(keyword);
     onSearch(keyword, trigger);
   };
 
   const { run: emitTyping, cancel } = useDebounceFn(emit, { wait: SEARCH_DEBOUNCE_MS });
+
+  if (value !== synced) {
+    setSynced(value);
+    setEmitted(value ?? '');
+    if ((value ?? '') !== emitted) {
+      cancel();
+      setDraft(value ?? '');
+    }
+  }
 
   const submit = (keyword: string) => {
     cancel();
@@ -63,7 +64,14 @@ export const SearchInput = ({ value, placeholder, onSearch, allowClear }: Search
         allowClear={allowClear && { clearIcon: <CloseCircleFilled aria-label={COMMON_COPY.clear} /> }}
         onChange={(event) => {
           setDraft(event.target.value);
-          emitTyping(event.target.value.trim(), SEARCH_TRIGGER.TYPING);
+          if (!composing.current) emitTyping(event.target.value.trim(), SEARCH_TRIGGER.TYPING);
+        }}
+        onCompositionStart={() => {
+          composing.current = true;
+        }}
+        onCompositionEnd={(event) => {
+          composing.current = false;
+          emitTyping(event.currentTarget.value.trim(), SEARCH_TRIGGER.TYPING);
         }}
         onClear={
           allowClear

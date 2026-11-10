@@ -29,7 +29,9 @@ export const ListToolbar = ({ list, searchPlaceholder, filters, end }: ListToolb
         <SearchInput
           value={list.keyword}
           placeholder={searchPlaceholder}
-          onSearch={(keyword, trigger) => list.setKeyword(keyword, { replace: trigger === SEARCH_TRIGGER.TYPING })}
+          onSearch={(keyword, trigger) =>
+            list.setKeyword(keyword, { replace: trigger === SEARCH_TRIGGER.TYPING || keyword === list.keyword })
+          }
           allowClear
         />
         {filters}

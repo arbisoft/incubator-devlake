@@ -83,7 +83,7 @@ export const ProjectHomePage = () => {
 
   const handleCreated = () => {
     setCreating(false);
-    list.setKeyword('');
+    list.clearFilters();
     refresh();
   };
 

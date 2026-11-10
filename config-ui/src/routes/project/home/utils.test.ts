@@ -124,7 +124,7 @@ describe('buildProjectQuery', () => {
   it('dedupes statuses and ignores unknown groups', () => {
     const query = buildProjectQuery(QUERY, {
       connection: [],
-      lastRunStatus: [LAST_RUN_STATUS_GROUP.FAILED, LAST_RUN_STATUS_GROUP.FAILED, 'bogus'],
+      lastRunStatus: [LAST_RUN_STATUS_GROUP.FAILED, LAST_RUN_STATUS_GROUP.FAILED, 'bogus', 'constructor', 'toString'],
     });
     expect(query.lastRunStatus).toEqual([...LAST_RUN_STATUS_GROUP_STATUSES.failed]);
   });
