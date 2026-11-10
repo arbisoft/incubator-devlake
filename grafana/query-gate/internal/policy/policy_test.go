@@ -34,7 +34,7 @@ func TestClassify(t *testing.T) {
 		{"/grafana/api/ds/query", "/grafana", Query},
 		{"/GRAFANA/api/ds/query/", "/grafana", Query},
 		{"/grafana/api/datasources/proxy/uid/x/q", "/grafana", AdminOnly},
-		{"/grafanax/api/ds/query", "/grafana", Pass},
+		{"/grafanax/api/ds/query", "/grafana", Query},
 		{"/api/ds/query/extra", "", Pass},
 		{"/api/datasources/proxy/uid/abc/query", "", AdminOnly},
 		{"/api/datasources/proxy/1/query", "", AdminOnly},
@@ -96,7 +96,47 @@ func TestClassifyRequestReadsPublicDashboardSettings(t *testing.T) {
 		{"GET", "/api/datasources/proxy/uid/x/", "", AdminOnly},
 	}
 	for _, tt := range tests {
-		if got := ClassifyRequest(tt.method, tt.path, tt.root); got != tt.want {
+		if got := ClassifyRequest(tt.method, tt.path, tt.path, tt.root); got != tt.want {
+			t.Errorf("ClassifyRequest(%q, %q, %q) = %d, want %d", tt.method, tt.path, tt.root, got, tt.want)
+		}
+	}
+}
+
+func TestClassifyTakesStrictestForm(t *testing.T) {
+	tests := []struct {
+		method, path, escaped, root string
+		want                        Class
+	}{
+		{"POST", "/api/datasources/uid/x/resources/../x", "/api/datasources/uid/x/resources/../x", "", AdminOnly},
+		{"POST", "/api/datasources/uid/x/resources/../x", "/api/datasources/uid/x/resources%2f..%2fx", "", AdminOnly},
+		{"POST", "/api/./ds/query", "/api/./ds/query", "", Query},
+		{"POST", "/api/snapshots-delete/abc", "/api/snapshots-delete/abc", "", AdminOnly},
+		{"GET", "/api/dashboards/uid/a/public-dashboards", "/api/dashboards/uid/a/public-dashboards", "", Pass},
+		{"GET", "/api/datasources/uid/x/resources/../../../dashboards/uid/a/public-dashboards", "/api/datasources/uid/x/resources/../../../dashboards/uid/a/public-dashboards", "", AdminOnly},
+		{"PUT", "/api/user", "/api/user", "", SelfUpdate},
+		{"PUT", "/API/USER/", "/API/USER/", "", SelfUpdate},
+		{"PUT", "/grafana/api/user", "/grafana/api/user", "/grafana", SelfUpdate},
+		{"GET", "/api/user", "/api/user", "", Pass},
+		{"PUT", "/api/user/password", "/api/user/password", "", Pass},
+	}
+	for _, tt := range tests {
+		if got := ClassifyRequest(tt.method, tt.path, tt.escaped, tt.root); got != tt.want {
+			t.Errorf("ClassifyRequest(%q, %q, %q, %q) = %d, want %d", tt.method, tt.path, tt.escaped, tt.root, got, tt.want)
+		}
+	}
+}
+
+func TestMisconfiguredRootStillGatesQueries(t *testing.T) {
+	tests := []struct {
+		method, path, root string
+		want               Class
+	}{
+		{"POST", "/grafana/api/ds/query", "", Query},
+		{"POST", "/x/api/datasources/proxy/1", "/grafana", AdminOnly},
+		{"PUT", "/grafana/api/user", "", SelfUpdate},
+	}
+	for _, tt := range tests {
+		if got := ClassifyRequest(tt.method, tt.path, tt.path, tt.root); got != tt.want {
 			t.Errorf("ClassifyRequest(%q, %q, %q) = %d, want %d", tt.method, tt.path, tt.root, got, tt.want)
 		}
 	}

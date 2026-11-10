@@ -22,6 +22,8 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"path"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -34,6 +36,8 @@ const (
 	ModeReport  Mode = "report"
 	ModeEnforce Mode = "enforce"
 )
+
+var rootPathRe = regexp.MustCompile(`^(/[A-Za-z0-9._~-]+)+$`)
 
 const minSyncInterval = 10 * time.Second
 
@@ -75,8 +79,8 @@ func Load(getenv func(string) string) (Config, error) {
 	c.Upstream = u
 	c.Listen = orDefault(getenv("GATE_LISTEN"), ":3001")
 	c.RootPath = getenv("GATE_ROOT_PATH")
-	if c.RootPath != "" && (!strings.HasPrefix(c.RootPath, "/") || strings.HasSuffix(c.RootPath, "/")) {
-		return c, errors.New("GATE_ROOT_PATH must start with / and not end with /")
+	if c.RootPath != "" && (!rootPathRe.MatchString(c.RootPath) || path.Clean(c.RootPath) != c.RootPath) {
+		return c, errors.New("GATE_ROOT_PATH must be a clean absolute path like /grafana")
 	}
 	c.DashboardsDir = orDefault(getenv("GATE_DASHBOARDS_DIR"), "/etc/grafana/dashboards")
 	c.MySQLUIDs = map[string]bool{}

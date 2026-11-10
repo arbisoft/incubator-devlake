@@ -42,8 +42,9 @@ import (
 )
 
 const (
-	maxBodyBytes = 16 << 20
-	readyTimeout = 5 * time.Second
+	maxBodyBytes    = 16 << 20
+	maxProfileBytes = 1 << 20
+	readyTimeout    = 5 * time.Second
 )
 
 // Event names written to the log.
@@ -62,6 +63,7 @@ const (
 	reasonTooLarge        = "request body too large"
 	reasonBadBody         = "invalid request body"
 	reasonAmbiguous       = "ambiguous key"
+	reasonScopingKey      = "login and email can only be changed by an administrator"
 )
 
 // Gate is the HTTP handler that gates and proxies requests.
@@ -138,7 +140,7 @@ func (g *Gate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		g.proxy.ServeHTTP(w, r)
 		return
 	}
-	class := policy.ClassifyRequest(r.Method, r.URL.Path, g.cfg.RootPath)
+	class := policy.ClassifyRequest(r.Method, r.URL.Path, r.URL.EscapedPath(), g.cfg.RootPath)
 	if class == policy.Pass {
 		g.proxy.ServeHTTP(w, r)
 		return
@@ -189,11 +191,18 @@ func (g *Gate) gated(w http.ResponseWriter, r *http.Request, class policy.Class)
 		return
 	}
 	if id.AdminFor(r) {
+		if !id.ServerAdmin {
+			r.Header.Set("X-Grafana-Org-Id", strconv.FormatInt(id.OrgID, 10))
+		}
 		g.proxy.ServeHTTP(w, r)
 		return
 	}
 	if class == policy.AdminOnly {
 		g.decide(w, r, &verdict{status: http.StatusForbidden, reason: reasonAdminOnly}, id, nil)
+		return
+	}
+	if class == policy.SelfUpdate {
+		g.selfUpdate(w, r, id)
 		return
 	}
 	g.query(w, r, id)
@@ -220,16 +229,74 @@ func setBody(r *http.Request, body []byte) {
 	r.Header.Set("Content-Length", strconv.Itoa(len(body)))
 }
 
+func contentEncodingAllowed(r *http.Request) bool {
+	for _, enc := range r.Header.Values("Content-Encoding") {
+		if e := strings.TrimSpace(enc); e != "" && !strings.EqualFold(e, "identity") {
+			return false
+		}
+	}
+	return true
+}
+
+// selfUpdate forwards a non-admin profile update unless it changes the caller's login or email.
+func (g *Gate) selfUpdate(w http.ResponseWriter, r *http.Request, id identity.Identity) {
+	if !contentEncodingAllowed(r) {
+		g.decide(w, r, &verdict{status: http.StatusUnsupportedMediaType, reason: reasonEncoding}, id, nil)
+		return
+	}
+	original, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxProfileBytes))
+	if err != nil {
+		v := &verdict{status: http.StatusBadRequest, reason: reasonBadBody}
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			v = &verdict{status: http.StatusRequestEntityTooLarge, reason: reasonTooLarge}
+		}
+		// A body that could not be read in full cannot be forwarded, so report mode answers it too.
+		g.logEvent(eventRejected, r, id, v)
+		writeJSON(w, v.status, v.body())
+		return
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(original, &fields); err != nil || fields == nil {
+		g.decide(w, r, &verdict{status: http.StatusBadRequest, reason: reasonBadBody}, id, original)
+		return
+	}
+	for _, f := range []struct{ key, current string }{{"login", id.Login}, {"email", id.Email}} {
+		var values []json.RawMessage
+		for k, v := range fields {
+			if strings.EqualFold(k, f.key) {
+				values = append(values, v)
+			}
+		}
+		if len(values) > 1 {
+			g.decide(w, r, &verdict{status: http.StatusBadRequest, reason: reasonAmbiguous}, id, original)
+			return
+		}
+		if len(values) == 0 {
+			continue
+		}
+		var val string
+		if err := json.Unmarshal(values[0], &val); err != nil {
+			g.decide(w, r, &verdict{status: http.StatusBadRequest, reason: reasonBadBody}, id, original)
+			return
+		}
+		if val = strings.TrimSpace(val); val != "" && val != f.current {
+			g.decide(w, r, &verdict{status: http.StatusForbidden, reason: reasonScopingKey}, id, original)
+			return
+		}
+	}
+	setBody(r, original)
+	g.proxy.ServeHTTP(w, r)
+}
+
 func (g *Gate) query(w http.ResponseWriter, r *http.Request, id identity.Identity) {
 	if r.Method != http.MethodPost {
 		g.decide(w, r, &verdict{status: http.StatusForbidden, reason: reasonMethod}, id, nil)
 		return
 	}
-	for _, enc := range r.Header.Values("Content-Encoding") {
-		if e := strings.TrimSpace(enc); e != "" && !strings.EqualFold(e, "identity") {
-			g.decide(w, r, &verdict{status: http.StatusUnsupportedMediaType, reason: reasonEncoding}, id, nil)
-			return
-		}
+	if !contentEncodingAllowed(r) {
+		g.decide(w, r, &verdict{status: http.StatusUnsupportedMediaType, reason: reasonEncoding}, id, nil)
+		return
 	}
 	if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type"))), "application/json") {
 		g.decide(w, r, &verdict{status: http.StatusUnsupportedMediaType, reason: reasonContentType}, id, nil)

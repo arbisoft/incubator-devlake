@@ -42,6 +42,8 @@ type Caller struct {
 type Template struct {
 	Location string
 	HasLogin bool
+	// HasCaller is set when the query has a login or email slot.
+	HasCaller bool
 	// AllProjects is set when the dashboard is tagged devlake:all-projects.
 	AllProjects bool
 	re          *regexp.Regexp
@@ -70,7 +72,7 @@ func newTemplate(location, sql string, vars map[string]Variable) (*Template, err
 	if err != nil {
 		return nil, fmt.Errorf("compiled pattern is invalid: %w", err)
 	}
-	t := &Template{Location: location, HasLogin: counts[fieldLogin] > 0, re: re, inner: inner}
+	t := &Template{Location: location, HasLogin: counts[fieldLogin] > 0, HasCaller: counts[fieldLogin] > 0 || counts[fieldEmail] > 0, re: re, inner: inner}
 	for field, cs := range callerSlots {
 		for n := 0; n < counts[field]; n++ {
 			t.groups[field] = append(t.groups[field], re.SubexpIndex(fmt.Sprintf("%s%d", cs.group, n)))
@@ -127,11 +129,11 @@ func (s *Set) Match(sql string, c Caller) MatchResult {
 		if m == nil {
 			continue
 		}
-		if !t.HasLogin && t.AllProjects {
+		if !t.HasCaller && t.AllProjects {
 			return MatchResult{Accepted: true, Location: t.Location}
 		}
 		reason := ReasonNoLoginSlot
-		if t.HasLogin {
+		if t.HasLogin || t.AllProjects {
 			reason = firstMismatch(sql, m, t, want, wantInner, reasons)
 			if reason == "" {
 				return MatchResult{Accepted: true, Location: t.Location}

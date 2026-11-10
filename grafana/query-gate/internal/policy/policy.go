@@ -25,12 +25,14 @@ import (
 	"strings"
 )
 
-// Class is how the gate treats a request path.
+// Class is how the gate treats a request path; a higher value is stricter.
 type Class int
 
 const (
 	// Pass is forwarded without inspection.
 	Pass Class = iota
+	// SelfUpdate is a profile update whose login and email must not change.
+	SelfUpdate
 	// Query is a datasource query that non-admins may send only when it matches a saved query.
 	Query
 	// AdminOnly is reserved for admins.
@@ -41,6 +43,7 @@ var adminPrefixes = []string{
 	"/api/datasources/proxy/",
 	"/api/public/dashboards",
 	"/api/snapshots",
+	"/api/snapshots-delete/",
 	"/api/snapshot/",
 	"/api/ruler",
 	"/api/v1/rule/",
@@ -85,9 +88,33 @@ func normalise(p, root string) string {
 	return strings.ToLower(path.Clean(p))
 }
 
-// Classify normalises the decoded request path and says how the gate treats it.
-func Classify(p, root string) Class {
-	p = normalise(p, root)
+// forms lists the lower-cased cleaned and uncleaned paths, plus every suffix from an /api/ or /apis/ segment.
+func forms(p, root string) []string {
+	p = stripRoot(p, root)
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	var out []string
+	seen := map[string]bool{}
+	add := func(f string) {
+		if !seen[f] {
+			seen[f] = true
+			out = append(out, f)
+		}
+	}
+	for _, base := range []string{strings.ToLower(path.Clean(p)), strings.ToLower(p)} {
+		add(base)
+		for k := 1; k < len(base); k++ {
+			if strings.HasPrefix(base[k:], "/api/") || strings.HasPrefix(base[k:], "/apis/") {
+				add(base[k:])
+			}
+		}
+	}
+	return out
+}
+
+// classifyOne classifies one lower-cased path.
+func classifyOne(p string) Class {
 	switch {
 	case p == "/api/ds/query":
 		return Query
@@ -110,12 +137,38 @@ func Classify(p, root string) Class {
 	return Pass
 }
 
+// Classify returns the strictest class over the path forms Grafana's router might match.
+func Classify(p, root string) Class {
+	c := Pass
+	for _, f := range forms(p, root) {
+		c = max(c, classifyOne(f))
+	}
+	return c
+}
+
 var dashboardPublicConfigRe = regexp.MustCompile(`^/api/dashboards/uid/[^/]+/public-dashboards$`)
 
-// ClassifyRequest is Classify, except that reading a dashboard's public-dashboard settings passes, as the dashboard page does.
-func ClassifyRequest(method, p, root string) Class {
-	c := Classify(p, root)
+func isCanonical(p, root string) bool {
+	r := stripRoot(p, root)
+	if !strings.HasPrefix(r, "/") {
+		return false
+	}
+	c := path.Clean(r)
+	return r == c || r == c+"/"
+}
+
+// ClassifyRequest is Classify over the decoded and escaped paths, with the method-specific rules applied.
+func ClassifyRequest(method, p, escaped, root string) Class {
+	c := max(Classify(p, root), Classify(escaped, root))
+	if method == http.MethodPut {
+		for _, f := range append(forms(p, root), forms(escaped, root)...) {
+			if f == "/api/user" || f == "/api/user/" {
+				c = max(c, SelfUpdate)
+			}
+		}
+	}
 	if c == AdminOnly && (method == http.MethodGet || method == http.MethodHead) &&
+		strings.EqualFold(escaped, p) && isCanonical(p, root) &&
 		dashboardPublicConfigRe.MatchString(normalise(p, root)) {
 		return Pass
 	}

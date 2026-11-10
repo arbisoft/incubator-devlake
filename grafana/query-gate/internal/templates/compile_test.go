@@ -252,6 +252,25 @@ func TestCompileSlotGrammars(t *testing.T) {
 			bad: []string{"/* */ SELECT 2 /* */ SELECT 1", "/* a* */ SELECT 1", "/* a/b */ SELECT 1"},
 		},
 		{
+			name: "value in block comment cannot open executable", sql: "SELECT 1 /*${v}*/", vars: vmap(single),
+			ok:  []string{"SELECT 1 /*x!*/", "SELECT 1 /**/"},
+			bad: []string{"SELECT 1 /*!50000 x*/", "SELECT 1 /*+x*/"},
+		},
+		{
+			name: "slot after spaced dash", sql: "SELECT 1 - ${v}", vars: vmap(single),
+			ok: []string{"SELECT 1 - 5"},
+		},
+		{
+			name: "raw list with dollar allValue", sql: "x IN (${v:raw})", vars: vmap(Variable{Name: "v", Type: "query", Multi: true, IncludeAll: true, AllValue: "$__all"}),
+			ok:  []string{"x IN ($__all)", "x IN (1,2)"},
+			bad: []string{"x IN (a)"},
+		},
+		{
+			name: "custom option after dash", sql: "INTERVAL -${v} DAY", vars: vmap(Variable{Name: "v", Type: "custom", Options: []string{"1", "7"}}),
+			ok:  []string{"INTERVAL -7 DAY"},
+			bad: []string{"INTERVAL -8 DAY"},
+		},
+		{
 			name: "newlines and case in literals", sql: "SELECT 1\nFROM t\tWHERE (a = ${v:sqlstring})", vars: vmap(single),
 			ok:  []string{"SELECT 1\nFROM t\tWHERE (a = 'x')"},
 			bad: []string{"select 1\nFROM t\tWHERE (a = 'x')"},
@@ -319,6 +338,11 @@ func TestCompileErrors(t *testing.T) {
 		{"login in macro", "WHERE $__timeFilter(${__user.login:sqlstring})", vmap(), "macro call"},
 		{"custom option with dollar", "x = ${v}", vmap(Variable{Name: "v", Type: "custom", Options: []string{"a$b"}}), "contains"},
 		{"possibly empty list after dash", "SELECT 1 -${v:sqlstring}- 1", vmap(multi), "dash"},
+		{"slot after dash", "SELECT 1 -${v:sqlstring}", vmap(multi), "dash or slash"},
+		{"slot after slash", "SELECT 1 /${v:sqlstring}", vmap(multi), "dash or slash"},
+		{"backslash in backticks", "SELECT `a\\b` WHERE x = ${v:sqlstring}", vmap(single), "backticks"},
+		{"custom option leading dash", "x = ${v}", vmap(Variable{Name: "v", Type: "custom", Options: []string{"-1"}}), "starts or ends"},
+		{"all value with quote", "x IN (${v:sqlstring})", vmap(Variable{Name: "v", Type: "query", Multi: true, IncludeAll: true, AllValue: "'x"}), "plain SQL fragment"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

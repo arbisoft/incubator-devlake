@@ -281,3 +281,19 @@ func TestMatchEmptyMultiValueSelection(t *testing.T) {
 		}
 	}
 }
+
+func TestAllProjectsTagStillChecksEmailSlots(t *testing.T) {
+	const body = `{"title": "All", "tags": ["devlake:all-projects"], "panels": [{"title": "P", "targets": [{"refId": "A", "rawSql": "SELECT 1 WHERE email = ${__user.email:sqlstring}"}]}]}`
+	set, errs := loadJSON(t, map[string]string{"d.json": body})
+	if len(errs) != 0 {
+		t.Fatalf("unexpected errors %v", errs)
+	}
+	alice := Caller{Login: "alice", Email: "alice@example.test"}
+	if got := set.Match("SELECT 1 WHERE email = 'alice@example.test'", alice); !got.Accepted {
+		t.Fatalf("own email = %+v", got)
+	}
+	got := set.Match("SELECT 1 WHERE email = 'mallory@example.test'", alice)
+	if got.Accepted || got.Reason != ReasonEmailMismatch {
+		t.Fatalf("other email = %+v", got)
+	}
+}

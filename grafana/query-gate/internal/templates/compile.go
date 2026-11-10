@@ -53,8 +53,8 @@ const (
 	patEpochMs = `[0-9]{1,16}`
 	// patLineComment is a value in a line comment that cannot end the comment.
 	patLineComment = `[^\n\r]*`
-	// patBlockComment is a value in a block comment that cannot end the comment.
-	patBlockComment = `[^*/]*`
+	// patBlockComment is a value in a block comment that cannot end the comment or start an executable or optimizer-hint comment.
+	patBlockComment = `(?:[^*/!+][^*/]*)?`
 )
 
 // Variable is the subset of a dashboard template variable the compiler needs.
@@ -176,12 +176,14 @@ func compile(sql string, vars map[string]Variable) (pattern string, counts [fiel
 	}
 	var pat, lit strings.Builder
 	var lx lexer
+	var last byte
 	flush := func() {
 		if lit.Len() == 0 {
 			return
 		}
 		lx.feed(lit.String())
 		pat.WriteString(regexp.QuoteMeta(lit.String()))
+		last = lit.String()[lit.Len()-1]
 		lit.Reset()
 	}
 	i := 0
@@ -215,13 +217,22 @@ func compile(sql string, vars map[string]Variable) (pattern string, counts [fiel
 			i = end
 			continue
 		}
-		if plan.kind == slotPattern && plan.canBeEmpty && strings.HasSuffix(lit.String(), "-") && lx.state == stateNormal {
-			return "", counts, inner, fmt.Errorf("%s: slot directly after a dash", slotText)
+		before := last
+		if lit.Len() > 0 {
+			before = lit.String()[lit.Len()-1]
+		}
+		probe := lx
+		probe.feed(lit.String())
+		if plan.kind == slotPattern && plan.canBeEmpty && probe.state == stateNormal && (before == '-' || before == '/') {
+			return "", counts, inner, fmt.Errorf("%s: slot directly after a dash or slash", slotText)
 		}
 		if dollarNameTailRe.MatchString(lit.String()) {
 			return "", counts, inner, fmt.Errorf("%s: slot directly after a dollar sign", slotText)
 		}
 		flush()
+		if lx.backslashInBacktick {
+			return "", counts, inner, errors.New("backslash inside backticks")
+		}
 		if m := macroOpenRe.FindStringSubmatch(sql[:i]); m != nil && backendMacros[m[1]] {
 			numeric := lx.state == stateNormal && plan.kind == slotPattern && (plan.byState != nil || plan.pattern == patEpochMs)
 			if plan.kind != slotOptions && !numeric {
@@ -280,6 +291,9 @@ func compile(sql string, vars map[string]Variable) (pattern string, counts [fiel
 		i = end
 	}
 	flush()
+	if lx.backslashInBacktick {
+		return "", counts, inner, errors.New("backslash inside backticks")
+	}
 	return "(?s)^" + pat.String() + "$", counts, inner, nil
 }
 
@@ -357,6 +371,11 @@ func resolveCustom(v Variable, format string) (slotPlan, error) {
 				return slotPlan{}, fmt.Errorf("custom option %q contains %q", o, bad)
 			}
 		}
+		for _, edge := range []string{"-", "/", "*"} {
+			if strings.HasPrefix(o, edge) || strings.HasSuffix(o, edge) {
+				return slotPlan{}, fmt.Errorf("custom option %q starts or ends with %q", o, edge)
+			}
+		}
 	}
 	var fed, quoted []string
 	for _, o := range opts {
@@ -404,6 +423,11 @@ func resolveList(v Variable, format string) (slotPlan, error) {
 		return slotPlan{}, fmt.Errorf("unsupported format %q for a multi-value variable", format)
 	}
 	if v.AllValue != "" {
+		var al lexer
+		al.feed(v.AllValue)
+		if al.state != stateNormal || al.pendingEsc || al.backslashInBacktick {
+			return slotPlan{}, fmt.Errorf("all value %q is not a plain SQL fragment", v.AllValue)
+		}
 		all := regexp.QuoteMeta(v.AllValue)
 		p.pattern = "(?:" + p.pattern + "|" + all + ")"
 		for st, bp := range p.byState {

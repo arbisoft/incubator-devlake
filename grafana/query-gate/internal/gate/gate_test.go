@@ -77,9 +77,11 @@ func newUpstream(t *testing.T) *upstream {
 		path := strings.TrimPrefix(r.URL.Path, "/grafana")
 		switch path {
 		case "/api/user", "/api/user/orgs":
-			u.identityCalls.Add(1)
-			serveIdentity(w, r, path)
-			return
+			if r.Method == http.MethodGet {
+				u.identityCalls.Add(1)
+				serveIdentity(w, r, path)
+				return
+			}
 		case "/api/health":
 			w.WriteHeader(int(u.healthStatus.Load()))
 			return
@@ -537,4 +539,75 @@ func TestUpstreamDownGivesBadGateway(t *testing.T) {
 	if status != 502 || !strings.Contains(body, "message") {
 		t.Fatalf("status %d %s", status, body)
 	}
+}
+
+func TestOrgAdminRequestIsPinnedToVerifiedOrg(t *testing.T) {
+	tests := []struct {
+		name, cookie string
+		headers      []string
+		want         string
+	}{
+		{"org admin without hint", "orgadmin", nil, "1"},
+		{"server admin keeps the requested org", "root", []string{"X-Grafana-Org-Id", "2"}, "2"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newHarness(t, config.ModeEnforce, "")
+			status, body := h.do(t, http.MethodPost, "/api/ds/query", tt.cookie, "application/json", queryBody("SELECT 1"), tt.headers...)
+			got := h.up.received()
+			if status != 200 || len(got) != 1 {
+				t.Fatalf("status %d %s, got %+v", status, body, got)
+			}
+			if v := got[0].header.Get("X-Grafana-Org-Id"); v != tt.want {
+				t.Fatalf("upstream org header = %q, want %q", v, tt.want)
+			}
+		})
+	}
+}
+
+func TestSelfUpdateCannotChangeScopingKeys(t *testing.T) {
+	const full = `{"name":"Alice A","login":"alice","email":"alice@example.test","theme":"dark"}`
+	tests := []struct {
+		name, cookie, body string
+		enforceStatus      int
+		reportRejects      bool
+	}{
+		{"login change", "alice", `{"login":"bob"}`, 403, true},
+		{"email change", "alice", `{"email":"bob@example.test"}`, 403, true},
+		{"unchanged profile", "alice", full, 200, false},
+		{"duplicate login keys", "alice", `{"login":"alice","LOGIN":"bob"}`, 400, true},
+		{"login not a string", "alice", `{"login":5}`, 400, true},
+		{"admin renames", "orgadmin", `{"login":"renamed"}`, 200, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newHarness(t, config.ModeEnforce, "")
+			status, body := h.do(t, http.MethodPut, "/api/user", tt.cookie, "application/json", tt.body)
+			got := h.up.received()
+			if status != tt.enforceStatus {
+				t.Fatalf("enforce status %d %s, want %d", status, body, tt.enforceStatus)
+			}
+			if tt.enforceStatus == 200 && (len(got) != 1 || string(got[0].body) != tt.body) {
+				t.Fatalf("enforce forwarded %+v", got)
+			}
+			if tt.enforceStatus != 200 && len(got) != 0 {
+				t.Fatalf("enforce forwarded %+v", got)
+			}
+			r := newHarness(t, config.ModeReport, "")
+			status, body = r.do(t, http.MethodPut, "/api/user", tt.cookie, "application/json", tt.body)
+			got = r.up.received()
+			if status != 200 || len(got) != 1 || string(got[0].body) != tt.body {
+				t.Fatalf("report status %d %s, got %+v", status, body, got)
+			}
+			if has := strings.Contains(r.logs.String(), `"would_reject"`); has != tt.reportRejects {
+				t.Fatalf("would_reject logged = %v, want %v:\n%s", has, tt.reportRejects, r.logs)
+			}
+		})
+	}
+	t.Run("reading the profile is not checked", func(t *testing.T) {
+		h := newHarness(t, config.ModeEnforce, "")
+		if status, body := h.do(t, http.MethodGet, "/api/user", "alice", "", ""); status != 200 {
+			t.Fatalf("status %d %s", status, body)
+		}
+	})
 }

@@ -18,6 +18,7 @@ limitations under the License.
 package sync
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -408,5 +409,53 @@ func TestRunStopsWithContext(t *testing.T) {
 	}
 	if f.callCount() == 0 {
 		t.Fatal("Run never synced")
+	}
+}
+
+func TestSaverFallsBackToCreatorOnlyOnFirstGeneration(t *testing.T) {
+	tests := []struct {
+		name string
+		d    dash
+		want int
+	}{
+		{"first generation uses creator", dash{1, map[string]string{"grafana.app/createdBy": "user:u-root"}, dashJSON("A", "SELECT a")}, 1},
+		{"later generation ignores creator", dash{3, map[string]string{"grafana.app/createdBy": "user:u-root"}, dashJSON("A", "SELECT a")}, 0},
+		{"later generation uses updater", dash{3, map[string]string{"grafana.app/updatedBy": "user:u-root"}, dashJSON("A", "SELECT a")}, 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newFake()
+			f.dashboard["a"] = tt.d
+			s := newSyncer(t, f, "svc", nil)
+			if err := s.RunOnce(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			if got := s.Current().Len(); got != tt.want {
+				t.Fatalf("Len = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSyncLogsNewlyTrustedGeneration(t *testing.T) {
+	f := newFake()
+	f.dashboard["a"] = dash{1, by("user:u-root"), dashJSON("A", "SELECT a")}
+	s := newSyncer(t, f, "svc", nil)
+	var buf bytes.Buffer
+	s.logger = slog.New(slog.NewJSONHandler(&buf, nil))
+	for i := 0; i < 2; i++ {
+		if err := s.RunOnce(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := strings.Count(buf.String(), `"msg":"dashboard trusted"`); n != 1 {
+		t.Fatalf("trusted lines = %d, want 1:\n%s", n, buf.String())
+	}
+	f.edit(func() { f.dashboard["a"] = dash{2, by("user:u-root"), dashJSON("A", "SELECT a2")} })
+	if err := s.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(buf.String(), `"msg":"dashboard trusted"`); n != 2 {
+		t.Fatalf("trusted lines = %d, want 2:\n%s", n, buf.String())
 	}
 }

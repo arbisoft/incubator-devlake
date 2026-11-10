@@ -62,6 +62,7 @@ type Syncer struct {
 	logger   *slog.Logger
 	http     *http.Client
 	cache    map[string]*cached
+	warned   map[string]int64
 	compiles int
 }
 
@@ -76,6 +77,7 @@ func New(base *url.URL, root, user, password string, interval time.Duration, shi
 		logger:   logger,
 		http:     &http.Client{},
 		cache:    map[string]*cached{},
+		warned:   map[string]int64{},
 	}
 	s.current.Store(templates.NewSet(shipped))
 	return s
@@ -129,6 +131,7 @@ func (s *Syncer) RunOnce(ctx context.Context) error {
 	for uid := range s.cache {
 		if !seen[uid] {
 			delete(s.cache, uid)
+			delete(s.warned, uid)
 		}
 	}
 	s.current.Store(templates.NewSet(append([][]*templates.Template{s.shipped}, trusted...)...))
@@ -144,16 +147,27 @@ type dashboardItem struct {
 	Spec json.RawMessage `json:"spec"`
 }
 
-func saverOf(annotations map[string]string) string {
+// saverOf names the last saver; the creator stands in only for a never-updated first generation.
+func saverOf(annotations map[string]string, generation int64) string {
 	if v := annotations["grafana.app/updatedBy"]; v != "" {
 		return v
 	}
-	return annotations["grafana.app/createdBy"]
+	if generation == 1 {
+		return annotations["grafana.app/createdBy"]
+	}
+	return ""
 }
 
 func (s *Syncer) dashboardTemplates(item dashboardItem, admins map[string]bool) []*templates.Template {
 	uid := item.Metadata.Name
-	saver := saverOf(item.Metadata.Annotations)
+	gen := item.Metadata.Generation
+	saver := saverOf(item.Metadata.Annotations, gen)
+	if saver == "" && gen > 1 {
+		if w, ok := s.warned[uid]; !ok || w != gen {
+			s.logger.Warn("dashboard not trusted: last updater unknown", "dashboard_uid", uid, "generation", gen)
+			s.warned[uid] = gen
+		}
+	}
 	if !strings.HasPrefix(saver, userPrefix) || !admins[strings.TrimPrefix(saver, userPrefix)] {
 		delete(s.cache, uid)
 		return nil
@@ -161,6 +175,7 @@ func (s *Syncer) dashboardTemplates(item dashboardItem, admins map[string]bool) 
 	c := s.cache[uid]
 	if c == nil || c.generation != item.Metadata.Generation || c.saver != saver {
 		s.compiles++
+		s.logger.Info("dashboard trusted", "dashboard_uid", uid, "generation", gen, "saver", saver)
 		ts, errs := templates.LoadDashboard(item.Spec, "db:"+uid)
 		for _, e := range errs {
 			s.logger.Warn("dashboard skipped query", "dashboard_uid", uid, "generation", item.Metadata.Generation, "location", e.Location, "error", e.Message)

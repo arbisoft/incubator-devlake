@@ -35,6 +35,8 @@ const (
 type lexer struct {
 	state      lexState
 	pendingEsc bool
+	// backslashInBacktick is set when a backslash is seen inside backticks, which Grafana treats as an escape and MySQL does not.
+	backslashInBacktick bool
 }
 
 func (l *lexer) feed(text string) {
@@ -56,9 +58,9 @@ func (l *lexer) feed(text string) {
 				l.state = stateBacktick
 			case c == '#':
 				l.state = stateLineComment
-			case c == '-' && i+2 < len(text) && text[i+1] == '-' && isCommentSpace(text[i+2]):
+			case c == '-' && i+1 < len(text) && text[i+1] == '-':
 				l.state = stateLineComment
-				i += 2
+				i++
 			case c == '/' && i+1 < len(text) && text[i+1] == '*':
 				l.state = stateBlockComment
 				i++
@@ -81,6 +83,9 @@ func (l *lexer) feed(text string) {
 				l.state = stateNormal
 			}
 		case stateBacktick:
+			if c == '\\' {
+				l.backslashInBacktick = true
+			}
 			if c == '`' {
 				if i+1 < len(text) && text[i+1] == '`' {
 					i++
@@ -100,10 +105,6 @@ func (l *lexer) feed(text string) {
 		}
 		i++
 	}
-}
-
-func isCommentSpace(c byte) bool {
-	return c == ' ' || c == '\t' || c == '\n'
 }
 
 func containsExecutableComment(text string) bool {
