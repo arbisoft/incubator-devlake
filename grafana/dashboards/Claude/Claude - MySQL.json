@@ -20,7 +20,20 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
   "id": null,
-  "links": [],
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Claude Trends",
+      "tooltip": "Weekly trends in cost per line, effort, agents, adoption and spend concentration",
+      "type": "link",
+      "url": "/d/claude_trends_mysql"
+    }
+  ],
   "panels": [
     {
       "datasource": "mysql",

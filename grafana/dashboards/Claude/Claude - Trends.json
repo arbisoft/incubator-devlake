@@ -1,0 +1,1552 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Weekly trends in Claude Code cost, effort, agents and adoption, from the hourly OTel metrics. Covers every user, including those whose clients send no logs.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Claude Usage",
+      "tooltip": "Hourly Claude Code usage, cost and acceptance for the selected range",
+      "type": "link",
+      "url": "/d/claude_adoption_mysql"
+    }
+  ],
+  "panels": [
+    {
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "**How to read this dashboard**\n\n- **Weeks** start on Monday (UTC). Only weeks that have ended and fall fully inside the time range are shown, so the current week appears once it ends.\n- **Coverage:** every panel comes from the hourly OTel metrics, which every Claude Code client sends, including clients that send no logs. Metric history starts on 2026-09-24.\n- **Effort and agents** are recorded per request from the hourly backfill onwards. Cost without them shows as *N/A* effort and as *Main thread*.\n- **Filters:** Project and Claude Code OTel teams narrow every panel. Developer narrows every panel except *Top 10% Share* and *Spend Concentration*, which compare people with each other.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.0.0",
+      "title": "About this dashboard",
+      "type": "text"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Estimated cost per 1,000 lines Claude Code added over the selected range.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "currencyUSD",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 0,
+        "y": 6
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Cost per 1k lines added$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT 1000 * c.cost / NULLIF(l.lines_added, 0) AS \"Cost per 1k lines added\",\n  c.opus / NULLIF(c.cost, 0) AS \"Opus share of cost\",\n  c.subagent / NULLIF(c.cost, 0) AS \"Subagent share of cost\"\nFROM (\n  SELECT SUM(estimated_cost_usd) AS cost,\n    SUM(CASE WHEN LOWER(model) LIKE '%opus%' THEN estimated_cost_usd ELSE 0 END) AS opus,\n    SUM(CASE WHEN agent_name <> '' THEN estimated_cost_usd ELSE 0 END) AS subagent\n  FROM _tool_claude_code_otel_hourly_model_usage\n  WHERE $__timeFilter(hour_start)\n    AND connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})\n) c\nCROSS JOIN (\n  SELECT SUM(lines_added) AS lines_added\n  FROM _tool_claude_code_otel_hourly_activity\n  WHERE $__timeFilter(hour_start)\n    AND connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})\n) l\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Cost per 1k Lines",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Opus models' share of estimated cost over the selected range.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percentunit",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 5,
+        "y": 6
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Opus share of cost$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT 1000 * c.cost / NULLIF(l.lines_added, 0) AS \"Cost per 1k lines added\",\n  c.opus / NULLIF(c.cost, 0) AS \"Opus share of cost\",\n  c.subagent / NULLIF(c.cost, 0) AS \"Subagent share of cost\"\nFROM (\n  SELECT SUM(estimated_cost_usd) AS cost,\n    SUM(CASE WHEN LOWER(model) LIKE '%opus%' THEN estimated_cost_usd ELSE 0 END) AS opus,\n    SUM(CASE WHEN agent_name <> '' THEN estimated_cost_usd ELSE 0 END) AS subagent\n  FROM _tool_claude_code_otel_hourly_model_usage\n  WHERE $__timeFilter(hour_start)\n    AND connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})\n) c\nCROSS JOIN (\n  SELECT SUM(lines_added) AS lines_added\n  FROM _tool_claude_code_otel_hourly_activity\n  WHERE $__timeFilter(hour_start)\n    AND connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})\n) l\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Opus Share",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Share of estimated cost from subagent requests rather than the main conversation.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percentunit",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 10,
+        "y": 6
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Subagent share of cost$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT 1000 * c.cost / NULLIF(l.lines_added, 0) AS \"Cost per 1k lines added\",\n  c.opus / NULLIF(c.cost, 0) AS \"Opus share of cost\",\n  c.subagent / NULLIF(c.cost, 0) AS \"Subagent share of cost\"\nFROM (\n  SELECT SUM(estimated_cost_usd) AS cost,\n    SUM(CASE WHEN LOWER(model) LIKE '%opus%' THEN estimated_cost_usd ELSE 0 END) AS opus,\n    SUM(CASE WHEN agent_name <> '' THEN estimated_cost_usd ELSE 0 END) AS subagent\n  FROM _tool_claude_code_otel_hourly_model_usage\n  WHERE $__timeFilter(hour_start)\n    AND connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})\n) c\nCROSS JOIN (\n  SELECT SUM(lines_added) AS lines_added\n  FROM _tool_claude_code_otel_hourly_activity\n  WHERE $__timeFilter(hour_start)\n    AND connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})\n) l\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Subagent Share",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Share of the range's estimated cost spent by the 10% of users who spent the most. Ignores the Developer filter.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percentunit",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 15,
+        "y": 6
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Top 10% share of cost$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Ignores the developer filter: a share of spend across people is always 100% for one person.\nSELECT SUM(CASE WHEN rn <= CEIL(0.10 * n) THEN cost ELSE 0 END) / NULLIF(MAX(total), 0) AS \"Top 10% share of cost\"\nFROM (\n  SELECT cost, ROW_NUMBER() OVER (ORDER BY cost DESC) AS rn, COUNT(*) OVER () AS n, SUM(cost) OVER () AS total\n  FROM (\n    SELECT COALESCE(NULLIF(user_email, ''), user_key) AS user, SUM(estimated_cost_usd) AS cost\n    FROM _tool_claude_code_otel_hourly_model_usage\n    WHERE $__timeFilter(hour_start)\n      AND connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    GROUP BY 1\n    HAVING SUM(estimated_cost_usd) > 0\n  ) u\n) r\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Top 10% Share",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Users with a Claude Code session or active time in the last completed week of the range.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 6
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Weekly active users$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- A user is active on a UTC day with any session or active time; weekdays are Monday to Friday.\nWITH RECURSIVE wk AS (\n  SELECT DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY) AS d\n  UNION ALL\n  SELECT DATE_ADD(d, INTERVAL 7 DAY) FROM wk WHERE DATE_ADD(d, INTERVAL 7 DAY) < $__timeTo()\n),\nweeks AS (\n  SELECT DATE_FORMAT(d, '%Y-%m-%d') AS week FROM wk\n  WHERE TIMESTAMP(d) >= $__timeFrom() AND TIMESTAMP(DATE_ADD(d, INTERVAL 7 DAY)) <= DATE_ADD($__timeTo(), INTERVAL 1 SECOND)\n),\ndays AS (\n  SELECT DISTINCT DATE(hour_start) AS d, COALESCE(NULLIF(user_email, ''), user_key) AS user\n  FROM _tool_claude_code_otel_hourly_activity\n  WHERE $__timeFilter(hour_start)\n    AND connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})\n    AND (session_count > 0 OR active_time_seconds > 0)\n),\nweekly AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(d), INTERVAL WEEKDAY(d) DAY), '%Y-%m-%d') AS week, COUNT(DISTINCT user) AS users, SUM(WEEKDAY(d) < 5) AS weekdays\n  FROM days\n  GROUP BY 1\n)\nSELECT TIMESTAMP(w.week) + INTERVAL 84 HOUR AS \"time\",\n  COALESCE(k.users, 0) AS \"Weekly active users\",\n  k.weekdays / NULLIF(k.users, 0) AS \"Active weekdays per user\"\nFROM weeks w\nLEFT JOIN weekly k ON k.week = w.week\nORDER BY 1\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Weekly Users",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "id": 7,
+      "panels": [],
+      "title": "Cost",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Bars: estimated cost per 1,000 lines Claude Code added in each completed week (left axis). Line: Opus models' share of that week's cost (right axis). Cost and lines are summed separately over the same users.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            },
+            "axisSoftMin": 0,
+            "barWidthFactor": 0.4
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cost per 1k lines added"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Cost per 1k lines added (USD)"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Opus share of cost"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "custom.drawStyle",
+                "value": "line"
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "always"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Opus share of cost"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 11
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Completed Monday-start UTC weeks only; cost and lines are summed separately and joined on the week.\nWITH RECURSIVE wk AS (\n  SELECT DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY) AS d\n  UNION ALL\n  SELECT DATE_ADD(d, INTERVAL 7 DAY) FROM wk WHERE DATE_ADD(d, INTERVAL 7 DAY) < $__timeTo()\n),\nweeks AS (\n  SELECT DATE_FORMAT(d, '%Y-%m-%d') AS week FROM wk\n  WHERE TIMESTAMP(d) >= $__timeFrom() AND TIMESTAMP(DATE_ADD(d, INTERVAL 7 DAY)) <= DATE_ADD($__timeTo(), INTERVAL 1 SECOND)\n),\ncost AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(hour_start), INTERVAL WEEKDAY(hour_start) DAY), '%Y-%m-%d') AS week, SUM(estimated_cost_usd) AS cost,\n    SUM(CASE WHEN LOWER(model) LIKE '%opus%' THEN estimated_cost_usd ELSE 0 END) AS opus\n  FROM _tool_claude_code_otel_hourly_model_usage\n  WHERE $__timeFilter(hour_start)\n    AND connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})\n  GROUP BY 1\n),\nadded AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(hour_start), INTERVAL WEEKDAY(hour_start) DAY), '%Y-%m-%d') AS week, SUM(lines_added) AS lines_added\n  FROM _tool_claude_code_otel_hourly_activity\n  WHERE $__timeFilter(hour_start)\n    AND connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})\n  GROUP BY 1\n)\nSELECT TIMESTAMP(w.week) + INTERVAL 84 HOUR AS \"time\",\n  1000 * c.cost / NULLIF(l.lines_added, 0) AS \"Cost per 1k lines added\",\n  c.opus / NULLIF(c.cost, 0) AS \"Opus share of cost\"\nFROM weeks w\nLEFT JOIN cost c ON c.week = w.week\nLEFT JOIN added l ON l.week = w.week\nORDER BY 1\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Cost per 1k Lines Added and Opus Share (Weekly)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Each bar is one completed week's estimated cost, split by the effort level its requests reported. N/A is cost whose requests reported no effort.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "percent"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            },
+            "axisSoftMin": 0,
+            "barWidthFactor": 0.4
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Low"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Medium"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "High"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "XHigh"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Max"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "N/A"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "text",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Completed Monday-start UTC weeks only; 'N/A' is cost whose requests reported no effort.\nWITH RECURSIVE wk AS (\n  SELECT DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY) AS d\n  UNION ALL\n  SELECT DATE_ADD(d, INTERVAL 7 DAY) FROM wk WHERE DATE_ADD(d, INTERVAL 7 DAY) < $__timeTo()\n),\nweeks AS (\n  SELECT DATE_FORMAT(d, '%Y-%m-%d') AS week FROM wk\n  WHERE TIMESTAMP(d) >= $__timeFrom() AND TIMESTAMP(DATE_ADD(d, INTERVAL 7 DAY)) <= DATE_ADD($__timeTo(), INTERVAL 1 SECOND)\n),\ne AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(hour_start), INTERVAL WEEKDAY(hour_start) DAY), '%Y-%m-%d') AS week, CASE effort WHEN 'low' THEN 'Low' WHEN 'medium' THEN 'Medium' WHEN 'high' THEN 'High' WHEN 'xhigh' THEN 'XHigh' WHEN 'max' THEN 'Max' ELSE 'N/A' END AS effort, SUM(estimated_cost_usd) AS cost\n  FROM _tool_claude_code_otel_hourly_model_usage\n  WHERE $__timeFilter(hour_start)\n    AND connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})\n  GROUP BY 1, 2\n)\nSELECT TIMESTAMP(w.week) + INTERVAL 84 HOUR AS \"time\",\n  SUM(CASE WHEN e.effort = 'Low' THEN e.cost ELSE 0 END) AS \"Low\",\n  SUM(CASE WHEN e.effort = 'Medium' THEN e.cost ELSE 0 END) AS \"Medium\",\n  SUM(CASE WHEN e.effort = 'High' THEN e.cost ELSE 0 END) AS \"High\",\n  SUM(CASE WHEN e.effort = 'XHigh' THEN e.cost ELSE 0 END) AS \"XHigh\",\n  SUM(CASE WHEN e.effort = 'Max' THEN e.cost ELSE 0 END) AS \"Max\",\n  SUM(CASE WHEN e.effort = 'N/A' THEN e.cost ELSE 0 END) AS \"N/A\"\nFROM weeks w\nLEFT JOIN e ON e.week = w.week\nGROUP BY w.week\nORDER BY 1\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Effort Mix (Weekly Share of Cost)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Estimated cost in each completed week for each effort level.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "currencyUSD",
+          "decimals": 2
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Low"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Medium"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "High"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "XHigh"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Max"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "N/A"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "text",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Completed Monday-start UTC weeks only; 'N/A' is cost whose requests reported no effort.\nWITH RECURSIVE wk AS (\n  SELECT DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY) AS d\n  UNION ALL\n  SELECT DATE_ADD(d, INTERVAL 7 DAY) FROM wk WHERE DATE_ADD(d, INTERVAL 7 DAY) < $__timeTo()\n),\nweeks AS (\n  SELECT DATE_FORMAT(d, '%Y-%m-%d') AS week FROM wk\n  WHERE TIMESTAMP(d) >= $__timeFrom() AND TIMESTAMP(DATE_ADD(d, INTERVAL 7 DAY)) <= DATE_ADD($__timeTo(), INTERVAL 1 SECOND)\n),\ne AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(hour_start), INTERVAL WEEKDAY(hour_start) DAY), '%Y-%m-%d') AS week, CASE effort WHEN 'low' THEN 'Low' WHEN 'medium' THEN 'Medium' WHEN 'high' THEN 'High' WHEN 'xhigh' THEN 'XHigh' WHEN 'max' THEN 'Max' ELSE 'N/A' END AS effort, SUM(estimated_cost_usd) AS cost\n  FROM _tool_claude_code_otel_hourly_model_usage\n  WHERE $__timeFilter(hour_start)\n    AND connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})\n  GROUP BY 1, 2\n)\nSELECT TIMESTAMP(w.week) + INTERVAL 84 HOUR AS \"time\",\n  SUM(CASE WHEN e.effort = 'Low' THEN e.cost ELSE 0 END) AS \"Low\",\n  SUM(CASE WHEN e.effort = 'Medium' THEN e.cost ELSE 0 END) AS \"Medium\",\n  SUM(CASE WHEN e.effort = 'High' THEN e.cost ELSE 0 END) AS \"High\",\n  SUM(CASE WHEN e.effort = 'XHigh' THEN e.cost ELSE 0 END) AS \"XHigh\",\n  SUM(CASE WHEN e.effort = 'Max' THEN e.cost ELSE 0 END) AS \"Max\",\n  SUM(CASE WHEN e.effort = 'N/A' THEN e.cost ELSE 0 END) AS \"N/A\"\nFROM weeks w\nLEFT JOIN e ON e.week = w.week\nGROUP BY w.week\nORDER BY 1\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Cost by Effort (Weekly)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 29
+      },
+      "id": 11,
+      "panels": [],
+      "title": "Adoption",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Bars: users with a Claude Code session or active time in each completed week (left axis). Line: how many of Monday to Friday each of them was active on average, by UTC day (right axis).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            },
+            "axisSoftMin": 0,
+            "barWidthFactor": 0.4
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Weekly active users"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Weekly active users"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Active weekdays per user"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 5
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.drawStyle",
+                "value": "line"
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "always"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Active weekdays per user"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 30
+      },
+      "id": 12,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- A user is active on a UTC day with any session or active time; weekdays are Monday to Friday.\nWITH RECURSIVE wk AS (\n  SELECT DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY) AS d\n  UNION ALL\n  SELECT DATE_ADD(d, INTERVAL 7 DAY) FROM wk WHERE DATE_ADD(d, INTERVAL 7 DAY) < $__timeTo()\n),\nweeks AS (\n  SELECT DATE_FORMAT(d, '%Y-%m-%d') AS week FROM wk\n  WHERE TIMESTAMP(d) >= $__timeFrom() AND TIMESTAMP(DATE_ADD(d, INTERVAL 7 DAY)) <= DATE_ADD($__timeTo(), INTERVAL 1 SECOND)\n),\ndays AS (\n  SELECT DISTINCT DATE(hour_start) AS d, COALESCE(NULLIF(user_email, ''), user_key) AS user\n  FROM _tool_claude_code_otel_hourly_activity\n  WHERE $__timeFilter(hour_start)\n    AND connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})\n    AND (session_count > 0 OR active_time_seconds > 0)\n),\nweekly AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(d), INTERVAL WEEKDAY(d) DAY), '%Y-%m-%d') AS week, COUNT(DISTINCT user) AS users, SUM(WEEKDAY(d) < 5) AS weekdays\n  FROM days\n  GROUP BY 1\n)\nSELECT TIMESTAMP(w.week) + INTERVAL 84 HOUR AS \"time\",\n  COALESCE(k.users, 0) AS \"Weekly active users\",\n  k.weekdays / NULLIF(k.users, 0) AS \"Active weekdays per user\"\nFROM weeks w\nLEFT JOIN weekly k ON k.week = w.week\nORDER BY 1\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Weekly Active Users and Active Weekdays per User",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Share of each completed week's estimated cost spent by the top 10% and the top 25% of users by cost that week. A rising line means spend is concentrating in fewer people. Ignores the Developer filter.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Users with cost"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "viz": true,
+                  "legend": true,
+                  "tooltip": false
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 30
+      },
+      "id": 13,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Ignores the developer filter: a share of spend across people is always 100% for one person.\nWITH RECURSIVE wk AS (\n  SELECT DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY) AS d\n  UNION ALL\n  SELECT DATE_ADD(d, INTERVAL 7 DAY) FROM wk WHERE DATE_ADD(d, INTERVAL 7 DAY) < $__timeTo()\n),\nweeks AS (\n  SELECT DATE_FORMAT(d, '%Y-%m-%d') AS week FROM wk\n  WHERE TIMESTAMP(d) >= $__timeFrom() AND TIMESTAMP(DATE_ADD(d, INTERVAL 7 DAY)) <= DATE_ADD($__timeTo(), INTERVAL 1 SECOND)\n),\nper_user AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(hour_start), INTERVAL WEEKDAY(hour_start) DAY), '%Y-%m-%d') AS week, COALESCE(NULLIF(user_email, ''), user_key) AS user, SUM(estimated_cost_usd) AS cost\n  FROM _tool_claude_code_otel_hourly_model_usage\n  WHERE $__timeFilter(hour_start)\n    AND connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  GROUP BY 1, 2\n  HAVING SUM(estimated_cost_usd) > 0\n),\nranked AS (\n  SELECT week, cost,\n    ROW_NUMBER() OVER (PARTITION BY week ORDER BY cost DESC) AS rn,\n    COUNT(*) OVER (PARTITION BY week) AS n,\n    SUM(cost) OVER (PARTITION BY week) AS total\n  FROM per_user\n),\nshares AS (\n  SELECT week,\n    SUM(CASE WHEN rn <= CEIL(0.10 * n) THEN cost ELSE 0 END) / MAX(total) AS top10,\n    SUM(CASE WHEN rn <= CEIL(0.25 * n) THEN cost ELSE 0 END) / MAX(total) AS top25,\n    MAX(n) AS users\n  FROM ranked\n  GROUP BY week\n)\nSELECT TIMESTAMP(w.week) + INTERVAL 84 HOUR AS \"time\",\n  s.top10 AS \"Top 10% of users\",\n  s.top25 AS \"Top 25% of users\",\n  s.users AS \"Users with cost\"\nFROM weeks w\nLEFT JOIN shares s ON s.week = w.week\nORDER BY 1\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Spend Concentration (Weekly)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 39
+      },
+      "id": 14,
+      "panels": [],
+      "title": "Agents",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Estimated cost in each completed week by the agent that made the requests. Main thread is the conversation itself. The 8 named subagents with the most cost in the range have their own series, and the rest are grouped as Other.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            },
+            "axisSoftMin": 0,
+            "barWidthFactor": 0.4
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "currencyUSD",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
+      "id": 15,
+      "options": {
+        "legend": {
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Total",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "-- The 8 named agents with the most cost in the range get their own series; the rest are grouped as Other.\nWITH RECURSIVE wk AS (\n  SELECT DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY) AS d\n  UNION ALL\n  SELECT DATE_ADD(d, INTERVAL 7 DAY) FROM wk WHERE DATE_ADD(d, INTERVAL 7 DAY) < $__timeTo()\n),\nweeks AS (\n  SELECT DATE_FORMAT(d, '%Y-%m-%d') AS week FROM wk\n  WHERE TIMESTAMP(d) >= $__timeFrom() AND TIMESTAMP(DATE_ADD(d, INTERVAL 7 DAY)) <= DATE_ADD($__timeTo(), INTERVAL 1 SECOND)\n),\na AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(hour_start), INTERVAL WEEKDAY(hour_start) DAY), '%Y-%m-%d') AS week, agent_name, SUM(estimated_cost_usd) AS cost\n  FROM _tool_claude_code_otel_hourly_model_usage\n  WHERE $__timeFilter(hour_start)\n    AND connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})\n  GROUP BY 1, 2\n),\ntop_agents AS (\n  SELECT agent_name FROM (\n    SELECT agent_name, ROW_NUMBER() OVER (ORDER BY SUM(cost) DESC, agent_name) AS rn\n    FROM a JOIN weeks USING (week)\n    WHERE agent_name <> ''\n    GROUP BY agent_name\n  ) t WHERE rn <= 8\n)\nSELECT TIMESTAMP(w.week) + INTERVAL 84 HOUR AS \"time\",\n  CASE WHEN a.agent_name = '' THEN 'Main thread' WHEN t.agent_name IS NOT NULL THEN a.agent_name ELSE 'Other' END AS metric,\n  SUM(a.cost) AS value\nFROM weeks w\nJOIN a ON a.week = w.week\nLEFT JOIN top_agents t ON t.agent_name = a.agent_name\nGROUP BY 1, 2\nORDER BY 1, 2\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Cost by Agent (Weekly)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Estimated cost for each Claude Code OTel team and agent over the selected range, with each agent's share of its team's cost.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false,
+            "minWidth": 110
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cost"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Share of team cost"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-blues"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 49
+      },
+      "id": 16,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT team_slug AS \"Team\",\n  CASE WHEN agent_name = '' THEN 'Main thread' ELSE agent_name END AS \"Agent\",\n  SUM(estimated_cost_usd) AS \"Cost\",\n  SUM(estimated_cost_usd) / SUM(SUM(estimated_cost_usd)) OVER (PARTITION BY team_slug) AS \"Share of team cost\"\nFROM _tool_claude_code_otel_hourly_model_usage\nWHERE $__timeFilter(hour_start)\n  AND connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(user_email, ''), user_key) IN (${user:sqlstring})\nGROUP BY team_slug, agent_name\nHAVING SUM(estimated_cost_usd) > 0\nORDER BY 1, 3 DESC\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Cost by Team and Agent",
+      "type": "table"
+    }
+  ],
+  "preload": false,
+  "refresh": "",
+  "schemaVersion": 41,
+  "tags": [
+    "claude",
+    "anthropic",
+    "devlake",
+    "ai"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allValue": "",
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nINNER JOIN user_project_mapping upm ON upm.project_name = p.name\nWHERE c.status = 'active'\n  AND upm.user_login = ${__user.login:sqlstring}\nORDER BY p.name;",
+        "includeAll": true,
+        "label": "DevLake project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nINNER JOIN user_project_mapping upm ON upm.project_name = p.name\nWHERE c.status = 'active'\n  AND upm.user_login = ${__user.login:sqlstring}\nORDER BY p.name;",
+        "refresh": 1,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND (cp.project_name REGEXP '^(${project:regex})$' AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring}))\nORDER BY c.team_slug;",
+        "includeAll": true,
+        "label": "Claude Code OTel teams",
+        "multi": true,
+        "name": "otel_teams",
+        "options": [],
+        "query": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND (cp.project_name REGEXP '^(${project:regex})$' AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring}))\nORDER BY c.team_slug;",
+        "refresh": 1,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "-- The label is the person's full name from their DevLake account, falling back to the email; the value stays the\n-- email (or user key) that every panel filters on.\nSELECT COALESCE(names.full_name, u.user) AS __text, u.user AS __value\nFROM (\n  SELECT COALESCE(NULLIF(user_email, ''), user_key) AS user FROM _tool_claude_code_otel_hourly_activity WHERE connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  UNION\n  SELECT COALESCE(NULLIF(user_email, ''), user_key) AS user FROM _tool_claude_code_otel_hourly_model_usage WHERE connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  UNION\n  SELECT COALESCE(NULLIF(user_email, ''), user_key) AS user FROM _tool_claude_code_otel_hourly_tool_usage WHERE connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n) u\nLEFT JOIN (\n  -- Resolve each email to a person's full name from accounts. gitextractor rows (id = email) are preferred;\n  -- only names that look like a full name (contain a space) are used, otherwise the email is shown.\n  SELECT LOWER(TRIM(a_n.email)) AS email_key,\n         COALESCE(MAX(CASE WHEN a_n.id = a_n.email THEN n_n.name END), MAX(n_n.name)) AS full_name\n  FROM accounts a_n\n  JOIN (SELECT id, TRIM(REPLACE(full_name, UNHEX('E2808B'), '')) AS name FROM accounts) n_n\n    ON n_n.id = a_n.id AND n_n.name LIKE '% %' AND n_n.name NOT LIKE '%@%'\n  WHERE NULLIF(TRIM(a_n.email), '') IS NOT NULL\n  GROUP BY LOWER(TRIM(a_n.email))\n) names ON names.email_key = LOWER(TRIM(u.user))\nORDER BY 1;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "User",
+        "multi": true,
+        "name": "user",
+        "options": [],
+        "query": "-- The label is the person's full name from their DevLake account, falling back to the email; the value stays the\n-- email (or user key) that every panel filters on.\nSELECT COALESCE(names.full_name, u.user) AS __text, u.user AS __value\nFROM (\n  SELECT COALESCE(NULLIF(user_email, ''), user_key) AS user FROM _tool_claude_code_otel_hourly_activity WHERE connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  UNION\n  SELECT COALESCE(NULLIF(user_email, ''), user_key) AS user FROM _tool_claude_code_otel_hourly_model_usage WHERE connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  UNION\n  SELECT COALESCE(NULLIF(user_email, ''), user_key) AS user FROM _tool_claude_code_otel_hourly_tool_usage WHERE connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n) u\nLEFT JOIN (\n  -- Resolve each email to a person's full name from accounts. gitextractor rows (id = email) are preferred;\n  -- only names that look like a full name (contain a space) are used, otherwise the email is shown.\n  SELECT LOWER(TRIM(a_n.email)) AS email_key,\n         COALESCE(MAX(CASE WHEN a_n.id = a_n.email THEN n_n.name END), MAX(n_n.name)) AS full_name\n  FROM accounts a_n\n  JOIN (SELECT id, TRIM(REPLACE(full_name, UNHEX('E2808B'), '')) AS name FROM accounts) n_n\n    ON n_n.id = a_n.id AND n_n.name LIKE '% %' AND n_n.name NOT LIKE '%@%'\n  WHERE NULLIF(TRIM(a_n.email), '') IS NOT NULL\n  GROUP BY LOWER(TRIM(a_n.email))\n) names ON names.email_key = LOWER(TRIM(u.user))\nORDER BY 1;",
+        "refresh": 2,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-8w",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "Claude Trends",
+  "uid": "claude_trends_mysql",
+  "version": 3
+}
