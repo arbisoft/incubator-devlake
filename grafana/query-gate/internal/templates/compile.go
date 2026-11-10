@@ -25,12 +25,17 @@ import (
 )
 
 const (
-	patQStr     = `'(?:[^'\\]|'')*'`
-	patQList    = `(?:` + patQStr + `(?:,` + patQStr + `)*)?`
-	patInner    = `(?:[^'\\]|'')*`
-	patRegexEsc = `\\[\\^$*+?.()|\[\]{}/,#\- ]`
+	// patQStr is a quoted SQL string whose value never has a dollar sign before an identifier character.
+	patQStr  = `'(?:[^'\\$]|''|\$+(?:[^'\\$_a-zA-Z0-9]|''))*\$*'`
+	patQList = `(?:` + patQStr + `(?:,` + patQStr + `)*)?`
+	// patInner is the quote-doubled inside of a string, with no dollar sign before an identifier character.
+	patInner    = `(?:[^'\\$]|''|\$+(?:[^'\\$_a-zA-Z0-9]|''))*`
+	patRegexEsc = `\\[\\^*+?.()|\[\]{}/,#\- ]`
 	patRegexPl  = `[^'\\^$*+?.()|\[\]{}\x00-\x1f]`
-	patRegexAtm = `(?:` + patRegexPl + `|` + patRegexEsc + `)`
+	// patRegexPlNI is a plain regex character that is not an identifier character.
+	patRegexPlNI = `[^'\\^$*+?.()|\[\]{}\x00-\x1f_a-zA-Z0-9]`
+	// patRegexAtm allows an escaped dollar only when a non-identifier atom follows.
+	patRegexAtm = `(?:` + patRegexPl + `|` + patRegexEsc + `|(?:\\\$)+(?:` + patRegexPlNI + `|` + patRegexEsc + `))`
 	patRegexLst = `(?:\(` + patRegexAtm + `+(?:\|` + patRegexAtm + `+)*\)|` + patRegexAtm + `+)`
 	// patRegexAny adds the empty group Grafana sends for an All selection with no options.
 	patRegexAny = `(?:` + patRegexLst + `|\(\))`
@@ -38,12 +43,12 @@ const (
 	patNum = `[0-9]+(?:\.[0-9]+)?`
 	// patNumList is comma-separated unsigned decimals, the shape of a raw multi-value list.
 	patNumList = patNum + `(?:,` + patNum + `)*`
-	// patInnerDQ is a default-format value inside double quotes; Grafana doubles ', and " or \ are never allowed.
-	patInnerDQ = `(?:[^"'\\]|'')*`
-	// patRawSQ is a raw value inside single quotes.
-	patRawSQ = `[^'\\]*`
-	// patRawDQ is a raw value inside double quotes.
-	patRawDQ = `[^"\\]*`
+	// patInnerDQ is a default-format value inside double quotes; Grafana doubles ', and " or \ are never allowed, nor a dollar before an identifier character.
+	patInnerDQ = `(?:[^"'\\$]|''|\$+(?:[^"'\\$_a-zA-Z0-9]|''))*`
+	// patRawSQ is a raw value inside single quotes with no dollar before an identifier character.
+	patRawSQ = `(?:[^'\\$]|\$+[^'\\$_a-zA-Z0-9])*`
+	// patRawDQ is a raw value inside double quotes with no dollar before an identifier character.
+	patRawDQ = `(?:[^"\\$]|\$+[^"\\$_a-zA-Z0-9])*`
 	// patEpochMs is a time-range bound in epoch milliseconds.
 	patEpochMs = `[0-9]{1,16}`
 	// patLineComment is a value in a line comment that cannot end the comment.
@@ -74,6 +79,10 @@ var (
 	braceNameRe = regexp.MustCompile(`^[A-Za-z0-9_.]+$`)
 	fmtRe       = regexp.MustCompile(`^[A-Za-z0-9_:]*$`)
 	wordRe      = regexp.MustCompile(`^\w+`)
+	// dollarNameTailRe matches text ending in a dollar sign and an optional identifier.
+	dollarNameTailRe = regexp.MustCompile(`\$[_a-zA-Z0-9]*$`)
+	// macroOpenRe matches text ending inside the arguments of an open macro call.
+	macroOpenRe = regexp.MustCompile(`\$(__[A-Za-z]+)\([^)]*$`)
 )
 
 // slotKind says how a resolved slot is rendered into the pattern.
@@ -209,7 +218,16 @@ func compile(sql string, vars map[string]Variable) (pattern string, counts [fiel
 		if plan.kind == slotPattern && plan.canBeEmpty && strings.HasSuffix(lit.String(), "-") && lx.state == stateNormal {
 			return "", counts, inner, fmt.Errorf("%s: slot directly after a dash", slotText)
 		}
+		if dollarNameTailRe.MatchString(lit.String()) {
+			return "", counts, inner, fmt.Errorf("%s: slot directly after a dollar sign", slotText)
+		}
 		flush()
+		if m := macroOpenRe.FindStringSubmatch(sql[:i]); m != nil && backendMacros[m[1]] {
+			numeric := lx.state == stateNormal && plan.kind == slotPattern && (plan.byState != nil || plan.pattern == patEpochMs)
+			if plan.kind != slotOptions && !numeric {
+				return "", counts, inner, fmt.Errorf("%s: slot inside a macro call", slotText)
+			}
+		}
 		if lx.pendingEsc {
 			return "", counts, inner, fmt.Errorf("%s: slot directly after a backslash escape", slotText)
 		}
@@ -334,7 +352,7 @@ func resolveCustom(v Variable, format string) (slotPlan, error) {
 		return slotPlan{}, errors.New("custom variable has no options")
 	}
 	for _, o := range opts {
-		for _, bad := range []string{"'", `"`, "`", `\`, "#", "--", "/*"} {
+		for _, bad := range []string{"'", `"`, "`", `\`, "$", "#", "--", "/*"} {
 			if strings.Contains(o, bad) {
 				return slotPlan{}, fmt.Errorf("custom option %q contains %q", o, bad)
 			}

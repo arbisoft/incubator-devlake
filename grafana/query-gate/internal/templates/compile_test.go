@@ -256,6 +256,11 @@ func TestCompileSlotGrammars(t *testing.T) {
 			ok:  []string{"SELECT 1\nFROM t\tWHERE (a = 'x')"},
 			bad: []string{"select 1\nFROM t\tWHERE (a = 'x')"},
 		},
+		{
+			name: "numeric slot inside macro", sql: "$__timeGroupAlias(t, ${v:raw})", vars: vmap(single),
+			ok:  []string{"$__timeGroupAlias(t, 3600)"},
+			bad: []string{"$__timeGroupAlias(t, 3600 OR 1=1)"},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -308,6 +313,11 @@ func TestCompileErrors(t *testing.T) {
 		{"constant with regex format", "x = ${v:regex}", vmap(Variable{Name: "v", Type: "constant", Query: "a"}), "unsupported format"},
 		{"unsupported variable type", "x = ${v}", vmap(Variable{Name: "v", Type: "interval"}), "unsupported variable type"},
 		{"slot after backslash", `x = 'a\${v}'`, vmap(single), "backslash"},
+		{"slot after dollar", "x = '$${v}'", vmap(single), "dollar sign"},
+		{"slot after dollar name", "x = '$abc${v}'", vmap(single), "dollar sign"},
+		{"text slot in macro", "SELECT $__timeFrom(${v:sqlstring})", vmap(single), "macro call"},
+		{"login in macro", "WHERE $__timeFilter(${__user.login:sqlstring})", vmap(), "macro call"},
+		{"custom option with dollar", "x = ${v}", vmap(Variable{Name: "v", Type: "custom", Options: []string{"a$b"}}), "contains"},
 		{"possibly empty list after dash", "SELECT 1 -${v:sqlstring}- 1", vmap(multi), "dash"},
 	}
 	for _, tc := range tests {
@@ -318,6 +328,69 @@ func TestCompileErrors(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("error %q does not contain %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestQuotedValuesRejectMacroSyntax(t *testing.T) {
+	multi := Variable{Name: "v", Type: "query", Multi: true, IncludeAll: true}
+	single := Variable{Name: "v", Type: "query"}
+	tests := []struct {
+		name string
+		sql  string
+		vars map[string]Variable
+		ok   []string
+		bad  []string
+	}{
+		{
+			name: "multi sqlstring", sql: "x IN (${v:sqlstring})", vars: vmap(multi),
+			ok:  []string{"x IN ('US$')", "x IN ('a $ b')", "x IN ('$')", "x IN ('$(')"},
+			bad: []string{"x IN ('$__timeFrom(')", "x IN ('a','$__timeTo(x')", "x IN ('a$b(')"},
+		},
+		{
+			name: "single sqlstring", sql: "x = ${v:sqlstring}", vars: vmap(single),
+			ok:  []string{"x = 'US$'", "x = 'a $ b'", "x = '$'", "x = '$('"},
+			bad: []string{"x = '$__timeFrom('", "x = '$__timeTo(x'", "x = 'a$b('"},
+		},
+		{
+			name: "single default in single quotes", sql: "x = '${v}'", vars: vmap(single),
+			ok:  []string{"x = 'a $ b'", "x = '$('"},
+			bad: []string{"x = '$__timeFrom('", "x = 'a$'"},
+		},
+		{
+			name: "single default in double quotes", sql: `x = "${v}"`, vars: vmap(single),
+			ok:  []string{`x = "a $ b"`},
+			bad: []string{`x = "$__timeFilter("`},
+		},
+		{
+			name: "raw in single quotes", sql: "x = '${v:raw}'", vars: vmap(single),
+			ok:  []string{"x = 'a $ b'"},
+			bad: []string{"x = '$__timeFrom('", "x = 'a$'"},
+		},
+		{
+			name: "raw in double quotes", sql: `x = "${v:raw}"`, vars: vmap(single),
+			ok:  []string{`x = "a $ b"`},
+			bad: []string{`x = "$__timeFrom("`, `x = "a$"`},
+		},
+		{
+			name: "regex", sql: "x REGEXP '${v:regex}'", vars: vmap(multi),
+			ok:  []string{`x REGEXP 'a\$ b'`, "x REGEXP '(a|b)'"},
+			bad: []string{`x REGEXP '\$__timeFrom\('`, `x REGEXP '(a|\$b)'`, `x REGEXP 'a\$'`},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tpl := compiled(t, tc.sql, tc.vars)
+			for _, s := range tc.ok {
+				if !tpl.re.MatchString(s) {
+					t.Errorf("expected match: %q", s)
+				}
+			}
+			for _, s := range tc.bad {
+				if tpl.re.MatchString(s) {
+					t.Errorf("expected no match: %q", s)
+				}
 			}
 		})
 	}

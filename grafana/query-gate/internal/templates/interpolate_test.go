@@ -214,3 +214,47 @@ func collectTestSources(t *testing.T, dir string) []source {
 	}
 	return sources
 }
+
+func TestShippedDashboardsRejectInjectedMacros(t *testing.T) {
+	const dir = "../../../dashboards"
+	set, errs, err := LoadDir(dir)
+	if err != nil || len(errs) != 0 {
+		t.Fatalf("load: %v %v", err, errs)
+	}
+	const macro = "$__timeFrom("
+	checked := 0
+	for _, src := range collectTestSources(t, dir) {
+		sql := interpolate(t, src.SQL, src.Vars, alice, []string{macro, "x"})
+		if strings.Count(sql, macro) <= strings.Count(src.SQL, macro) {
+			continue
+		}
+		checked++
+		if got := set.Match(sql, alice); got.Accepted {
+			t.Errorf("accepted an injected macro: %s\nSQL: %s", src.Location, sql)
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no source took the injected macro")
+	}
+}
+
+func TestGitLabLegacyMacroInjectionRejected(t *testing.T) {
+	const dir = "../../../dashboards"
+	set, errs, err := LoadDir(dir)
+	if err != nil || len(errs) != 0 {
+		t.Fatalf("load: %v %v", err, errs)
+	}
+	for _, src := range collectTestSources(t, dir) {
+		if !strings.Contains(src.Location, "GitLab Legacy") || !strings.Contains(src.Location, "3.1 Number of New Merge Requests") {
+			continue
+		}
+		sql := interpolate(t, strings.ReplaceAll(src.SQL, "${developer}", "DEVSLOT"), src.Vars, alice, []string{"proj"})
+		injected := quoteAll([]string{")) AND (SELECT COUNT(*) FROM user_project_mapping WHERE user_login <> 0x616c696365) >= 0 #", "$__timeFrom("})
+		sql = strings.ReplaceAll(sql, "DEVSLOT", injected)
+		if got := set.Match(sql, alice); got.Accepted {
+			t.Fatalf("accepted the injected query: %s", sql)
+		}
+		return
+	}
+	t.Fatal("GitLab Legacy 3.1 Number of New Merge Requests source not found")
+}
