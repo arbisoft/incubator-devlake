@@ -90,6 +90,15 @@ func TestGateLogsAreClean(t *testing.T) {
 	if rejected == 0 {
 		t.Error("no \"event\":\"rejected\" line in the logs")
 	}
+	hasWouldReject := false
+	for k := range counts {
+		if strings.HasPrefix(k, "would_reject /") {
+			hasWouldReject = true
+		}
+	}
+	if !hasWouldReject {
+		t.Error("no would_reject lines: the report-mode logs were not captured")
+	}
 	keys := make([]string, 0, len(counts))
 	for k := range counts {
 		keys = append(keys, k)

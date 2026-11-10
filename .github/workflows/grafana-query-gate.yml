@@ -20,14 +20,12 @@ on:
   push:
     branches: [ main-arbisoft ]
     paths:
-      - 'grafana/query-gate/**'
-      - 'grafana/dashboards/**'
+      - 'grafana/**'
       - '.github/workflows/grafana-query-gate.yml'
   pull_request:
     branches: [ main-arbisoft ]
     paths:
-      - 'grafana/query-gate/**'
-      - 'grafana/dashboards/**'
+      - 'grafana/**'
       - '.github/workflows/grafana-query-gate.yml'
 
 permissions:
@@ -48,7 +46,22 @@ jobs:
         run: test -z "$(gofmt -l .)"
       - name: vet
         run: go vet ./...
+      - name: vet (verify tag)
+        run: go vet -tags verify ./...
       - name: test
-        run: go test -count=1 ./...
+        run: go test -race -count=1 ./...
+      - name: compile verify suite
+        run: go test -count=1 -tags verify -run '^$' ./...
+      - name: install golangci-lint
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.63.4
+      - name: golangci-lint
+        run: golangci-lint run ./... && golangci-lint run --build-tags verify ./...
       - name: lint dashboards
         run: go run . lint ../dashboards
+  image:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: build image
+        run: docker build -t grafana-query-gate-check grafana/

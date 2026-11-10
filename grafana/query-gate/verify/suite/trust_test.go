@@ -110,12 +110,13 @@ func TestUIDashboardTrustLifecycle(t *testing.T) {
 		tg.saveDashboard(t, "editor-resave", editor, map[string]any{"dashboard": editedDash, "overwrite": true})
 		editorBody := queryBody(t, tg.topo, mysqlUID, editorSQL)
 		t.Logf("untrusted after %s", poll(t, 40*time.Second, 2*time.Second, func() bool {
-			return tg.dsQuery(t, "viewer-marker", viewer, body).status == http.StatusForbidden &&
-				tg.dsQuery(t, "viewer-editor-sql", viewer, editorBody).status == http.StatusForbidden
+			a, b := tg.dsQuery(t, "viewer-marker", viewer, body), tg.dsQuery(t, "viewer-editor-sql", viewer, editorBody)
+			return a.status == http.StatusForbidden && answeredBy(a.body) == "gate" &&
+				b.status == http.StatusForbidden && answeredBy(b.body) == "gate"
 		}))
 		for i := 0; i < 3; i++ {
 			time.Sleep(5 * time.Second)
-			if r := tg.dsQuery(t, "viewer-editor-sql", viewer, editorBody); r.status != http.StatusForbidden || strings.Contains(string(r.body), editorMarker) {
+			if r := tg.dsQuery(t, "viewer-editor-sql", viewer, editorBody); r.status != http.StatusForbidden || answeredBy(r.body) != "gate" || strings.Contains(string(r.body), editorMarker) {
 				t.Fatalf("editor's SQL became runnable for a viewer: status %d", r.status)
 			}
 		}
@@ -164,8 +165,18 @@ func TestEditorDashboardNeverTrusted(t *testing.T) {
 		t.Logf("sync account can read it after %s", poll(t, 120*time.Second, 5*time.Second, func() bool {
 			return tg.apiJSON(t, "system-get", system, http.MethodGet, "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/"+uid, nil).status == http.StatusOK
 		}))
-		time.Sleep(25 * time.Second)
-		wantGate(t, "viewer-marker", tg.dsQuery(t, "viewer-marker", tg.cookie(t, us.viewerA), queryBody(t, tg.topo, mysqlUID, sql)))
+		// A tagged dashboard from the org admin must become trusted, which proves the sync has run.
+		controlMarker, controlUID := "gvm_"+randHex(6), "gv-control-"+randHex(4)
+		controlSQL := "SELECT '" + controlMarker + "' AS c"
+		tg.cleanupDashboard(t, controlUID)
+		tg.saveDashboard(t, "control-save", tg.cookie(t, us.orgAdmin), dashboardBody(controlUID, []string{trustTag}, controlSQL))
+		viewer := tg.cookie(t, us.viewerA)
+		controlBody := queryBody(t, tg.topo, mysqlUID, controlSQL)
+		t.Logf("control trusted after %s", poll(t, 120*time.Second, 2*time.Second, func() bool {
+			r := tg.dsQuery(t, "viewer-control", viewer, controlBody)
+			return r.status == http.StatusOK && strings.Contains(string(r.body), controlMarker)
+		}))
+		wantGate(t, "viewer-marker", tg.dsQuery(t, "viewer-marker", viewer, queryBody(t, tg.topo, mysqlUID, sql)))
 	})
 }
 

@@ -122,7 +122,7 @@ gapi() {
 }
 
 provision_topology() {
-  local name=$1 base=$2 entry login role sa pw var id code body email
+  local name=$1 base=$2 entry login role sa pw var id code body email org2
   echo "provision: $name ($base)"
   local entries=(
     "gv-system|Viewer|true|GV_SYSTEM_PASSWORD"
@@ -150,6 +150,18 @@ provision_topology() {
     jq -n --argjson a "$sa" '{isGrafanaAdmin:$a}' | gapi PUT "$base/api/admin/users/$id/permissions" --data-binary @- -o /dev/null
     jq -n --arg p "$pw" '{password:$p}' | gapi PUT "$base/api/admin/users/$id/password" --data-binary @- -o /dev/null
   done
+  code=$(curl -sS -o /dev/null -w '%{http_code}' -K <(printf 'user = "gv-admin:%s"\n' "$GV_ADMIN_PASSWORD") \
+    "$base/api/orgs/name/gv-org2" || true)
+  if [ "$code" = 404 ]; then
+    jq -n '{name:"gv-org2"}' | gapi POST "$base/api/orgs" --data-binary @- -o /dev/null
+  elif [ "$code" != 200 ]; then
+    die "lookup of org gv-org2 on $name returned HTTP $code"
+  fi
+  org2=$(gapi GET "$base/api/orgs/name/gv-org2" | jq -r .id)
+  code=$(jq -n '{loginOrEmail:"gv-orgadmin",role:"Viewer"}' |
+    curl -sS -o /dev/null -w '%{http_code}' -X POST -K <(printf 'user = "gv-admin:%s"\n' "$GV_ADMIN_PASSWORD") \
+      -H 'Content-Type: application/json' --data-binary @- "$base/api/orgs/$org2/users" || true)
+  case "$code" in 200 | 409) ;; *) die "adding gv-orgadmin to org gv-org2 on $name returned HTTP $code" ;; esac
 }
 
 provision() {
@@ -322,27 +334,36 @@ cmd_browser() {
 }
 
 all_step() {
-  local name=$1
+  local name=$1 rc
   shift
   echo "== all: $name"
-  "$@" || die "all: step '$name' failed"
+  set +e
+  ( set -e; "$@" )
+  rc=$?
+  set -e
+  [ "$rc" = 0 ] || die "all: step '$name' failed"
 }
 
 cmd_all() {
-  local early late
+  local early report off late
   all_step up cmd_up
   all_step smoke cmd_smoke
   all_step "suite (enforce)" cmd_suite
   all_step outage cmd_outage
-  # Switching modes recreates the gates, which drops their logs, so snapshot the enforce-run logs first.
+  # Switching modes recreates the gates, which drops their logs, so snapshot each run's logs first.
   early=$(cmd_logs | paste -sd, -)
+  export GV_GATE_MODE=report
   all_step "mode report" cmd_mode report
   GV_EXPECT_MODE=report all_step "suite (report)" cmd_suite -run 'TestReportMode|TestHealthEndpoints'
+  report=$(cmd_logs | paste -sd, -)
+  export GV_GATE_MODE=off
   all_step "mode off" cmd_mode off
   GV_EXPECT_MODE=off all_step "suite (off)" cmd_suite -run 'TestOffMode|TestHealthEndpoints'
+  off=$(cmd_logs | paste -sd, -)
+  export GV_GATE_MODE=enforce
   all_step "mode enforce" cmd_mode enforce
   late=$(cmd_logs | paste -sd, -)
-  GV_LOGS="$early,$late" all_step "suite (logs)" cmd_suite -run TestGateLogsAreClean
+  GV_LOGS="$early,$report,$off,$late" all_step "suite (logs)" cmd_suite -run TestGateLogsAreClean
 }
 
 main() {

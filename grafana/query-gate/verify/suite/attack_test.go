@@ -251,6 +251,7 @@ func TestDatasourceVariantsRejected(t *testing.T) {
 	eachEntry(t, func(t *testing.T, tg target) {
 		cookie := tg.cookie(t, us.viewerA)
 		mysqlID := dsID(t, tg.topo, mysqlUID)
+		saved := savedSQL(t, panelTasks, us.viewerA.login, projA)
 		type variant struct {
 			name, ds string
 			id       int64
@@ -258,14 +259,15 @@ func TestDatasourceVariantsRejected(t *testing.T) {
 			want     []int
 		}
 		vs := []variant{
-			{"no-uid-mysql-id", `"datasource":{"type":"mysql"}`, mysqlID, canarySQL(), []int{403}},
-			{"string-datasource", `"datasource":"mysql"`, mysqlID, canarySQL(), []int{400, 403}},
-			{"unknown-uid", mysqlDS("does-not-exist"), mysqlID, canarySQL(), []int{403}},
+			{"no-uid-mysql-id", `"datasource":{"type":"mysql"}`, mysqlID, saved, []int{403}},
+			{"string-datasource", `"datasource":"mysql"`, mysqlID, saved, []int{400, 403}},
+			{"unknown-uid", mysqlDS("does-not-exist"), mysqlID, saved, []int{403}},
 		}
 		if pid, puid, ok := prometheusDS(t, tg.topo); ok {
 			vs = append(vs,
-				variant{"prometheus-uid", `"datasource":{"type":"prometheus","uid":` + jsonStr(puid) + `}`, pid, canarySQL(), []int{403}},
-				variant{"mysql-uid-prometheus-id", mysqlDS(mysqlUID), pid, canarySQL(), []int{403}})
+				variant{"prometheus-uid", `"datasource":{"type":"prometheus","uid":` + jsonStr(puid) + `}`, pid, saved, []int{403}},
+				// Grafana resolves the datasource by uid, so this runs the viewer's own saved query on MySQL.
+				variant{"mysql-uid-prometheus-id", mysqlDS(mysqlUID), pid, saved, []int{200}})
 		} else {
 			t.Log("no prometheus datasource on this topology, skipping the two prometheus variants")
 		}
@@ -280,7 +282,14 @@ func TestDatasourceVariantsRejected(t *testing.T) {
 		vs = append(vs, variant{"saved-with-" + prodExtraDS, mysqlDS(prodExtraDS), extraID, savedSQL(t, panelTasks, us.viewerA.login, projA), want})
 		for _, v := range vs {
 			body := wrapQueries(queryObj("A", v.ds, stdRest(rawSQLField(v.sql), v.id)))
-			wantStatus(t, v.name, tg.dsQuery(t, v.name, cookie, body), v.want...)
+			got := tg.dsQuery(t, v.name, cookie, body)
+			wantStatus(t, v.name, got, v.want...)
+			if got.status == http.StatusForbidden && answeredBy(got.body) != "gate" {
+				t.Errorf("%s: 403 came from Grafana, want the gate", v.name)
+			}
+			if got.status == http.StatusOK && !hasFrames(got.body, "A") {
+				t.Errorf("%s: 200 without results.A.frames", v.name)
+			}
 		}
 	})
 }
@@ -493,8 +502,78 @@ func TestOrgAdminOrgOverride(t *testing.T) {
 		if !leaked(r.body) {
 			t.Error("org-id-1: canary missing")
 		}
-		tg.call(t, "org-id-2", http.MethodPost, q, opts{cookie: cookie, contentType: jsonType, body: body, headers: map[string]string{"X-Grafana-Org-Id": "2"}})
-		tg.call(t, "query-orgId-2", http.MethodPost, q+"?orgId=2", opts{cookie: cookie, contentType: jsonType, body: body})
+		org2 := strconv.FormatInt(org2ID(t, tg), 10)
+		wantGate(t, "org-id-2", tg.call(t, "org-id-2", http.MethodPost, q, opts{cookie: cookie, contentType: jsonType, body: body, headers: map[string]string{"X-Grafana-Org-Id": org2}}))
+		wantGate(t, "query-orgId-2", tg.call(t, "query-orgId-2", http.MethodPost, q+"?orgId="+org2, opts{cookie: cookie, contentType: jsonType, body: body}))
+	})
+}
+
+func org2ID(t *testing.T, tg target) int64 {
+	t.Helper()
+	r := tg.apiJSON(t, "org2-lookup", tg.cookie(t, loadUsers(t).system), http.MethodGet, "/api/orgs/name/gv-org2", nil)
+	if r.status != http.StatusOK {
+		t.Fatalf("org gv-org2 not found on %s (status %d): run run.sh provision", tg.topo.name, r.status)
+	}
+	var o struct {
+		ID int64 `json:"id"`
+	}
+	if err := json.Unmarshal(r.body, &o); err != nil || o.ID == 0 {
+		t.Fatalf("org gv-org2 lookup on %s: bad body", tg.topo.name)
+	}
+	return o.ID
+}
+
+func TestOrgSwitchDoesNotKeepAdmin(t *testing.T) {
+	requireMode(t, "enforce")
+	us := loadUsers(t)
+	eachEdge(t, func(t *testing.T, tg target) {
+		cookie := tg.cookie(t, us.orgAdmin)
+		body := queryBody(t, tg.topo, mysqlUID, canarySQL())
+		first := tg.dsQueryOpen(t, "admin-canary", cookie, body)
+		wantStatus(t, "admin-canary", first, http.StatusOK)
+		if !leaked(first.body) {
+			t.Error("admin-canary: canary missing")
+		}
+		wantStatus(t, "switch-org", tg.apiJSON(t, "switch-org", cookie, http.MethodPost, "/api/user/using/"+strconv.FormatInt(org2ID(t, tg), 10), nil), http.StatusOK)
+		t.Cleanup(func() { tg.apiJSON(t, "switch-back", cookie, http.MethodPost, "/api/user/using/1", nil) })
+		r := tg.dsQueryOpen(t, "after-switch", cookie, body)
+		switch {
+		case r.status == http.StatusForbidden && answeredBy(r.body) == "gate":
+		case r.status == http.StatusOK && leaked(r.body):
+		default:
+			t.Errorf("after-switch: status %d answered by %s, want a gate 403 or a 200 that ran in org 1", r.status, answeredBy(r.body))
+		}
+	})
+}
+
+func TestSelfLoginRenameRejected(t *testing.T) {
+	requireMode(t, "enforce")
+	us := loadUsers(t)
+	eachEntry(t, func(t *testing.T, tg target) {
+		cookie := tg.cookie(t, us.viewerA)
+		cur := tg.apiJSON(t, "self-get", cookie, http.MethodGet, "/api/user", nil)
+		wantStatus(t, "self-get", cur, http.StatusOK)
+		var me struct{ Name, Login, Email string }
+		if err := json.Unmarshal(cur.body, &me); err != nil {
+			t.Fatalf("self-get: %v", err)
+		}
+		put := func(name, login, email string) reply {
+			return tg.apiJSON(t, name, cookie, http.MethodPut, "/api/user", map[string]string{"name": me.Name, "login": login, "email": email})
+		}
+		wantGate(t, "rename-login", put("rename-login", us.viewerB.login, me.Email))
+		wantGate(t, "rename-email", put("rename-email", me.Login, "gv-other@example.test"))
+		wantStatus(t, "unchanged", put("unchanged", me.Login, me.Email), http.StatusOK)
+	})
+}
+
+func TestMacroInQuotedValueRejected(t *testing.T) {
+	requireMode(t, "enforce")
+	us := loadUsers(t)
+	projA := needProjects(t, us.viewerA.login)
+	eachEntry(t, func(t *testing.T, tg target) {
+		// Grafana expands macros without regard to quotes, so a quoted value can still smuggle one in.
+		sql := savedSQL(t, panelTasks, us.viewerA.login, append(append([]string(nil), projA...), "$__timeFrom("))
+		wantGate(t, "macro-in-value", tg.dsQuery(t, "macro-in-value", tg.cookie(t, us.viewerA), queryBody(t, tg.topo, mysqlUID, sql)))
 	})
 }
 

@@ -34,8 +34,8 @@ const LONG_RUN_MS = 6 * 60 * 1000;
 const LONG_SAMPLE_MS = 30 * 1000;
 
 const TOPOLOGIES = {
-  staging: { base: 'https://aperture.arbisoft.com/grafana', origin: 'https://aperture.arbisoft.com', direct: 'http://127.0.0.1:3013/grafana' },
-  prod: { base: 'https://devlake-grafana.arbisoft.com', origin: 'https://devlake-grafana.arbisoft.com', direct: null },
+  staging: { base: 'https://aperture.arbisoft.com/grafana', origin: 'https://aperture.arbisoft.com', direct: 'http://127.0.0.1:3013/grafana', mysqlUids: ['devlake-mysql'] },
+  prod: { base: 'https://devlake-grafana.arbisoft.com', origin: 'https://devlake-grafana.arbisoft.com', direct: null, mysqlUids: ['devlake-mysql', 'P430005175C4C7810'] },
 };
 
 const USERS = {
@@ -70,7 +70,7 @@ const SPECIALS = [
   { name: 'edit-panel', users: ['gv-editor', 'gv-orgadmin'], expectRejection: false, pages: (d) => [{ dash: d.byUid.get(AI_UID), query: EDIT_PANEL_QUERY }] },
 ];
 
-const FAILING_TYPES = new Set(['unexpected-rejection', 'false-positive', 'replay-mismatch', 'frame-error-gate-only', 'missing-breakout-rejection', 'breakout-more-rows']);
+const FAILING_TYPES = new Set(['unexpected-rejection', 'false-positive', 'replay-mismatch', 'frame-error-gate-only', 'missing-breakout-rejection', 'breakout-more-rows', 'scenario-error', 'no-queries', 'unexpected-gate-block']);
 
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -139,7 +139,10 @@ function loadDashboards() {
     const j = JSON.parse(fs.readFileSync(file, 'utf8'));
     const rel = path.relative(ROOT, file).split(path.sep).join('/');
     const vars = ((j.templating && j.templating.list) || []).map((v) => v.name);
-    return { file: rel, uid: j.uid, title: j.title, vars };
+    // Datasource uid of each top-level panel with SQL, so the count can follow what each topology has.
+    const sqlPanelUids = (j.panels || []).filter((pn) => (pn.targets || []).some((t) => typeof t.rawSql === 'string' && t.rawSql.trim() !== ''))
+      .map((pn) => ((pn.datasource && pn.datasource.uid) || ''));
+    return { file: rel, uid: j.uid, title: j.title, vars, sqlPanelUids };
   });
   const bad = all.filter((d) => !d.uid);
   if (bad.length) fail(`dashboards without uid: ${bad.map((d) => d.file).join(', ')}`);
@@ -205,7 +208,7 @@ function printPlan(opts, selected, all, inputs) {
 function newScenario(dash, name, extra) {
   return {
     dashboard: dash.uid, title: dash.title, name, kind: extra.kind || 'main', expectRejection: !!extra.expectRejection,
-    requests: [], apiErrors: [], console: [], scenarioErrors: [], findings: [],
+    sqlPanelUids: dash.sqlPanelUids || [], requests: [], apiErrors: [], gateBlocks: [], console: [], scenarioErrors: [], findings: [],
   };
 }
 
@@ -258,8 +261,15 @@ function attachRecorder(page, wsStat) {
       const p = captureQuery(resp, scn).catch(() => {});
       rec.pending.add(p);
       p.finally(() => rec.pending.delete(p));
-    } else if (scn && pathOf(url).includes('/api/') && resp.status() >= 400) {
+    } else if (scn && (pathOf(url).includes('/api/') || pathOf(url).includes('/apis/')) && resp.status() >= 400) {
       scn.apiErrors.push({ path: pathOf(url), status: resp.status() });
+      if (resp.status() === 403) {
+        const p = resp.text().then((t) => {
+          if (t.includes('querygate.blocked')) scn.gateBlocks.push({ path: pathOf(url), status: resp.status() });
+        }).catch(() => {});
+        rec.pending.add(p);
+        p.finally(() => rec.pending.delete(p));
+      }
     }
   });
   page.on('websocket', (ws) => {
@@ -400,6 +410,14 @@ function evaluate(scn, topo) {
       for (const [ref, r] of gateErr) addFinding(scn, 'frame-error-unreplayed', e, `${ref}: ${r.error}`);
     }
   }
+  // Only a fresh page load must query; a variable change may affect no panel.
+  const sqlPanels = scn.sqlPanelUids.filter((u) => TOPOLOGIES[topo].mysqlUids.includes(u)).length;
+  if (scn.kind === 'main' && scn.name === 'default' && sqlPanels > 0 && scn.requests.length === 0) {
+    addFinding(scn, 'no-queries', null, 'dashboard has SQL panels but sent no /api/ds/query');
+  }
+  if (!scn.expectRejection) {
+    for (const g of scn.gateBlocks) addFinding(scn, 'unexpected-gate-block', { panelId: '', panelTitle: '', status: g.status }, g.path);
+  }
   for (const a of scn.apiErrors) addFinding(scn, 'api-error', { panelId: '', panelTitle: '', status: a.status }, a.path);
   for (const m of scn.scenarioErrors) addFinding(scn, 'scenario-error', null, m);
 }
@@ -451,7 +469,7 @@ async function runScenario(st, page, rec, dash, name, action, extra = {}) {
   await replayAll(st, scn);
   evaluate(scn, st.topoName);
   if (extra.afterEvaluate) extra.afterEvaluate(scn);
-  if (scn.findings.some((f) => FAILING_TYPES.has(f.type) || f.type === 'scenario-error')) await screenshot(st, page, scn);
+  if (scn.findings.some((f) => FAILING_TYPES.has(f.type))) await screenshot(st, page, scn);
   rec.cur = null;
 }
 
