@@ -41,10 +41,14 @@ var rollupEventColumns = dal.Select("event_key, connection_id, user_key, user_ac
 
 const (
 	// planCommand enters plan mode without a permission_mode_changed event.
-	planCommand         = "plan"
-	skillToolName       = "Skill"
-	toolDecisionReject  = "reject"
-	maxModelsUsedLength = 1024
+	planCommand = "plan"
+	// permissionModeAttribute is the mode a tool_decision reports from client v2.1.301.
+	permissionModeAttribute = "permission_mode"
+	// observedModeCondition keeps the tool decisions that report a permission mode.
+	observedModeCondition = "JSON_TYPE(JSON_EXTRACT(attributes, '$.permission_mode')) = 'STRING'"
+	skillToolName         = "Skill"
+	toolDecisionReject    = "reject"
+	maxModelsUsedLength   = 1024
 	// mainThreadQuerySource is the api_request query_source of the conversation itself,
 	// as opposed to background work such as session titles and summaries.
 	mainThreadQuerySource = "repl_main_thread"
@@ -219,6 +223,69 @@ func lessEventOrder(leftAt time.Time, leftSequence int64, rightAt time.Time, rig
 		return leftAt.Before(rightAt)
 	}
 	return leftSequence < rightSequence
+}
+
+// observedMode is the permission mode one tool decision reported.
+type observedMode struct {
+	at       time.Time
+	sequence int64
+	promptID string
+	mode     string
+}
+
+// observedModeOf reads the mode a tool_decision reported; clients before v2.1.301 report none.
+func observedModeOf(event *models.OtelEvent) (observedMode, bool) {
+	if event.EventName != eventToolDecision {
+		return observedMode{}, false
+	}
+	mode := truncate(eventString(eventAttributes(event), permissionModeAttribute), maxAiLabelLength)
+	if mode == "" {
+		return observedMode{}, false
+	}
+	return observedMode{at: event.EventTimestamp, sequence: int64Value(event.EventSequence), promptID: event.PromptId, mode: mode}, true
+}
+
+// firstObservedMode returns the earliest mode the events' tool decisions reported, or nil.
+func firstObservedMode(events []*models.OtelEvent) *observedMode {
+	var first *observedMode
+	for _, event := range events {
+		observed, ok := observedModeOf(event)
+		if !ok {
+			continue
+		}
+		if first == nil || lessEventOrder(observed.at, observed.sequence, first.at, first.sequence) {
+			found := observed
+			first = &found
+		}
+	}
+	return first
+}
+
+// latestChangeAt returns the last mode change at or before (at, sequence), with the same ordering modeAt uses.
+func (m sessionModes) latestChangeAt(at time.Time, sequence int64) (modeChange, bool) {
+	var latest modeChange
+	found := false
+	for _, change := range m.changes {
+		if lessEventOrder(at, sequence, change.at, change.sequence) {
+			break
+		}
+		latest, found = change, true
+	}
+	return latest, found
+}
+
+// promptMode resolves a prompt's mode: its own observed decision, else the latest one earlier in the session unless a later mode change overrides it, else the inferred mode.
+func (m sessionModes) promptMode(own, earlier *observedMode, at time.Time, sequence int64) (string, bool) {
+	if own != nil {
+		return own.mode, false
+	}
+	if earlier != nil {
+		change, found := m.latestChangeAt(at, sequence)
+		if !found || lessEventOrder(change.at, change.sequence, earlier.at, earlier.sequence) {
+			return earlier.mode, false
+		}
+	}
+	return m.modeAt(at, sequence)
 }
 
 // promptRollup is one prompt's facts derived from its events.
@@ -574,7 +641,16 @@ func rollupSession(tx dal.Transaction, workspaceKey string, target *sessionTarge
 			continue
 		}
 		rollup := buildPromptRollup(workspaceKey, promptID, events)
-		rollup.prompt.PermissionMode, rollup.prompt.PermissionModeInferred = modes.modeAt(rollup.prompt.StartedAt, promptSequence(events))
+		own := firstObservedMode(events)
+		var earlier *observedMode
+		if own == nil && target.sessionID != "" {
+			loaded, loadErr := latestObservedModeBefore(tx, target, rollup.prompt.StartedAt)
+			if loadErr != nil {
+				return loadErr
+			}
+			earlier = loaded
+		}
+		rollup.prompt.PermissionMode, rollup.prompt.PermissionModeInferred = modes.promptMode(own, earlier, rollup.prompt.StartedAt, promptSequence(events))
 		accountID, err := domainAccountID(tx, accounts, workspaceKey, rollup.prompt.UserKey, rollup.prompt.UserAccountId, rollup.prompt.UserEmail)
 		if err != nil {
 			return err
@@ -588,6 +664,44 @@ func rollupSession(tx dal.Transaction, workspaceKey string, target *sessionTarge
 		return refreshSessionModes(tx, workspaceKey, target, modes, promptSequences)
 	}
 	return nil
+}
+
+// latestObservedModeBefore loads the latest mode a tool decision reported in the session before at, or nil.
+func latestObservedModeBefore(tx dal.Transaction, target *sessionTarget, at time.Time) (*observedMode, error) {
+	event := &models.OtelEvent{}
+	err := tx.First(event, rollupEventColumns,
+		dal.Where("connection_id = ? AND user_key = ? AND session_id = ? AND event_name = ? AND event_timestamp < ? AND "+observedModeCondition,
+			target.connectionID, target.userKey, target.sessionID, eventToolDecision, at),
+		dal.Orderby("event_timestamp DESC, event_sequence DESC"))
+	if err != nil {
+		if tx.IsErrorNotFound(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("load Claude Code earlier permission mode: %w", err)
+	}
+	if observed, ok := observedModeOf(event); ok {
+		return &observed, nil
+	}
+	return nil, nil
+}
+
+// sessionObservedModes loads the modes the session's tool decisions reported, in event order.
+func sessionObservedModes(tx dal.Transaction, target *sessionTarget) ([]observedMode, error) {
+	events := make([]*models.OtelEvent, 0)
+	if err := tx.All(&events, rollupEventColumns, dal.Where("connection_id = ? AND user_key = ? AND session_id = ? AND event_name = ? AND "+observedModeCondition,
+		target.connectionID, target.userKey, target.sessionID, eventToolDecision)); err != nil {
+		return nil, fmt.Errorf("load Claude Code session permission modes: %w", err)
+	}
+	observed := make([]observedMode, 0, len(events))
+	for _, event := range events {
+		if mode, ok := observedModeOf(event); ok {
+			observed = append(observed, mode)
+		}
+	}
+	sort.SliceStable(observed, func(i, j int) bool {
+		return lessEventOrder(observed[i].at, observed[i].sequence, observed[j].at, observed[j].sequence)
+	})
+	return observed, nil
 }
 
 // loadPromptSequences returns the event.sequence of each user_prompt in the session, which
@@ -683,11 +797,26 @@ func refreshSessionModes(tx dal.Transaction, workspaceKey string, target *sessio
 	); err != nil {
 		return fmt.Errorf("load Claude Code session prompts: %w", err)
 	}
+	observed, err := sessionObservedModes(tx, target)
+	if err != nil {
+		return err
+	}
 	for _, prompt := range prompts {
 		if _, rebuilt := target.promptIDs[prompt.PromptId]; rebuilt {
 			continue
 		}
-		mode, inferred := modes.modeAt(prompt.StartedAt, promptSequences[prompt.PromptId])
+		sequence := promptSequences[prompt.PromptId]
+		var own, earlier *observedMode
+		for i := range observed {
+			if observed[i].promptID == prompt.PromptId {
+				if own == nil {
+					own = &observed[i]
+				}
+			} else if lessEventOrder(observed[i].at, observed[i].sequence, prompt.StartedAt, sequence) {
+				earlier = &observed[i]
+			}
+		}
+		mode, inferred := modes.promptMode(own, earlier, prompt.StartedAt, sequence)
 		if mode == prompt.PermissionMode && inferred == prompt.PermissionModeInferred {
 			continue
 		}

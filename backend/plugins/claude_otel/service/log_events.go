@@ -301,6 +301,20 @@ var storedEventAttributes = map[string]struct{}{
 	// skill_activated and other named components.
 	"skill.name": {}, "skill.source": {}, "invocation_trigger": {}, "plugin.name": {},
 	"agent.name": {}, "mcp_server.name": {},
+	// tool_decision mode and auto-mode classifier.
+	"permission_mode": {}, "classifier_verdict": {}, "classifier_category": {},
+	// hook_execution_start/complete and hook_registered.
+	"hook_event": {}, "hook_name": {}, "hook_source": {}, "hook_type": {}, "hook_matcher": {},
+	"managed_only": {}, "num_hooks": {}, "num_success": {}, "num_blocking": {},
+	"num_non_blocking_error": {}, "num_cancelled": {}, "total_duration_ms": {},
+	// managed_settings_resolved; the resolved settings body is never kept.
+	"managed_settings.sources": {}, "managed_settings.trigger": {}, "error.type": {},
+	// subagent_completed.
+	"agent_type": {}, "agent.source": {}, "total_tool_uses": {}, "total_tokens": {}, "final_model": {},
+	// plugin_loaded.
+	"plugin.version": {}, "plugin.scope": {}, "enabled_via": {}, "marketplace.name": {},
+	// compaction.
+	"pre_tokens": {}, "post_tokens": {},
 	// permission_mode_changed.
 	"from_mode": {}, "to_mode": {}, "trigger": {},
 }

@@ -409,6 +409,12 @@ func TestPrepareEventsStoresOnlyAllowlistedAttributes(t *testing.T) {
 	stripContentAttributes(request)
 	for _, record := range resourceLogRecords(request.GetResourceLogs()[0]) {
 		setStringAttribute(record, "assistant_draft", "content from a future release")
+		setStringAttribute(record, "process.owner", "content from a future release")
+		setStringAttribute(record, "anthropic.seat_type", "content from a future release")
+		setStringAttribute(record, "files_reviewed", "content from a future release")
+		setStringAttribute(record, "managed_settings.settings", "content from a future release")
+		setStringAttribute(record, "permission_mode", "auto")
+		setStringAttribute(record, "hook_name", "PreToolUse:Bash")
 	}
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
 
@@ -428,6 +434,16 @@ func TestPrepareEventsStoresOnlyAllowlistedAttributes(t *testing.T) {
 		}
 		if _, kept := attributes["event.sequence"]; !kept {
 			t.Fatalf("%s attributes = %v, want allowlisted attributes kept", item.event.EventName, attributes)
+		}
+		for _, key := range []string{"permission_mode", "hook_name"} {
+			if _, kept := attributes[key]; !kept {
+				t.Fatalf("%s attributes = %v, want %s kept", item.event.EventName, attributes, key)
+			}
+		}
+		for _, key := range []string{"process.owner", "anthropic.seat_type", "files_reviewed", "managed_settings.settings"} {
+			if _, kept := attributes[key]; kept {
+				t.Fatalf("%s attributes kept %q, want it dropped", item.event.EventName, key)
+			}
 		}
 	}
 }
@@ -563,6 +579,50 @@ func TestSessionModesInferEachPromptMode(t *testing.T) {
 			mode, inferred := newSessionModes(testCase.changes).modeAt(at(testCase.promptMinute), 0)
 			if mode != testCase.mode || inferred != testCase.inferred {
 				t.Fatalf("modeAt() = %q inferred=%t, want %q inferred=%t", mode, inferred, testCase.mode, testCase.inferred)
+			}
+		})
+	}
+}
+
+func TestPromptModePrefersObservedDecisions(t *testing.T) {
+	at := func(minute int) time.Time { return time.Date(2026, 10, 14, 10, minute, 0, 0, time.UTC) }
+	change := func(minute int, from, to string) *models.OtelEvent {
+		attributes, _ := json.Marshal(map[string]string{"from_mode": from, "to_mode": to})
+		return &models.OtelEvent{EventName: eventPermissionModeChanged, EventTimestamp: at(minute), Attributes: attributes}
+	}
+	decision := func(minute int, attributes map[string]string) *models.OtelEvent {
+		encoded, _ := json.Marshal(attributes)
+		return &models.OtelEvent{EventName: eventToolDecision, PromptId: "p1", EventTimestamp: at(minute), Attributes: encoded}
+	}
+	reporting := func(minute int, mode string) *models.OtelEvent {
+		return decision(minute, map[string]string{"permission_mode": mode})
+	}
+	testCases := []struct {
+		name     string
+		own      []*models.OtelEvent
+		earlier  *models.OtelEvent
+		changes  []*models.OtelEvent
+		mode     string
+		inferred bool
+	}{
+		{name: "own decision", own: []*models.OtelEvent{reporting(5, "auto")}, mode: "auto"},
+		{name: "own decision beats an earlier change", own: []*models.OtelEvent{reporting(5, "auto")}, changes: []*models.OtelEvent{change(1, "default", "plan")}, mode: "auto"},
+		{name: "earlier decision", earlier: reporting(1, "auto"), mode: "auto"},
+		{name: "mode change after the earlier decision wins", earlier: reporting(1, "auto"), changes: []*models.OtelEvent{change(3, "auto", "plan")}, mode: "plan"},
+		{name: "earlier decision after the mode change wins", earlier: reporting(3, "bypassPermissions"), changes: []*models.OtelEvent{change(1, "default", "plan")}, mode: "bypassPermissions"},
+		{name: "decision without a mode", own: []*models.OtelEvent{decision(5, map[string]string{"decision": "accept"})}, mode: ai.PermissionModeDefault, inferred: true},
+		{name: "nothing observed", mode: ai.PermissionModeDefault, inferred: true},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			var earlier *observedMode
+			if testCase.earlier != nil {
+				observed, _ := observedModeOf(testCase.earlier)
+				earlier = &observed
+			}
+			mode, inferred := newSessionModes(testCase.changes).promptMode(firstObservedMode(testCase.own), earlier, at(5), 0)
+			if mode != testCase.mode || inferred != testCase.inferred {
+				t.Fatalf("promptMode() = %q inferred=%t, want %q inferred=%t", mode, inferred, testCase.mode, testCase.inferred)
 			}
 		})
 	}

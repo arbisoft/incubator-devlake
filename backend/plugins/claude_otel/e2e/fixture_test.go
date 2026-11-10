@@ -423,6 +423,11 @@ func (w *world) insertLogBatch(specs []resourceSpec) *models.OtelLogBatch {
 	for _, spec := range specs {
 		request.ResourceLogs = append(request.ResourceLogs, spec.who.logResource(spec.at, spec.seed))
 	}
+	return w.insertLogRequest(request)
+}
+
+// insertLogRequest stores one raw log batch for a request the way the ingest path does.
+func (w *world) insertLogRequest(request *collectorlogs.ExportLogsServiceRequest) *models.OtelLogBatch {
 	payload, err := proto.MarshalOptions{Deterministic: true}.Marshal(request)
 	require.NoError(w.t, err)
 	hash := sha256.Sum256(payload)

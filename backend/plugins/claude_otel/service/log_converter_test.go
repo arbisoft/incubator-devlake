@@ -103,6 +103,8 @@ func TestRollupSessionRederivesEarlierPromptModesOnLaterModeChange(t *testing.T)
 	tx.EXPECT().All(mock.Anything, mock.Anything, mock.Anything).Run(func(result interface{}, clauses ...dal.Clause) {
 		where := whereExpr(clauses, 1)
 		switch {
+		case strings.Contains(where, "permission_mode"):
+			*result.(*[]*models.OtelEvent) = []*models.OtelEvent{}
 		case strings.Contains(where, "command_name = ?"):
 			*result.(*[]*models.OtelEvent) = []*models.OtelEvent{modeChange}
 		case strings.Contains(where, "event_name = ?"):
@@ -112,7 +114,7 @@ func TestRollupSessionRederivesEarlierPromptModesOnLaterModeChange(t *testing.T)
 		default:
 			t.Fatalf("unexpected load %q", where)
 		}
-	}).Return(nil).Times(3)
+	}).Return(nil).Times(4)
 	tx.EXPECT().CreateOrUpdate(mock.AnythingOfType("*ai.AiPermissionModeChange")).Return(nil).Once()
 	updated := make(map[string]map[string]interface{})
 	tx.EXPECT().UpdateColumns(mock.AnythingOfType("*ai.AiPrompt"), mock.Anything, mock.Anything).Run(func(_ interface{}, sets []dal.DalSet, clauses ...dal.Clause) {
@@ -176,6 +178,10 @@ func TestRollupSessionLoadsAndWritesModesOnlyWhenNeeded(t *testing.T) {
 					*result.(*[]*models.OtelEvent) = []*models.OtelEvent{{EventName: eventUserPrompt, SessionId: "sess-1", PromptId: "p1", EventTimestamp: at.Add(time.Minute)}}
 				}
 			}).Return(nil)
+			// The prompt has no tool decision, so the earlier decision in the session is looked up.
+			noEarlierDecision := errors.NotFound.New("no earlier tool decision")
+			tx.EXPECT().First(mock.AnythingOfType("*models.OtelEvent"), mock.Anything, mock.Anything, mock.Anything).Return(noEarlierDecision).Once()
+			tx.EXPECT().IsErrorNotFound(noEarlierDecision).Return(true).Once()
 			tx.EXPECT().CreateOrUpdate(mock.AnythingOfType("*ai.AiPrompt")).Return(nil).Once()
 			tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptSkill"), mock.Anything).Return(nil).Once()
 			tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptFailure"), mock.Anything).Return(nil).Once()
@@ -193,14 +199,14 @@ func TestRollupSessionLoadsAndWritesModesOnlyWhenNeeded(t *testing.T) {
 			}
 			sessionPromptLoads := 0
 			for _, where := range loads {
-				if strings.Contains(where, "event_name = ?") && !strings.Contains(where, "command_name") {
+				if strings.Contains(where, "event_name = ?") && !strings.Contains(where, "command_name") && !strings.Contains(where, "permission_mode") {
 					sessionPromptLoads++
 				}
 			}
 			wantLoads, wantPromptLoads := 2, 0
 			if modeChanged {
-				// The prompt sequences and the session's prompts for refreshSessionModes.
-				wantLoads, wantPromptLoads = 4, 1
+				// The prompt sequences, the session's prompts and the session permission-mode load for refreshSessionModes.
+				wantLoads, wantPromptLoads = 5, 1
 			}
 			if len(loads) != wantLoads || sessionPromptLoads != wantPromptLoads {
 				t.Fatalf("loads = %q, want %d loads with %d session prompt sequence load(s)", loads, wantLoads, wantPromptLoads)
