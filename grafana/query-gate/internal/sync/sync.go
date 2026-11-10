@@ -24,10 +24,12 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"sort"
 	"strings"
+	gosync "sync"
 	"sync/atomic"
 	"time"
 
@@ -44,6 +46,17 @@ const (
 	requestTimeout = 10 * time.Second
 	maxBody        = 64 << 20
 )
+
+const initialBackoff = 2 * time.Second
+
+// Status is the sync health the gate reports; it carries no error text.
+type Status struct {
+	Enabled             bool       `json:"enabled"`
+	LastSuccess         *time.Time `json:"last_success,omitempty"`
+	LastErrorAt         *time.Time `json:"last_error_at,omitempty"`
+	ConsecutiveFailures int        `json:"consecutive_failures"`
+	RootPathOK          *bool      `json:"root_path_ok,omitempty"`
+}
 
 type cached struct {
 	generation int64
@@ -64,6 +77,12 @@ type Syncer struct {
 	cache    map[string]*cached
 	warned   map[string]int64
 	compiles int
+	root     string
+	after    func(time.Duration) <-chan time.Time
+	jitter   func(time.Duration) time.Duration
+	now      func() time.Time
+	mu       gosync.Mutex
+	status   Status
 }
 
 // New returns a syncer; an empty user disables it.
@@ -78,6 +97,11 @@ func New(base *url.URL, root, user, password string, interval time.Duration, shi
 		http:     &http.Client{},
 		cache:    map[string]*cached{},
 		warned:   map[string]int64{},
+		root:     root,
+		after:    time.After,
+		jitter:   func(d time.Duration) time.Duration { return d + rand.N(d/5+1) },
+		now:      time.Now,
+		status:   Status{Enabled: user != ""},
 	}
 	s.current.Store(templates.NewSet(shipped))
 	return s
@@ -86,23 +110,90 @@ func New(base *url.URL, root, user, password string, interval time.Duration, shi
 // Current returns the shipped templates plus the trusted database dashboards.
 func (s *Syncer) Current() *templates.Set { return s.current.Load() }
 
-// Run syncs now and then every interval until ctx is done.
+// Status returns a copy of the current sync health.
+func (s *Syncer) Status() Status {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	st := s.status
+	if st.LastSuccess != nil {
+		t := *st.LastSuccess
+		st.LastSuccess = &t
+	}
+	if st.LastErrorAt != nil {
+		t := *st.LastErrorAt
+		st.LastErrorAt = &t
+	}
+	if st.RootPathOK != nil {
+		b := *st.RootPathOK
+		st.RootPathOK = &b
+	}
+	return st
+}
+
+func (s *Syncer) record(err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := s.now()
+	if err == nil {
+		s.status.LastSuccess = &now
+		s.status.ConsecutiveFailures = 0
+		return
+	}
+	s.status.LastErrorAt = &now
+	s.status.ConsecutiveFailures++
+}
+
+func (s *Syncer) runAndRecord(ctx context.Context) error {
+	err := s.RunOnce(ctx)
+	if err != nil && ctx.Err() == nil {
+		s.logger.Error("dashboard sync failed", "error", err.Error())
+	}
+	if ctx.Err() == nil {
+		s.record(err)
+	}
+	return err
+}
+
+// Run syncs now, retrying with backoff until the first success, then every interval until ctx is done.
 func (s *Syncer) Run(ctx context.Context) {
 	if s.user == "" {
 		s.logger.Info("dashboard sync disabled: no Grafana credentials configured")
 		return
 	}
+	for backoff := initialBackoff; s.runAndRecord(ctx) != nil; backoff = min(backoff*2, s.interval) {
+		select {
+		case <-ctx.Done():
+			return
+		case <-s.after(s.jitter(backoff)):
+		}
+	}
 	ticker := time.NewTicker(s.interval)
 	defer ticker.Stop()
 	for {
-		if err := s.RunOnce(ctx); err != nil && ctx.Err() == nil {
-			s.logger.Error("dashboard sync failed", "error", err.Error())
-		}
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
 		}
+		_ = s.runAndRecord(ctx)
+	}
+}
+
+func (s *Syncer) checkRootPath(ctx context.Context) {
+	var res struct {
+		AppSubURL string `json:"appSubUrl"`
+	}
+	if err := s.get(ctx, "/api/frontend/settings", &res); err != nil {
+		s.logger.Warn("could not read Grafana appSubUrl", "error", err.Error())
+		return
+	}
+	ok := res.AppSubURL == s.root
+	s.mu.Lock()
+	wasFalse := s.status.RootPathOK != nil && !*s.status.RootPathOK
+	s.status.RootPathOK = &ok
+	s.mu.Unlock()
+	if !ok && !wasFalse {
+		s.logger.Error("GATE_ROOT_PATH does not match Grafana's appSubUrl", "root", s.root, "app_sub_url", res.AppSubURL)
 	}
 }
 
@@ -115,6 +206,7 @@ func (s *Syncer) RunOnce(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	s.checkRootPath(ctx)
 	items, err := s.dashboards(ctx)
 	if err != nil {
 		return err

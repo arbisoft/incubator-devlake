@@ -45,7 +45,7 @@ type source struct {
 
 // LoadDir compiles every saved query found in the dashboard JSON files under dir.
 func LoadDir(dir string) (*Set, []CompileError, error) {
-	set := &Set{}
+	var parts [][]*Template
 	var errs []CompileError
 	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -63,14 +63,14 @@ func LoadDir(dir string) (*Set, []CompileError, error) {
 			rel = path
 		}
 		ts, es := loadDashboard(data, rel, strings.TrimSuffix(d.Name(), ".json"))
-		set.templates = append(set.templates, ts...)
+		parts = append(parts, ts)
 		errs = append(errs, es...)
 		return nil
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("walk %s: %w", dir, err)
 	}
-	return set, errs, nil
+	return NewSet(parts...), errs, nil
 }
 
 // LoadDashboard compiles every saved query of one dashboard JSON document; source names it in parse errors.

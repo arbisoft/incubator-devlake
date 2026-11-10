@@ -87,6 +87,14 @@ func TestLoadConfig(t *testing.T) {
 		{name: "no uids", env: base(map[string]string{"GATE_MYSQL_DS_UID": " , "}), wantErr: "GATE_MYSQL_DS_UID"},
 		{name: "user without password", env: base(map[string]string{"GATE_GRAFANA_USER": "u"}), wantErr: "GATE_GRAFANA_PASSWORD"},
 		{name: "password without user", env: base(map[string]string{"GATE_GRAFANA_PASSWORD": "hunter2"}), wantErr: "GATE_GRAFANA_USER"},
+		{name: "gate user with management password", env: base(map[string]string{"GATE_GRAFANA_USER": "u", "GRAFANA_MANAGEMENT_PASSWORD": "p"}), wantErr: "GATE_GRAFANA_USER and GATE_GRAFANA_PASSWORD must be set together"},
+		{name: "management user only", env: base(map[string]string{"GRAFANA_MANAGEMENT_USER": "u"}), wantErr: "GRAFANA_MANAGEMENT_USER and GRAFANA_MANAGEMENT_PASSWORD must be set together"},
+		{name: "management password only", env: base(map[string]string{"GRAFANA_MANAGEMENT_PASSWORD": "p"}), wantErr: "GRAFANA_MANAGEMENT_USER and GRAFANA_MANAGEMENT_PASSWORD must be set together"},
+		{name: "no credentials disables sync", env: base(nil), check: func(t *testing.T, c Config) {
+			if c.GrafanaUser != "" || c.GrafanaPass != "" {
+				t.Fatalf("unexpected %+v", c)
+			}
+		}},
 		{name: "interval not a duration", env: base(map[string]string{"GATE_SYNC_INTERVAL": "soon"}), wantErr: "GATE_SYNC_INTERVAL"},
 		{name: "interval too short", env: base(map[string]string{"GATE_SYNC_INTERVAL": "9s"}), wantErr: "GATE_SYNC_INTERVAL"},
 	}

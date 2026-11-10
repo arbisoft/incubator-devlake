@@ -30,6 +30,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -38,12 +39,16 @@ import (
 	"github.com/apache/incubator-devlake/grafana/query-gate/internal/identity"
 	"github.com/apache/incubator-devlake/grafana/query-gate/internal/policy"
 	"github.com/apache/incubator-devlake/grafana/query-gate/internal/request"
+	gatesync "github.com/apache/incubator-devlake/grafana/query-gate/internal/sync"
 	"github.com/apache/incubator-devlake/grafana/query-gate/internal/templates"
 )
 
 const (
-	maxBodyBytes    = 16 << 20
+	maxBodyBytes    = 4 << 20
+	maxSQLBytes     = 256 << 10
+	maxQueries      = 100
 	maxProfileBytes = 1 << 20
+	bodyReadTimeout = 30 * time.Second
 	readyTimeout    = 5 * time.Second
 )
 
@@ -61,6 +66,8 @@ const (
 	reasonEncoding        = "content encoding not allowed"
 	reasonContentType     = "content type must be application/json"
 	reasonTooLarge        = "request body too large"
+	reasonQueryTooLarge   = "query too large"
+	reasonTooManyQueries  = "too many queries"
 	reasonBadBody         = "invalid request body"
 	reasonAmbiguous       = "ambiguous key"
 	reasonScopingKey      = "login and email can only be changed by an administrator"
@@ -75,11 +82,13 @@ type Gate struct {
 	sets     func() *templates.Set
 	logger   *slog.Logger
 	health   *http.Client
+	sem      chan struct{}
+	status   func() gatesync.Status
 }
 
 // New returns the gate handler.
-func New(cfg config.Config, upstream *url.URL, ident *identity.Client, sets func() *templates.Set, logger *slog.Logger) http.Handler {
-	g := &Gate{cfg: cfg, upstream: upstream, ident: ident, sets: sets, logger: logger, health: &http.Client{Timeout: readyTimeout}}
+func New(cfg config.Config, upstream *url.URL, ident *identity.Client, sets func() *templates.Set, status func() gatesync.Status, logger *slog.Logger) http.Handler {
+	g := &Gate{cfg: cfg, upstream: upstream, ident: ident, sets: sets, status: status, logger: logger, health: &http.Client{Timeout: readyTimeout}, sem: make(chan struct{}, 4*runtime.GOMAXPROCS(0))}
 	g.proxy = &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			pr.SetURL(upstream)
@@ -109,6 +118,8 @@ type verdict struct {
 	location string
 	refID    string
 	sqlHash  string
+	// always makes decide answer the request in every mode.
+	always bool
 }
 
 func (v *verdict) body() map[string]string {
@@ -129,7 +140,7 @@ func (g *Gate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		switch r.URL.Path {
 		case "/gate/healthz":
-			writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "mode": g.cfg.Mode, "templates": g.sets().Len()})
+			writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "mode": g.cfg.Mode, "templates": g.sets().Len(), "sync": g.status()})
 			return
 		case "/gate/readyz":
 			g.ready(w, r)
@@ -157,12 +168,12 @@ func (g *Gate) ready(w http.ResponseWriter, r *http.Request) {
 		if resp, err = g.health.Do(req); err == nil {
 			_ = resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {
-				writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
+				writeJSON(w, http.StatusOK, map[string]any{"status": "ready", "sync": g.status()})
 				return
 			}
 		}
 	}
-	writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unavailable"})
+	writeJSON(w, http.StatusServiceUnavailable, map[string]any{"status": "unavailable", "sync": g.status()})
 }
 
 func (g *Gate) gated(w http.ResponseWriter, r *http.Request, class policy.Class) {
@@ -210,7 +221,7 @@ func (g *Gate) gated(w http.ResponseWriter, r *http.Request, class policy.Class)
 
 // decide logs a rejection, then answers it in enforce mode or forwards the original body in report mode.
 func (g *Gate) decide(w http.ResponseWriter, r *http.Request, v *verdict, id identity.Identity, original []byte) {
-	if g.cfg.Mode == config.ModeEnforce {
+	if g.cfg.Mode == config.ModeEnforce || v.always {
 		g.logEvent(eventRejected, r, id, v)
 		writeJSON(w, v.status, v.body())
 		return
@@ -244,49 +255,55 @@ func (g *Gate) selfUpdate(w http.ResponseWriter, r *http.Request, id identity.Id
 		g.decide(w, r, &verdict{status: http.StatusUnsupportedMediaType, reason: reasonEncoding}, id, nil)
 		return
 	}
-	original, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxProfileBytes))
-	if err != nil {
-		v := &verdict{status: http.StatusBadRequest, reason: reasonBadBody}
-		var tooBig *http.MaxBytesError
-		if errors.As(err, &tooBig) {
-			v = &verdict{status: http.StatusRequestEntityTooLarge, reason: reasonTooLarge}
-		}
-		// A body that could not be read in full cannot be forwarded, so report mode answers it too.
-		g.logEvent(eventRejected, r, id, v)
-		writeJSON(w, v.status, v.body())
+	original, v, ok := g.inspectProfile(w, r, id)
+	if !ok {
 		return
+	}
+	if v != nil {
+		g.decide(w, r, v, id, original)
+		return
+	}
+	setBody(r, original)
+	g.proxy.ServeHTTP(w, r)
+}
+
+// inspectProfile reads and checks a profile update while holding a slot; ok is false when the client left.
+func (g *Gate) inspectProfile(w http.ResponseWriter, r *http.Request, id identity.Identity) (original []byte, v *verdict, ok bool) {
+	release, ok := g.acquire(r)
+	if !ok {
+		return nil, nil, false
+	}
+	defer release()
+	original, v = g.readBody(w, r, maxProfileBytes)
+	if v != nil {
+		return nil, v, true
 	}
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(original, &fields); err != nil || fields == nil {
-		g.decide(w, r, &verdict{status: http.StatusBadRequest, reason: reasonBadBody}, id, original)
-		return
+		return original, &verdict{status: http.StatusBadRequest, reason: reasonBadBody}, true
 	}
 	for _, f := range []struct{ key, current string }{{"login", id.Login}, {"email", id.Email}} {
 		var values []json.RawMessage
-		for k, v := range fields {
+		for k, raw := range fields {
 			if strings.EqualFold(k, f.key) {
-				values = append(values, v)
+				values = append(values, raw)
 			}
 		}
 		if len(values) > 1 {
-			g.decide(w, r, &verdict{status: http.StatusBadRequest, reason: reasonAmbiguous}, id, original)
-			return
+			return original, &verdict{status: http.StatusBadRequest, reason: reasonAmbiguous}, true
 		}
 		if len(values) == 0 {
 			continue
 		}
 		var val string
 		if err := json.Unmarshal(values[0], &val); err != nil {
-			g.decide(w, r, &verdict{status: http.StatusBadRequest, reason: reasonBadBody}, id, original)
-			return
+			return original, &verdict{status: http.StatusBadRequest, reason: reasonBadBody}, true
 		}
 		if val = strings.TrimSpace(val); val != "" && val != f.current {
-			g.decide(w, r, &verdict{status: http.StatusForbidden, reason: reasonScopingKey}, id, original)
-			return
+			return original, &verdict{status: http.StatusForbidden, reason: reasonScopingKey}, true
 		}
 	}
-	setBody(r, original)
-	g.proxy.ServeHTTP(w, r)
+	return original, nil, true
 }
 
 func (g *Gate) query(w http.ResponseWriter, r *http.Request, id identity.Identity) {
@@ -302,28 +319,11 @@ func (g *Gate) query(w http.ResponseWriter, r *http.Request, id identity.Identit
 		g.decide(w, r, &verdict{status: http.StatusUnsupportedMediaType, reason: reasonContentType}, id, nil)
 		return
 	}
-	original, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodyBytes))
-	if err != nil {
-		v := &verdict{status: http.StatusBadRequest, reason: reasonBadBody}
-		var tooBig *http.MaxBytesError
-		if errors.As(err, &tooBig) {
-			v = &verdict{status: http.StatusRequestEntityTooLarge, reason: reasonTooLarge}
-		}
-		// A body that could not be read in full cannot be forwarded, so report mode answers it too.
-		g.logEvent(eventRejected, r, id, v)
-		writeJSON(w, v.status, v.body())
+	original, canonical, v, ok := g.inspectQuery(w, r, id)
+	if !ok {
 		return
 	}
-	req, canonical, err := request.Parse(original)
-	if err != nil {
-		reason := reasonBadBody
-		if errors.Is(err, request.ErrAmbiguousKey) {
-			reason = reasonAmbiguous
-		}
-		g.decide(w, r, &verdict{status: http.StatusBadRequest, reason: reason}, id, original)
-		return
-	}
-	if v := g.checkQueries(req, id); v != nil {
+	if v != nil {
 		g.decide(w, r, v, id, original)
 		return
 	}
@@ -331,8 +331,64 @@ func (g *Gate) query(w http.ResponseWriter, r *http.Request, id identity.Identit
 	g.proxy.ServeHTTP(w, r)
 }
 
+// acquire takes a checking slot and returns its release, or false when the client left while waiting.
+func (g *Gate) acquire(r *http.Request) (func(), bool) {
+	select {
+	case g.sem <- struct{}{}:
+		return func() { <-g.sem }, true
+	case <-r.Context().Done():
+		return nil, false
+	}
+}
+
+// readBody reads the request body under the read deadline, returning a verdict when it cannot be read in full.
+func (g *Gate) readBody(w http.ResponseWriter, r *http.Request, limit int64) ([]byte, *verdict) {
+	rc := http.NewResponseController(w)
+	_ = rc.SetReadDeadline(time.Now().Add(bodyReadTimeout))
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, limit))
+	_ = rc.SetReadDeadline(time.Time{})
+	if err == nil {
+		return body, nil
+	}
+	// A body that could not be read in full cannot be forwarded, so every mode answers it.
+	v := &verdict{status: http.StatusBadRequest, reason: reasonBadBody, always: true}
+	var tooBig *http.MaxBytesError
+	if errors.As(err, &tooBig) {
+		v = &verdict{status: http.StatusRequestEntityTooLarge, reason: reasonTooLarge, always: true}
+	}
+	return nil, v
+}
+
+// inspectQuery reads, parses and checks a query body while holding a slot; ok is false when the client left.
+func (g *Gate) inspectQuery(w http.ResponseWriter, r *http.Request, id identity.Identity) (original, canonical []byte, v *verdict, ok bool) {
+	release, ok := g.acquire(r)
+	if !ok {
+		return nil, nil, nil, false
+	}
+	defer release()
+	original, v = g.readBody(w, r, maxBodyBytes)
+	if v != nil {
+		return nil, nil, v, true
+	}
+	req, canonical, err := request.Parse(original)
+	if err != nil {
+		reason := reasonBadBody
+		if errors.Is(err, request.ErrAmbiguousKey) {
+			reason = reasonAmbiguous
+		}
+		return original, nil, &verdict{status: http.StatusBadRequest, reason: reason}, true
+	}
+	return original, canonical, g.checkQueries(req, id), true
+}
+
 func (g *Gate) checkQueries(req *request.Request, id identity.Identity) *verdict {
+	if len(req.Queries) > maxQueries {
+		return &verdict{status: http.StatusBadRequest, reason: reasonTooManyQueries, always: true}
+	}
 	for _, q := range req.Queries {
+		if len(q.RawSQL) > maxSQLBytes {
+			return &verdict{status: http.StatusRequestEntityTooLarge, reason: reasonQueryTooLarge, refID: q.RefID, sqlHash: hashSQL(q.RawSQL), always: true}
+		}
 		needsMatch, reason := request.CheckQuery(q, g.cfg.MySQLUIDs)
 		if reason != "" {
 			return &verdict{status: http.StatusForbidden, reason: string(reason), refID: q.RefID, sqlHash: hashSQL(q.RawSQL)}

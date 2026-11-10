@@ -237,15 +237,16 @@ func TestMatchEmailSlot(t *testing.T) {
 }
 
 func BenchmarkMatch(b *testing.B) {
-	set := &Set{}
+	var all []*Template
 	for n := 0; n < 500; n++ {
 		sql := fmt.Sprintf("SELECT col%d, COUNT(*) FROM tbl%d WHERE project IN (${v:sqlstring}) AND owner = ${__user.login:sqlstring} GROUP BY 1", n, n)
 		tpl, err := newTemplate(fmt.Sprintf("loc%d", n), sql, vmap(Variable{Name: "v", Type: "query", Multi: true, IncludeAll: true}))
 		if err != nil {
 			b.Fatal(err)
 		}
-		set.templates = append(set.templates, tpl)
+		all = append(all, tpl)
 	}
+	set := NewSet(all)
 	sql := "SELECT col499, COUNT(*) FROM tbl499 WHERE project IN ('a','b','c') AND owner = 'alice' GROUP BY 1"
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -295,5 +296,28 @@ func TestAllProjectsTagStillChecksEmailSlots(t *testing.T) {
 	got := set.Match("SELECT 1 WHERE email = 'mallory@example.test'", alice)
 	if got.Accepted || got.Reason != ReasonEmailMismatch {
 		t.Fatalf("other email = %+v", got)
+	}
+}
+
+func TestSetScansDistinctPatternsOnce(t *testing.T) {
+	dash := func(sql string) string {
+		return `{"title":"D","panels":[{"title":"P","targets":[{"refId":"A","rawSql":"` + sql + `"}]}]}`
+	}
+	const same = "SELECT a FROM t WHERE owner = ${__user.login:sqlstring}"
+	var parts [][]*Template
+	for i, sql := range []string{same, same, "SELECT b FROM u WHERE owner = ${__user.login:sqlstring}"} {
+		ts, errs := LoadDashboard([]byte(dash(sql)), fmt.Sprintf("d%d", i))
+		if len(errs) != 0 {
+			t.Fatal(errs)
+		}
+		parts = append(parts, ts)
+	}
+	s := NewSet(parts...)
+	if s.Len() != 3 || len(s.scan) != 2 {
+		t.Fatalf("Len = %d, scan = %d, want 3 and 2", s.Len(), len(s.scan))
+	}
+	m := s.Match("SELECT a FROM t WHERE owner = 'alice'", Caller{Login: "alice"})
+	if !m.Accepted || m.Location != parts[0][0].Location {
+		t.Fatalf("match = %+v, want location %s", m, parts[0][0].Location)
 	}
 }

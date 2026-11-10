@@ -53,6 +53,10 @@ type fakeGrafana struct {
 	dashboard map[string]dash
 	auth      string
 	listCalls int
+	// failUsers makes that many user searches answer 500 before they succeed.
+	failUsers int
+	// appSubURL is served by /api/frontend/settings; nil leaves the endpoint missing.
+	appSubURL *string
 }
 
 func (f *fakeGrafana) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -78,7 +82,18 @@ func (f *fakeGrafana) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return all[lo:hi]
 	}
 	switch r.URL.Path {
+	case "/api/frontend/settings":
+		if f.appSubURL == nil {
+			http.NotFound(w, r)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"appSubUrl": *f.appSubURL})
 	case "/api/users/search":
+		if f.failUsers > 0 {
+			f.failUsers--
+			http.Error(w, "down", http.StatusInternalServerError)
+			return
+		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"totalCount": len(f.users), "users": page(f.users)})
 	case "/api/org/users/search":
 		_ = json.NewEncoder(w).Encode(map[string]any{"totalCount": len(f.orgUsers), "orgUsers": page(f.orgUsers)})
@@ -457,5 +472,67 @@ func TestSyncLogsNewlyTrustedGeneration(t *testing.T) {
 	}
 	if n := strings.Count(buf.String(), `"msg":"dashboard trusted"`); n != 2 {
 		t.Fatalf("trusted lines = %d, want 2:\n%s", n, buf.String())
+	}
+}
+
+func TestRunRetriesUntilFirstSuccess(t *testing.T) {
+	f := newFake()
+	f.failUsers = 2
+	s := newSyncer(t, f, "svc", nil)
+	var mu sync.Mutex
+	var waits []time.Duration
+	s.after = func(d time.Duration) <-chan time.Time {
+		mu.Lock()
+		waits = append(waits, d)
+		mu.Unlock()
+		ch := make(chan time.Time, 1)
+		ch <- time.Time{}
+		return ch
+	}
+	s.jitter = func(d time.Duration) time.Duration { return d }
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { s.Run(ctx); close(done) }()
+	deadline := time.Now().Add(5 * time.Second)
+	for s.Status().LastSuccess == nil && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	cancel()
+	<-done
+	st := s.Status()
+	mu.Lock()
+	defer mu.Unlock()
+	if len(waits) != 2 || waits[0] != 2*time.Second || waits[1] != 4*time.Second {
+		t.Fatalf("backoffs = %v, want [2s 4s]", waits)
+	}
+	if st.LastSuccess == nil || st.LastErrorAt == nil || st.ConsecutiveFailures != 0 || !st.Enabled {
+		t.Fatalf("status = %+v", st)
+	}
+}
+
+func TestRootPathCheck(t *testing.T) {
+	str := func(v string) *string { return &v }
+	tests := []struct {
+		name      string
+		appSubURL *string
+		want      *bool
+	}{
+		{"matching root", str(""), new(true)},
+		{"mismatched root", str("/grafana"), new(false)},
+		{"endpoint missing", nil, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newFake()
+			f.appSubURL = tt.appSubURL
+			s := newSyncer(t, f, "svc", nil)
+			if err := s.RunOnce(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			got := s.Status().RootPathOK
+			if (got == nil) != (tt.want == nil) || (got != nil && *got != *tt.want) {
+				t.Fatalf("RootPathOK = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

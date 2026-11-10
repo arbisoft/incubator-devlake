@@ -75,7 +75,7 @@ func serve() int {
 	go syncer.Run(ctx)
 	srv := &http.Server{
 		Addr:              cfg.Listen,
-		Handler:           gate.New(cfg, cfg.Upstream, identity.New(cfg.Upstream, cfg.RootPath), syncer.Current, logger),
+		Handler:           gate.New(cfg, cfg.Upstream, identity.New(cfg.Upstream, cfg.RootPath), syncer.Current, syncer.Status, logger),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}

@@ -33,9 +33,11 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/apache/incubator-devlake/grafana/query-gate/internal/config"
 	"github.com/apache/incubator-devlake/grafana/query-gate/internal/identity"
+	gatesync "github.com/apache/incubator-devlake/grafana/query-gate/internal/sync"
 	"github.com/apache/incubator-devlake/grafana/query-gate/internal/templates"
 )
 
@@ -61,6 +63,8 @@ type upstream struct {
 	got           []received
 	identityCalls atomic.Int32
 	healthStatus  atomic.Int32
+	// hold, when set before any request, blocks query requests after they are recorded.
+	hold chan struct{}
 }
 
 func (u *upstream) received() []received {
@@ -95,6 +99,9 @@ func newUpstream(t *testing.T) *upstream {
 		u.mu.Lock()
 		u.got = append(u.got, received{r.Method, r.URL.Path, r.Header.Get("Content-Type"), r.ContentLength, body, r.Header.Clone()})
 		u.mu.Unlock()
+		if u.hold != nil && path == "/api/ds/query" {
+			<-u.hold
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"ok":true}`)
 	}))
@@ -152,6 +159,12 @@ type harness struct {
 
 func newHarness(t *testing.T, mode config.Mode, root string) *harness {
 	t.Helper()
+	return newCustomHarness(t, mode, root, nil)
+}
+
+// newCustomHarness lets tests adjust the gate and wrap the template source before it serves.
+func newCustomHarness(t *testing.T, mode config.Mode, root string, tweak func(g *Gate, sets *func() *templates.Set)) *harness {
+	t.Helper()
 	up := newUpstream(t)
 	target, err := url.Parse(up.srv.URL)
 	if err != nil {
@@ -165,8 +178,13 @@ func newHarness(t *testing.T, mode config.Mode, root string) *harness {
 	}
 	set := templates.NewSet(own, shared)
 	logs := &bytes.Buffer{}
-	h := New(cfg, target, identity.New(target, root), func() *templates.Set { return set }, slog.New(slog.NewJSONHandler(logs, nil)))
-	srv := httptest.NewServer(h)
+	sets := func() *templates.Set { return set }
+	status := func() gatesync.Status { return gatesync.Status{} }
+	g := New(cfg, target, identity.New(target, root), sets, status, slog.New(slog.NewJSONHandler(logs, nil))).(*Gate)
+	if tweak != nil {
+		tweak(g, &g.sets)
+	}
+	srv := httptest.NewServer(g)
 	t.Cleanup(srv.Close)
 	return &harness{up: up, gate: srv, logs: logs}
 }
@@ -513,16 +531,16 @@ func TestOrgAdminBypassOnlyForCurrentOrg(t *testing.T) {
 func TestHealthEndpoints(t *testing.T) {
 	h := newHarness(t, config.ModeReport, "")
 	status, body := h.do(t, http.MethodGet, "/gate/healthz", "", "", "")
-	if status != 200 || body != `{"mode":"report","status":"ok","templates":2}` {
+	if status != 200 || body != `{"mode":"report","status":"ok","sync":{"enabled":false,"consecutive_failures":0},"templates":2}` {
 		t.Fatalf("healthz %d %s", status, body)
 	}
 	status, body = h.do(t, http.MethodGet, "/gate/readyz", "", "", "")
-	if status != 200 || body != `{"status":"ready"}` {
+	if status != 200 || body != `{"status":"ready","sync":{"enabled":false,"consecutive_failures":0}}` {
 		t.Fatalf("readyz %d %s", status, body)
 	}
 	h.up.healthStatus.Store(503)
 	status, body = h.do(t, http.MethodGet, "/gate/readyz", "", "", "")
-	if status != 503 || body != `{"status":"unavailable"}` {
+	if status != 503 || body != `{"status":"unavailable","sync":{"enabled":false,"consecutive_failures":0}}` {
 		t.Fatalf("readyz down %d %s", status, body)
 	}
 	h.up.srv.Close()
@@ -610,4 +628,113 @@ func TestSelfUpdateCannotChangeScopingKeys(t *testing.T) {
 			t.Fatalf("status %d %s", status, body)
 		}
 	})
+}
+
+func manyQueriesBody(n int, sql string) string {
+	qs := make([]map[string]any, n)
+	for i := range qs {
+		qs[i] = map[string]any{"rawSql": sql, "refId": "A", "datasource": map[string]string{"uid": "devlake-mysql", "type": "mysql"}}
+	}
+	b, _ := json.Marshal(map[string]any{"queries": qs})
+	return string(b)
+}
+
+func paddedBody(size int) string {
+	b := queryBody("SELECT 1")
+	return b + strings.Repeat(" ", size-len(b))
+}
+
+func TestRequestLimits(t *testing.T) {
+	tests := []struct {
+		name       string
+		body       string
+		want       int
+		wantReason string
+	}{
+		{"body over the limit", paddedBody(maxBodyBytes + 1), 413, reasonTooLarge},
+		{"query over the limit", queryBody(strings.Repeat("a", maxSQLBytes+1)), 413, reasonQueryTooLarge},
+		{"too many queries", manyQueriesBody(maxQueries+1, "SELECT 1"), 400, reasonTooManyQueries},
+		{"at the query limit", manyQueriesBody(maxQueries, aliceSQL), 200, ""},
+	}
+	for _, mode := range []config.Mode{config.ModeEnforce, config.ModeReport} {
+		for _, tt := range tests {
+			t.Run(string(mode)+"/"+tt.name, func(t *testing.T) {
+				h := newHarness(t, mode, "")
+				status, body := h.do(t, http.MethodPost, "/api/ds/query", "alice", "application/json", tt.body)
+				if status != tt.want {
+					t.Fatalf("status %d %.200s, want %d", status, body, tt.want)
+				}
+				if tt.wantReason == "" {
+					return
+				}
+				if !strings.Contains(body, tt.wantReason) || len(h.up.received()) != 0 {
+					t.Fatalf("body %.200s, upstream %d", body, len(h.up.received()))
+				}
+			})
+		}
+	}
+}
+
+func TestMatchConcurrencyIsBounded(t *testing.T) {
+	var inflight, peak atomic.Int32
+	h := newCustomHarness(t, config.ModeEnforce, "", func(g *Gate, sets *func() *templates.Set) {
+		g.sem = make(chan struct{}, 2)
+		inner := *sets
+		*sets = func() *templates.Set {
+			n := inflight.Add(1)
+			defer inflight.Add(-1)
+			for p := peak.Load(); n > p && !peak.CompareAndSwap(p, n); p = peak.Load() {
+			}
+			time.Sleep(20 * time.Millisecond)
+			return inner()
+		}
+	})
+	var wg sync.WaitGroup
+	statuses := make([]int, 10)
+	for i := range statuses {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			statuses[i], _ = h.do(t, http.MethodPost, "/api/ds/query", "alice", "application/json", queryBody(aliceSQL))
+		}()
+	}
+	wg.Wait()
+	for i, st := range statuses {
+		if st != 200 {
+			t.Fatalf("request %d answered %d", i, st)
+		}
+	}
+	if peak.Load() > 2 || peak.Load() == 0 {
+		t.Fatalf("peak in flight = %d, want 1 or 2", peak.Load())
+	}
+}
+
+func TestSlotIsReleasedBeforeForwarding(t *testing.T) {
+	h := newCustomHarness(t, config.ModeEnforce, "", func(g *Gate, _ *func() *templates.Set) {
+		g.sem = make(chan struct{}, 1)
+	})
+	h.up.hold = make(chan struct{})
+	var once sync.Once
+	release := func() { once.Do(func() { close(h.up.hold) }) }
+	t.Cleanup(release)
+	var wg sync.WaitGroup
+	for range 2 {
+		want := len(h.up.received()) + 1
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			h.do(t, http.MethodPost, "/api/ds/query", "alice", "application/json", queryBody(aliceSQL))
+		}()
+		deadline := time.Now().Add(2 * time.Second)
+		for len(h.up.received()) < want && time.Now().Before(deadline) {
+			time.Sleep(5 * time.Millisecond)
+		}
+		if got := len(h.up.received()); got < want {
+			release()
+			wg.Wait()
+			t.Fatalf("only %d queries reached upstream while the first was still being forwarded, want %d", got, want)
+		}
+	}
+	release()
+	wg.Wait()
 }

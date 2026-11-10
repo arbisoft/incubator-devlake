@@ -54,6 +54,8 @@ type Template struct {
 // Set is an ordered collection of compiled templates.
 type Set struct {
 	templates []*Template
+	// scan holds the first template of each distinct pattern, which is all matching needs.
+	scan []*Template
 }
 
 // MatchResult is the outcome of matching one SQL string.
@@ -84,8 +86,20 @@ func newTemplate(location, sql string, vars map[string]Variable) (*Template, err
 // NewSet concatenates template lists, in order, into one set.
 func NewSet(parts ...[]*Template) *Set {
 	s := &Set{}
+	type key struct {
+		pattern     string
+		allProjects bool
+	}
+	seen := map[key]bool{}
 	for _, p := range parts {
 		s.templates = append(s.templates, p...)
+		for _, t := range p {
+			k := key{t.re.String(), t.AllProjects}
+			if !seen[k] {
+				seen[k] = true
+				s.scan = append(s.scan, t)
+			}
+		}
 	}
 	return s
 }
@@ -124,7 +138,7 @@ func (s *Set) Match(sql string, c Caller) MatchResult {
 	wantInner := [fieldCount]string{fieldLogin: doubleQuotes(c.Login), fieldEmail: doubleQuotes(c.Email)}
 	reasons := [fieldCount]Reason{fieldLogin: ReasonLoginMismatch, fieldEmail: ReasonEmailMismatch}
 	best := MatchResult{Reason: ReasonNoMatch}
-	for _, t := range s.templates {
+	for _, t := range s.scan {
 		m := t.re.FindStringSubmatchIndex(sql)
 		if m == nil {
 			continue

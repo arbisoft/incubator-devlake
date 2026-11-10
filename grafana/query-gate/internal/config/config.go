@@ -92,10 +92,17 @@ func Load(getenv func(string) string) (Config, error) {
 	if len(c.MySQLUIDs) == 0 {
 		return c, errors.New("GATE_MYSQL_DS_UID must name at least one datasource uid")
 	}
-	c.GrafanaUser = orDefault(getenv("GATE_GRAFANA_USER"), getenv("GRAFANA_MANAGEMENT_USER"))
-	c.GrafanaPass = orDefault(getenv("GATE_GRAFANA_PASSWORD"), getenv("GRAFANA_MANAGEMENT_PASSWORD"))
-	if (c.GrafanaUser == "") != (c.GrafanaPass == "") {
-		return c, errors.New("GATE_GRAFANA_USER and GATE_GRAFANA_PASSWORD must be set together")
+	switch {
+	case getenv("GATE_GRAFANA_USER") != "" || getenv("GATE_GRAFANA_PASSWORD") != "":
+		c.GrafanaUser, c.GrafanaPass = getenv("GATE_GRAFANA_USER"), getenv("GATE_GRAFANA_PASSWORD")
+		if c.GrafanaUser == "" || c.GrafanaPass == "" {
+			return c, errors.New("GATE_GRAFANA_USER and GATE_GRAFANA_PASSWORD must be set together")
+		}
+	case getenv("GRAFANA_MANAGEMENT_USER") != "" || getenv("GRAFANA_MANAGEMENT_PASSWORD") != "":
+		c.GrafanaUser, c.GrafanaPass = getenv("GRAFANA_MANAGEMENT_USER"), getenv("GRAFANA_MANAGEMENT_PASSWORD")
+		if c.GrafanaUser == "" || c.GrafanaPass == "" {
+			return c, errors.New("GRAFANA_MANAGEMENT_USER and GRAFANA_MANAGEMENT_PASSWORD must be set together")
+		}
 	}
 	c.SyncInterval = time.Minute
 	if v := getenv("GATE_SYNC_INTERVAL"); v != "" {
