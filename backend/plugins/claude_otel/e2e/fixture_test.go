@@ -228,6 +228,11 @@ func (w *world) insertBatch(specs []resourceSpec) *models.OtelMetricBatch {
 	for _, spec := range specs {
 		request.ResourceMetrics = append(request.ResourceMetrics, spec.who.resource(spec.at, spec.seed))
 	}
+	return w.insertMetricRequest(request)
+}
+
+// insertMetricRequest stores one raw metric batch for a request the way the ingest path does.
+func (w *world) insertMetricRequest(request *collectormetrics.ExportMetricsServiceRequest) *models.OtelMetricBatch {
 	payload, err := proto.MarshalOptions{Deterministic: true}.Marshal(request)
 	require.NoError(w.t, err)
 	hash := sha256.Sum256(payload)

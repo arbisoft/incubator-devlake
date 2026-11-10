@@ -43,11 +43,12 @@ const (
 	identityColumnLength = 255
 	// Hourly fact dimension widths, from models.OtelHourlyModelUsage and
 	// OtelHourlyToolUsage. The ai_* columns model and tool roll up into are as wide.
-	modelDimensionLength          = 255
-	querySourceDimensionLength    = 64
-	toolDimensionLength           = 100 // tool_name and language
-	effortDimensionLength         = 16
-	attributionDimensionLength    = 64 // agent.name and skill.name
+	modelDimensionLength       = 255
+	querySourceDimensionLength = 64
+	toolDimensionLength        = 100 // tool_name and language
+	effortDimensionLength      = 16
+	// 64 keeps the model usage primary key under 3,072 bytes; names that share 64 characters share a row.
+	attributionDimensionLength    = 64
 	decisionSourceDimensionLength = 32
 	startTypeDimensionLength      = 16
 )

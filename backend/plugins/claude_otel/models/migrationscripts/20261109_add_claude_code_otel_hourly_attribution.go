@@ -43,11 +43,16 @@ type addClaudeCodeOtelHourlyAttribution struct{}
 
 func (*addClaudeCodeOtelHourlyAttribution) Up(basicRes context.BasicRes) errors.Error {
 	db := basicRes.GetDal()
-	if err := db.Exec(addModelUsageAttributionSQL); err != nil {
-		return errors.Default.Wrap(err, "add attribution dimensions to hourly model usage")
+	// Each ALTER commits on its own, so a rerun skips the one that already ran.
+	if !db.HasColumn("_tool_claude_code_otel_hourly_model_usage", "effort") {
+		if err := db.Exec(addModelUsageAttributionSQL); err != nil {
+			return errors.Default.Wrap(err, "add attribution dimensions to hourly model usage")
+		}
 	}
-	if err := db.Exec(addToolUsageAttributionSQL); err != nil {
-		return errors.Default.Wrap(err, "add decision source to hourly tool usage")
+	if !db.HasColumn("_tool_claude_code_otel_hourly_tool_usage", "decision_source") {
+		if err := db.Exec(addToolUsageAttributionSQL); err != nil {
+			return errors.Default.Wrap(err, "add decision source to hourly tool usage")
+		}
 	}
 	return nil
 }

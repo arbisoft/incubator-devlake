@@ -51,6 +51,10 @@ func (c *rawConverter) applyHourlyUpdates(tx dal.Transaction, updates []factUpda
 			return err
 		}
 		for _, fact := range pointFacts(update) {
+			// An unchanged cumulative session count starts no session.
+			if fact.fact == hourlySessionStartFact && value.value.Sign() == 0 {
+				continue
+			}
 			if err := upsertHourlyFact(tx, fact, value, fact.observedAt); err != nil {
 				return classifyStorageError(fmt.Errorf("write hourly Claude Code OTel facts: %w", err))
 			}

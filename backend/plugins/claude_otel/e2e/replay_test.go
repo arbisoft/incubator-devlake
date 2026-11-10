@@ -170,6 +170,9 @@ func (f facts) userKeys() map[string]struct{} {
 	for _, row := range f.Tool {
 		keys[row.UserKey] = struct{}{}
 	}
+	for _, row := range f.SessionStart {
+		keys[row.UserKey] = struct{}{}
+	}
 	for _, row := range f.AiActivity {
 		keys[*row.UserKey] = struct{}{}
 	}
@@ -192,6 +195,9 @@ func (f facts) organizations() map[string]struct{} {
 		orgs[*row.OrganizationId] = struct{}{}
 	}
 	for _, row := range f.Tool {
+		orgs[*row.OrganizationId] = struct{}{}
+	}
+	for _, row := range f.SessionStart {
 		orgs[*row.OrganizationId] = struct{}{}
 	}
 	for _, row := range f.AiActivity {
@@ -347,6 +353,7 @@ func TestRebindAndReplayRebuildsOnlyTheReboundTeam(t *testing.T) {
 	require.Zero(t, w.count(&models.OtelHourlyActivity{}, "connection_id = ? AND user_key = ?", fixture.a.ID, stray.userKey()))
 	require.Zero(t, w.count(&models.OtelHourlyModelUsage{}, "connection_id = ? AND user_key = ?", fixture.a.ID, stray.userKey()))
 	require.Zero(t, w.count(&models.OtelHourlyToolUsage{}, "connection_id = ? AND user_key = ?", fixture.a.ID, stray.userKey()))
+	require.Zero(t, w.count(&models.OtelHourlySessionStart{}, "connection_id = ? AND user_key = ?", fixture.a.ID, stray.userKey()))
 	require.Zero(t, w.count(&ai.AiActivity{}, "user_key = ? AND workspace_key = ?", stray.userKey(), orgW))
 	require.Zero(t, w.count(&ai.AiModelUsage{}, "user_key = ? AND workspace_key = ?", stray.userKey(), orgW))
 	require.Zero(t, w.count(&ai.AiToolDecision{}, "user_key = ? AND workspace_key = ?", stray.userKey(), orgW))
@@ -516,7 +523,7 @@ func TestRebindRevokedConnectionRecoversItsLivePeriod(t *testing.T) {
 	afterRevoked := w.factsOf(revoked.ID)
 	requireFilled(t, afterRevoked)
 	require.Equal(t, beforeSuccessor, w.factsOf(successor.ID))
-	for _, table := range []interface{}{&models.OtelHourlyActivity{}, &models.OtelHourlyModelUsage{}, &models.OtelHourlyToolUsage{}} {
+	for _, table := range []interface{}{&models.OtelHourlyActivity{}, &models.OtelHourlyModelUsage{}, &models.OtelHourlyToolUsage{}, &models.OtelHourlySessionStart{}} {
 		require.Positive(t, w.count(table, "connection_id = ? AND hour_start >= ? AND hour_start < ?", revoked.ID, w.day(-2), w.day(-1)))
 		require.Zero(t, w.count(table, "connection_id = ? AND hour_start >= ?", revoked.ID, revokedAt))
 		require.Zero(t, w.count(table, "connection_id = ? AND hour_start < ?", successor.ID, revokedAt))

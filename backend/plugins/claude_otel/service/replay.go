@@ -462,6 +462,10 @@ func (c *rawConverter) replaceReplayRange(tx dal.Transaction, rangeStart, rangeE
 	}
 	updates := make([]factUpdate, 0, len(aggregates))
 	for _, aggregate := range aggregates {
+		// An unchanged cumulative session count starts no session.
+		if aggregate.update.fact == hourlySessionStartFact && aggregate.value.Sign() == 0 {
+			continue
+		}
 		if err := upsertHourlyFact(tx, aggregate.update, metricNumber{value: aggregate.value}, aggregate.lastObservedAt); err != nil {
 			return fmt.Errorf("write replayed hourly facts: %w", err)
 		}

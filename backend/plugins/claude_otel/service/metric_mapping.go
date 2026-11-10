@@ -244,7 +244,10 @@ func pointFacts(update factUpdate) []factUpdate {
 	start := update
 	start.fact = hourlySessionStartFact
 	start.column = "start_count"
-	return []factUpdate{update, start}
+	activity := update
+	activity.sessionID = ""
+	activity.startType = ""
+	return []factUpdate{activity, start}
 }
 
 func defaultDimension(value string) string {

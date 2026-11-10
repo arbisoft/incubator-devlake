@@ -530,57 +530,87 @@ func TestReplayDeltaBatchesRebuildStableHourlyAggregates(t *testing.T) {
 
 func TestReplayKeepsRowsThatDifferOnlyByAttribution(t *testing.T) {
 	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
-	newRequest := func(effort, source string) *collectormetrics.ExportMetricsServiceRequest {
-		request := newConverterRequest(observedAt, testOrganizationID)
-		metrics := request.ResourceMetrics[0].ScopeMetrics[0].Metrics
-		token := metrics[1].GetSum().DataPoints[0]
-		token.Attributes = append(token.Attributes, stringAttribute("effort", effort))
-		decision := metrics[2].GetSum().DataPoints[0]
-		decision.Attributes = append(decision.Attributes, stringAttribute("source", source))
-		return request
+	const (
+		modelUsage = "model usage"
+		toolUsage  = "tool usage"
+		sessions   = "session count"
+	)
+	testCases := []struct {
+		name      string
+		target    string
+		attribute string
+		values    [2]string
+	}{
+		{name: "effort", target: modelUsage, attribute: "effort", values: [2]string{"high", "low"}},
+		{name: "agent name", target: modelUsage, attribute: "agent.name", values: [2]string{"planner", "reviewer"}},
+		{name: "skill name", target: modelUsage, attribute: "skill.name", values: [2]string{"commit", "deploy"}},
+		{name: "decision source", target: toolUsage, attribute: "source", values: [2]string{"config", "user_temporary"}},
+		{name: "session id", target: sessions, attribute: "session.id", values: [2]string{"sess-1", "sess-2"}},
+		{name: "start type", target: sessions, attribute: "start_type", values: [2]string{"fresh", "resume"}},
 	}
-	marshalBatch := func(request *collectormetrics.ExportMetricsServiceRequest) *models.OtelMetricBatch {
-		payload, err := proto.Marshal(request)
-		if err != nil {
-			t.Fatalf("proto.Marshal() error = %v", err)
-		}
-		return &models.OtelMetricBatch{PayloadProto: payload, PayloadSchemaVersion: otelPayloadSchemaVersion, Status: models.OtelBatchStatusProcessed}
-	}
-	batches := []*models.OtelMetricBatch{marshalBatch(newRequest("high", "config")), marshalBatch(newRequest("low", "user_temporary"))}
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: observedAt.Add(-time.Hour)}}})
-	converter := newRawConverter(database, nil)
-	aggregates := make(map[string]*hourlyAggregate)
-	for _, batch := range batches {
-		processed, skippedErr, err := converter.replayBatch(batch, observedAt.Truncate(24*time.Hour), observedAt.Truncate(24*time.Hour).Add(24*time.Hour), aggregates)
-		if err != nil || skippedErr != nil || !processed {
-			t.Fatalf("replayBatch() = %t, %v, %v", processed, skippedErr, err)
-		}
-	}
+	dayStart := observedAt.Truncate(24 * time.Hour)
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			aggregates := make(map[string]*hourlyAggregate)
+			for _, value := range testCase.values {
+				request := newConverterRequest(observedAt, testOrganizationID)
+				metrics := request.ResourceMetrics[0].ScopeMetrics[0].Metrics
+				var point *metricsv1.NumberDataPoint
+				switch testCase.target {
+				case modelUsage:
+					point = metrics[1].GetSum().DataPoints[0]
+				case toolUsage:
+					point = metrics[2].GetSum().DataPoints[0]
+				default:
+					point = metrics[0].GetSum().DataPoints[0]
+				}
+				point.Attributes = append(point.Attributes, stringAttribute(testCase.attribute, value))
+				payload, err := proto.Marshal(request)
+				if err != nil {
+					t.Fatalf("proto.Marshal() error = %v", err)
+				}
+				batch := &models.OtelMetricBatch{PayloadProto: payload, PayloadSchemaVersion: otelPayloadSchemaVersion, Status: models.OtelBatchStatusProcessed}
+				processed, skippedErr, err := newRawConverter(database, nil).replayBatch(batch, dayStart, dayStart.Add(24*time.Hour), aggregates)
+				if err != nil || skippedErr != nil || !processed {
+					t.Fatalf("replayBatch() = %t, %v, %v", processed, skippedErr, err)
+				}
+			}
 
-	efforts := make(map[string]string)
-	sources := make(map[string]string)
-	for _, aggregate := range aggregates {
-		update := aggregate.update
-		if update.fact == hourlyModelUsageFact && update.column == "input_tokens" {
-			efforts[update.effort] = aggregate.value.RatString()
-		}
-		if update.fact == hourlyToolUsageFact && update.column == "accepted_count" {
-			sources[update.decisionSource] = aggregate.value.RatString()
-		}
-	}
-	if !reflect.DeepEqual(efforts, map[string]string{"high": "10", "low": "10"}) {
-		t.Fatalf("input token aggregates by effort = %v, want high and low at 10 each", efforts)
-	}
-	if !reflect.DeepEqual(sources, map[string]string{"config": "2", "user_temporary": "2"}) {
-		t.Fatalf("accepted count aggregates by source = %v, want config and user_temporary at 2 each", sources)
+			got := make(map[string]string)
+			for _, aggregate := range aggregates {
+				update := aggregate.update
+				switch {
+				case testCase.target == modelUsage && update.fact == hourlyModelUsageFact && update.column == "input_tokens":
+					got[update.effort+"/"+update.agent+"/"+update.skill] = aggregate.value.RatString()
+				case testCase.target == toolUsage && update.fact == hourlyToolUsageFact && update.column == "accepted_count":
+					got[update.decisionSource] = aggregate.value.RatString()
+				case testCase.target == sessions && update.fact == hourlySessionStartFact && update.column == "start_count":
+					got[update.sessionID+"/"+update.startType] = aggregate.value.RatString()
+				}
+			}
+			wantValue := map[string]string{modelUsage: "10", toolUsage: "2", sessions: "1"}[testCase.target]
+			if len(got) != 2 {
+				t.Fatalf("%s aggregates = %v, want two rows that differ only by %s", testCase.target, got, testCase.attribute)
+			}
+			for key, value := range got {
+				if value != wantValue {
+					t.Fatalf("%s aggregate %q = %s, want %s", testCase.target, key, value, wantValue)
+				}
+			}
+		})
 	}
 }
 
 func TestReplayAggregatesSessionStarts(t *testing.T) {
 	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
 	request := newConverterRequest(observedAt, testOrganizationID)
-	point := request.ResourceMetrics[0].ScopeMetrics[0].Metrics[0].GetSum().DataPoints[0]
+	sum := request.ResourceMetrics[0].ScopeMetrics[0].Metrics[0].GetSum()
+	second := proto.Clone(sum.DataPoints[0]).(*metricsv1.NumberDataPoint)
+	point := sum.DataPoints[0]
 	point.Attributes = append(point.Attributes, stringAttribute("start_type", "resume"), stringAttribute("session.id", "sess-1"))
+	second.Attributes = append(second.Attributes, stringAttribute("start_type", "fresh"), stringAttribute("session.id", "sess-2"))
+	sum.DataPoints = append(sum.DataPoints, second)
 	payload, err := proto.Marshal(request)
 	if err != nil {
 		t.Fatalf("proto.Marshal() error = %v", err)
@@ -595,18 +625,20 @@ func TestReplayAggregatesSessionStarts(t *testing.T) {
 	}
 
 	got := make(map[string]string)
+	activityAggregates := 0
 	for _, aggregate := range aggregates {
 		update := aggregate.update
 		if update.fact == hourlyActivityFact && update.column == "session_count" {
+			activityAggregates++
 			got["session_count"] = aggregate.value.RatString()
 		}
 		if update.fact == hourlySessionStartFact && update.column == "start_count" {
 			got["start_count/"+update.sessionID+"/"+update.startType] = aggregate.value.RatString()
 		}
 	}
-	want := map[string]string{"session_count": "1", "start_count/sess-1/resume": "1"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("session aggregates = %v, want %v", got, want)
+	want := map[string]string{"session_count": "2", "start_count/sess-1/resume": "1", "start_count/sess-2/fresh": "1"}
+	if activityAggregates != 1 || !reflect.DeepEqual(got, want) {
+		t.Fatalf("session aggregates = %v (%d activity), want %v with one activity aggregate", got, activityAggregates, want)
 	}
 }
 
