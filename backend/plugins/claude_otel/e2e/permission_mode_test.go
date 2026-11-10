@@ -130,3 +130,57 @@ func TestObservedPermissionModeRollupRefreshAndReplay(t *testing.T) {
 	require.Equal(t, want, w.promptModes(orgR))
 	w.requireLogReplayCompleted(3)
 }
+
+func TestCarriedPermissionModeOrderAndLateDecisions(t *testing.T) {
+	w := newWorld(t)
+	w.connection("alpha", orgR, w.day(-5))
+	const session = "sess-mode-2"
+	who := a1
+	t1 := w.day(-2).Add(11 * time.Hour)
+	send := func(records ...*logsv1.LogRecord) {
+		w.insertLogRequest(&collectorlogs.ExportLogsServiceRequest{ResourceLogs: []*logsv1.ResourceLogs{clientLogResource(records...)}})
+		w.drainNow()
+	}
+	decision := func(prompt string, at time.Time, sequence int64, mode string) *logsv1.LogRecord {
+		return sessionRecord(who, session, prompt, "tool_decision", at, sequence,
+			strAttr("permission_mode", mode), strAttr("tool_name", "Bash"), strAttr("decision", "accept"), strAttr("source", "config"))
+	}
+	inferred := promptModeState{mode: ai.PermissionModeDefault, inferred: true}
+
+	send(sessionRecord(who, session, "p-carry-1", "user_prompt", t1, 10, intAttr("prompt_length", 12)))
+	send(sessionRecord(who, session, "p-carry-3", "user_prompt", t1.Add(10*time.Minute), 30, intAttr("prompt_length", 12)))
+	require.Equal(t, inferred, w.promptModes(orgR)["p-carry-3"])
+
+	send(
+		sessionRecord(who, session, "p-carry-2", "user_prompt", t1.Add(5*time.Minute), 20, intAttr("prompt_length", 12)),
+		decision("p-carry-2", t1.Add(5*time.Minute+10*time.Second), 21, "acceptEdits"),
+		decision("p-carry-2", t1.Add(5*time.Minute+20*time.Second), 22, "bypassPermissions"),
+		decision("p-carry-2", t1.Add(5*time.Minute+30*time.Second), 23, ""),
+	)
+	modes := w.promptModes(orgR)
+	require.Equal(t, promptModeState{mode: "acceptEdits"}, modes["p-carry-2"])
+	require.Equal(t, promptModeState{mode: "acceptEdits"}, modes["p-carry-3"])
+	require.Equal(t, inferred, modes["p-carry-1"])
+
+	t4 := t1.Add(15 * time.Minute)
+	send(
+		decision("p-carry-3", t4, 40, "plan"),
+		sessionRecord(who, session, "p-carry-4", "user_prompt", t4, 41, intAttr("prompt_length", 12)),
+	)
+	modes = w.promptModes(orgR)
+	require.Equal(t, promptModeState{mode: "plan"}, modes["p-carry-3"])
+	require.Equal(t, promptModeState{mode: "plan"}, modes["p-carry-4"])
+	want := modes
+
+	require.NoError(t, w.tester.Dal.UpdateColumns(&ai.AiPrompt{}, []dal.DalSet{
+		{ColumnName: "permission_mode", Value: ai.PermissionModeDefault},
+		{ColumnName: "permission_mode_inferred", Value: true},
+	}, dal.Where("workspace_key = ?", orgR)))
+
+	_, err := service.CreateOtelReplay(e2eUser, &service.OtelReplayInput{OtelReplayRange: w.replayDates(-2, -2)})
+	require.NoError(t, err)
+	w.drainNow()
+
+	require.Equal(t, want, w.promptModes(orgR))
+	w.requireLogReplayCompleted(4)
+}

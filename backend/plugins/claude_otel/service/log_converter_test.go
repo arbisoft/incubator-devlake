@@ -178,10 +178,6 @@ func TestRollupSessionLoadsAndWritesModesOnlyWhenNeeded(t *testing.T) {
 					*result.(*[]*models.OtelEvent) = []*models.OtelEvent{{EventName: eventUserPrompt, SessionId: "sess-1", PromptId: "p1", EventTimestamp: at.Add(time.Minute)}}
 				}
 			}).Return(nil)
-			// The prompt has no tool decision, so the earlier decision in the session is looked up.
-			noEarlierDecision := errors.NotFound.New("no earlier tool decision")
-			tx.EXPECT().First(mock.AnythingOfType("*models.OtelEvent"), mock.Anything, mock.Anything, mock.Anything).Return(noEarlierDecision).Once()
-			tx.EXPECT().IsErrorNotFound(noEarlierDecision).Return(true).Once()
 			tx.EXPECT().CreateOrUpdate(mock.AnythingOfType("*ai.AiPrompt")).Return(nil).Once()
 			tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptSkill"), mock.Anything).Return(nil).Once()
 			tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptFailure"), mock.Anything).Return(nil).Once()
@@ -197,19 +193,23 @@ func TestRollupSessionLoadsAndWritesModesOnlyWhenNeeded(t *testing.T) {
 			if !strings.Contains(loads[0], "command_name = ?") {
 				t.Fatalf("first load = %q, want only the session's mode changes", loads[0])
 			}
-			sessionPromptLoads := 0
+			sessionPromptLoads, observedLoads := 0, 0
 			for _, where := range loads {
+				if strings.Contains(where, "permission_mode") {
+					observedLoads++
+				}
 				if strings.Contains(where, "event_name = ?") && !strings.Contains(where, "command_name") && !strings.Contains(where, "permission_mode") {
 					sessionPromptLoads++
 				}
 			}
-			wantLoads, wantPromptLoads := 2, 0
+			// The mode events, the prompt events and the session's observed modes, which a refresh reuses.
+			wantLoads, wantPromptLoads := 3, 0
 			if modeChanged {
-				// The prompt sequences, the session's prompts and the session permission-mode load for refreshSessionModes.
+				// The prompt sequences and the session's prompts load for refreshSessionModes.
 				wantLoads, wantPromptLoads = 5, 1
 			}
-			if len(loads) != wantLoads || sessionPromptLoads != wantPromptLoads {
-				t.Fatalf("loads = %q, want %d loads with %d session prompt sequence load(s)", loads, wantLoads, wantPromptLoads)
+			if len(loads) != wantLoads || sessionPromptLoads != wantPromptLoads || observedLoads != 1 {
+				t.Fatalf("loads = %q, want %d loads with %d session prompt sequence load(s) and 1 observed-mode load", loads, wantLoads, wantPromptLoads)
 			}
 		})
 	}

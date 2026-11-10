@@ -23,8 +23,7 @@ import (
 	"github.com/apache/incubator-devlake/core/models/domainlayer"
 )
 
-// Permission modes reported by Claude Code. PermissionModeDefault is also used when a
-// session never reported a mode change, with PermissionModeInferred set.
+// Permission modes reported by Claude Code. PermissionModeDefault is also the assumed mode when nothing revealed one.
 const (
 	PermissionModeDefault = "default"
 	PermissionModePlan    = "plan"
@@ -63,9 +62,7 @@ type AiPrompt struct {
 	// CommandName is the slash command the prompt invoked, if any.
 	CommandName   string `gorm:"type:varchar(255);index" json:"commandName"`
 	CommandSource string `gorm:"type:varchar(32)" json:"commandSource"`
-	// PermissionMode is the mode the prompt ran in (default, plan, acceptEdits, auto,
-	// bypassPermissions). PermissionModeInferred is true when the session reported no
-	// mode change, so the mode is assumed rather than observed.
+	// PermissionMode is the mode the prompt ran in; PermissionModeInferred is true when no tool decision or mode change revealed it.
 	PermissionMode         string `gorm:"type:varchar(64);index" json:"permissionMode"`
 	PermissionModeInferred bool   `json:"permissionModeInferred"`
 	// ModelsUsed lists the base model IDs of the prompt's API requests, comma-separated and

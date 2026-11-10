@@ -628,6 +628,43 @@ func TestPromptModePrefersObservedDecisions(t *testing.T) {
 	}
 }
 
+func TestEarlierObservedMode(t *testing.T) {
+	at := func(minute int) time.Time { return time.Date(2026, 10, 14, 10, minute, 0, 0, time.UTC) }
+	entry := func(prompt string, minute int, sequence int64, mode string) observedMode {
+		return observedMode{at: at(minute), sequence: sequence, promptID: prompt, mode: mode}
+	}
+	testCases := []struct {
+		name     string
+		observed []observedMode
+		prompt   string
+		minute   int
+		sequence int64
+		want     string
+	}{
+		{name: "first decision of the latest earlier prompt", observed: []observedMode{entry("p1", 1, 1, "acceptEdits"), entry("p1", 2, 2, "bypassPermissions")}, prompt: "p2", minute: 5, want: "acceptEdits"},
+		{name: "two earlier prompts", observed: []observedMode{entry("p1", 1, 1, "default"), entry("p2", 3, 2, "plan")}, prompt: "p3", minute: 5, want: "plan"},
+		{name: "same timestamp with a lower sequence is earlier", observed: []observedMode{entry("p1", 5, 3, "plan")}, prompt: "p2", minute: 5, sequence: 4, want: "plan"},
+		{name: "same timestamp with a higher sequence is later", observed: []observedMode{entry("p1", 5, 3, "plan")}, prompt: "p2", minute: 5, sequence: 2},
+		{name: "own decisions are ignored", observed: []observedMode{entry("p2", 1, 1, "plan")}, prompt: "p2", minute: 5},
+		{name: "later decisions are ignored", observed: []observedMode{entry("p1", 6, 1, "plan")}, prompt: "p2", minute: 5},
+		{name: "decisions without a prompt are returned themselves", observed: []observedMode{entry("", 1, 1, "plan"), entry("", 2, 2, "auto")}, prompt: "p2", minute: 5, want: "auto"},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := earlierObservedMode(testCase.observed, testCase.prompt, at(testCase.minute), testCase.sequence)
+			if testCase.want == "" {
+				if got != nil {
+					t.Fatalf("earlierObservedMode() = %#v, want nil", got)
+				}
+				return
+			}
+			if got == nil || got.mode != testCase.want {
+				t.Fatalf("earlierObservedMode() = %#v, want mode %q", got, testCase.want)
+			}
+		})
+	}
+}
+
 func collectSkills(adds func(c *skillCollector)) []*ai.AiPromptSkill {
 	collector := newSkillCollector(testOrganizationID, "p1")
 	adds(collector)
@@ -1078,6 +1115,27 @@ func TestSessionTargetsGroupPromptsAndFlagModeChanges(t *testing.T) {
 	targets := sessionTargets(prepared.events)
 	if len(targets) != 1 || !targets[0].modeChanged || len(targets[0].promptIDs) != 3 {
 		t.Fatalf("sessionTargets() = %d targets, modeChanged %t, prompts %d", len(targets), targets[0].modeChanged, len(targets[0].promptIDs))
+	}
+}
+
+func TestSessionTargetsFlagObservedModes(t *testing.T) {
+	at := func(minute int) time.Time { return time.Date(2026, 10, 14, 10, minute, 0, 0, time.UTC) }
+	decision := func(session string, minute int, mode string) preparedEvent {
+		event := otelEventWith(eventToolDecision, "p1", at(minute), int64(minute), map[string]string{"permission_mode": mode})
+		event.SessionId = session
+		return preparedEvent{event: event}
+	}
+	target := sessionTargets([]preparedEvent{decision("sess-1", 7, "plan"), decision("sess-1", 3, "auto"), decision("sess-1", 1, "")})[0]
+	if !target.modeObserved || !target.earliestObserved.Equal(at(3)) {
+		t.Fatalf("modeObserved = %t, earliestObserved = %v, want true and %v", target.modeObserved, target.earliestObserved, at(3))
+	}
+	for name, events := range map[string][]preparedEvent{
+		"blank mode": {decision("sess-1", 1, "")},
+		"no session": {decision("", 1, "plan")},
+	} {
+		if got := sessionTargets(events)[0]; got.modeObserved || !got.earliestObserved.IsZero() {
+			t.Fatalf("%s: modeObserved = %t, earliestObserved = %v, want unset", name, got.modeObserved, got.earliestObserved)
+		}
 	}
 }
 
