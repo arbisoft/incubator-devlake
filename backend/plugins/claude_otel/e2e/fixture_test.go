@@ -47,6 +47,8 @@ var (
 	fxModels   = []string{"claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-opus-5-5[1m]", "claude-sonnet-5"}
 	fxQueries  = []string{"main", "auxiliary", "subagent"}
 	fxEfforts  = []string{"low", "medium", "high", "xhigh", "max"}
+	fxAgents   = []string{"", "general-purpose", "edly-saas-agents:edly-test-case-writer"}
+	fxSkills   = []string{"", "build"}
 	fxTools    = []string{"Edit", "Write"}
 	fxLangs    = []string{"Markdown", "Python", "TypeScript"}
 	fxSources  = []string{"config", "user_permanent", "user_temporary", "user_reject"}
@@ -165,13 +167,21 @@ func (a actor) resource(at time.Time, seed int) *metricsv1.ResourceMetrics {
 		base = append(base, strAttr("os.type", "darwin"), strAttr("host.arch", "arm64"))
 	}
 	model, query, effort := fxModels[seed%len(fxModels)], fxQueries[seed%len(fxQueries)], fxEfforts[seed%len(fxEfforts)]
+	attribution := []*commonv1.KeyValue{strAttr("effort", effort)}
+	if agent := fxAgents[seed%len(fxAgents)]; agent != "" {
+		attribution = append(attribution, strAttr("agent.name", agent))
+	}
+	if skill := fxSkills[seed%len(fxSkills)]; skill != "" {
+		attribution = append(attribution, strAttr("skill.name", skill))
+	}
 	tick := 0
 	next := func() time.Time {
 		tick++
 		return at.Add(time.Duration(tick) * time.Second)
 	}
 	tokenAttrs := func(kind string) []*commonv1.KeyValue {
-		return withAttrs(base, strAttr("type", kind), strAttr("model", model), strAttr("query_source", query), strAttr("effort", effort))
+		attrs := withAttrs(base, strAttr("type", kind), strAttr("model", model), strAttr("query_source", query))
+		return append(attrs, attribution...)
 	}
 	f := float64(seed)
 	metrics := []*metricsv1.Metric{
@@ -181,7 +191,7 @@ func (a actor) resource(at time.Time, seed int) *metricsv1.ResourceMetrics {
 			dataPoint(tokenAttrs("cacheRead"), next(), f*457, true),
 			dataPoint(tokenAttrs("cacheCreation"), next(), f*61+3, false)),
 		deltaSum("claude_code.cost.usage",
-			dataPoint(withAttrs(base, strAttr("model", model), strAttr("query_source", query), strAttr("effort", effort)), next(), f*0.0125+0.0003, false)),
+			dataPoint(withAttrs(withAttrs(base, strAttr("model", model), strAttr("query_source", query)), attribution...), next(), f*0.0125+0.0003, false)),
 		deltaSum("claude_code.active_time.total",
 			dataPoint(withAttrs(base, strAttr("type", "cli")), next(), f*3.25, false),
 			dataPoint(withAttrs(base, strAttr("type", "user")), next(), f*1.5+0.25, false)),

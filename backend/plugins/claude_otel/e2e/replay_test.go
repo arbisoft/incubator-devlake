@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"math/big"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -41,8 +42,8 @@ const (
 	dateLayout             = "2006-01-02"
 	resourcesSkippedCode   = "resources_skipped"
 	hourlyActivityOrder    = "connection_id, user_key, hour_start"
-	hourlyModelOrder       = "connection_id, user_key, hour_start, model, query_source"
-	hourlyToolOrder        = "connection_id, user_key, hour_start, tool_name, language"
+	hourlyModelOrder       = "connection_id, user_key, hour_start, model, query_source, effort, agent_name, skill_name"
+	hourlyToolOrder        = "connection_id, user_key, hour_start, tool_name, language, decision_source"
 	canonicalActivityOrder = "workspace_key, user_key, date, type, interface_type"
 	canonicalModelOrder    = "workspace_key, user_key, date, model"
 	canonicalToolOrder     = "workspace_key, user_key, date, tool_name"
@@ -139,6 +140,9 @@ func requireFilled(t *testing.T, f facts) {
 	require.NotEmpty(t, f.AiActivity)
 	require.NotEmpty(t, f.AiModel)
 	require.NotEmpty(t, f.AiTool)
+	require.True(t, slices.ContainsFunc(f.Model, func(row models.OtelHourlyModelUsage) bool { return row.Effort != "" }))
+	require.True(t, slices.ContainsFunc(f.Model, func(row models.OtelHourlyModelUsage) bool { return row.AgentName != "" }))
+	require.True(t, slices.ContainsFunc(f.Tool, func(row models.OtelHourlyToolUsage) bool { return row.DecisionSource != "" }))
 }
 
 // userKeys lists the distinct developers across every row of the set.

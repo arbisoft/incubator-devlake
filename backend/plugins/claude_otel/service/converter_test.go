@@ -172,6 +172,55 @@ func TestPrepareUpdatesRejectsMalformedSupportedMetric(t *testing.T) {
 	}
 }
 
+func TestPrepareUpdatesReadsAttributionDimensions(t *testing.T) {
+	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: observedAt.Add(-time.Hour)}}})
+	longSkill := strings.Repeat("s", 70)
+	request := newConverterRequest(observedAt, testOrganizationID)
+	metrics := request.ResourceMetrics[0].ScopeMetrics[0].Metrics
+	appendAttributes := func(metric *metricsv1.Metric, attributes ...*commonv1.KeyValue) {
+		point := metric.GetSum().DataPoints[0]
+		point.Attributes = append(point.Attributes, attributes...)
+	}
+	appendAttributes(metrics[1], stringAttribute("effort", "high"), stringAttribute("agent.name", "general-purpose"), stringAttribute("skill.name", longSkill))
+	appendAttributes(metrics[2], stringAttribute("source", "config"))
+	appendAttributes(metrics[0], stringAttribute("effort", "high"))
+
+	prepared, err := newRawConverter(database, nil).prepareUpdates(request)
+	if err != nil {
+		t.Fatalf("prepareUpdates() error = %v", err)
+	}
+	byMetric := func(updates []factUpdate, metric string) factUpdate {
+		for _, update := range updates {
+			if update.metric == metric {
+				return update
+			}
+		}
+		t.Fatalf("no update for metric %s", metric)
+		return factUpdate{}
+	}
+	token := byMetric(prepared.updates, metricTokenUsage)
+	if token.effort != "high" || token.agent != "general-purpose" || token.skill != longSkill[:64] {
+		t.Fatalf("token effort/agent/skill = %q/%q/%q, want high/general-purpose/%q", token.effort, token.agent, token.skill, longSkill[:64])
+	}
+	decision := byMetric(prepared.updates, metricToolDecision)
+	if decision.decisionSource != "config" || decision.effort != "" || decision.agent != "" || decision.skill != "" {
+		t.Fatalf("decision source/effort/agent/skill = %q/%q/%q/%q, want config and empty others", decision.decisionSource, decision.effort, decision.agent, decision.skill)
+	}
+	activity := byMetric(prepared.updates, metricSessionCount)
+	if activity.effort != "" || activity.agent != "" || activity.skill != "" || activity.decisionSource != "" {
+		t.Fatalf("activity attribution = %q/%q/%q/%q, want all empty", activity.effort, activity.agent, activity.skill, activity.decisionSource)
+	}
+
+	untouched, err := newRawConverter(database, nil).prepareUpdates(newConverterRequest(observedAt, testOrganizationID))
+	if err != nil {
+		t.Fatalf("prepareUpdates() error = %v", err)
+	}
+	if token := byMetric(untouched.updates, metricTokenUsage); token.effort != "" {
+		t.Fatalf("token effort = %q, want empty when the attribute is absent", token.effort)
+	}
+}
+
 func TestPrepareUpdatesSkipsOnlyResourceGroupsWithAttributionFailures(t *testing.T) {
 	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: observedAt.Add(-time.Hour)}}})
@@ -428,6 +477,54 @@ func TestReplayDeltaBatchesRebuildStableHourlyAggregates(t *testing.T) {
 	}
 }
 
+func TestReplayKeepsRowsThatDifferOnlyByAttribution(t *testing.T) {
+	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
+	newRequest := func(effort, source string) *collectormetrics.ExportMetricsServiceRequest {
+		request := newConverterRequest(observedAt, testOrganizationID)
+		metrics := request.ResourceMetrics[0].ScopeMetrics[0].Metrics
+		token := metrics[1].GetSum().DataPoints[0]
+		token.Attributes = append(token.Attributes, stringAttribute("effort", effort))
+		decision := metrics[2].GetSum().DataPoints[0]
+		decision.Attributes = append(decision.Attributes, stringAttribute("source", source))
+		return request
+	}
+	marshalBatch := func(request *collectormetrics.ExportMetricsServiceRequest) *models.OtelMetricBatch {
+		payload, err := proto.Marshal(request)
+		if err != nil {
+			t.Fatalf("proto.Marshal() error = %v", err)
+		}
+		return &models.OtelMetricBatch{PayloadProto: payload, PayloadSchemaVersion: otelPayloadSchemaVersion, Status: models.OtelBatchStatusProcessed}
+	}
+	batches := []*models.OtelMetricBatch{marshalBatch(newRequest("high", "config")), marshalBatch(newRequest("low", "user_temporary"))}
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: observedAt.Add(-time.Hour)}}})
+	converter := newRawConverter(database, nil)
+	aggregates := make(map[string]*hourlyAggregate)
+	for _, batch := range batches {
+		processed, skippedErr, err := converter.replayBatch(batch, observedAt.Truncate(24*time.Hour), observedAt.Truncate(24*time.Hour).Add(24*time.Hour), aggregates)
+		if err != nil || skippedErr != nil || !processed {
+			t.Fatalf("replayBatch() = %t, %v, %v", processed, skippedErr, err)
+		}
+	}
+
+	efforts := make(map[string]string)
+	sources := make(map[string]string)
+	for _, aggregate := range aggregates {
+		update := aggregate.update
+		if update.fact == hourlyModelUsageFact && update.column == "input_tokens" {
+			efforts[update.effort] = aggregate.value.RatString()
+		}
+		if update.fact == hourlyToolUsageFact && update.column == "accepted_count" {
+			sources[update.decisionSource] = aggregate.value.RatString()
+		}
+	}
+	if !reflect.DeepEqual(efforts, map[string]string{"high": "10", "low": "10"}) {
+		t.Fatalf("input token aggregates by effort = %v, want high and low at 10 each", efforts)
+	}
+	if !reflect.DeepEqual(sources, map[string]string{"config": "2", "user_temporary": "2"}) {
+		t.Fatalf("accepted count aggregates by source = %v, want config and user_temporary at 2 each", sources)
+	}
+}
+
 func TestCounterDeltaUsesExactCumulativeIncreaseResetAndOrder(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -502,6 +599,12 @@ func TestRealShapedClaudeCodeExportIsAcceptedAndConverted(t *testing.T) {
 	for _, update := range prepared.updates {
 		if update.temporality != metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_DELTA || update.organizationID != testOrganizationID {
 			t.Fatalf("%s temporality/organization = %s/%q", update.metric, update.temporality, update.organizationID)
+		}
+		if update.fact == hourlyModelUsageFact && (update.effort != "high" || update.agent != "general-purpose" || update.skill != "build") {
+			t.Fatalf("%s effort/agent/skill = %q/%q/%q, want high/general-purpose/build", update.metric, update.effort, update.agent, update.skill)
+		}
+		if update.metric == metricToolDecision && update.decisionSource == "" {
+			t.Fatalf("%s decision source is empty, want the source attribute", update.metric)
 		}
 	}
 }

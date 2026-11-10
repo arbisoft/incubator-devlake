@@ -193,9 +193,9 @@ func upsertHourlyFact(tx dal.Transaction, update factUpdate, value metricNumber,
 func hourlyFactTarget(update factUpdate) (string, []string, []interface{}) {
 	switch update.fact {
 	case hourlyModelUsageFact:
-		return models.OtelHourlyModelUsageTable, []string{"model", "query_source"}, []interface{}{update.model, update.query}
+		return models.OtelHourlyModelUsageTable, []string{"model", "query_source", "effort", "agent_name", "skill_name"}, []interface{}{update.model, update.query, update.effort, update.agent, update.skill}
 	case hourlyToolUsageFact:
-		return models.OtelHourlyToolUsageTable, []string{"tool_name", "language"}, []interface{}{update.tool, update.language}
+		return models.OtelHourlyToolUsageTable, []string{"tool_name", "language", "decision_source"}, []interface{}{update.tool, update.language, update.decisionSource}
 	default:
 		return models.OtelHourlyActivityTable, nil, nil
 	}

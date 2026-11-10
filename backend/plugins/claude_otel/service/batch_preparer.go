@@ -42,10 +42,13 @@ const (
 	// email columns in the hourly, event and ai_* tables.
 	identityColumnLength = 255
 	// Hourly fact dimension widths, from models.OtelHourlyModelUsage and
-	// OtelHourlyToolUsage. The ai_* columns they roll up into are as wide.
-	modelDimensionLength       = 255
-	querySourceDimensionLength = 64
-	toolDimensionLength        = 100 // tool_name and language
+	// OtelHourlyToolUsage. The ai_* columns model and tool roll up into are as wide.
+	modelDimensionLength          = 255
+	querySourceDimensionLength    = 64
+	toolDimensionLength           = 100 // tool_name and language
+	effortDimensionLength         = 16
+	attributionDimensionLength    = 64 // agent.name and skill.name
+	decisionSourceDimensionLength = 32
 )
 
 // skipKind is the unit a batch skipped for bad data. A resource group is skipped for bad
@@ -286,6 +289,14 @@ func (p *batchPreparer) prepareDatapoint(
 		temporality:    temporality,
 		startNanos:     point.GetStartTimeUnixNano(),
 		timeNanos:      point.GetTimeUnixNano(),
+	}
+	switch mapping.fact {
+	case hourlyModelUsageFact:
+		update.effort = truncate(attributeString(pointAttrs, "effort"), effortDimensionLength)
+		update.agent = truncate(attributeString(pointAttrs, "agent.name"), attributionDimensionLength)
+		update.skill = truncate(attributeString(pointAttrs, "skill.name"), attributionDimensionLength)
+	case hourlyToolUsageFact:
+		update.decisionSource = truncate(attributeString(pointAttrs, "source"), decisionSourceDimensionLength)
 	}
 	if mapping.fact == hourlyModelUsageFact && update.model == "" {
 		return factUpdate{}, permanentConversionError(errorInvalidDimension, "metric %s is missing model", metric.GetName())

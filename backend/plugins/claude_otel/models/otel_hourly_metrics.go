@@ -51,7 +51,7 @@ type OtelHourlyActivity struct {
 
 func (OtelHourlyActivity) TableName() string { return OtelHourlyActivityTable }
 
-// OtelHourlyModelUsage stores model and query-source specific token and cost metrics.
+// OtelHourlyModelUsage stores token and cost metrics by model, query source, effort, agent and skill.
 type OtelHourlyModelUsage struct {
 	ConnectionId        uint64    `gorm:"primaryKey;index"`
 	TeamSlug            string    `gorm:"type:varchar(63);index"`
@@ -63,6 +63,9 @@ type OtelHourlyModelUsage struct {
 	HourStart           time.Time `gorm:"primaryKey;index;index:idx_otel_hourly_model_usage_daily,priority:3"`
 	Model               string    `gorm:"type:varchar(255);primaryKey"`
 	QuerySource         string    `gorm:"type:varchar(64);primaryKey"`
+	Effort              string    `gorm:"type:varchar(16);primaryKey;default:''"`
+	AgentName           string    `gorm:"type:varchar(64);primaryKey;default:''"`
+	SkillName           string    `gorm:"type:varchar(64);primaryKey;default:''"`
 	InputTokens         int64     `gorm:"not null;default:0"`
 	OutputTokens        int64     `gorm:"not null;default:0"`
 	CacheReadTokens     int64     `gorm:"not null;default:0"`
@@ -76,7 +79,7 @@ type OtelHourlyModelUsage struct {
 
 func (OtelHourlyModelUsage) TableName() string { return OtelHourlyModelUsageTable }
 
-// OtelHourlyToolUsage stores Claude Code edit-tool decision counts, not generic tool executions.
+// OtelHourlyToolUsage stores Claude Code edit-tool decision counts by tool, language and decision source.
 type OtelHourlyToolUsage struct {
 	ConnectionId    uint64    `gorm:"primaryKey;index"`
 	TeamSlug        string    `gorm:"type:varchar(63);index"`
@@ -88,6 +91,7 @@ type OtelHourlyToolUsage struct {
 	HourStart       time.Time `gorm:"primaryKey;index;index:idx_otel_hourly_tool_usage_daily,priority:3"`
 	ToolName        string    `gorm:"type:varchar(100);primaryKey"`
 	Language        string    `gorm:"type:varchar(100);primaryKey"`
+	DecisionSource  string    `gorm:"type:varchar(32);primaryKey;default:''"`
 	AcceptedCount   int64     `gorm:"not null;default:0"`
 	RejectedCount   int64     `gorm:"not null;default:0"`
 	FirstObservedAt time.Time `gorm:"type:datetime(3)"`

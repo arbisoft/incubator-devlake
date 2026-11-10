@@ -30,5 +30,6 @@ func All() []plugin.MigrationScript {
 		new(addClaudeCodeOtelReplayRequestKind),
 		new(addClaudeCodeOtelReplayAudit),
 		new(normalizeAiPromptModelsUsed),
+		new(addClaudeCodeOtelHourlyAttribution),
 	}
 }

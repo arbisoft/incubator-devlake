@@ -109,6 +109,10 @@ type factUpdate struct {
 	query          string
 	tool           string
 	language       string
+	effort         string
+	agent          string
+	skill          string
+	decisionSource string
 	value          metricNumber
 	temporality    metricsv1.AggregationTemporality
 	startNanos     uint64
