@@ -31,5 +31,6 @@ func All() []plugin.MigrationScript {
 		new(addClaudeCodeOtelReplayAudit),
 		new(normalizeAiPromptModelsUsed),
 		new(addClaudeCodeOtelHourlyAttribution),
+		new(addClaudeCodeOtelHourlySessionStarts),
 	}
 }

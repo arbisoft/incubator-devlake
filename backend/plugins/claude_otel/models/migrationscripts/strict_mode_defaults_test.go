@@ -31,6 +31,7 @@ func TestHourlyFactColumnsSupportStrictModePartialUpserts(t *testing.T) {
 		&otelHourlyActivity20260914{},
 		&otelHourlyModelUsage20260914{},
 		&otelHourlyToolUsage20260914{},
+		&otelHourlySessionStart20261109{},
 	} {
 		parsed, err := schema.Parse(model, &sync.Map{}, schema.NamingStrategy{})
 		if err != nil {

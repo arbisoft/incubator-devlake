@@ -39,14 +39,15 @@ import (
 )
 
 const (
-	dateLayout             = "2006-01-02"
-	resourcesSkippedCode   = "resources_skipped"
-	hourlyActivityOrder    = "connection_id, user_key, hour_start"
-	hourlyModelOrder       = "connection_id, user_key, hour_start, model, query_source, effort, agent_name, skill_name"
-	hourlyToolOrder        = "connection_id, user_key, hour_start, tool_name, language, decision_source"
-	canonicalActivityOrder = "workspace_key, user_key, date, type, interface_type"
-	canonicalModelOrder    = "workspace_key, user_key, date, model"
-	canonicalToolOrder     = "workspace_key, user_key, date, tool_name"
+	dateLayout              = "2006-01-02"
+	resourcesSkippedCode    = "resources_skipped"
+	hourlyActivityOrder     = "connection_id, user_key, hour_start"
+	hourlyModelOrder        = "connection_id, user_key, hour_start, model, query_source, effort, agent_name, skill_name"
+	hourlyToolOrder         = "connection_id, user_key, hour_start, tool_name, language, decision_source"
+	hourlySessionStartOrder = "connection_id, user_key, hour_start, session_id, start_type"
+	canonicalActivityOrder  = "workspace_key, user_key, date, type, interface_type"
+	canonicalModelOrder     = "workspace_key, user_key, date, model"
+	canonicalToolOrder      = "workspace_key, user_key, date, tool_name"
 )
 
 var e2eUser = &common.User{Name: "E2E", Email: "e2e@example.com"}
@@ -114,22 +115,24 @@ func clearVolatile(v reflect.Value) {
 
 // facts is every hourly and canonical row one connection produced.
 type facts struct {
-	Activity   []models.OtelHourlyActivity
-	Model      []models.OtelHourlyModelUsage
-	Tool       []models.OtelHourlyToolUsage
-	AiActivity []ai.AiActivity
-	AiModel    []ai.AiModelUsage
-	AiTool     []ai.AiToolDecision
+	Activity     []models.OtelHourlyActivity
+	Model        []models.OtelHourlyModelUsage
+	Tool         []models.OtelHourlyToolUsage
+	SessionStart []models.OtelHourlySessionStart
+	AiActivity   []ai.AiActivity
+	AiModel      []ai.AiModelUsage
+	AiTool       []ai.AiToolDecision
 }
 
 func (w *world) factsOf(connectionID uint64) facts {
 	return facts{
-		Activity:   snapshot[models.OtelHourlyActivity](w, hourlyActivityOrder, "connection_id = ?", connectionID),
-		Model:      snapshot[models.OtelHourlyModelUsage](w, hourlyModelOrder, "connection_id = ?", connectionID),
-		Tool:       snapshot[models.OtelHourlyToolUsage](w, hourlyToolOrder, "connection_id = ?", connectionID),
-		AiActivity: snapshot[ai.AiActivity](w, canonicalActivityOrder, "source_connection_id = ?", connectionID),
-		AiModel:    snapshot[ai.AiModelUsage](w, canonicalModelOrder, "source_connection_id = ?", connectionID),
-		AiTool:     snapshot[ai.AiToolDecision](w, canonicalToolOrder, "source_connection_id = ?", connectionID),
+		Activity:     snapshot[models.OtelHourlyActivity](w, hourlyActivityOrder, "connection_id = ?", connectionID),
+		Model:        snapshot[models.OtelHourlyModelUsage](w, hourlyModelOrder, "connection_id = ?", connectionID),
+		Tool:         snapshot[models.OtelHourlyToolUsage](w, hourlyToolOrder, "connection_id = ?", connectionID),
+		SessionStart: snapshot[models.OtelHourlySessionStart](w, hourlySessionStartOrder, "connection_id = ?", connectionID),
+		AiActivity:   snapshot[ai.AiActivity](w, canonicalActivityOrder, "source_connection_id = ?", connectionID),
+		AiModel:      snapshot[ai.AiModelUsage](w, canonicalModelOrder, "source_connection_id = ?", connectionID),
+		AiTool:       snapshot[ai.AiToolDecision](w, canonicalToolOrder, "source_connection_id = ?", connectionID),
 	}
 }
 
@@ -137,12 +140,22 @@ func requireFilled(t *testing.T, f facts) {
 	require.NotEmpty(t, f.Activity)
 	require.NotEmpty(t, f.Model)
 	require.NotEmpty(t, f.Tool)
+	require.NotEmpty(t, f.SessionStart)
 	require.NotEmpty(t, f.AiActivity)
 	require.NotEmpty(t, f.AiModel)
 	require.NotEmpty(t, f.AiTool)
 	require.True(t, slices.ContainsFunc(f.Model, func(row models.OtelHourlyModelUsage) bool { return row.Effort != "" }))
 	require.True(t, slices.ContainsFunc(f.Model, func(row models.OtelHourlyModelUsage) bool { return row.AgentName != "" }))
 	require.True(t, slices.ContainsFunc(f.Tool, func(row models.OtelHourlyToolUsage) bool { return row.DecisionSource != "" }))
+	require.True(t, slices.ContainsFunc(f.SessionStart, func(row models.OtelHourlySessionStart) bool { return row.SessionId != "" }))
+	var starts, sessions int64
+	for _, row := range f.SessionStart {
+		starts += row.StartCount
+	}
+	for _, row := range f.Activity {
+		sessions += row.SessionCount
+	}
+	require.Equal(t, sessions, starts)
 }
 
 // userKeys lists the distinct developers across every row of the set.

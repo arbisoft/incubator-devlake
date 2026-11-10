@@ -221,6 +221,57 @@ func TestPrepareUpdatesReadsAttributionDimensions(t *testing.T) {
 	}
 }
 
+func TestPrepareUpdatesRecordsSessionStarts(t *testing.T) {
+	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: observedAt.Add(-time.Hour)}}})
+	sessionUUID := "5d0c2a4e-6f1b-4c3a-9e7d-2b8f1a6c4e90"
+	testCases := []struct {
+		name          string
+		sessionID     string
+		startType     string
+		wantSessionID string
+	}{
+		{name: "session with resume start", sessionID: sessionUUID, startType: "resume", wantSessionID: sessionUUID},
+		{name: "missing session id", startType: "fresh"},
+		{name: "overlong session id is dropped", sessionID: strings.Repeat("a", eventIDColumnLength+1), startType: "fresh"},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			request := newConverterRequest(observedAt, testOrganizationID)
+			metrics := request.ResourceMetrics[0].ScopeMetrics[0].Metrics
+			point := metrics[0].GetSum().DataPoints[0]
+			point.Attributes = append(point.Attributes, stringAttribute("start_type", testCase.startType))
+			if testCase.sessionID != "" {
+				point.Attributes = append(point.Attributes, stringAttribute("session.id", testCase.sessionID))
+			}
+			prepared, err := newRawConverter(database, nil).prepareUpdates(request)
+			if err != nil {
+				t.Fatalf("prepareUpdates() error = %v", err)
+			}
+			byMetric := func(metric string) factUpdate {
+				for _, update := range prepared.updates {
+					if update.metric == metric {
+						return update
+					}
+				}
+				t.Fatalf("no update for metric %s", metric)
+				return factUpdate{}
+			}
+			session := byMetric(metricSessionCount)
+			if session.metric != metricSessionCount || session.sessionID != testCase.wantSessionID || session.startType != testCase.startType {
+				t.Fatalf("session update = %s/%q/%q, want %s/%q/%q", session.metric, session.sessionID, session.startType, metricSessionCount, testCase.wantSessionID, testCase.startType)
+			}
+			facts := pointFacts(session)
+			if len(facts) != 2 || facts[1].fact != hourlySessionStartFact || facts[1].column != "start_count" {
+				t.Fatalf("pointFacts(session) = %d facts, want the activity fact then a start_count session start", len(facts))
+			}
+			if token := pointFacts(byMetric(metricTokenUsage)); len(token) != 1 {
+				t.Fatalf("pointFacts(token) = %d facts, want 1", len(token))
+			}
+		})
+	}
+}
+
 func TestPrepareUpdatesSkipsOnlyResourceGroupsWithAttributionFailures(t *testing.T) {
 	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: observedAt.Add(-time.Hour)}}})
@@ -525,6 +576,40 @@ func TestReplayKeepsRowsThatDifferOnlyByAttribution(t *testing.T) {
 	}
 }
 
+func TestReplayAggregatesSessionStarts(t *testing.T) {
+	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
+	request := newConverterRequest(observedAt, testOrganizationID)
+	point := request.ResourceMetrics[0].ScopeMetrics[0].Metrics[0].GetSum().DataPoints[0]
+	point.Attributes = append(point.Attributes, stringAttribute("start_type", "resume"), stringAttribute("session.id", "sess-1"))
+	payload, err := proto.Marshal(request)
+	if err != nil {
+		t.Fatalf("proto.Marshal() error = %v", err)
+	}
+	batch := &models.OtelMetricBatch{PayloadProto: payload, PayloadSchemaVersion: otelPayloadSchemaVersion, Status: models.OtelBatchStatusProcessed}
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: observedAt.Add(-time.Hour)}}})
+	aggregates := make(map[string]*hourlyAggregate)
+	dayStart := observedAt.Truncate(24 * time.Hour)
+	processed, skippedErr, err := newRawConverter(database, nil).replayBatch(batch, dayStart, dayStart.Add(24*time.Hour), aggregates)
+	if err != nil || skippedErr != nil || !processed {
+		t.Fatalf("replayBatch() = %t, %v, %v", processed, skippedErr, err)
+	}
+
+	got := make(map[string]string)
+	for _, aggregate := range aggregates {
+		update := aggregate.update
+		if update.fact == hourlyActivityFact && update.column == "session_count" {
+			got["session_count"] = aggregate.value.RatString()
+		}
+		if update.fact == hourlySessionStartFact && update.column == "start_count" {
+			got["start_count/"+update.sessionID+"/"+update.startType] = aggregate.value.RatString()
+		}
+	}
+	want := map[string]string{"session_count": "1", "start_count/sess-1/resume": "1"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("session aggregates = %v, want %v", got, want)
+	}
+}
+
 func TestCounterDeltaUsesExactCumulativeIncreaseResetAndOrder(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -605,6 +690,9 @@ func TestRealShapedClaudeCodeExportIsAcceptedAndConverted(t *testing.T) {
 		}
 		if update.metric == metricToolDecision && update.decisionSource == "" {
 			t.Fatalf("%s decision source is empty, want the source attribute", update.metric)
+		}
+		if update.metric == metricSessionCount && (update.sessionID != "5d0c2a4e-6f1b-4c3a-9e7d-2b8f1a6c4e90" || update.startType != "fresh") {
+			t.Fatalf("%s session/start type = %q/%q, want the exported session and fresh", update.metric, update.sessionID, update.startType)
 		}
 	}
 }

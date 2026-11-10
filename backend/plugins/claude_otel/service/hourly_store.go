@@ -50,8 +50,10 @@ func (c *rawConverter) applyHourlyUpdates(tx dal.Transaction, updates []factUpda
 		if err != nil {
 			return err
 		}
-		if err := upsertHourlyFact(tx, update, value, update.observedAt); err != nil {
-			return classifyStorageError(fmt.Errorf("write hourly Claude Code OTel facts: %w", err))
+		for _, fact := range pointFacts(update) {
+			if err := upsertHourlyFact(tx, fact, value, fact.observedAt); err != nil {
+				return classifyStorageError(fmt.Errorf("write hourly Claude Code OTel facts: %w", err))
+			}
 		}
 	}
 	return nil
@@ -196,6 +198,8 @@ func hourlyFactTarget(update factUpdate) (string, []string, []interface{}) {
 		return models.OtelHourlyModelUsageTable, []string{"model", "query_source", "effort", "agent_name", "skill_name"}, []interface{}{update.model, update.query, update.effort, update.agent, update.skill}
 	case hourlyToolUsageFact:
 		return models.OtelHourlyToolUsageTable, []string{"tool_name", "language", "decision_source"}, []interface{}{update.tool, update.language, update.decisionSource}
+	case hourlySessionStartFact:
+		return models.OtelHourlySessionStartsTable, []string{"session_id", "start_type"}, []interface{}{update.sessionID, update.startType}
 	default:
 		return models.OtelHourlyActivityTable, nil, nil
 	}

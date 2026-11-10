@@ -183,6 +183,10 @@ func (a actor) resource(at time.Time, seed int) *metricsv1.ResourceMetrics {
 		attrs := withAttrs(base, strAttr("type", kind), strAttr("model", model), strAttr("query_source", query))
 		return append(attrs, attribution...)
 	}
+	sessionAttrs := withAttrs(base, strAttr("start_type", []string{"fresh", "resume"}[seed%2]))
+	if seed%3 != 0 {
+		sessionAttrs = append(sessionAttrs, strAttr("session.id", "sess-"+a.team+"-"+a.name+"-"+strconv.Itoa(seed)))
+	}
 	f := float64(seed)
 	metrics := []*metricsv1.Metric{
 		deltaSum("claude_code.token.usage",
@@ -202,7 +206,7 @@ func (a actor) resource(at time.Time, seed int) *metricsv1.ResourceMetrics {
 			dataPoint(withAttrs(base, strAttr("tool_name", fxTools[seed%len(fxTools)]), strAttr("decision", "accept"), strAttr("source", fxSources[seed%len(fxSources)]), strAttr("language", fxLangs[seed%len(fxLangs)])), next(), float64(seed%4+1), false),
 			dataPoint(withAttrs(base, strAttr("tool_name", fxTools[seed%len(fxTools)]), strAttr("decision", "reject"), strAttr("source", "user_reject"), strAttr("language", fxLangs[seed%len(fxLangs)])), next(), float64(seed%3+1), false)),
 		deltaSum("claude_code.session.count",
-			dataPoint(withAttrs(base, strAttr("start_type", []string{"fresh", "resume"}[seed%2])), next(), float64(seed%3+1), false)),
+			dataPoint(sessionAttrs, next(), float64(seed%3+1), false)),
 		deltaSum("claude_code.commit.count", dataPoint(base, next(), float64(seed%4+1), false)),
 	}
 	return &metricsv1.ResourceMetrics{

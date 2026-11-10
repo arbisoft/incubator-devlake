@@ -49,6 +49,7 @@ const (
 	effortDimensionLength         = 16
 	attributionDimensionLength    = 64 // agent.name and skill.name
 	decisionSourceDimensionLength = 32
+	startTypeDimensionLength      = 16
 )
 
 // skipKind is the unit a batch skipped for bad data. A resource group is skipped for bad
@@ -298,11 +299,27 @@ func (p *batchPreparer) prepareDatapoint(
 	case hourlyToolUsageFact:
 		update.decisionSource = truncate(attributeString(pointAttrs, "source"), decisionSourceDimensionLength)
 	}
+	if metric.GetName() == metricSessionCount {
+		update.sessionID = sessionStartID(pointAttrs, resourceAttrs)
+		update.startType = truncate(attributeString(pointAttrs, "start_type"), startTypeDimensionLength)
+	}
 	if mapping.fact == hourlyModelUsageFact && update.model == "" {
 		return factUpdate{}, permanentConversionError(errorInvalidDimension, "metric %s is missing model", metric.GetName())
 	}
 	update.seriesHash = metricSeriesHash(connection.ID, scope, metric, resourceAttrs, point)
 	return update, nil
+}
+
+// sessionStartID returns the session.id attribute, or "" when it is missing or too long to store whole.
+func sessionStartID(pointAttrs, resourceAttrs []*commonv1.KeyValue) string {
+	id := attributeString(pointAttrs, "session.id")
+	if id == "" {
+		id = attributeString(resourceAttrs, "session.id")
+	}
+	if utf8.RuneCountInString(id) > eventIDColumnLength {
+		return ""
+	}
+	return id
 }
 
 // otlpSignal names one OTLP signal's resource and record in attribution errors.

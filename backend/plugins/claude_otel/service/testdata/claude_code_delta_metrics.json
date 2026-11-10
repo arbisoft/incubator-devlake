@@ -91,6 +91,12 @@
                         }
                       },
                       {
+                        "key": "session.id",
+                        "value": {
+                          "stringValue": "5d0c2a4e-6f1b-4c3a-9e7d-2b8f1a6c4e90"
+                        }
+                      },
+                      {
                         "key": "devlake_team",
                         "value": {
                           "stringValue": "platform"
