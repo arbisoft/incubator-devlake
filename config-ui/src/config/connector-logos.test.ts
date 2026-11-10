@@ -18,10 +18,13 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { pluginConfigs } from '@/plugins/register';
+import { getConnectorVisual, pluginAliasMap } from '@/plugins/utils';
+import { OTEL_INTEGRATION_KEY } from '@/routes/connection/constants';
 import { CONNECTOR_BRAND_COLORS } from '@/theme';
 import { CONNECTOR_LOGO_KIND } from '@/ui/plugin-icon';
 
-import { CONNECTOR_LOGO_KEYS, getConnectorLogo } from './connector-logos';
+import { CONNECTOR_LOGO_KEYS } from './connector-logos';
 
 const EXPECTED_KINDS: Record<string, string> = {
   github: 'mono',
@@ -56,22 +59,43 @@ const EXPECTED_KINDS: Record<string, string> = {
   'gh-copilot': 'mono',
 };
 
-describe('getConnectorLogo', () => {
-  it('covers exactly the registered keys', () => {
+const KNOWN_KEYS = new Set([
+  ...pluginConfigs.map(({ plugin }) => plugin),
+  ...Object.keys(pluginAliasMap),
+  OTEL_INTEGRATION_KEY,
+]);
+
+describe('getConnectorVisual', () => {
+  it('has a logo key only for a registered plugin id, an alias or the OTel integration key', () => {
+    expect(CONNECTOR_LOGO_KEYS.filter((key) => !KNOWN_KEYS.has(key))).toEqual([]);
+  });
+
+  it('has a logo kind row for every logo key', () => {
     expect([...CONNECTOR_LOGO_KEYS].sort()).toEqual(Object.keys(EXPECTED_KINDS).sort());
   });
 
-  it('returns undefined for an unknown plugin', () => {
-    expect(getConnectorLogo('not-a-plugin')).toBeUndefined();
+  it('returns no logo for an unknown plugin and still returns an icon', () => {
+    const visual = getConnectorVisual('not-a-plugin');
+    expect(visual.logo).toBeUndefined();
+    expect(typeof visual.icon).toBe('function');
+  });
+
+  it('resolves aliases', () => {
+    expect(getConnectorVisual('copilot').logo).toBe(getConnectorVisual('gh-copilot').logo);
+    expect(getConnectorVisual('copilot').logo).toBeDefined();
   });
 
   it.each(Object.entries(EXPECTED_KINDS))('maps %s to the %s kind', (plugin, kind) => {
-    expect(getConnectorLogo(plugin)?.kind).toBe(kind);
+    expect(getConnectorVisual(plugin).logo?.kind).toBe(kind);
+  });
+
+  it.each(['plane', 'cursor'])('inverts the %s mark in dark mode', (plugin) => {
+    expect(getConnectorVisual(plugin).logo).toMatchObject({ invertInDark: true });
   });
 
   it('draws every tint colour from the brand colours', () => {
     CONNECTOR_LOGO_KEYS.forEach((plugin) => {
-      const logo = getConnectorLogo(plugin);
+      const { logo } = getConnectorVisual(plugin);
       if (logo?.kind === CONNECTOR_LOGO_KIND.TINT) expect(Object.values(CONNECTOR_BRAND_COLORS)).toContain(logo.color);
     });
   });

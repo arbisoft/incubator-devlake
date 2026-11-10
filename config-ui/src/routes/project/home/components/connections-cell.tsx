@@ -18,7 +18,7 @@
 
 import { Popover } from 'antd';
 
-import { getConnectorLogo } from '@/config';
+import { getConnectorVisual } from '@/plugins/utils';
 import { PluginIcon, splitOverflow } from '@/ui';
 
 import { COPY, MAX_VISIBLE_CONNECTIONS } from '../constants';
@@ -39,7 +39,7 @@ export const ConnectionsCell = ({ entries, buttonRef }: ConnectionsCellProps) =>
         <IconRow aria-hidden>
           {visible.map(({ key, plugin, icon }) => (
             <IconLabel key={key}>
-              <PluginIcon icon={icon} size="sm" logo={getConnectorLogo(plugin)} />
+              <PluginIcon icon={icon} size="sm" logo={getConnectorVisual(plugin).logo} />
             </IconLabel>
           ))}
           {hidden.length > 0 && <MoreCount>{COPY.moreConnections(hidden.length)}</MoreCount>}

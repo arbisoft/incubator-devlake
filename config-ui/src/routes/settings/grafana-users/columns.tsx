@@ -16,7 +16,7 @@
  *
  */
 
-import { EditOutlined } from '@ant-design/icons';
+import { AppstoreOutlined } from '@ant-design/icons';
 import type { TableColumnsType } from 'antd';
 
 import { ACCESS_STATUS } from '@/api/access';
@@ -76,7 +76,7 @@ const renderProjects = (user: GrafanaUser, onEditProjects: GrafanaColumnActions[
       )}
     </ProjectChips>
     <IconButton
-      icon={<EditOutlined />}
+      icon={<AppstoreOutlined />}
       label={COPY.actions.editProjectsFor(user.email)}
       onClick={() => onEditProjects(user)}
     />

@@ -69,7 +69,7 @@ export const BlueprintHomePage = () => {
   );
 
   const { data: projects } = useRefreshData(
-    (signal) => API.project.list({ page: 1, pageSize: PROJECT_FILTER_OPTIONS_LIMIT }, signal),
+    (signal) => API.project.list({ page: 1, pageSize: PROJECT_FILTER_OPTIONS_LIMIT, namesOnly: true }, signal),
     [],
   );
   const projectOptions = useMemo(
@@ -79,16 +79,16 @@ export const BlueprintHomePage = () => {
   const connectionOptions = useConnectionFilterOptions({ includeOtel: false });
 
   const navigate = useNavigate();
-  const columns = useMemo(
-    () =>
-      getColumns({
-        onConfigure: (id) => navigate(PATHS.BLUEPRINT_VIEW(id, BLUEPRINT_VIEW.CONFIGURATION)),
-        filters,
-        connectionOptions,
-        projectOptions,
-      }),
-    [navigate, filters, connectionOptions, projectOptions],
-  );
+  const filterKey = JSON.stringify([filters.connection, filters.type, filters.projectName, filters.status]);
+  const columns = useMemo(() => {
+    const [connection, type, projectName, status] = JSON.parse(filterKey) as [string[], string[], string[], string];
+    return getColumns({
+      onConfigure: (id) => navigate(PATHS.BLUEPRINT_VIEW(id, BLUEPRINT_VIEW.CONFIGURATION)),
+      filters: { connection, type, projectName, status },
+      connectionOptions,
+      projectOptions,
+    });
+  }, [navigate, filterKey, connectionOptions, projectOptions]);
 
   const handleCreated = () => {
     setCreating(false);

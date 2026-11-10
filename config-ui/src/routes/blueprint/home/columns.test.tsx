@@ -27,7 +27,6 @@ import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 import { getColumns } from './columns';
 import { BLUEPRINT_COLUMN, COPY, STATUS_FILTER } from './constants';
 import type { BlueprintFilters } from './types';
-import { getTypeOptions } from './utils';
 
 const ROW = {
   id: 7,
@@ -125,7 +124,7 @@ describe('blueprint columns', () => {
       filterSearch: true,
     });
     expect(find(columns, BLUEPRINT_COLUMN.FREQUENCY)).toMatchObject({
-      filters: getTypeOptions(),
+      filters: ['Manual', 'Daily', 'Weekly', 'Monthly', 'Custom'].map((label) => ({ text: label, value: label })),
       filteredValue: ['Daily', 'Weekly'],
       filterMultiple: true,
     });

@@ -18,8 +18,10 @@
 
 import React from 'react';
 
+import { getConnectorLogo } from '@/config/connector-logos';
 import PluginIcon from '@/images/plugin-icon.svg?react';
 import { IPluginConfig } from '@/types';
+import type { ConnectorLogo } from '@/ui/plugin-icon';
 
 import { pluginConfigs } from './register';
 export { getPluginScopeId } from './scope-id';
@@ -74,7 +76,7 @@ export const getPluginScopeName = (plugin: string, scope: ScopeNameInput) => {
   return `${scope.fullName ?? scope.name ?? scope.id ?? ''}`;
 };
 
-const pluginAliasMap: Record<string, string> = {
+export const pluginAliasMap: Record<string, string> = {
   claude_code: 'claude_code',
   copilot: 'gh-copilot',
 };
@@ -136,4 +138,9 @@ export const getPluginConfig = (name: string): IPluginConfig => {
     };
   }
   return pluginConfig;
+};
+
+export const getConnectorVisual = (plugin: string): { icon: IPluginConfig['icon']; logo?: ConnectorLogo } => {
+  const { icon, plugin: resolved } = getPluginConfig(plugin);
+  return { icon, logo: getConnectorLogo(resolved) };
 };

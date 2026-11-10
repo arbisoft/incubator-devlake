@@ -22,6 +22,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import API from '@/api';
+import type { ComplianceScorecardRow } from '@/api/compliance-scorecard';
 import { BLUEPRINT_VIEW, PATHS } from '@/config';
 import { useRefreshData } from '@/hooks';
 import { useConnectionFilterOptions } from '@/routes/connection/use-connection-filter-options';
@@ -73,7 +74,8 @@ export const ProjectHomePage = () => {
     [data, otelConnections],
   );
 
-  const readiness = useMemo(() => toReadinessMap(scorecard?.rows), [scorecard]);
+  const scorecardKey = JSON.stringify(scorecard?.rows ?? []);
+  const readiness = useMemo(() => toReadinessMap(JSON.parse(scorecardKey) as ComplianceScorecardRow[]), [scorecardKey]);
 
   const handleConfigure = useCallback(
     (name: string) => navigate(PATHS.PROJECT_BLUEPRINT_VIEW(name, BLUEPRINT_VIEW.CONFIGURATION)),

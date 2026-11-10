@@ -30,17 +30,20 @@ import { useConnectionFilterOptions } from './use-connection-filter-options';
 
 const OTEL = [{ connection: { id: 7, name: 'Team A' }, projects: [] }] as unknown as OtelConnectionResponse[];
 
-const setup = (props: Parameters<typeof useConnectionFilterOptions>[0]) => {
-  const store = configureStore({
+const makeStore = () =>
+  configureStore({
     reducer: { connections: connectionsSlice.reducer },
     preloadedState: {
       connections: {
         ...connectionsSlice.getInitialState(),
         connections: [{ unique: 'github-1', plugin: 'github', pluginName: 'GitHub', id: 1, name: 'arbisoft/website' }],
-        webhooks: [{ id: 3, name: 'deploys' }],
+        webhooks: [{ id: 3, name: 'alerts' }],
       },
     },
   } as never);
+
+const setup = (props: Parameters<typeof useConnectionFilterOptions>[0]) => {
+  const store = makeStore();
   const wrapper = ({ children }: { children: ReactNode }) => <Provider store={store}>{children}</Provider>;
   return renderHook(() => useConnectionFilterOptions(props), { wrapper }).result.current;
 };
@@ -48,15 +51,31 @@ const setup = (props: Parameters<typeof useConnectionFilterOptions>[0]) => {
 describe('useConnectionFilterOptions', () => {
   it('lists store connections and webhooks as plugin:id sorted by text', () => {
     const options = setup({ includeOtel: false, otelConnections: OTEL });
-    expect(options.map(({ value }) => value)).toEqual(['github:1', `${WEBHOOK_PLUGIN}:3`]);
-    expect(options[0].text).toBe('arbisoft/website (GitHub)');
-    expect([...options].map(({ text }) => text)).toEqual(
-      [...options.map(({ text }) => text)].sort((a, b) => a.localeCompare(b)),
-    );
+    expect(options.map(({ value }) => value)).toEqual([`${WEBHOOK_PLUGIN}:3`, 'github:1']);
+    expect(options[1].text).toBe('arbisoft/website (GitHub)');
   });
 
   it('adds OTel connections only when asked', () => {
     const options = setup({ includeOtel: true, otelConnections: OTEL });
     expect(options.find(({ value }) => value === `${OTEL_INTEGRATION_KEY}:7`)?.text).toBe(`Team A (${COPY.otelName})`);
+  });
+
+  it('keeps the options reference across rerenders without an explicit OTel list', () => {
+    const store = makeStore();
+    const wrapper = ({ children }: { children: ReactNode }) => <Provider store={store}>{children}</Provider>;
+    const { result, rerender } = renderHook(() => useConnectionFilterOptions({ includeOtel: false }), { wrapper });
+    const first = result.current;
+    rerender();
+    expect(result.current).toBe(first);
+  });
+
+  it('keeps the options reference when the store is replaced by equal data', () => {
+    let store = makeStore();
+    const wrapper = ({ children }: { children: ReactNode }) => <Provider store={store}>{children}</Provider>;
+    const { result, rerender } = renderHook(() => useConnectionFilterOptions({ includeOtel: false }), { wrapper });
+    const first = result.current;
+    store = makeStore();
+    rerender();
+    expect(result.current).toBe(first);
   });
 });

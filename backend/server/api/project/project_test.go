@@ -32,9 +32,10 @@ func TestProjectQueryBindsRepeatedParams(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Request = httptest.NewRequest(http.MethodGet,
-		"/projects?connection=github:1&connection=claude_otel:7&lastRunStatus=TASK_FAILED&lastRunStatus=TASK_COMPLETED", nil)
+		"/projects?connection=github:1&connection=claude_otel:7&lastRunStatus=TASK_FAILED&lastRunStatus=TASK_COMPLETED&namesOnly=true", nil)
 	var query services.ProjectQuery
 	assert.NoError(t, c.ShouldBindQuery(&query))
 	assert.Equal(t, []string{"github:1", "claude_otel:7"}, query.Connection)
 	assert.Equal(t, []string{"TASK_FAILED", "TASK_COMPLETED"}, query.LastRunStatus)
+	assert.True(t, query.NamesOnly)
 }

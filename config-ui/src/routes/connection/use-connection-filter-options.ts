@@ -28,6 +28,8 @@ import { COPY, OTEL_INTEGRATION_KEY } from './constants';
 
 const VALUE_SEPARATOR = ':';
 
+const noOtelConnections: OtelConnectionResponse[] = [];
+
 type Options = { includeOtel: boolean; otelConnections?: OtelConnectionResponse[] };
 
 const toOption = (plugin: string, id: ID, name: string, pluginLabel: string): ListFilterOption & { text: string } => ({
@@ -35,21 +37,22 @@ const toOption = (plugin: string, id: ID, name: string, pluginLabel: string): Li
   value: `${plugin}${VALUE_SEPARATOR}${id}`,
 });
 
-export const useConnectionFilterOptions = ({ includeOtel, otelConnections = [] }: Options) => {
+export const useConnectionFilterOptions = ({ includeOtel, otelConnections = noOtelConnections }: Options) => {
   const connections = useAppSelector(selectAllConnections);
   const webhooks = useAppSelector(selectWebhooks);
 
-  return useMemo(() => {
-    const webhookLabel = getPluginConfig(WEBHOOK_PLUGIN).name;
-    const options = [
-      ...connections.map(({ plugin, id, name, pluginName }) => toOption(plugin, id, name, pluginName)),
-      ...webhooks.map(({ id, name }) => toOption(WEBHOOK_PLUGIN, id, name, webhookLabel)),
-      ...(includeOtel
-        ? otelConnections.map(({ connection }) =>
-            toOption(OTEL_INTEGRATION_KEY, connection.id, connection.name, COPY.otelName),
-          )
-        : []),
-    ];
-    return options.sort((a, b) => a.text.localeCompare(b.text));
-  }, [connections, webhooks, includeOtel, otelConnections]);
+  const webhookLabel = getPluginConfig(WEBHOOK_PLUGIN).name;
+  const options = [
+    ...connections.map(({ plugin, id, name, pluginName }) => toOption(plugin, id, name, pluginName)),
+    ...webhooks.map(({ id, name }) => toOption(WEBHOOK_PLUGIN, id, name, webhookLabel)),
+    ...(includeOtel
+      ? otelConnections.map(({ connection }) =>
+          toOption(OTEL_INTEGRATION_KEY, connection.id, connection.name, COPY.otelName),
+        )
+      : []),
+  ].sort((a, b) => a.text.localeCompare(b.text));
+
+  // Options are plain data, so a content key keeps their identity across equal refetches.
+  const key = JSON.stringify(options);
+  return useMemo(() => JSON.parse(key) as typeof options, [key]);
 };

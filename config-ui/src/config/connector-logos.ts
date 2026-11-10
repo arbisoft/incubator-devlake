@@ -69,10 +69,10 @@ const CONNECTOR_LOGOS: Record<string, ConnectorLogo> = {
   bamboo: { Svg: BambooLogo, color: CONNECTOR_BRAND_COLORS.bamboo, kind: TINT },
   sonarqube: { Svg: SonarqubeLogo, color: CONNECTOR_BRAND_COLORS.sonarqube, kind: TINT },
   codex: { kind: MONO },
-  plane: { Svg: PlaneLogo, kind: LOGO },
+  plane: { Svg: PlaneLogo, kind: LOGO, invertInDark: true },
   notion: { kind: MONO },
   opsgenie: { Svg: OpsgenieLogo, kind: MONO },
-  cursor: { Svg: CursorLogo, kind: LOGO },
+  cursor: { Svg: CursorLogo, kind: LOGO, invertInDark: true },
   'gh-copilot': { Svg: GhCopilotLogo, kind: MONO },
 };
 

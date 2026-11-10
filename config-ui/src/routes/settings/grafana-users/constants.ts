@@ -165,8 +165,6 @@ export const COPY = {
     addUser: 'Add user',
     enable: 'Enable',
     disable: 'Disable',
-    editDetails: 'Edit details',
-    setPassword: SET_PASSWORD_LABEL,
     review: 'Review',
     close: 'Close',
     columnLabel: 'Actions',

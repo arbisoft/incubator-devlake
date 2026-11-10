@@ -21,13 +21,14 @@ import styled from 'styled-components';
 import { ICON_SIZE_PX } from '@/ui/constants';
 import type { IconSize } from '@/ui/types';
 
-export const Icon = styled.span<{ $size: IconSize; $mono?: boolean; $color?: string }>`
+export const Icon = styled.span<{ $size: IconSize; $mono?: boolean; $color?: string; $invert?: boolean }>`
   display: inline-flex;
   flex: none;
   width: ${({ $size }) => ICON_SIZE_PX[$size]}px;
   height: ${({ $size }) => ICON_SIZE_PX[$size]}px;
   ${({ $mono, theme }) => $mono && `color: ${theme.colors.text};`}
   ${({ $color }) => $color && `color: ${$color};`}
+  ${({ $invert }) => $invert && 'filter: invert(1);'}
 
   & > svg,
   & > img {

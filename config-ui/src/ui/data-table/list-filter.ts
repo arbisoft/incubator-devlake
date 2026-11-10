@@ -25,14 +25,10 @@ export type ListFilterOption = { text: ReactNode; value: string };
 
 type ListFilterOptions = { multiple?: boolean; search?: boolean };
 
-// antd resyncs an open dropdown whenever filteredValue changes identity, so unchanged values must keep theirs
-const singleValues = new Map<string, string[]>();
-
 const toFilteredValue = (value: string | string[] | undefined): string[] | null => {
   if (Array.isArray(value)) return value.length ? value : null;
   if (!value) return null;
-  if (!singleValues.has(value)) singleValues.set(value, [value]);
-  return singleValues.get(value) ?? null;
+  return [value];
 };
 
 export const listFilterProps = <T extends object>(

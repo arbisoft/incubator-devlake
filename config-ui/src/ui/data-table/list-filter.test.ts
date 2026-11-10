@@ -36,12 +36,6 @@ describe('listFilterProps', () => {
     expect(listFilterProps(value, OPTIONS).filteredValue).toEqual(expected);
   });
 
-  it('keeps the same filteredValue reference for an unchanged URL value', () => {
-    const urlValue = ['github:1'];
-    expect(listFilterProps(urlValue, []).filteredValue).toBe(listFilterProps(urlValue, []).filteredValue);
-    expect(listFilterProps('enabled', []).filteredValue).toBe(listFilterProps('enabled', []).filteredValue);
-  });
-
   it('defaults to multiple without search and passes the options through', () => {
     expect(listFilterProps([], OPTIONS)).toMatchObject({ filters: OPTIONS, filterMultiple: true, filterSearch: false });
   });

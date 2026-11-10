@@ -16,7 +16,8 @@
  *
  */
 
-import { screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
+import { ThemeProvider } from 'styled-components';
 import { describe, expect, it, vi } from 'vitest';
 
 import { CONNECTOR_BRAND_COLORS } from '@/theme';
@@ -34,12 +35,23 @@ const PLUGIN_TEST_ID = 'plugin-icon';
 const light = getTheme('light');
 
 const TINT_COLOR = CONNECTOR_BRAND_COLORS.hubspot;
+const dark = getTheme('dark');
+const INVERT_FILTER = 'invert(1)';
 const TestSvg: SvgComponent = (props) => <svg data-testid={LOGO_TEST_ID} {...props} />;
 
 const logo = (kind: typeof CONNECTOR_LOGO_KIND.LOGO | typeof CONNECTOR_LOGO_KIND.MONO): ConnectorLogo => ({
   Svg: TestSvg,
   kind,
 });
+
+const renderInDark = (mark: ConnectorLogo) => {
+  render(
+    <ThemeProvider theme={dark}>
+      <PluginIcon icon={() => null} size="md" logo={mark} />
+    </ThemeProvider>,
+  );
+  return screen.getByTestId(LOGO_TEST_ID).parentElement as HTMLElement;
+};
 
 const colourOf = (value: string) => {
   const probe = document.createElement('i');
@@ -80,19 +92,38 @@ describe('PluginIcon', () => {
       />,
     );
     const wrapper = screen.getByTestId(LOGO_TEST_ID).parentElement as HTMLElement;
-    expect(getComputedStyle(wrapper).color).toBe(colourOf(TINT_COLOR));
+    expect(getComputedStyle(wrapper).color).toBe(colourOf(TINT_COLOR.light));
   });
 
   it('asks the plugin icon for the brand colour when a tint has no Svg', () => {
     const icon = vi.fn(() => <svg data-testid={PLUGIN_TEST_ID} />);
     renderWithTheme(<PluginIcon icon={icon} size="md" logo={{ kind: CONNECTOR_LOGO_KIND.TINT, color: TINT_COLOR }} />);
     expect(screen.getByTestId(PLUGIN_TEST_ID)).toBeTruthy();
-    expect(icon).toHaveBeenCalledWith({ color: TINT_COLOR });
+    expect(icon).toHaveBeenCalledWith({ color: TINT_COLOR.light });
   });
 
   it('asks the plugin icon for the text colour when a mono has no Svg', () => {
     const icon = vi.fn(() => <svg data-testid={PLUGIN_TEST_ID} />);
     renderWithTheme(<PluginIcon icon={icon} size="md" logo={{ kind: CONNECTOR_LOGO_KIND.MONO }} />);
     expect(icon).toHaveBeenCalledWith({ color: light.colors.text });
+  });
+
+  it('colours a tint logo with its dark brand colour under the dark theme', () => {
+    const wrapper = renderInDark({ kind: CONNECTOR_LOGO_KIND.TINT, color: TINT_COLOR, Svg: TestSvg });
+    expect(getComputedStyle(wrapper).color).toBe(colourOf(TINT_COLOR.dark));
+  });
+
+  it('inverts a flagged logo in dark mode only', () => {
+    const flagged: ConnectorLogo = { kind: CONNECTOR_LOGO_KIND.LOGO, Svg: TestSvg, invertInDark: true };
+    expect(getComputedStyle(renderInDark(flagged)).filter).toBe(INVERT_FILTER);
+    cleanup();
+    renderWithTheme(<PluginIcon icon={() => null} size="md" logo={flagged} />);
+    expect(getComputedStyle(screen.getByTestId(LOGO_TEST_ID).parentElement as HTMLElement).filter).not.toBe(
+      INVERT_FILTER,
+    );
+  });
+
+  it('never inverts an unflagged logo', () => {
+    expect(getComputedStyle(renderInDark(logo(CONNECTOR_LOGO_KIND.LOGO))).filter).not.toBe(INVERT_FILTER);
   });
 });

@@ -19,27 +19,31 @@
 import { useTheme } from 'styled-components';
 
 import type { AppThemeColors } from '@/theme';
+import type { ResolvedTheme } from '@/theme/tokens';
 
 import { CONNECTOR_LOGO_KIND } from './constants';
 import { Icon } from './styled';
 import type { PluginIconProps } from './types';
 
-const renderMark = ({ icon, logo, colors }: Pick<PluginIconProps, 'icon' | 'logo'> & { colors: AppThemeColors }) => {
+type MarkProps = Pick<PluginIconProps, 'icon' | 'logo'> & { colors: AppThemeColors; mode: ResolvedTheme };
+
+const renderMark = ({ icon, logo, colors, mode }: MarkProps) => {
   if (!logo) return icon({ color: colors.iconBrand });
   if (logo.Svg) return <logo.Svg />;
-  return icon({ color: logo.kind === CONNECTOR_LOGO_KIND.TINT ? logo.color : colors.text });
+  return icon({ color: logo.kind === CONNECTOR_LOGO_KIND.TINT ? logo.color[mode] : colors.text });
 };
 
 export const PluginIcon = ({ icon, size, logo }: PluginIconProps) => {
-  const { colors } = useTheme();
+  const { colors, mode } = useTheme();
   return (
     <Icon
       $size={size}
       $mono={logo?.kind === CONNECTOR_LOGO_KIND.MONO}
-      $color={logo?.kind === CONNECTOR_LOGO_KIND.TINT ? logo.color : undefined}
+      $color={logo?.kind === CONNECTOR_LOGO_KIND.TINT ? logo.color[mode] : undefined}
+      $invert={logo?.kind === CONNECTOR_LOGO_KIND.LOGO && logo.invertInDark && mode === 'dark'}
       aria-hidden
     >
-      {renderMark({ icon, logo, colors })}
+      {renderMark({ icon, logo, colors, mode })}
     </Icon>
   );
 };

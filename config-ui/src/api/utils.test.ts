@@ -22,8 +22,8 @@ import { toSearchParams } from './utils';
 
 describe('toSearchParams', () => {
   it('repeats array items and stringifies scalars', () => {
-    expect(toSearchParams({ page: 1, enable: false, connection: ['a:1', 'b:2'] }).toString()).toBe(
-      'page=1&enable=false&connection=a%3A1&connection=b%3A2',
+    expect(toSearchParams({ page: 1, enable: false, namesOnly: true, connection: ['a:1', 'b:2'] }).toString()).toBe(
+      'page=1&enable=false&namesOnly=true&connection=a%3A1&connection=b%3A2',
     );
   });
 

@@ -18,7 +18,7 @@
 
 import { useTheme } from 'styled-components';
 
-import { getConnectorLogo } from '@/config';
+import { getConnectorVisual } from '@/plugins/utils';
 import { PluginIcon } from '@/ui';
 
 import { COPY } from '../constants';
@@ -51,7 +51,7 @@ export const ConnectionsPopover = ({ details }: ConnectionsPopoverProps) => {
       <PopoverList>
         {details.map(({ key, plugin, name, pluginLabel, category, icon }) => (
           <PopoverRow key={key}>
-            <PluginIcon icon={icon} size="sm" logo={getConnectorLogo(plugin)} />
+            <PluginIcon icon={icon} size="sm" logo={getConnectorVisual(plugin).logo} />
             <RowCopy>
               <RowTitle title={name}>{name}</RowTitle>
               <RowSubtitle>{text.subtitle(pluginLabel, category)}</RowSubtitle>

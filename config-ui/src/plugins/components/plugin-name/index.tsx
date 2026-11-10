@@ -16,10 +16,7 @@
  *
  */
 
-import { useMemo } from 'react';
-
-import { getConnectorLogo } from '@/config';
-import { getPluginConfig } from '@/plugins';
+import { getConnectorVisual } from '@/plugins/utils';
 import { PluginIcon } from '@/ui';
 
 import { Wrapper } from './styled';
@@ -30,11 +27,9 @@ interface Props {
 }
 
 export const PluginName = ({ plugin, name }: Props) => {
-  const pluginConfig = useMemo(() => getPluginConfig(plugin), [plugin]);
-
   return (
     <Wrapper>
-      <PluginIcon icon={pluginConfig.icon} size="md" logo={getConnectorLogo(plugin)} />
+      <PluginIcon {...getConnectorVisual(plugin)} size="md" />
       <span>{name}</span>
     </Wrapper>
   );

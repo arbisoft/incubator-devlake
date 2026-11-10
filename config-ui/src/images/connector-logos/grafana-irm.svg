@@ -3,11 +3,11 @@
 <svg viewBox="0 0 351 365" version="1.1" id="grafana-irm-Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
 	 style="enable-background:new 0 0 351 365;" xml:space="preserve">
 <style type="text/css">
-	.grafana-irm-st0{fill:url(#SVGID_1_);}
+	.grafana-irm-st0{fill:url(#grafana-irm-SVGID_1_);}
 </style>
 <g id="grafana-irm-Layer_1_1_">
 </g>
-<linearGradient id="SVGID_1_" gradientUnits="userSpaceOnUse" x1="175.5" y1="30%" x2="175.5" y2="99%">
+<linearGradient id="grafana-irm-SVGID_1_" gradientUnits="userSpaceOnUse" x1="175.5" y1="30%" x2="175.5" y2="99%">
 	<stop  offset="0" style="stop-color:#F05A28"/>
 	<stop  offset="1" style="stop-color:#FBCA0A"/>
 </linearGradient>

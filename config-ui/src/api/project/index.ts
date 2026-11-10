@@ -25,7 +25,11 @@ import { toSearchParams } from '../utils';
 
 export type ListParams = Pagination &
   KeywordParams &
-  SortParams<'name' | 'createdAt' | 'lastRunAt'> & { connection?: string[]; lastRunStatus?: string[] };
+  SortParams<'name' | 'createdAt' | 'lastRunAt'> & {
+    connection?: string[];
+    lastRunStatus?: string[];
+    namesOnly?: boolean;
+  };
 
 export const list = (data: ListParams, signal?: AbortSignal): Promise<{ count: number; projects: IProject[] }> =>
   request('/projects', { data: toSearchParams(data), signal });

@@ -46,6 +46,7 @@ type ProjectQuery struct {
 	Keyword       *string  `json:"keyword" form:"keyword"`
 	Connection    []string `json:"connection" form:"connection"`       // repeatable "plugin:connectionId"
 	LastRunStatus []string `json:"lastRunStatus" form:"lastRunStatus"` // repeatable pipeline status
+	NamesOnly     bool     `json:"namesOnly" form:"namesOnly"`         // project rows sorted by name, no per-project lookups
 }
 
 // otelConnectionProjectTable mirrors the claude_otel table name; server/ must not import plugins/
@@ -62,6 +63,8 @@ const projectLastRunJoin = "LEFT JOIN (SELECT b.project_name, MAX(p.finished_at)
 	"GROUP BY b.project_name) lr ON lr.project_name = projects.name"
 
 const projectSortLastRunAt = "lastRunAt"
+
+const projectNamesOrder = "projects.name ASC"
 
 var projectSortSpec = sortSpec{
 	columns: map[string]string{
@@ -149,9 +152,12 @@ func GetProjects(query *ProjectQuery) ([]*models.ApiOutputProject, int64, errors
 	if err := VerifyStruct(query); err != nil {
 		return nil, 0, err
 	}
-	orderBy, err := query.orderBy(projectSortSpec)
-	if err != nil {
-		return nil, 0, err
+	orderBy := projectNamesOrder
+	if !query.NamesOnly {
+		var err errors.Error
+		if orderBy, err = query.orderBy(projectSortSpec); err != nil {
+			return nil, 0, err
+		}
 	}
 	clauses, err := projectFilterClauses(query)
 	if err != nil {
@@ -163,7 +169,7 @@ func GetProjects(query *ProjectQuery) ([]*models.ApiOutputProject, int64, errors
 		return nil, 0, errors.Default.Wrap(err, "error getting DB count of project")
 	}
 
-	if query.SortBy == projectSortLastRunAt {
+	if !query.NamesOnly && query.SortBy == projectSortLastRunAt {
 		clauses = append(clauses, dal.Select("projects.*"), dal.Join(projectLastRunJoin))
 	}
 	clauses = append(clauses,
@@ -177,6 +183,12 @@ func GetProjects(query *ProjectQuery) ([]*models.ApiOutputProject, int64, errors
 		return nil, 0, errors.Default.Wrap(err, "error finding DB project")
 	}
 	apiOutProjects := make([]*models.ApiOutputProject, len(projects))
+	if query.NamesOnly {
+		for idx, project := range projects {
+			apiOutProjects[idx] = &models.ApiOutputProject{Project: *project}
+		}
+		return apiOutProjects, count, nil
+	}
 	g := new(errgroup.Group)
 	for idx, project := range projects {
 		tmpProject := *project
