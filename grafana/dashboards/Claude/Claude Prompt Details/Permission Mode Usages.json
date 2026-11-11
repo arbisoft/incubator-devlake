@@ -707,7 +707,7 @@
                 "value": [
                   {
                     "title": "Open this engineer's mode drilldown",
-                    "url": "/d/claude_engineer_modes_mysql?var-user=${__data.fields.user:percentencode}&${__url_time_range}"
+                    "url": "/d/claude_engineer_modes_mysql?var-user=${__data.fields.user:percentencode}&${repository:queryparam}&${__url_time_range}"
                   }
                 ]
               },
@@ -920,7 +920,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "One row per engineer with an observed permission mode in the time range, one cell per UTC day, coloured by the mode most of that engineer's prompts ran in that day. Only prompts whose mode was reported count; days with none are blank. Prompts that made no model request are left out. Hover a cell for the engineer and mode. Shows the 15 engineers with the most such prompts; use the panel link 'Show every engineer' for the full list.",
+      "description": "Each engineer's most used permission mode per UTC day: one row per engineer, one cell per day, coloured by the mode most of their prompts ran in that day. A cell is a day, not time spent working, and doesn't show how many prompts there were or how clear the lead was. Only prompts whose mode was reported count; days with none are blank. Prompts that made no model request are left out. Hover a cell for the engineer and mode. Shows the 15 engineers with the most such prompts; use the panel link 'Show every engineer' for the full list.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1017,7 +1017,7 @@
           "placement": "bottom",
           "showLegend": true
         },
-        "mergeValues": true,
+        "mergeValues": false,
         "rowHeight": 0.8,
         "showValue": "never",
         "tooltip": {
@@ -1039,11 +1039,11 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "-- days is each UTC day in the range; pm is each engineer's prompts per day and observed mode.\nWITH RECURSIVE days AS (\n  SELECT DATE($__timeFrom()) AS d\n  UNION ALL\n  SELECT d + INTERVAL 1 DAY FROM days WHERE d + INTERVAL 1 DAY < $__timeTo()\n),\npm AS (\n  SELECT COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user, DATE(p.started_at) AS d, p.permission_mode,\n    COUNT(*) AS prompts,\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n    AND p.models_used <> ''\n    AND NOT p.permission_mode_inferred\n  GROUP BY 1, 2, 3\n),\n-- dom is the mode most of the engineer's prompts ran in that day.\ndom AS (\n  SELECT user, d, permission_mode,\n    ROW_NUMBER() OVER (PARTITION BY user, d ORDER BY prompts DESC, permission_mode) AS rn\n  FROM pm\n),\n-- eng ranks engineers by observed prompts; the panel shows the top ${daily_engineers}.\neng AS (\n  SELECT user, COALESCE(MAX(full_name), user) AS engineer,\n    ROW_NUMBER() OVER (ORDER BY SUM(prompts) DESC, user) AS activity_rank\n  FROM pm\n  GROUP BY user\n)\nSELECT TIMESTAMP(days.d) AS time, eng.engineer,\n  -- A day without observed prompts is left blank.\n  CASE WHEN dom.permission_mode IS NULL THEN NULL ELSE CASE dom.permission_mode WHEN 'default' THEN 'Agentic' WHEN 'auto' THEN 'Auto' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'plan' THEN 'Plan' WHEN 'bypassPermissions' THEN 'Bypass Permissions' ELSE 'Other' END END AS mode\nFROM eng\nCROSS JOIN days\nLEFT JOIN dom ON dom.user = eng.user AND dom.d = days.d AND dom.rn = 1\nWHERE eng.activity_rank <= ${daily_engineers}\nUNION ALL\nSELECT $__timeTo(), engineer, NULL FROM eng WHERE eng.activity_rank <= ${daily_engineers}\nORDER BY 1, 2",
+          "rawSql": "-- pm is each engineer's prompts per day and observed mode; days is each UTC day from the first of them.\nWITH RECURSIVE pm AS (\n  SELECT COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user, DATE(p.started_at) AS d, p.permission_mode,\n    COUNT(*) AS prompts,\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n    AND p.models_used <> ''\n    AND NOT p.permission_mode_inferred\n  GROUP BY 1, 2, 3\n),\n-- Starting at the first observed day keeps long ranges under MySQL's recursion limit.\ndays AS (\n  SELECT MIN(d) AS d FROM pm\n  UNION ALL\n  SELECT d + INTERVAL 1 DAY FROM days WHERE d + INTERVAL 1 DAY < $__timeTo()\n),\n-- dom is the mode most of the engineer's prompts ran in that day.\ndom AS (\n  SELECT user, d, permission_mode,\n    ROW_NUMBER() OVER (PARTITION BY user, d ORDER BY prompts DESC, permission_mode) AS rn\n  FROM pm\n),\n-- eng ranks engineers by observed prompts; the panel shows the top ${daily_engineers}.\neng AS (\n  SELECT user, COALESCE(MAX(full_name), user) AS engineer,\n    ROW_NUMBER() OVER (ORDER BY SUM(prompts) DESC, user) AS activity_rank\n  FROM pm\n  GROUP BY user\n)\nSELECT TIMESTAMP(days.d) AS time, eng.engineer,\n  -- A day without observed prompts is left blank.\n  CASE WHEN dom.permission_mode IS NULL THEN NULL ELSE CASE dom.permission_mode WHEN 'default' THEN 'Agentic' WHEN 'auto' THEN 'Auto' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'plan' THEN 'Plan' WHEN 'bypassPermissions' THEN 'Bypass Permissions' ELSE 'Other' END END AS mode\nFROM eng\nCROSS JOIN days\nLEFT JOIN dom ON dom.user = eng.user AND dom.d = days.d AND dom.rn = 1\nWHERE eng.activity_rank <= ${daily_engineers}\nUNION ALL\nSELECT $__timeTo(), engineer, NULL FROM eng WHERE eng.activity_rank <= ${daily_engineers}\nORDER BY 1, 2",
           "refId": "A"
         }
       ],
-      "title": "Modes by Engineer (Daily)",
+      "title": "Most Used Mode by Engineer (Daily)",
       "transformations": [
         {
           "id": "partitionByValues",
@@ -1785,7 +1785,7 @@
           "text": "Top 15",
           "value": "15"
         },
-        "description": "How many engineers Modes by Engineer (Daily) shows",
+        "description": "How many engineers Most Used Mode by Engineer (Daily) shows",
         "hide": 2,
         "includeAll": false,
         "label": "Daily rows",
