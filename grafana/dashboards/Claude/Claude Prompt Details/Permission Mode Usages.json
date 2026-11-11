@@ -659,6 +659,415 @@
         "x": 0,
         "y": 21
       },
+      "id": 38,
+      "panels": [],
+      "title": "Switching by Engineer",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Engineers who switched permission mode in the time range, most switches first. Switches: counted switches. Sessions with a switch: sessions with at least one. Sessions: the engineer's sessions with prompts in the range. Switches per session: Switches / Sessions. Most common transition: the from → to pair they switched most. Shift+Tab share: share of switches made with Shift+Tab. Plan exits: switches made by approving a plan. /plan: plan mode entered with /plan. Auto-gate denials: Auto refused an action and dropped to Agentic. No trigger reported: switches whose Claude Code version gave no trigger. Startup applying the configured default mode is not counted; switches before a session's first prompt are. Click an engineer for their sessions' modes over time.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false,
+            "minWidth": 90,
+            "wrapHeaderText": true
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Engineer"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open this engineer's mode drilldown",
+                    "url": "/d/claude_engineer_modes_mysql?var-user=${__data.fields.user:percentencode}&${__url_time_range}"
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Team"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 130
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Most common transition"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 220
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Switches per session"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Shift+Tab share"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "user"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom.viz",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
+      "id": 39,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- sw is every counted switch in the range whose session matches the filters.\nWITH sw AS (\n  SELECT COALESCE(NULLIF(m.user_email, ''), m.user_key) AS user, m.session_id, m.from_mode, m.to_mode, m.`trigger`\n  FROM ai_permission_mode_changes m\n  WHERE $__timeFilter(m.changed_at)\n    AND m.session_id IN (SELECT p.session_id FROM ai_prompts p WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring}) AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring}))\n    AND COALESCE(NULLIF(m.user_email, ''), m.user_key) IN (${user:sqlstring})\n    -- Startup applying the configured default mode is not a switch; older clients report it with no trigger.\n    AND m.`trigger` <> 'startup_reresolve'\n    AND NOT (m.`trigger` = '' AND m.from_mode = 'default' AND m.to_mode = 'auto'\n      AND NOT EXISTS (SELECT 1 FROM ai_prompts fp WHERE fp.workspace_key = m.workspace_key AND fp.session_id = m.session_id AND fp.started_at <= m.changed_at))\n),\n-- ps is each engineer's sessions with prompts in the range, their teams and their name.\nps AS (\n  SELECT x.user, SUM(x.sessions) AS sessions,\n    GROUP_CONCAT(DISTINCT c.team_slug ORDER BY c.team_slug SEPARATOR ', ') AS teams,\n    MAX(x.full_name) AS full_name\n  FROM (\n    SELECT COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user, p.source_connection_id,\n      COUNT(DISTINCT p.session_id) AS sessions,\n      MAX(NULLIF(TRIM(a.full_name), '')) AS full_name\n    FROM ai_prompts p\n    LEFT JOIN accounts a ON a.id = p.account_id\n    WHERE $__timeFilter(p.started_at)\n      AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n      AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n      AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n    GROUP BY 1, 2\n  ) x\n  JOIN _tool_claude_code_otel_connections c ON c.id = x.source_connection_id\n  GROUP BY x.user\n),\n-- top is each engineer's most common transition.\ntop AS (\n  SELECT user, transition\n  FROM (\n    SELECT user, CONCAT(CASE from_mode WHEN '' THEN 'Before /plan' WHEN 'default' THEN 'Agentic' WHEN 'auto' THEN 'Auto' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'plan' THEN 'Plan' WHEN 'bypassPermissions' THEN 'Bypass Permissions' ELSE from_mode END, ' → ', CASE to_mode WHEN 'default' THEN 'Agentic' WHEN 'auto' THEN 'Auto' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'plan' THEN 'Plan' WHEN 'bypassPermissions' THEN 'Bypass Permissions' ELSE to_mode END) AS transition,\n      ROW_NUMBER() OVER (PARTITION BY user ORDER BY COUNT(*) DESC, from_mode, to_mode) AS rn\n    FROM sw\n    GROUP BY user, from_mode, to_mode\n  ) t\n  WHERE rn = 1\n),\n-- agg is each engineer's switch counts, joined to the small ps and top sets below.\nagg AS (\n  SELECT user,\n    COUNT(*) AS switches,\n    COUNT(DISTINCT session_id) AS switch_sessions,\n    SUM(`trigger` = 'shift_tab') AS shift_tab,\n    SUM(`trigger` = 'exit_plan_mode') AS plan_exits,\n    SUM(`trigger` = 'plan_command') AS plan_command,\n    SUM(`trigger` = 'auto_gate_denied') AS gate_denials,\n    SUM(`trigger` = '') AS no_trigger\n  FROM sw\n  GROUP BY user\n)\nSELECT COALESCE(ps.full_name, agg.user) AS \"Engineer\",\n  ps.teams AS \"Team\",\n  agg.switches AS \"Switches\",\n  agg.switch_sessions AS \"Sessions with a switch\",\n  ps.sessions AS \"Sessions\",\n  agg.switches / NULLIF(ps.sessions, 0) AS \"Switches per session\",\n  top.transition AS \"Most common transition\",\n  agg.shift_tab / agg.switches AS \"Shift+Tab share\",\n  agg.plan_exits AS \"Plan exits\",\n  agg.plan_command AS \"/plan\",\n  agg.gate_denials AS \"Auto-gate denials\",\n  agg.no_trigger AS \"No trigger reported\",\n  agg.user AS user\nFROM agg\nLEFT JOIN ps ON ps.user = agg.user\nLEFT JOIN top ON top.user = agg.user\nORDER BY 3 DESC, 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Switches per Engineer",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Switches in the time range, with the mode switched from as rows and the mode switched to as columns; each cell is a switch count, darker for more. Total is the row's switches. 'Before /plan' is a switch made with /plan, where Claude Code doesn't report the mode before it. Startup applying the configured default mode is not counted. Other is any mode not listed.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "color-background",
+              "mode": "basic"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false,
+            "minWidth": 90
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "color": {
+            "mode": "continuous-blues"
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "color": "transparent",
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "From"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Total"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
+      "id": 40,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- sw is every counted switch in the range whose session matches the filters.\nWITH sw AS (\n  SELECT CASE m.from_mode WHEN '' THEN 'Before /plan' WHEN 'default' THEN 'Agentic' WHEN 'auto' THEN 'Auto' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'plan' THEN 'Plan' WHEN 'bypassPermissions' THEN 'Bypass Permissions' ELSE 'Other' END AS f, m.to_mode\n  FROM ai_permission_mode_changes m\n  WHERE $__timeFilter(m.changed_at)\n    AND m.session_id IN (SELECT p.session_id FROM ai_prompts p WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring}) AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring}))\n    AND COALESCE(NULLIF(m.user_email, ''), m.user_key) IN (${user:sqlstring})\n    -- Startup applying the configured default mode is not a switch; older clients report it with no trigger.\n    AND m.`trigger` <> 'startup_reresolve'\n    AND NOT (m.`trigger` = '' AND m.from_mode = 'default' AND m.to_mode = 'auto'\n      AND NOT EXISTS (SELECT 1 FROM ai_prompts fp WHERE fp.workspace_key = m.workspace_key AND fp.session_id = m.session_id AND fp.started_at <= m.changed_at))\n)\nSELECT f AS \"From\",\n  SUM(to_mode = 'default') AS \"Agentic\",\n  SUM(to_mode = 'auto') AS \"Auto\",\n  SUM(to_mode = 'acceptEdits') AS \"Accept Edits\",\n  SUM(to_mode = 'plan') AS \"Plan\",\n  SUM(to_mode = 'bypassPermissions') AS \"Bypass Permissions\",\n  SUM(to_mode NOT IN ('default', 'auto', 'acceptEdits', 'plan', 'bypassPermissions')) AS \"Other\",\n  COUNT(*) AS \"Total\"\nFROM sw\nGROUP BY f\nORDER BY FIELD(f, 'Agentic', 'Auto', 'Accept Edits', 'Plan', 'Bypass Permissions', 'Other', 'Before /plan')",
+          "refId": "A"
+        }
+      ],
+      "title": "Mode Flow",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "One row per engineer with an observed permission mode in the time range, one cell per UTC day, coloured by the mode most of that engineer's prompts ran in that day. Only prompts whose mode was reported count; days with none are blank. Prompts that made no model request are left out. Hover a cell for the engineer and mode. Shows the 15 engineers with the most such prompts; use the panel link 'Show every engineer' for the full list.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineWidth": 1,
+            "spanNulls": false
+          },
+          "displayName": "${__series.name}",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "Agentic": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "Agentic"
+                },
+                "Auto": {
+                  "color": "blue",
+                  "index": 1,
+                  "text": "Auto"
+                },
+                "Accept Edits": {
+                  "color": "yellow",
+                  "index": 2,
+                  "text": "Accept Edits"
+                },
+                "Plan": {
+                  "color": "purple",
+                  "index": 3,
+                  "text": "Plan"
+                },
+                "Bypass Permissions": {
+                  "color": "red",
+                  "index": 4,
+                  "text": "Bypass Permissions"
+                },
+                "Other": {
+                  "color": "orange",
+                  "index": 5,
+                  "text": "Other"
+                },
+                "Inferred": {
+                  "color": "#8e8e8e",
+                  "index": 6,
+                  "text": "Inferred"
+                }
+              }
+            },
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": {
+                  "color": "transparent",
+                  "index": 7,
+                  "text": ""
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 16,
+        "w": 24,
+        "x": 0,
+        "y": 41
+      },
+      "id": 41,
+      "options": {
+        "alignValue": "left",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "mergeValues": true,
+        "rowHeight": 0.8,
+        "showValue": "never",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "links": [
+        {
+          "title": "Show every engineer",
+          "url": "/d/claude_prompts_permission_modes_mysql${__url.params:exclude:var-daily_engineers,viewPanel}&var-daily_engineers=1000&viewPanel=41"
+        }
+      ],
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- days is each UTC day in the range; pm is each engineer's prompts per day and observed mode.\nWITH RECURSIVE days AS (\n  SELECT DATE($__timeFrom()) AS d\n  UNION ALL\n  SELECT d + INTERVAL 1 DAY FROM days WHERE d + INTERVAL 1 DAY < $__timeTo()\n),\npm AS (\n  SELECT COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user, DATE(p.started_at) AS d, p.permission_mode,\n    COUNT(*) AS prompts,\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n    AND p.models_used <> ''\n    AND NOT p.permission_mode_inferred\n  GROUP BY 1, 2, 3\n),\n-- dom is the mode most of the engineer's prompts ran in that day.\ndom AS (\n  SELECT user, d, permission_mode,\n    ROW_NUMBER() OVER (PARTITION BY user, d ORDER BY prompts DESC, permission_mode) AS rn\n  FROM pm\n),\n-- eng ranks engineers by observed prompts; the panel shows the top ${daily_engineers}.\neng AS (\n  SELECT user, COALESCE(MAX(full_name), user) AS engineer,\n    ROW_NUMBER() OVER (ORDER BY SUM(prompts) DESC, user) AS activity_rank\n  FROM pm\n  GROUP BY user\n)\nSELECT TIMESTAMP(days.d) AS time, eng.engineer,\n  -- A day without observed prompts is left blank.\n  CASE WHEN dom.permission_mode IS NULL THEN NULL ELSE CASE dom.permission_mode WHEN 'default' THEN 'Agentic' WHEN 'auto' THEN 'Auto' WHEN 'acceptEdits' THEN 'Accept Edits' WHEN 'plan' THEN 'Plan' WHEN 'bypassPermissions' THEN 'Bypass Permissions' ELSE 'Other' END END AS mode\nFROM eng\nCROSS JOIN days\nLEFT JOIN dom ON dom.user = eng.user AND dom.d = days.d AND dom.rn = 1\nWHERE eng.activity_rank <= ${daily_engineers}\nUNION ALL\nSELECT $__timeTo(), engineer, NULL FROM eng WHERE eng.activity_rank <= ${daily_engineers}\nORDER BY 1, 2",
+          "refId": "A"
+        }
+      ],
+      "title": "Modes by Engineer (Daily)",
+      "transformations": [
+        {
+          "id": "partitionByValues",
+          "options": {
+            "fields": [
+              "engineer"
+            ],
+            "keepFields": false,
+            "naming": {
+              "asLabels": false
+            }
+          }
+        }
+      ],
+      "type": "state-timeline"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 57
+      },
       "id": 34,
       "panels": [],
       "title": "Trends",
@@ -834,7 +1243,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 22
+        "y": 58
       },
       "id": 35,
       "options": {
@@ -1047,7 +1456,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 22
+        "y": 58
       },
       "id": 36,
       "options": {
@@ -1233,7 +1642,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 31
+        "y": 67
       },
       "id": 37,
       "options": {
@@ -1370,6 +1779,32 @@
         "skipUrlSync": false,
         "sort": 0,
         "type": "query"
+      },
+      {
+        "current": {
+          "text": "Top 15",
+          "value": "15"
+        },
+        "description": "How many engineers Modes by Engineer (Daily) shows",
+        "hide": 2,
+        "includeAll": false,
+        "label": "Daily rows",
+        "multi": false,
+        "name": "daily_engineers",
+        "options": [
+          {
+            "selected": true,
+            "text": "Top 15",
+            "value": "15"
+          },
+          {
+            "selected": false,
+            "text": "All",
+            "value": "1000"
+          }
+        ],
+        "query": "Top 15 : 15,All : 1000",
+        "type": "custom"
       }
     ]
   },
