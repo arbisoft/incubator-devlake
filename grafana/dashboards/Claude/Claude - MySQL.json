@@ -1414,7 +1414,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Per Claude Code OTel team: users sending metrics in the range, how many also send logs (at least one prompt), and Repo share: the share of the team's prompts that carry a repository. Low repo attribution means 10+ prompts and under half the team's repository share; working outside a git repository also lowers it.",
+      "description": "Per Claude Code OTel team, over the selected range. Metrics users: users sending any telemetry. Log users: users with at least one prompt, meaning their logs reach DevLake. Logs coverage: log users as a share of metrics users. Repo users: users with at least one prompt that carries a repository. Repo share: share of the team's prompts that carry a repository. Low repo users: users with 10+ prompts whose own repo share is under half the team's; working outside a git repository also lowers it.",
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -1549,7 +1549,7 @@
     },
     {
       "datasource": "mysql",
-      "description": "Users who sent metrics in the range but no prompts (their logs are not reaching DevLake), or whose prompts carry a repository far less often than their team's (10+ prompts, under half the team's share). Share this list with the team lead to check their Claude Code settings.",
+      "description": "Users to follow up with their team lead, over the selected range. Gap: No logs means metrics arrived but no prompts did; Low repo attribution means 10+ prompts and under half the team's repo share, which can also come from working outside a git repository. Last metrics: latest hour with metrics from the user. Prompts: the user's prompts. Repo share: share of the user's prompts that carry a repository. Team repo share: share of all the team's prompts that carry a repository, the baseline the user is compared against.",
       "fieldConfig": {
         "defaults": {
           "custom": {
