@@ -172,6 +172,106 @@ func TestPrepareUpdatesRejectsMalformedSupportedMetric(t *testing.T) {
 	}
 }
 
+func TestPrepareUpdatesReadsAttributionDimensions(t *testing.T) {
+	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: observedAt.Add(-time.Hour)}}})
+	longSkill := strings.Repeat("s", 70)
+	request := newConverterRequest(observedAt, testOrganizationID)
+	metrics := request.ResourceMetrics[0].ScopeMetrics[0].Metrics
+	appendAttributes := func(metric *metricsv1.Metric, attributes ...*commonv1.KeyValue) {
+		point := metric.GetSum().DataPoints[0]
+		point.Attributes = append(point.Attributes, attributes...)
+	}
+	appendAttributes(metrics[1], stringAttribute("effort", "high"), stringAttribute("agent.name", "general-purpose"), stringAttribute("skill.name", longSkill))
+	appendAttributes(metrics[2], stringAttribute("source", "config"))
+	appendAttributes(metrics[0], stringAttribute("effort", "high"))
+
+	prepared, err := newRawConverter(database, nil).prepareUpdates(request)
+	if err != nil {
+		t.Fatalf("prepareUpdates() error = %v", err)
+	}
+	byMetric := func(updates []factUpdate, metric string) factUpdate {
+		for _, update := range updates {
+			if update.metric == metric {
+				return update
+			}
+		}
+		t.Fatalf("no update for metric %s", metric)
+		return factUpdate{}
+	}
+	token := byMetric(prepared.updates, metricTokenUsage)
+	if token.effort != "high" || token.agent != "general-purpose" || token.skill != longSkill[:64] {
+		t.Fatalf("token effort/agent/skill = %q/%q/%q, want high/general-purpose/%q", token.effort, token.agent, token.skill, longSkill[:64])
+	}
+	decision := byMetric(prepared.updates, metricToolDecision)
+	if decision.decisionSource != "config" || decision.effort != "" || decision.agent != "" || decision.skill != "" {
+		t.Fatalf("decision source/effort/agent/skill = %q/%q/%q/%q, want config and empty others", decision.decisionSource, decision.effort, decision.agent, decision.skill)
+	}
+	activity := byMetric(prepared.updates, metricSessionCount)
+	if activity.effort != "" || activity.agent != "" || activity.skill != "" || activity.decisionSource != "" {
+		t.Fatalf("activity attribution = %q/%q/%q/%q, want all empty", activity.effort, activity.agent, activity.skill, activity.decisionSource)
+	}
+
+	untouched, err := newRawConverter(database, nil).prepareUpdates(newConverterRequest(observedAt, testOrganizationID))
+	if err != nil {
+		t.Fatalf("prepareUpdates() error = %v", err)
+	}
+	if token := byMetric(untouched.updates, metricTokenUsage); token.effort != "" {
+		t.Fatalf("token effort = %q, want empty when the attribute is absent", token.effort)
+	}
+}
+
+func TestPrepareUpdatesRecordsSessionStarts(t *testing.T) {
+	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: observedAt.Add(-time.Hour)}}})
+	sessionUUID := "5d0c2a4e-6f1b-4c3a-9e7d-2b8f1a6c4e90"
+	testCases := []struct {
+		name          string
+		sessionID     string
+		startType     string
+		wantSessionID string
+	}{
+		{name: "session with resume start", sessionID: sessionUUID, startType: "resume", wantSessionID: sessionUUID},
+		{name: "missing session id", startType: "fresh"},
+		{name: "overlong session id is dropped", sessionID: strings.Repeat("a", eventIDColumnLength+1), startType: "fresh"},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			request := newConverterRequest(observedAt, testOrganizationID)
+			metrics := request.ResourceMetrics[0].ScopeMetrics[0].Metrics
+			point := metrics[0].GetSum().DataPoints[0]
+			point.Attributes = append(point.Attributes, stringAttribute("start_type", testCase.startType))
+			if testCase.sessionID != "" {
+				point.Attributes = append(point.Attributes, stringAttribute("session.id", testCase.sessionID))
+			}
+			prepared, err := newRawConverter(database, nil).prepareUpdates(request)
+			if err != nil {
+				t.Fatalf("prepareUpdates() error = %v", err)
+			}
+			byMetric := func(metric string) factUpdate {
+				for _, update := range prepared.updates {
+					if update.metric == metric {
+						return update
+					}
+				}
+				t.Fatalf("no update for metric %s", metric)
+				return factUpdate{}
+			}
+			session := byMetric(metricSessionCount)
+			if session.metric != metricSessionCount || session.sessionID != testCase.wantSessionID || session.startType != testCase.startType {
+				t.Fatalf("session update = %s/%q/%q, want %s/%q/%q", session.metric, session.sessionID, session.startType, metricSessionCount, testCase.wantSessionID, testCase.startType)
+			}
+			facts := pointFacts(session)
+			if len(facts) != 2 || facts[1].fact != hourlySessionStartFact || facts[1].column != "start_count" {
+				t.Fatalf("pointFacts(session) = %d facts, want the activity fact then a start_count session start", len(facts))
+			}
+			if token := pointFacts(byMetric(metricTokenUsage)); len(token) != 1 {
+				t.Fatalf("pointFacts(token) = %d facts, want 1", len(token))
+			}
+		})
+	}
+}
+
 func TestPrepareUpdatesSkipsOnlyResourceGroupsWithAttributionFailures(t *testing.T) {
 	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: observedAt.Add(-time.Hour)}}})
@@ -428,6 +528,120 @@ func TestReplayDeltaBatchesRebuildStableHourlyAggregates(t *testing.T) {
 	}
 }
 
+func TestReplayKeepsRowsThatDifferOnlyByAttribution(t *testing.T) {
+	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
+	const (
+		modelUsage = "model usage"
+		toolUsage  = "tool usage"
+		sessions   = "session count"
+	)
+	testCases := []struct {
+		name      string
+		target    string
+		attribute string
+		values    [2]string
+	}{
+		{name: "effort", target: modelUsage, attribute: "effort", values: [2]string{"high", "low"}},
+		{name: "agent name", target: modelUsage, attribute: "agent.name", values: [2]string{"planner", "reviewer"}},
+		{name: "skill name", target: modelUsage, attribute: "skill.name", values: [2]string{"commit", "deploy"}},
+		{name: "decision source", target: toolUsage, attribute: "source", values: [2]string{"config", "user_temporary"}},
+		{name: "session id", target: sessions, attribute: "session.id", values: [2]string{"sess-1", "sess-2"}},
+		{name: "start type", target: sessions, attribute: "start_type", values: [2]string{"fresh", "resume"}},
+	}
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: observedAt.Add(-time.Hour)}}})
+	dayStart := observedAt.Truncate(24 * time.Hour)
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			aggregates := make(map[string]*hourlyAggregate)
+			for _, value := range testCase.values {
+				request := newConverterRequest(observedAt, testOrganizationID)
+				metrics := request.ResourceMetrics[0].ScopeMetrics[0].Metrics
+				var point *metricsv1.NumberDataPoint
+				switch testCase.target {
+				case modelUsage:
+					point = metrics[1].GetSum().DataPoints[0]
+				case toolUsage:
+					point = metrics[2].GetSum().DataPoints[0]
+				default:
+					point = metrics[0].GetSum().DataPoints[0]
+				}
+				point.Attributes = append(point.Attributes, stringAttribute(testCase.attribute, value))
+				payload, err := proto.Marshal(request)
+				if err != nil {
+					t.Fatalf("proto.Marshal() error = %v", err)
+				}
+				batch := &models.OtelMetricBatch{PayloadProto: payload, PayloadSchemaVersion: otelPayloadSchemaVersion, Status: models.OtelBatchStatusProcessed}
+				processed, skippedErr, err := newRawConverter(database, nil).replayBatch(batch, dayStart, dayStart.Add(24*time.Hour), aggregates)
+				if err != nil || skippedErr != nil || !processed {
+					t.Fatalf("replayBatch() = %t, %v, %v", processed, skippedErr, err)
+				}
+			}
+
+			got := make(map[string]string)
+			for _, aggregate := range aggregates {
+				update := aggregate.update
+				switch {
+				case testCase.target == modelUsage && update.fact == hourlyModelUsageFact && update.column == "input_tokens":
+					got[update.effort+"/"+update.agent+"/"+update.skill] = aggregate.value.RatString()
+				case testCase.target == toolUsage && update.fact == hourlyToolUsageFact && update.column == "accepted_count":
+					got[update.decisionSource] = aggregate.value.RatString()
+				case testCase.target == sessions && update.fact == hourlySessionStartFact && update.column == "start_count":
+					got[update.sessionID+"/"+update.startType] = aggregate.value.RatString()
+				}
+			}
+			wantValue := map[string]string{modelUsage: "10", toolUsage: "2", sessions: "1"}[testCase.target]
+			if len(got) != 2 {
+				t.Fatalf("%s aggregates = %v, want two rows that differ only by %s", testCase.target, got, testCase.attribute)
+			}
+			for key, value := range got {
+				if value != wantValue {
+					t.Fatalf("%s aggregate %q = %s, want %s", testCase.target, key, value, wantValue)
+				}
+			}
+		})
+	}
+}
+
+func TestReplayAggregatesSessionStarts(t *testing.T) {
+	observedAt := time.Date(2026, 9, 14, 10, 15, 0, 0, time.UTC)
+	request := newConverterRequest(observedAt, testOrganizationID)
+	sum := request.ResourceMetrics[0].ScopeMetrics[0].Metrics[0].GetSum()
+	second := proto.Clone(sum.DataPoints[0]).(*metricsv1.NumberDataPoint)
+	point := sum.DataPoints[0]
+	point.Attributes = append(point.Attributes, stringAttribute("start_type", "resume"), stringAttribute("session.id", "sess-1"))
+	second.Attributes = append(second.Attributes, stringAttribute("start_type", "fresh"), stringAttribute("session.id", "sess-2"))
+	sum.DataPoints = append(sum.DataPoints, second)
+	payload, err := proto.Marshal(request)
+	if err != nil {
+		t.Fatalf("proto.Marshal() error = %v", err)
+	}
+	batch := &models.OtelMetricBatch{PayloadProto: payload, PayloadSchemaVersion: otelPayloadSchemaVersion, Status: models.OtelBatchStatusProcessed}
+	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform", Model: common.Model{ID: 7, CreatedAt: observedAt.Add(-time.Hour)}}})
+	aggregates := make(map[string]*hourlyAggregate)
+	dayStart := observedAt.Truncate(24 * time.Hour)
+	processed, skippedErr, err := newRawConverter(database, nil).replayBatch(batch, dayStart, dayStart.Add(24*time.Hour), aggregates)
+	if err != nil || skippedErr != nil || !processed {
+		t.Fatalf("replayBatch() = %t, %v, %v", processed, skippedErr, err)
+	}
+
+	got := make(map[string]string)
+	activityAggregates := 0
+	for _, aggregate := range aggregates {
+		update := aggregate.update
+		if update.fact == hourlyActivityFact && update.column == "session_count" {
+			activityAggregates++
+			got["session_count"] = aggregate.value.RatString()
+		}
+		if update.fact == hourlySessionStartFact && update.column == "start_count" {
+			got["start_count/"+update.sessionID+"/"+update.startType] = aggregate.value.RatString()
+		}
+	}
+	want := map[string]string{"session_count": "2", "start_count/sess-1/resume": "1", "start_count/sess-2/fresh": "1"}
+	if activityAggregates != 1 || !reflect.DeepEqual(got, want) {
+		t.Fatalf("session aggregates = %v (%d activity), want %v with one activity aggregate", got, activityAggregates, want)
+	}
+}
+
 func TestCounterDeltaUsesExactCumulativeIncreaseResetAndOrder(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -502,6 +716,15 @@ func TestRealShapedClaudeCodeExportIsAcceptedAndConverted(t *testing.T) {
 	for _, update := range prepared.updates {
 		if update.temporality != metricsv1.AggregationTemporality_AGGREGATION_TEMPORALITY_DELTA || update.organizationID != testOrganizationID {
 			t.Fatalf("%s temporality/organization = %s/%q", update.metric, update.temporality, update.organizationID)
+		}
+		if update.fact == hourlyModelUsageFact && (update.effort != "high" || update.agent != "general-purpose" || update.skill != "build") {
+			t.Fatalf("%s effort/agent/skill = %q/%q/%q, want high/general-purpose/build", update.metric, update.effort, update.agent, update.skill)
+		}
+		if update.metric == metricToolDecision && update.decisionSource == "" {
+			t.Fatalf("%s decision source is empty, want the source attribute", update.metric)
+		}
+		if update.metric == metricSessionCount && (update.sessionID != "5d0c2a4e-6f1b-4c3a-9e7d-2b8f1a6c4e90" || update.startType != "fresh") {
+			t.Fatalf("%s session/start type = %q/%q, want the exported session and fresh", update.metric, update.sessionID, update.startType)
 		}
 	}
 }

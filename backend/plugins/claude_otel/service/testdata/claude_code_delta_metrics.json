@@ -91,6 +91,12 @@
                         }
                       },
                       {
+                        "key": "session.id",
+                        "value": {
+                          "stringValue": "5d0c2a4e-6f1b-4c3a-9e7d-2b8f1a6c4e90"
+                        }
+                      },
+                      {
                         "key": "devlake_team",
                         "value": {
                           "stringValue": "platform"
@@ -159,6 +165,24 @@
                         "key": "query_source",
                         "value": {
                           "stringValue": "auxiliary"
+                        }
+                      },
+                      {
+                        "key": "effort",
+                        "value": {
+                          "stringValue": "high"
+                        }
+                      },
+                      {
+                        "key": "agent.name",
+                        "value": {
+                          "stringValue": "general-purpose"
+                        }
+                      },
+                      {
+                        "key": "skill.name",
+                        "value": {
+                          "stringValue": "build"
                         }
                       },
                       {
@@ -234,6 +258,24 @@
                         }
                       },
                       {
+                        "key": "effort",
+                        "value": {
+                          "stringValue": "high"
+                        }
+                      },
+                      {
+                        "key": "agent.name",
+                        "value": {
+                          "stringValue": "general-purpose"
+                        }
+                      },
+                      {
+                        "key": "skill.name",
+                        "value": {
+                          "stringValue": "build"
+                        }
+                      },
+                      {
                         "key": "type",
                         "value": {
                           "stringValue": "input"
@@ -298,6 +340,24 @@
                         "key": "query_source",
                         "value": {
                           "stringValue": "auxiliary"
+                        }
+                      },
+                      {
+                        "key": "effort",
+                        "value": {
+                          "stringValue": "high"
+                        }
+                      },
+                      {
+                        "key": "agent.name",
+                        "value": {
+                          "stringValue": "general-purpose"
+                        }
+                      },
+                      {
+                        "key": "skill.name",
+                        "value": {
+                          "stringValue": "build"
                         }
                       },
                       {
@@ -368,6 +428,24 @@
                         }
                       },
                       {
+                        "key": "effort",
+                        "value": {
+                          "stringValue": "high"
+                        }
+                      },
+                      {
+                        "key": "agent.name",
+                        "value": {
+                          "stringValue": "general-purpose"
+                        }
+                      },
+                      {
+                        "key": "skill.name",
+                        "value": {
+                          "stringValue": "build"
+                        }
+                      },
+                      {
                         "key": "type",
                         "value": {
                           "stringValue": "cacheRead"
@@ -432,6 +510,24 @@
                         "key": "query_source",
                         "value": {
                           "stringValue": "auxiliary"
+                        }
+                      },
+                      {
+                        "key": "effort",
+                        "value": {
+                          "stringValue": "high"
+                        }
+                      },
+                      {
+                        "key": "agent.name",
+                        "value": {
+                          "stringValue": "general-purpose"
+                        }
+                      },
+                      {
+                        "key": "skill.name",
+                        "value": {
+                          "stringValue": "build"
                         }
                       },
                       {
@@ -691,6 +787,24 @@
                         }
                       },
                       {
+                        "key": "effort",
+                        "value": {
+                          "stringValue": "high"
+                        }
+                      },
+                      {
+                        "key": "agent.name",
+                        "value": {
+                          "stringValue": "general-purpose"
+                        }
+                      },
+                      {
+                        "key": "skill.name",
+                        "value": {
+                          "stringValue": "build"
+                        }
+                      },
+                      {
                         "key": "devlake_team",
                         "value": {
                           "stringValue": "platform"
@@ -763,6 +877,24 @@
                         }
                       },
                       {
+                        "key": "effort",
+                        "value": {
+                          "stringValue": "high"
+                        }
+                      },
+                      {
+                        "key": "agent.name",
+                        "value": {
+                          "stringValue": "general-purpose"
+                        }
+                      },
+                      {
+                        "key": "skill.name",
+                        "value": {
+                          "stringValue": "build"
+                        }
+                      },
+                      {
                         "key": "type",
                         "value": {
                           "stringValue": "input"
@@ -827,6 +959,24 @@
                         "key": "query_source",
                         "value": {
                           "stringValue": "main"
+                        }
+                      },
+                      {
+                        "key": "effort",
+                        "value": {
+                          "stringValue": "high"
+                        }
+                      },
+                      {
+                        "key": "agent.name",
+                        "value": {
+                          "stringValue": "general-purpose"
+                        }
+                      },
+                      {
+                        "key": "skill.name",
+                        "value": {
+                          "stringValue": "build"
                         }
                       },
                       {
@@ -897,6 +1047,24 @@
                         }
                       },
                       {
+                        "key": "effort",
+                        "value": {
+                          "stringValue": "high"
+                        }
+                      },
+                      {
+                        "key": "agent.name",
+                        "value": {
+                          "stringValue": "general-purpose"
+                        }
+                      },
+                      {
+                        "key": "skill.name",
+                        "value": {
+                          "stringValue": "build"
+                        }
+                      },
+                      {
                         "key": "type",
                         "value": {
                           "stringValue": "cacheRead"
@@ -961,6 +1129,24 @@
                         "key": "query_source",
                         "value": {
                           "stringValue": "main"
+                        }
+                      },
+                      {
+                        "key": "effort",
+                        "value": {
+                          "stringValue": "high"
+                        }
+                      },
+                      {
+                        "key": "agent.name",
+                        "value": {
+                          "stringValue": "general-purpose"
+                        }
+                      },
+                      {
+                        "key": "skill.name",
+                        "value": {
+                          "stringValue": "build"
                         }
                       },
                       {

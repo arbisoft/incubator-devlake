@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"math/big"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -38,14 +39,15 @@ import (
 )
 
 const (
-	dateLayout             = "2006-01-02"
-	resourcesSkippedCode   = "resources_skipped"
-	hourlyActivityOrder    = "connection_id, user_key, hour_start"
-	hourlyModelOrder       = "connection_id, user_key, hour_start, model, query_source"
-	hourlyToolOrder        = "connection_id, user_key, hour_start, tool_name, language"
-	canonicalActivityOrder = "workspace_key, user_key, date, type, interface_type"
-	canonicalModelOrder    = "workspace_key, user_key, date, model"
-	canonicalToolOrder     = "workspace_key, user_key, date, tool_name"
+	dateLayout              = "2006-01-02"
+	resourcesSkippedCode    = "resources_skipped"
+	hourlyActivityOrder     = "connection_id, user_key, hour_start"
+	hourlyModelOrder        = "connection_id, user_key, hour_start, model, query_source, effort, agent_name, skill_name"
+	hourlyToolOrder         = "connection_id, user_key, hour_start, tool_name, language, decision_source"
+	hourlySessionStartOrder = "connection_id, user_key, hour_start, session_id, start_type"
+	canonicalActivityOrder  = "workspace_key, user_key, date, type, interface_type"
+	canonicalModelOrder     = "workspace_key, user_key, date, model"
+	canonicalToolOrder      = "workspace_key, user_key, date, tool_name"
 )
 
 var e2eUser = &common.User{Name: "E2E", Email: "e2e@example.com"}
@@ -113,22 +115,24 @@ func clearVolatile(v reflect.Value) {
 
 // facts is every hourly and canonical row one connection produced.
 type facts struct {
-	Activity   []models.OtelHourlyActivity
-	Model      []models.OtelHourlyModelUsage
-	Tool       []models.OtelHourlyToolUsage
-	AiActivity []ai.AiActivity
-	AiModel    []ai.AiModelUsage
-	AiTool     []ai.AiToolDecision
+	Activity     []models.OtelHourlyActivity
+	Model        []models.OtelHourlyModelUsage
+	Tool         []models.OtelHourlyToolUsage
+	SessionStart []models.OtelHourlySessionStart
+	AiActivity   []ai.AiActivity
+	AiModel      []ai.AiModelUsage
+	AiTool       []ai.AiToolDecision
 }
 
 func (w *world) factsOf(connectionID uint64) facts {
 	return facts{
-		Activity:   snapshot[models.OtelHourlyActivity](w, hourlyActivityOrder, "connection_id = ?", connectionID),
-		Model:      snapshot[models.OtelHourlyModelUsage](w, hourlyModelOrder, "connection_id = ?", connectionID),
-		Tool:       snapshot[models.OtelHourlyToolUsage](w, hourlyToolOrder, "connection_id = ?", connectionID),
-		AiActivity: snapshot[ai.AiActivity](w, canonicalActivityOrder, "source_connection_id = ?", connectionID),
-		AiModel:    snapshot[ai.AiModelUsage](w, canonicalModelOrder, "source_connection_id = ?", connectionID),
-		AiTool:     snapshot[ai.AiToolDecision](w, canonicalToolOrder, "source_connection_id = ?", connectionID),
+		Activity:     snapshot[models.OtelHourlyActivity](w, hourlyActivityOrder, "connection_id = ?", connectionID),
+		Model:        snapshot[models.OtelHourlyModelUsage](w, hourlyModelOrder, "connection_id = ?", connectionID),
+		Tool:         snapshot[models.OtelHourlyToolUsage](w, hourlyToolOrder, "connection_id = ?", connectionID),
+		SessionStart: snapshot[models.OtelHourlySessionStart](w, hourlySessionStartOrder, "connection_id = ?", connectionID),
+		AiActivity:   snapshot[ai.AiActivity](w, canonicalActivityOrder, "source_connection_id = ?", connectionID),
+		AiModel:      snapshot[ai.AiModelUsage](w, canonicalModelOrder, "source_connection_id = ?", connectionID),
+		AiTool:       snapshot[ai.AiToolDecision](w, canonicalToolOrder, "source_connection_id = ?", connectionID),
 	}
 }
 
@@ -136,9 +140,22 @@ func requireFilled(t *testing.T, f facts) {
 	require.NotEmpty(t, f.Activity)
 	require.NotEmpty(t, f.Model)
 	require.NotEmpty(t, f.Tool)
+	require.NotEmpty(t, f.SessionStart)
 	require.NotEmpty(t, f.AiActivity)
 	require.NotEmpty(t, f.AiModel)
 	require.NotEmpty(t, f.AiTool)
+	require.True(t, slices.ContainsFunc(f.Model, func(row models.OtelHourlyModelUsage) bool { return row.Effort != "" }))
+	require.True(t, slices.ContainsFunc(f.Model, func(row models.OtelHourlyModelUsage) bool { return row.AgentName != "" }))
+	require.True(t, slices.ContainsFunc(f.Tool, func(row models.OtelHourlyToolUsage) bool { return row.DecisionSource != "" }))
+	require.True(t, slices.ContainsFunc(f.SessionStart, func(row models.OtelHourlySessionStart) bool { return row.SessionId != "" }))
+	var starts, sessions int64
+	for _, row := range f.SessionStart {
+		starts += row.StartCount
+	}
+	for _, row := range f.Activity {
+		sessions += row.SessionCount
+	}
+	require.Equal(t, sessions, starts)
 }
 
 // userKeys lists the distinct developers across every row of the set.
@@ -151,6 +168,9 @@ func (f facts) userKeys() map[string]struct{} {
 		keys[row.UserKey] = struct{}{}
 	}
 	for _, row := range f.Tool {
+		keys[row.UserKey] = struct{}{}
+	}
+	for _, row := range f.SessionStart {
 		keys[row.UserKey] = struct{}{}
 	}
 	for _, row := range f.AiActivity {
@@ -175,6 +195,9 @@ func (f facts) organizations() map[string]struct{} {
 		orgs[*row.OrganizationId] = struct{}{}
 	}
 	for _, row := range f.Tool {
+		orgs[*row.OrganizationId] = struct{}{}
+	}
+	for _, row := range f.SessionStart {
 		orgs[*row.OrganizationId] = struct{}{}
 	}
 	for _, row := range f.AiActivity {
@@ -330,6 +353,7 @@ func TestRebindAndReplayRebuildsOnlyTheReboundTeam(t *testing.T) {
 	require.Zero(t, w.count(&models.OtelHourlyActivity{}, "connection_id = ? AND user_key = ?", fixture.a.ID, stray.userKey()))
 	require.Zero(t, w.count(&models.OtelHourlyModelUsage{}, "connection_id = ? AND user_key = ?", fixture.a.ID, stray.userKey()))
 	require.Zero(t, w.count(&models.OtelHourlyToolUsage{}, "connection_id = ? AND user_key = ?", fixture.a.ID, stray.userKey()))
+	require.Zero(t, w.count(&models.OtelHourlySessionStart{}, "connection_id = ? AND user_key = ?", fixture.a.ID, stray.userKey()))
 	require.Zero(t, w.count(&ai.AiActivity{}, "user_key = ? AND workspace_key = ?", stray.userKey(), orgW))
 	require.Zero(t, w.count(&ai.AiModelUsage{}, "user_key = ? AND workspace_key = ?", stray.userKey(), orgW))
 	require.Zero(t, w.count(&ai.AiToolDecision{}, "user_key = ? AND workspace_key = ?", stray.userKey(), orgW))
@@ -499,7 +523,7 @@ func TestRebindRevokedConnectionRecoversItsLivePeriod(t *testing.T) {
 	afterRevoked := w.factsOf(revoked.ID)
 	requireFilled(t, afterRevoked)
 	require.Equal(t, beforeSuccessor, w.factsOf(successor.ID))
-	for _, table := range []interface{}{&models.OtelHourlyActivity{}, &models.OtelHourlyModelUsage{}, &models.OtelHourlyToolUsage{}} {
+	for _, table := range []interface{}{&models.OtelHourlyActivity{}, &models.OtelHourlyModelUsage{}, &models.OtelHourlyToolUsage{}, &models.OtelHourlySessionStart{}} {
 		require.Positive(t, w.count(table, "connection_id = ? AND hour_start >= ? AND hour_start < ?", revoked.ID, w.day(-2), w.day(-1)))
 		require.Zero(t, w.count(table, "connection_id = ? AND hour_start >= ?", revoked.ID, revokedAt))
 		require.Zero(t, w.count(table, "connection_id = ? AND hour_start < ?", successor.ID, revokedAt))

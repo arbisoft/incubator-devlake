@@ -409,6 +409,25 @@ func TestPrepareEventsStoresOnlyAllowlistedAttributes(t *testing.T) {
 	stripContentAttributes(request)
 	for _, record := range resourceLogRecords(request.GetResourceLogs()[0]) {
 		setStringAttribute(record, "assistant_draft", "content from a future release")
+		setStringAttribute(record, "process.owner", "content from a future release")
+		setStringAttribute(record, "anthropic.seat_type", "content from a future release")
+		setStringAttribute(record, "files_reviewed", "content from a future release")
+		setStringAttribute(record, "managed_settings.settings", "content from a future release")
+		setStringAttribute(record, "claude.deployment_mode", "content from a future release")
+		setStringAttribute(record, "ttft_ms", "content from a future release")
+		setStringAttribute(record, "cost_usd_micros", "content from a future release")
+		setStringAttribute(record, "client_request_id", "content from a future release")
+		setStringAttribute(record, "message.uuid", "content from a future release")
+		setStringAttribute(record, "plugin_id", "content from a future release")
+		setStringAttribute(record, "review_ms", "content from a future release")
+		setStringAttribute(record, "vulns_found", "content from a future release")
+		setStringAttribute(record, "hook_definitions", "content from a future release")
+		setStringAttribute(record, "workspace.host_paths", "content from a future release")
+		setStringAttribute(record, "managed_settings.resolved_sha", "content from a future release")
+		setStringAttribute(record, "managed_settings.helper.path", "content from a future release")
+		setStringAttribute(record, "hook_matcher", "content from a future release")
+		setStringAttribute(record, "permission_mode", "auto")
+		setStringAttribute(record, "hook_name", "PreToolUse:Bash")
 	}
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
 
@@ -429,6 +448,17 @@ func TestPrepareEventsStoresOnlyAllowlistedAttributes(t *testing.T) {
 		if _, kept := attributes["event.sequence"]; !kept {
 			t.Fatalf("%s attributes = %v, want allowlisted attributes kept", item.event.EventName, attributes)
 		}
+		for _, key := range []string{"permission_mode", "hook_name"} {
+			if _, kept := attributes[key]; !kept {
+				t.Fatalf("%s attributes = %v, want %s kept", item.event.EventName, attributes, key)
+			}
+		}
+		for _, key := range []string{"process.owner", "anthropic.seat_type", "files_reviewed", "managed_settings.settings",
+			"claude.deployment_mode", "ttft_ms", "cost_usd_micros", "client_request_id", "message.uuid", "plugin_id", "review_ms", "vulns_found", "hook_definitions", "workspace.host_paths", "managed_settings.resolved_sha", "managed_settings.helper.path", "hook_matcher"} {
+			if _, kept := attributes[key]; kept {
+				t.Fatalf("%s attributes kept %q, want it dropped", item.event.EventName, key)
+			}
+		}
 	}
 }
 
@@ -447,7 +477,7 @@ func TestStoredAttributesNormalizesTheRepositoryURL(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			stored := storedAttributes(map[string]interface{}{
+			stored := storedAttributes("", map[string]interface{}{
 				repositoryURLAttribute: test.value,
 				"vcs.repository.name":  "Repo",
 				"vcs.owner.name":       "Org",
@@ -465,7 +495,7 @@ func TestStoredAttributesNormalizesTheRepositoryURL(t *testing.T) {
 		})
 	}
 
-	stored := storedAttributes(map[string]interface{}{"vcs.repository.name": "Repo"})
+	stored := storedAttributes("", map[string]interface{}{"vcs.repository.name": "Repo"})
 	if _, added := stored[repositoryURLAttribute]; added || len(stored) != 1 {
 		t.Fatalf("stored = %v, want no repository url added", stored)
 	}
@@ -495,6 +525,74 @@ func TestPrepareEventsNormalizesTheStoredRepositoryURL(t *testing.T) {
 		if got := attributes[repositoryURLAttribute]; got != "https://github.com/example-org/example-repo" {
 			t.Fatalf("%s repository url = %v, want it normalized", item.event.EventName, got)
 		}
+	}
+}
+
+func TestStoredAttributesDropsEventContentAndCapsStrings(t *testing.T) {
+	longText := strings.Repeat("x", 3000)
+	tests := []struct {
+		name       string
+		event      string
+		attributes map[string]interface{}
+		check      func(t *testing.T, stored map[string]interface{})
+	}{
+		{"compaction error dropped", eventCompaction, map[string]interface{}{"error": longText, "pre_tokens": float64(1200)}, func(t *testing.T, stored map[string]interface{}) {
+			if _, kept := stored["error"]; kept || stored["pre_tokens"] != float64(1200) {
+				t.Fatalf("stored = %v, want error dropped and pre_tokens kept", stored)
+			}
+		}},
+		{"tool_result error dropped", eventToolResult, map[string]interface{}{"error": "file contents"}, func(t *testing.T, stored map[string]interface{}) {
+			if _, kept := stored["error"]; kept {
+				t.Fatalf("stored = %v, want error dropped", stored)
+			}
+		}},
+		{"api_error error kept", eventAPIError, map[string]interface{}{"error": "overloaded"}, func(t *testing.T, stored map[string]interface{}) {
+			if stored["error"] != "overloaded" {
+				t.Fatalf("stored = %v, want error kept", stored)
+			}
+		}},
+		{"long string capped by runes", "hook_execution_complete", map[string]interface{}{"hook_name": strings.Repeat("é", 5000)}, func(t *testing.T, stored map[string]interface{}) {
+			name, _ := stored["hook_name"].(string)
+			if utf8.RuneCountInString(name) != maxStoredAttributeLength || !utf8.ValidString(name) {
+				t.Fatalf("hook_name has %d runes, want %d", utf8.RuneCountInString(name), maxStoredAttributeLength)
+			}
+		}},
+		{"tool_parameters not capped", eventToolDecision, map[string]interface{}{toolParametersAttribute: longText}, func(t *testing.T, stored map[string]interface{}) {
+			if stored[toolParametersAttribute] != longText {
+				t.Fatalf("tool_parameters was changed, want it kept as is")
+			}
+		}},
+		{"number unchanged", eventAPIRequest, map[string]interface{}{"cost_usd": float64(0.25)}, func(t *testing.T, stored map[string]interface{}) {
+			if stored["cost_usd"] != float64(0.25) {
+				t.Fatalf("stored = %v, want cost_usd unchanged", stored)
+			}
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			test.check(t, storedAttributes(test.event, test.attributes))
+		})
+	}
+}
+
+func TestStripContentAttributesDropsCompactionError(t *testing.T) {
+	compaction := &logsv1.LogRecord{Attributes: []*commonv1.KeyValue{
+		stringAttribute("event.name", "compaction"), stringAttribute("error", "model output"), stringAttribute("pre_tokens", "1200"),
+	}}
+	apiError := &logsv1.LogRecord{Attributes: []*commonv1.KeyValue{
+		stringAttribute("event.name", "api_error"), stringAttribute("error", "overloaded"),
+	}}
+	request := &collectorlogs.ExportLogsServiceRequest{ResourceLogs: []*logsv1.ResourceLogs{{
+		ScopeLogs: []*logsv1.ScopeLogs{{LogRecords: []*logsv1.LogRecord{compaction, apiError}}},
+	}}}
+
+	stripContentAttributes(request)
+
+	if hasAttribute(compaction.GetAttributes(), "error") || !hasAttribute(compaction.GetAttributes(), "pre_tokens") {
+		t.Fatalf("compaction attributes = %v, want error dropped and pre_tokens kept", compaction.GetAttributes())
+	}
+	if !hasAttribute(apiError.GetAttributes(), "error") {
+		t.Fatalf("api_error attributes = %v, want error kept", apiError.GetAttributes())
 	}
 }
 
@@ -563,6 +661,87 @@ func TestSessionModesInferEachPromptMode(t *testing.T) {
 			mode, inferred := newSessionModes(testCase.changes).modeAt(at(testCase.promptMinute), 0)
 			if mode != testCase.mode || inferred != testCase.inferred {
 				t.Fatalf("modeAt() = %q inferred=%t, want %q inferred=%t", mode, inferred, testCase.mode, testCase.inferred)
+			}
+		})
+	}
+}
+
+func TestPromptModePrefersObservedDecisions(t *testing.T) {
+	at := func(minute int) time.Time { return time.Date(2026, 10, 14, 10, minute, 0, 0, time.UTC) }
+	change := func(minute int, from, to string) *models.OtelEvent {
+		attributes, _ := json.Marshal(map[string]string{"from_mode": from, "to_mode": to})
+		return &models.OtelEvent{EventName: eventPermissionModeChanged, EventTimestamp: at(minute), Attributes: attributes}
+	}
+	decision := func(minute int, attributes map[string]string) *models.OtelEvent {
+		encoded, _ := json.Marshal(attributes)
+		return &models.OtelEvent{EventName: eventToolDecision, PromptId: "p1", EventTimestamp: at(minute), Attributes: encoded}
+	}
+	reporting := func(minute int, mode string) *models.OtelEvent {
+		return decision(minute, map[string]string{"permission_mode": mode})
+	}
+	testCases := []struct {
+		name     string
+		own      []*models.OtelEvent
+		earlier  *models.OtelEvent
+		changes  []*models.OtelEvent
+		mode     string
+		inferred bool
+	}{
+		{name: "own decision", own: []*models.OtelEvent{reporting(5, "auto")}, mode: "auto"},
+		{name: "own decision beats an earlier change", own: []*models.OtelEvent{reporting(5, "auto")}, changes: []*models.OtelEvent{change(1, "default", "plan")}, mode: "auto"},
+		{name: "earlier decision", earlier: reporting(1, "auto"), mode: "auto"},
+		{name: "mode change after the earlier decision wins", earlier: reporting(1, "auto"), changes: []*models.OtelEvent{change(3, "auto", "plan")}, mode: "plan"},
+		{name: "earlier decision after the mode change wins", earlier: reporting(3, "bypassPermissions"), changes: []*models.OtelEvent{change(1, "default", "plan")}, mode: "bypassPermissions"},
+		{name: "decision without a mode", own: []*models.OtelEvent{decision(5, map[string]string{"decision": "accept"})}, mode: ai.PermissionModeDefault, inferred: true},
+		{name: "nothing observed", mode: ai.PermissionModeDefault, inferred: true},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			var earlier *observedMode
+			if testCase.earlier != nil {
+				observed, _ := observedModeOf(testCase.earlier)
+				earlier = &observed
+			}
+			mode, inferred := newSessionModes(testCase.changes).promptMode(firstObservedMode(testCase.own), earlier, at(5), 0)
+			if mode != testCase.mode || inferred != testCase.inferred {
+				t.Fatalf("promptMode() = %q inferred=%t, want %q inferred=%t", mode, inferred, testCase.mode, testCase.inferred)
+			}
+		})
+	}
+}
+
+func TestEarlierObservedMode(t *testing.T) {
+	at := func(minute int) time.Time { return time.Date(2026, 10, 14, 10, minute, 0, 0, time.UTC) }
+	entry := func(prompt string, minute int, sequence int64, mode string) observedMode {
+		return observedMode{at: at(minute), sequence: sequence, promptID: prompt, mode: mode}
+	}
+	testCases := []struct {
+		name     string
+		observed []observedMode
+		prompt   string
+		minute   int
+		sequence int64
+		want     string
+	}{
+		{name: "first decision of the latest earlier prompt", observed: []observedMode{entry("p1", 1, 1, "acceptEdits"), entry("p1", 2, 2, "bypassPermissions")}, prompt: "p2", minute: 5, want: "acceptEdits"},
+		{name: "two earlier prompts", observed: []observedMode{entry("p1", 1, 1, "default"), entry("p2", 3, 2, "plan")}, prompt: "p3", minute: 5, want: "plan"},
+		{name: "same timestamp with a lower sequence is earlier", observed: []observedMode{entry("p1", 5, 3, "plan")}, prompt: "p2", minute: 5, sequence: 4, want: "plan"},
+		{name: "same timestamp with a higher sequence is later", observed: []observedMode{entry("p1", 5, 3, "plan")}, prompt: "p2", minute: 5, sequence: 2},
+		{name: "own decisions are ignored", observed: []observedMode{entry("p2", 1, 1, "plan")}, prompt: "p2", minute: 5},
+		{name: "later decisions are ignored", observed: []observedMode{entry("p1", 6, 1, "plan")}, prompt: "p2", minute: 5},
+		{name: "decisions without a prompt are returned themselves", observed: []observedMode{entry("", 1, 1, "plan"), entry("", 2, 2, "auto")}, prompt: "p2", minute: 5, want: "auto"},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := earlierObservedMode(testCase.observed, testCase.prompt, at(testCase.minute), testCase.sequence)
+			if testCase.want == "" {
+				if got != nil {
+					t.Fatalf("earlierObservedMode() = %#v, want nil", got)
+				}
+				return
+			}
+			if got == nil || got.mode != testCase.want {
+				t.Fatalf("earlierObservedMode() = %#v, want mode %q", got, testCase.want)
 			}
 		})
 	}
@@ -734,9 +913,14 @@ func TestBuildPromptRollupRecordsFailureReasons(t *testing.T) {
 func TestBuildPromptRollupNeverCopiesToolErrorMessage(t *testing.T) {
 	events := promptEvents(t, loadLogEventsFixture(t), "p2")
 	toolEvent := failedToolResult(t, events)
-	if eventString(eventAttributes(toolEvent), "error") == "" {
-		t.Fatal("unstripped tool_result has no error attribute; the fixture no longer exercises this case")
+	// Conversion drops the tool_result error, so the event is given one to prove the rollup ignores it too.
+	attributes := eventAttributes(toolEvent)
+	attributes["error"] = "cat: secrets.env: contents echoed"
+	encoded, err := json.Marshal(attributes)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
 	}
+	toolEvent.Attributes = encoded
 	toolFailures := 0
 	for _, failure := range buildPromptRollup(testOrganizationID, "p2", events).failures {
 		if failure.FailureKind != ai.FailureKindToolError {
@@ -1018,6 +1202,27 @@ func TestSessionTargetsGroupPromptsAndFlagModeChanges(t *testing.T) {
 	targets := sessionTargets(prepared.events)
 	if len(targets) != 1 || !targets[0].modeChanged || len(targets[0].promptIDs) != 3 {
 		t.Fatalf("sessionTargets() = %d targets, modeChanged %t, prompts %d", len(targets), targets[0].modeChanged, len(targets[0].promptIDs))
+	}
+}
+
+func TestSessionTargetsFlagObservedModes(t *testing.T) {
+	at := func(minute int) time.Time { return time.Date(2026, 10, 14, 10, minute, 0, 0, time.UTC) }
+	decision := func(session string, minute int, mode string) preparedEvent {
+		event := otelEventWith(eventToolDecision, "p1", at(minute), int64(minute), map[string]string{"permission_mode": mode})
+		event.SessionId = session
+		return preparedEvent{event: event}
+	}
+	target := sessionTargets([]preparedEvent{decision("sess-1", 7, "plan"), decision("sess-1", 3, "auto"), decision("sess-1", 1, "")})[0]
+	if !target.modeObserved || !target.earliestObserved.Equal(at(3)) {
+		t.Fatalf("modeObserved = %t, earliestObserved = %v, want true and %v", target.modeObserved, target.earliestObserved, at(3))
+	}
+	for name, events := range map[string][]preparedEvent{
+		"blank mode": {decision("sess-1", 1, "")},
+		"no session": {decision("", 1, "plan")},
+	} {
+		if got := sessionTargets(events)[0]; got.modeObserved || !got.earliestObserved.IsZero() {
+			t.Fatalf("%s: modeObserved = %t, earliestObserved = %v, want unset", name, got.modeObserved, got.earliestObserved)
+		}
 	}
 }
 

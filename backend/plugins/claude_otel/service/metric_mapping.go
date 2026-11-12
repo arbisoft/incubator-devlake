@@ -58,6 +58,7 @@ const (
 	hourlyActivityFact hourlyFact = iota
 	hourlyModelUsageFact
 	hourlyToolUsageFact
+	hourlySessionStartFact
 )
 
 // metricMapping is the allowlisted destination of one Claude Code metric. A metric maps
@@ -109,6 +110,12 @@ type factUpdate struct {
 	query          string
 	tool           string
 	language       string
+	effort         string
+	agent          string
+	skill          string
+	decisionSource string
+	sessionID      string
+	startType      string
 	value          metricNumber
 	temporality    metricsv1.AggregationTemporality
 	startNanos     uint64
@@ -227,6 +234,20 @@ func lessSeriesSample(left, right factUpdate) bool {
 		return order < 0
 	}
 	return left.timeNanos < right.timeNanos
+}
+
+// pointFacts returns every hourly fact one prepared datapoint adds to: its own, and for a session count the session start it records.
+func pointFacts(update factUpdate) []factUpdate {
+	if update.metric != metricSessionCount {
+		return []factUpdate{update}
+	}
+	start := update
+	start.fact = hourlySessionStartFact
+	start.column = "start_count"
+	activity := update
+	activity.sessionID = ""
+	activity.startType = ""
+	return []factUpdate{activity, start}
 }
 
 func defaultDimension(value string) string {
