@@ -129,3 +129,21 @@ func TestPromptToolsAndSessionHooksMigrationIsRerunnable(t *testing.T) {
 		require.True(t, tester.Dal.HasColumn("ai_prompts", column), column)
 	}
 }
+
+func TestAiCommitsMigrationIsRerunnable(t *testing.T) {
+	tester := e2ehelper.NewDataFlowTester(t, "claude_otel", impl.ClaudeOtel{})
+	basicRes := contextimpl.NewDefaultBasicRes(tester.Cfg, tester.Log, tester.Dal)
+	var script plugin.MigrationScript
+	for _, candidate := range coremigrations.All() {
+		if candidate.Version() == 20261113120000 {
+			script = candidate
+		}
+	}
+	require.NotNil(t, script, "core migration 20261113120000 is not registered")
+	require.NoError(t, script.Up(basicRes))
+	require.NoError(t, script.Up(basicRes), "a rerun must succeed")
+	require.True(t, tester.Dal.HasTable("ai_commits"))
+	for _, column := range []string{"commit_sha", "branch_name", "prompt_id", "first_seen_at", "repository_url"} {
+		require.True(t, tester.Dal.HasColumn("ai_commits", column), column)
+	}
+}
