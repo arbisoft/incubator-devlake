@@ -18,6 +18,7 @@ limitations under the License.
 package service
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -180,4 +181,105 @@ func TestSessionTargetsFlagRegisteredHooks(t *testing.T) {
 	}
 	require.True(t, sessionTargets([]preparedEvent{registered("sess-1")})[0].hooksRegistered)
 	require.False(t, sessionTargets([]preparedEvent{registered("")})[0].hooksRegistered)
+}
+
+func TestBuildPromptRollupCommits(t *testing.T) {
+	const (
+		shaA = "0123456789abcdef0123456789abcdef01234567"
+		shaB = "fedcba9876543210fedcba9876543210fedcba98"
+	)
+	head := func(name string, minute int, revision, branch, repo string) *models.OtelEvent {
+		attributes := map[string]string{}
+		if revision != "" {
+			attributes["vcs.ref.head.revision"] = revision
+		}
+		if branch != "" {
+			attributes["vcs.ref.head.name"] = branch
+		}
+		if repo != "" {
+			attributes["vcs.repository.url.full"] = repo
+		}
+		return rollupEvent(name, minute, attributes, nil)
+	}
+	tests := []struct {
+		name   string
+		events []*models.OtelEvent
+		want   []struct {
+			sha, branch string
+			minute      int
+			repo        *string
+		}
+	}{
+		{
+			name:   "same sha keeps the earliest event and its branch",
+			events: []*models.OtelEvent{head(eventToolResult, 5, shaA, "late", ""), head(eventToolResult, 2, shaA, "early", "https://github.com/o/r")},
+			want: []struct {
+				sha, branch string
+				minute      int
+				repo        *string
+			}{{shaA, "early", 2, strPtr("https://github.com/o/r")}},
+		},
+		{
+			name:   "upper-case sha is lowercased",
+			events: []*models.OtelEvent{head(eventToolResult, 1, strings.ToUpper(shaA), "main", "")},
+			want: []struct {
+				sha, branch string
+				minute      int
+				repo        *string
+			}{{shaA, "main", 1, nil}},
+		},
+		{
+			name: "invalid, missing and non-tool_result revisions produce no row",
+			events: []*models.OtelEvent{
+				head(eventToolResult, 1, shaA[:39], "main", ""),
+				head(eventToolResult, 2, "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz", "main", ""),
+				head(eventToolResult, 3, "", "main", ""),
+				head(eventAPIRequest, 4, shaA, "main", ""),
+			},
+		},
+		{
+			name:   "two shas sort by time",
+			events: []*models.OtelEvent{head(eventToolResult, 7, shaB, "b", ""), head(eventToolResult, 3, shaA, "a", "")},
+			want: []struct {
+				sha, branch string
+				minute      int
+				repo        *string
+			}{{shaA, "a", 3, nil}, {shaB, "b", 7, nil}},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			events := append([]*models.OtelEvent{rollupEvent(eventUserPrompt, 0, nil, nil)}, test.events...)
+			rollup := buildPromptRollup(testOrganizationID, "p1", events)
+			require.Len(t, rollup.commits, len(test.want))
+			for index, want := range test.want {
+				got := rollup.commits[index]
+				require.Equal(t, want.sha, got.CommitSha)
+				require.Equal(t, want.branch, got.BranchName)
+				require.True(t, got.FirstSeenAt.Equal(time.Date(2026, 11, 11, 10, want.minute, 0, 0, time.UTC)), "first seen %s", got.FirstSeenAt)
+				require.Equal(t, want.repo, got.RepositoryUrl)
+				require.Equal(t, "p1", got.PromptId)
+				require.Equal(t, rollup.prompt.SessionId, got.SessionId)
+				require.Equal(t, rollup.prompt.UserEmail, got.UserEmail)
+				require.Equal(t, testOrganizationID, got.WorkspaceKey)
+			}
+			again := buildPromptRollup(testOrganizationID, "p1", events)
+			for index, commit := range rollup.commits {
+				require.Equal(t, commit.Id, again.commits[index].Id)
+			}
+			if len(rollup.commits) == 2 {
+				require.NotEqual(t, rollup.commits[0].Id, rollup.commits[1].Id)
+			}
+		})
+	}
+}
+
+func TestBuildPromptRollupCommitFallsBackToPromptRepository(t *testing.T) {
+	sha := "0123456789abcdef0123456789abcdef01234567"
+	rollup := buildPromptRollup(testOrganizationID, "p1", []*models.OtelEvent{
+		rollupEvent(eventUserPrompt, 0, map[string]string{"vcs.repository.url.full": "https://github.com/o/r"}, nil),
+		rollupEvent(eventToolResult, 1, map[string]string{"vcs.ref.head.revision": sha}, nil),
+	})
+	require.Len(t, rollup.commits, 1)
+	require.Equal(t, strPtr("https://github.com/o/r"), rollup.commits[0].RepositoryUrl)
 }

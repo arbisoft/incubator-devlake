@@ -113,5 +113,6 @@ func GetDomainTablesInfo() []dal.Tabler {
 		&ai.AiPermissionModeChange{},
 		&ai.AiPromptTool{},
 		&ai.AiSessionHook{},
+		&ai.AiCommit{},
 	}
 }

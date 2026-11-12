@@ -315,6 +315,7 @@ type promptRollup struct {
 	skills   []*ai.AiPromptSkill
 	failures []*ai.AiPromptFailure
 	tools    []*ai.AiPromptTool
+	commits  []*ai.AiCommit
 	// firstMainRequestAt is the time of the prompt's first main-thread request, nil when it made none.
 	firstMainRequestAt *time.Time
 }
@@ -334,9 +335,10 @@ func buildPromptRollup(workspaceKey, promptID string, events []*models.OtelEvent
 			EstimatedCostUsd: "0.00000000",
 			SourceType:       aiSourceOtel,
 		},
-		skills: newSkillCollector(workspaceKey, promptID),
-		models: make(map[string]struct{}),
-		tools:  make(map[toolKey]*ai.AiPromptTool),
+		skills:  newSkillCollector(workspaceKey, promptID),
+		models:  make(map[string]struct{}),
+		tools:   make(map[toolKey]*ai.AiPromptTool),
+		commits: make(map[string]*commitSighting),
 	}
 	prompt := builder.prompt
 	for index, event := range events {
@@ -372,7 +374,7 @@ func buildPromptRollup(workspaceKey, promptID string, events []*models.OtelEvent
 		tool.SessionId = prompt.SessionId
 		tool.StartedAt = prompt.StartedAt
 	}
-	return promptRollup{prompt: prompt, skills: collected, failures: builder.failures, tools: tools, firstMainRequestAt: builder.firstMainRequestAt}
+	return promptRollup{prompt: prompt, skills: collected, failures: builder.failures, tools: tools, commits: builder.sortedCommits(), firstMainRequestAt: builder.firstMainRequestAt}
 }
 
 // promptBuilder accumulates one prompt's row, skills, failures and models from its ordered events.
@@ -382,12 +384,23 @@ type promptBuilder struct {
 	models   map[string]struct{}
 	failures []*ai.AiPromptFailure
 	tools    map[toolKey]*ai.AiPromptTool
+	commits  map[string]*commitSighting
 	// firstMainRequestAt is the time of the first main-thread request, which also supplies the first-request fields.
 	firstMainRequestAt *time.Time
 	// mainThreadEffort is set once a main-thread request has given the prompt its effort,
 	// so a later request cannot replace it.
 	mainThreadEffort bool
 }
+
+// commitSighting is the earliest tool_result of a prompt that reported one commit.
+type commitSighting struct {
+	at       time.Time
+	sequence int64
+	branch   string
+	repoURL  *string
+}
+
+var commitShaPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 // toolKey names one tool row of a prompt.
 type toolKey struct {
@@ -523,6 +536,7 @@ func (b *promptBuilder) applyAPIError(event *models.OtelEvent, attributes map[st
 }
 
 func (b *promptBuilder) applyToolResult(event *models.OtelEvent, attributes map[string]interface{}) {
+	b.noteCommit(event, attributes)
 	b.prompt.ToolCallCount++
 	row := b.toolRow(event.ToolName, event.McpServerName)
 	row.CallCount++
@@ -538,6 +552,51 @@ func (b *promptBuilder) applyToolResult(event *models.OtelEvent, attributes map[
 	if event.ToolName == skillToolName {
 		b.skills.add(event.SkillName, ai.SkillDetectedViaSkillTool, "", "", "", event.EventTimestamp)
 	}
+}
+
+func (b *promptBuilder) noteCommit(event *models.OtelEvent, attributes map[string]interface{}) {
+	sha := strings.ToLower(strings.TrimSpace(eventString(attributes, headRevisionAttribute)))
+	if !commitShaPattern.MatchString(sha) {
+		return
+	}
+	sequence := int64Value(event.EventSequence)
+	if seen, found := b.commits[sha]; found && !lessEventOrder(event.EventTimestamp, sequence, seen.at, seen.sequence) {
+		return
+	}
+	b.commits[sha] = &commitSighting{at: event.EventTimestamp, sequence: sequence, branch: truncate(eventString(attributes, headNameAttribute), 255), repoURL: repositoryURL(attributes)}
+}
+
+// sortedCommits returns the prompt's commit rows ordered by first sighting then SHA; the caller's prompt identity is already set.
+func (b *promptBuilder) sortedCommits() []*ai.AiCommit {
+	prompt := b.prompt
+	rows := make([]*ai.AiCommit, 0, len(b.commits))
+	for sha, seen := range b.commits {
+		repoURL := seen.repoURL
+		if repoURL == nil {
+			repoURL = prompt.RepositoryUrl
+		}
+		rows = append(rows, &ai.AiCommit{
+			DomainEntity:       domainlayer.NewDomainEntity(ai.CanonicalKey{Kind: ai.IDKindCommit, Provider: aiProviderClaude, WorkspaceKey: prompt.WorkspaceKey, Grain: []string{prompt.PromptId, sha}}.ID()),
+			Provider:           aiProviderClaude,
+			WorkspaceKey:       prompt.WorkspaceKey,
+			SourceConnectionId: prompt.SourceConnectionId,
+			UserKey:            prompt.UserKey,
+			UserEmail:          prompt.UserEmail,
+			SessionId:          prompt.SessionId,
+			PromptId:           prompt.PromptId,
+			CommitSha:          sha,
+			BranchName:         seen.branch,
+			RepositoryUrl:      repoURL,
+			FirstSeenAt:        seen.at,
+		})
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		if !rows[i].FirstSeenAt.Equal(rows[j].FirstSeenAt) {
+			return rows[i].FirstSeenAt.Before(rows[j].FirstSeenAt)
+		}
+		return rows[i].CommitSha < rows[j].CommitSha
+	})
+	return rows
 }
 
 // newFailure adds a failure row for event to the prompt and returns it. buildPromptRollup
@@ -966,7 +1025,13 @@ func writePromptRollup(tx dal.Transaction, rollup promptRollup) error {
 	if err := tx.Delete(&ai.AiPromptTool{}, dal.Where("workspace_key = ? AND prompt_id = ?", rollup.prompt.WorkspaceKey, rollup.prompt.PromptId)); err != nil {
 		return fmt.Errorf("clear Claude Code prompt tools: %w", err)
 	}
-	return createInBatches(tx, rollup.tools, "write Claude Code prompt tools")
+	if err := createInBatches(tx, rollup.tools, "write Claude Code prompt tools"); err != nil {
+		return err
+	}
+	if err := tx.Delete(&ai.AiCommit{}, dal.Where("workspace_key = ? AND prompt_id = ?", rollup.prompt.WorkspaceKey, rollup.prompt.PromptId)); err != nil {
+		return fmt.Errorf("clear Claude Code prompt commits: %w", err)
+	}
+	return createInBatches(tx, rollup.commits, "write Claude Code prompt commits")
 }
 
 func writeModeChanges(tx dal.Transaction, workspaceKey string, target *sessionTarget, events []*models.OtelEvent, modes sessionModes) error {

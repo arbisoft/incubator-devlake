@@ -29,7 +29,10 @@ import (
 	logsv1 "go.opentelemetry.io/proto/otlp/logs/v1"
 )
 
-const toolsSession = "sess-tools-1"
+const (
+	toolsSession = "sess-tools-1"
+	toolsCommit  = "0123456789abcdef0123456789abcdef01234567"
+)
 
 // toolsSessionRecords is one session of two prompts two hours apart, with tools, decisions and hooks.
 func toolsSessionRecords(who actor, t0 time.Time) []*logsv1.LogRecord {
@@ -39,8 +42,8 @@ func toolsSessionRecords(who actor, t0 time.Time) []*logsv1.LogRecord {
 			intAttr("input_tokens", input), intAttr("output_tokens", 5), intAttr("cache_read_tokens", cacheRead), intAttr("cache_creation_tokens", cacheCreation),
 			strAttr("cost_usd", cost))
 	}
-	result := func(at time.Time, sequence int64, tool, server, success string, duration int64) *logsv1.LogRecord {
-		extra := []*commonv1.KeyValue{strAttr("tool_name", tool), strAttr("success", success), intAttr("duration_ms", duration)}
+	result := func(at time.Time, sequence int64, tool, server, success string, duration int64, more ...*commonv1.KeyValue) *logsv1.LogRecord {
+		extra := append([]*commonv1.KeyValue{strAttr("tool_name", tool), strAttr("success", success), intAttr("duration_ms", duration)}, more...)
 		if server != "" {
 			extra = append(extra, strAttr("mcp_server.name", server))
 		}
@@ -64,7 +67,7 @@ func toolsSessionRecords(who actor, t0 time.Time) []*logsv1.LogRecord {
 		request("p-tools-1", t0.Add(5*s), 2, "subagent", 900, 900, 900, "9.0"),
 		request("p-tools-1", t0.Add(6*s), 3, "repl_main_thread", 10, 200, 3000, "0.25"),
 		request("p-tools-1", t0.Add(7*s), 4, "repl_main_thread", 1, 1, 1, "5.0"),
-		result(t0.Add(8*s), 5, "Bash", "", "true", 100),
+		result(t0.Add(8*s), 5, "Bash", "", "true", 100, strAttr("vcs.ref.head.revision", toolsCommit), strAttr("vcs.ref.head.name", "feat/x")),
 		result(t0.Add(9*s), 6, "Bash", "", "false", 50),
 		result(t0.Add(10*s), 7, "search", "github", "true", 700),
 		decision(t0.Add(11*s), 8, "Bash", "accept", "user_temporary"),
@@ -111,6 +114,15 @@ func TestPromptToolsHooksAndIdleRollup(t *testing.T) {
 		require.True(t, row.StartedAt.Equal(t0), "started_at = %s", row.StartedAt)
 	}
 
+	commits := snapshot[ai.AiCommit](w, "commit_sha", "workspace_key = ?", orgR)
+	require.Len(t, commits, 1)
+	require.Equal(t, toolsCommit, commits[0].CommitSha)
+	require.Equal(t, "feat/x", commits[0].BranchName)
+	require.Equal(t, "p-tools-1", commits[0].PromptId)
+	require.Equal(t, toolsSession, commits[0].SessionId)
+	require.Equal(t, a1.email(), commits[0].UserEmail)
+	require.True(t, commits[0].FirstSeenAt.Equal(t0.Add(8*time.Second)), "first_seen_at = %s", commits[0].FirstSeenAt)
+
 	prompts := make(map[string]ai.AiPrompt)
 	for _, prompt := range snapshot[ai.AiPrompt](w, "prompt_id", "workspace_key = ?", orgR) {
 		prompts[prompt.PromptId] = prompt
@@ -151,6 +163,8 @@ func TestPromptToolsAndHooksReplayIsIdentical(t *testing.T) {
 	before.Events = nil
 	require.Len(t, before.Tool, 3)
 	require.Len(t, before.Hook, 2)
+	commitsBefore := snapshot[ai.AiCommit](w, "commit_sha", "workspace_key = ?", orgR)
+	require.Len(t, commitsBefore, 1)
 
 	_, err := service.CreateOtelReplay(e2eUser, &service.OtelReplayInput{OtelReplayRange: w.replayDates(-2, -2)})
 	require.NoError(t, err)
@@ -159,5 +173,6 @@ func TestPromptToolsAndHooksReplayIsIdentical(t *testing.T) {
 	after := w.logFactsOf(0, orgR)
 	after.Events = nil
 	require.Equal(t, before, after)
+	require.Equal(t, commitsBefore, snapshot[ai.AiCommit](w, "commit_sha", "workspace_key = ?", orgR))
 	w.requireLogReplayCompleted(1)
 }

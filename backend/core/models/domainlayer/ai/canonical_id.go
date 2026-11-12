@@ -41,6 +41,7 @@ const (
 	IDKindPermissionModeChange IDKind = "permission_mode_change"
 	IDKindPromptTool           IDKind = "prompt_tool"
 	IDKindSessionHook          IDKind = "session_hook"
+	IDKindCommit               IDKind = "commit"
 )
 
 // CanonicalKey identifies one fact independently of the source that reported it, so a
