@@ -44,6 +44,18 @@
       "tooltip": "Back to the Claude Prompts dashboard",
       "type": "link",
       "url": "/d/claude_prompts_mysql"
+    },
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "title": "Claude Engineer Mode Drilldown",
+      "tooltip": "The same user's sessions coloured by permission mode, with their mode switches",
+      "type": "link",
+      "url": "/d/claude_engineer_modes_mysql"
     }
   ],
   "liveNow": false,

@@ -45,6 +45,8 @@ const (
 	eventSkillActivated        = "skill_activated"
 	eventPermissionModeChanged = "permission_mode_changed"
 	eventCompaction            = "compaction"
+	eventHookExecutionComplete = "hook_execution_complete"
+	eventHookRegistered        = "hook_registered"
 )
 
 // Typed event column widths in characters, from models.OtelEvent.

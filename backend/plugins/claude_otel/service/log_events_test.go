@@ -1017,6 +1017,7 @@ func TestPromptBuilderApplyEffort(t *testing.T) {
 	}{
 		{"main thread after background", []request{{"generate_session_title", "low"}, {mainThreadQuerySource, "high"}, {mainThreadQuerySource, "max"}}, "high"},
 		{"main thread before background", []request{{mainThreadQuerySource, "xhigh"}, {"generate_session_title", "low"}}, "xhigh"},
+		{"headless main thread after subagent", []request{{"agent:custom", "low"}, {sdkQuerySource, "high"}}, "high"},
 		{"background only", []request{{"generate_session_title", "low"}, {"away_summary", "medium"}}, "low"},
 		{"main thread without effort", []request{{mainThreadQuerySource, ""}, {"away_summary", "medium"}}, "medium"},
 		{"no query source", []request{{"", "medium"}}, "medium"},
