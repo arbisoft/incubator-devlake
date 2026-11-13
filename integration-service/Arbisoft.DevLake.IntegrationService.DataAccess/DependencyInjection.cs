@@ -86,7 +86,8 @@ public static class DependencyInjection
         services.AddScoped<ISophiaClient, SophiaClient>();
 
         // Each client has its own timeout and circuit breaker. Read calls retry transient failures; the Sophia callback does not, because the
-        // processing job retries it and records every attempt.
+        // processing job retries it and records every attempt. DevLake and Workstream each have one host. The Sophia clients call whatever host each
+        // client's outbound config names, so they keep a breaker per host: one client's failing endpoint never pauses another client's deliveries.
         AddUpstreamClient(services, ExternalHttpClients.DevLake, retries: true, (provider, client) =>
         {
             var options = provider.GetRequiredService<IOptions<DevLakeOptions>>().Value;
@@ -99,8 +100,8 @@ public static class DependencyInjection
             client.BaseAddress = EndWithSlash(options.BaseUrl);
         }, provider => provider.GetRequiredService<IOptions<WorkstreamOptions>>().Value.TimeoutSeconds);
 
-        AddUpstreamClient(services, ExternalHttpClients.SophiaToken, retries: true, (_, _) => { }, SophiaTimeoutSeconds);
-        AddUpstreamClient(services, ExternalHttpClients.SophiaCallback, retries: false, (_, _) => { }, SophiaTimeoutSeconds);
+        AddUpstreamClient(services, ExternalHttpClients.SophiaToken, retries: true, (_, _) => { }, SophiaTimeoutSeconds, breakerPerHost: true);
+        AddUpstreamClient(services, ExternalHttpClients.SophiaCallback, retries: false, (_, _) => { }, SophiaTimeoutSeconds, breakerPerHost: true);
     }
 
     private static int SophiaTimeoutSeconds(IServiceProvider provider) => provider.GetRequiredService<IOptions<SophiaOptions>>().Value.TimeoutSeconds;
@@ -108,9 +109,14 @@ public static class DependencyInjection
     private static Uri EndWithSlash(string baseUrl) => new(baseUrl.EndsWith('/') ? baseUrl : baseUrl + "/");
 
     private static void AddUpstreamClient(
-        IServiceCollection services, string name, bool retries, Action<IServiceProvider, HttpClient> configure, Func<IServiceProvider, int> attemptTimeoutSeconds)
+        IServiceCollection services,
+        string name,
+        bool retries,
+        Action<IServiceProvider, HttpClient> configure,
+        Func<IServiceProvider, int> attemptTimeoutSeconds,
+        bool breakerPerHost = false)
     {
-        services.AddHttpClient(name, (provider, client) =>
+        var pipeline = services.AddHttpClient(name, (provider, client) =>
             {
                 configure(provider, client);
                 client.Timeout = Timeout.InfiniteTimeSpan; // The pipeline's timeouts apply instead.
@@ -143,6 +149,12 @@ public static class DependencyInjection
                 });
                 builder.AddTimeout(attempt);
             });
+
+        if (breakerPerHost)
+        {
+            // One pipeline (so one breaker) per scheme, host and port the requests go to.
+            pipeline.SelectPipelineByAuthority();
+        }
     }
 
     /// <summary>The longest a call may take with all its retries: every attempt in full, plus the longest the backoff delays can add up to.</summary>

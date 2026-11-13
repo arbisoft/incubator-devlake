@@ -174,7 +174,7 @@ On shutdown the job stops taking new work. A delivery to Sophia that has already
 
 ## Calls to DevLake, Sophia and Workstream
 
-Three typed HTTP clients make the outbound calls. Each has its own timeout and circuit breaker, and none of them logs a URL, a token or a payload, only the correlation ID, the system and the status.
+Three typed HTTP clients make the outbound calls. Each has its own timeout and circuit breaker, and none of them logs a URL, a token or a payload, only the correlation ID, the system and the status. The Sophia clients keep a breaker per host (scheme, host and port), because each client's outbound config names its own: one client's failing callback opens only its own breaker and never pauses or fails another client's deliveries.
 
 | Client | Calls | Authentication |
 |---|---|---|

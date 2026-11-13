@@ -367,10 +367,17 @@ public sealed class ProcessingEndToEndTests : ApiTestBase
         var body = JsonSerializer.Serialize(new { correlation_id = correlationId, event_type = Single, emails = new[] { "ghost@arbisoft.com" }, time_frame = "24h", requested_on = DateTimeOffset.UtcNow });
 
         await RabbitMqHarness.PublishRawAsync(Factory.QueueName, correlationId, Single, body);
-        await WaitForAsync(async () => await Seed.QueueDepthAsync() == 0);
 
-        var dead = await RabbitMqHarness.DrainAsync(Factory.QueueName + ".dead");
+        // The queue depth counts only messages waiting to be taken, so it reads 0 while the job still holds this one: wait for the dead-letter queue.
+        var dead = new List<DrainedMessage>();
+        await WaitForAsync(async () =>
+        {
+            dead.AddRange(await RabbitMqHarness.DrainAsync(Factory.QueueName + ".dead"));
+            return dead.Count > 0;
+        });
+
         Assert.Equal(correlationId, Assert.Single(dead).CorrelationId);
+        Assert.Equal(0, await Seed.QueueDepthAsync());
         Assert.Empty(_upstream.DevLakeStatsRequests);
         Assert.Empty(_upstream.Callbacks);
     }
