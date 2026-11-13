@@ -5378,7 +5378,7 @@
         "spec": {
           "id": 49,
           "title": "Delivery over eight weeks",
-          "description": "Pull requests merged and tickets closed on the left axis, production deployments on the right where their smaller range would flatten against the others. Weekly over eight weeks; the current week is partial.",
+          "description": "Pull requests merged and tickets closed on the left axis; successful production deployments (dashed) and staging deployments (dotted) on the right, where their smaller range would flatten against the others. Staging means a non-production environment named like staging, dev, QA, UAT, test or demo. Weekly over eight weeks; the current week is partial.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -5397,7 +5397,7 @@
                         "name": "devlake-mysql"
                       },
                       "spec": {
-                        "rawSql": "WITH RECURSIVE\nweeks AS (\n  SELECT CAST(DATE_SUB(DATE(NOW()), INTERVAL WEEKDAY(NOW()) + 49 DAY) AS DATETIME) AS week_start\n  UNION ALL\n  SELECT week_start + INTERVAL 7 DAY FROM weeks WHERE week_start < DATE_SUB(DATE(NOW()), INTERVAL WEEKDAY(NOW()) DAY)\n),\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nscoped_boards AS (\n  SELECT DISTINCT pm.row_id AS board_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'boards' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nscoped_issues AS (\n  SELECT DISTINCT bi.issue_id\n  FROM board_issues bi\n  JOIN scoped_boards sb ON sb.board_id = bi.board_id\n),\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nclosed AS (\n  SELECT i.id, i.resolution_date\n  FROM issues i\n  WHERE i.id IN (SELECT issue_id FROM scoped_issues)\n    AND i.resolution_date >= NOW() - INTERVAL 70 DAY AND i.resolution_date < NOW()\n    AND COALESCE(i.type, '') <> 'EPIC'\n    AND COALESCE(i.original_status, '') NOT IN ('Cancelled', 'Invalid')\n)\n, merged AS (\n  SELECT DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY) AS week_start, COUNT(DISTINCT pr.id) AS n\n  FROM pull_requests pr\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND pr.merged_date >= (SELECT MIN(week_start) FROM weeks) AND pr.merged_date < NOW()\n  GROUP BY 1\n),\ntickets AS (\n  SELECT DATE_SUB(DATE(resolution_date), INTERVAL WEEKDAY(resolution_date) DAY) AS week_start, COUNT(DISTINCT id) AS n\n  FROM closed\n  GROUP BY 1\n),\ndeploys AS (\n  SELECT DATE_SUB(DATE(dc.finished_date), INTERVAL WEEKDAY(dc.finished_date) DAY) AS week_start, COUNT(DISTINCT dc.cicd_deployment_id) AS n\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n    AND dc.result = 'SUCCESS' AND LOWER(dc.environment) LIKE '%prod%'\n    AND dc.finished_date >= (SELECT MIN(week_start) FROM weeks) AND dc.finished_date < NOW()\n  GROUP BY 1\n)\nSELECT w.week_start AS time, COALESCE(m.n, 0) AS \"PRs merged\", COALESCE(t.n, 0) AS \"Tickets closed\", COALESCE(d.n, 0) AS Deployments\nFROM weeks w\nLEFT JOIN merged m ON m.week_start = w.week_start\nLEFT JOIN tickets t ON t.week_start = w.week_start\nLEFT JOIN deploys d ON d.week_start = w.week_start\nORDER BY w.week_start",
+                        "rawSql": "WITH RECURSIVE\nweeks AS (\n  SELECT CAST(DATE_SUB(DATE(NOW()), INTERVAL WEEKDAY(NOW()) + 49 DAY) AS DATETIME) AS week_start\n  UNION ALL\n  SELECT week_start + INTERVAL 7 DAY FROM weeks WHERE week_start < DATE_SUB(DATE(NOW()), INTERVAL WEEKDAY(NOW()) DAY)\n),\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nscoped_boards AS (\n  SELECT DISTINCT pm.row_id AS board_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'boards' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nscoped_issues AS (\n  SELECT DISTINCT bi.issue_id\n  FROM board_issues bi\n  JOIN scoped_boards sb ON sb.board_id = bi.board_id\n),\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nclosed AS (\n  SELECT i.id, i.resolution_date\n  FROM issues i\n  WHERE i.id IN (SELECT issue_id FROM scoped_issues)\n    AND i.resolution_date >= NOW() - INTERVAL 70 DAY AND i.resolution_date < NOW()\n    AND COALESCE(i.type, '') <> 'EPIC'\n    AND COALESCE(i.original_status, '') NOT IN ('Cancelled', 'Invalid')\n)\n, merged AS (\n  SELECT DATE_SUB(DATE(pr.merged_date), INTERVAL WEEKDAY(pr.merged_date) DAY) AS week_start, COUNT(DISTINCT pr.id) AS n\n  FROM pull_requests pr\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND pr.merged_date >= (SELECT MIN(week_start) FROM weeks) AND pr.merged_date < NOW()\n  GROUP BY 1\n),\ntickets AS (\n  SELECT DATE_SUB(DATE(resolution_date), INTERVAL WEEKDAY(resolution_date) DAY) AS week_start, COUNT(DISTINCT id) AS n\n  FROM closed\n  GROUP BY 1\n),\ndeploys AS (\n  SELECT DATE_SUB(DATE(dc.finished_date), INTERVAL WEEKDAY(dc.finished_date) DAY) AS week_start, COUNT(DISTINCT dc.cicd_deployment_id) AS n\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n    AND dc.result = 'SUCCESS' AND LOWER(dc.environment) LIKE '%prod%'\n    AND dc.finished_date >= (SELECT MIN(week_start) FROM weeks) AND dc.finished_date < NOW()\n  GROUP BY 1\n),\nstaging AS (\n  SELECT DATE_SUB(DATE(dc.finished_date), INTERVAL WEEKDAY(dc.finished_date) DAY) AS week_start, COUNT(DISTINCT dc.cicd_deployment_id) AS n\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n    AND dc.result = 'SUCCESS' AND LOWER(dc.environment) NOT LIKE '%prod%' AND LOWER(dc.environment) REGEXP 'stag|dev|qa|uat|test|demo'\n    AND dc.finished_date >= (SELECT MIN(week_start) FROM weeks) AND dc.finished_date < NOW()\n  GROUP BY 1\n)\nSELECT w.week_start AS time, COALESCE(m.n, 0) AS \"PRs merged\", COALESCE(t.n, 0) AS \"Tickets closed\", COALESCE(d.n, 0) AS \"Prod deploys\", COALESCE(s.n, 0) AS \"Staging deploys\"\nFROM weeks w\nLEFT JOIN merged m ON m.week_start = w.week_start\nLEFT JOIN tickets t ON t.week_start = w.week_start\nLEFT JOIN deploys d ON d.week_start = w.week_start\nLEFT JOIN staging s ON s.week_start = w.week_start\nORDER BY w.week_start",
                         "format": "table",
                         "rawQuery": true,
                         "editorMode": "code"
@@ -5480,7 +5480,7 @@
                   {
                     "matcher": {
                       "id": "byName",
-                      "options": "Deployments"
+                      "options": "Prod deploys"
                     },
                     "properties": [
                       {
@@ -5493,6 +5493,28 @@
                           "fill": "dash",
                           "dash": [
                             10,
+                            10
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Staging deploys"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.axisPlacement",
+                        "value": "right"
+                      },
+                      {
+                        "id": "custom.lineStyle",
+                        "value": {
+                          "fill": "dot",
+                          "dash": [
+                            0,
                             10
                           ]
                         }
@@ -5882,7 +5904,7 @@
         "spec": {
           "id": 53,
           "title": "Deploys (stg/dev)",
-          "description": "Successful staging and development deployments in the last 7 days, vs the 7 before.",
+          "description": "Successful deployments to non-production environments (staging, dev, QA, UAT, test or demo) in the last 7 days, vs the 7 before.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -5901,7 +5923,7 @@
                         "name": "devlake-mysql"
                       },
                       "spec": {
-                        "rawSql": "WITH\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\n, deploys AS (\n  SELECT dc.cicd_deployment_id, dc.finished_date\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n    AND dc.result = 'SUCCESS' AND LOWER(dc.environment) REGEXP 'stag|stage|dev' AND LOWER(dc.environment) NOT LIKE '%prod%'\n    AND dc.finished_date >= NOW() - INTERVAL 14 DAY AND dc.finished_date < NOW()\n)\nSELECT NOW() - INTERVAL 7 DAY AS time, COUNT(DISTINCT cicd_deployment_id) AS value FROM deploys WHERE finished_date < NOW() - INTERVAL 7 DAY\nUNION ALL\nSELECT NOW() AS time, COUNT(DISTINCT cicd_deployment_id) AS value FROM deploys WHERE finished_date >= NOW() - INTERVAL 7 DAY",
+                        "rawSql": "WITH\nscoped_cicd AS (\n  SELECT DISTINCT pm.row_id AS scope_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'cicd_scopes' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n)\n, deploys AS (\n  SELECT dc.cicd_deployment_id, dc.finished_date\n  FROM cicd_deployment_commits dc\n  WHERE dc.cicd_scope_id IN (SELECT scope_id FROM scoped_cicd)\n    AND dc.result = 'SUCCESS' AND LOWER(dc.environment) NOT LIKE '%prod%' AND LOWER(dc.environment) REGEXP 'stag|dev|qa|uat|test|demo'\n    AND dc.finished_date >= NOW() - INTERVAL 14 DAY AND dc.finished_date < NOW()\n)\nSELECT NOW() - INTERVAL 7 DAY AS time, COUNT(DISTINCT cicd_deployment_id) AS value FROM deploys WHERE finished_date < NOW() - INTERVAL 7 DAY\nUNION ALL\nSELECT NOW() AS time, COUNT(DISTINCT cicd_deployment_id) AS value FROM deploys WHERE finished_date >= NOW() - INTERVAL 7 DAY",
                         "format": "table",
                         "rawQuery": true,
                         "editorMode": "code"
