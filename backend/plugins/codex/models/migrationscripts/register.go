@@ -24,5 +24,6 @@ func All() []plugin.MigrationScript {
 		new(addCodexInitialTables),
 		new(addCodexUsageTable),
 		new(migrateToAnalyticsAPI),
+		new(addScopeConfigEntities),
 	}
 }

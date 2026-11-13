@@ -24,5 +24,6 @@ func All() []plugin.MigrationScript {
 		new(addHubspotInitialTables),
 		new(addHubspotWebhookFields),
 		new(addHubspotOwners),
+		new(addScopeConfigEntities),
 	}
 }
