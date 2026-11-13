@@ -67,7 +67,7 @@ public class RequestWorkerTests
     private static EmployeeStatsDto Stats(string email)
     {
         var data = new Dictionary<string, JsonElement> { [email] = JsonDocument.Parse("{\"n\":1}").RootElement.Clone() };
-        return new EmployeeStatsDto(email, ["alt@gmail.com"], data, data, data, data);
+        return new EmployeeStatsDto(email, ["alt@gmail.com"], data, data, data, data, []);
     }
 
     private static QueueDelivery Delivery(string? rejection = null, string correlationId = "c1") =>
@@ -129,6 +129,9 @@ public class RequestWorkerTests
         {
             Assert.Equal(1, engineer.GetProperty(source).GetProperty("jane@arbisoft.com").GetProperty("n").GetInt32());
         }
+
+        Assert.Equal(JsonValueKind.Array, engineer.GetProperty("errors").ValueKind);
+        Assert.Equal(0, engineer.GetProperty("errors").GetArrayLength());
     }
 
     [Fact]

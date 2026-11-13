@@ -164,7 +164,8 @@ public sealed class RequestWorker : IRequestWorker
 
     /// <summary>
     /// Checks the client's credentials first, so a client whose credentials are refused costs DevLake nothing; then collects. DevLake down or refusing
-    /// our token stops the run; DevLake refusing the request itself fails only this request.
+    /// our token stops the run. DevLake refusing one email and source is recorded in the payload by the collector; any other refusal that still
+    /// reaches here fails only this request.
     /// </summary>
     private async Task<Collected> CollectAsync(RequestLog request, ReadableRequest readable, ProcessingRun run, CancellationToken stopping)
     {

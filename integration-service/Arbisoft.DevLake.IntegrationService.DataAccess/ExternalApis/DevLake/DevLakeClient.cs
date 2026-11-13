@@ -71,8 +71,8 @@ public sealed class DevLakeClient : IDevLakeClient
             cancellationToken);
     }
 
-    /// <summary>The path segment of each stats endpoint, as DevLake names it.</summary>
-    internal static string PathOf(DevLakeStatsSource source) => source switch
+    /// <summary>The path segment of each stats endpoint, as DevLake names it. The callback body uses the same names.</summary>
+    public static string PathOf(DevLakeStatsSource source) => source switch
     {
         DevLakeStatsSource.Jira => "jira",
         DevLakeStatsSource.Github => "github",

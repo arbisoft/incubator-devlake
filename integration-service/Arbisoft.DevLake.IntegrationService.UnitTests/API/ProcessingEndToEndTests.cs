@@ -291,7 +291,7 @@ public sealed class ProcessingEndToEndTests : ApiTestBase
     }
 
     [BrokersFact]
-    public async Task WhenDevLakeRefusesTheRequest_ItFailsOnItsOwn_WithTheReasonRecorded_AndNothingIsDelivered()
+    public async Task WhenDevLakeRefusesAMappedEmail_TheOtherStatsAreStillDelivered_WithTheRefusalListedPerSource()
     {
         var (_, token) = await IsolatedClientAsync(Single);
         var jane = $"jane-{Guid.NewGuid():N}@arbisoft.com";
@@ -300,30 +300,43 @@ public sealed class ProcessingEndToEndTests : ApiTestBase
         _upstream.DevLakeStats = email => email == alias ? HttpStatusCode.NotFound : HttpStatusCode.OK;
 
         var request = await GetStatsAsync(token, jane);
-        await WaitForStatusAsync(token, request.Correlation, "Failure");
+        await WaitForStatusAsync(token, request.Correlation, "Success");
 
-        Assert.Empty(_upstream.Callbacks);
-        var attempt = Assert.Single(await Seed.AttemptsAsync((await Seed.LogAsync(request.Correlation))!.Id));
-        Assert.Equal("FetchFailed", attempt.AttemptStatus);
-        Assert.Contains("DevLake", attempt.FailureError, StringComparison.Ordinal);
-        Assert.Equal(0, await Seed.QueueDepthAsync());
+        var engineer = Assert.Single(JsonDocument.Parse(Assert.Single(_upstream.Callbacks).Content!).RootElement.GetProperty("engineers").EnumerateArray());
+        foreach (var source in new[] { "jira", "github", "ai_usage", "ai_cost" })
+        {
+            Assert.True(engineer.GetProperty(source).TryGetProperty(jane, out _));
+            Assert.False(engineer.GetProperty(source).TryGetProperty(alias, out _));
+        }
+
+        var errors = engineer.GetProperty("errors").EnumerateArray().ToList();
+        Assert.Equal(4, errors.Count);
+        Assert.All(errors, error =>
+        {
+            Assert.Equal(alias, error.GetProperty("email").GetString());
+            Assert.Equal(404, error.GetProperty("status").GetInt32());
+        });
     }
 
     [BrokersFact]
-    public async Task OneFailingRequest_DoesNotStopTheOthers()
+    public async Task OneEngineerDevLakeRefuses_DoesNotAffectTheOtherRequests()
     {
         var (_, token) = await IsolatedClientAsync(Single);
         _upstream.DevLakeStats = email => email.StartsWith("bad", StringComparison.Ordinal) ? HttpStatusCode.NotFound : HttpStatusCode.OK;
 
         var bad = await GetStatsAsync(token, "bad@arbisoft.com");
         var good = await Task.WhenAll(Enumerable.Range(1, 4).Select(i => GetStatsAsync(token, $"good{i}@arbisoft.com")));
-        await WaitForStatusAsync(token, bad.Correlation, "Failure");
-        foreach (var request in good)
+        foreach (var request in good.Append(bad))
         {
             await WaitForStatusAsync(token, request.Correlation, "Success");
         }
 
-        Assert.Equal(4, _upstream.Callbacks.Count());
+        Assert.Equal(5, _upstream.Callbacks.Count());
+        var errorsPerRequest = _upstream.Callbacks.ToDictionary(
+            callback => callback.CorrelationId!,
+            callback => JsonDocument.Parse(callback.Content!).RootElement.GetProperty("engineers")[0].GetProperty("errors").GetArrayLength());
+        Assert.Equal(4, errorsPerRequest[bad.Correlation]);
+        Assert.All(good, request => Assert.Equal(0, errorsPerRequest[request.Correlation]));
         Assert.Equal(0, await Seed.QueueDepthAsync());
     }
 

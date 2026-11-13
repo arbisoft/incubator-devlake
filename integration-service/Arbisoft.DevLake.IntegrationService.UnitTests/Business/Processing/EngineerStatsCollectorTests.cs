@@ -18,6 +18,7 @@ using Arbisoft.DevLake.IntegrationService.Business.Dtos.Stats;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Processing;
 using Arbisoft.DevLake.IntegrationService.DataAccess.ExternalApis;
 using Arbisoft.DevLake.IntegrationService.DataAccess.ExternalApis.DevLake;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
 namespace Arbisoft.DevLake.IntegrationService.UnitTests.Business.Processing;
@@ -33,7 +34,7 @@ public class EngineerStatsCollectorTests
     {
         _devLake.GetStatsAsync(Arg.Any<DevLakeStatsSource>(), Arg.Any<string>(), Arg.Any<StatsQuery>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(call => Task.FromResult(Stats($"{call.ArgAt<string>(1)}|{call.ArgAt<DevLakeStatsSource>(0)}")));
-        _collector = new EngineerStatsCollector(_devLake);
+        _collector = new EngineerStatsCollector(_devLake, NullLogger<EngineerStatsCollector>.Instance);
     }
 
     private static JsonElement Stats(string label) => JsonDocument.Parse($"{{\"label\":\"{label}\"}}").RootElement.Clone();
@@ -122,12 +123,53 @@ public class EngineerStatsCollectorTests
     }
 
     [Fact]
-    public async Task WhenAnyCallFails_TheWholeCollectionFails_SoNoResultIsDeliveredWithAGap()
+    public async Task EverythingCollected_HasNoErrors()
     {
-        _devLake.GetStatsAsync(DevLakeStatsSource.Github, Arg.Any<string>(), Arg.Any<StatsQuery>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromException<JsonElement>(new ExternalApiRejectedException("DevLake", "nope", 404)));
+        Assert.Empty((await CollectAsync()).Errors);
+    }
 
-        await Assert.ThrowsAsync<ExternalApiRejectedException>(() => CollectAsync());
+    [Fact]
+    public async Task ACallDevLakeRejects_IsListedAsAnError_AndEverythingElseIsKept()
+    {
+        _devLake.GetStatsAsync(DevLakeStatsSource.Github, "jane@arbisoft.com", Arg.Any<StatsQuery>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<JsonElement>(new ExternalApiRejectedException("DevLake", "DevLake rejected the request (404).", 404)));
+
+        var result = await CollectAsync();
+
+        Assert.Equal(new StatsErrorDto("github", "jane@arbisoft.com", 404, "DevLake rejected the request (404)."), Assert.Single(result.Errors));
+        Assert.Empty(result.Github);
+        Assert.Single(result.Jira);
+        Assert.Single(result.AiUsage);
+        Assert.Single(result.AiCost);
+    }
+
+    /// <summary>The review's case: one bad mapped email used to throw away the engineer's (and the whole batch's) other results.</summary>
+    [Fact]
+    public async Task AMappedEmailDevLakeRefusesEverywhere_CostsOnlyThatEmailsStats()
+    {
+        GivenMapped("bad..email@gmail.com");
+        _devLake.GetStatsAsync(Arg.Any<DevLakeStatsSource>(), "bad..email@gmail.com", Arg.Any<StatsQuery>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<JsonElement>(new ExternalApiRejectedException("DevLake", "DevLake rejected the request (400).", 400)));
+
+        var result = await CollectAsync();
+
+        Assert.Equal(["ai_cost", "ai_usage", "github", "jira"], result.Errors.Select(e => e.Source).Order(StringComparer.Ordinal));
+        Assert.All(result.Errors, error => Assert.Equal(("bad..email@gmail.com", 400), (error.Email, error.Status)));
+        foreach (var source in new[] { result.Jira, result.Github, result.AiUsage, result.AiCost })
+        {
+            Assert.Equal(["jane@arbisoft.com"], source.Keys);
+        }
+    }
+
+    [Fact]
+    public async Task AnAnswerThatIsNotJson_IsListedAsAnErrorWithoutAStatus()
+    {
+        _devLake.GetStatsAsync(DevLakeStatsSource.AiCost, Arg.Any<string>(), Arg.Any<StatsQuery>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<JsonElement>(new ExternalApiResponseException("DevLake", "DevLake answered with something that is not JSON.")));
+
+        var error = Assert.Single((await CollectAsync()).Errors);
+
+        Assert.Equal(("ai_cost", (int?)null), (error.Source, error.Status));
     }
 
     [Fact]
@@ -144,7 +186,7 @@ public class EngineerStatsCollectorTests
     }
 
     [Fact]
-    public async Task UnavailableOutranksRejected()
+    public async Task ASystemicFailure_StillFailsTheWholeCollection_EvenAlongsideCallsThatWereOnlyRejected()
     {
         _devLake.GetStatsAsync(DevLakeStatsSource.Jira, Arg.Any<string>(), Arg.Any<StatsQuery>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<JsonElement>(new ExternalApiRejectedException("DevLake", "bad", 400)));
@@ -159,7 +201,7 @@ public class EngineerStatsCollectorTests
     {
         var finished = 0;
         _devLake.GetStatsAsync(DevLakeStatsSource.Jira, Arg.Any<string>(), Arg.Any<StatsQuery>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromException<JsonElement>(new ExternalApiRejectedException("DevLake", "bad", 400)));
+            .Returns(Task.FromException<JsonElement>(new ExternalApiUnavailableException("DevLake", "down", 503)));
         _devLake.GetStatsAsync(DevLakeStatsSource.Github, Arg.Any<string>(), Arg.Any<StatsQuery>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(async _ =>
             {
@@ -168,7 +210,7 @@ public class EngineerStatsCollectorTests
                 return Stats("slow");
             });
 
-        await Assert.ThrowsAsync<ExternalApiRejectedException>(() => CollectAsync());
+        await Assert.ThrowsAsync<ExternalApiUnavailableException>(() => CollectAsync());
 
         Assert.Equal(1, Volatile.Read(ref finished));
     }

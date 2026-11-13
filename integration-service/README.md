@@ -134,7 +134,7 @@ Each item is one step of work on one request:
 - It makes one delivery attempt and records it in `RequestResponseAttempts`. Delivered ends the request `Success`. Only answers that may pass are retried: an unreachable callback, 408, 429 or any 5xx defers the request as `Processing` by `Processing:DeliveryRetryDelaySeconds` (30), doubling after each failure, or by the callback's `Retry-After` when that is longer, never more than `Processing:MaxDeliveryRetryDelaySeconds` (900), until the client's `maxAttempts` is used and it ends `Failed`. Any other 4xx (400, 404, 422, ...) means the callback refuses this result, so the request ends `Failed` at once with the status recorded. With the defaults, ten attempts fit in the two hours a request may live. Credentials refused by the callback make the client failing and defer the request without counting an attempt.
 - The stored body is deleted once the request finishes.
 
-One failing request never stops the others. DevLake down, or refusing our token, during a run stops the run taking new work; the request that hit it waits `Processing:UnavailableRetryDelaySeconds`, and the next run tries again. A request DevLake refuses (a 4xx) fails on its own with the reason recorded.
+One failing request never stops the others. DevLake down, or refusing our token, during a run stops the run taking new work; the request that hit it waits `Processing:UnavailableRetryDelaySeconds`, and the next run tries again. A call DevLake refuses for one email and source (a 4xx) is listed in that engineer's `errors` and the rest is delivered.
 
 The callback body (Sophia has not specified one):
 
@@ -149,13 +149,18 @@ The callback body (Sophia has not specified one):
       "jira":     { "jane@arbisoft.com": { ... } },
       "github":   { "jane@arbisoft.com": { ... }, "jane.d@gmail.com": { ... } },
       "ai_usage": { "jane@arbisoft.com": { ... } },
-      "ai_cost":  { "jane@arbisoft.com": { ... } }
+      "ai_cost":  { "jane@arbisoft.com": { ... } },
+      "errors": [
+        { "source": "jira", "email": "jane.d@gmail.com", "status": 400, "error": "DevLake rejected the request (400)." }
+      ]
     }
   ]
 }
 ```
 
 A range request has `from` and `to` instead of `time_frame`. Each source holds the stats of every email as DevLake returned them. A batch has one entry per engineer.
+
+`errors` lists every call DevLake refused for that engineer (a 4xx, or an answer that is not JSON, which has no `status`): that email is missing from that source, and everything else is still delivered, so one bad mapped email no longer costs the engineer's other stats or the rest of a batch. It is an empty array when everything was collected. The `error` text names the status only, never DevLake's answer.
 
 On shutdown the job stops taking new work. A delivery to Sophia that has already started is finished and recorded, so a delivered result is never left unrecorded. A request stopped in the middle of collecting is handed back due at once, so the next start picks it up without waiting for its lease to run out.
 

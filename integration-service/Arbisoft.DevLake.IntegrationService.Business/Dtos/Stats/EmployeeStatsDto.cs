@@ -20,7 +20,8 @@ namespace Arbisoft.DevLake.IntegrationService.Business.Dtos.Stats;
 
 /// <summary>
 /// One engineer's stats, merged from DevLake. Each source holds the stats of the engineer's Arbisoft email and of every other email they commit
-/// with, keyed by email and exactly as DevLake returned them.
+/// with, keyed by email and exactly as DevLake returned them. A call DevLake refused is left out of its source and listed in <see cref="Errors"/>,
+/// which is empty when everything was collected.
 /// </summary>
 public sealed record EmployeeStatsDto(
     [property: JsonPropertyName("email")] string Email,
@@ -28,4 +29,5 @@ public sealed record EmployeeStatsDto(
     [property: JsonPropertyName("jira")] IReadOnlyDictionary<string, JsonElement> Jira,
     [property: JsonPropertyName("github")] IReadOnlyDictionary<string, JsonElement> Github,
     [property: JsonPropertyName("ai_usage")] IReadOnlyDictionary<string, JsonElement> AiUsage,
-    [property: JsonPropertyName("ai_cost")] IReadOnlyDictionary<string, JsonElement> AiCost);
+    [property: JsonPropertyName("ai_cost")] IReadOnlyDictionary<string, JsonElement> AiCost,
+    [property: JsonPropertyName("errors")] IReadOnlyList<StatsErrorDto> Errors);
