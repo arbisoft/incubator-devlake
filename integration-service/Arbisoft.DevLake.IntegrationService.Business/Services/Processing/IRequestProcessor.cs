@@ -22,15 +22,16 @@ namespace Arbisoft.DevLake.IntegrationService.Business.Services.Processing;
 /// <param name="DeadLettered">Messages that can never be processed and were parked.</param>
 /// <param name="Expired">Stale requests marked failed at the start of the run.</param>
 /// <param name="HaltReason">Why the run stopped early, or null when it did not.</param>
-public sealed record ProcessingRunSummary(int Received, int Completed, int Requeued, int DeadLettered, int Expired, string? HaltReason)
+/// <param name="Republished">Requests recorded by the API but never queued, published again in this run.</param>
+public sealed record ProcessingRunSummary(int Received, int Completed, int Requeued, int DeadLettered, int Expired, string? HaltReason, int Republished = 0)
 {
-    public bool DidWork => Received > 0 || Expired > 0 || HaltReason is not null;
+    public bool DidWork => Received > 0 || Expired > 0 || Republished > 0 || HaltReason is not null;
 }
 
 public interface IRequestProcessor
 {
     /// <summary>
-    /// One run: marks stale requests failed, checks the queue, makes sure DevLake and Sophia can be used, then takes a batch off the queue,
+    /// One run: marks stale requests failed, republishes requests that were recorded but never queued, checks the queue, makes sure DevLake and Sophia can be used, then takes a batch off the queue,
     /// processes it with bounded parallelism, and acknowledges, requeues or dead-letters each message. One request's failure never stops the others.
     /// </summary>
     Task<ProcessingRunSummary> ProcessPendingAsync(CancellationToken cancellationToken);

@@ -23,27 +23,46 @@ namespace Arbisoft.DevLake.IntegrationService.DataAccess.Messaging;
 
 /// <summary>
 /// Publishes with broker confirms (INT-Q2) on one channel, one publish at a time because channels are not thread-safe. At the
-/// request rates this service accepts, that is far below what a single channel can do.
+/// request rates this service accepts, that is far below what a single channel can do. Every publish, including its wait for the channel, is
+/// bounded by <see cref="RabbitMqOptions.PublishTimeoutSeconds"/> (INT-8).
 /// </summary>
 public sealed class RequestQueuePublisher : IRequestQueuePublisher, IAsyncDisposable
 {
     private readonly IRabbitMqConnection _connection;
     private readonly RabbitMqOptions _options;
+    private readonly TimeProvider _timeProvider;
     private readonly SemaphoreSlim _publishLock = new(1, 1);
     private IChannel? _channel;
 
-    public RequestQueuePublisher(IRabbitMqConnection connection, IOptions<RabbitMqOptions> options)
+    public RequestQueuePublisher(IRabbitMqConnection connection, IOptions<RabbitMqOptions> options, TimeProvider? timeProvider = null)
     {
         _connection = connection;
         _options = options.Value;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public async Task PublishAsync(QueueMessage message, CancellationToken cancellationToken)
     {
-        await _publishLock.WaitAsync(cancellationToken);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(_options.PublishTimeoutSeconds), _timeProvider);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
         try
         {
-            await PublishWithOneRetryAsync(message, cancellationToken);
+            await _publishLock.WaitAsync(linked.Token);
+        }
+        catch (OperationCanceledException exception) when (timeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            throw new QueueUnavailableException("The message broker did not accept the request in time.", exception);
+        }
+
+        try
+        {
+            await PublishWithOneRetryAsync(message, linked.Token);
+        }
+        catch (OperationCanceledException exception) when (timeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            // The channel may still be waiting for the confirm; it is not safe to reuse.
+            await DropChannelAsync();
+            throw new QueueUnavailableException("The message broker did not confirm the request in time.", exception);
         }
         finally
         {

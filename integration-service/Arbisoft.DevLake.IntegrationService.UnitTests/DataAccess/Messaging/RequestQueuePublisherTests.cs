@@ -16,6 +16,7 @@
 using Arbisoft.DevLake.IntegrationService.DataAccess.Messaging;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Options;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
@@ -136,5 +137,57 @@ public sealed class RequestQueuePublisherTests : IAsyncDisposable
         await cancellation.CancelAsync();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => _publisher.PublishAsync(Message, cancellation.Token));
+    }
+
+    /// <summary>A channel whose publish never completes, as with a broker that blocks publishers under a memory alarm, until it is cancelled.</summary>
+    private static IChannel StuckChannel()
+    {
+        var channel = OpenChannel();
+        channel.BasicPublishAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<BasicProperties>(), Arg.Any<ReadOnlyMemory<byte>>(), Arg.Any<CancellationToken>())
+            .Returns(call => new ValueTask(Task.Delay(Timeout.Infinite, call.ArgAt<CancellationToken>(5))));
+        return channel;
+    }
+
+    [Fact]
+    public async Task Publish_ThatTheBrokerNeverConfirms_GivesUpAfterThePublishTimeout_AsQueueUnavailable_AndDropsTheChannel()
+    {
+        var time = new FakeTimeProvider();
+        var stuck = StuckChannel();
+        var fresh = OpenChannel();
+        _connection.CreateChannelAsync(true, Arg.Any<CancellationToken>()).Returns(stuck, fresh);
+        await using var publisher = new RequestQueuePublisher(_connection, Options.Create(new RabbitMqOptions { RequestQueueName = "q", PublishTimeoutSeconds = 10 }), time);
+
+        var publish = publisher.PublishAsync(Message, CancellationToken.None);
+        time.Advance(TimeSpan.FromSeconds(9));
+        Assert.False(publish.IsCompleted);
+        time.Advance(TimeSpan.FromSeconds(1));
+
+        var exception = await Assert.ThrowsAsync<QueueUnavailableException>(() => publish);
+        Assert.Contains("in time", exception.Message, StringComparison.Ordinal);
+        await stuck.Received(1).DisposeAsync();
+        await publisher.PublishAsync(Message, CancellationToken.None);
+        await fresh.Received(1).BasicPublishAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<BasicProperties>(), Arg.Any<ReadOnlyMemory<byte>>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Publish_WaitingBehindAStuckPublish_AlsoGivesUpInTime()
+    {
+        var time = new FakeTimeProvider();
+        var stuck = StuckChannel();
+        _connection.CreateChannelAsync(true, Arg.Any<CancellationToken>()).Returns(stuck);
+        await using var publisher = new RequestQueuePublisher(_connection, Options.Create(new RabbitMqOptions { RequestQueueName = "q", PublishTimeoutSeconds = 10 }), time);
+
+        var first = publisher.PublishAsync(Message, CancellationToken.None);
+        var second = publisher.PublishAsync(Message, CancellationToken.None);
+        time.Advance(TimeSpan.FromSeconds(10));
+
+        await Assert.ThrowsAsync<QueueUnavailableException>(() => first);
+        await Assert.ThrowsAsync<QueueUnavailableException>(() => second);
+    }
+
+    [Fact]
+    public void ThePublishTimeout_DefaultsToTenSeconds()
+    {
+        Assert.Equal(10, new RabbitMqOptions().PublishTimeoutSeconds);
     }
 }

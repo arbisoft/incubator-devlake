@@ -89,9 +89,12 @@ The client, scope, key and token lists show at most 200 rows.
 
 Stats requests wait in a durable RabbitMQ quorum queue (`RabbitMq:RequestQueueName`). Messages are persistent, carry the correlation ID and a `schema-version` header, and are confirmed by the broker before the API answers.
 
+The API records a request before it publishes it (an outbox): it commits the `RequestLogs` row and its body as `Received`, returns its database connection to the pool, publishes, and only then marks the row `Queued`. So a message always has a row, and a caller disconnecting after the commit cannot undo it. If the process stops between the commit and the publish, the processing job publishes the `Received` row again (see below).
+
 | Setting | Default | Effect |
 |---|---|---|
 | `QueueMaxLength` | 10000 | When the queue is full the broker rejects the publish and the API answers 429 |
+| `PublishTimeoutSeconds` | 10 | The longest one publish may take, including waiting for the publish channel and the broker's confirm. A slower publish counts as the broker being unavailable (503), so a broker that blocks publishers cannot hold API requests open |
 | `MessageTtlSeconds` | 7200 | A request that waits longer expires into the dead-letter queue |
 | `DeliveryLimit` | 5 | A message redelivered more often than this is moved to the dead-letter queue by the consumer |
 | `ReceiveBatchLimit` | 10 | The most messages one processing run takes from the queue |
@@ -107,7 +110,7 @@ Failed, expired and unreadable messages go to `<queue>.dead` through the `<queue
 - **Emails** are trimmed and lower-cased, and must be in an allowed domain. Raw emails are never written to logs or error responses.
 - **No callback URL:** when the client has no active outbound URL for the event type (`engineer-stats` or `engineer-stats-batch`), the request is logged as `Revoked - no callback URL`, nothing is queued, and the API answers 422 with that reason in `error`.
 - **Duplicates:** an identical request (same client, emails and time frame) inside the duplicate window returns the original acknowledgement. A unique key in the database is what prevents the duplicate, so concurrent identical requests also produce one. Revoked and failed requests never block a repeat.
-- **Queue problems:** 429 with `Retry-After` when the queue is full, 503 with `Retry-After` when the broker is unreachable. Nothing is recorded in either case.
+- **Queue problems:** 429 with `Retry-After` when the queue is full, 503 with `Retry-After` when the broker is unreachable or does not confirm within `RabbitMq:PublishTimeoutSeconds`. The request is recorded as `Failed` with a `PublishFailed` attempt giving the reason, and it gives up its idempotency key, so the client's retry is queued as a new request. If a publish that timed out did reach the queue, the job finds the request `Failed` and drops the message.
 
 ## Processing requests
 
@@ -116,12 +119,14 @@ A background job in the API takes queued stats requests off RabbitMQ, collects t
 Every `Processing:IntervalSeconds` (30) a run does this, in order:
 
 1. Marks requests that were never finished, because their message expired from the queue or was dead-lettered, as `Failed`, so polling does not say `Queued` forever.
-2. Checks the queue depth, and does nothing more if it is empty.
-3. Checks that DevLake accepts our API token and that a Sophia access token can be obtained for every client that has requests waiting. If not, the run stops **before taking any message**, so requests stay queued and no message's redelivery count goes up. A client with nothing waiting is not checked.
-4. Takes up to `RabbitMq:ReceiveBatchLimit` (10) messages and processes up to `Processing:MaxParallelRequests` (4) at a time.
+2. Publishes again the requests still `Received` more than `Processing:RepublishAfterSeconds` (60) after they were recorded: the API committed them but never published them. It stops at the first refusal from the broker and tries again next run.
+3. Checks the queue depth, and does nothing more if it is empty.
+4. Checks that DevLake accepts our API token and that a Sophia access token can be obtained for every client that has requests waiting. If not, the run stops **before taking any message**, so requests stay queued and no message's redelivery count goes up. A client with nothing waiting is not checked.
+5. Takes up to `RabbitMq:ReceiveBatchLimit` (10) messages and processes up to `Processing:MaxParallelRequests` (4) at a time.
 
 For each request the job:
 
+- moves the message to the dead-letter queue if it has no `RequestLogs` row, because the API always records the row before it publishes;
 - skips and acknowledges it if it is already finished (a repeat delivery does no second delivery to the client);
 - marks it `Revoked - no callback URL` if the callback was removed while it waited;
 - sets it to `Processing`, loads the engineer's mapped emails, and fetches Jira, GitHub, AI usage and AI cost for the Arbisoft email and every mapped email at once;
@@ -162,6 +167,7 @@ A request that waits longer than the queue's message lifetime plus `Processing:S
 | `Processing:MaxParallelRequests` | 4 | Requests processed at the same time in one run |
 | `Processing:DeliveryRetryDelaySeconds` | 30 | Wait before the second delivery attempt; doubles each time |
 | `Processing:StaleGraceSeconds` | 60 | Extra time past the queue lifetime before an unfinished request is failed |
+| `Processing:RepublishAfterSeconds` | 60 | How old a request still `Received` must be before the job publishes it again. It must be more than twice `RabbitMq:PublishTimeoutSeconds`, or the host refuses to start, so an intake that is still publishing is never overtaken |
 
 ## Calls to DevLake, Sophia and Workstream
 

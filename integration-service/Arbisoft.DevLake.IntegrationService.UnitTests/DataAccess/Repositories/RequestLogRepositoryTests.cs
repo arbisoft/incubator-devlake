@@ -88,6 +88,37 @@ public class RequestLogRepositoryTests : RepositoryTestBase
     }
 
     [MySqlFact]
+    public async Task TryChangeStatus_ChangesOnlyFromTheExpectedStatus()
+    {
+        var client = await InsertClientAsync();
+        var id = await InsertRequestLogAsync(client.Id, RequestStatus.Received);
+
+        Assert.True(await Repository.TryChangeStatusAsync(id, RequestStatus.Received, RequestStatus.Queued, CancellationToken.None));
+        Assert.False(await Repository.TryChangeStatusAsync(id, RequestStatus.Received, RequestStatus.Failed, CancellationToken.None));
+
+        Assert.Equal(RequestStatus.Queued, (await Repository.GetByIdAsync(id, CancellationToken.None))!.Status);
+    }
+
+    [MySqlFact]
+    public async Task ListByStatusCreatedBetween_IncludesTheStartExcludesTheEnd_OldestFirst()
+    {
+        var client = await InsertClientAsync();
+        var from = Instant.AddDays(5000);
+        var before = from.AddMinutes(10);
+        var atStart = await InsertRequestLogAsync(client.Id, RequestStatus.Received, from);
+        var inside = await InsertRequestLogAsync(client.Id, RequestStatus.Received, from.AddMinutes(5));
+        await InsertRequestLogAsync(client.Id, RequestStatus.Received, before);
+        await InsertRequestLogAsync(client.Id, RequestStatus.Received, from.AddMinutes(-1));
+        await InsertRequestLogAsync(client.Id, RequestStatus.Queued, from.AddMinutes(6));
+
+        var found = await Repository.ListByStatusCreatedBetweenAsync(RequestStatus.Received, from, before, 10, CancellationToken.None);
+        var limited = await Repository.ListByStatusCreatedBetweenAsync(RequestStatus.Received, from, before, 1, CancellationToken.None);
+
+        Assert.Equal([atStart, inside], found.Select(l => l.Id));
+        Assert.Equal([atStart], limited.Select(l => l.Id));
+    }
+
+    [MySqlFact]
     public async Task List_AppliesEachFilterIndependently()
     {
         var client = await InsertClientAsync();

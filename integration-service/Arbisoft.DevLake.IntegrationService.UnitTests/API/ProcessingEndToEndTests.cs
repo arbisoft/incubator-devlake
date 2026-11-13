@@ -17,7 +17,9 @@ using System.Net;
 using System.Text.Json;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Requests;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
 using Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Arbisoft.DevLake.IntegrationService.UnitTests.API;
 
@@ -329,18 +331,45 @@ public sealed class ProcessingEndToEndTests : ApiTestBase
     }
 
     [BrokersFact]
-    public async Task AMessageWhoseLogRowDoesNotExist_StaysQueued_NotLostAndNotProcessed()
+    public async Task AMessageWhoseLogRowDoesNotExist_IsDeadLettered_AndNotProcessed()
     {
         var (_, _) = await IsolatedClientAsync(Single);
         var correlationId = Guid.NewGuid().ToString("D");
         var body = JsonSerializer.Serialize(new { correlation_id = correlationId, event_type = Single, emails = new[] { "ghost@arbisoft.com" }, time_frame = "24h", requested_on = DateTimeOffset.UtcNow });
 
         await RabbitMqHarness.PublishRawAsync(Factory.QueueName, correlationId, Single, body);
-        await Task.Delay(3500);
+        await WaitForAsync(async () => await Seed.QueueDepthAsync() == 0);
 
-        Assert.Equal(1, await Seed.QueueDepthAsync());
+        var dead = await RabbitMqHarness.DrainAsync(Factory.QueueName + ".dead");
+        Assert.Equal(correlationId, Assert.Single(dead).CorrelationId);
         Assert.Empty(_upstream.DevLakeStatsRequests);
         Assert.Empty(_upstream.Callbacks);
+    }
+
+    /// <summary>The outbox relay: the API committed the request but stopped before publishing it, so there is no message, only the Received row.</summary>
+    [BrokersFact]
+    public async Task ARequestRecordedButNeverPublished_IsPublishedAgainByTheJob_AndDelivered()
+    {
+        var (client, token) = await IsolatedClientAsync(Single);
+        var correlationId = await Seed.SeedRequestAsync(client, RequestStatus.Received);
+        var log = (await Seed.LogAsync(correlationId))!;
+        var body = JsonSerializer.Serialize(new
+        {
+            correlation_id = correlationId,
+            event_type = Single,
+            emails = new[] { $"relay-{Guid.NewGuid():N}@arbisoft.com" },
+            time_frame = "24h",
+            requested_on = DateTimeOffset.UtcNow
+        });
+        await using (var scope = Factory.Services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IRequestLogRepository>().InsertJsonAsync(new RequestLogJson { RequestLogId = log.Id, Json = body }, CancellationToken.None);
+        }
+
+        await Seed.ExecuteAsync("UPDATE RequestLogs SET createdOn = @old WHERE id = @id", new { old = DateTime.UtcNow.AddMinutes(-2), id = log.Id });
+
+        await WaitForStatusAsync(token, correlationId, "Success");
+        Assert.Equal(correlationId, Assert.Single(_upstream.Callbacks).CorrelationId);
     }
 
     [BrokersFact]

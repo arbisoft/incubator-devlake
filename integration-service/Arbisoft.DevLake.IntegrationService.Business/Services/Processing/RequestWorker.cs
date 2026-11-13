@@ -58,9 +58,9 @@ public sealed class RequestWorker : IRequestWorker
         var request = await _requestLogs.GetByCorrelationIdAsync(correlationId, stopping);
         if (request is null)
         {
-            // The API publishes before it commits, so the log can briefly be missing. Put the message back; if it never appears the redelivery limit parks it.
-            _logger.LogWarning("Request {CorrelationId} has no log row yet; leaving it queued", correlationId);
-            return WorkerOutcome.Requeue;
+            // The API commits the log before it publishes, so a message without one did not come from this service's intake and can never succeed.
+            _logger.LogError("Request {CorrelationId} has no log row and is moved to the dead-letter queue", correlationId);
+            return WorkerOutcome.DeadLetter;
         }
 
         if (IsFinished(request.Status))

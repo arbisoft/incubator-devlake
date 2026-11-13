@@ -35,4 +35,10 @@ public interface IDbSession : IAsyncDisposable
 
     /// <summary>Undoes everything since <see cref="BeginTransactionAsync"/> and leaves the session usable for further work.</summary>
     Task RollbackAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Returns the connection to the pool before slow work that does not need it, such as waiting on the message broker. The next query opens
+    /// one again. Not allowed while a transaction is open.
+    /// </summary>
+    Task ReleaseConnectionAsync();
 }

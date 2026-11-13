@@ -91,6 +91,32 @@ public class DbSessionTests : RepositoryTestBase
     }
 
     [MySqlFact]
+    public async Task ReleaseConnection_ReturnsItToThePool_AndTheNextQueryOpensAnother()
+    {
+        await using var scope = _fixture.Services!.CreateAsyncScope();
+        var session = scope.ServiceProvider.GetRequiredService<IDbSession>();
+        var first = await session.GetConnectionAsync(CancellationToken.None);
+
+        await session.ReleaseConnectionAsync();
+
+        Assert.Equal(System.Data.ConnectionState.Closed, first.State);
+        var second = await session.GetConnectionAsync(CancellationToken.None);
+        Assert.NotSame(first, second);
+        Assert.True(await scope.ServiceProvider.GetRequiredService<IScopeRepository>().InsertAsync(NewScopeRow(), CancellationToken.None) > 0);
+        await session.ReleaseConnectionAsync();
+        await session.ReleaseConnectionAsync();
+    }
+
+    [MySqlFact]
+    public async Task ReleaseConnection_WhileATransactionIsOpen_Throws()
+    {
+        var session = Get<IDbSession>();
+        await session.BeginTransactionAsync(CancellationToken.None);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(session.ReleaseConnectionAsync);
+    }
+
+    [MySqlFact]
     public async Task Rollback_WithoutATransaction_Throws()
     {
         await Assert.ThrowsAsync<InvalidOperationException>(() => Get<IDbSession>().RollbackAsync(CancellationToken.None));

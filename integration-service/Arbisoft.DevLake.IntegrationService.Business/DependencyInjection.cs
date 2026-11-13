@@ -46,6 +46,7 @@ public static class DependencyInjection
             .Bind(configuration.GetSection(ProcessingOptions.SectionName))
             .ValidateDataAnnotations()
             .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<ProcessingOptions>, ProcessingOptionsValidator>();
 
         services.AddMemoryCache();
         services.AddSingleton<ISecretEncryptor, SecretEncryptor>();
@@ -74,6 +75,7 @@ public static class DependencyInjection
         services.AddScoped<ICallbackDelivery, CallbackDelivery>();
         services.AddScoped<IRequestWorker, RequestWorker>();
         services.AddScoped<IStaleRequestSweeper, StaleRequestSweeper>();
+        services.AddScoped<IReceivedRequestRelay, ReceivedRequestRelay>();
         services.AddScoped<IProcessingPreflight, ProcessingPreflight>();
         services.AddScoped<IRequestProcessor, RequestProcessor>();
         return services;

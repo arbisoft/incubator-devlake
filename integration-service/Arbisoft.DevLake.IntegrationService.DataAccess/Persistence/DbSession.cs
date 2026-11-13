@@ -71,6 +71,20 @@ public sealed class DbSession : IDbSession
         Transaction = null;
     }
 
+    public async Task ReleaseConnectionAsync()
+    {
+        if (Transaction is not null)
+        {
+            throw new InvalidOperationException("The connection cannot be released while a transaction is open.");
+        }
+
+        if (_connection is not null)
+        {
+            await _connection.DisposeAsync();
+            _connection = null;
+        }
+    }
+
     /// <summary>Disposing with an open transaction rolls it back.</summary>
     public async ValueTask DisposeAsync()
     {

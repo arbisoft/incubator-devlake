@@ -48,6 +48,16 @@ public interface IRequestLogRepository
 
     Task<bool> UpdateStatusAsync(long id, string status, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Changes the status to <paramref name="newStatus"/> only if it is still <paramref name="expectedStatus"/>. Returns false when something else changed it first, for example the
+    /// processing job picking up the message before the API marked the request queued.
+    /// </summary>
+    Task<bool> TryChangeStatusAsync(long id, string expectedStatus, string newStatus, CancellationToken cancellationToken);
+
+    /// <summary>Requests in <paramref name="status"/> created at or after <paramref name="createdFrom"/> and before <paramref name="createdBefore"/>, oldest first.</summary>
+    Task<IReadOnlyList<RequestLog>> ListByStatusCreatedBetweenAsync(
+        string status, DateTimeOffset createdFrom, DateTimeOffset createdBefore, int limit, CancellationToken cancellationToken);
+
     /// <summary>Requests with the given status created at or after <paramref name="since"/>, oldest first, at most <paramref name="limit"/>.</summary>
     Task<IReadOnlyList<RequestLog>> ListByStatusSinceAsync(string status, DateTimeOffset since, int limit, CancellationToken cancellationToken);
 

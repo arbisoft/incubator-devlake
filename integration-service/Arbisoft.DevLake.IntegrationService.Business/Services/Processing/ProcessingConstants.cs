@@ -37,6 +37,9 @@ public static class DeliveryAttemptStatus
 
     /// <summary>The request waited in the queue until it expired.</summary>
     public const string Expired = "Expired";
+
+    /// <summary>The API could not put the request on the queue (full, unreachable or too slow), so it was never processed.</summary>
+    public const string PublishFailed = "PublishFailed";
 }
 
 /// <summary>What happens to a queued message once the job has dealt with it.</summary>

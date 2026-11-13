@@ -38,6 +38,7 @@ public class RequestServiceTests
     public RequestServiceTests()
     {
         _logs.TryInsertAsync(Arg.Any<RequestLog>(), Arg.Any<CancellationToken>()).Returns(41L);
+        _logs.TryChangeStatusAsync(Arg.Any<long>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
         _logs.InsertAsync(Arg.Any<RequestLog>(), Arg.Any<CancellationToken>()).Returns(42L);
         _service = new RequestService(_logs, _callbacks, _publisher, _session, new FakeTimeProvider(Now), NullLogger<RequestService>.Instance);
     }
@@ -54,7 +55,7 @@ public class RequestServiceTests
     }
 
     [Fact]
-    public async Task Submit_WithACallback_LogsThenPublishesThenMarksQueuedThenCommits()
+    public async Task Submit_WithACallback_CommitsTheRowFirst_ThenReleasesTheConnection_ThenPublishes_ThenMarksItQueued()
     {
         GivenCallback();
 
@@ -66,10 +67,37 @@ public class RequestServiceTests
             _session.BeginTransactionAsync(Arg.Any<CancellationToken>());
             _logs.TryInsertAsync(Arg.Any<RequestLog>(), Arg.Any<CancellationToken>());
             _logs.InsertJsonAsync(Arg.Any<RequestLogJson>(), Arg.Any<CancellationToken>());
-            _publisher.PublishAsync(Arg.Any<QueueMessage>(), Arg.Any<CancellationToken>());
-            _logs.UpdateStatusAsync(41, RequestStatus.Queued, Arg.Any<CancellationToken>());
             _session.CommitAsync(Arg.Any<CancellationToken>());
+            _session.ReleaseConnectionAsync();
+            _publisher.PublishAsync(Arg.Any<QueueMessage>(), Arg.Any<CancellationToken>());
+            _logs.TryChangeStatusAsync(41, RequestStatus.Received, RequestStatus.Queued, Arg.Any<CancellationToken>());
         });
+    }
+
+    [Fact]
+    public async Task Submit_OnceTheRowIsCommitted_TheCallerDisconnectingNoLongerStopsThePublishOrTheStatusChange()
+    {
+        GivenCallback();
+        using var disconnected = new CancellationTokenSource();
+        await _session.CommitAsync(Arg.Do<CancellationToken>(_ => disconnected.Cancel()));
+
+        var result = await _service.SubmitAsync(Submission(), disconnected.Token);
+
+        Assert.Equal(SubmissionOutcome.Queued, result.Outcome);
+        await _publisher.Received(1).PublishAsync(Arg.Any<QueueMessage>(), CancellationToken.None);
+        await _logs.Received(1).TryChangeStatusAsync(41, RequestStatus.Received, RequestStatus.Queued, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Submit_WhenTheJobAlreadyTookTheMessage_LeavesItsStatusAlone()
+    {
+        GivenCallback();
+        _logs.TryChangeStatusAsync(41, RequestStatus.Received, RequestStatus.Queued, Arg.Any<CancellationToken>()).Returns(false);
+
+        var result = await _service.SubmitAsync(Submission(), CancellationToken.None);
+
+        Assert.Equal(SubmissionOutcome.Queued, result.Outcome);
+        await _logs.DidNotReceiveWithAnyArgs().UpdateStatusAsync(default, default!, default);
     }
 
     [Fact]
@@ -200,7 +228,7 @@ public class RequestServiceTests
     [Theory]
     [InlineData(typeof(QueueFullException))]
     [InlineData(typeof(QueueUnavailableException))]
-    public async Task Submit_WhenTheQueueRejectsTheMessage_NeverCommits_SoNothingIsLeftBehind(Type exceptionType)
+    public async Task Submit_WhenTheQueueRejectsTheMessage_EndsTheRequestFailedWithTheReason_FreesItsKey_AndRethrows(Type exceptionType)
     {
         GivenCallback();
         _publisher.PublishAsync(Arg.Any<QueueMessage>(), Arg.Any<CancellationToken>())
@@ -208,7 +236,36 @@ public class RequestServiceTests
 
         await Assert.ThrowsAsync(exceptionType, () => _service.SubmitAsync(Submission(), CancellationToken.None));
 
+        await _logs.Received(1).TryChangeStatusAsync(41, RequestStatus.Received, RequestStatus.Failed, CancellationToken.None);
+        await _logs.Received(1).ReleaseIdempotencyKeyAsync(41, CancellationToken.None);
+        await _logs.Received(1).InsertAttemptAsync(
+            Arg.Is<RequestResponseAttempt>(a => a.RequestLogId == 41 && a.AttemptStatus == "PublishFailed" && a.FailureError == "rejected" && a.AttemptOn == Now),
+            CancellationToken.None);
+        await _logs.DidNotReceive().TryChangeStatusAsync(41, RequestStatus.Received, RequestStatus.Queued, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Submit_WhenARejectedRequestWasAlreadyTakenByTheJob_LeavesItAlone()
+    {
+        GivenCallback();
+        _publisher.PublishAsync(Arg.Any<QueueMessage>(), Arg.Any<CancellationToken>()).Returns(_ => Task.FromException(new QueueUnavailableException("timed out", null)));
+        _logs.TryChangeStatusAsync(41, RequestStatus.Received, RequestStatus.Failed, Arg.Any<CancellationToken>()).Returns(false);
+
+        await Assert.ThrowsAsync<QueueUnavailableException>(() => _service.SubmitAsync(Submission(), CancellationToken.None));
+
+        await _logs.DidNotReceiveWithAnyArgs().ReleaseIdempotencyKeyAsync(default, default);
+        await _logs.DidNotReceiveWithAnyArgs().InsertAttemptAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Submit_WhenRecordingTheRowFails_NeverPublishes()
+    {
+        GivenCallback();
+        _logs.InsertJsonAsync(Arg.Any<RequestLogJson>(), Arg.Any<CancellationToken>()).Returns(Task.FromException<long>(new InvalidOperationException("db down")));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _service.SubmitAsync(Submission(), CancellationToken.None));
+
         await _session.DidNotReceiveWithAnyArgs().CommitAsync(default);
-        await _logs.DidNotReceiveWithAnyArgs().UpdateStatusAsync(default, default!, default);
+        await _publisher.DidNotReceiveWithAnyArgs().PublishAsync(default!, default);
     }
 }

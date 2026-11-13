@@ -149,11 +149,11 @@ public class RequestWorkerTests
     }
 
     [Fact]
-    public async Task AMessageWhoseLogRowIsNotThereYet_IsPutBack_NotLost()
+    public async Task AMessageWithNoLogRow_IsDeadLettered_BecauseTheApiAlwaysCommitsTheRowBeforePublishing()
     {
         _logs.GetByCorrelationIdAsync("c1", Arg.Any<CancellationToken>()).Returns((RequestLog?)null);
 
-        Assert.Equal(WorkerOutcome.Requeue, await _worker.ProcessAsync(Delivery(), CancellationToken.None));
+        Assert.Equal(WorkerOutcome.DeadLetter, await _worker.ProcessAsync(Delivery(), CancellationToken.None));
 
         await _collector.DidNotReceiveWithAnyArgs().CollectAsync(default!, default!, default!, default!, default);
     }

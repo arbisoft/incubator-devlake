@@ -37,6 +37,13 @@ public sealed class ProcessingOptions
     [Range(1, 3600)]
     public int DeliveryRetryDelaySeconds { get; init; } = 30;
 
+    /// <summary>
+    /// How old a request still marked Received must be before the job publishes it again, because its intake never finished publishing it. It must
+    /// be more than twice <c>RabbitMq:PublishTimeoutSeconds</c>, so an intake that is still publishing is never overtaken.
+    /// </summary>
+    [Range(1, 3600)]
+    public int RepublishAfterSeconds { get; init; } = 60;
+
     /// <summary>How long past the queue's message lifetime a request may stay unfinished before it is marked failed.</summary>
     [Range(0, 3600)]
     public int StaleGraceSeconds { get; init; } = 60;

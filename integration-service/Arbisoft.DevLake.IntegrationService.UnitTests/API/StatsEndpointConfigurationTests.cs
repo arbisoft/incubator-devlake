@@ -150,7 +150,7 @@ public sealed class FullQueueTests : ApiTestBase
     }
 
     [BrokersFact]
-    public async Task WhenTheQueueIsFull_TheApiAnswers429_AndTheRejectedRequestLeavesNoTrace()
+    public async Task WhenTheQueueIsFull_TheApiAnswers429_AndTheRejectedRequestIsRecordedFailedWithTheReason()
     {
         var (client, token) = await ClientWithCallbacksAsync(RequestEventTypes.EngineerStats);
         Assert.Equal(HttpStatusCode.OK, (await GetStatsAsync(token, "one@arbisoft.com")).Status);
@@ -164,8 +164,11 @@ public sealed class FullQueueTests : ApiTestBase
         Assert.DoesNotContain("amqp", rejected.Text, StringComparison.OrdinalIgnoreCase);
 
         var logs = await Seed.LogsForAsync(client);
-        Assert.Equal(2, logs.Count);
-        Assert.All(logs, log => Assert.Equal("Queued", log.Status));
+        Assert.Equal(3, logs.Count);
+        Assert.Equal(2, logs.Count(log => log.Status == "Queued"));
+        var failed = Assert.Single(logs, log => log.Status == "Failed");
+        Assert.Null(failed.IdempotencyKey);
+        Assert.Equal("PublishFailed", Assert.Single(await Seed.AttemptsAsync(failed.Id)).AttemptStatus);
         Assert.Equal(2, (await RabbitMqHarness.DrainAsync(Factory.QueueName)).Count);
     }
 
@@ -193,7 +196,7 @@ public sealed class BrokerDownTests : ApiTestBase
     }
 
     [MySqlFact]
-    public async Task WhenTheBrokerIsUnreachable_TheApiAnswers503WithRetryAfter_AndRecordsNothing()
+    public async Task WhenTheBrokerIsUnreachable_TheApiAnswers503WithRetryAfter_AndRecordsTheRequestFailed_SoARetryIsNotADuplicate()
     {
         var (client, token) = await ClientWithCallbacksAsync(RequestEventTypes.EngineerStats);
 
@@ -202,7 +205,10 @@ public sealed class BrokerDownTests : ApiTestBase
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.Status);
         Assert.Equal("60", response.Headers.GetValues("Retry-After").Single());
         Assert.Equal("queue_unavailable", response.Json.GetProperty("code").GetString());
-        Assert.Empty(await Seed.LogsForAsync(client));
+        var failed = Assert.Single(await Seed.LogsForAsync(client));
+        Assert.Equal("Failed", failed.Status);
+        Assert.Null(failed.IdempotencyKey);
+        Assert.Equal("PublishFailed", Assert.Single(await Seed.AttemptsAsync(failed.Id)).AttemptStatus);
     }
 
     [MySqlFact]

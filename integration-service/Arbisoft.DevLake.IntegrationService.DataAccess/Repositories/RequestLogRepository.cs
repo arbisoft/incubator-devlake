@@ -89,6 +89,22 @@ public sealed class RequestLogRepository : RepositoryBase, IRequestLogRepository
         return changed > 0;
     }
 
+    public async Task<bool> TryChangeStatusAsync(long id, string expectedStatus, string newStatus, CancellationToken cancellationToken)
+    {
+        var changed = await ExecuteAsync(
+            "UPDATE RequestLogs SET status = @newStatus WHERE id = @id AND status = @expectedStatus", new { id, expectedStatus, newStatus }, cancellationToken);
+        return changed > 0;
+    }
+
+    public Task<IReadOnlyList<RequestLog>> ListByStatusCreatedBetweenAsync(
+        string status, DateTimeOffset createdFrom, DateTimeOffset createdBefore, int limit, CancellationToken cancellationToken)
+    {
+        return QueryAsync<RequestLog>(
+            $"SELECT {Columns} FROM RequestLogs WHERE status = @status AND createdOn >= @createdFrom AND createdOn < @createdBefore ORDER BY createdOn, id LIMIT @limit",
+            new { status, createdFrom, createdBefore, limit },
+            cancellationToken);
+    }
+
     public Task<IReadOnlyList<RequestLog>> ListByStatusSinceAsync(string status, DateTimeOffset since, int limit, CancellationToken cancellationToken)
     {
         return QueryAsync<RequestLog>(

@@ -60,6 +60,13 @@ public sealed class RabbitMqOptions
     [Range(1, 1000)]
     public int DeliveryLimit { get; init; } = 5;
 
+    /// <summary>
+    /// The longest one publish may take, from waiting for the publish channel to the broker's confirm. A publish that takes longer is reported as
+    /// the queue being unavailable, so a broker that blocks publishers (for example under a memory alarm) cannot hold an API request open.
+    /// </summary>
+    [Range(1, 300)]
+    public int PublishTimeoutSeconds { get; init; } = 10;
+
     /// <summary>The most messages one receive call returns. This bounds the work in flight per run (the pull-based prefetch).</summary>
     [Range(1, 1000)]
     public int ReceiveBatchLimit { get; init; } = 10;

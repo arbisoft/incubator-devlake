@@ -25,6 +25,7 @@ namespace Arbisoft.DevLake.IntegrationService.Business.Services.Processing;
 public sealed class RequestProcessor : IRequestProcessor
 {
     private readonly IStaleRequestSweeper _sweeper;
+    private readonly IReceivedRequestRelay _relay;
     private readonly IRequestQueueConsumer _consumer;
     private readonly IProcessingPreflight _preflight;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -34,6 +35,7 @@ public sealed class RequestProcessor : IRequestProcessor
 
     public RequestProcessor(
         IStaleRequestSweeper sweeper,
+        IReceivedRequestRelay relay,
         IRequestQueueConsumer consumer,
         IProcessingPreflight preflight,
         IServiceScopeFactory scopeFactory,
@@ -42,6 +44,7 @@ public sealed class RequestProcessor : IRequestProcessor
         ILogger<RequestProcessor> logger)
     {
         _sweeper = sweeper;
+        _relay = relay;
         _consumer = consumer;
         _preflight = preflight;
         _scopeFactory = scopeFactory;
@@ -53,21 +56,22 @@ public sealed class RequestProcessor : IRequestProcessor
     public async Task<ProcessingRunSummary> ProcessPendingAsync(CancellationToken cancellationToken)
     {
         var expired = await _sweeper.SweepAsync(cancellationToken);
+        var republished = await _relay.RelayAsync(cancellationToken);
         if (await _consumer.GetDepthAsync(cancellationToken) == 0)
         {
-            return new ProcessingRunSummary(0, 0, 0, 0, expired, null);
+            return new ProcessingRunSummary(0, 0, 0, 0, expired, null, republished);
         }
 
         var preflight = await _preflight.RunAsync(cancellationToken);
         if (!preflight.Ready)
         {
             _logger.LogError("Processing is paused and requests stay queued: {Problem}", preflight.Problem);
-            return new ProcessingRunSummary(0, 0, 0, 0, expired, preflight.Problem);
+            return new ProcessingRunSummary(0, 0, 0, 0, expired, preflight.Problem, republished);
         }
 
         await using var batch = await _consumer.ReceiveAsync(_rabbitMq.ReceiveBatchLimit, cancellationToken);
         var outcomes = await WorkAsync(batch.Deliveries, cancellationToken);
-        return await SettleAsync(batch, outcomes, expired);
+        return await SettleAsync(batch, outcomes, expired) with { Republished = republished };
     }
 
     /// <summary>

@@ -22,6 +22,6 @@ public interface IRequestQueuePublisher
     /// the request is safely queued.
     /// </summary>
     /// <exception cref="QueueFullException">The queue is at its maximum length.</exception>
-    /// <exception cref="QueueUnavailableException">The broker could not be reached or did not take the message.</exception>
+    /// <exception cref="QueueUnavailableException">The broker could not be reached, or did not take the message within the publish timeout.</exception>
     Task PublishAsync(QueueMessage message, CancellationToken cancellationToken);
 }

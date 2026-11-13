@@ -26,6 +26,7 @@ namespace Arbisoft.DevLake.IntegrationService.UnitTests.Business.Processing;
 public sealed class RequestProcessorTests : IDisposable
 {
     private readonly IStaleRequestSweeper _sweeper = Substitute.For<IStaleRequestSweeper>();
+    private readonly IReceivedRequestRelay _relay = Substitute.For<IReceivedRequestRelay>();
     private readonly IRequestQueueConsumer _consumer = Substitute.For<IRequestQueueConsumer>();
     private readonly IProcessingPreflight _preflight = Substitute.For<IProcessingPreflight>();
     private readonly IQueueBatch _batch = Substitute.For<IQueueBatch>();
@@ -57,6 +58,7 @@ public sealed class RequestProcessorTests : IDisposable
         _services = services.BuildServiceProvider();
         return new RequestProcessor(
             _sweeper,
+            _relay,
             _consumer,
             _preflight,
             _services.GetRequiredService<IServiceScopeFactory>(),
@@ -104,6 +106,37 @@ public sealed class RequestProcessorTests : IDisposable
         Assert.True(summary.DidWork);
         await _preflight.DidNotReceiveWithAnyArgs().RunAsync(default);
         await _consumer.DidNotReceiveWithAnyArgs().ReceiveAsync(default, default);
+    }
+
+    /// <summary>A request recorded but never published has no message, so the queue can look empty while it waits: the relay must run first.</summary>
+    [Fact]
+    public async Task RecordedButUnqueuedRequests_AreRepublished_BeforeTheEmptyQueueShortcut()
+    {
+        _consumer.GetDepthAsync(Arg.Any<CancellationToken>()).Returns(0);
+        _relay.RelayAsync(Arg.Any<CancellationToken>()).Returns(2);
+
+        var summary = await Create().ProcessPendingAsync(CancellationToken.None);
+
+        Assert.Equal(2, summary.Republished);
+        Assert.True(summary.DidWork);
+        Received.InOrder(() =>
+        {
+            _sweeper.SweepAsync(Arg.Any<CancellationToken>());
+            _relay.RelayAsync(Arg.Any<CancellationToken>());
+            _consumer.GetDepthAsync(Arg.Any<CancellationToken>());
+        });
+    }
+
+    [Fact]
+    public async Task TheRepublishedCount_IsReportedForARunThatProcessedMessagesToo()
+    {
+        _relay.RelayAsync(Arg.Any<CancellationToken>()).Returns(1);
+        Deliveries(WorkerOutcome.Completed);
+
+        var summary = await Create().ProcessPendingAsync(CancellationToken.None);
+
+        Assert.Equal(1, summary.Republished);
+        Assert.Equal(1, summary.Completed);
     }
 
     [Fact]
