@@ -39,6 +39,8 @@ const (
 	IDKindPromptSkill          IDKind = "prompt_skill"
 	IDKindPromptFailure        IDKind = "prompt_failure"
 	IDKindPermissionModeChange IDKind = "permission_mode_change"
+	IDKindPromptTool           IDKind = "prompt_tool"
+	IDKindSessionHook          IDKind = "session_hook"
 )
 
 // CanonicalKey identifies one fact independently of the source that reported it, so a

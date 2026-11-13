@@ -361,6 +361,263 @@
       ],
       "title": "Claude Working Time",
       "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 2,
+      "panels": [],
+      "title": "When People Work (Pakistan Time)",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Prompts started in each hour and weekday, in Pakistan time (UTC+5), over the selected range. Users whose clients send no logs are left out.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false,
+            "minWidth": 50
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Hour"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 60
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^(?!Hour$).*"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-blues"
+                }
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.align",
+                "value": "center"
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "",
+                        "color": "transparent",
+                        "index": 0
+                      }
+                    }
+                  },
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "text": "",
+                        "color": "transparent",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 27,
+        "w": 12,
+        "x": 0,
+        "y": 17
+      },
+      "id": 3,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Prompts per weekday and hour, in Pakistan time (UTC+5).\nWITH RECURSIVE hours AS (\n  SELECT 0 AS hr UNION ALL SELECT hr + 1 FROM hours WHERE hr < 23\n),\nh AS (\n  SELECT WEEKDAY(CONVERT_TZ(p.started_at, '+00:00', '+05:00')) AS wd,\n    HOUR(CONVERT_TZ(p.started_at, '+00:00', '+05:00')) AS hr,\n    COUNT(*) AS prompts, SUM(p.estimated_cost_usd) AS cost\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.status = 'active' AND ('__all__' IN (${otel_teams:sqlstring}) OR c_g.team_slug IN (${otel_teams:sqlstring})) AND ('__all__' IN (${project:sqlstring}) OR cp_g.project_name IN (${project:sqlstring})) AND upm_g.user_login = ${__user.login:sqlstring})\n    AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring}))\n    AND ('__all__' IN (${repository:sqlstring}) OR COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring}))\n  GROUP BY 1, 2\n)\nSELECT CONCAT(LPAD(x.hr, 2, '0'), ':00') AS \"Hour\",\n  SUM(CASE WHEN h.wd = 0 THEN h.prompts ELSE 0 END) AS \"Mon\",\n  SUM(CASE WHEN h.wd = 1 THEN h.prompts ELSE 0 END) AS \"Tue\",\n  SUM(CASE WHEN h.wd = 2 THEN h.prompts ELSE 0 END) AS \"Wed\",\n  SUM(CASE WHEN h.wd = 3 THEN h.prompts ELSE 0 END) AS \"Thu\",\n  SUM(CASE WHEN h.wd = 4 THEN h.prompts ELSE 0 END) AS \"Fri\",\n  SUM(CASE WHEN h.wd = 5 THEN h.prompts ELSE 0 END) AS \"Sat\",\n  SUM(CASE WHEN h.wd = 6 THEN h.prompts ELSE 0 END) AS \"Sun\"\nFROM hours x\nLEFT JOIN h ON h.hr = x.hr\nGROUP BY x.hr\nORDER BY x.hr\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Prompts by Weekday and Hour (Pakistan Time)",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Average estimated cost per prompt for each hour and weekday, in Pakistan time (UTC+5), over the selected range. Empty cells had no prompts.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false,
+            "minWidth": 50
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Hour"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 60
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^(?!Hour$).*"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-YlRd"
+                }
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.align",
+                "value": "center"
+              },
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "text": "",
+                        "color": "transparent",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 27,
+        "w": 12,
+        "x": 12,
+        "y": 17
+      },
+      "id": 4,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Estimated cost per prompt for each weekday and hour, in Pakistan time (UTC+5).\nWITH RECURSIVE hours AS (\n  SELECT 0 AS hr UNION ALL SELECT hr + 1 FROM hours WHERE hr < 23\n),\nh AS (\n  SELECT WEEKDAY(CONVERT_TZ(p.started_at, '+00:00', '+05:00')) AS wd,\n    HOUR(CONVERT_TZ(p.started_at, '+00:00', '+05:00')) AS hr,\n    COUNT(*) AS prompts, SUM(p.estimated_cost_usd) AS cost\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.status = 'active' AND ('__all__' IN (${otel_teams:sqlstring}) OR c_g.team_slug IN (${otel_teams:sqlstring})) AND ('__all__' IN (${project:sqlstring}) OR cp_g.project_name IN (${project:sqlstring})) AND upm_g.user_login = ${__user.login:sqlstring})\n    AND ('__all__' IN (${user:sqlstring}) OR COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring}))\n    AND ('__all__' IN (${repository:sqlstring}) OR COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring}))\n  GROUP BY 1, 2\n)\nSELECT CONCAT(LPAD(x.hr, 2, '0'), ':00') AS \"Hour\",\n  SUM(CASE WHEN h.wd = 0 THEN h.cost END) / SUM(CASE WHEN h.wd = 0 THEN h.prompts END) AS \"Mon\",\n  SUM(CASE WHEN h.wd = 1 THEN h.cost END) / SUM(CASE WHEN h.wd = 1 THEN h.prompts END) AS \"Tue\",\n  SUM(CASE WHEN h.wd = 2 THEN h.cost END) / SUM(CASE WHEN h.wd = 2 THEN h.prompts END) AS \"Wed\",\n  SUM(CASE WHEN h.wd = 3 THEN h.cost END) / SUM(CASE WHEN h.wd = 3 THEN h.prompts END) AS \"Thu\",\n  SUM(CASE WHEN h.wd = 4 THEN h.cost END) / SUM(CASE WHEN h.wd = 4 THEN h.prompts END) AS \"Fri\",\n  SUM(CASE WHEN h.wd = 5 THEN h.cost END) / SUM(CASE WHEN h.wd = 5 THEN h.prompts END) AS \"Sat\",\n  SUM(CASE WHEN h.wd = 6 THEN h.cost END) / SUM(CASE WHEN h.wd = 6 THEN h.prompts END) AS \"Sun\"\nFROM hours x\nLEFT JOIN h ON h.hr = x.hr\nGROUP BY x.hr\nORDER BY x.hr\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Cost per Prompt by Weekday and Hour (Pakistan Time)",
+      "type": "table"
     }
   ],
   "preload": false,

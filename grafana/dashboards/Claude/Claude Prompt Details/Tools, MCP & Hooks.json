@@ -1,0 +1,1841 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Which tools, MCP servers and hooks Claude Code uses, how often they fail, and what hooks cost in time, from OTel log events.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "dashboard",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": false,
+      "type": "link",
+      "title": "Tool & Prompt Failures",
+      "tooltip": "Failure reasons and recent failed tool calls and API requests",
+      "url": "/d/claude_prompts_failures_mysql"
+    }
+  ],
+  "panels": [
+    {
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "**How to read this dashboard**\n\n- **Source:** per-prompt tool and hook counts (`ai_prompt_tools`, `ai_prompts`) and registered hooks per session (`ai_session_hooks`), built from Claude Code's log events. Users whose clients send no logs are left out, and log history starts on 2026-10-27. Tool and hook counts fall on the day their prompt started.\n- **Weeks** start on Monday (UTC). Weekly charts show only weeks that have ended and fall fully inside the time range.\n- **MCP** covers every tool an MCP server provides. Failure rate is failed calls out of all calls.\n- **Hooks:** only hook runs inside a prompt are counted, and hook detail is kept from the hook attribute backfill onwards. *Managed* hooks come from `policySettings`, the managed settings an administrator deploys.\n- **Filters:** Project, Claude Code OTel teams, User and Repository narrow every panel. Repository is each event's own repository; events outside a repository count as Unknown.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.0.0",
+      "title": "About this dashboard",
+      "type": "text"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Tool calls that finished in the selected range.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 8
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Tool calls$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT SUM(t.call_count) AS \"Tool calls\",\n  SUM(CASE WHEN t.tool_name = 'Bash' THEN t.call_count ELSE 0 END) / NULLIF(SUM(t.call_count), 0) AS \"Bash share\",\n  SUM(CASE WHEN t.mcp_server_name <> '' THEN t.call_count ELSE 0 END) AS \"MCP calls\",\n  SUM(CASE WHEN t.mcp_server_name <> '' THEN t.failure_count ELSE 0 END) / NULLIF(SUM(CASE WHEN t.mcp_server_name <> '' THEN t.call_count ELSE 0 END), 0) AS \"MCP failure rate\",\n  COUNT(DISTINCT CASE WHEN t.call_count > 0 THEN NULLIF(t.mcp_server_name, '') END) AS \"MCP servers\"\nFROM ai_prompt_tools t\n  JOIN ai_prompts p ON p.id = t.ai_prompt_id\n  WHERE $__timeFilter(t.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Tool Calls",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Share of tool calls that ran a shell command through Bash.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percentunit",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 8
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Bash share$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT SUM(t.call_count) AS \"Tool calls\",\n  SUM(CASE WHEN t.tool_name = 'Bash' THEN t.call_count ELSE 0 END) / NULLIF(SUM(t.call_count), 0) AS \"Bash share\",\n  SUM(CASE WHEN t.mcp_server_name <> '' THEN t.call_count ELSE 0 END) AS \"MCP calls\",\n  SUM(CASE WHEN t.mcp_server_name <> '' THEN t.failure_count ELSE 0 END) / NULLIF(SUM(CASE WHEN t.mcp_server_name <> '' THEN t.call_count ELSE 0 END), 0) AS \"MCP failure rate\",\n  COUNT(DISTINCT CASE WHEN t.call_count > 0 THEN NULLIF(t.mcp_server_name, '') END) AS \"MCP servers\"\nFROM ai_prompt_tools t\n  JOIN ai_prompts p ON p.id = t.ai_prompt_id\n  WHERE $__timeFilter(t.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Bash Share",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Tool calls served by an MCP server.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 8
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^MCP calls$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT SUM(t.call_count) AS \"Tool calls\",\n  SUM(CASE WHEN t.tool_name = 'Bash' THEN t.call_count ELSE 0 END) / NULLIF(SUM(t.call_count), 0) AS \"Bash share\",\n  SUM(CASE WHEN t.mcp_server_name <> '' THEN t.call_count ELSE 0 END) AS \"MCP calls\",\n  SUM(CASE WHEN t.mcp_server_name <> '' THEN t.failure_count ELSE 0 END) / NULLIF(SUM(CASE WHEN t.mcp_server_name <> '' THEN t.call_count ELSE 0 END), 0) AS \"MCP failure rate\",\n  COUNT(DISTINCT CASE WHEN t.call_count > 0 THEN NULLIF(t.mcp_server_name, '') END) AS \"MCP servers\"\nFROM ai_prompt_tools t\n  JOIN ai_prompts p ON p.id = t.ai_prompt_id\n  WHERE $__timeFilter(t.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n",
+          "refId": "A"
+        }
+      ],
+      "title": "MCP Calls",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Share of MCP tool calls that failed.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percentunit",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 8
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^MCP failure rate$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT SUM(t.call_count) AS \"Tool calls\",\n  SUM(CASE WHEN t.tool_name = 'Bash' THEN t.call_count ELSE 0 END) / NULLIF(SUM(t.call_count), 0) AS \"Bash share\",\n  SUM(CASE WHEN t.mcp_server_name <> '' THEN t.call_count ELSE 0 END) AS \"MCP calls\",\n  SUM(CASE WHEN t.mcp_server_name <> '' THEN t.failure_count ELSE 0 END) / NULLIF(SUM(CASE WHEN t.mcp_server_name <> '' THEN t.call_count ELSE 0 END), 0) AS \"MCP failure rate\",\n  COUNT(DISTINCT CASE WHEN t.call_count > 0 THEN NULLIF(t.mcp_server_name, '') END) AS \"MCP servers\"\nFROM ai_prompt_tools t\n  JOIN ai_prompts p ON p.id = t.ai_prompt_id\n  WHERE $__timeFilter(t.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n",
+          "refId": "A"
+        }
+      ],
+      "title": "MCP Failures",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Distinct MCP servers called in the range.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 8
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^MCP servers$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT SUM(t.call_count) AS \"Tool calls\",\n  SUM(CASE WHEN t.tool_name = 'Bash' THEN t.call_count ELSE 0 END) / NULLIF(SUM(t.call_count), 0) AS \"Bash share\",\n  SUM(CASE WHEN t.mcp_server_name <> '' THEN t.call_count ELSE 0 END) AS \"MCP calls\",\n  SUM(CASE WHEN t.mcp_server_name <> '' THEN t.failure_count ELSE 0 END) / NULLIF(SUM(CASE WHEN t.mcp_server_name <> '' THEN t.call_count ELSE 0 END), 0) AS \"MCP failure rate\",\n  COUNT(DISTINCT CASE WHEN t.call_count > 0 THEN NULLIF(t.mcp_server_name, '') END) AS \"MCP servers\"\nFROM ai_prompt_tools t\n  JOIN ai_prompts p ON p.id = t.ai_prompt_id\n  WHERE $__timeFilter(t.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n",
+          "refId": "A"
+        }
+      ],
+      "title": "MCP Servers",
+      "type": "stat"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Share of hook runs that blocked the action they guarded.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percentunit",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 8
+      },
+      "id": 7,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Hook block rate$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT SUM(p.hook_block_count) / NULLIF(SUM(p.hook_count), 0) AS \"Hook block rate\"\nFROM ai_prompts p\nWHERE $__timeFilter(p.started_at)\n  AND p.hook_count > 0\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Hook Blocks",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 8,
+      "panels": [],
+      "title": "Tools",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Tool calls in each completed week, split by tool. Edit and Write includes MultiEdit and NotebookEdit; MCP covers every MCP server's tools.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "percent"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            },
+            "axisSoftMin": 0,
+            "barWidthFactor": 0.4
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Bash"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Read"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Edit and Write"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Grep and Glob"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Agent"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MCP"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Web"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#8ab8ff",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Other"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#8e8e8e",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Completed Monday-start UTC weeks only; MCP covers every tool an MCP server provides.\nWITH RECURSIVE wk AS (\n  SELECT DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY) AS d\n  UNION ALL\n  SELECT DATE_ADD(d, INTERVAL 7 DAY) FROM wk WHERE DATE_ADD(d, INTERVAL 7 DAY) < $__timeTo()\n),\nweeks AS (\n  SELECT DATE_FORMAT(d, '%Y-%m-%d') AS week FROM wk\n  WHERE TIMESTAMP(d) >= $__timeFrom() AND TIMESTAMP(DATE_ADD(d, INTERVAL 7 DAY)) <= DATE_ADD($__timeTo(), INTERVAL 1 SECOND)\n),\nx AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(t.started_at), INTERVAL WEEKDAY(t.started_at) DAY), '%Y-%m-%d') AS week, CASE WHEN t.mcp_server_name <> '' OR LEFT(t.tool_name, 5) = 'mcp__' THEN 'MCP'\n      WHEN t.tool_name = 'Bash' THEN 'Bash'\n      WHEN t.tool_name = 'Read' THEN 'Read'\n      WHEN t.tool_name IN ('Edit', 'Write', 'MultiEdit', 'NotebookEdit') THEN 'Edit and Write'\n      WHEN t.tool_name IN ('Grep', 'Glob') THEN 'Grep and Glob'\n      WHEN t.tool_name IN ('Agent', 'Task') THEN 'Agent'\n      WHEN t.tool_name IN ('WebFetch', 'WebSearch') THEN 'Web'\n      ELSE 'Other' END AS grp, SUM(t.call_count) AS calls\n  FROM ai_prompt_tools t\n  JOIN ai_prompts p ON p.id = t.ai_prompt_id\n  WHERE $__timeFilter(t.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  GROUP BY 1, 2\n)\nSELECT TIMESTAMP(w.week) + INTERVAL 84 HOUR AS \"time\",\n  SUM(CASE WHEN x.grp = 'Bash' THEN x.calls ELSE 0 END) AS \"Bash\",\n  SUM(CASE WHEN x.grp = 'Read' THEN x.calls ELSE 0 END) AS \"Read\",\n  SUM(CASE WHEN x.grp = 'Edit and Write' THEN x.calls ELSE 0 END) AS \"Edit and Write\",\n  SUM(CASE WHEN x.grp = 'Grep and Glob' THEN x.calls ELSE 0 END) AS \"Grep and Glob\",\n  SUM(CASE WHEN x.grp = 'Agent' THEN x.calls ELSE 0 END) AS \"Agent\",\n  SUM(CASE WHEN x.grp = 'MCP' THEN x.calls ELSE 0 END) AS \"MCP\",\n  SUM(CASE WHEN x.grp = 'Web' THEN x.calls ELSE 0 END) AS \"Web\",\n  SUM(CASE WHEN x.grp = 'Other' THEN x.calls ELSE 0 END) AS \"Other\"\nFROM weeks w\nLEFT JOIN x ON x.week = w.week\nGROUP BY w.week\nORDER BY 1\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Tool Mix (Weekly Share of Calls)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Each Claude Code OTel team's tool calls over the selected range, with each tool's share of them and the share that failed.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false,
+            "minWidth": 80
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Calls"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Bash"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-blues"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Read"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-blues"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Edit and Write"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-blues"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Grep and Glob"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-blues"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Agent"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-blues"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MCP"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-blues"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Web"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-blues"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Other"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-blues"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Failure rate"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
+      "id": 10,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT x.team_slug AS \"Team\",\n  SUM(x.calls) AS \"Calls\",\n  SUM(CASE WHEN x.grp = 'Bash' THEN x.calls ELSE 0 END) / NULLIF(SUM(x.calls), 0) AS \"Bash\",\n  SUM(CASE WHEN x.grp = 'Read' THEN x.calls ELSE 0 END) / NULLIF(SUM(x.calls), 0) AS \"Read\",\n  SUM(CASE WHEN x.grp = 'Edit and Write' THEN x.calls ELSE 0 END) / NULLIF(SUM(x.calls), 0) AS \"Edit and Write\",\n  SUM(CASE WHEN x.grp = 'Grep and Glob' THEN x.calls ELSE 0 END) / NULLIF(SUM(x.calls), 0) AS \"Grep and Glob\",\n  SUM(CASE WHEN x.grp = 'Agent' THEN x.calls ELSE 0 END) / NULLIF(SUM(x.calls), 0) AS \"Agent\",\n  SUM(CASE WHEN x.grp = 'MCP' THEN x.calls ELSE 0 END) / NULLIF(SUM(x.calls), 0) AS \"MCP\",\n  SUM(CASE WHEN x.grp = 'Web' THEN x.calls ELSE 0 END) / NULLIF(SUM(x.calls), 0) AS \"Web\",\n  SUM(CASE WHEN x.grp = 'Other' THEN x.calls ELSE 0 END) / NULLIF(SUM(x.calls), 0) AS \"Other\",\n  SUM(x.failures) / NULLIF(SUM(x.calls), 0) AS \"Failure rate\"\nFROM (\n  SELECT c.team_slug, CASE WHEN t.mcp_server_name <> '' OR LEFT(t.tool_name, 5) = 'mcp__' THEN 'MCP'\n      WHEN t.tool_name = 'Bash' THEN 'Bash'\n      WHEN t.tool_name = 'Read' THEN 'Read'\n      WHEN t.tool_name IN ('Edit', 'Write', 'MultiEdit', 'NotebookEdit') THEN 'Edit and Write'\n      WHEN t.tool_name IN ('Grep', 'Glob') THEN 'Grep and Glob'\n      WHEN t.tool_name IN ('Agent', 'Task') THEN 'Agent'\n      WHEN t.tool_name IN ('WebFetch', 'WebSearch') THEN 'Web'\n      ELSE 'Other' END AS grp, SUM(t.call_count) AS calls, SUM(t.failure_count) AS failures\n  FROM ai_prompt_tools t\n  JOIN ai_prompts p ON p.id = t.ai_prompt_id\n  JOIN _tool_claude_code_otel_connections c ON c.id = p.source_connection_id\n  WHERE $__timeFilter(t.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  GROUP BY 1, 2\n) x\nGROUP BY x.team_slug\nHAVING SUM(x.calls) > 0\nORDER BY 2 DESC\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Tool Mix by Team",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
+      "id": 11,
+      "panels": [],
+      "title": "MCP",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Calls, users, teams, failure rate and time for each MCP server over the selected range.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false,
+            "minWidth": 60
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Server"
+            },
+            "properties": [
+              {
+                "id": "custom.minWidth",
+                "value": 130
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Failure rate"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Average duration"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Total time"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "id": 12,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT t.mcp_server_name AS \"Server\",\n  SUM(t.call_count) AS \"Calls\",\n  COUNT(DISTINCT COALESCE(NULLIF(p.user_email, ''), p.user_key)) AS \"Users\",\n  COUNT(DISTINCT p.source_connection_id) AS \"Teams\",\n  SUM(t.failure_count) / NULLIF(SUM(t.call_count), 0) AS \"Failure rate\",\n  SUM(t.duration_ms) / NULLIF(SUM(t.call_count), 0) AS \"Average duration\",\n  SUM(t.duration_ms) AS \"Total time\"\nFROM ai_prompt_tools t\nJOIN ai_prompts p ON p.id = t.ai_prompt_id\nWHERE $__timeFilter(t.started_at)\n  AND t.mcp_server_name <> ''\n  AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\nGROUP BY t.mcp_server_name\nHAVING SUM(t.call_count) > 0\nORDER BY 2 DESC\n",
+          "refId": "A"
+        }
+      ],
+      "title": "MCP Servers",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "MCP tool calls in each completed week by server. The 8 servers with the most calls in the range have their own series; the rest are grouped as Other.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            },
+            "axisSoftMin": 0,
+            "barWidthFactor": 0.4
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      },
+      "id": 13,
+      "options": {
+        "legend": {
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Total",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "-- The 8 servers with the most calls in the range get their own series; the rest are grouped as Other.\nWITH RECURSIVE wk AS (\n  SELECT DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY) AS d\n  UNION ALL\n  SELECT DATE_ADD(d, INTERVAL 7 DAY) FROM wk WHERE DATE_ADD(d, INTERVAL 7 DAY) < $__timeTo()\n),\nweeks AS (\n  SELECT DATE_FORMAT(d, '%Y-%m-%d') AS week FROM wk\n  WHERE TIMESTAMP(d) >= $__timeFrom() AND TIMESTAMP(DATE_ADD(d, INTERVAL 7 DAY)) <= DATE_ADD($__timeTo(), INTERVAL 1 SECOND)\n),\nm AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(t.started_at), INTERVAL WEEKDAY(t.started_at) DAY), '%Y-%m-%d') AS week, t.mcp_server_name AS server, SUM(t.call_count) AS calls\n  FROM ai_prompt_tools t\n  JOIN ai_prompts p ON p.id = t.ai_prompt_id\n  WHERE $__timeFilter(t.started_at)\n    AND t.mcp_server_name <> ''\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  GROUP BY 1, 2\n),\ntop_servers AS (\n  SELECT server FROM (\n    SELECT server, ROW_NUMBER() OVER (ORDER BY SUM(calls) DESC, server) AS rn\n    FROM m JOIN weeks USING (week)\n    GROUP BY server\n  ) r WHERE rn <= 8\n)\nSELECT TIMESTAMP(w.week) + INTERVAL 84 HOUR AS \"time\",\n  COALESCE(s.server, 'Other') AS metric,\n  SUM(m.calls) AS value\nFROM weeks w\nJOIN m ON m.week = w.week\nLEFT JOIN top_servers s ON s.server = m.server\nGROUP BY 1, 2\nORDER BY 1, 2\n",
+          "refId": "A"
+        }
+      ],
+      "title": "MCP Calls by Server (Weekly)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 42
+      },
+      "id": 14,
+      "panels": [],
+      "title": "Hooks",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Users and sessions with hooks registered, per Claude Code OTel team, over the selected range. Managed hooks come from policySettings. Sources and Hook events list what is registered.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false,
+            "minWidth": 110
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sources"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              },
+              {
+                "id": "custom.minWidth",
+                "value": 160
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Hook events"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              },
+              {
+                "id": "custom.minWidth",
+                "value": 160
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 43
+      },
+      "id": 15,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- policySettings is the managed settings source, so its hooks are the ones an administrator deployed.\nSELECT c.team_slug AS \"Team\",\n  COUNT(DISTINCT COALESCE(NULLIF(h.user_email, ''), h.user_key)) AS \"Users with hooks\",\n  COUNT(DISTINCT CASE WHEN h.hook_source = 'policySettings' THEN COALESCE(NULLIF(h.user_email, ''), h.user_key) END) AS \"Users with managed hooks\",\n  COUNT(DISTINCT h.session_id) AS \"Sessions\",\n  GROUP_CONCAT(DISTINCT h.hook_source ORDER BY h.hook_source SEPARATOR ', ') AS \"Sources\",\n  GROUP_CONCAT(DISTINCT h.hook_event ORDER BY h.hook_event SEPARATOR ', ') AS \"Hook events\"\nFROM ai_session_hooks h\nJOIN _tool_claude_code_otel_connections c ON c.id = h.source_connection_id\nWHERE $__timeFilter(h.first_registered_at)\n  AND h.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  AND COALESCE(NULLIF(h.user_email, ''), h.user_key) IN (${user:sqlstring})\n  AND COALESCE(h.repository_url, 'Unknown') IN (${repository:sqlstring})\nGROUP BY c.team_slug\nORDER BY 2 DESC\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Hook Coverage by Team",
+      "type": "table"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Hook runs in each completed week (bars, left axis), with the share that blocked the action (block rate) or failed without blocking (error rate) (lines, right axis).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            },
+            "axisSoftMin": 0,
+            "barWidthFactor": 0.4
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Hook runs"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Hook runs"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Block rate"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "custom.drawStyle",
+                "value": "line"
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "always"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Rate"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Error rate"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "custom.drawStyle",
+                "value": "line"
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "always"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Rate"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 49
+      },
+      "id": 16,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Completed Monday-start UTC weeks only; hook runs count on the day their prompt started.\nWITH RECURSIVE wk AS (\n  SELECT DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY) AS d\n  UNION ALL\n  SELECT DATE_ADD(d, INTERVAL 7 DAY) FROM wk WHERE DATE_ADD(d, INTERVAL 7 DAY) < $__timeTo()\n),\nweeks AS (\n  SELECT DATE_FORMAT(d, '%Y-%m-%d') AS week FROM wk\n  WHERE TIMESTAMP(d) >= $__timeFrom() AND TIMESTAMP(DATE_ADD(d, INTERVAL 7 DAY)) <= DATE_ADD($__timeTo(), INTERVAL 1 SECOND)\n),\nx AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(p.started_at), INTERVAL WEEKDAY(p.started_at) DAY), '%Y-%m-%d') AS week, SUM(p.hook_count) AS hooks, SUM(p.hook_block_count) AS blocking, SUM(p.hook_error_count) AS errors\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.hook_count > 0\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  GROUP BY 1\n)\nSELECT TIMESTAMP(w.week) + INTERVAL 84 HOUR AS \"time\",\n  COALESCE(x.hooks, 0) AS \"Hook runs\",\n  x.blocking / NULLIF(x.hooks, 0) AS \"Block rate\",\n  x.errors / NULLIF(x.hooks, 0) AS \"Error rate\"\nFROM weeks w\nLEFT JOIN x ON x.week = w.week\nORDER BY 1\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Hook Outcomes (Weekly)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Time hooks took per prompt, summed over the prompt's hook runs, as the median and the average in each completed week.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 49
+      },
+      "id": 17,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Hook time per prompt is the sum over the prompt's hook runs; prompts without hook runs are left out.\nWITH RECURSIVE wk AS (\n  SELECT DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY) AS d\n  UNION ALL\n  SELECT DATE_ADD(d, INTERVAL 7 DAY) FROM wk WHERE DATE_ADD(d, INTERVAL 7 DAY) < $__timeTo()\n),\nweeks AS (\n  SELECT DATE_FORMAT(d, '%Y-%m-%d') AS week FROM wk\n  WHERE TIMESTAMP(d) >= $__timeFrom() AND TIMESTAMP(DATE_ADD(d, INTERVAL 7 DAY)) <= DATE_ADD($__timeTo(), INTERVAL 1 SECOND)\n),\nranked AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(p.started_at), INTERVAL WEEKDAY(p.started_at) DAY), '%Y-%m-%d') AS week, p.hook_duration_ms AS ms,\n    ROW_NUMBER() OVER (PARTITION BY DATE_FORMAT(DATE_SUB(DATE(p.started_at), INTERVAL WEEKDAY(p.started_at) DAY), '%Y-%m-%d') ORDER BY p.hook_duration_ms) AS rn,\n    COUNT(*) OVER (PARTITION BY DATE_FORMAT(DATE_SUB(DATE(p.started_at), INTERVAL WEEKDAY(p.started_at) DAY), '%Y-%m-%d')) AS n\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.hook_count > 0\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n),\nx AS (\n  SELECT week, MAX(CASE WHEN rn = CEIL(n / 2) THEN ms END) AS p50, AVG(ms) AS avg_ms\n  FROM ranked\n  GROUP BY week\n)\nSELECT TIMESTAMP(w.week) + INTERVAL 84 HOUR AS \"time\",\n  x.p50 AS \"Median per prompt\",\n  x.avg_ms AS \"Average per prompt\"\nFROM weeks w\nLEFT JOIN x ON x.week = w.week\nORDER BY 1\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Hook Time per Prompt (Weekly)",
+      "type": "timeseries"
+    }
+  ],
+  "preload": false,
+  "refresh": "",
+  "schemaVersion": 42,
+  "tags": [
+    "claude",
+    "anthropic",
+    "devlake",
+    "ai"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nINNER JOIN user_project_mapping upm ON upm.project_name = p.name\nWHERE c.status = 'active'\n  AND upm.user_login = ${__user.login:sqlstring}\nORDER BY p.name;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Project",
+        "multi": true,
+        "name": "project",
+        "options": [],
+        "query": "SELECT DISTINCT p.name AS __text, p.name AS __value\nFROM projects p\nINNER JOIN _tool_claude_code_otel_connection_projects cp ON cp.project_name = p.name\nINNER JOIN _tool_claude_code_otel_connections c ON c.id = cp.connection_id\nINNER JOIN user_project_mapping upm ON upm.project_name = p.name\nWHERE c.status = 'active'\n  AND upm.user_login = ${__user.login:sqlstring}\nORDER BY p.name;",
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND (cp.project_name REGEXP '^(${project:regex})$' AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring}))\nORDER BY c.team_slug;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Claude Code OTel teams",
+        "multi": true,
+        "name": "otel_teams",
+        "options": [],
+        "query": "SELECT DISTINCT\n    c.team_slug AS __text,\n    c.team_slug AS __value\nFROM _tool_claude_code_otel_connections AS c\nINNER JOIN _tool_claude_code_otel_connection_projects AS cp\n    ON cp.connection_id = c.id\nWHERE c.status = 'active'\n  AND (cp.project_name REGEXP '^(${project:regex})$' AND cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring}))\nORDER BY c.team_slug;",
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "-- The label is the person's full name from their DevLake account, falling back to the email; the value stays the\n-- email (or user key) that every panel filters on.\nSELECT COALESCE(u.full_name, u.user) AS __text, u.user AS __value\nFROM (\n  SELECT COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  GROUP BY 1\n) u\nORDER BY 1;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Engineer",
+        "multi": true,
+        "name": "user",
+        "options": [],
+        "query": "-- The label is the person's full name from their DevLake account, falling back to the email; the value stays the\n-- email (or user key) that every panel filters on.\nSELECT COALESCE(u.full_name, u.user) AS __text, u.user AS __value\nFROM (\n  SELECT COALESCE(NULLIF(p.user_email, ''), p.user_key) AS user,\n    MAX(NULLIF(TRIM(a.full_name), '')) AS full_name\n  FROM ai_prompts p\n  LEFT JOIN accounts a ON a.id = p.account_id\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n  GROUP BY 1\n) u\nORDER BY 1;",
+        "refresh": 2,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": "mysql",
+        "definition": "-- Repositories the selected users' prompts ran in, labelled as on Token Usage by Repository.\n-- 'Unknown' stands for prompts without a repository; a real repository_url is always an\n-- https URL, so it cannot clash.\nSELECT CASE\n    WHEN r.url = 'Unknown' THEN 'Unknown'\n    WHEN r.url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GH: ')\n    WHEN r.url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GL: ')\n    WHEN r.url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'BB: ')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN r.url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/(scm/)?', 'BB: ')\n    ELSE REGEXP_REPLACE(r.url, '^https?://', '')\n  END AS __text, r.url AS __value\nFROM (\n  SELECT DISTINCT COALESCE(p.repository_url, 'Unknown') AS url\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n) r\nORDER BY r.url = 'Unknown', 1;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Repository",
+        "multi": true,
+        "name": "repository",
+        "options": [],
+        "query": "-- Repositories the selected users' prompts ran in, labelled as on Token Usage by Repository.\n-- 'Unknown' stands for prompts without a repository; a real repository_url is always an\n-- https URL, so it cannot clash.\nSELECT CASE\n    WHEN r.url = 'Unknown' THEN 'Unknown'\n    WHEN r.url REGEXP '^https?://([^/]*[.])?github[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GH: ')\n    WHEN r.url REGEXP '^https?://([^/]*[.])?gitlab[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'GL: ')\n    WHEN r.url REGEXP '^https?://(www[.])?bitbucket[.]org/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/', 'BB: ')\n    -- Bitbucket Server clone URLs carry an scm/ prefix that the SSH remote of the same repository lacks.\n    WHEN r.url REGEXP '^https?://([^/]*[.])?bitbucket[^/.]*[.][^/]+/' THEN REGEXP_REPLACE(r.url, '^https?://[^/]+/(scm/)?', 'BB: ')\n    ELSE REGEXP_REPLACE(r.url, '^https?://', '')\n  END AS __text, r.url AS __value\nFROM (\n  SELECT DISTINCT COALESCE(p.repository_url, 'Unknown') AS url\n  FROM ai_prompts p\n  WHERE p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n) r\nORDER BY r.url = 'Unknown', 1;",
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ]
+  },
+  "timezone": "utc",
+  "title": "Tools, MCP & Hooks",
+  "uid": "claude_prompts_tools_mcp_hooks_mysql"
+}
