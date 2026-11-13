@@ -58,6 +58,8 @@ Private signing keys are stored AES-256-GCM encrypted in the `SecretStoreEntries
 
 Health endpoints: `/health/live` and `/health/ready`. Readiness checks MySQL and RabbitMQ.
 
+Run **one instance of the API**. Several things live in the process, not in shared state: the rate limits, the cap on concurrent DevLake calls (`DevLake:MaxConcurrentRequests`), the cache of Sophia access tokens, and the processing job. A second instance would double every limit, and its job's stale-request sweep could mark `Failed` a request the other instance is still delivering. The admin portal can run separately; it does not process requests.
+
 ## Admin portal
 
 The portal (`Arbisoft.DevLake.IntegrationService.Web`) manages the auth side of the service. It shares the API's database and the same `Database__*`, `RabbitMq__*` and `Security__*` settings, and it never processes requests. It signs in one admin account from configuration; the password is stored only as a hash:
@@ -71,14 +73,14 @@ dotnet run --project Arbisoft.DevLake.IntegrationService.Web
 Every page needs the sign-in (the fallback policy is deny), POSTs need an anti-forgery token, sign-in attempts are limited to 10 a minute per address, and the cookie is HttpOnly, SameSite=Strict and lasts 8 hours of activity. With no admin configured, nobody can sign in. Each change records the admin's name as `createdBy` or `modifiedBy`.
 
 - **Clients:** list, create, edit and view details, including the active flag and token lifetime (60 to 86,400 seconds). The Client ID never changes.
-- **Client secrets:** create one (1 to 730 days) and it is shown once; only a hash is stored. Revoke any of them. A client can hold several, so a secret can be rotated without downtime. Share new credentials through Passbolt.
-- **Scopes:** list, create and edit, and assign them to a client on its details page.
+- **Client secrets:** create one (1 to 730 days) and it is shown once; only a hash is stored. Revoke any of them; the unexpired tokens issued with that secret are revoked in the same transaction, so a leaked secret's tokens stop working at once. Every API call also checks, in the same query that checks the token and its client, that the token's secret is not revoked, so a token issued at the moment its secret was revoked is refused too. A client can hold several, so a secret can be rotated without downtime. Share new credentials through Passbolt.
+- **Scopes:** list, create and edit, and assign them to a client on its details page. Taking a scope away from a client also revokes the client's unexpired tokens, because they still carry it; the client's next token has its current scopes.
 - **Signing keys:** list the keys and rotate the active one. Rotation generates an RSA key, stores the private half encrypted, activates the new key and retires the old one in one transaction. Retired keys stay, so tokens already issued keep verifying until they expire.
 - **Access tokens:** list the 200 most recent and revoke one with a reason. The reason also records who revoked it, because the table has no "revoked by" column.
 
 - **Email mappings:** list (50 a page, with search), create and edit the other emails each engineer commits with. Both addresses are trimmed and lower-cased by `EmailNormalizer` before they are compared or stored, the Arbisoft address must be in `Requests:AllowedEmailDomains`, and the mapped address is also kept as typed. The matched columns use a binary collation, so SQL compares exactly what the code compares.
 - **Outbound configs:** one per client. Choose OAuth2 client credentials or a static API token, the base URL (HTTPS; plain HTTP only for localhost), max delivery attempts (1 to 10) and the active flag. Secrets are encrypted before they are stored and are never shown again: leave a field blank to keep the stored value, or type a new one to rotate it. The page shows whether one is stored, when it was last rotated and, for a token, when it expires. Fields for the other auth type are cleared on save.
-- **Callback URLs:** for each config, the event type to method and path mappings. The path is checked with the same code that builds the calls, so it must start with a single `/` and stay on the base URL's host. Only one URL can be active per event type.
+- **Callback URLs:** for each config, the event type to method and path mappings. The path is appended to the base URL, keeping the base URL's own path (`https://sophia.example.com/api/v1` and `/cb` call `https://sophia.example.com/api/v1/cb`), and the config page shows the full URL each one calls. The path is checked with the same code that builds the calls, so it must start with a single `/` and stay on the base URL's host. Only one URL can be active per event type.
 - **Request logs:** filter by client, status and UTC dates (50 a page), and open a request to see its JSON body and every delivery attempt with the client's response. The body holds engineer emails, so it is shown only here.
 
 The client, scope, key and token lists show at most 200 rows.
@@ -217,7 +219,7 @@ Only read calls retry (timeouts, 5xx and 429, never a 4xx). The Sophia callback 
 
 ## Projects from Workstream
 
-`GET /fetch/projects` (scope `projects:fetch`, not versioned) returns every Workstream project with its team lead, so DevLake never calls Workstream itself. It first checks Workstream's token, then reads `/projects?page=N&pageSize=M` page after page (`Workstream:PageSize`, default 10) until a short page, a page with nothing new on it, or a safety limit of 10,000 pages.
+`GET /fetch/projects` (scope `projects:fetch`, not versioned) returns every Workstream project with its team lead, so DevLake never calls Workstream itself. It first checks Workstream's token, then reads `/projects?page=N&pageSize=M` page after page (`Workstream:PageSize`, default 10) until a page whose `next` link is null, an empty page, a page with nothing new on it, or a safety limit of 10,000 pages. A short page is not taken as the end, because Workstream may cap the page size below what was asked for.
 
 ```json
 [ { "id": "p-1", "name": "Apollo", "team_lead": { "name": "Jane Doe", "email": "jane.doe@arbisoft.com" } } ]
@@ -269,6 +271,7 @@ These settings can be changed without code changes:
 | `RateLimits:StatsPerMinute` | 100 | Single-email requests per client per minute |
 | `RateLimits:BatchPerMinute` | 20 | Batch requests per client per minute |
 | `RateLimits:PollPerMinute` | 100 | Status poll requests per client per minute |
+| `RateLimits:TokenPerMinute` | 10 | `POST /auth/token/` requests per caller IP address per minute. Each attempt runs a slow secret hash, so this stops secret guessing and CPU exhaustion. Over the limit the answer is 429 with `Retry-After` |
 
 As with every setting, an environment variable overrides the file, for example `Requests__DuplicateWindowMinutes=5`.
 

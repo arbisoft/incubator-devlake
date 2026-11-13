@@ -18,5 +18,6 @@ namespace Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
 /// <summary>The admin lists show the newest rows up to this cap; the portal is for a handful of clients, not for browsing thousands.</summary>
 internal static class AdminPaging
 {
-    public const int MaxRows = 200;
+    /// <summary>The same as the repositories' page cap, so a list never asks for more than one page can hold.</summary>
+    public const int MaxRows = DataAccess.Repositories.RepositoryBase.MaxPageSize;
 }

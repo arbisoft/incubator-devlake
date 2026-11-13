@@ -24,7 +24,8 @@ public interface IClientConfigRepository
 
     Task<ClientConfig?> GetByIdAsync(long id, CancellationToken cancellationToken);
 
-    Task<PagedResult<ClientConfig>> ListAsync(int page, int pageSize, CancellationToken cancellationToken);
+    /// <summary>The configs of the given clients. A client with no config has no row in the result.</summary>
+    Task<IReadOnlyList<ClientConfig>> GetByClientRefIdsAsync(IReadOnlyCollection<long> clientRefIds, CancellationToken cancellationToken);
 
     Task<long> InsertAsync(ClientConfig config, CancellationToken cancellationToken);
 

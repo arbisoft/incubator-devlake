@@ -25,6 +25,9 @@ public class OutboundUrlTests
     [InlineData("https://sophia.example.com:8443", "/cb", "https://sophia.example.com:8443/cb")]
     [InlineData("http://localhost:5097", "/cb", "http://localhost:5097/cb")]
     [InlineData("http://127.0.0.1:5097", "/cb", "http://127.0.0.1:5097/cb")]
+    [InlineData("https://sophia.example.com/api/v1", "/cb", "https://sophia.example.com/api/v1/cb")]
+    [InlineData("https://sophia.example.com/api/v1/", "/cb", "https://sophia.example.com/api/v1/cb")]
+    [InlineData("https://sophia.example.com/api/v1", "/cb?source=devlake", "https://sophia.example.com/api/v1/cb?source=devlake")]
     public void Combine_JoinsABaseAndAPath(string baseUrl, string path, string expected)
     {
         Assert.Equal(expected, OutboundUrl.Combine(baseUrl, path).AbsoluteUri);

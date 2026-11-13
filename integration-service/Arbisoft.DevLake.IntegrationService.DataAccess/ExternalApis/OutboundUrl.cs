@@ -21,7 +21,10 @@ namespace Arbisoft.DevLake.IntegrationService.DataAccess.ExternalApis;
 /// </summary>
 public static class OutboundUrl
 {
-    /// <summary>Joins a base URL and a path. The result stays on the base URL's host, so a path cannot redirect the call elsewhere.</summary>
+    /// <summary>
+    /// Appends a path to a base URL, keeping the base URL's own path: <c>https://sophia/api/v1</c> and <c>/cb</c> give <c>https://sophia/api/v1/cb</c>.
+    /// The result stays on the base URL's host, so a path cannot redirect the call elsewhere.
+    /// </summary>
     public static Uri Combine(string baseUrl, string path)
     {
         var baseUri = Parse(baseUrl, "base URL");
@@ -30,7 +33,7 @@ public static class OutboundUrl
             throw new CallbackNotConfiguredException("The outbound path must start with a single '/'.");
         }
 
-        var combined = new Uri(baseUri, path);
+        var combined = new Uri(baseUri, baseUri.AbsolutePath.TrimEnd('/') + path);
         if (!string.Equals(combined.Host, baseUri.Host, StringComparison.OrdinalIgnoreCase) || combined.Port != baseUri.Port)
         {
             throw new CallbackNotConfiguredException("The outbound path must stay on the base URL's host.");

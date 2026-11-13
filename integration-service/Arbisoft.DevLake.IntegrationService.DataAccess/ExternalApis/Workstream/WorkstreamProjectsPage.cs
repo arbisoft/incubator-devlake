@@ -20,12 +20,18 @@ namespace Arbisoft.DevLake.IntegrationService.DataAccess.ExternalApis.Workstream
 /// <summary>One page of Workstream's project list.</summary>
 /// <param name="Items">The projects on this page, as Workstream returned them.</param>
 /// <param name="Page">The page number that was asked for, starting at 1.</param>
-/// <param name="PageSize">The page size that was asked for. A page with fewer items than this is the last one.</param>
-public sealed record WorkstreamProjectsPage(IReadOnlyList<JsonElement> Items, int Page, int PageSize)
+/// <param name="PageSize">The page size that was asked for. Workstream may return fewer, for example when it caps the page size.</param>
+/// <param name="HasNextPage">What Workstream's <c>next</c> link says, when the answer has one: true for a link, false for null. Null when there is no such field.</param>
+public sealed record WorkstreamProjectsPage(IReadOnlyList<JsonElement> Items, int Page, int PageSize, bool? HasNextPage = null)
 {
     private static readonly string[] ListProperties = ["results", "data", "items", "projects"];
+    private const string NextProperty = "next";
 
-    public bool IsLast => Items.Count < PageSize;
+    /// <summary>
+    /// The last page is the one whose <c>next</c> link is null or, with no such link, an empty page. A page with fewer items than were asked for
+    /// is not taken as the last: Workstream may cap the page size below what was asked, and stopping there would silently cut the list short.
+    /// </summary>
+    public bool IsLast => HasNextPage is { } hasNext ? !hasNext : Items.Count == 0;
 
     /// <summary>
     /// Reads a page from either shape Workstream may use: a bare JSON array, or an object holding the array under results, data, items or projects.
@@ -47,10 +53,25 @@ public sealed record WorkstreamProjectsPage(IReadOnlyList<JsonElement> Items, in
         {
             if (body.TryGetProperty(name, out var list) && list.ValueKind == JsonValueKind.Array)
             {
-                return new WorkstreamProjectsPage(list.EnumerateArray().ToList(), page, pageSize);
+                return new WorkstreamProjectsPage(list.EnumerateArray().ToList(), page, pageSize, ReadNext(body));
             }
         }
 
         return null;
+    }
+
+    private static bool? ReadNext(JsonElement body)
+    {
+        if (!body.TryGetProperty(NextProperty, out var next))
+        {
+            return null;
+        }
+
+        return next.ValueKind switch
+        {
+            JsonValueKind.Null => false,
+            JsonValueKind.String => !string.IsNullOrEmpty(next.GetString()),
+            _ => null
+        };
     }
 }

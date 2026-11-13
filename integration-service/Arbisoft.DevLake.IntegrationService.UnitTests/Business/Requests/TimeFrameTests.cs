@@ -29,7 +29,7 @@ public class TimeFrameTests
     [InlineData("12M", 12, 'M', 8640)]
     [InlineData("1y", 1, 'y', 8760)]
     [InlineData("365d", 365, 'd', 8760)]
-    [InlineData("8760h", 8760, 'h', 8760)]
+    [InlineData("999h", 999, 'h', 999)]
     public void TryParse_AcceptsTheDocumentedFormats(string text, int value, char unit, double hours)
     {
         Assert.True(TimeFrame.TryParse(text, out var timeFrame, out var error));
@@ -61,7 +61,6 @@ public class TimeFrameTests
     [InlineData("1d ")]
     [InlineData("24hours")]
     [InlineData("abc")]
-    [InlineData("99999999999d")]
     public void TryParse_RejectsAnythingElse_UnitsAreCaseSensitive(string? text)
     {
         Assert.False(TimeFrame.TryParse(text, out _, out var error));
@@ -74,11 +73,32 @@ public class TimeFrameTests
     [InlineData("13M")]
     [InlineData("53w")]
     [InlineData("2y")]
-    [InlineData("8761h")]
     public void TryParse_RejectsAnythingLongerThanOneYear(string text)
     {
         Assert.False(TimeFrame.TryParse(text, out _, out var error));
 
         Assert.Equal("The time frame cannot be longer than one year.", error);
+    }
+
+    /// <summary>DevLake's stats endpoints accept 1 to 999 (<c>^([1-9][0-9]{0,2})([hdwMy])$</c>). A larger number would be acknowledged here and refused there.</summary>
+    [Theory]
+    [InlineData("1000h")]
+    [InlineData("8760h")]
+    [InlineData("8761h")]
+    [InlineData("0365d")]
+    [InlineData("99999999999d")]
+    public void TryParse_RejectsANumberDevLakeWouldRefuse(string text)
+    {
+        Assert.False(TimeFrame.TryParse(text, out _, out var error));
+
+        Assert.NotNull(error);
+    }
+
+    [Fact]
+    public void TryParse_ExplainsTheLimitOnTheNumber()
+    {
+        Assert.False(TimeFrame.TryParse("1000h", out _, out var error));
+
+        Assert.Equal("The time frame number must be from 1 to 999.", error);
     }
 }

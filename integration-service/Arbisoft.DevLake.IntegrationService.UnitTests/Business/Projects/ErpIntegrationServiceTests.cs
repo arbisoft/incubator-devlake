@@ -41,16 +41,20 @@ public class ErpIntegrationServiceTests
 
     private static WorkstreamProjectsPage Page(int page, params int[] ids) => new(ids.Select(Item).ToList(), page, 3);
 
+    /// <summary>Serves the pages in order, then an empty page after the last one, as a Workstream without a next link ends its list.</summary>
     private void GivenPages(params WorkstreamProjectsPage[] pages)
     {
         foreach (var page in pages)
         {
             _workstream.GetProjectsPageAsync(page.Page, 3, CorrelationId, Arg.Any<CancellationToken>()).Returns(page);
         }
+
+        var after = pages.Length == 0 ? 1 : pages.Max(page => page.Page) + 1;
+        _workstream.GetProjectsPageAsync(after, 3, CorrelationId, Arg.Any<CancellationToken>()).Returns(Page(after));
     }
 
     [Fact]
-    public async Task EveryPage_IsReadAndMergedInOrder_UntilTheShortOne()
+    public async Task EveryPage_IsReadAndMergedInOrder_UntilAnEmptyPage()
     {
         GivenPages(Page(1, 1, 2, 3), Page(2, 4, 5, 6), Page(3, 7));
 
@@ -59,8 +63,30 @@ public class ErpIntegrationServiceTests
         Assert.Equal(ProjectsFetchOutcome.Fetched, result.Outcome);
         Assert.Equal(["p1", "p2", "p3", "p4", "p5", "p6", "p7"], result.Projects.Select(p => p.Id));
         Assert.Equal("Lead 4", result.Projects[3].TeamLead!.Name);
-        await _workstream.Received(1).GetProjectsPageAsync(3, 3, CorrelationId, Arg.Any<CancellationToken>());
-        await _workstream.DidNotReceive().GetProjectsPageAsync(4, Arg.Any<int>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _workstream.Received(1).GetProjectsPageAsync(4, 3, CorrelationId, Arg.Any<CancellationToken>());
+        await _workstream.DidNotReceive().GetProjectsPageAsync(5, Arg.Any<int>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AShortPage_IsNotTakenAsTheLast_SoAWorkstreamThatCapsThePageSizeStillGivesTheWholeList()
+    {
+        GivenPages(Page(1, 1, 2), Page(2, 3, 4), Page(3, 5));
+
+        var result = await _service.FetchProjectsAsync(CorrelationId, CancellationToken.None);
+
+        Assert.Equal(["p1", "p2", "p3", "p4", "p5"], result.Projects.Select(p => p.Id));
+    }
+
+    [Fact]
+    public async Task ANullNextLink_EndsTheList_WithoutAskingForAnotherPage()
+    {
+        _workstream.GetProjectsPageAsync(1, 3, CorrelationId, Arg.Any<CancellationToken>())
+            .Returns(new WorkstreamProjectsPage([Item(1), Item(2)], 1, 3, HasNextPage: false));
+
+        var result = await _service.FetchProjectsAsync(CorrelationId, CancellationToken.None);
+
+        Assert.Equal(["p1", "p2"], result.Projects.Select(p => p.Id));
+        await _workstream.Received(1).GetProjectsPageAsync(Arg.Any<int>(), 3, CorrelationId, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -189,7 +215,7 @@ public class ErpIntegrationServiceTests
         await _service.FetchProjectsAsync(CorrelationId, cancellation.Token);
 
         await _workstream.Received(1).IsTokenValidAsync(CorrelationId, cancellation.Token);
-        await _workstream.Received(2).GetProjectsPageAsync(Arg.Any<int>(), 3, CorrelationId, cancellation.Token);
+        await _workstream.Received(3).GetProjectsPageAsync(Arg.Any<int>(), 3, CorrelationId, cancellation.Token);
     }
 
     private static Exception Failure(Type type) => type.Name switch

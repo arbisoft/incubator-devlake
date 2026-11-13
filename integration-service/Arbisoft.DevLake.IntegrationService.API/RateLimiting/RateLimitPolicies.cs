@@ -24,14 +24,16 @@ using Microsoft.Extensions.Options;
 namespace Arbisoft.DevLake.IntegrationService.API.RateLimiting;
 
 /// <summary>
-/// Per-client rate limits at the edge (API-9). Each client has its own allowance, so one busy client cannot use up another's. A client over a
-/// limit gets 429 with Retry-After.
+/// Rate limits at the edge (API-9). Each client has its own allowance, so one busy client cannot use up another's; the anonymous token endpoint
+/// is limited per caller IP address instead, because the caller is not known until its secret has been checked. A caller over a limit gets 429
+/// with Retry-After.
 /// </summary>
 public static class RateLimitPolicies
 {
     public const string SingleStats = "stats-single";
     public const string BatchStats = "stats-batch";
     public const string RequestPoll = "requests-poll";
+    public const string Token = "auth-token";
     public const string ErrorCode = "rate_limited";
 
     private const int SegmentsPerWindow = 6;
@@ -57,13 +59,24 @@ public static class RateLimitPolicies
         options.AddPolicy(SingleStats, context => PerClient(context, limits.Value.StatsPerMinute));
         options.AddPolicy(BatchStats, context => PerClient(context, limits.Value.BatchPerMinute));
         options.AddPolicy(RequestPoll, context => PerClient(context, limits.Value.PollPerMinute));
+        options.AddPolicy(Token, context => SlidingWindow(CallerIp(context), limits.Value.TokenPerMinute));
         options.OnRejected = WriteRejectionAsync;
     }
 
     private static RateLimitPartition<string> PerClient(HttpContext context, int permitsPerMinute)
     {
-        var client = context.User.FindFirstValue(TokenClaims.Client) ?? context.Connection.RemoteIpAddress?.ToString() ?? AnonymousPartition;
-        return RateLimitPartition.GetSlidingWindowLimiter(client, _ => new SlidingWindowRateLimiterOptions
+        return SlidingWindow(context.User.FindFirstValue(TokenClaims.Client) ?? CallerIp(context), permitsPerMinute);
+    }
+
+    private static string CallerIp(HttpContext context)
+    {
+        var address = context.Connection.RemoteIpAddress;
+        return address is null ? AnonymousPartition : (address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address).ToString();
+    }
+
+    private static RateLimitPartition<string> SlidingWindow(string partition, int permitsPerMinute)
+    {
+        return RateLimitPartition.GetSlidingWindowLimiter(partition, _ => new SlidingWindowRateLimiterOptions
         {
             PermitLimit = permitsPerMinute,
             Window = Window,

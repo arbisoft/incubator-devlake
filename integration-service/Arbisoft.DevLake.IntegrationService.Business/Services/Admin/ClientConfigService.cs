@@ -77,7 +77,7 @@ public sealed class ClientConfigService : IClientConfigService
     public async Task<IReadOnlyList<ClientConfigRowDto>> ListAsync(CancellationToken cancellationToken)
     {
         var clients = await _clients.ListAsync(1, AdminPaging.MaxRows, cancellationToken);
-        var configs = (await _configs.ListAsync(1, AdminPaging.MaxRows, cancellationToken)).Items.ToDictionary(c => c.ClientRefId);
+        var configs = (await _configs.GetByClientRefIdsAsync(clients.Items.Select(c => c.Id).ToList(), cancellationToken)).ToDictionary(c => c.ClientRefId);
         return clients.Items
             .Select(c => new ClientConfigRowDto(c.Id, c.ClientId, c.Name, configs.TryGetValue(c.Id, out var config) ? ToDto(config) : null))
             .ToList();
@@ -92,7 +92,7 @@ public sealed class ClientConfigService : IClientConfigService
         }
 
         var config = await _configs.GetByClientRefIdAsync(clientRefId, cancellationToken);
-        var urls = config is null ? [] : (await _configs.GetOutboundUrlsAsync(config.Id, cancellationToken)).Select(ToDto).ToList();
+        var urls = config is null ? [] : (await _configs.GetOutboundUrlsAsync(config.Id, cancellationToken)).Select(url => ToDto(url, config.BaseUrl)).ToList();
         return new ClientConfigDetailsDto(client.Id, client.ClientId, client.Name, config is null ? null : ToDto(config), urls);
     }
 
@@ -133,7 +133,7 @@ public sealed class ClientConfigService : IClientConfigService
     public async Task<OutboundUrlDto?> GetUrlAsync(long urlId, CancellationToken cancellationToken)
     {
         var url = await _configs.GetOutboundUrlByIdAsync(urlId, cancellationToken);
-        return url is null ? null : ToDto(url);
+        return url is null ? null : ToDto(url, baseUrl: null);
     }
 
     public async Task<AdminResult<long>> CreateUrlAsync(long clientRefId, OutboundUrlInput input, string createdBy, CancellationToken cancellationToken)
@@ -378,6 +378,18 @@ public sealed class ClientConfigService : IClientConfigService
         !string.IsNullOrEmpty(c.OutboundClientSecretEncrypted), !string.IsNullOrEmpty(c.ApiTokenEncrypted),
         c.TokenExpiresOn, c.TokenRotatedOn, c.MaxAttempts, c.IsActive, c.CreatedOn, c.CreatedBy, c.ModifiedOn, c.ModifiedBy);
 
-    private static OutboundUrlDto ToDto(ClientConfigOutboundUrl u) =>
-        new(u.Id, u.ClientConfigId, u.EventType, u.Method, u.Path, u.IsActive, u.CreatedOn, u.CreatedBy, u.ModifiedOn, u.ModifiedBy);
+    private static OutboundUrlDto ToDto(ClientConfigOutboundUrl u, string? baseUrl) =>
+        new(u.Id, u.ClientConfigId, u.EventType, u.Method, u.Path, u.IsActive, u.CreatedOn, u.CreatedBy, u.ModifiedOn, u.ModifiedBy, Resolve(baseUrl, u.Path));
+
+    private static string? Resolve(string? baseUrl, string path)
+    {
+        try
+        {
+            return baseUrl is null ? null : OutboundUrl.Combine(baseUrl, path).AbsoluteUri;
+        }
+        catch (CallbackNotConfiguredException)
+        {
+            return null;
+        }
+    }
 }

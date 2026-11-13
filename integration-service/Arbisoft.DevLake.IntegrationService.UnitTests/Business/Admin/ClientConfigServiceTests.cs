@@ -16,6 +16,7 @@
 using Arbisoft.DevLake.IntegrationService.Business.Dtos.Admin;
 using Arbisoft.DevLake.IntegrationService.Business.Security;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
+using Arbisoft.DevLake.IntegrationService.DataAccess.ExternalApis;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
 using Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers.Builders;
@@ -193,12 +194,24 @@ public class ClientConfigServiceTests
     {
         _clients.ListAsync(1, Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(new PagedResult<Client>([new Client { Id = 1, ClientId = "sophia" }, new Client { Id = 2, ClientId = "other" }], 2, 1, 200));
-        _configs.ListAsync(1, Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(new PagedResult<ClientConfig>([Stored()], 1, 1, 200));
+        _configs.GetByClientRefIdsAsync(Arg.Is<IReadOnlyCollection<long>>(ids => ids.Count == 2 && ids.Contains(1) && ids.Contains(2)), Arg.Any<CancellationToken>())
+            .Returns([Stored()]);
 
         var rows = await _service.ListAsync(CancellationToken.None);
 
         Assert.NotNull(rows[0].Config);
         Assert.Null(rows[1].Config);
+    }
+
+    [Fact]
+    public async Task Get_ShowsTheFullAddressEachCallbackUrlCalls()
+    {
+        _clients.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(new Client { Id = 1, ClientId = "sophia", Name = "Sophia" });
+        GivenConfig(new ClientConfigOutboundUrl { Id = 7, ClientConfigId = 4, EventType = "engineer-stats", Method = "POST", Path = "/cb", IsActive = true });
+
+        var details = await _service.GetAsync(1, CancellationToken.None);
+
+        Assert.Equal(OutboundUrl.Combine(Stored().BaseUrl, "/cb").AbsoluteUri, Assert.Single(details!.Urls).ResolvedUrl);
     }
 
     private void GivenConfig(params ClientConfigOutboundUrl[] urls)

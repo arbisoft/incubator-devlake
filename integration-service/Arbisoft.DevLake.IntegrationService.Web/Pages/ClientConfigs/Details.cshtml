@@ -58,7 +58,7 @@ else
     <div class="actions"><a class="button" asp-page="/ClientConfigs/Urls/Create" asp-route-clientRefId="@details.ClientRefId">New URL</a></div>
     <div class="table-wrap">
     <table>
-      <thead><tr><th>Event type</th><th>Method</th><th>Path</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th>Event type</th><th>Method</th><th>Path</th><th>Calls</th><th>Status</th><th></th></tr></thead>
       <tbody>
       @foreach (var url in details.Urls)
       {
@@ -66,13 +66,14 @@ else
             <td class="mono">@url.EventType</td>
             <td>@url.Method</td>
             <td class="mono">@url.Path</td>
+            <td class="mono">@(url.ResolvedUrl ?? "Not a valid URL; check the base URL")</td>
             <td><span class="badge @(url.IsActive ? "Active" : "Inactive")">@(url.IsActive ? "Active" : "Inactive")</span></td>
             <td><a asp-page="/ClientConfigs/Urls/Edit" asp-route-clientRefId="@details.ClientRefId" asp-route-urlId="@url.Id">Edit</a></td>
           </tr>
       }
       @if (details.Urls.Count == 0)
       {
-          <tr><td colspan="5" class="muted">No URLs yet.</td></tr>
+          <tr><td colspan="6" class="muted">No URLs yet.</td></tr>
       }
       </tbody>
     </table>

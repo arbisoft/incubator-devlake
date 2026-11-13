@@ -48,6 +48,16 @@ public class ScopeAndMappingRepositoryTests : RepositoryTestBase
     }
 
     [MySqlFact]
+    public async Task Scope_GetExistingIds_ReturnsOnlyTheIdsThatExist()
+    {
+        var repository = Get<IScopeRepository>();
+        var id = await repository.InsertAsync(new Scope { Name = Unique("stats:read"), CreatedOn = Instant }, CancellationToken.None);
+
+        Assert.Equal([id], await repository.GetExistingIdsAsync([id, long.MaxValue], CancellationToken.None));
+        Assert.Empty(await repository.GetExistingIdsAsync([], CancellationToken.None));
+    }
+
+    [MySqlFact]
     public async Task EmailMapping_GetMappedEmails_ReturnsOnlyThatEngineersOtherEmails()
     {
         var repository = Get<IEmailMappingRepository>();

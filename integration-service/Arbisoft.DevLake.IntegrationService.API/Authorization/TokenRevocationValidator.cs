@@ -20,20 +20,19 @@ using Microsoft.IdentityModel.JsonWebTokens;
 namespace Arbisoft.DevLake.IntegrationService.API.Authorization;
 
 /// <summary>
-/// Runs after a token's signature, issuer, audience and expiry check out. It rejects the token when the Auth API never issued it
-/// (no AccessTokens row for its jti), when it was revoked, or when its client has been deactivated, so a revocation or a deactivation takes
-/// effect before the token expires.
+/// Runs after a token's signature, issuer, audience and expiry check out. It rejects the token when the Auth API never issued it (no AccessTokens
+/// row for its jti), when it was revoked, when its client has been deactivated, or when the secret it was issued with has been revoked. All four
+/// are read in one query, so a revocation or a deactivation takes effect on the next request, before the token expires. Checking the secret here
+/// also covers a token issued at the same moment its secret was revoked, which the bulk revocation of that secret's tokens can miss.
 /// </summary>
 public sealed class TokenRevocationValidator
 {
     private readonly IAccessTokenRepository _accessTokens;
-    private readonly IClientRepository _clients;
     private readonly ILogger<TokenRevocationValidator> _logger;
 
-    public TokenRevocationValidator(IAccessTokenRepository accessTokens, IClientRepository clients, ILogger<TokenRevocationValidator> logger)
+    public TokenRevocationValidator(IAccessTokenRepository accessTokens, ILogger<TokenRevocationValidator> logger)
     {
         _accessTokens = accessTokens;
-        _clients = clients;
         _logger = logger;
     }
 
@@ -46,21 +45,26 @@ public sealed class TokenRevocationValidator
             return;
         }
 
-        var stored = await _accessTokens.GetByJtiAsync(jti, context.HttpContext.RequestAborted);
-        if (stored is null)
+        var validity = await _accessTokens.GetValidityByJtiAsync(jti, context.HttpContext.RequestAborted);
+        if (validity is null)
         {
             _logger.LogWarning("Rejected a validly signed token that was never issued, jti {Jti}", jti);
             context.Fail("The token was not issued by this service.");
         }
-        else if (stored.RevokedOn is not null)
+        else if (validity.TokenRevokedOn is not null)
         {
             _logger.LogInformation("Rejected revoked token {Jti}", jti);
             context.Fail("The token has been revoked.");
         }
-        else if (await _clients.GetByIdAsync(stored.ClientRefId, context.HttpContext.RequestAborted) is not { IsActive: true })
+        else if (validity.ClientIsActive is not true)
         {
             _logger.LogInformation("Rejected token {Jti} of a client that is no longer active", jti);
             context.Fail("The client is not active.");
+        }
+        else if (validity.SecretId is null || validity.SecretRevokedOn is not null)
+        {
+            _logger.LogInformation("Rejected token {Jti} issued with a client secret that has been revoked", jti);
+            context.Fail("The client secret the token was issued with has been revoked.");
         }
     }
 }

@@ -74,7 +74,7 @@ public sealed class WorkstreamClientTests : IDisposable
         Assert.Equal(2, page.Page);
         Assert.Equal(10, page.PageSize);
         Assert.Equal([1, 2], page.Items.Select(item => item.GetProperty("id").GetInt32()));
-        Assert.True(page.IsLast);
+        Assert.False(page.IsLast);
     }
 
     [Theory]
@@ -93,7 +93,7 @@ public sealed class WorkstreamClientTests : IDisposable
     }
 
     [Fact]
-    public async Task AFullPage_IsNotTheLast_AndAShortOrEmptyPageIs()
+    public async Task WithNoNextLink_OnlyAnEmptyPageIsTheLast_BecauseWorkstreamMayCapThePageSize()
     {
         _host.Handler.Respond(HttpStatusCode.OK, "[{\"id\":1},{\"id\":2}]").Respond(HttpStatusCode.OK, "[{\"id\":3}]").Respond(HttpStatusCode.OK, "[]");
 
@@ -102,9 +102,21 @@ public sealed class WorkstreamClientTests : IDisposable
         var empty = await UseAsync(client => client.GetProjectsPageAsync(3, 2, CorrelationId, CancellationToken.None));
 
         Assert.False(full.IsLast);
-        Assert.True(short1.IsLast);
+        Assert.False(short1.IsLast);
         Assert.True(empty.IsLast);
         Assert.Empty(empty.Items);
+    }
+
+    [Theory]
+    [InlineData("{\"results\":[{\"id\":1}],\"next\":\"https://workstream.test/api/projects?page=2\"}", false)]
+    [InlineData("{\"results\":[{\"id\":1}],\"next\":null}", true)]
+    [InlineData("{\"results\":[{\"id\":1}],\"next\":\"\"}", true)]
+    [InlineData("{\"results\":[{\"id\":1}],\"next\":3}", false)]
+    public void ANextLink_DecidesWhetherThePageIsTheLast(string json, bool isLast)
+    {
+        using var document = JsonDocument.Parse(json);
+
+        Assert.Equal(isLast, WorkstreamProjectsPage.FromJson(document.RootElement, 1, 10)!.IsLast);
     }
 
     [Theory]

@@ -13,11 +13,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using Arbisoft.DevLake.IntegrationService.API.RateLimiting;
 using Arbisoft.DevLake.IntegrationService.Business.Dtos.Auth;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Auth;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Net.Http.Headers;
 
 namespace Arbisoft.DevLake.IntegrationService.API.Controllers;
@@ -38,12 +40,14 @@ public sealed class AuthController : ControllerBase
         _authService = authService;
     }
 
-    /// <summary>Exchanges a Client ID and secret (HTTP Basic) for a bearer token.</summary>
+    /// <summary>Exchanges a Client ID and secret (HTTP Basic) for a bearer token. Limited per caller IP address; over the limit the answer is 429 with Retry-After.</summary>
     [HttpPost("/auth/token/")]
+    [EnableRateLimiting(RateLimitPolicies.Token)]
     [ProducesResponseType<TokenResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<OAuthErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<OAuthErrorResponse>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<OAuthErrorResponse>(StatusCodes.Status415UnsupportedMediaType)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> TokenAsync([FromForm(Name = "grant_type")] string? grantType, CancellationToken cancellationToken)
     {
         Response.Headers.CacheControl = "no-store";

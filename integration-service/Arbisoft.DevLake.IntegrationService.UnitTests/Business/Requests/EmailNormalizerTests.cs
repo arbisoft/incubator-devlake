@@ -50,6 +50,8 @@ public class EmailNormalizerTests
     [InlineData("jane@arbisoft..com")]
     [InlineData("jane@arbisoft.com, other@arbisoft.com")]
     [InlineData("<jane@arbisoft.com>")]
+    [InlineData("jane..doe@arbisoft.com")]
+    [InlineData("jane.@arbisoft.com")]
     public void TryNormalize_RejectsMalformedAddresses(string? raw)
     {
         Assert.False(EmailNormalizer.TryNormalize(raw, Domains, out _, out var error));
@@ -113,6 +115,9 @@ public class EmailNormalizerTests
     [Theory]
     [InlineData(" Jane.Doe@Gmail.COM ", "jane.doe@gmail.com")]
     [InlineData("12345+jane@users.noreply.github.com", "12345+jane@users.noreply.github.com")]
+    [InlineData("a.b.c@x.com", "a.b.c@x.com")]
+    [InlineData("a-@x.com", "a-@x.com")]
+    [InlineData("o'neil@x-y.com", "o'neil@x-y.com")]
     public void TryNormalizeAnyDomain_NormalizesWhateverTheDomain(string raw, string expected)
     {
         Assert.True(EmailNormalizer.TryNormalizeAnyDomain(raw, out var normalized, out var error));
@@ -127,6 +132,9 @@ public class EmailNormalizerTests
     [InlineData("no-at-sign")]
     [InlineData("two@@gmail.com")]
     [InlineData("a b@gmail.com")]
+    [InlineData("a..b@x.com")]
+    [InlineData("a.@gmail.com")]
+    [InlineData(".a@x.com")]
     public void TryNormalizeAnyDomain_RejectsMalformedAddresses(string? raw)
     {
         Assert.False(EmailNormalizer.TryNormalizeAnyDomain(raw, out _, out var error));

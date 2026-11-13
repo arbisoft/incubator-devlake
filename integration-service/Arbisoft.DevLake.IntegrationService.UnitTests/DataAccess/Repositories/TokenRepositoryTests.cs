@@ -66,6 +66,75 @@ public class TokenRepositoryTests : RepositoryTestBase
     }
 
     [MySqlFact]
+    public async Task AccessToken_RevokeActiveBySecret_RevokesOnlyThatSecretsLiveTokens()
+    {
+        var repository = Get<IAccessTokenRepository>();
+        var live = await NewTokenAsync();
+        var liveId = await repository.InsertAsync(live, CancellationToken.None);
+        var expiredId = await repository.InsertAsync(Copy(live, expiresOn: Instant.AddMinutes(-1)), CancellationToken.None);
+        var otherSecretId = await repository.InsertAsync(Copy(live, clientSecretId: await InsertSecretAsync(live.ClientRefId)), CancellationToken.None);
+        var alreadyId = await repository.InsertAsync(Copy(live), CancellationToken.None);
+        await repository.RevokeAsync(alreadyId, "earlier", Instant.AddMinutes(-5), CancellationToken.None);
+
+        Assert.Equal(1, await repository.RevokeActiveBySecretAsync(live.ClientSecretId, "secret revoked", Instant, CancellationToken.None));
+
+        Assert.Equal("secret revoked", (await repository.GetByIdAsync(liveId, CancellationToken.None))!.RevokedReason);
+        Assert.Null((await repository.GetByIdAsync(expiredId, CancellationToken.None))!.RevokedOn);
+        Assert.Null((await repository.GetByIdAsync(otherSecretId, CancellationToken.None))!.RevokedOn);
+        Assert.Equal("earlier", (await repository.GetByIdAsync(alreadyId, CancellationToken.None))!.RevokedReason);
+    }
+
+    [MySqlFact]
+    public async Task AccessToken_RevokeActiveByClient_RevokesOnlyThatClientsLiveTokens()
+    {
+        var repository = Get<IAccessTokenRepository>();
+        var mine = await NewTokenAsync();
+        var mineId = await repository.InsertAsync(mine, CancellationToken.None);
+        var otherClients = await NewTokenAsync();
+        var otherId = await repository.InsertAsync(otherClients, CancellationToken.None);
+
+        Assert.Equal(1, await repository.RevokeActiveByClientAsync(mine.ClientRefId, "scope removed", Instant, CancellationToken.None));
+
+        Assert.Equal("scope removed", (await repository.GetByIdAsync(mineId, CancellationToken.None))!.RevokedReason);
+        Assert.Null((await repository.GetByIdAsync(otherId, CancellationToken.None))!.RevokedOn);
+    }
+
+    [MySqlFact]
+    public async Task AccessToken_GetValidityByJti_ReadsTheTokenClientAndSecretStateInOneGo()
+    {
+        var repository = Get<IAccessTokenRepository>();
+        var token = await NewTokenAsync();
+        var id = await repository.InsertAsync(token, CancellationToken.None);
+
+        var fresh = await repository.GetValidityByJtiAsync(token.Jti, CancellationToken.None);
+        Assert.Equal(token.ClientRefId, fresh!.ClientRefId);
+        Assert.Null(fresh.TokenRevokedOn);
+        Assert.True(fresh.ClientIsActive);
+        Assert.Equal(token.ClientSecretId, fresh.SecretId);
+        Assert.Null(fresh.SecretRevokedOn);
+
+        await Get<IClientRepository>().RevokeSecretAsync(token.ClientSecretId, Instant.AddMinutes(1), CancellationToken.None);
+        await repository.RevokeAsync(id, "leaked", Instant.AddMinutes(2), CancellationToken.None);
+
+        var revoked = await repository.GetValidityByJtiAsync(token.Jti, CancellationToken.None);
+        Assert.Equal(Instant.AddMinutes(1), revoked!.SecretRevokedOn);
+        Assert.Equal(Instant.AddMinutes(2), revoked.TokenRevokedOn);
+        Assert.Null(await repository.GetValidityByJtiAsync(Guid.NewGuid().ToString("D"), CancellationToken.None));
+    }
+
+    private static AccessToken Copy(AccessToken token, DateTimeOffset? expiresOn = null, long? clientSecretId = null) => new()
+    {
+        Jti = Guid.NewGuid().ToString("D"),
+        ClientRefId = token.ClientRefId,
+        ClientSecretId = clientSecretId ?? token.ClientSecretId,
+        SigningKeyId = token.SigningKeyId,
+        GrantedScopes = token.GrantedScopes,
+        IssuedOn = token.IssuedOn.AddHours(-2),
+        ExpiresOn = expiresOn ?? token.ExpiresOn,
+        IssuedToIp = token.IssuedToIp
+    };
+
+    [MySqlFact]
     public async Task AccessToken_DuplicateJti_IsRejected()
     {
         var repository = Get<IAccessTokenRepository>();

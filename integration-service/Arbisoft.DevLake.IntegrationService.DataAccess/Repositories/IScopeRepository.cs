@@ -23,6 +23,9 @@ public interface IScopeRepository
 
     Task<Scope?> GetByIdAsync(long id, CancellationToken cancellationToken);
 
+    /// <summary>Which of the given scope IDs exist.</summary>
+    Task<IReadOnlyList<long>> GetExistingIdsAsync(IReadOnlyCollection<long> ids, CancellationToken cancellationToken);
+
     Task<Scope?> GetByNameAsync(string name, CancellationToken cancellationToken);
 
     Task<long> InsertAsync(Scope scope, CancellationToken cancellationToken);

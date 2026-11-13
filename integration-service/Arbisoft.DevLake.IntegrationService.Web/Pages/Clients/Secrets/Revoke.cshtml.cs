@@ -32,13 +32,13 @@ public sealed class RevokeModel(IClientService clients) : AdminPageModel
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
-        var result = await clients.RevokeSecretAsync(Id, SecretId, cancellationToken);
+        var result = await clients.RevokeSecretAsync(Id, SecretId, Admin, cancellationToken);
         if (!result.Succeeded)
         {
             return Fail(result.Error);
         }
 
-        Message = $"Secret {SecretId} revoked.";
+        Message = $"Secret {SecretId} revoked, along with the unexpired tokens issued with it.";
         return RedirectToPage("/Clients/Details", new { id = Id });
     }
 }

@@ -17,7 +17,10 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
 using Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Arbisoft.DevLake.IntegrationService.UnitTests.API;
@@ -117,6 +120,61 @@ public sealed class ScopeAuthorizationEndpointTests : IAsyncLifetime, IDisposabl
         await _seed.RevokeTokenAsync(new Microsoft.IdentityModel.JsonWebTokens.JsonWebToken(token).Id);
 
         Assert.Equal(HttpStatusCode.Unauthorized, await GetStatusAsync("/test/stats", token));
+    }
+
+    [MySqlFact]
+    public async Task RevokingTheSecretATokenWasIssuedWith_RejectsTheToken()
+    {
+        var client = await _seed!.SeedClientAsync();
+        var token = await ApiSeed.RequestTokenAsync(_http!, client);
+        Assert.Equal(HttpStatusCode.OK, await GetStatusAsync("/test/stats", token));
+
+        await using (var scope = _factory!.Services.CreateAsyncScope())
+        {
+            var result = await scope.ServiceProvider.GetRequiredService<IClientService>().RevokeSecretAsync(client.ClientRefId, client.SecretId, "admin", CancellationToken.None);
+            Assert.True(result.Succeeded);
+        }
+
+        Assert.Equal(HttpStatusCode.Unauthorized, await GetStatusAsync("/test/stats", token));
+    }
+
+    /// <summary>
+    /// The race the bulk revocation can miss: a token issued at the same moment its secret is revoked is never itself marked revoked. Revoking only
+    /// the secret row, as that race leaves things, must still be enough to reject the token.
+    /// </summary>
+    [MySqlFact]
+    public async Task ATokenWhoseSecretWasRevokedWithoutTheTokenItself_IsRejected()
+    {
+        var client = await _seed!.SeedClientAsync();
+        var token = await ApiSeed.RequestTokenAsync(_http!, client);
+        Assert.Equal(HttpStatusCode.OK, await GetStatusAsync("/test/stats", token));
+
+        await using (var scope = _factory!.Services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IClientRepository>().RevokeSecretAsync(client.SecretId, DateTimeOffset.UtcNow, CancellationToken.None);
+        }
+
+        Assert.Equal(HttpStatusCode.Unauthorized, await GetStatusAsync("/test/stats", token));
+    }
+
+    [MySqlFact]
+    public async Task RemovingAScopeFromTheClient_RejectsItsExistingTokens()
+    {
+        var client = await _seed!.SeedClientAsync();
+        var token = await ApiSeed.RequestTokenAsync(_http!, client);
+        Assert.Equal(HttpStatusCode.OK, await GetStatusAsync("/test/projects", token));
+
+        await using (var scope = _factory!.Services.CreateAsyncScope())
+        {
+            var statsScope = await scope.ServiceProvider.GetRequiredService<IScopeRepository>().GetByNameAsync("stats:read", CancellationToken.None);
+            var result = await scope.ServiceProvider.GetRequiredService<IClientService>().SetScopesAsync(client.ClientRefId, [statsScope!.Id], "admin", CancellationToken.None);
+            Assert.True(result.Succeeded);
+        }
+
+        Assert.Equal(HttpStatusCode.Unauthorized, await GetStatusAsync("/test/stats", token));
+        var fresh = await ApiSeed.RequestTokenAsync(_http!, client);
+        Assert.Equal(HttpStatusCode.OK, await GetStatusAsync("/test/stats", fresh));
+        Assert.Equal(HttpStatusCode.Forbidden, await GetStatusAsync("/test/projects", fresh));
     }
 
     [MySqlFact]

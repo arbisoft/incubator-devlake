@@ -23,6 +23,9 @@ public interface IAccessTokenRepository
 
     Task<AccessToken?> GetByJtiAsync(string jti, CancellationToken cancellationToken);
 
+    /// <summary>The token's revocation, its client's active flag and its secret's revocation, in one query. Null when no token has this jti.</summary>
+    Task<AccessTokenValidity?> GetValidityByJtiAsync(string jti, CancellationToken cancellationToken);
+
     Task<AccessToken?> GetByIdAsync(long id, CancellationToken cancellationToken);
 
     /// <summary>Lists issued tokens, newest first, optionally for one client.</summary>
@@ -30,4 +33,10 @@ public interface IAccessTokenRepository
 
     /// <summary>Revokes a token that is not already revoked. Returns false when nothing changed.</summary>
     Task<bool> RevokeAsync(long id, string reason, DateTimeOffset revokedOn, CancellationToken cancellationToken);
+
+    /// <summary>Revokes every token issued with the client secret that has not expired or been revoked yet. Returns how many were revoked.</summary>
+    Task<int> RevokeActiveBySecretAsync(long clientSecretId, string reason, DateTimeOffset revokedOn, CancellationToken cancellationToken);
+
+    /// <summary>Revokes every token of the client that has not expired or been revoked yet. Returns how many were revoked.</summary>
+    Task<int> RevokeActiveByClientAsync(long clientRefId, string reason, DateTimeOffset revokedOn, CancellationToken cancellationToken);
 }

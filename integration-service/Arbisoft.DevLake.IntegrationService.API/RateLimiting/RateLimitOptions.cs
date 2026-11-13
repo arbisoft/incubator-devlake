@@ -33,4 +33,11 @@ public sealed class RateLimitOptions
     /// <summary>Request status poll requests per client per minute.</summary>
     [Range(1, 100_000)]
     public int PollPerMinute { get; init; } = 100;
+
+    /// <summary>
+    /// Token requests per caller IP address per minute. Every attempt runs a deliberately slow secret hash, even for an unknown client, so this
+    /// keeps the anonymous token endpoint from being used to guess secrets or to burn CPU. A client needs one token per token lifetime.
+    /// </summary>
+    [Range(1, 100_000)]
+    public int TokenPerMinute { get; init; } = 10;
 }

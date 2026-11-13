@@ -44,6 +44,15 @@ public sealed class AccessTokenRepository : RepositoryBase, IAccessTokenReposito
         return QuerySingleOrDefaultAsync<AccessToken>($"SELECT {Columns} FROM AccessTokens WHERE jti = @jti", new { jti }, cancellationToken);
     }
 
+    public Task<AccessTokenValidity?> GetValidityByJtiAsync(string jti, CancellationToken cancellationToken)
+    {
+        return QuerySingleOrDefaultAsync<AccessTokenValidity>(
+            "SELECT t.clientRefId AS ClientRefId, t.revokedOn AS TokenRevokedOn, c.isActive AS ClientIsActive, s.id AS SecretId, s.revokedOn AS SecretRevokedOn " +
+            "FROM AccessTokens t LEFT JOIN Clients c ON c.id = t.clientRefId LEFT JOIN ClientSecrets s ON s.id = t.clientSecretId WHERE t.jti = @jti",
+            new { jti },
+            cancellationToken);
+    }
+
     public Task<AccessToken?> GetByIdAsync(long id, CancellationToken cancellationToken)
     {
         return QuerySingleOrDefaultAsync<AccessToken>($"SELECT {Columns} FROM AccessTokens WHERE id = @id", new { id }, cancellationToken);
@@ -62,5 +71,21 @@ public sealed class AccessTokenRepository : RepositoryBase, IAccessTokenReposito
             new { id, reason, revokedOn },
             cancellationToken);
         return changed > 0;
+    }
+
+    public Task<int> RevokeActiveBySecretAsync(long clientSecretId, string reason, DateTimeOffset revokedOn, CancellationToken cancellationToken)
+    {
+        return ExecuteAsync(
+            "UPDATE AccessTokens SET revokedOn = @revokedOn, revokedReason = @reason WHERE clientSecretId = @clientSecretId AND revokedOn IS NULL AND expiresOn > @revokedOn",
+            new { clientSecretId, reason, revokedOn },
+            cancellationToken);
+    }
+
+    public Task<int> RevokeActiveByClientAsync(long clientRefId, string reason, DateTimeOffset revokedOn, CancellationToken cancellationToken)
+    {
+        return ExecuteAsync(
+            "UPDATE AccessTokens SET revokedOn = @revokedOn, revokedReason = @reason WHERE clientRefId = @clientRefId AND revokedOn IS NULL AND expiresOn > @revokedOn",
+            new { clientRefId, reason, revokedOn },
+            cancellationToken);
     }
 }

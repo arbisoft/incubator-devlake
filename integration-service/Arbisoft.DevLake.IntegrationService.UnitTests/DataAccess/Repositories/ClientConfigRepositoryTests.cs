@@ -82,6 +82,21 @@ public class ClientConfigRepositoryTests : RepositoryTestBase
     }
 
     [MySqlFact]
+    public async Task Config_GetByClientRefIds_ReturnsTheConfigsOfThoseClientsOnly()
+    {
+        var configured = await InsertClientAsync();
+        var unconfigured = await InsertClientAsync();
+        var other = await InsertClientAsync();
+        await Repository.InsertAsync(NewConfig(configured.Id), CancellationToken.None);
+        await Repository.InsertAsync(NewConfig(other.Id), CancellationToken.None);
+
+        var found = await Repository.GetByClientRefIdsAsync([configured.Id, unconfigured.Id], CancellationToken.None);
+
+        Assert.Equal(configured.Id, Assert.Single(found).ClientRefId);
+        Assert.Empty(await Repository.GetByClientRefIdsAsync([], CancellationToken.None));
+    }
+
+    [MySqlFact]
     public async Task Config_SecondConfigForTheSameClient_IsRejected()
     {
         var client = await InsertClientAsync();

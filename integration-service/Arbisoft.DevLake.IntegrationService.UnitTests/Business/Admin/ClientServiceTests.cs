@@ -30,6 +30,7 @@ public class ClientServiceTests
 
     private readonly IClientRepository _clients = Substitute.For<IClientRepository>();
     private readonly IScopeRepository _scopes = Substitute.For<IScopeRepository>();
+    private readonly IAccessTokenRepository _tokens = Substitute.For<IAccessTokenRepository>();
     private readonly IClientSecretHasher _hasher = Substitute.For<IClientSecretHasher>();
     private readonly IDbSession _session = Substitute.For<IDbSession>();
     private readonly ClientService _service;
@@ -39,7 +40,9 @@ public class ClientServiceTests
         _hasher.Hash(Arg.Any<string>()).Returns(call => "hash-of-" + call.Arg<string>());
         _scopes.ListAsync(1, Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(new PagedResult<Scope>([new Scope { Id = 1, Name = "stats:read" }, new Scope { Id = 2, Name = "projects:fetch" }], 2, 1, 200));
-        _service = new ClientService(_clients, _scopes, _hasher, _session, new FakeTimeProvider(Now));
+        _scopes.GetExistingIdsAsync(Arg.Any<IReadOnlyCollection<long>>(), Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<IReadOnlyCollection<long>>().Where(id => id is 1 or 2).ToList());
+        _service = new ClientService(_clients, _scopes, _tokens, _hasher, _session, new FakeTimeProvider(Now));
     }
 
     private static ClientInput Input(string clientId = "sophia", string name = "Sophia", bool active = true, int lifetime = 900) => new(clientId, name, active, lifetime);
@@ -177,7 +180,7 @@ public class ClientServiceTests
     {
         _clients.GetSecretsAsync(1, Arg.Any<CancellationToken>()).Returns([new ClientSecret { Id = 5, ClientRefId = 1 }]);
 
-        var result = await _service.RevokeSecretAsync(1, 6, CancellationToken.None);
+        var result = await _service.RevokeSecretAsync(1, 6, "admin", CancellationToken.None);
 
         Assert.False(result.Succeeded);
         await _clients.DidNotReceiveWithAnyArgs().RevokeSecretAsync(default, default, default);
@@ -188,7 +191,7 @@ public class ClientServiceTests
     {
         _clients.GetSecretsAsync(1, Arg.Any<CancellationToken>()).Returns([new ClientSecret { Id = 5, ClientRefId = 1, RevokedOn = Now.AddDays(-1) }]);
 
-        var result = await _service.RevokeSecretAsync(1, 5, CancellationToken.None);
+        var result = await _service.RevokeSecretAsync(1, 5, "admin", CancellationToken.None);
 
         Assert.False(result.Succeeded);
     }
@@ -199,9 +202,53 @@ public class ClientServiceTests
         _clients.GetSecretsAsync(1, Arg.Any<CancellationToken>()).Returns([new ClientSecret { Id = 5, ClientRefId = 1 }]);
         _clients.RevokeSecretAsync(5, Now, Arg.Any<CancellationToken>()).Returns(true);
 
-        var result = await _service.RevokeSecretAsync(1, 5, CancellationToken.None);
+        var result = await _service.RevokeSecretAsync(1, 5, "admin", CancellationToken.None);
 
         Assert.True(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task RevokeSecret_AlsoRevokesTheTokensIssuedWithIt_InTheSameTransaction()
+    {
+        _clients.GetSecretsAsync(1, Arg.Any<CancellationToken>()).Returns([new ClientSecret { Id = 5, ClientRefId = 1 }]);
+        _clients.RevokeSecretAsync(5, Now, Arg.Any<CancellationToken>()).Returns(true);
+
+        await _service.RevokeSecretAsync(1, 5, "admin", CancellationToken.None);
+
+        Received.InOrder(() =>
+        {
+            _session.BeginTransactionAsync(Arg.Any<CancellationToken>());
+            _clients.RevokeSecretAsync(5, Now, Arg.Any<CancellationToken>());
+            _tokens.RevokeActiveBySecretAsync(5, Arg.Is<string>(reason => reason.Contains("admin", StringComparison.Ordinal)), Now, Arg.Any<CancellationToken>());
+            _session.CommitAsync(Arg.Any<CancellationToken>());
+        });
+    }
+
+    [Fact]
+    public async Task RevokeSecret_LosingARaceToAnotherRevoke_RollsBackAndRevokesNoTokens()
+    {
+        _clients.GetSecretsAsync(1, Arg.Any<CancellationToken>()).Returns([new ClientSecret { Id = 5, ClientRefId = 1 }]);
+        _clients.RevokeSecretAsync(5, Now, Arg.Any<CancellationToken>()).Returns(false);
+
+        var result = await _service.RevokeSecretAsync(1, 5, "admin", CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        await _tokens.DidNotReceiveWithAnyArgs().RevokeActiveBySecretAsync(default, default!, default, default);
+        await _session.Received(1).RollbackAsync(Arg.Any<CancellationToken>());
+        await _session.DidNotReceiveWithAnyArgs().CommitAsync(default);
+    }
+
+    [Fact]
+    public async Task RevokeSecret_ATokenRevocationFailure_RollsBackTheSecretToo()
+    {
+        _clients.GetSecretsAsync(1, Arg.Any<CancellationToken>()).Returns([new ClientSecret { Id = 5, ClientRefId = 1 }]);
+        _clients.RevokeSecretAsync(5, Now, Arg.Any<CancellationToken>()).Returns(true);
+        _tokens.RevokeActiveBySecretAsync(default, default!, default, default).ReturnsForAnyArgs(Task.FromException<int>(new InvalidOperationException("db down")));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _service.RevokeSecretAsync(1, 5, "admin", CancellationToken.None));
+
+        await _session.Received(1).RollbackAsync(Arg.Any<CancellationToken>());
+        await _session.DidNotReceiveWithAnyArgs().CommitAsync(default);
     }
 
     [Fact]
@@ -219,6 +266,48 @@ public class ClientServiceTests
             _clients.UpdateAsync(Arg.Is<Client>(c => c.ModifiedBy == "editor"), Arg.Any<CancellationToken>());
             _session.CommitAsync(Arg.Any<CancellationToken>());
         });
+    }
+
+    [Fact]
+    public async Task SetScopes_RemovingAScope_RevokesTheClientsTokens_InTheSameTransaction()
+    {
+        GivenClient();
+        _clients.GetClientScopesAsync(1, Arg.Any<CancellationToken>()).Returns([new ClientScope { ClientRefId = 1, ScopeId = 1 }, new ClientScope { ClientRefId = 1, ScopeId = 2 }]);
+
+        var result = await _service.SetScopesAsync(1, [1], "editor", CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Received.InOrder(() =>
+        {
+            _session.BeginTransactionAsync(Arg.Any<CancellationToken>());
+            _clients.ReplaceScopesAsync(1, Arg.Any<IReadOnlyCollection<long>>(), "editor", Now, Arg.Any<CancellationToken>());
+            _clients.UpdateAsync(Arg.Any<Client>(), Arg.Any<CancellationToken>());
+            _tokens.RevokeActiveByClientAsync(1, Arg.Is<string>(reason => reason.Contains("editor", StringComparison.Ordinal)), Now, Arg.Any<CancellationToken>());
+            _session.CommitAsync(Arg.Any<CancellationToken>());
+        });
+    }
+
+    [Fact]
+    public async Task SetScopes_OnlyAddingScopes_LeavesTheTokensAlone()
+    {
+        GivenClient();
+        _clients.GetClientScopesAsync(1, Arg.Any<CancellationToken>()).Returns([new ClientScope { ClientRefId = 1, ScopeId = 1 }]);
+
+        var result = await _service.SetScopesAsync(1, [1, 2], "editor", CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        await _tokens.DidNotReceiveWithAnyArgs().RevokeActiveByClientAsync(default, default!, default, default);
+    }
+
+    [Fact]
+    public async Task SetScopes_ChecksOnlyTheChosenScopes_SoItWorksHoweverManyScopesExist()
+    {
+        GivenClient();
+
+        await _service.SetScopesAsync(1, [2, 1], "editor", CancellationToken.None);
+
+        await _scopes.Received(1).GetExistingIdsAsync(Arg.Is<IReadOnlyCollection<long>>(ids => ids.Count == 2 && ids.Contains(1) && ids.Contains(2)), Arg.Any<CancellationToken>());
+        await _scopes.DidNotReceiveWithAnyArgs().ListAsync(default, default, default);
     }
 
     [Fact]

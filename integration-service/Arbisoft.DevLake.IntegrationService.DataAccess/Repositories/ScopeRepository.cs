@@ -39,6 +39,11 @@ public sealed class ScopeRepository : RepositoryBase, IScopeRepository
         return QuerySingleOrDefaultAsync<Scope>($"SELECT {Columns} FROM Scopes WHERE id = @id", new { id }, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<long>> GetExistingIdsAsync(IReadOnlyCollection<long> ids, CancellationToken cancellationToken)
+    {
+        return ids.Count == 0 ? [] : await QueryAsync<long>("SELECT id FROM Scopes WHERE id IN @ids", new { ids }, cancellationToken);
+    }
+
     public Task<Scope?> GetByNameAsync(string name, CancellationToken cancellationToken)
     {
         return QuerySingleOrDefaultAsync<Scope>($"SELECT {Columns} FROM Scopes WHERE name = @name", new { name }, cancellationToken);

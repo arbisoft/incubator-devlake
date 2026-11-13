@@ -43,9 +43,11 @@ public sealed class ClientConfigRepository : RepositoryBase, IClientConfigReposi
         return QuerySingleOrDefaultAsync<ClientConfig>($"SELECT {Columns} FROM ClientConfigs WHERE id = @id", new { id }, cancellationToken);
     }
 
-    public Task<PagedResult<ClientConfig>> ListAsync(int page, int pageSize, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<ClientConfig>> GetByClientRefIdsAsync(IReadOnlyCollection<long> clientRefIds, CancellationToken cancellationToken)
     {
-        return QueryPageAsync<ClientConfig>(Columns, "FROM ClientConfigs", "id", null, page, pageSize, cancellationToken);
+        return clientRefIds.Count == 0
+            ? []
+            : await QueryAsync<ClientConfig>($"SELECT {Columns} FROM ClientConfigs WHERE clientRefId IN @clientRefIds", new { clientRefIds }, cancellationToken);
     }
 
     public Task<long> InsertAsync(ClientConfig config, CancellationToken cancellationToken)

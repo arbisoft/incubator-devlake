@@ -77,6 +77,10 @@ public static partial class EmailNormalizer
             : throw new ArgumentException(error, nameof(raw));
     }
 
-    [GeneratedRegex(@"^[a-z0-9][a-z0-9._%+'\-]*@[a-z0-9]([a-z0-9\-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9\-]*[a-z0-9])?)+$")]
+    /// <summary>
+    /// A dot-atom local part (no leading, trailing or repeated dot) and a host name. It is no looser than Go's <c>mail.ParseAddress</c>, which
+    /// DevLake uses to check the same address, so an address accepted here is never refused by DevLake after the request was acknowledged.
+    /// </summary>
+    [GeneratedRegex(@"^[a-z0-9](?:[a-z0-9_%+'\-]|\.(?=[a-z0-9_%+'\-]))*@[a-z0-9]([a-z0-9\-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9\-]*[a-z0-9])?)+$")]
     private static partial Regex Shape();
 }

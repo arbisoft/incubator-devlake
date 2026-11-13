@@ -24,8 +24,9 @@ namespace Arbisoft.DevLake.IntegrationService.Business.Services.Requests;
 
 /// <summary>
 /// Decides whether a request repeats an earlier one. The database's unique key on the idempotency key is what actually prevents a duplicate;
-/// this class applies the window rules around it: a request outside the duplicate window, or one that failed, does not block a repeat, and a
-/// revoked request never held a key to begin with.
+/// this class applies the window rules around it: a request outside the duplicate window, or one that failed or was revoked, does not block a
+/// repeat. A request revoked at intake never held a key; one revoked while it was processed (its callback URL was removed) gives its key up
+/// here, so a repeat sent after the callback is restored is queued instead of being answered with the revoked request.
 /// </summary>
 public sealed class IdempotencyCheck : IIdempotencyCheck
 {
@@ -56,7 +57,7 @@ public sealed class IdempotencyCheck : IIdempotencyCheck
         }
 
         var windowStart = _timeProvider.GetUtcNow().AddMinutes(-_options.Value.DuplicateWindowMinutes);
-        if (existing.CreatedOn < windowStart || existing.Status == RequestStatus.Failed)
+        if (existing.CreatedOn < windowStart || existing.Status is RequestStatus.Failed or RequestStatus.RevokedNoCallbackUrl)
         {
             await _requestLogs.ReleaseIdempotencyKeyAsync(existing.Id, cancellationToken);
             return null;

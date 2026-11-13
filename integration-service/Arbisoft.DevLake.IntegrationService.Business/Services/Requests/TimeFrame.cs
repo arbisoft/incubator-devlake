@@ -19,13 +19,15 @@ namespace Arbisoft.DevLake.IntegrationService.Business.Services.Requests;
 
 /// <summary>
 /// A requested time frame such as <c>24h</c>, <c>1w</c>, <c>30d</c>, <c>11M</c> or <c>1y</c>. Units are case-sensitive: h hours, d days,
-/// w weeks, M months, y years. Months count as 30 days and years as 365. The longest accepted time frame is one year (API-5).
+/// w weeks, M months, y years. Months count as 30 days and years as 365. The longest accepted time frame is one year (API-5), and the
+/// number is at most 999, the same grammar DevLake's stats endpoints accept (<c>^([1-9][0-9]{0,2})([hdwMy])$</c>), so nothing accepted here
+/// is refused by DevLake after it was acknowledged.
 /// </summary>
 public readonly record struct TimeFrame
 {
     public static readonly TimeSpan MaxDuration = TimeSpan.FromDays(365);
 
-    private const int MaxDigits = 5;
+    private const int MaxDigits = 3;
 
     private TimeFrame(int value, char unit, string text)
     {
@@ -53,7 +55,7 @@ public readonly record struct TimeFrame
     public static bool TryParse(string? text, out TimeFrame timeFrame, out string? error)
     {
         timeFrame = default;
-        if (string.IsNullOrEmpty(text) || text.Length < 2 || text.Length > MaxDigits + 1)
+        if (string.IsNullOrEmpty(text) || text.Length < 2)
         {
             error = "The time frame must be a number followed by a unit, for example 24h, 1w, 30d, 11M or 1y.";
             return false;
@@ -67,11 +69,19 @@ public readonly record struct TimeFrame
         }
 
         var digits = text[..^1];
-        if (digits[0] == '0' || !int.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out var value))
+        if (digits[0] == '0' || !digits.All(char.IsAsciiDigit))
         {
             error = "The time frame must start with a whole number greater than zero.";
             return false;
         }
+
+        if (digits.Length > MaxDigits)
+        {
+            error = "The time frame number must be from 1 to 999.";
+            return false;
+        }
+
+        var value = int.Parse(digits, NumberStyles.None, CultureInfo.InvariantCulture);
 
         var candidate = new TimeFrame(value, unit, text);
         if (candidate.Duration > MaxDuration)

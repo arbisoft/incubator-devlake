@@ -33,6 +33,7 @@ public class RateLimitOptionsTests
         Assert.Equal(100, options.StatsPerMinute);
         Assert.Equal(20, options.BatchPerMinute);
         Assert.Equal(100, options.PollPerMinute);
+        Assert.Equal(10, options.TokenPerMinute);
         Assert.True(IsValid(options));
     }
 
@@ -42,5 +43,6 @@ public class RateLimitOptionsTests
         Assert.False(IsValid(new RateLimitOptions { StatsPerMinute = 0 }));
         Assert.False(IsValid(new RateLimitOptions { BatchPerMinute = 0 }));
         Assert.False(IsValid(new RateLimitOptions { PollPerMinute = -1 }));
+        Assert.False(IsValid(new RateLimitOptions { TokenPerMinute = 0 }));
     }
 }

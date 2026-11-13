@@ -54,8 +54,9 @@ public sealed class ErpIntegrationService : IErpIntegrationService
     }
 
     /// <summary>
-    /// Reads page after page until a short page, a page with nothing new on it, or the page limit. Projects seen on an earlier page are kept once, so a
-    /// project that moves while paging is not listed twice. A failure on any page propagates, so the caller never gets part of the list.
+    /// Reads page after page until the last page (see <see cref="WorkstreamProjectsPage.IsLast"/>), a page with nothing new on it, or the page
+    /// limit. Projects seen on an earlier page are kept once, so a project that moves while paging is not listed twice. A failure on any page
+    /// propagates, so the caller never gets part of the list.
     /// </summary>
     private async Task<List<ProjectDto>> ReadAllPagesAsync(string correlationId, CancellationToken cancellationToken)
     {

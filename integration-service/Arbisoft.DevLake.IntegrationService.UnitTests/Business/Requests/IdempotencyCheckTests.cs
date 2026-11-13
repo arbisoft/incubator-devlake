@@ -138,10 +138,12 @@ public class IdempotencyCheckTests
         await _requestLogs.Received(1).ReleaseIdempotencyKeyAsync(5, Arg.Any<CancellationToken>());
     }
 
-    [Fact]
-    public async Task FindDuplicate_AFailedRequest_DoesNotBlockARepeat()
+    [Theory]
+    [InlineData(RequestStatus.Failed)]
+    [InlineData(RequestStatus.RevokedNoCallbackUrl)]
+    public async Task FindDuplicate_AFailedOrRevokedRequest_DoesNotBlockARepeat(string status)
     {
-        Existing(new RequestLog { Id = 7, Status = RequestStatus.Failed, CreatedOn = Now.AddMinutes(-1) });
+        Existing(new RequestLog { Id = 7, Status = status, CreatedOn = Now.AddMinutes(-1) });
 
         Assert.Null(await Create().FindDuplicateAsync("key", CancellationToken.None));
 

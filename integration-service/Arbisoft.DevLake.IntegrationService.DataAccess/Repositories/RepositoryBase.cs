@@ -26,7 +26,8 @@ namespace Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
 /// </summary>
 public abstract class RepositoryBase
 {
-    public const int MaxPageSize = 100;
+    /// <summary>The most rows one page query returns, whatever page size is asked for. The admin portal's lists show up to this many.</summary>
+    public const int MaxPageSize = 200;
 
     private readonly IDbSession _session;
     private readonly int _commandTimeoutSeconds;

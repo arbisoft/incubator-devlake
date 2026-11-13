@@ -58,6 +58,10 @@ public sealed record ClientConfigInput(
     int MaxAttempts,
     bool IsActive);
 
+/// <summary>
+/// A callback URL as the portal shows it. <c>ResolvedUrl</c> is the full address a callback goes to, the client's base URL followed by the path,
+/// or null when it is not known or cannot be built.
+/// </summary>
 public sealed record OutboundUrlDto(
     long Id,
     long ClientConfigId,
@@ -68,6 +72,7 @@ public sealed record OutboundUrlDto(
     DateTimeOffset CreatedOn,
     string CreatedBy,
     DateTimeOffset? ModifiedOn,
-    string? ModifiedBy);
+    string? ModifiedBy,
+    string? ResolvedUrl);
 
 public sealed record OutboundUrlInput(string EventType, string Method, string Path, bool IsActive);

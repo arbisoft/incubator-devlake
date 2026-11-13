@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -166,6 +167,29 @@ public sealed class AuthEndpointTests : IAsyncLifetime, IDisposable
         }
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await PostAsync("/auth/token/", $"{clientId}:{Secret}")).StatusCode);
+    }
+
+    [MySqlFact]
+    public async Task Token_TooManyAttemptsFromOneAddress_Get429WithRetryAfter_WhateverTheClientId()
+    {
+        using var factory = new ApiFactory(_database.DatabaseConnectionString, new Dictionary<string, string> { ["RateLimits:TokenPerMinute"] = "2" });
+        using var http = factory.CreateClient();
+
+        async Task<HttpResponseMessage> AttemptAsync(string clientId)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/auth/token/");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{clientId}:wrong")));
+            request.Content = new FormUrlEncodedContent(new Dictionary<string, string> { ["grant_type"] = "client_credentials" });
+            return await http.SendAsync(request);
+        }
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await AttemptAsync("guess-1")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await AttemptAsync("guess-2")).StatusCode);
+        using var limited = await AttemptAsync("guess-3");
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, limited.StatusCode);
+        Assert.InRange(int.Parse(limited.Headers.GetValues("Retry-After").Single(), CultureInfo.InvariantCulture), 1, 60);
+        Assert.Equal("rate_limited", (await limited.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
     }
 
     [MySqlFact]

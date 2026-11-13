@@ -37,9 +37,13 @@ public interface IClientService
     /// <summary>Creates a secret that is valid for the given number of days. A client can hold several at once, so a secret can be rotated without downtime.</summary>
     Task<AdminResult<NewClientSecretDto>> CreateSecretAsync(long id, int validForDays, string createdBy, CancellationToken cancellationToken);
 
-    Task<AdminResult> RevokeSecretAsync(long id, long secretId, CancellationToken cancellationToken);
+    /// <summary>Revokes a secret and, in the same transaction, every unexpired token issued with it, so a leaked secret's tokens stop working at once.</summary>
+    Task<AdminResult> RevokeSecretAsync(long id, long secretId, string revokedBy, CancellationToken cancellationToken);
 
-    /// <summary>Replaces the scopes a client may request.</summary>
+    /// <summary>
+    /// Replaces the scopes a client may request. When a scope is taken away, the client's unexpired tokens are revoked in the same transaction,
+    /// because they still carry the scope; the client then gets a token with its current scopes.
+    /// </summary>
     Task<AdminResult> SetScopesAsync(long id, IReadOnlyCollection<long> scopeIds, string changedBy, CancellationToken cancellationToken);
 }
 
@@ -53,14 +57,17 @@ public sealed partial class ClientService : IClientService
 
     private readonly IClientRepository _clients;
     private readonly IScopeRepository _scopes;
+    private readonly IAccessTokenRepository _tokens;
     private readonly IClientSecretHasher _hasher;
     private readonly IDbSession _session;
     private readonly TimeProvider _timeProvider;
 
-    public ClientService(IClientRepository clients, IScopeRepository scopes, IClientSecretHasher hasher, IDbSession session, TimeProvider timeProvider)
+    public ClientService(
+        IClientRepository clients, IScopeRepository scopes, IAccessTokenRepository tokens, IClientSecretHasher hasher, IDbSession session, TimeProvider timeProvider)
     {
         _clients = clients;
         _scopes = scopes;
+        _tokens = tokens;
         _hasher = hasher;
         _session = session;
         _timeProvider = timeProvider;
@@ -158,7 +165,7 @@ public sealed partial class ClientService : IClientService
         return AdminResult.Success(new NewClientSecretDto(secretId, client.ClientId, plain, expiresOn));
     }
 
-    public async Task<AdminResult> RevokeSecretAsync(long id, long secretId, CancellationToken cancellationToken)
+    public async Task<AdminResult> RevokeSecretAsync(long id, long secretId, string revokedBy, CancellationToken cancellationToken)
     {
         var secrets = await _clients.GetSecretsAsync(id, cancellationToken);
         var secret = secrets.FirstOrDefault(s => s.Id == secretId);
@@ -172,7 +179,19 @@ public sealed partial class ClientService : IClientService
             return AdminResult.Fail("The secret is already revoked.");
         }
 
-        return await _clients.RevokeSecretAsync(secretId, _timeProvider.GetUtcNow(), cancellationToken)
+        var now = _timeProvider.GetUtcNow();
+        return await InTransactionAsync(
+            async () =>
+            {
+                if (!await _clients.RevokeSecretAsync(secretId, now, cancellationToken))
+                {
+                    return false;
+                }
+
+                await _tokens.RevokeActiveBySecretAsync(secretId, $"Client secret {secretId} was revoked (revoked by {revokedBy})", now, cancellationToken);
+                return true;
+            },
+            cancellationToken)
             ? AdminResult.Ok
             : AdminResult.Fail("The secret is already revoked.");
     }
@@ -186,27 +205,50 @@ public sealed partial class ClientService : IClientService
         }
 
         var wanted = scopeIds.Distinct().ToList();
-        var known = (await _scopes.ListAsync(1, AdminPaging.MaxRows, cancellationToken)).Items.Select(s => s.Id).ToHashSet();
-        if (wanted.Any(scopeId => !known.Contains(scopeId)))
+        var known = await _scopes.GetExistingIdsAsync(wanted, cancellationToken);
+        if (known.Count != wanted.Count)
         {
             return AdminResult.Fail("One of the scopes does not exist.");
         }
 
+        var current = await _clients.GetClientScopesAsync(id, cancellationToken);
+        var removesAScope = current.Any(scope => !wanted.Contains(scope.ScopeId));
         var now = _timeProvider.GetUtcNow();
+        await InTransactionAsync(
+            async () =>
+            {
+                await _clients.ReplaceScopesAsync(id, wanted, changedBy, now, cancellationToken);
+                await _clients.UpdateAsync(Modified(client, client.Name, client.IsActive, client.AccessTokenLifetimeSeconds, changedBy), cancellationToken);
+                if (removesAScope)
+                {
+                    await _tokens.RevokeActiveByClientAsync(id, $"A scope was removed from the client (changed by {changedBy})", now, cancellationToken);
+                }
+
+                return true;
+            },
+            cancellationToken);
+        return AdminResult.Ok;
+    }
+
+    private async Task<bool> InTransactionAsync(Func<Task<bool>> work, CancellationToken cancellationToken)
+    {
         await _session.BeginTransactionAsync(cancellationToken);
         try
         {
-            await _clients.ReplaceScopesAsync(id, wanted, changedBy, now, cancellationToken);
-            await _clients.UpdateAsync(Modified(client, client.Name, client.IsActive, client.AccessTokenLifetimeSeconds, changedBy), cancellationToken);
-            await _session.CommitAsync(cancellationToken);
+            if (await work())
+            {
+                await _session.CommitAsync(cancellationToken);
+                return true;
+            }
+
+            await _session.RollbackAsync(cancellationToken);
+            return false;
         }
         catch
         {
             await _session.RollbackAsync(cancellationToken);
             throw;
         }
-
-        return AdminResult.Ok;
     }
 
     private Client Modified(Client existing, string name, bool isActive, int lifetimeSeconds, string modifiedBy) => new()

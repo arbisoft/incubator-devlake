@@ -67,7 +67,7 @@ public sealed class ErpIntegrationEndpointTests : ApiTestBase
         Assert.Equal("Project 7", projects[6].GetProperty("name").GetString());
         Assert.Equal("Lead 7", projects[6].GetProperty("team_lead").GetProperty("name").GetString());
         Assert.Equal("lead7@arbisoft.com", projects[6].GetProperty("team_lead").GetProperty("email").GetString());
-        Assert.Equal(3, _workstream.WorkstreamProjectRequests.Count());
+        Assert.Equal(4, _workstream.WorkstreamProjectRequests.Count()); // Three pages of projects, then the empty page that ends the list.
     }
 
     [MySqlFact]
@@ -94,7 +94,7 @@ public sealed class ErpIntegrationEndpointTests : ApiTestBase
         var check = Assert.Single(_workstream.WorkstreamTokenChecks);
         Assert.Equal("Bearer token", check.Authorization);
         var pages = _workstream.WorkstreamProjectRequests.ToList();
-        Assert.Equal(["page=1&pageSize=10", "page=2&pageSize=10"], pages.Select(p => p.Uri.Query.TrimStart('?')));
+        Assert.Equal(["page=1&pageSize=10", "page=2&pageSize=10", "page=3&pageSize=10"], pages.Select(p => p.Uri.Query.TrimStart('?')));
         Assert.All(pages, page => Assert.Equal("Bearer token", page.Authorization));
         var correlationId = response.Headers.GetValues("X-Correlation-Id").Single();
         Assert.Equal(correlationId, check.CorrelationId);

@@ -29,13 +29,11 @@ namespace Arbisoft.DevLake.IntegrationService.UnitTests.API.Authorization;
 public class TokenRevocationValidatorTests
 {
     private readonly IAccessTokenRepository _accessTokens = Substitute.For<IAccessTokenRepository>();
-    private readonly IClientRepository _clients = Substitute.For<IClientRepository>();
     private readonly TokenRevocationValidator _validator;
 
     public TokenRevocationValidatorTests()
     {
-        _clients.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(new Client { Id = 1, IsActive = true });
-        _validator = new TokenRevocationValidator(_accessTokens, _clients, NullLogger<TokenRevocationValidator>.Instance);
+        _validator = new TokenRevocationValidator(_accessTokens, NullLogger<TokenRevocationValidator>.Instance);
     }
 
     private static TokenValidatedContext ContextFor(string? jti)
@@ -56,70 +54,85 @@ public class TokenRevocationValidatorTests
         return new TokenValidatedContext(new DefaultHttpContext(), scheme, new JwtBearerOptions()) { SecurityToken = new JsonWebToken(token) };
     }
 
+    private void Given(string jti, DateTimeOffset? tokenRevokedOn = null, bool? clientIsActive = true, long? secretId = 5, DateTimeOffset? secretRevokedOn = null) =>
+        _accessTokens.GetValidityByJtiAsync(jti, Arg.Any<CancellationToken>()).Returns(new AccessTokenValidity
+        {
+            ClientRefId = 1,
+            TokenRevokedOn = tokenRevokedOn,
+            ClientIsActive = clientIsActive,
+            SecretId = secretId,
+            SecretRevokedOn = secretRevokedOn
+        });
+
+    private async Task<string?> FailureForAsync(string? jti)
+    {
+        var context = ContextFor(jti);
+        await _validator.ValidateAsync(context);
+        return context.Result?.Failure?.Message;
+    }
+
     [Fact]
     public async Task IssuedAndNotRevoked_Passes()
     {
-        _accessTokens.GetByJtiAsync("jti-1", Arg.Any<CancellationToken>()).Returns(new AccessToken { Jti = "jti-1", ClientRefId = 1 });
-        var context = ContextFor("jti-1");
+        Given("jti-1");
 
-        await _validator.ValidateAsync(context);
-
-        Assert.False(context.Result?.Failure is not null);
+        Assert.Null(await FailureForAsync("jti-1"));
     }
 
     [Fact]
     public async Task OfAClientThatIsNoLongerActive_IsRejected()
     {
-        _clients.GetByIdAsync(2, Arg.Any<CancellationToken>()).Returns(new Client { Id = 2, IsActive = false });
-        _accessTokens.GetByJtiAsync("jti-2", Arg.Any<CancellationToken>()).Returns(new AccessToken { Jti = "jti-2", ClientRefId = 2 });
-        var context = ContextFor("jti-2");
+        Given("jti-2", clientIsActive: false);
 
-        await _validator.ValidateAsync(context);
-
-        Assert.Contains("not active", context.Result!.Failure!.Message, StringComparison.Ordinal);
+        Assert.Contains("not active", await FailureForAsync("jti-2"), StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task OfAClientThatNoLongerExists_IsRejected()
     {
-        _accessTokens.GetByJtiAsync("jti-3", Arg.Any<CancellationToken>()).Returns(new AccessToken { Jti = "jti-3", ClientRefId = 99 });
-        var context = ContextFor("jti-3");
+        Given("jti-3", clientIsActive: null);
 
-        await _validator.ValidateAsync(context);
-
-        Assert.NotNull(context.Result!.Failure);
+        Assert.NotNull(await FailureForAsync("jti-3"));
     }
 
     [Fact]
     public async Task Revoked_IsRejected()
     {
-        _accessTokens.GetByJtiAsync("jti-1", Arg.Any<CancellationToken>()).Returns(new AccessToken { Jti = "jti-1", RevokedOn = DateTimeOffset.UtcNow });
-        var context = ContextFor("jti-1");
+        Given("jti-1", tokenRevokedOn: DateTimeOffset.UtcNow);
 
-        await _validator.ValidateAsync(context);
+        Assert.Contains("revoked", await FailureForAsync("jti-1"), StringComparison.Ordinal);
+    }
 
-        Assert.Contains("revoked", context.Result!.Failure!.Message, StringComparison.Ordinal);
+    /// <summary>A token issued while its secret was being revoked escapes the bulk revocation of that secret's tokens; this check still stops it.</summary>
+    [Fact]
+    public async Task IssuedWithASecretThatHasSinceBeenRevoked_IsRejected_EvenIfTheTokenItselfWasNot()
+    {
+        Given("jti-4", secretRevokedOn: DateTimeOffset.UtcNow);
+
+        Assert.Contains("client secret", await FailureForAsync("jti-4"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task IssuedWithASecretThatNoLongerExists_IsRejected()
+    {
+        Given("jti-5", secretId: null);
+
+        Assert.NotNull(await FailureForAsync("jti-5"));
     }
 
     [Fact]
     public async Task NeverIssuedByThisService_IsRejected()
     {
-        _accessTokens.GetByJtiAsync("ghost", Arg.Any<CancellationToken>()).Returns((AccessToken?)null);
-        var context = ContextFor("ghost");
+        _accessTokens.GetValidityByJtiAsync("ghost", Arg.Any<CancellationToken>()).Returns((AccessTokenValidity?)null);
 
-        await _validator.ValidateAsync(context);
-
-        Assert.Contains("not issued", context.Result!.Failure!.Message, StringComparison.Ordinal);
+        Assert.Contains("not issued", await FailureForAsync("ghost"), StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task WithoutAJti_IsRejectedWithoutQueryingTheDatabase()
     {
-        var context = ContextFor(jti: null);
+        Assert.NotNull(await FailureForAsync(jti: null));
 
-        await _validator.ValidateAsync(context);
-
-        Assert.NotNull(context.Result!.Failure);
-        await _accessTokens.DidNotReceiveWithAnyArgs().GetByJtiAsync(default!, default);
+        await _accessTokens.DidNotReceiveWithAnyArgs().GetValidityByJtiAsync(default!, default);
     }
 }
