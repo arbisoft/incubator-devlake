@@ -92,7 +92,7 @@ public class DependencyInjectionTests
     [InlineData("RabbitMq:QueueMaxLength", "1")]
     [InlineData("RabbitMq:MessageTtlSeconds", "0")]
     [InlineData("RabbitMq:DeliveryLimit", "0")]
-    [InlineData("RabbitMq:ReceiveBatchLimit", "0")]
+    [InlineData("RabbitMq:PublishTimeoutSeconds", "0")]
     public void AddDataAccess_OutOfRangeQueueSetting_FailsValidation(string key, string value)
     {
         var settings = new Dictionary<string, string?>(ValidSettings) { [key] = value };

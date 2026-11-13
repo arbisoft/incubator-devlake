@@ -34,7 +34,7 @@ public class StaleRequestSweeperTests
 
     public StaleRequestSweeperTests()
     {
-        _logs.ListStaleAsync(Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<DateTimeOffset>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns([]);
+        _logs.ListStaleAsync(Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns([]);
         _sweeper = new StaleRequestSweeper(
             _logs,
             _attempts,
@@ -52,6 +52,7 @@ public class StaleRequestSweeperTests
         await _logs.Received(1).ListStaleAsync(
             Arg.Is<IReadOnlyCollection<string>>(statuses => statuses.Order().SequenceEqual(new[] { RequestStatus.Processing, RequestStatus.Queued, RequestStatus.Received }.Order())),
             Now.AddSeconds(-(7200 + 60)),
+            Now,
             100,
             Arg.Any<CancellationToken>());
     }
@@ -59,7 +60,7 @@ public class StaleRequestSweeperTests
     [Fact]
     public async Task EachStaleRequest_IsMarkedFailed_WithAnExpiredAttemptThatSaysWhy()
     {
-        _logs.ListStaleAsync(Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<DateTimeOffset>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+        _logs.ListStaleAsync(Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns([new RequestLog { Id = 1, CorrelationId = "a" }, new RequestLog { Id = 2, CorrelationId = "b" }]);
 
         var swept = await _sweeper.SweepAsync(CancellationToken.None);
@@ -68,6 +69,7 @@ public class StaleRequestSweeperTests
         foreach (var id in new long[] { 1, 2 })
         {
             await _logs.Received(1).UpdateStatusAsync(id, RequestStatus.Failed, Arg.Any<CancellationToken>());
+            await _logs.Received(1).DeletePayloadAsync(id, Arg.Any<CancellationToken>());
             await _attempts.Received(1).RecordAsync(id, DeliveryAttemptStatus.Expired, "{}", Arg.Is<string?>(reason => reason != null && reason.Contains("expired")), Arg.Any<CancellationToken>());
         }
     }

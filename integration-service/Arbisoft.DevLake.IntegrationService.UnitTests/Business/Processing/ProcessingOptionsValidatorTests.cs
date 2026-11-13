@@ -12,6 +12,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 using Arbisoft.DevLake.IntegrationService.Business.Services.Processing;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Options;
 using Microsoft.Extensions.Options;
@@ -40,6 +41,16 @@ public class ProcessingOptionsValidatorTests
 
         Assert.True(result.Failed);
         Assert.Contains("RepublishAfterSeconds", result.FailureMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ALongestDeliveryWaitShorterThanTheFirst_FailsStartup()
+    {
+        var result = new ProcessingOptionsValidator(Options.Create(new RabbitMqOptions()))
+            .Validate(null, new ProcessingOptions { DeliveryRetryDelaySeconds = 60, MaxDeliveryRetryDelaySeconds = 30 });
+
+        Assert.True(result.Failed);
+        Assert.Contains("MaxDeliveryRetryDelaySeconds", result.FailureMessage, StringComparison.Ordinal);
     }
 
     [Fact]

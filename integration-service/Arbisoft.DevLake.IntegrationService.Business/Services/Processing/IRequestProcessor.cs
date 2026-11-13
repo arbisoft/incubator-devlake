@@ -15,24 +15,37 @@
 
 namespace Arbisoft.DevLake.IntegrationService.Business.Services.Processing;
 
-/// <summary>What one run of the processor did, for the log.</summary>
-/// <param name="Received">Messages taken off the queue.</param>
-/// <param name="Completed">Requests finished (delivered, failed or revoked) and acknowledged.</param>
-/// <param name="Requeued">Messages put back to be tried again later.</param>
-/// <param name="DeadLettered">Messages that can never be processed and were parked.</param>
-/// <param name="Expired">Stale requests marked failed at the start of the run.</param>
-/// <param name="HaltReason">Why the run stopped early, or null when it did not.</param>
-/// <param name="Republished">Requests recorded by the API but never queued, published again in this run.</param>
-public sealed record ProcessingRunSummary(int Received, int Completed, int Requeued, int DeadLettered, int Expired, string? HaltReason, int Republished = 0)
+/// <summary>What one processing run did, for the log.</summary>
+/// <param name="MessagesTaken">Messages taken off the queue.</param>
+/// <param name="Resumed">Requests the database had waiting (deferred or left by a stopped worker) that were picked up again.</param>
+/// <param name="Finished">Requests that ended Success, Failed or Revoked.</param>
+/// <param name="Deferred">Requests left waiting in the database for their next attempt.</param>
+/// <param name="DeadLettered">Messages moved to the dead-letter queue.</param>
+/// <param name="Requeued">Messages put back on the queue because something went wrong before their request was taken.</param>
+/// <param name="Expired">Requests marked Failed because they outlived the request lifetime.</param>
+/// <param name="Republished">Requests recorded by the API but never queued, published again.</param>
+/// <param name="HaltReason">Why the run did not take work, or stopped taking it early.</param>
+public sealed record ProcessingRunSummary(
+    int MessagesTaken = 0,
+    int Resumed = 0,
+    int Finished = 0,
+    int Deferred = 0,
+    int DeadLettered = 0,
+    int Requeued = 0,
+    int Expired = 0,
+    int Republished = 0,
+    string? HaltReason = null)
 {
-    public bool DidWork => Received > 0 || Expired > 0 || Republished > 0 || HaltReason is not null;
+    public bool DidWork => MessagesTaken > 0 || Resumed > 0 || Expired > 0 || Republished > 0 || HaltReason is not null;
 }
 
 public interface IRequestProcessor
 {
     /// <summary>
-    /// One run: marks stale requests failed, republishes requests that were recorded but never queued, checks the queue, makes sure DevLake and Sophia can be used, then takes a batch off the queue,
-    /// processes it with bounded parallelism, and acknowledges, requeues or dead-letters each message. One request's failure never stops the others.
+    /// One run: marks expired requests failed, republishes requests that were recorded but never queued, and, if there is work and DevLake is
+    /// usable, takes work one item per free worker (at most <see cref="ProcessingOptions.MaxParallelRequests"/> at a time): first the requests the
+    /// database has due, then messages from the queue, until there is none left, the run's time budget is used, or DevLake fails. Each item is one
+    /// step of work that ends with its request finished or deferred, so nothing is held in memory or in the queue between attempts.
     /// </summary>
     Task<ProcessingRunSummary> ProcessPendingAsync(CancellationToken cancellationToken);
 }

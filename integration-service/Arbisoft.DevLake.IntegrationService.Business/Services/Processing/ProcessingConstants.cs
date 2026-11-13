@@ -42,18 +42,36 @@ public static class DeliveryAttemptStatus
     public const string PublishFailed = "PublishFailed";
 }
 
-/// <summary>What happens to a queued message once the job has dealt with it.</summary>
-public enum WorkerOutcome
+/// <summary>What happens to a queue message once the job has dealt with it.</summary>
+public enum MessageOutcome
 {
-    /// <summary>The request is finished, whatever the result: acknowledge the message.</summary>
-    Completed,
+    /// <summary>The database owns the request now, or it is already finished: remove the message.</summary>
+    Ack,
 
-    /// <summary>Put the message back: the request cannot be dealt with yet.</summary>
+    /// <summary>Put the message back: something went wrong before the request could be taken.</summary>
     Requeue,
-
-    /// <summary>Put the message back and stop taking work: something systemic (credentials, DevLake or Sophia down) stands in the way of every request.</summary>
-    StopRun,
 
     /// <summary>The message can never be processed: move it to the dead-letter queue.</summary>
     DeadLetter
+}
+
+/// <summary>What one step of work did to a request.</summary>
+public enum StepResult
+{
+    /// <summary>Nothing: another worker holds the request, it is finished, or it is not due yet.</summary>
+    Skipped,
+
+    /// <summary>The request reached Success, Failed or Revoked.</summary>
+    Finished,
+
+    /// <summary>The request waits in the database until its next attempt.</summary>
+    Deferred
+}
+
+/// <summary>The outcome of handling one queue message.</summary>
+public sealed record WorkResult(MessageOutcome Message, StepResult Step)
+{
+    public static WorkResult DeadLettered { get; } = new(MessageOutcome.DeadLetter, StepResult.Skipped);
+
+    public static WorkResult Acknowledged { get; } = new(MessageOutcome.Ack, StepResult.Skipped);
 }

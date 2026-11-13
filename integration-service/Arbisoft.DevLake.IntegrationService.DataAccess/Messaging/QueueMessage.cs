@@ -23,4 +23,5 @@ public sealed record QueueMessage(string CorrelationId, string EventType, string
 /// <param name="DeliveryTag">Identifies this delivery when acknowledging it.</param>
 /// <param name="Redelivered">True when the broker has delivered this message before.</param>
 /// <param name="DeliveryCount">How many times it was delivered before this delivery.</param>
-public sealed record QueueDelivery(QueueMessage Message, ulong DeliveryTag, bool Redelivered, int DeliveryCount);
+/// <param name="Rejection">Why the consumer cannot accept the message, or null. A rejected message must be dead-lettered; its correlation ID may be empty.</param>
+public sealed record QueueDelivery(QueueMessage Message, ulong DeliveryTag, bool Redelivered, int DeliveryCount, string? Rejection = null);

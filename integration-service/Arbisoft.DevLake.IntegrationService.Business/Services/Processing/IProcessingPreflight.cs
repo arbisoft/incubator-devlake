@@ -28,9 +28,9 @@ public sealed record PreflightResult(bool Ready, string? Problem)
 public interface IProcessingPreflight
 {
     /// <summary>
-    /// Checks that DevLake accepts our API token and that an access token can be obtained for every client that has requests waiting. Clients with
-    /// nothing waiting are not checked, so an idle client's broken credentials stop nobody. Done before messages are taken, so a credentials problem
-    /// leaves requests queued without raising any message's delivery count.
+    /// Checks that DevLake answers and accepts our API token, before any request is taken: every request needs DevLake, so without it nothing is
+    /// taken and nothing changes. Clients' own credentials are not checked here; a client whose credentials are refused has only its own requests
+    /// deferred while the others carry on.
     /// </summary>
     Task<PreflightResult> RunAsync(CancellationToken cancellationToken);
 }

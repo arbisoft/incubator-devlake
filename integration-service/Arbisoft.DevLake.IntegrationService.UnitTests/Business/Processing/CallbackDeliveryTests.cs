@@ -19,8 +19,6 @@ using Arbisoft.DevLake.IntegrationService.DataAccess.ExternalApis.Sophia;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 
 namespace Arbisoft.DevLake.IntegrationService.UnitTests.Business.Processing;
@@ -33,17 +31,14 @@ public class CallbackDeliveryTests
 
     private readonly ISophiaClient _sophia = Substitute.For<ISophiaClient>();
     private readonly IClientConfigRepository _configs = Substitute.For<IClientConfigRepository>();
-    private readonly IRequestLogRepository _logs = Substitute.For<IRequestLogRepository>();
     private readonly IRequestAttemptLog _attempts = Substitute.For<IRequestAttemptLog>();
-    private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 11, 11, 12, 0, 0, TimeSpan.Zero));
     private readonly CallbackDelivery _delivery;
 
     public CallbackDeliveryTests()
     {
         GivenConfig(maxAttempts: 3);
-        _attempts.CountDeliveryAttemptsAsync(41, Arg.Any<CancellationToken>()).Returns(0);
-        var options = Options.Create(new ProcessingOptions { DeliveryRetryDelaySeconds = 30 });
-        _delivery = new CallbackDelivery(_sophia, _configs, _logs, _attempts, options, _time, NullLogger<CallbackDelivery>.Instance);
+        GivenFailedBefore(0);
+        _delivery = new CallbackDelivery(_sophia, _configs, _attempts, NullLogger<CallbackDelivery>.Instance);
     }
 
     private void GivenConfig(int maxAttempts, bool active = true)
@@ -51,197 +46,106 @@ public class CallbackDeliveryTests
         _configs.GetByClientRefIdAsync(7, Arg.Any<CancellationToken>()).Returns(new ClientConfig { Id = 3, ClientRefId = 7, MaxAttempts = maxAttempts, IsActive = active });
     }
 
-    private static SophiaDeliveryResult Ok() => new(true, 200, "{\"ok\":true}");
+    private void GivenFailedBefore(int attempts) => _attempts.CountDeliveryAttemptsAsync(41, Arg.Any<CancellationToken>()).Returns(attempts);
 
-    private static SophiaDeliveryResult Failed(int status = 500) => new(false, status, "{\"error\":\"x\"}");
+    private void SophiaAnswers(SophiaDeliveryResult result) =>
+        _sophia.PostCallbackAsync(7, "engineer-stats", Payload, "c1", Arg.Any<CancellationToken>()).Returns(result);
 
-    private void SophiaAnswers(params object[] answers)
-    {
-        var queue = new Queue<object>(answers);
-        _sophia.PostCallbackAsync(7, "engineer-stats", Payload, "c1", Arg.Any<CancellationToken>()).Returns(_ =>
-        {
-            var next = queue.Count > 1 ? queue.Dequeue() : queue.Peek();
-            return next is Exception exception ? Task.FromException<SophiaDeliveryResult>(exception) : Task.FromResult((SophiaDeliveryResult)next);
-        });
-    }
-
-    /// <summary>Runs a delivery, moving the clock past each wait, and returns how long it waited in total.</summary>
-    private async Task<(WorkerOutcome Outcome, TimeSpan Waited)> RunAsync(CancellationToken stopping = default)
-    {
-        var started = _time.GetUtcNow();
-        var delivery = _delivery.DeliverAsync(Request, Payload, stopping);
-        while (!delivery.IsCompleted)
-        {
-            _time.Advance(TimeSpan.FromSeconds(1));
-            await Task.Delay(2, CancellationToken.None);
-        }
-
-        return (await delivery, _time.GetUtcNow() - started);
-    }
+    private void SophiaThrows(Exception exception) =>
+        _sophia.PostCallbackAsync(7, "engineer-stats", Payload, "c1", Arg.Any<CancellationToken>()).Returns(Task.FromException<SophiaDeliveryResult>(exception));
 
     [Fact]
-    public async Task ADeliveryThatWorksFirstTime_RecordsOneAttempt_AndMarksTheRequestSuccess()
+    public async Task AnAcceptedPost_IsDelivered_AndRecordedWithSophiasAnswer()
     {
-        SophiaAnswers(Ok());
+        SophiaAnswers(new SophiaDeliveryResult(true, 200, "{\"ok\":true}"));
 
-        var (outcome, waited) = await RunAsync();
+        var attempt = await _delivery.AttemptAsync(Request, Payload);
 
-        Assert.Equal(WorkerOutcome.Completed, outcome);
-        Assert.True(waited < TimeSpan.FromSeconds(5));
+        Assert.Equal(DeliveryOutcome.Delivered, attempt.Outcome);
         await _attempts.Received(1).RecordAsync(41, DeliveryAttemptStatus.Delivered, "{\"ok\":true}", null, Arg.Any<CancellationToken>());
-        await _logs.Received(1).UpdateStatusAsync(41, RequestStatus.Success, Arg.Any<CancellationToken>());
-        await _sophia.Received(1).PostCallbackAsync(7, "engineer-stats", Payload, "c1", Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task AFailedDelivery_IsRetriedAfterTheConfiguredWait_ThenSucceeds()
+    public async Task ARefusedPost_IsOneFailedAttempt_RecordedWithTheStatus_AndNeverWaitedOn()
     {
-        SophiaAnswers(Failed(500), Ok());
+        GivenFailedBefore(1);
+        SophiaAnswers(new SophiaDeliveryResult(false, 500, "{\"error\":\"x\"}"));
 
-        var (outcome, waited) = await RunAsync();
+        var attempt = await _delivery.AttemptAsync(Request, Payload);
 
-        Assert.Equal(WorkerOutcome.Completed, outcome);
-        Assert.InRange(waited, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(40));
+        Assert.Equal(new DeliveryAttempt(DeliveryOutcome.Failed, 2, AttemptsUsedUp: false), attempt);
+        await _sophia.Received(1).PostCallbackAsync(7, "engineer-stats", Payload, "c1", Arg.Any<CancellationToken>());
         await _attempts.Received(1).RecordAsync(41, DeliveryAttemptStatus.DeliveryFailed, "{\"error\":\"x\"}", "HTTP 500", Arg.Any<CancellationToken>());
-        await _attempts.Received(1).RecordAsync(41, DeliveryAttemptStatus.Delivered, Arg.Any<string>(), Arg.Is<string?>(failure => failure == null), Arg.Any<CancellationToken>());
-        await _logs.Received(1).UpdateStatusAsync(41, RequestStatus.Success, Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task TheWaitDoublesAfterEachFailure()
+    public async Task TheAttemptThatReachesMaxAttempts_SaysTheAttemptsAreUsedUp()
     {
-        SophiaAnswers(Failed(), Failed(), Ok());
+        GivenFailedBefore(2);
+        SophiaAnswers(new SophiaDeliveryResult(false, 502, string.Empty));
 
-        var (_, waited) = await RunAsync();
+        var attempt = await _delivery.AttemptAsync(Request, Payload);
 
-        Assert.InRange(waited, TimeSpan.FromSeconds(90), TimeSpan.FromSeconds(100));
+        Assert.Equal(new DeliveryAttempt(DeliveryOutcome.Failed, 3, AttemptsUsedUp: true), attempt);
     }
 
     [Fact]
-    public async Task WhenEveryAttemptFails_TheRequestIsMarkedFailed_AfterExactlyMaxAttemptsTries()
+    public async Task WhenMaxAttemptsIsAlreadyUsedUp_NothingIsSent()
     {
-        SophiaAnswers(Failed(502));
+        GivenFailedBefore(3);
 
-        var (outcome, _) = await RunAsync();
+        var attempt = await _delivery.AttemptAsync(Request, Payload);
 
-        Assert.Equal(WorkerOutcome.Completed, outcome);
-        await _sophia.Received(3).PostCallbackAsync(7, "engineer-stats", Payload, "c1", Arg.Any<CancellationToken>());
-        await _attempts.Received(3).RecordAsync(41, DeliveryAttemptStatus.DeliveryFailed, Arg.Any<string>(), "HTTP 502", Arg.Any<CancellationToken>());
-        await _logs.Received(1).UpdateStatusAsync(41, RequestStatus.Failed, Arg.Any<CancellationToken>());
-        await _logs.DidNotReceive().UpdateStatusAsync(41, RequestStatus.Success, Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task TheNumberOfAttempts_ComesFromTheClientsConfig()
-    {
-        GivenConfig(maxAttempts: 1);
-        SophiaAnswers(Failed());
-
-        var (_, waited) = await RunAsync();
-
-        await _sophia.Received(1).PostCallbackAsync(7, "engineer-stats", Payload, "c1", Arg.Any<CancellationToken>());
-        Assert.True(waited < TimeSpan.FromSeconds(5));
-        await _logs.Received(1).UpdateStatusAsync(41, RequestStatus.Failed, Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task AfterARestart_AttemptsAlreadyMadeCountAgainstTheLimit()
-    {
-        _attempts.CountDeliveryAttemptsAsync(41, Arg.Any<CancellationToken>()).Returns(2);
-        SophiaAnswers(Failed());
-
-        await RunAsync();
-
-        await _sophia.Received(1).PostCallbackAsync(7, "engineer-stats", Payload, "c1", Arg.Any<CancellationToken>());
-        await _logs.Received(1).UpdateStatusAsync(41, RequestStatus.Failed, Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task WhenTheLimitWasAlreadyReached_NothingMoreIsSent_AndTheRequestIsFailed()
-    {
-        _attempts.CountDeliveryAttemptsAsync(41, Arg.Any<CancellationToken>()).Returns(3);
-
-        var (outcome, _) = await RunAsync();
-
-        Assert.Equal(WorkerOutcome.Completed, outcome);
+        Assert.True(attempt.AttemptsUsedUp);
         await _sophia.DidNotReceiveWithAnyArgs().PostCallbackAsync(default, default!, default!, default!, default);
-        await _logs.Received(1).UpdateStatusAsync(41, RequestStatus.Failed, Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task AnUnreachableSophia_CountsAsAFailedAttempt_WithTheReason()
+    public async Task AnUnreachableCallback_IsAFailedAttempt_RecordedWithTheReason()
     {
-        SophiaAnswers(new ExternalApiUnavailableException("Sophia", "Sophia could not be reached or timed out."), Ok());
+        SophiaThrows(new ExternalApiUnavailableException("Sophia", "Sophia did not answer", 503));
 
-        var (outcome, _) = await RunAsync();
+        var attempt = await _delivery.AttemptAsync(Request, Payload);
 
-        Assert.Equal(WorkerOutcome.Completed, outcome);
-        await _attempts.Received(1).RecordAsync(41, DeliveryAttemptStatus.DeliveryFailed, "{}", "Sophia could not be reached or timed out.", Arg.Any<CancellationToken>());
-        await _logs.Received(1).UpdateStatusAsync(41, RequestStatus.Success, Arg.Any<CancellationToken>());
+        Assert.Equal(new DeliveryAttempt(DeliveryOutcome.Failed, 1, AttemptsUsedUp: false), attempt);
+        await _attempts.Received(1).RecordAsync(41, DeliveryAttemptStatus.DeliveryFailed, "{}", "Sophia did not answer", Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task ACredentialsProblem_PutsTheRequestBackAndStopsTheRun_WithoutSpendingAnAttempt()
+    public async Task RefusedCredentials_AreTheClientsProblem_NotAnAttempt()
     {
-        SophiaAnswers(new ExternalAuthenticationException("Sophia", "rejected", 401));
+        SophiaThrows(new ExternalAuthenticationException("Sophia", "Sophia rejected our access token (401).", 401));
 
-        var (outcome, _) = await RunAsync();
+        var attempt = await _delivery.AttemptAsync(Request, Payload);
 
-        Assert.Equal(WorkerOutcome.StopRun, outcome);
-        await _logs.Received(1).UpdateStatusAsync(41, RequestStatus.Queued, Arg.Any<CancellationToken>());
+        Assert.Equal(DeliveryOutcome.CredentialsRefused, attempt.Outcome);
         await _attempts.DidNotReceiveWithAnyArgs().RecordAsync(default, default!, default!, default, default);
     }
 
     [Fact]
-    public async Task ACallbackRemovedWhileDelivering_RevokesTheRequest()
+    public async Task ACallbackRemovedMeanwhile_Revokes()
     {
-        SophiaAnswers(new CallbackNotConfiguredException("gone"));
+        SophiaThrows(new CallbackNotConfiguredException("gone"));
 
-        var (outcome, _) = await RunAsync();
-
-        Assert.Equal(WorkerOutcome.Completed, outcome);
-        await _logs.Received(1).UpdateStatusAsync(41, RequestStatus.RevokedNoCallbackUrl, Arg.Any<CancellationToken>());
+        Assert.Equal(DeliveryOutcome.Revoked, (await _delivery.AttemptAsync(Request, Payload)).Outcome);
     }
 
     [Fact]
-    public async Task AnInactiveConfig_RevokesTheRequest_WithoutSending()
+    public async Task AClientWithNoActiveConfig_Revokes_WithoutCallingSophia()
     {
-        GivenConfig(maxAttempts: 3, active: false);
+        GivenConfig(3, active: false);
 
-        var (outcome, _) = await RunAsync();
-
-        Assert.Equal(WorkerOutcome.Completed, outcome);
+        Assert.Equal(DeliveryOutcome.Revoked, (await _delivery.AttemptAsync(Request, Payload)).Outcome);
         await _sophia.DidNotReceiveWithAnyArgs().PostCallbackAsync(default, default!, default!, default!, default);
-        await _logs.Received(1).UpdateStatusAsync(41, RequestStatus.RevokedNoCallbackUrl, Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task AShutdownDuringTheWait_PutsTheRequestBack_ForAnotherRun()
+    public async Task ThePost_IsNeverCancelled()
     {
-        SophiaAnswers(Failed());
-        using var stopping = new CancellationTokenSource();
-        var delivery = _delivery.DeliverAsync(Request, Payload, stopping.Token);
-        await Task.Delay(50);
+        SophiaAnswers(new SophiaDeliveryResult(true, 200, "{}"));
 
-        await stopping.CancelAsync();
-        var outcome = await delivery;
+        await _delivery.AttemptAsync(Request, Payload);
 
-        Assert.Equal(WorkerOutcome.Requeue, outcome);
-        await _logs.Received(1).UpdateStatusAsync(41, RequestStatus.Queued, Arg.Any<CancellationToken>());
-        await _sophia.Received(1).PostCallbackAsync(7, "engineer-stats", Payload, "c1", Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task APostIsNeverCutShortByAShutdown_SoADeliveredResultIsAlwaysRecorded()
-    {
-        SophiaAnswers(Ok());
-        using var stopping = new CancellationTokenSource();
-        await stopping.CancelAsync();
-
-        var (outcome, _) = await RunAsync(stopping.Token);
-
-        Assert.Equal(WorkerOutcome.Completed, outcome);
-        await _sophia.Received(1).PostCallbackAsync(7, "engineer-stats", Payload, "c1", Arg.Is<CancellationToken>(token => !token.CanBeCanceled));
-        await _attempts.Received(1).RecordAsync(41, DeliveryAttemptStatus.Delivered, Arg.Any<string>(), Arg.Is<string?>(failure => failure == null), Arg.Is<CancellationToken>(token => !token.CanBeCanceled));
+        await _sophia.Received(1).PostCallbackAsync(7, "engineer-stats", Payload, "c1", CancellationToken.None);
     }
 }

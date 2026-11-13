@@ -12,14 +12,15 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 using Arbisoft.DevLake.IntegrationService.DataAccess.Options;
 using Microsoft.Extensions.Options;
 
 namespace Arbisoft.DevLake.IntegrationService.Business.Services.Processing;
 
 /// <summary>
-/// Fails startup when the relay could republish a request whose intake is still publishing it: the relay must wait longer than one publish may
-/// take, or the same request is queued twice.
+/// Fails startup on settings that contradict each other: a relay that could republish a request whose intake is still publishing it (the relay
+/// must wait longer than one publish may take), or a longest retry wait shorter than the first.
 /// </summary>
 public sealed class ProcessingOptionsValidator : IValidateOptions<ProcessingOptions>
 {
@@ -33,9 +34,15 @@ public sealed class ProcessingOptionsValidator : IValidateOptions<ProcessingOpti
     public ValidateOptionsResult Validate(string? name, ProcessingOptions options)
     {
         var publishTimeout = _rabbitMq.Value.PublishTimeoutSeconds;
-        return options.RepublishAfterSeconds > publishTimeout * 2
+        if (options.RepublishAfterSeconds <= publishTimeout * 2)
+        {
+            return ValidateOptionsResult.Fail(
+                $"Processing:RepublishAfterSeconds ({options.RepublishAfterSeconds}) must be more than twice RabbitMq:PublishTimeoutSeconds ({publishTimeout}).");
+        }
+
+        return options.MaxDeliveryRetryDelaySeconds >= options.DeliveryRetryDelaySeconds
             ? ValidateOptionsResult.Success
             : ValidateOptionsResult.Fail(
-                $"Processing:RepublishAfterSeconds ({options.RepublishAfterSeconds}) must be more than twice RabbitMq:PublishTimeoutSeconds ({publishTimeout}).");
+                $"Processing:MaxDeliveryRetryDelaySeconds ({options.MaxDeliveryRetryDelaySeconds}) must not be less than Processing:DeliveryRetryDelaySeconds ({options.DeliveryRetryDelaySeconds}).");
     }
 }

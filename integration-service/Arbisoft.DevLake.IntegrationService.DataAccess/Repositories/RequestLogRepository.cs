@@ -23,7 +23,12 @@ namespace Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
 
 public sealed class RequestLogRepository : RepositoryBase, IRequestLogRepository
 {
-    private const string Columns = "id, clientRefId, correlationId, url, status, eventType, createdOn, idempotencyKey";
+    private const string Columns = "id, clientRefId, correlationId, url, status, eventType, createdOn, idempotencyKey, nextAttemptOn, claimedUntil";
+
+    /// <summary>Not claimed by anybody (or the claim ran out) and not deferred to later. Uses @now.</summary>
+    private const string Claimable =
+        "status IN ('" + RequestStatus.Received + "', '" + RequestStatus.Queued + "', '" + RequestStatus.Processing + "') " +
+        "AND (claimedUntil IS NULL OR claimedUntil < @now) AND (nextAttemptOn IS NULL OR nextAttemptOn <= @now)";
     private const string IdempotencyIndex = "UX_RequestLogs_idempotencyKey";
     private const string AttemptColumns = "id, requestLogId, responseJson, attemptStatus, failureError, attemptBy, attemptOn";
 
@@ -85,8 +90,53 @@ public sealed class RequestLogRepository : RepositoryBase, IRequestLogRepository
 
     public async Task<bool> UpdateStatusAsync(long id, string status, CancellationToken cancellationToken)
     {
-        var changed = await ExecuteAsync("UPDATE RequestLogs SET status = @status WHERE id = @id", new { id, status }, cancellationToken);
+        var changed = await ExecuteAsync(
+            "UPDATE RequestLogs SET status = @status, nextAttemptOn = NULL, claimedUntil = NULL WHERE id = @id", new { id, status }, cancellationToken);
         return changed > 0;
+    }
+
+    public async Task<bool> TryClaimAsync(long id, DateTimeOffset now, DateTimeOffset leaseUntil, CancellationToken cancellationToken)
+    {
+        var changed = await ExecuteAsync(
+            "UPDATE RequestLogs SET status = '" + RequestStatus.Processing + "', claimedUntil = @leaseUntil, nextAttemptOn = NULL WHERE id = @id AND " + Claimable,
+            new { id, now, leaseUntil },
+            cancellationToken);
+        return changed > 0;
+    }
+
+    public async Task DeferAsync(long id, string status, DateTimeOffset nextAttemptOn, CancellationToken cancellationToken)
+    {
+        await ExecuteAsync(
+            "UPDATE RequestLogs SET status = @status, nextAttemptOn = @nextAttemptOn, claimedUntil = NULL WHERE id = @id", new { id, status, nextAttemptOn }, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<RequestLog>> ListDueAsync(DateTimeOffset now, DateTimeOffset createdSince, int limit, CancellationToken cancellationToken)
+    {
+        // A request with neither a deferral nor a lease that is still Received or Queued is new: its message is in the queue, which owns it.
+        return QueryAsync<RequestLog>(
+            $"SELECT {Columns} FROM RequestLogs WHERE {Claimable} AND (nextAttemptOn IS NOT NULL OR status = '{RequestStatus.Processing}') " +
+            "AND createdOn >= @createdSince ORDER BY COALESCE(nextAttemptOn, claimedUntil, createdOn), id LIMIT @limit",
+            new { now, createdSince, limit },
+            cancellationToken);
+    }
+
+    public async Task SavePayloadAsync(long requestLogId, string payload, DateTimeOffset createdOn, CancellationToken cancellationToken)
+    {
+        await ExecuteAsync(
+            "INSERT INTO RequestPayloads (requestLogId, payload, createdOn) VALUES (@requestLogId, @payload, @createdOn) " +
+            "ON DUPLICATE KEY UPDATE payload = VALUES(payload), createdOn = VALUES(createdOn)",
+            new { requestLogId, payload, createdOn },
+            cancellationToken);
+    }
+
+    public Task<string?> GetPayloadAsync(long requestLogId, CancellationToken cancellationToken)
+    {
+        return QuerySingleOrDefaultAsync<string>("SELECT payload FROM RequestPayloads WHERE requestLogId = @requestLogId", new { requestLogId }, cancellationToken);
+    }
+
+    public async Task DeletePayloadAsync(long requestLogId, CancellationToken cancellationToken)
+    {
+        await ExecuteAsync("DELETE FROM RequestPayloads WHERE requestLogId = @requestLogId", new { requestLogId }, cancellationToken);
     }
 
     public async Task<bool> TryChangeStatusAsync(long id, string expectedStatus, string newStatus, CancellationToken cancellationToken)
@@ -113,19 +163,13 @@ public sealed class RequestLogRepository : RepositoryBase, IRequestLogRepository
             cancellationToken);
     }
 
-    public Task<IReadOnlyList<RequestLog>> ListStaleAsync(IReadOnlyCollection<string> statuses, DateTimeOffset createdBefore, int limit, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<RequestLog>> ListStaleAsync(
+        IReadOnlyCollection<string> statuses, DateTimeOffset createdBefore, DateTimeOffset now, int limit, CancellationToken cancellationToken)
     {
         return QueryAsync<RequestLog>(
-            $"SELECT {Columns} FROM RequestLogs WHERE status IN @statuses AND createdOn < @createdBefore ORDER BY createdOn, id LIMIT @limit",
-            new { statuses, createdBefore, limit },
-            cancellationToken);
-    }
-
-    public Task<IReadOnlyList<long>> GetClientsWithPendingRequestsAsync(CancellationToken cancellationToken)
-    {
-        return QueryAsync<long>(
-            "SELECT DISTINCT clientRefId FROM RequestLogs WHERE status IN @statuses ORDER BY clientRefId",
-            new { statuses = new[] { RequestStatus.Queued, RequestStatus.Processing } },
+            $"SELECT {Columns} FROM RequestLogs WHERE status IN @statuses AND createdOn < @createdBefore AND (claimedUntil IS NULL OR claimedUntil < @now) " +
+            "ORDER BY createdOn, id LIMIT @limit",
+            new { statuses, createdBefore, now, limit },
             cancellationToken);
     }
 

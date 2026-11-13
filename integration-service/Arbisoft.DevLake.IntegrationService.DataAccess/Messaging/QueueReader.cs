@@ -19,31 +19,36 @@ using RabbitMQ.Client.Exceptions;
 namespace Arbisoft.DevLake.IntegrationService.DataAccess.Messaging;
 
 /// <inheritdoc />
-public sealed class QueueBatch : IQueueBatch
+public sealed class QueueReader : IQueueReader
 {
     private readonly IChannel _channel;
+    private readonly Func<IChannel, CancellationToken, Task<QueueDelivery?>> _next;
+    private readonly SemaphoreSlim _channelLock = new(1, 1);
 
-    public QueueBatch(IChannel channel, IReadOnlyList<QueueDelivery> deliveries)
+    public QueueReader(IChannel channel, Func<IChannel, CancellationToken, Task<QueueDelivery?>> next)
     {
         _channel = channel;
-        Deliveries = deliveries;
+        _next = next;
     }
 
-    public IReadOnlyList<QueueDelivery> Deliveries { get; }
+    public Task<QueueDelivery?> NextAsync(CancellationToken cancellationToken)
+    {
+        return RunAsync(() => _next(_channel, cancellationToken), cancellationToken);
+    }
 
     public Task AckAsync(QueueDelivery delivery, CancellationToken cancellationToken)
     {
-        return RunAsync(() => _channel.BasicAckAsync(delivery.DeliveryTag, multiple: false, cancellationToken));
+        return RunAsync(() => _channel.BasicAckAsync(delivery.DeliveryTag, multiple: false, cancellationToken), cancellationToken);
     }
 
     public Task RequeueAsync(QueueDelivery delivery, CancellationToken cancellationToken)
     {
-        return RunAsync(() => _channel.BasicNackAsync(delivery.DeliveryTag, multiple: false, requeue: true, cancellationToken));
+        return RunAsync(() => _channel.BasicNackAsync(delivery.DeliveryTag, multiple: false, requeue: true, cancellationToken), cancellationToken);
     }
 
     public Task DeadLetterAsync(QueueDelivery delivery, CancellationToken cancellationToken)
     {
-        return RunAsync(() => _channel.BasicNackAsync(delivery.DeliveryTag, multiple: false, requeue: false, cancellationToken));
+        return RunAsync(() => _channel.BasicNackAsync(delivery.DeliveryTag, multiple: false, requeue: false, cancellationToken), cancellationToken);
     }
 
     public async ValueTask DisposeAsync()
@@ -56,17 +61,38 @@ public sealed class QueueBatch : IQueueBatch
         {
             // A closed channel has already returned its unacknowledged messages to the queue.
         }
+        finally
+        {
+            _channelLock.Dispose();
+        }
     }
 
-    private static async Task RunAsync(Func<ValueTask> action)
+    private async Task RunAsync(Func<ValueTask> action, CancellationToken cancellationToken)
     {
+        await RunAsync<bool>(
+            async () =>
+            {
+                await action();
+                return true;
+            },
+            cancellationToken);
+    }
+
+    /// <summary>One channel call at a time: a channel is not safe for concurrent use, and parallel workers settle their own messages.</summary>
+    private async Task<T> RunAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken)
+    {
+        await _channelLock.WaitAsync(cancellationToken);
         try
         {
-            await action();
+            return await action();
         }
         catch (Exception exception) when (exception is AlreadyClosedException or OperationInterruptedException or IOException)
         {
-            throw new QueueUnavailableException("The connection to the broker was lost before the message could be settled; it will be delivered again.", exception);
+            throw new QueueUnavailableException("The connection to the broker was lost; unacknowledged messages will be delivered again.", exception);
+        }
+        finally
+        {
+            _channelLock.Release();
         }
     }
 }

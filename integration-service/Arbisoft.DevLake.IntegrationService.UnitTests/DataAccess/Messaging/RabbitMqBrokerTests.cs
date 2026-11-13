@@ -30,7 +30,7 @@ public class RabbitMqBrokerTests
         var message = RabbitMqHarness.NewMessage();
 
         await broker.Publisher.PublishAsync(message, CancellationToken.None);
-        await using var batch = await broker.Consumer.ReceiveAsync(10, CancellationToken.None);
+        await using var batch = await QueueBatch.TakeAsync(broker.Consumer, 10);
 
         var delivery = Assert.Single(batch.Deliveries);
         Assert.Equal(message, delivery.Message);
@@ -78,12 +78,12 @@ public class RabbitMqBrokerTests
         await using var broker = RabbitMqHarness.Create();
         await broker.Publisher.PublishAsync(RabbitMqHarness.NewMessage(), CancellationToken.None);
 
-        await using (var batch = await broker.Consumer.ReceiveAsync(10, CancellationToken.None))
+        await using (var batch = await QueueBatch.TakeAsync(broker.Consumer, 10))
         {
             await batch.AckAsync(batch.Deliveries[0], CancellationToken.None);
         }
 
-        await using var again = await broker.Consumer.ReceiveAsync(10, CancellationToken.None);
+        await using var again = await QueueBatch.TakeAsync(broker.Consumer, 10);
         Assert.Empty(again.Deliveries);
         Assert.Equal(0u, await broker.CountAsync(broker.DeadQueue));
     }
@@ -101,7 +101,7 @@ public class RabbitMqBrokerTests
         Assert.Equal(3, await broker.Consumer.GetDepthAsync(CancellationToken.None));
         Assert.Equal(3, await broker.Consumer.GetDepthAsync(CancellationToken.None));
 
-        await using var batch = await broker.Consumer.ReceiveAsync(1, CancellationToken.None);
+        await using var batch = await QueueBatch.TakeAsync(broker.Consumer, 1);
         var delivery = Assert.Single(batch.Deliveries);
         Assert.False(delivery.Redelivered);
         Assert.Equal(0, delivery.DeliveryCount);
@@ -115,12 +115,12 @@ public class RabbitMqBrokerTests
         var message = RabbitMqHarness.NewMessage();
         await broker.Publisher.PublishAsync(message, CancellationToken.None);
 
-        await using (var first = await broker.Consumer.ReceiveAsync(10, CancellationToken.None))
+        await using (var first = await QueueBatch.TakeAsync(broker.Consumer, 10))
         {
             Assert.Single(first.Deliveries);
         }
 
-        await using var second = await broker.Consumer.ReceiveAsync(10, CancellationToken.None);
+        await using var second = await QueueBatch.TakeAsync(broker.Consumer, 10);
         var delivery = Assert.Single(second.Deliveries);
         Assert.Equal(message, delivery.Message);
         Assert.True(delivery.Redelivered);
@@ -132,12 +132,12 @@ public class RabbitMqBrokerTests
         await using var broker = RabbitMqHarness.Create();
         await broker.Publisher.PublishAsync(RabbitMqHarness.NewMessage(), CancellationToken.None);
 
-        await using (var first = await broker.Consumer.ReceiveAsync(10, CancellationToken.None))
+        await using (var first = await QueueBatch.TakeAsync(broker.Consumer, 10))
         {
             await first.RequeueAsync(first.Deliveries[0], CancellationToken.None);
         }
 
-        await using var second = await broker.Consumer.ReceiveAsync(10, CancellationToken.None);
+        await using var second = await QueueBatch.TakeAsync(broker.Consumer, 10);
         var delivery = Assert.Single(second.Deliveries);
         Assert.True(delivery.Redelivered);
         Assert.True(delivery.DeliveryCount >= 1);
@@ -150,7 +150,7 @@ public class RabbitMqBrokerTests
         var message = RabbitMqHarness.NewMessage();
         await broker.Publisher.PublishAsync(message, CancellationToken.None);
 
-        await using (var batch = await broker.Consumer.ReceiveAsync(10, CancellationToken.None))
+        await using (var batch = await QueueBatch.TakeAsync(broker.Consumer, 10))
         {
             await batch.DeadLetterAsync(batch.Deliveries[0], CancellationToken.None);
         }
@@ -169,22 +169,22 @@ public class RabbitMqBrokerTests
         await broker.RawPublishAsync(new BasicProperties { CorrelationId = "b", Type = "t" });
         await broker.RawPublishAsync(new BasicProperties { Headers = new Dictionary<string, object?> { [QueueConstants.SchemaVersionHeader] = 1 } });
 
-        await using var batch = await broker.Consumer.ReceiveAsync(10, CancellationToken.None);
+        await using var batch = await QueueBatch.TakeAsync(broker.Consumer, 10);
 
         Assert.Empty(batch.Deliveries);
         await RabbitMqHarness.WaitUntilAsync(async () => await broker.CountAsync(broker.DeadQueue) == 3);
     }
 
     [RabbitMqFact]
-    public async Task Receive_NeverReturnsMoreThanThePerRunLimit_AndLeavesTheRestQueued()
+    public async Task TakingSomeMessages_LeavesTheRestQueued()
     {
-        await using var broker = RabbitMqHarness.Create(batchLimit: 10);
+        await using var broker = RabbitMqHarness.Create();
         for (var i = 0; i < 15; i++)
         {
             await broker.Publisher.PublishAsync(RabbitMqHarness.NewMessage(), CancellationToken.None);
         }
 
-        await using (var batch = await broker.Consumer.ReceiveAsync(100, CancellationToken.None))
+        await using (var batch = await QueueBatch.TakeAsync(broker.Consumer, 10))
         {
             Assert.Equal(10, batch.Deliveries.Count);
             foreach (var delivery in batch.Deliveries)
@@ -209,7 +209,7 @@ public class RabbitMqBrokerTests
         Assert.Equal(3u, await broker.CountAsync(broker.Options.RequestQueueName));
         Assert.Equal(0u, await broker.CountAsync(broker.DeadQueue));
 
-        await using (var batch = await broker.Consumer.ReceiveAsync(2, CancellationToken.None))
+        await using (var batch = await QueueBatch.TakeAsync(broker.Consumer, 2))
         {
             foreach (var delivery in batch.Deliveries)
             {
@@ -242,12 +242,12 @@ public class RabbitMqBrokerTests
 
         for (var delivery = 1; delivery <= 3; delivery++)
         {
-            await using var batch = await broker.Consumer.ReceiveAsync(1, CancellationToken.None);
+            await using var batch = await QueueBatch.TakeAsync(broker.Consumer, 1);
             Assert.Equal(message, Assert.Single(batch.Deliveries).Message);
             await batch.RequeueAsync(batch.Deliveries[0], CancellationToken.None);
         }
 
-        await using var last = await broker.Consumer.ReceiveAsync(1, CancellationToken.None);
+        await using var last = await QueueBatch.TakeAsync(broker.Consumer, 1);
         Assert.Empty(last.Deliveries);
         await RabbitMqHarness.WaitUntilAsync(async () => await broker.CountAsync(broker.DeadQueue) == 1);
         Assert.Equal(0u, await broker.CountAsync(broker.Options.RequestQueueName));
@@ -283,7 +283,7 @@ public class RabbitMqBrokerTests
         await broker.Publisher.PublishAsync(RabbitMqHarness.NewMessage(), CancellationToken.None);
         await broker.DropConnectionFromTheBrokerAsync();
 
-        await using var batch = await broker.Consumer.ReceiveAsync(10, CancellationToken.None);
+        await using var batch = await QueueBatch.TakeAsync(broker.Consumer, 10);
         Assert.Equal(2, batch.Deliveries.Count);
     }
 

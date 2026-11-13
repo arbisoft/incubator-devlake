@@ -41,6 +41,7 @@ public sealed class ProcessingEndToEndTests : ApiTestBase
             ["Processing:Enabled"] = "true",
             ["Processing:IntervalSeconds"] = "1",
             ["Processing:DeliveryRetryDelaySeconds"] = "1",
+            ["Processing:UnavailableRetryDelaySeconds"] = "1",
             ["Resilience:RetryBaseDelayMilliseconds"] = "1",
             ["RateLimits:PollPerMinute"] = "100000"
         })
@@ -227,17 +228,18 @@ public sealed class ProcessingEndToEndTests : ApiTestBase
     }
 
     [BrokersFact]
-    public async Task WhenSophiaRefusesOurCredentials_RequestsStayQueued_ThenCompleteOnceItIsFixed()
+    public async Task WhenSophiaRefusesOurCredentials_TheRequestWaitsQueuedInTheDatabase_WithoutCallingDevLake_ThenCompletesOnceItIsFixed()
     {
         var (_, token) = await IsolatedClientAsync(Single);
         _upstream.SophiaTokenStatus = HttpStatusCode.Unauthorized;
 
         var request = await GetStatsAsync(token, "jane@arbisoft.com");
         await WaitForAsync(async () => _upstream.SophiaTokenRequests.Count() >= 2);
+        await WaitForAsync(async () => await Seed.LogAsync(request.Correlation) is { Status: RequestStatus.Queued, NextAttemptOn: not null });
 
-        Assert.Equal("Queued", await PollAsync(token, request.Correlation));
-        Assert.Equal(1, await Seed.QueueDepthAsync());
+        Assert.Equal(0, await Seed.QueueDepthAsync());
         Assert.Empty(_upstream.DevLakeStatsRequests);
+        Assert.Empty(await Seed.AttemptsAsync((await Seed.LogAsync(request.Correlation))!.Id));
 
         _upstream.SophiaTokenStatus = HttpStatusCode.OK;
         await WaitForStatusAsync(token, request.Correlation, "Success");
@@ -370,6 +372,46 @@ public sealed class ProcessingEndToEndTests : ApiTestBase
 
         await WaitForStatusAsync(token, correlationId, "Success");
         Assert.Equal(correlationId, Assert.Single(_upstream.Callbacks).CorrelationId);
+    }
+
+    /// <summary>A worker that stopped mid-step (a crash) leaves the request Processing with a lease and no message; once the lease runs out the job resumes it.</summary>
+    [BrokersFact]
+    public async Task ARequestLeftByAWorkerThatStopped_IsPickedUpAgainOnceItsLeaseRunsOut()
+    {
+        var (client, token) = await IsolatedClientAsync(Single);
+        var correlationId = await Seed.SeedRequestAsync(client, RequestStatus.Processing);
+        var log = (await Seed.LogAsync(correlationId))!;
+        var body = JsonSerializer.Serialize(new
+        {
+            correlation_id = correlationId,
+            event_type = Single,
+            emails = new[] { $"crash-{Guid.NewGuid():N}@arbisoft.com" },
+            time_frame = "24h",
+            requested_on = DateTimeOffset.UtcNow
+        });
+        await using (var scope = Factory.Services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IRequestLogRepository>().InsertJsonAsync(new RequestLogJson { RequestLogId = log.Id, Json = body }, CancellationToken.None);
+        }
+
+        await Seed.ExecuteAsync("UPDATE RequestLogs SET claimedUntil = @expired WHERE id = @id", new { expired = DateTime.UtcNow.AddMinutes(-1), id = log.Id });
+
+        await WaitForStatusAsync(token, correlationId, "Success");
+        Assert.Equal(correlationId, Assert.Single(_upstream.Callbacks).CorrelationId);
+    }
+
+    [BrokersFact]
+    public async Task ARequestStillHeldByAWorker_IsLeftAlone()
+    {
+        var (client, token) = await IsolatedClientAsync(Single);
+        var correlationId = await Seed.SeedRequestAsync(client, RequestStatus.Processing);
+        var log = (await Seed.LogAsync(correlationId))!;
+        await Seed.ExecuteAsync("UPDATE RequestLogs SET claimedUntil = @held WHERE id = @id", new { held = DateTime.UtcNow.AddMinutes(10), id = log.Id });
+
+        await Task.Delay(3500);
+
+        Assert.Equal("Processing", await PollAsync(token, correlationId));
+        Assert.Empty(_upstream.Callbacks);
     }
 
     [BrokersFact]

@@ -14,14 +14,22 @@
 // limitations under the License.
 
 using Arbisoft.DevLake.IntegrationService.DataAccess.Messaging;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
 
 namespace Arbisoft.DevLake.IntegrationService.Business.Services.Processing;
 
+/// <summary>
+/// Moves one request one step forward: collects its stats if they are not stored yet, then makes one delivery attempt, and leaves it finished or
+/// deferred to its next attempt in the database. It never waits between attempts.
+/// </summary>
 public interface IRequestWorker
 {
     /// <summary>
-    /// Does everything for one queued request: collects the stats, delivers them, and leaves the request log in its final state. A shutdown
-    /// (<paramref name="stopping"/>) puts the request back instead of abandoning it half done.
+    /// Handles a message taken off the queue. Once the request is claimed the database owns it, so the message is acknowledged whatever happens
+    /// to the request; a message the request is not found for, or that the consumer rejected, is dead-lettered.
     /// </summary>
-    Task<WorkerOutcome> ProcessAsync(QueueDelivery delivery, CancellationToken stopping);
+    Task<WorkResult> HandleMessageAsync(QueueDelivery delivery, ProcessingRun run, CancellationToken stopping);
+
+    /// <summary>Handles a request the database says is due: deferred until now, or left by a worker that stopped.</summary>
+    Task<StepResult> HandleDueAsync(RequestLog request, ProcessingRun run, CancellationToken stopping);
 }

@@ -18,8 +18,8 @@ namespace Arbisoft.DevLake.IntegrationService.Business.Services.Processing;
 public interface IStaleRequestSweeper
 {
     /// <summary>
-    /// Marks requests that were never finished, because their message expired from the queue or was dead-lettered, as Failed, so a client polling
-    /// for them is not told <c>Queued</c> forever. Returns how many it marked.
+    /// Marks requests that did not finish within the queue's message lifetime (plus a grace period) as Failed: their message expired or was
+    /// dead-lettered, or their retries ran past the lifetime. A request a worker currently holds is left alone. Returns how many it marked.
     /// </summary>
     Task<int> SweepAsync(CancellationToken cancellationToken);
 }

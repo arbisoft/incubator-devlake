@@ -66,8 +66,4 @@ public sealed class RabbitMqOptions
     /// </summary>
     [Range(1, 300)]
     public int PublishTimeoutSeconds { get; init; } = 10;
-
-    /// <summary>The most messages one receive call returns. This bounds the work in flight per run (the pull-based prefetch).</summary>
-    [Range(1, 1000)]
-    public int ReceiveBatchLimit { get; init; } = 10;
 }

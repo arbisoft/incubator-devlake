@@ -31,7 +31,7 @@ public sealed class RequestProcessingJobTests : IDisposable
 
     public RequestProcessingJobTests()
     {
-        _processor.ProcessPendingAsync(Arg.Any<CancellationToken>()).Returns(new ProcessingRunSummary(0, 0, 0, 0, 0, null));
+        _processor.ProcessPendingAsync(Arg.Any<CancellationToken>()).Returns(new ProcessingRunSummary());
         _services = new ServiceCollection().AddScoped(_ => _processor).AddLogging(builder => builder.AddProvider(_logs)).BuildServiceProvider();
     }
 
@@ -78,7 +78,7 @@ public sealed class RequestProcessingJobTests : IDisposable
     public async Task ARunThatFails_IsLogged_AndTheJobCarriesOnAtTheNextInterval()
     {
         _processor.ProcessPendingAsync(Arg.Any<CancellationToken>())
-            .Returns(Task.FromException<ProcessingRunSummary>(new InvalidOperationException("the database is down")), Task.FromResult(new ProcessingRunSummary(0, 0, 0, 0, 0, null)));
+            .Returns(Task.FromException<ProcessingRunSummary>(new InvalidOperationException("the database is down")), Task.FromResult(new ProcessingRunSummary()));
         using var job = Create();
 
         await job.StartAsync(CancellationToken.None);
@@ -92,12 +92,12 @@ public sealed class RequestProcessingJobTests : IDisposable
     [Fact]
     public async Task ARunThatDidWork_IsLoggedWithItsCounts()
     {
-        _processor.ProcessPendingAsync(Arg.Any<CancellationToken>()).Returns(new ProcessingRunSummary(5, 3, 1, 1, 2, "DevLake rejected our API token."));
+        _processor.ProcessPendingAsync(Arg.Any<CancellationToken>()).Returns(new ProcessingRunSummary(MessagesTaken: 5, Resumed: 4, Finished: 3, Deferred: 2, DeadLettered: 1, Requeued: 1, Expired: 2, Republished: 6, HaltReason: "DevLake rejected our API token."));
         using var job = Create();
 
         await job.RunOnceAsync(CancellationToken.None);
 
-        Assert.Contains("5 received, 3 completed, 1 requeued, 1 dead-lettered, 2 expired", _logs.All, StringComparison.Ordinal);
+        Assert.Contains("5 messages taken, 4 waiting requests resumed, 3 finished, 2 deferred, 1 dead-lettered, 1 requeued, 2 expired, 6 republished", _logs.All, StringComparison.Ordinal);
         Assert.Contains("stopped early: DevLake rejected our API token.", _logs.All, StringComparison.Ordinal);
     }
 
@@ -119,7 +119,7 @@ public sealed class RequestProcessingJobTests : IDisposable
         {
             await stopping.CancelAsync();
             call.ArgAt<CancellationToken>(0).ThrowIfCancellationRequested();
-            return new ProcessingRunSummary(0, 0, 0, 0, 0, null);
+            return new ProcessingRunSummary();
         });
         using var job = Create();
 

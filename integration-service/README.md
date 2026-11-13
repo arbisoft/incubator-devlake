@@ -96,10 +96,9 @@ The API records a request before it publishes it (an outbox): it commits the `Re
 | `QueueMaxLength` | 10000 | When the queue is full the broker rejects the publish and the API answers 429 |
 | `PublishTimeoutSeconds` | 10 | The longest one publish may take, including waiting for the publish channel and the broker's confirm. A slower publish counts as the broker being unavailable (503), so a broker that blocks publishers cannot hold API requests open |
 | `MessageTtlSeconds` | 7200 | A request that waits longer expires into the dead-letter queue |
-| `DeliveryLimit` | 5 | A message redelivered more often than this is moved to the dead-letter queue by the consumer |
-| `ReceiveBatchLimit` | 10 | The most messages one processing run takes from the queue |
+| `DeliveryLimit` | 5 | A message redelivered more often than this is moved to the dead-letter queue, and its request is marked `Failed` with the reason |
 
-Failed, expired and unreadable messages go to `<queue>.dead` through the `<queue>.dlx` exchange. Inspect them in the RabbitMQ management UI (http://localhost:15672). To replay one, use the UI's "Move messages" shovel from the dead-letter queue back to the request queue.
+Rejected, expired and unreadable messages go to `<queue>.dead` through the `<queue>.dlx` exchange. Inspect them in the RabbitMQ management UI (http://localhost:15672). To replay one, use the UI's "Move messages" shovel from the dead-letter queue back to the request queue.
 
 ## Stats requests
 
@@ -116,24 +115,26 @@ Failed, expired and unreadable messages go to `<queue>.dead` through the `<queue
 
 A background job in the API takes queued stats requests off RabbitMQ, collects the stats from DevLake, and delivers them to the client's callback. It is on by default and can be turned off with `Processing:Enabled=false` (requests then stay queued).
 
+Once the job takes a request off the queue, its `RequestLogs` row owns it and the message is acknowledged. A request that has to wait (a failed delivery, refused client credentials, DevLake down) is deferred in the database to `nextAttemptOn`, so it never sleeps in memory, never blocks other requests, and never uses up its message's redeliveries. A worker claims a request with a lease (`claimedUntil`) through an `UPDATE` that only one worker can win, so a duplicate message or a second worker never does the work twice, and a request whose worker stopped (a crash) is picked up again once its lease runs out.
+
 Every `Processing:IntervalSeconds` (30) a run does this, in order:
 
-1. Marks requests that were never finished, because their message expired from the queue or was dead-lettered, as `Failed`, so polling does not say `Queued` forever.
+1. Marks requests that did not finish within the queue's message lifetime plus `Processing:StaleGraceSeconds` as `Failed`, with an `Expired` attempt, so polling does not say `Queued` forever. A request a worker currently holds is left alone.
 2. Publishes again the requests still `Received` more than `Processing:RepublishAfterSeconds` (60) after they were recorded: the API committed them but never published them. It stops at the first refusal from the broker and tries again next run.
-3. Checks the queue depth, and does nothing more if it is empty.
-4. Checks that DevLake accepts our API token and that a Sophia access token can be obtained for every client that has requests waiting. If not, the run stops **before taking any message**, so requests stay queued and no message's redelivery count goes up. A client with nothing waiting is not checked.
-5. Takes up to `RabbitMq:ReceiveBatchLimit` (10) messages and processes up to `Processing:MaxParallelRequests` (4) at a time.
+3. Lists the requests the database has due (deferred until now, or left by a worker that stopped). If there are none and the queue is empty, it does nothing more.
+4. Checks that DevLake answers and accepts our API token. If not, nothing is taken.
+5. Takes work one item per free worker, `Processing:MaxParallelRequests` (4) at a time: first the due requests, then messages from the queue. It keeps going until the queue is empty, `Processing:RunBudgetSeconds` (120) is used, or DevLake fails during the run. Nothing is taken that cannot be started at once, so no message is put back unworked.
 
-For each request the job:
+Each item is one step of work on one request:
 
-- moves the message to the dead-letter queue if it has no `RequestLogs` row, because the API always records the row before it publishes;
-- skips and acknowledges it if it is already finished (a repeat delivery does no second delivery to the client);
-- marks it `Revoked - no callback URL` if the callback was removed while it waited;
-- sets it to `Processing`, loads the engineer's mapped emails, and fetches Jira, GitHub, AI usage and AI cost for the Arbisoft email and every mapped email at once;
-- posts one merged body to the callback, up to the client's `maxAttempts` times, waiting `Processing:DeliveryRetryDelaySeconds` (30) after the first failure and twice as long after each further one, and records every attempt in `RequestResponseAttempts`;
-- ends the request `Success` or `Failed`, then acknowledges the message.
+- A message the consumer rejects (unknown schema version, no correlation ID, delivered more than `RabbitMq:DeliveryLimit` times) is dead-lettered, and its request is marked `Failed` with the reason. A message whose request has no `RequestLogs` row is dead-lettered too, because the API always records the row before it publishes.
+- A message for a request that is finished, or that the job already owns, is acknowledged and nothing else happens, so a repeat never delivers twice.
+- A request whose callback was removed while it waited is marked `Revoked - no callback URL`.
+- If its stats are not collected yet, the job first makes sure a Sophia access token can be had for the client. If the client's credentials are refused, that client is marked failing for the rest of the run: this and its other requests wait `Processing:UnavailableRetryDelaySeconds` (60) as `Queued`, DevLake is not called for them, and every other client carries on. Then it loads the engineer's mapped emails, fetches Jira, GitHub, AI usage and AI cost for the Arbisoft email and every mapped email at once, and stores the merged body in `RequestPayloads`, so every delivery attempt sends the same result.
+- It makes one delivery attempt and records it in `RequestResponseAttempts`. Delivered ends the request `Success`. A failure defers it as `Processing` by `Processing:DeliveryRetryDelaySeconds` (30), doubling after each failure up to `Processing:MaxDeliveryRetryDelaySeconds` (900), until the client's `maxAttempts` is used and it ends `Failed`. With the defaults, ten attempts fit in the two hours a request may live. Credentials refused by the callback make the client failing and defer the request without counting an attempt.
+- The stored body is deleted once the request finishes.
 
-One failing request never stops the others. DevLake or Sophia being down, or refusing our credentials, is systemic: the request goes back to `Queued`, the rest of the run is not started, and the next run tries again. A request DevLake refuses (a 4xx) fails on its own with the reason recorded.
+One failing request never stops the others. DevLake down, or refusing our token, during a run stops the run taking new work; the request that hit it waits `Processing:UnavailableRetryDelaySeconds`, and the next run tries again. A request DevLake refuses (a 4xx) fails on its own with the reason recorded.
 
 The callback body (Sophia has not specified one):
 
@@ -156,16 +157,18 @@ The callback body (Sophia has not specified one):
 
 A range request has `from` and `to` instead of `time_frame`. Each source holds the stats of every email as DevLake returned them. A batch has one entry per engineer.
 
-On shutdown the job stops taking new work. A delivery to Sophia that has already started is finished and recorded, so a delivered result is never left unrecorded; everything else goes back on the queue.
-
-A request that waits longer than the queue's message lifetime plus `Processing:StaleGraceSeconds` (60) is marked `Failed` with an `Expired` attempt.
+On shutdown the job stops taking new work. A delivery to Sophia that has already started is finished and recorded, so a delivered result is never left unrecorded. A request stopped in the middle of collecting is handed back due at once, so the next start picks it up without waiting for its lease to run out.
 
 | Setting | Default | Effect |
 |---|---|---|
 | `Processing:Enabled` | true | Turns the job on or off |
 | `Processing:IntervalSeconds` | 30 | How often the job runs |
-| `Processing:MaxParallelRequests` | 4 | Requests processed at the same time in one run |
+| `Processing:MaxParallelRequests` | 4 | Requests worked on at the same time |
+| `Processing:RunBudgetSeconds` | 120 | How long one run keeps taking new work; work already started finishes |
 | `Processing:DeliveryRetryDelaySeconds` | 30 | Wait before the second delivery attempt; doubles each time |
+| `Processing:MaxDeliveryRetryDelaySeconds` | 900 | The longest wait between two delivery attempts. It must not be less than `DeliveryRetryDelaySeconds` |
+| `Processing:UnavailableRetryDelaySeconds` | 60 | Wait before trying again a request held up by DevLake being down or its client's credentials being refused |
+| `Processing:ClaimLeaseSeconds` | 600 | How long a worker holds a request. It must be longer than one step (collecting plus one delivery); a request whose worker stopped is picked up again after it |
 | `Processing:StaleGraceSeconds` | 60 | Extra time past the queue lifetime before an unfinished request is failed |
 | `Processing:RepublishAfterSeconds` | 60 | How old a request still `Received` must be before the job publishes it again. It must be more than twice `RabbitMq:PublishTimeoutSeconds`, or the host refuses to start, so an intake that is still publishing is never overtaken |
 

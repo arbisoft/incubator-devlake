@@ -26,4 +26,10 @@ public sealed class RequestLog
     public string EventType { get; init; } = string.Empty;
     public DateTimeOffset CreatedOn { get; init; }
     public string? IdempotencyKey { get; init; }
+
+    /// <summary>When a deferred request is next due. Null while the request is new, being worked on, or finished.</summary>
+    public DateTimeOffset? NextAttemptOn { get; init; }
+
+    /// <summary>Until when a worker holds the request. Null when nobody does.</summary>
+    public DateTimeOffset? ClaimedUntil { get; init; }
 }

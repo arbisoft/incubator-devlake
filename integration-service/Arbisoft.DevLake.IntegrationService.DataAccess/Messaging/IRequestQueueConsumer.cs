@@ -18,11 +18,11 @@ namespace Arbisoft.DevLake.IntegrationService.DataAccess.Messaging;
 public interface IRequestQueueConsumer
 {
     /// <summary>
-    /// Takes up to <paramref name="maxMessages"/> requests off the queue (never more than the configured per-run limit) without
-    /// acknowledging them. Messages the code cannot read go to the dead-letter queue instead of being returned.
+    /// Opens a reader on a channel of its own. The caller takes messages one at a time, as it has room to work on them, and settles each one when
+    /// its work is done. Disposing the reader returns every message that was not settled to the queue, so nothing is lost.
     /// </summary>
     /// <exception cref="QueueUnavailableException">The broker could not be reached.</exception>
-    Task<IQueueBatch> ReceiveAsync(int maxMessages, CancellationToken cancellationToken);
+    Task<IQueueReader> OpenAsync(CancellationToken cancellationToken);
 
     /// <summary>
     /// How many messages are waiting in the queue. A cheap check that does not take any message, so it does not raise a message's delivery count.
@@ -32,13 +32,15 @@ public interface IRequestQueueConsumer
     Task<int> GetDepthAsync(CancellationToken cancellationToken);
 }
 
-/// <summary>
-/// A set of received, not yet acknowledged messages and the channel they came from. Acknowledge each message only after its work has
-/// committed. Disposing the batch returns every message that was not acknowledged to the queue, so nothing is lost.
-/// </summary>
-public interface IQueueBatch : IAsyncDisposable
+/// <summary>Takes messages off the queue one at a time, without acknowledging them. Safe to settle from several tasks at once.</summary>
+public interface IQueueReader : IAsyncDisposable
 {
-    IReadOnlyList<QueueDelivery> Deliveries { get; }
+    /// <summary>
+    /// The next message, or null when the queue is empty. A message the consumer cannot accept (an unknown schema version, no correlation ID, or
+    /// delivered more often than the limit) comes back with <see cref="QueueDelivery.Rejection"/> set: the caller records why and dead-letters it.
+    /// </summary>
+    /// <exception cref="QueueUnavailableException">The connection to the broker was lost.</exception>
+    Task<QueueDelivery?> NextAsync(CancellationToken cancellationToken);
 
     /// <summary>The work is done: remove the message from the queue.</summary>
     Task AckAsync(QueueDelivery delivery, CancellationToken cancellationToken);

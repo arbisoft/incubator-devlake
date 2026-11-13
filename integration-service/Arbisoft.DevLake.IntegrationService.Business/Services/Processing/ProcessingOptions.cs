@@ -33,9 +33,31 @@ public sealed class ProcessingOptions
     [Range(1, 32)]
     public int MaxParallelRequests { get; init; } = 4;
 
-    /// <summary>The wait before the second attempt to deliver to Sophia. Each further wait doubles.</summary>
+    /// <summary>The wait before the second attempt to deliver to Sophia. Each further wait doubles, up to <see cref="MaxDeliveryRetryDelaySeconds"/>.</summary>
     [Range(1, 3600)]
     public int DeliveryRetryDelaySeconds { get; init; } = 30;
+
+    /// <summary>
+    /// The longest wait between two delivery attempts. With the defaults (30 s doubling, capped at 15 minutes) ten attempts fit inside the two hours a
+    /// request may live.
+    /// </summary>
+    [Range(1, 3600)]
+    public int MaxDeliveryRetryDelaySeconds { get; init; } = 900;
+
+    /// <summary>How long a request waits before it is tried again when DevLake was down or its client's credentials were refused.</summary>
+    [Range(1, 3600)]
+    public int UnavailableRetryDelaySeconds { get; init; } = 60;
+
+    /// <summary>
+    /// How long a worker holds a request it is working on. Another worker can take the request only after this runs out, which is how a request
+    /// whose worker stopped (a crash) is picked up again. It must be longer than one step of work: collecting from DevLake and one delivery attempt.
+    /// </summary>
+    [Range(30, 7200)]
+    public int ClaimLeaseSeconds { get; init; } = 600;
+
+    /// <summary>How long one run keeps taking new work. Work already started finishes; the next run carries on.</summary>
+    [Range(1, 3600)]
+    public int RunBudgetSeconds { get; init; } = 120;
 
     /// <summary>
     /// How old a request still marked Received must be before the job publishes it again, because its intake never finished publishing it. It must

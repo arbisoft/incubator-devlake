@@ -33,7 +33,7 @@ public class RequestQueueConsumerTests
     public RequestQueueConsumerTests()
     {
         _connection.CreateChannelAsync(false, Arg.Any<CancellationToken>()).Returns(_channel);
-        _consumer = new RequestQueueConsumer(_connection, Options.Create(new RabbitMqOptions { RequestQueueName = "q", ReceiveBatchLimit = 3 }), NullLogger<RequestQueueConsumer>.Instance);
+        _consumer = new RequestQueueConsumer(_connection, Options.Create(new RabbitMqOptions { RequestQueueName = "q", DeliveryLimit = 5 }), NullLogger<RequestQueueConsumer>.Instance);
     }
 
     private static BasicGetResult Result(ulong tag, object? schemaVersion = null, string? correlationId = "cid", string? type = "engineer-stats", string body = "{}", bool redelivered = false, long? acquiredCount = null)
@@ -60,38 +60,39 @@ public class RequestQueueConsumerTests
     }
 
     [Fact]
-    public async Task Receive_ReturnsReadableMessagesWithTheirDeliveryDetails()
+    public async Task Next_ReturnsAReadableMessageWithItsDeliveryDetails()
     {
         Queue(Result(7, schemaVersion: 1, body: "{\"a\":1}", redelivered: true, acquiredCount: 2));
+        await using var reader = await _consumer.OpenAsync(CancellationToken.None);
 
-        await using var batch = await _consumer.ReceiveAsync(10, CancellationToken.None);
+        var delivery = await reader.NextAsync(CancellationToken.None);
 
-        var delivery = Assert.Single(batch.Deliveries);
+        Assert.NotNull(delivery);
         Assert.Equal(new QueueMessage("cid", "engineer-stats", "{\"a\":1}"), delivery.Message);
         Assert.Equal(7UL, delivery.DeliveryTag);
         Assert.True(delivery.Redelivered);
         Assert.Equal(2, delivery.DeliveryCount);
+        Assert.Null(delivery.Rejection);
     }
 
     [Fact]
-    public async Task Receive_NeverReturnsMoreThanThePerRunLimit()
+    public async Task Next_TakesOneMessagePerCall_AndNullWhenTheQueueIsEmpty()
     {
-        Queue(Result(1, 1), Result(2, 1), Result(3, 1), Result(4, 1), Result(5, 1));
+        Queue(Result(1, 1), Result(2, 1));
+        await using var reader = await _consumer.OpenAsync(CancellationToken.None);
 
-        await using var batch = await _consumer.ReceiveAsync(100, CancellationToken.None);
-
-        Assert.Equal(3, batch.Deliveries.Count);
-        await _channel.Received(3).BasicGetAsync("q", false, Arg.Any<CancellationToken>());
+        Assert.Equal(1UL, (await reader.NextAsync(CancellationToken.None))!.DeliveryTag);
+        await _channel.Received(1).BasicGetAsync("q", false, Arg.Any<CancellationToken>());
+        Assert.Equal(2UL, (await reader.NextAsync(CancellationToken.None))!.DeliveryTag);
+        Assert.Null(await reader.NextAsync(CancellationToken.None));
     }
 
     [Fact]
-    public async Task Receive_AnEmptyQueue_ReturnsAnEmptyBatch()
+    public async Task Open_TakesNothingByItself()
     {
-        Queue();
+        await using var reader = await _consumer.OpenAsync(CancellationToken.None);
 
-        await using var batch = await _consumer.ReceiveAsync(10, CancellationToken.None);
-
-        Assert.Empty(batch.Deliveries);
+        await _channel.DidNotReceiveWithAnyArgs().BasicGetAsync(default!, default, default);
     }
 
     [Theory]
@@ -100,59 +101,69 @@ public class RequestQueueConsumerTests
     [InlineData(2)]
     [InlineData(99)]
     [InlineData("1")]
-    public async Task Receive_AnUnsupportedOrMissingSchemaVersion_IsDeadLetteredNotReturned(object? version)
+    public async Task Next_AnUnsupportedOrMissingSchemaVersion_IsReturnedRejected_ForTheCallerToRecordAndDeadLetter(object? version)
     {
         Queue(Result(9, version));
+        await using var reader = await _consumer.OpenAsync(CancellationToken.None);
 
-        await using var batch = await _consumer.ReceiveAsync(10, CancellationToken.None);
+        var delivery = await reader.NextAsync(CancellationToken.None);
 
-        Assert.Empty(batch.Deliveries);
-        await _channel.Received(1).BasicNackAsync(9, false, false, Arg.Any<CancellationToken>());
+        Assert.Contains("schema version", delivery!.Rejection, StringComparison.Ordinal);
+        Assert.Equal("cid", delivery.Message.CorrelationId);
+        await _channel.DidNotReceiveWithAnyArgs().BasicNackAsync(default, default, default, default);
     }
 
     [Theory]
     [InlineData(null, "engineer-stats")]
     [InlineData("cid", null)]
-    public async Task Receive_AMessageWithoutACorrelationIdOrType_IsDeadLettered(string? correlationId, string? type)
+    public async Task Next_AMessageWithoutACorrelationIdOrType_IsReturnedRejected(string? correlationId, string? type)
     {
         Queue(Result(4, 1, correlationId, type));
+        await using var reader = await _consumer.OpenAsync(CancellationToken.None);
 
-        await using var batch = await _consumer.ReceiveAsync(10, CancellationToken.None);
+        var delivery = await reader.NextAsync(CancellationToken.None);
 
-        Assert.Empty(batch.Deliveries);
-        await _channel.Received(1).BasicNackAsync(4, false, false, Arg.Any<CancellationToken>());
+        Assert.Contains("correlation ID", delivery!.Rejection, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task Receive_AMessageDeliveredTooOften_IsDeadLettered_ButOneAtTheLimitIsStillDelivered()
+    public async Task Next_AMessageDeliveredTooOften_IsReturnedRejected_ButOneAtTheLimitIsAccepted()
     {
         Queue(Result(1, 1, acquiredCount: 5), Result(2, 1, acquiredCount: 6));
+        await using var reader = await _consumer.OpenAsync(CancellationToken.None);
 
-        await using var batch = await _consumer.ReceiveAsync(10, CancellationToken.None);
-
-        Assert.Equal(1UL, Assert.Single(batch.Deliveries).DeliveryTag);
-        await _channel.Received(1).BasicNackAsync(2, false, false, Arg.Any<CancellationToken>());
+        Assert.Null((await reader.NextAsync(CancellationToken.None))!.Rejection);
+        Assert.Contains("over the limit of 5", (await reader.NextAsync(CancellationToken.None))!.Rejection, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task Receive_IgnoresUnknownHeadersAndFields_AndStillReadsAnUnknownBodyShape()
+    public async Task Next_IgnoresUnknownHeadersAndFields_AndStillReadsAnUnknownBodyShape()
     {
         var result = Result(5, 1, body: "{\"email\":\"a@arbisoft.com\",\"somethingNew\":[1,2,3]}");
         result.BasicProperties.Headers!["x-future-header"] = "whatever";
         Queue(result);
+        await using var reader = await _consumer.OpenAsync(CancellationToken.None);
 
-        await using var batch = await _consumer.ReceiveAsync(10, CancellationToken.None);
-
-        Assert.Contains("somethingNew", Assert.Single(batch.Deliveries).Message.Json, StringComparison.Ordinal);
+        Assert.Contains("somethingNew", (await reader.NextAsync(CancellationToken.None))!.Message.Json, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task Receive_WhenTheConnectionDropsMidRead_ThrowsQueueUnavailable_AndReleasesTheChannel()
+    public async Task Next_WhenTheConnectionDrops_ThrowsQueueUnavailable()
     {
         _channel.BasicGetAsync("q", false, Arg.Any<CancellationToken>())
             .Returns(_ => Task.FromException<BasicGetResult?>(new AlreadyClosedException(new ShutdownEventArgs(ShutdownInitiator.Peer, 320, "gone"))));
+        await using var reader = await _consumer.OpenAsync(CancellationToken.None);
 
-        await Assert.ThrowsAsync<QueueUnavailableException>(() => _consumer.ReceiveAsync(10, CancellationToken.None));
+        await Assert.ThrowsAsync<QueueUnavailableException>(() => reader.NextAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Disposing_TheReader_ReleasesTheChannel_EvenWhenTheChannelIsAlreadyGone()
+    {
+        _channel.DisposeAsync().Returns(_ => ValueTask.FromException(new AlreadyClosedException(new ShutdownEventArgs(ShutdownInitiator.Peer, 320, "gone"))));
+        var reader = await _consumer.OpenAsync(CancellationToken.None);
+
+        await reader.DisposeAsync();
 
         await _channel.Received(1).DisposeAsync();
     }
@@ -179,14 +190,17 @@ public class RequestQueueConsumerTests
     }
 
     [Fact]
-    public async Task Batch_AckRequeueAndDeadLetter_MapToTheMatchingBrokerCalls()
+    public async Task AckRequeueAndDeadLetter_MapToTheMatchingBrokerCalls()
     {
         Queue(Result(1, 1), Result(2, 1), Result(3, 1));
-        await using var batch = await _consumer.ReceiveAsync(10, CancellationToken.None);
+        await using var reader = await _consumer.OpenAsync(CancellationToken.None);
+        var first = await reader.NextAsync(CancellationToken.None);
+        var second = await reader.NextAsync(CancellationToken.None);
+        var third = await reader.NextAsync(CancellationToken.None);
 
-        await batch.AckAsync(batch.Deliveries[0], CancellationToken.None);
-        await batch.RequeueAsync(batch.Deliveries[1], CancellationToken.None);
-        await batch.DeadLetterAsync(batch.Deliveries[2], CancellationToken.None);
+        await reader.AckAsync(first!, CancellationToken.None);
+        await reader.RequeueAsync(second!, CancellationToken.None);
+        await reader.DeadLetterAsync(third!, CancellationToken.None);
 
         await _channel.Received(1).BasicAckAsync(1, false, Arg.Any<CancellationToken>());
         await _channel.Received(1).BasicNackAsync(2, false, true, Arg.Any<CancellationToken>());
@@ -194,13 +208,37 @@ public class RequestQueueConsumerTests
     }
 
     [Fact]
-    public async Task Batch_AckOnALostChannel_ThrowsQueueUnavailable()
+    public async Task AckOnALostChannel_ThrowsQueueUnavailable()
     {
         Queue(Result(1, 1));
-        await using var batch = await _consumer.ReceiveAsync(10, CancellationToken.None);
+        await using var reader = await _consumer.OpenAsync(CancellationToken.None);
+        var delivery = await reader.NextAsync(CancellationToken.None);
         _channel.BasicAckAsync(1, false, Arg.Any<CancellationToken>())
             .Returns(_ => ValueTask.FromException(new AlreadyClosedException(new ShutdownEventArgs(ShutdownInitiator.Peer, 320, "gone"))));
 
-        await Assert.ThrowsAsync<QueueUnavailableException>(() => batch.AckAsync(batch.Deliveries[0], CancellationToken.None));
+        await Assert.ThrowsAsync<QueueUnavailableException>(() => reader.AckAsync(delivery!, CancellationToken.None));
+    }
+
+    /// <summary>Parallel workers settle their own messages; a channel is not safe for concurrent use, so the reader lets one call through at a time.</summary>
+    [Fact]
+    public async Task SettlingFromManyTasksAtOnce_ReachesTheChannelOneCallAtATime()
+    {
+        var inFlight = 0;
+        var peak = 0;
+        async Task SlowAckAsync()
+        {
+            var now = Interlocked.Increment(ref inFlight);
+            peak = Math.Max(peak, now);
+            await Task.Delay(10);
+            Interlocked.Decrement(ref inFlight);
+        }
+
+        _channel.BasicAckAsync(Arg.Any<ulong>(), false, Arg.Any<CancellationToken>()).Returns(_ => new ValueTask(SlowAckAsync()));
+        await using var reader = await _consumer.OpenAsync(CancellationToken.None);
+        var deliveries = Enumerable.Range(1, 8).Select(tag => new QueueDelivery(new QueueMessage("c", "t", "{}"), (ulong)tag, false, 0)).ToList();
+
+        await Task.WhenAll(deliveries.Select(delivery => reader.AckAsync(delivery, CancellationToken.None)));
+
+        Assert.Equal(1, peak);
     }
 }

@@ -24,9 +24,12 @@ namespace Arbisoft.DevLake.IntegrationService.UnitTests.DataAccess.Repositories;
 [Collection(MySqlTestGroup.Name)]
 public class RequestLogRepositoryTests : RepositoryTestBase
 {
+    private readonly MySqlDatabaseFixture _fixture;
+
     public RequestLogRepositoryTests(MySqlDatabaseFixture fixture)
         : base(fixture)
     {
+        _fixture = fixture;
     }
 
     private IRequestLogRepository Repository => Get<IRequestLogRepository>();
@@ -83,7 +86,7 @@ public class RequestLogRepositoryTests : RepositoryTestBase
         var queued = await Repository.ListByStatusSinceAsync(RequestStatus.Queued, since, 10, CancellationToken.None);
         var limited = await Repository.ListByStatusSinceAsync(RequestStatus.Queued, since, 2, CancellationToken.None);
 
-        Assert.Equal([early, received, late], queued.Select(l => l.Id));
+        Assert.Equal([early, received, late], queued.Where(l => l.ClientRefId == client.Id).Select(l => l.Id));
         Assert.Equal(2, limited.Count);
     }
 
@@ -222,8 +225,8 @@ public class RequestLogRepositoryTests : RepositoryTestBase
         await InsertRequestLogAsync(client.Id, RequestStatus.Queued, cutoff.AddHours(1));
         await InsertRequestLogAsync(client.Id, RequestStatus.Queued, cutoff);
 
-        var stale = await Repository.ListStaleAsync([RequestStatus.Received, RequestStatus.Queued, RequestStatus.Processing], cutoff, 10_000, CancellationToken.None);
-        var limited = await Repository.ListStaleAsync([RequestStatus.Received, RequestStatus.Queued, RequestStatus.Processing], cutoff, 1, CancellationToken.None);
+        var stale = await Repository.ListStaleAsync([RequestStatus.Received, RequestStatus.Queued, RequestStatus.Processing], cutoff, cutoff, 10_000, CancellationToken.None);
+        var limited = await Repository.ListStaleAsync([RequestStatus.Received, RequestStatus.Queued, RequestStatus.Processing], cutoff, cutoff, 1, CancellationToken.None);
 
         Assert.Equal([oldest, older], stale.Where(l => l.ClientRefId == client.Id).Select(l => l.Id));
         Assert.Equal(stale.OrderBy(l => l.CreatedOn).ThenBy(l => l.Id).Select(l => l.Id), stale.Select(l => l.Id));
@@ -232,25 +235,138 @@ public class RequestLogRepositoryTests : RepositoryTestBase
     }
 
     [MySqlFact]
-    public async Task GetClientsWithPendingRequests_ListsOnlyClientsWithQueuedOrProcessingRequests()
+    public async Task ListStale_LeavesOutARequestAWorkerStillHolds()
     {
-        var waiting = await InsertClientAsync();
-        var busy = await InsertClientAsync();
-        var finished = await InsertClientAsync();
-        var idle = await InsertClientAsync();
-        await InsertRequestLogAsync(waiting.Id, RequestStatus.Queued);
-        await InsertRequestLogAsync(waiting.Id, RequestStatus.Queued);
-        await InsertRequestLogAsync(busy.Id, RequestStatus.Processing);
-        await InsertRequestLogAsync(finished.Id, RequestStatus.Success);
-        await InsertRequestLogAsync(finished.Id, RequestStatus.Failed);
-        await InsertRequestLogAsync(finished.Id, RequestStatus.RevokedNoCallbackUrl);
+        var client = await InsertClientAsync();
+        var cutoff = Instant.AddYears(51);
+        var held = await InsertRequestLogAsync(client.Id, RequestStatus.Processing, cutoff.AddHours(-3));
+        var leaseRanOut = await InsertRequestLogAsync(client.Id, RequestStatus.Processing, cutoff.AddHours(-3));
+        Assert.True(await Repository.TryClaimAsync(held, cutoff, cutoff.AddMinutes(10), CancellationToken.None));
+        Assert.True(await Repository.TryClaimAsync(leaseRanOut, cutoff.AddHours(-1), cutoff.AddMinutes(-1), CancellationToken.None));
 
-        var clients = await Repository.GetClientsWithPendingRequestsAsync(CancellationToken.None);
+        var stale = await Repository.ListStaleAsync([RequestStatus.Processing], cutoff, cutoff, 10_000, CancellationToken.None);
 
-        Assert.Single(clients, id => id == waiting.Id);
-        Assert.Contains(busy.Id, clients);
-        Assert.DoesNotContain(finished.Id, clients);
-        Assert.DoesNotContain(idle.Id, clients);
+        Assert.Equal([leaseRanOut], stale.Where(l => l.ClientRefId == client.Id).Select(l => l.Id));
+    }
+
+    [MySqlFact]
+    public async Task TryClaim_OnlyOneOfTwoWorkersWins_AndTheWinnerHoldsItUntilTheLeaseRunsOut()
+    {
+        var client = await InsertClientAsync();
+        var id = await InsertRequestLogAsync(client.Id, RequestStatus.Queued);
+        var now = Instant.AddYears(52);
+
+        Assert.True(await Repository.TryClaimAsync(id, now, now.AddMinutes(10), CancellationToken.None));
+        Assert.False(await Repository.TryClaimAsync(id, now.AddMinutes(1), now.AddMinutes(11), CancellationToken.None));
+
+        var claimed = (await Repository.GetByIdAsync(id, CancellationToken.None))!;
+        Assert.Equal(RequestStatus.Processing, claimed.Status);
+        Assert.Equal(now.AddMinutes(10), claimed.ClaimedUntil);
+        Assert.Null(claimed.NextAttemptOn);
+
+        Assert.True(await Repository.TryClaimAsync(id, now.AddMinutes(10).AddTicks(10), now.AddMinutes(20), CancellationToken.None));
+    }
+
+    [MySqlFact]
+    public async Task TryClaim_TwoWorkersAtTheSameMoment_ExactlyOneWins()
+    {
+        var client = await InsertClientAsync();
+        var id = await InsertRequestLogAsync(client.Id, RequestStatus.Queued);
+        var now = Instant.AddYears(53);
+
+        var attempts = await Task.WhenAll(Enumerable.Range(0, 8).Select(async _ =>
+        {
+            await using var scope = _fixture.Services!.CreateAsyncScope();
+            return await scope.ServiceProvider.GetRequiredService<IRequestLogRepository>().TryClaimAsync(id, now, now.AddMinutes(10), CancellationToken.None);
+        }));
+
+        Assert.Single(attempts, won => won);
+    }
+
+    [MySqlFact]
+    public async Task TryClaim_AFinishedRequest_CannotBeClaimed()
+    {
+        var client = await InsertClientAsync();
+        foreach (var status in new[] { RequestStatus.Success, RequestStatus.Failed, RequestStatus.RevokedNoCallbackUrl })
+        {
+            var id = await InsertRequestLogAsync(client.Id, status);
+
+            Assert.False(await Repository.TryClaimAsync(id, Instant, Instant.AddMinutes(10), CancellationToken.None));
+        }
+    }
+
+    [MySqlFact]
+    public async Task Defer_ReleasesTheLease_AndTheRequestIsClaimableOnlyOnceItIsDue()
+    {
+        var client = await InsertClientAsync();
+        var id = await InsertRequestLogAsync(client.Id, RequestStatus.Queued);
+        var now = Instant.AddYears(54);
+        await Repository.TryClaimAsync(id, now, now.AddMinutes(10), CancellationToken.None);
+
+        await Repository.DeferAsync(id, RequestStatus.Processing, now.AddMinutes(2), CancellationToken.None);
+
+        var deferred = (await Repository.GetByIdAsync(id, CancellationToken.None))!;
+        Assert.Equal(now.AddMinutes(2), deferred.NextAttemptOn);
+        Assert.Null(deferred.ClaimedUntil);
+        Assert.False(await Repository.TryClaimAsync(id, now.AddMinutes(1), now.AddMinutes(11), CancellationToken.None));
+        Assert.True(await Repository.TryClaimAsync(id, now.AddMinutes(2), now.AddMinutes(12), CancellationToken.None));
+    }
+
+    [MySqlFact]
+    public async Task UpdateStatus_ClearsTheLeaseAndTheDeferral()
+    {
+        var client = await InsertClientAsync();
+        var id = await InsertRequestLogAsync(client.Id, RequestStatus.Queued);
+        await Repository.DeferAsync(id, RequestStatus.Processing, Instant.AddMinutes(2), CancellationToken.None);
+
+        await Repository.UpdateStatusAsync(id, RequestStatus.Success, CancellationToken.None);
+
+        var finished = (await Repository.GetByIdAsync(id, CancellationToken.None))!;
+        Assert.Null(finished.NextAttemptOn);
+        Assert.Null(finished.ClaimedUntil);
+    }
+
+    [MySqlFact]
+    public async Task ListDue_ListsDeferredRequestsThatAreDue_AndRequestsWhoseLeaseRanOut_ButNotNewQueuedOnesOrFinishedOnes()
+    {
+        var client = await InsertClientAsync();
+        var now = Instant.AddYears(55);
+        var since = now.AddHours(-2);
+        var dueRetry = await InsertRequestLogAsync(client.Id, RequestStatus.Queued, now.AddMinutes(-30));
+        await Repository.DeferAsync(dueRetry, RequestStatus.Processing, now.AddMinutes(-1), CancellationToken.None);
+        var notYet = await InsertRequestLogAsync(client.Id, RequestStatus.Queued, now.AddMinutes(-30));
+        await Repository.DeferAsync(notYet, RequestStatus.Processing, now.AddMinutes(5), CancellationToken.None);
+        var crashed = await InsertRequestLogAsync(client.Id, RequestStatus.Queued, now.AddMinutes(-30));
+        await Repository.TryClaimAsync(crashed, now.AddMinutes(-20), now.AddMinutes(-10), CancellationToken.None);
+        var held = await InsertRequestLogAsync(client.Id, RequestStatus.Queued, now.AddMinutes(-30));
+        await Repository.TryClaimAsync(held, now, now.AddMinutes(10), CancellationToken.None);
+        var waitingForCredentials = await InsertRequestLogAsync(client.Id, RequestStatus.Queued, now.AddMinutes(-30));
+        await Repository.DeferAsync(waitingForCredentials, RequestStatus.Queued, now.AddMinutes(-2), CancellationToken.None);
+        await InsertRequestLogAsync(client.Id, RequestStatus.Queued, now.AddMinutes(-30));
+        await InsertRequestLogAsync(client.Id, RequestStatus.Success, now.AddMinutes(-30));
+        var tooOld = await InsertRequestLogAsync(client.Id, RequestStatus.Queued, since.AddMinutes(-1));
+        await Repository.DeferAsync(tooOld, RequestStatus.Processing, now.AddMinutes(-1), CancellationToken.None);
+
+        var due = await Repository.ListDueAsync(now, since, 100, CancellationToken.None);
+
+        Assert.Equal(new[] { waitingForCredentials, dueRetry, crashed }.Order(), due.Where(l => l.ClientRefId == client.Id).Select(l => l.Id).Order());
+    }
+
+    [MySqlFact]
+    public async Task Payload_IsStoredExactly_ReplacedOnASecondSave_AndDeleted()
+    {
+        var client = await InsertClientAsync();
+        var id = await InsertRequestLogAsync(client.Id);
+        const string first = "{\"b\": 1, \"a\":  [\"x\"]}";
+
+        await Repository.SavePayloadAsync(id, first, Instant, CancellationToken.None);
+        Assert.Equal(first, await Repository.GetPayloadAsync(id, CancellationToken.None));
+
+        await Repository.SavePayloadAsync(id, "{}", Instant, CancellationToken.None);
+        Assert.Equal("{}", await Repository.GetPayloadAsync(id, CancellationToken.None));
+
+        await Repository.DeletePayloadAsync(id, CancellationToken.None);
+        Assert.Null(await Repository.GetPayloadAsync(id, CancellationToken.None));
     }
 
     [MySqlFact]

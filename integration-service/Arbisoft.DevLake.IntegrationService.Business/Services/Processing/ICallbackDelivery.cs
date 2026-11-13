@@ -17,12 +17,34 @@ using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
 
 namespace Arbisoft.DevLake.IntegrationService.Business.Services.Processing;
 
+/// <summary>How one delivery attempt went.</summary>
+public enum DeliveryOutcome
+{
+    /// <summary>The client's callback accepted the result.</summary>
+    Delivered,
+
+    /// <summary>The client has no active callback for the request any more.</summary>
+    Revoked,
+
+    /// <summary>The client's callback or token endpoint refused our credentials. This is the client's problem, not the request's, and is not counted as an attempt.</summary>
+    CredentialsRefused,
+
+    /// <summary>The callback could not be reached or did not accept the result. Counted towards the client's maxAttempts.</summary>
+    Failed
+}
+
+/// <summary>The result of one delivery attempt.</summary>
+/// <param name="Outcome">How it went.</param>
+/// <param name="FailedAttempts">How many counted attempts have failed so far, this one included.</param>
+/// <param name="AttemptsUsedUp">True when the client's maxAttempts is reached, so the request must end Failed.</param>
+public sealed record DeliveryAttempt(DeliveryOutcome Outcome, int FailedAttempts = 0, bool AttemptsUsedUp = false);
+
 public interface ICallbackDelivery
 {
     /// <summary>
-    /// Posts a request's result to the client's callback, trying up to the client's <c>maxAttempts</c> times with a growing wait between tries, recording
-    /// every try, and leaving the request Success, Failed or Revoked. The post itself is never cut short by a shutdown, so a delivered result is
-    /// always recorded; the wait between tries is.
+    /// Makes one attempt to post a request's result to the client's callback and records it, unless the client's maxAttempts is already used up.
+    /// It never waits between attempts: the caller defers the request to its next attempt. The post is never cut short by a shutdown, so a
+    /// delivered result is always recorded.
     /// </summary>
-    Task<WorkerOutcome> DeliverAsync(RequestLog request, string payloadJson, CancellationToken stopping);
+    Task<DeliveryAttempt> AttemptAsync(RequestLog request, string payloadJson);
 }

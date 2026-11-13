@@ -55,7 +55,7 @@ public sealed class RabbitMqHarness : IAsyncDisposable
 
     public RequestQueueConsumer Consumer { get; }
 
-    public static RabbitMqHarness Create(int maxLength = 10_000, int ttlSeconds = 7200, int deliveryLimit = 5, int batchLimit = 10)
+    public static RabbitMqHarness Create(int maxLength = 10_000, int ttlSeconds = 7200, int deliveryLimit = 5)
     {
         var settings = Settings ?? throw new InvalidOperationException($"{EnvironmentVariable} is not set.");
         var id = Guid.NewGuid().ToString("N");
@@ -69,8 +69,7 @@ public sealed class RabbitMqHarness : IAsyncDisposable
             RequestQueueName = $"it.{id}",
             QueueMaxLength = maxLength,
             MessageTtlSeconds = ttlSeconds,
-            DeliveryLimit = deliveryLimit,
-            ReceiveBatchLimit = batchLimit
+            DeliveryLimit = deliveryLimit
         };
         return new RabbitMqHarness(options, settings);
     }

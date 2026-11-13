@@ -69,11 +69,13 @@ public sealed class RequestProcessingJob : BackgroundService
             if (summary.DidWork)
             {
                 _logger.LogInformation(
-                    "Processing run: {Received} received, {Completed} completed, {Requeued} requeued, {DeadLettered} dead-lettered, {Expired} expired, {Republished} republished{Halt}",
-                    summary.Received,
-                    summary.Completed,
-                    summary.Requeued,
+                    "Processing run: {Taken} messages taken, {Resumed} waiting requests resumed, {Finished} finished, {Deferred} deferred, {DeadLettered} dead-lettered, {Requeued} requeued, {Expired} expired, {Republished} republished{Halt}",
+                    summary.MessagesTaken,
+                    summary.Resumed,
+                    summary.Finished,
+                    summary.Deferred,
                     summary.DeadLettered,
+                    summary.Requeued,
                     summary.Expired,
                     summary.Republished,
                     summary.HaltReason is null ? string.Empty : $", stopped early: {summary.HaltReason}");

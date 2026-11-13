@@ -46,7 +46,33 @@ public interface IRequestLogRepository
     /// <summary>The JSON body of a request log, or null when it has none.</summary>
     Task<string?> GetJsonAsync(long requestLogId, CancellationToken cancellationToken);
 
+    /// <summary>Sets the status and clears any deferral and lease, for a request that is finished or handed back to the queue.</summary>
     Task<bool> UpdateStatusAsync(long id, string status, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Claims a request for <paramref name="leaseUntil"/>, setting it Processing. It succeeds only if the request is Received, Queued or Processing,
+    /// nobody holds an unexpired lease on it, and it is not deferred past <paramref name="now"/>, so of two workers trying at once exactly one wins.
+    /// </summary>
+    Task<bool> TryClaimAsync(long id, DateTimeOffset now, DateTimeOffset leaseUntil, CancellationToken cancellationToken);
+
+    /// <summary>Releases the lease and defers the request to <paramref name="nextAttemptOn"/> with the given status.</summary>
+    Task DeferAsync(long id, string status, DateTimeOffset nextAttemptOn, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Requests the database owns that can be claimed now, soonest due first: deferred requests whose time has come, and requests whose lease ran
+    /// out because their worker stopped. New requests still waiting in the queue are not included. Only requests created at or after
+    /// <paramref name="createdSince"/> are listed; older ones are left to expire.
+    /// </summary>
+    Task<IReadOnlyList<RequestLog>> ListDueAsync(DateTimeOffset now, DateTimeOffset createdSince, int limit, CancellationToken cancellationToken);
+
+    /// <summary>Stores the collected callback body of a request, replacing any stored before.</summary>
+    Task SavePayloadAsync(long requestLogId, string payload, DateTimeOffset createdOn, CancellationToken cancellationToken);
+
+    /// <summary>The stored callback body of a request, or null.</summary>
+    Task<string?> GetPayloadAsync(long requestLogId, CancellationToken cancellationToken);
+
+    /// <summary>Deletes the stored callback body of a finished request.</summary>
+    Task DeletePayloadAsync(long requestLogId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Changes the status to <paramref name="newStatus"/> only if it is still <paramref name="expectedStatus"/>. Returns false when something else changed it first, for example the
@@ -61,11 +87,12 @@ public interface IRequestLogRepository
     /// <summary>Requests with the given status created at or after <paramref name="since"/>, oldest first, at most <paramref name="limit"/>.</summary>
     Task<IReadOnlyList<RequestLog>> ListByStatusSinceAsync(string status, DateTimeOffset since, int limit, CancellationToken cancellationToken);
 
-    /// <summary>Requests in any of the given statuses that were created before <paramref name="createdBefore"/>, oldest first, at most <paramref name="limit"/>.</summary>
-    Task<IReadOnlyList<RequestLog>> ListStaleAsync(IReadOnlyCollection<string> statuses, DateTimeOffset createdBefore, int limit, CancellationToken cancellationToken);
-
-    /// <summary>The ids of the clients that have requests waiting or in progress, so a check can be limited to clients that actually have work.</summary>
-    Task<IReadOnlyList<long>> GetClientsWithPendingRequestsAsync(CancellationToken cancellationToken);
+    /// <summary>
+    /// Requests in any of the given statuses that were created before <paramref name="createdBefore"/> and that nobody holds a lease on at
+    /// <paramref name="now"/>, oldest first, at most <paramref name="limit"/>.
+    /// </summary>
+    Task<IReadOnlyList<RequestLog>> ListStaleAsync(
+        IReadOnlyCollection<string> statuses, DateTimeOffset createdBefore, DateTimeOffset now, int limit, CancellationToken cancellationToken);
 
     Task<PagedResult<RequestLog>> ListAsync(RequestLogFilter filter, int page, int pageSize, CancellationToken cancellationToken);
 
