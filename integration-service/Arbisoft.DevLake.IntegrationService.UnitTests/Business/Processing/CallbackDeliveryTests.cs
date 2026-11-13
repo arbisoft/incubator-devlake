@@ -78,6 +78,44 @@ public class CallbackDeliveryTests
         await _attempts.Received(1).RecordAsync(41, DeliveryAttemptStatus.DeliveryFailed, "{\"error\":\"x\"}", "HTTP 500", Arg.Any<CancellationToken>());
     }
 
+    [Theory]
+    [InlineData(408)]
+    [InlineData(429)]
+    [InlineData(500)]
+    [InlineData(502)]
+    [InlineData(503)]
+    [InlineData(504)]
+    public async Task ATimeoutTooManyRequestsOrServerError_IsWorthRetrying(int status)
+    {
+        SophiaAnswers(new SophiaDeliveryResult(false, status, string.Empty));
+
+        Assert.Equal(DeliveryOutcome.Failed, (await _delivery.AttemptAsync(Request, Payload)).Outcome);
+    }
+
+    [Theory]
+    [InlineData(400)]
+    [InlineData(404)]
+    [InlineData(409)]
+    [InlineData(410)]
+    [InlineData(422)]
+    public async Task AnyOther4xx_IsRejected_RecordedWithTheStatus_AndNotRetried(int status)
+    {
+        SophiaAnswers(new SophiaDeliveryResult(false, status, "{\"error\":\"unknown engineer\"}"));
+
+        var attempt = await _delivery.AttemptAsync(Request, Payload);
+
+        Assert.Equal(new DeliveryAttempt(DeliveryOutcome.Rejected, 1), attempt);
+        await _attempts.Received(1).RecordAsync(41, DeliveryAttemptStatus.DeliveryFailed, "{\"error\":\"unknown engineer\"}", $"HTTP {status}", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task TheCallbacksRetryAfter_IsPassedOnWithTheFailedAttempt()
+    {
+        SophiaAnswers(new SophiaDeliveryResult(false, 429, string.Empty, TimeSpan.FromSeconds(200)));
+
+        Assert.Equal(TimeSpan.FromSeconds(200), (await _delivery.AttemptAsync(Request, Payload)).RetryAfter);
+    }
+
     [Fact]
     public async Task TheAttemptThatReachesMaxAttempts_SaysTheAttemptsAreUsedUp()
     {

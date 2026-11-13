@@ -126,7 +126,25 @@ public sealed class SophiaClient : ISophiaClient
             _logger.LogWarning("Sophia's callback answered {Status} for request {CorrelationId}", (int)response.StatusCode, correlationId);
         }
 
-        return new SophiaDeliveryResult(response.IsSuccessStatusCode, (int)response.StatusCode, stored);
+        return new SophiaDeliveryResult(response.IsSuccessStatusCode, (int)response.StatusCode, stored, RetryAfterOf(response));
+    }
+
+    /// <summary>Retry-After as a number of seconds or as a date. A date in the past means no wait.</summary>
+    private TimeSpan? RetryAfterOf(HttpResponseMessage response)
+    {
+        var header = response.Headers.RetryAfter;
+        if (header?.Delta is { } delta)
+        {
+            return delta;
+        }
+
+        if (header?.Date is { } date)
+        {
+            var wait = date - _timeProvider.GetUtcNow();
+            return wait > TimeSpan.Zero ? wait : TimeSpan.Zero;
+        }
+
+        return null;
     }
 
     private async Task<string> GetAccessTokenAsync(ClientConfig config, string tokenKey, string correlationId, CancellationToken cancellationToken)

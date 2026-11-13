@@ -22,4 +22,5 @@ namespace Arbisoft.DevLake.IntegrationService.DataAccess.ExternalApis.Sophia;
 /// <param name="Delivered">True for a 2xx answer.</param>
 /// <param name="StatusCode">The HTTP status Sophia answered with.</param>
 /// <param name="ResponseBody">Sophia's answer, cut to a length that is safe to store.</param>
-public sealed record SophiaDeliveryResult(bool Delivered, int StatusCode, string ResponseBody);
+/// <param name="RetryAfter">How long Sophia asked us to wait before trying again (its Retry-After header), or null when it did not say.</param>
+public sealed record SophiaDeliveryResult(bool Delivered, int StatusCode, string ResponseBody, TimeSpan? RetryAfter = null);

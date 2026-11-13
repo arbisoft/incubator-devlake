@@ -370,6 +370,31 @@ public class RequestWorkerTests
         await _logs.DidNotReceiveWithAnyArgs().DeletePayloadAsync(default, default);
     }
 
+    [Theory]
+    [InlineData(1, 200, 200)]
+    [InlineData(3, 10, 120)]
+    [InlineData(1, 5000, 900)]
+    public async Task TheCallbacksRetryAfter_IsHonouredWhenLongerThanTheBackoff_UpToTheLongestWait(int failedAttempts, int retryAfterSeconds, int delaySeconds)
+    {
+        GivenDelivery(new DeliveryAttempt(DeliveryOutcome.Failed, failedAttempts, AttemptsUsedUp: false, TimeSpan.FromSeconds(retryAfterSeconds)));
+
+        await HandleAsync();
+
+        await _logs.Received(1).DeferAsync(41, RequestStatus.Processing, Now.AddSeconds(delaySeconds), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ADeliveryTheCallbackRejected_FailsTheRequestAtOnce_WithoutRetrying()
+    {
+        GivenDelivery(new DeliveryAttempt(DeliveryOutcome.Rejected, 1));
+
+        Assert.Equal(StepResult.Finished, (await HandleAsync()).Step);
+
+        await _logs.Received(1).UpdateStatusAsync(41, RequestStatus.Failed, Arg.Any<CancellationToken>());
+        await _logs.Received(1).DeletePayloadAsync(41, Arg.Any<CancellationToken>());
+        await _logs.DidNotReceiveWithAnyArgs().DeferAsync(default, default!, default, default);
+    }
+
     [Fact]
     public async Task TheLastAllowedFailedDelivery_FailsTheRequest_AndDropsTheStoredPayload()
     {

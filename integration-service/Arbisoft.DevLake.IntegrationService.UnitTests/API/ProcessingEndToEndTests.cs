@@ -177,6 +177,33 @@ public sealed class ProcessingEndToEndTests : ApiTestBase
     }
 
     [BrokersFact]
+    public async Task ACallbackThatRejectsTheResult_EndsFailedAfterOneAttempt_WithoutRetrying()
+    {
+        var (_, token) = await IsolatedClientAsync(Single);
+        _upstream.ScriptCallbacks(HttpStatusCode.BadRequest, HttpStatusCode.OK);
+
+        var request = await GetStatsAsync(token, "jane@arbisoft.com");
+        await WaitForStatusAsync(token, request.Correlation, "Failure");
+
+        Assert.Single(_upstream.Callbacks);
+        var attempt = Assert.Single(await Seed.AttemptsAsync((await Seed.LogAsync(request.Correlation))!.Id));
+        Assert.Equal("HTTP 400", attempt.FailureError);
+    }
+
+    [BrokersFact]
+    public async Task ACallbackThatSaysTooManyRequests_IsTriedAgain_AndEndsSuccess()
+    {
+        var (_, token) = await IsolatedClientAsync(Single);
+        _upstream.ScriptCallbacks(HttpStatusCode.TooManyRequests);
+
+        var request = await GetStatsAsync(token, "jane@arbisoft.com");
+        await WaitForStatusAsync(token, request.Correlation, "Success");
+
+        var log = (await Seed.LogAsync(request.Correlation))!;
+        Assert.Equal(["DeliveryFailed", "Delivered"], (await Seed.AttemptsAsync(log.Id)).Select(a => a.AttemptStatus));
+    }
+
+    [BrokersFact]
     public async Task ADeliveryThatFailsOnceThenWorks_EndsSuccess_WithBothAttemptsRecorded()
     {
         var (_, token) = await IsolatedClientAsync(Single);

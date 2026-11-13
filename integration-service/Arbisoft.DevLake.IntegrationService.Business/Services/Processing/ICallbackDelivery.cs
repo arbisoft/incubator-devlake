@@ -29,15 +29,24 @@ public enum DeliveryOutcome
     /// <summary>The client's callback or token endpoint refused our credentials. This is the client's problem, not the request's, and is not counted as an attempt.</summary>
     CredentialsRefused,
 
-    /// <summary>The callback could not be reached or did not accept the result. Counted towards the client's maxAttempts.</summary>
-    Failed
+    /// <summary>
+    /// The callback could not be reached or answered with something worth retrying (408, 429 or 5xx). Counted towards the client's maxAttempts.
+    /// </summary>
+    Failed,
+
+    /// <summary>
+    /// The callback refused the result with a 4xx that sending it again cannot fix (400, 404, 422, ...). Recorded, and the request ends Failed
+    /// at once instead of being retried.
+    /// </summary>
+    Rejected
 }
 
 /// <summary>The result of one delivery attempt.</summary>
 /// <param name="Outcome">How it went.</param>
 /// <param name="FailedAttempts">How many counted attempts have failed so far, this one included.</param>
 /// <param name="AttemptsUsedUp">True when the client's maxAttempts is reached, so the request must end Failed.</param>
-public sealed record DeliveryAttempt(DeliveryOutcome Outcome, int FailedAttempts = 0, bool AttemptsUsedUp = false);
+/// <param name="RetryAfter">How long the callback asked us to wait before the next attempt, or null.</param>
+public sealed record DeliveryAttempt(DeliveryOutcome Outcome, int FailedAttempts = 0, bool AttemptsUsedUp = false, TimeSpan? RetryAfter = null);
 
 public interface ICallbackDelivery
 {

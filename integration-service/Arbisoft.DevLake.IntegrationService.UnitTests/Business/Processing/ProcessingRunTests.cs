@@ -72,6 +72,19 @@ public class ProcessingRunTests
         Assert.Equal(TimeSpan.FromSeconds(seconds), RetryDelays.ForDelivery(failedAttempts, options));
     }
 
+    [Theory]
+    [InlineData(1, null, 30)]
+    [InlineData(1, 10, 30)]
+    [InlineData(1, 45, 45)]
+    [InlineData(2, 3600, 900)]
+    public void ARetryAfter_IsUsedWhenItIsLonger_ButNeverPastTheCap(int failedAttempts, int? retryAfterSeconds, int seconds)
+    {
+        var options = new ProcessingOptions { DeliveryRetryDelaySeconds = 30, MaxDeliveryRetryDelaySeconds = 900 };
+        TimeSpan? retryAfter = retryAfterSeconds is { } value ? TimeSpan.FromSeconds(value) : null;
+
+        Assert.Equal(TimeSpan.FromSeconds(seconds), RetryDelays.ForDelivery(failedAttempts, options, retryAfter));
+    }
+
     [Fact]
     public void TenAttemptsWithTheDefaults_FitInsideTheTwoHourRequestLifetime()
     {

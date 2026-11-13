@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using System.Net;
 using Arbisoft.DevLake.IntegrationService.DataAccess.ExternalApis;
 using Arbisoft.DevLake.IntegrationService.DataAccess.ExternalApis.Sophia;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
@@ -59,7 +60,18 @@ public sealed class CallbackDelivery : ICallbackDelivery
                 result.ResponseBody,
                 result.Delivered ? null : $"HTTP {result.StatusCode}",
                 CancellationToken.None);
-            return result.Delivered ? new DeliveryAttempt(DeliveryOutcome.Delivered) : Failed(failed + 1, config.MaxAttempts);
+            if (result.Delivered)
+            {
+                return new DeliveryAttempt(DeliveryOutcome.Delivered);
+            }
+
+            if (!IsWorthRetrying(result.StatusCode))
+            {
+                _logger.LogWarning("Request {CorrelationId}: the callback refused the result with {Status}; it is not retried", request.CorrelationId, result.StatusCode);
+                return new DeliveryAttempt(DeliveryOutcome.Rejected, failed + 1);
+            }
+
+            return Failed(failed + 1, config.MaxAttempts) with { RetryAfter = result.RetryAfter };
         }
         catch (CallbackNotConfiguredException)
         {
@@ -77,6 +89,13 @@ public sealed class CallbackDelivery : ICallbackDelivery
             return Failed(failed + 1, config.MaxAttempts);
         }
     }
+
+    /// <summary>
+    /// A timeout (408), being told to slow down (429) or a server error (5xx) may pass. Any other 4xx means the callback refuses this result, and
+    /// sending the same body again cannot change that. 401 and 403 never get here: they are a credentials problem for the whole client.
+    /// </summary>
+    private static bool IsWorthRetrying(int statusCode) =>
+        statusCode is (int)HttpStatusCode.RequestTimeout or (int)HttpStatusCode.TooManyRequests or >= 500 || statusCode < 400;
 
     private static DeliveryAttempt Failed(int failedAttempts, int maxAttempts) =>
         new(DeliveryOutcome.Failed, failedAttempts, AttemptsUsedUp: failedAttempts >= maxAttempts);

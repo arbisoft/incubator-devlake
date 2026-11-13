@@ -380,6 +380,50 @@ public sealed class SophiaClientTests : IDisposable
     }
 
     [Fact]
+    public async Task ARetryAfterInSeconds_IsPassedOn()
+    {
+        Script((request, _) =>
+        {
+            var response = Route(request, HttpStatusCode.TooManyRequests, "slow down");
+            if (request.RequestUri!.AbsoluteUri != TokenUrl)
+            {
+                response.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromSeconds(120));
+            }
+
+            return Task.FromResult(response);
+        });
+
+        Assert.Equal(TimeSpan.FromSeconds(120), (await PostAsync()).RetryAfter);
+    }
+
+    [Theory]
+    [InlineData(300, 300)]
+    [InlineData(-60, 0)]
+    public async Task ARetryAfterDate_IsTurnedIntoAWait_AndADateInThePastMeansNone(int offsetSeconds, int expectedSeconds)
+    {
+        Script((request, _) =>
+        {
+            var response = Route(request, HttpStatusCode.ServiceUnavailable, string.Empty);
+            if (request.RequestUri!.AbsoluteUri != TokenUrl)
+            {
+                response.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(_time.GetUtcNow().AddSeconds(offsetSeconds));
+            }
+
+            return Task.FromResult(response);
+        });
+
+        Assert.Equal(TimeSpan.FromSeconds(expectedSeconds), (await PostAsync()).RetryAfter);
+    }
+
+    [Fact]
+    public async Task NoRetryAfter_MeansNone()
+    {
+        Script((request, _) => Task.FromResult(Route(request, HttpStatusCode.InternalServerError, "oops")));
+
+        Assert.Null((await PostAsync()).RetryAfter);
+    }
+
+    [Fact]
     public async Task AVeryLongAnswer_IsCutToALengthThatIsSafeToStore()
     {
         Script((request, _) => Task.FromResult(Route(request, HttpStatusCode.InternalServerError, new string('x', 20_000))));

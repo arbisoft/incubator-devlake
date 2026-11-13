@@ -18,12 +18,16 @@ namespace Arbisoft.DevLake.IntegrationService.Business.Services.Processing;
 /// <summary>How long a request waits before its next attempt.</summary>
 public static class RetryDelays
 {
-    /// <summary>After <paramref name="failedAttempts"/> failed deliveries: the first delay, doubled after each further failure, never more than the cap.</summary>
-    public static TimeSpan ForDelivery(int failedAttempts, ProcessingOptions options)
+    /// <summary>
+    /// After <paramref name="failedAttempts"/> failed deliveries: the first delay, doubled after each further failure, or the callback's own
+    /// Retry-After when that is longer; never more than the cap, so a request is not pushed past its lifetime.
+    /// </summary>
+    public static TimeSpan ForDelivery(int failedAttempts, ProcessingOptions options, TimeSpan? retryAfter = null)
     {
         var doublings = Math.Clamp(failedAttempts - 1, 0, 30);
-        var seconds = Math.Min(options.DeliveryRetryDelaySeconds * Math.Pow(2, doublings), options.MaxDeliveryRetryDelaySeconds);
-        return TimeSpan.FromSeconds(seconds);
+        var backoff = options.DeliveryRetryDelaySeconds * Math.Pow(2, doublings);
+        var asked = retryAfter?.TotalSeconds ?? 0;
+        return TimeSpan.FromSeconds(Math.Min(Math.Max(backoff, asked), options.MaxDeliveryRetryDelaySeconds));
     }
 
     /// <summary>After DevLake was down or a client's credentials were refused.</summary>

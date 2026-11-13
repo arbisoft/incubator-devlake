@@ -216,6 +216,8 @@ public sealed class RequestWorker : IRequestWorker
             case DeliveryOutcome.CredentialsRefused:
                 run.MarkClientFailing(request.ClientRefId);
                 return await DeferUnavailableAsync(request, payload);
+            case DeliveryOutcome.Rejected:
+                return await FinishAsync(request, RequestStatus.Failed);
         }
 
         if (attempt.AttemptsUsedUp)
@@ -224,7 +226,7 @@ public sealed class RequestWorker : IRequestWorker
             return await FinishAsync(request, RequestStatus.Failed);
         }
 
-        var delay = RetryDelays.ForDelivery(attempt.FailedAttempts, _options);
+        var delay = RetryDelays.ForDelivery(attempt.FailedAttempts, _options, attempt.RetryAfter);
         _logger.LogInformation(
             "Request {CorrelationId}: delivery attempt {Attempt} failed; the next is due in {Delay}", request.CorrelationId, attempt.FailedAttempts, delay);
         await DeferAsync(request, RequestStatus.Processing, delay);
