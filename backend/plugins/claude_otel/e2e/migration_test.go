@@ -21,10 +21,13 @@ import (
 	"database/sql"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/apache/incubator-devlake/core/dal"
+	"github.com/apache/incubator-devlake/core/models/domainlayer/code"
+	"github.com/apache/incubator-devlake/core/models/domainlayer/ticket"
 	coremigrations "github.com/apache/incubator-devlake/core/models/migrationscripts"
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/helpers/e2ehelper"
@@ -145,5 +148,61 @@ func TestAiCommitsMigrationIsRerunnable(t *testing.T) {
 	require.True(t, tester.Dal.HasTable("ai_commits"))
 	for _, column := range []string{"commit_sha", "branch_name", "prompt_id", "first_seen_at", "repository_url"} {
 		require.True(t, tester.Dal.HasColumn("ai_commits", column), column)
+	}
+}
+
+func TestDashboardDateIndexesMigrationIsRerunnable(t *testing.T) {
+	tester := e2ehelper.NewDataFlowTester(t, "claude_otel", impl.ClaudeOtel{})
+	basicRes := contextimpl.NewDefaultBasicRes(tester.Cfg, tester.Log, tester.Dal)
+	var script plugin.MigrationScript
+	for _, candidate := range coremigrations.All() {
+		if candidate.Version() == 20261113130000 {
+			script = candidate
+		}
+	}
+	require.NotNil(t, script, "core migration 20261113130000 is not registered")
+
+	indexes := map[string]string{
+		"commits":          "idx_commits_authored_date",
+		"repo_commits":     "idx_repo_commits_commit_sha",
+		"issue_changelogs": "idx_issue_changelogs_created_date",
+	}
+	hasIndex := func(table, index string) bool {
+		var count int
+		require.NoError(t, tester.Db.Raw(
+			"SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?",
+			table, index).Row().Scan(&count))
+		return count > 0
+	}
+	createTable := func(table string) string {
+		var name, ddl string
+		require.NoError(t, tester.Db.Raw("SHOW CREATE TABLE "+table).Row().Scan(&name, &ddl))
+		return ddl
+	}
+	require.NoError(t, tester.Dal.AutoMigrate(&code.Commit{}))
+	require.NoError(t, tester.Dal.AutoMigrate(&code.RepoCommit{}))
+	require.NoError(t, tester.Dal.AutoMigrate(&ticket.IssueChangelogs{}))
+
+	before := map[string]string{}
+	for table, index := range indexes {
+		if hasIndex(table, index) {
+			require.NoError(t, tester.Dal.Exec("DROP INDEX "+index+" ON "+table))
+		}
+		before[table] = createTable(table)
+	}
+
+	require.NoError(t, script.Up(basicRes))
+	require.NoError(t, script.Up(basicRes), "a rerun must succeed")
+
+	for table, index := range indexes {
+		require.True(t, hasIndex(table, index), "%s.%s", table, index)
+		var kept []string
+		for _, line := range strings.Split(createTable(table), "\n") {
+			if !strings.Contains(line, index) {
+				kept = append(kept, line)
+			}
+		}
+		// Dropping the index line can leave a dangling comma on the last key line.
+		require.Equal(t, strings.ReplaceAll(before[table], ",\n)", "\n)"), strings.ReplaceAll(strings.Join(kept, "\n"), ",\n)", "\n)"), table)
 	}
 }
