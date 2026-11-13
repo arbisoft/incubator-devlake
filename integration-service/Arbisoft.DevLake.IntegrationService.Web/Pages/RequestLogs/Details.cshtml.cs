@@ -37,4 +37,23 @@ public sealed class DetailsModel(IRequestLogService logs) : AdminPageModel
         Log = log;
         return Page();
     }
+
+    public async Task<IActionResult> OnPostRetryAsync(CancellationToken cancellationToken)
+    {
+        var result = await logs.RetryAsync(Id, Admin, cancellationToken);
+        if (!result.Succeeded)
+        {
+            var log = await logs.GetAsync(Id, cancellationToken);
+            if (log is null)
+            {
+                return NotFound();
+            }
+
+            Log = log;
+            return Fail(result.Error);
+        }
+
+        Message = "The request is back in processing. The job picks it up on its next run.";
+        return RedirectToPage(new { id = Id });
+    }
 }

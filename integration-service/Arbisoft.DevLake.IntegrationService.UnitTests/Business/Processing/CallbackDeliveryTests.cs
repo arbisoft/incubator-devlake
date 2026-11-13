@@ -46,7 +46,7 @@ public class CallbackDeliveryTests
         _configs.GetByClientRefIdAsync(7, Arg.Any<CancellationToken>()).Returns(new ClientConfig { Id = 3, ClientRefId = 7, MaxAttempts = maxAttempts, IsActive = active });
     }
 
-    private void GivenFailedBefore(int attempts) => _attempts.CountDeliveryAttemptsAsync(41, Arg.Any<CancellationToken>()).Returns(attempts);
+    private void GivenFailedBefore(int attempts) => _attempts.CountDeliveryAttemptsAsync(41, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(attempts);
 
     private void SophiaAnswers(SophiaDeliveryResult result) =>
         _sophia.PostCallbackAsync(7, "engineer-stats", Payload, "c1", Arg.Any<CancellationToken>()).Returns(result);
@@ -175,6 +175,18 @@ public class CallbackDeliveryTests
 
         Assert.Equal(DeliveryOutcome.Revoked, (await _delivery.AttemptAsync(Request, Payload)).Outcome);
         await _sophia.DidNotReceiveWithAnyArgs().PostCallbackAsync(default, default!, default!, default!, default);
+    }
+
+    /// <summary>A request an administrator retried starts a fresh set of attempts: only attempts since it last entered processing count.</summary>
+    [Fact]
+    public async Task OnlyAttemptsSinceTheRequestLastEnteredProcessing_Count()
+    {
+        var queuedOn = new DateTimeOffset(2026, 11, 13, 9, 0, 0, TimeSpan.Zero);
+        SophiaAnswers(new SophiaDeliveryResult(true, 200, "{}"));
+
+        await _delivery.AttemptAsync(new RequestLog { Id = 41, ClientRefId = 7, CorrelationId = "c1", EventType = "engineer-stats", CreatedOn = queuedOn.AddDays(-1), QueuedOn = queuedOn }, Payload);
+
+        await _attempts.Received(1).CountDeliveryAttemptsAsync(41, queuedOn, Arg.Any<CancellationToken>());
     }
 
     [Fact]

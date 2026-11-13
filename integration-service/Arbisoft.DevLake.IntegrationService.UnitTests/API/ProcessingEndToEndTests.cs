@@ -15,6 +15,7 @@
 
 using System.Net;
 using System.Text.Json;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Requests;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
@@ -188,6 +189,28 @@ public sealed class ProcessingEndToEndTests : ApiTestBase
         Assert.Single(_upstream.Callbacks);
         var attempt = Assert.Single(await Seed.AttemptsAsync((await Seed.LogAsync(request.Correlation))!.Id));
         Assert.Equal("HTTP 400", attempt.FailureError);
+    }
+
+    /// <summary>#10: a failed request is retried from the admin portal (no dead-letter shovelling) and delivered under its original correlation ID.</summary>
+    [BrokersFact]
+    public async Task AFailedRequest_RetriedByAnAdmin_IsProcessedAgain_AndDeliveredUnderItsOriginalCorrelationId()
+    {
+        var (_, token) = await IsolatedClientAsync(Single);
+        _upstream.ScriptCallbacks(HttpStatusCode.BadRequest, HttpStatusCode.OK);
+        var request = await GetStatsAsync(token, "jane@arbisoft.com");
+        await WaitForStatusAsync(token, request.Correlation, "Failure");
+
+        await using (var scope = Factory.Services.CreateAsyncScope())
+        {
+            var log = (await Seed.LogAsync(request.Correlation))!;
+            var result = await scope.ServiceProvider.GetRequiredService<IRequestLogService>().RetryAsync(log.Id, "alice", CancellationToken.None);
+            Assert.True(result.Succeeded);
+        }
+
+        await WaitForStatusAsync(token, request.Correlation, "Success");
+        Assert.Equal([request.Correlation, request.Correlation], _upstream.Callbacks.Select(c => c.CorrelationId));
+        var attempts = await Seed.AttemptsAsync((await Seed.LogAsync(request.Correlation))!.Id);
+        Assert.Equal(["DeliveryFailed", "Retried", "Delivered"], attempts.Select(a => a.AttemptStatus));
     }
 
     [BrokersFact]
@@ -466,7 +489,7 @@ public sealed class ProcessingEndToEndTests : ApiTestBase
     {
         var (client, token) = await IsolatedClientAsync(Single);
         var correlationId = await Seed.SeedRequestAsync(client, RequestStatus.Queued);
-        await Seed.ExecuteAsync("UPDATE RequestLogs SET createdOn = @old WHERE correlationId = @id", new { old = DateTime.UtcNow.AddHours(-3), id = correlationId });
+        await Seed.ExecuteAsync("UPDATE RequestLogs SET createdOn = @old, queuedOn = @old WHERE correlationId = @id", new { old = DateTime.UtcNow.AddHours(-3), id = correlationId });
 
         await WaitForStatusAsync(token, correlationId, "Failure");
 

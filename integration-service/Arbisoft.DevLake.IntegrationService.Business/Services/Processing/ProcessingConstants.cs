@@ -40,6 +40,9 @@ public static class DeliveryAttemptStatus
 
     /// <summary>The API could not put the request on the queue (full, unreachable or too slow), so it was never processed.</summary>
     public const string PublishFailed = "PublishFailed";
+
+    /// <summary>An administrator put a failed request back into processing. Not an attempt; it marks where the fresh set of attempts starts.</summary>
+    public const string Retried = "Retried";
 }
 
 /// <summary>What happens to a queue message once the job has dealt with it.</summary>

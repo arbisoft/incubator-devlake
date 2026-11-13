@@ -18,6 +18,7 @@ using Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
 using Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers.Builders;
+using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 
 namespace Arbisoft.DevLake.IntegrationService.UnitTests.Business.Admin;
@@ -33,7 +34,7 @@ public class RequestLogServiceTests
     public RequestLogServiceTests()
     {
         _clients.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(new ClientBuilder().Build());
-        _service = new RequestLogService(_logs, _clients);
+        _service = new RequestLogService(_logs, _clients, new FakeTimeProvider(Now));
     }
 
     private static RequestLog Log(long id, string status = RequestStatus.Success) =>
@@ -119,5 +120,78 @@ public class RequestLogServiceTests
     {
         Assert.Contains(RequestStatus.RevokedNoCallbackUrl, _service.Statuses);
         Assert.Equal(7, _service.Statuses.Count);
+    }
+
+    private void GivenFailedWithBody(long id)
+    {
+        _logs.GetByIdAsync(id, Arg.Any<CancellationToken>()).Returns(Log(id, RequestStatus.Failed));
+        _logs.GetJsonAsync(id, Arg.Any<CancellationToken>()).Returns("{\"emails\":[\"a@arbisoft.com\"]}");
+        _logs.TryRetryAsync(id, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+    }
+
+    [Fact]
+    public async Task Retry_PutsAFailedRequestBackIntoProcessing_AndRecordsWhoDidIt()
+    {
+        GivenFailedWithBody(5);
+
+        var result = await _service.RetryAsync(5, "alice", CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        await _logs.Received(1).TryRetryAsync(5, Now, Arg.Any<CancellationToken>());
+        await _logs.Received(1).InsertAttemptAsync(
+            Arg.Is<RequestResponseAttempt>(a => a.RequestLogId == 5 && a.AttemptStatus == "Retried" && a.AttemptBy == "Admin: alice" && a.AttemptOn == Now),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(RequestStatus.Success)]
+    [InlineData(RequestStatus.Queued)]
+    [InlineData(RequestStatus.Processing)]
+    [InlineData(RequestStatus.RevokedNoCallbackUrl)]
+    public async Task Retry_OnlyAFailedRequest_CanBeRetried(string status)
+    {
+        _logs.GetByIdAsync(5, Arg.Any<CancellationToken>()).Returns(Log(5, status));
+
+        var result = await _service.RetryAsync(5, "alice", CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        await _logs.DidNotReceiveWithAnyArgs().TryRetryAsync(default, default, default);
+    }
+
+    [Fact]
+    public async Task Retry_ARequestWithoutAStoredBody_IsRefused()
+    {
+        GivenFailedWithBody(5);
+        _logs.GetJsonAsync(5, Arg.Any<CancellationToken>()).Returns((string?)null);
+
+        Assert.False((await _service.RetryAsync(5, "alice", CancellationToken.None)).Succeeded);
+        await _logs.DidNotReceiveWithAnyArgs().TryRetryAsync(default, default, default);
+    }
+
+    [Fact]
+    public async Task Retry_AnUnknownRequest_OrOneThatChangedMeanwhile_IsRefused_WithNothingRecorded()
+    {
+        Assert.False((await _service.RetryAsync(99, "alice", CancellationToken.None)).Succeeded);
+
+        GivenFailedWithBody(5);
+        _logs.TryRetryAsync(5, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(false);
+        Assert.Contains("changed", (await _service.RetryAsync(5, "alice", CancellationToken.None)).Error, StringComparison.Ordinal);
+        await _logs.DidNotReceiveWithAnyArgs().InsertAttemptAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Get_OffersRetry_OnlyForAFailedRequestWithABody_AndShowsWhenItIsNextDue()
+    {
+        GivenFailedWithBody(5);
+        _logs.GetAttemptsAsync(5, Arg.Any<CancellationToken>()).Returns([]);
+        var due = Now.AddMinutes(3);
+        _logs.GetByIdAsync(6, Arg.Any<CancellationToken>()).Returns(new RequestLog { Id = 6, ClientRefId = 1, Status = RequestStatus.Processing, CreatedOn = Now, QueuedOn = Now, NextAttemptOn = due });
+        _logs.GetJsonAsync(6, Arg.Any<CancellationToken>()).Returns("{}");
+        _logs.GetAttemptsAsync(6, Arg.Any<CancellationToken>()).Returns([]);
+
+        Assert.True((await _service.GetAsync(5, CancellationToken.None))!.CanRetry);
+        var waiting = (await _service.GetAsync(6, CancellationToken.None))!;
+        Assert.False(waiting.CanRetry);
+        Assert.Equal(due, waiting.NextAttemptOn);
     }
 }

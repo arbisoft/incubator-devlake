@@ -44,9 +44,9 @@ public sealed class RequestAttemptLog : IRequestAttemptLog
             cancellationToken);
     }
 
-    public async Task<int> CountDeliveryAttemptsAsync(long requestLogId, CancellationToken cancellationToken)
+    public async Task<int> CountDeliveryAttemptsAsync(long requestLogId, DateTimeOffset since, CancellationToken cancellationToken)
     {
         var attempts = await _requestLogs.GetAttemptsAsync(requestLogId, cancellationToken);
-        return attempts.Count(attempt => attempt.AttemptStatus is DeliveryAttemptStatus.Delivered or DeliveryAttemptStatus.DeliveryFailed);
+        return attempts.Count(attempt => attempt.AttemptOn >= since && attempt.AttemptStatus is DeliveryAttemptStatus.Delivered or DeliveryAttemptStatus.DeliveryFailed);
     }
 }

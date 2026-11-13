@@ -20,6 +20,9 @@ public interface IRequestAttemptLog
 {
     Task RecordAsync(long requestLogId, string attemptStatus, string responseJson, string? failure, CancellationToken cancellationToken);
 
-    /// <summary>How many tries to deliver the result were already made, for example before a restart. Only delivery attempts count.</summary>
-    Task<int> CountDeliveryAttemptsAsync(long requestLogId, CancellationToken cancellationToken);
+    /// <summary>
+    /// How many tries to deliver the result were made since <paramref name="since"/>, the time the request last entered processing, so a request
+    /// an administrator retried gets a fresh set of attempts. Only delivery attempts count.
+    /// </summary>
+    Task<int> CountDeliveryAttemptsAsync(long requestLogId, DateTimeOffset since, CancellationToken cancellationToken);
 }

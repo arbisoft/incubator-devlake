@@ -229,7 +229,7 @@ public class RequestLogRepositoryTests : RepositoryTestBase
         var limited = await Repository.ListStaleAsync([RequestStatus.Received, RequestStatus.Queued, RequestStatus.Processing], cutoff, cutoff, 1, CancellationToken.None);
 
         Assert.Equal([oldest, older], stale.Where(l => l.ClientRefId == client.Id).Select(l => l.Id));
-        Assert.Equal(stale.OrderBy(l => l.CreatedOn).ThenBy(l => l.Id).Select(l => l.Id), stale.Select(l => l.Id));
+        Assert.Equal(stale.OrderBy(l => l.QueuedOn).ThenBy(l => l.Id).Select(l => l.Id), stale.Select(l => l.Id));
         Assert.Single(limited);
         Assert.Equal(stale[0].Id, limited[0].Id);
     }
@@ -350,6 +350,48 @@ public class RequestLogRepositoryTests : RepositoryTestBase
         var due = await Repository.ListDueAsync(now, since, 100, CancellationToken.None);
 
         Assert.Equal(new[] { waitingForCredentials, dueRetry, crashed }.Order(), due.Where(l => l.ClientRefId == client.Id).Select(l => l.Id).Order());
+    }
+
+    [MySqlFact]
+    public async Task QueuedOn_StartsAsCreatedOn()
+    {
+        var client = await InsertClientAsync();
+        var id = await InsertRequestLogAsync(client.Id, RequestStatus.Queued, Instant.AddMinutes(7));
+
+        Assert.Equal(Instant.AddMinutes(7), (await Repository.GetByIdAsync(id, CancellationToken.None))!.QueuedOn);
+    }
+
+    [MySqlFact]
+    public async Task TryRetry_PutsAFailedRequestBack_DueNow_WithAFreshLifetime_AndKeepsWhenItWasCreated()
+    {
+        var client = await InsertClientAsync();
+        var created = Instant.AddYears(56);
+        var id = await InsertRequestLogAsync(client.Id, RequestStatus.Failed, created);
+        var now = created.AddHours(5);
+
+        Assert.True(await Repository.TryRetryAsync(id, now, CancellationToken.None));
+        Assert.False(await Repository.TryRetryAsync(id, now, CancellationToken.None));
+
+        var retried = (await Repository.GetByIdAsync(id, CancellationToken.None))!;
+        Assert.Equal(RequestStatus.Queued, retried.Status);
+        Assert.Equal(created, retried.CreatedOn);
+        Assert.Equal(now, retried.QueuedOn);
+        Assert.Equal(now, retried.NextAttemptOn);
+        Assert.Null(retried.ClaimedUntil);
+        Assert.Contains(retried.Id, (await Repository.ListDueAsync(now, now.AddHours(-2), 100, CancellationToken.None)).Select(l => l.Id));
+        Assert.DoesNotContain(retried.Id, (await Repository.ListStaleAsync([RequestStatus.Queued], now.AddHours(-2), now, 10_000, CancellationToken.None)).Select(l => l.Id));
+    }
+
+    [MySqlFact]
+    public async Task TryRetry_LeavesAnyRequestThatIsNotFailedAlone()
+    {
+        var client = await InsertClientAsync();
+        foreach (var status in new[] { RequestStatus.Success, RequestStatus.Queued, RequestStatus.Processing, RequestStatus.RevokedNoCallbackUrl })
+        {
+            var id = await InsertRequestLogAsync(client.Id, status);
+
+            Assert.False(await Repository.TryRetryAsync(id, Instant, CancellationToken.None));
+        }
     }
 
     [MySqlFact]

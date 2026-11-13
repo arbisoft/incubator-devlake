@@ -27,9 +27,24 @@ limitations under the License.
     <dt>Event type</dt><dd class="mono">@log.EventType</dd>
     <dt>Status</dt><dd>@log.Status</dd>
     <dt>Created</dt><dd>@AdminPageModel.Utc(log.CreatedOn)</dd>
+    @if (log.QueuedOn != log.CreatedOn)
+    {
+        <dt>Retried</dt><dd>@AdminPageModel.Utc(log.QueuedOn)</dd>
+    }
+    @if (log.NextAttemptOn is not null)
+    {
+        <dt>Next attempt</dt><dd>@AdminPageModel.Utc(log.NextAttemptOn)</dd>
+    }
     <dt>Request</dt><dd class="mono long">@log.Url</dd>
   </dl>
 </div>
+@if (log.CanRetry)
+{
+    <form method="post" asp-page-handler="Retry" class="panel">
+      <p>Puts the request back into processing once the cause of the failure is fixed. It keeps its correlation ID, gets a fresh two hours and a fresh set of delivery attempts, and is collected from DevLake again.</p>
+      <div class="actions"><button type="submit">Retry request</button></div>
+    </form>
+}
 <h2>Body</h2>
 <p class="muted">As the client sent it. It holds engineer emails, so treat it as personal data.</p>
 @if (string.IsNullOrEmpty(log.Json))

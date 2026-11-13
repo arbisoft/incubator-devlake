@@ -23,7 +23,7 @@ namespace Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
 
 public sealed class RequestLogRepository : RepositoryBase, IRequestLogRepository
 {
-    private const string Columns = "id, clientRefId, correlationId, url, status, eventType, createdOn, idempotencyKey, nextAttemptOn, claimedUntil";
+    private const string Columns = "id, clientRefId, correlationId, url, status, eventType, createdOn, queuedOn, idempotencyKey, nextAttemptOn, claimedUntil";
 
     /// <summary>Not claimed by anybody (or the claim ran out) and not deferred to later. Uses @now.</summary>
     private const string Claimable =
@@ -40,8 +40,8 @@ public sealed class RequestLogRepository : RepositoryBase, IRequestLogRepository
     public Task<long> InsertAsync(RequestLog requestLog, CancellationToken cancellationToken)
     {
         return InsertAsync(
-            "INSERT INTO RequestLogs (clientRefId, correlationId, url, status, eventType, createdOn, idempotencyKey) " +
-            "VALUES (@ClientRefId, @CorrelationId, @Url, @Status, @EventType, @CreatedOn, @IdempotencyKey)",
+            "INSERT INTO RequestLogs (clientRefId, correlationId, url, status, eventType, createdOn, queuedOn, idempotencyKey) " +
+            "VALUES (@ClientRefId, @CorrelationId, @Url, @Status, @EventType, @CreatedOn, COALESCE(@QueuedOn, @CreatedOn), @IdempotencyKey)",
             requestLog,
             cancellationToken);
     }
@@ -104,19 +104,29 @@ public sealed class RequestLogRepository : RepositoryBase, IRequestLogRepository
         return changed > 0;
     }
 
+    public async Task<bool> TryRetryAsync(long id, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var changed = await ExecuteAsync(
+            "UPDATE RequestLogs SET status = '" + RequestStatus.Queued + "', queuedOn = @now, nextAttemptOn = @now, claimedUntil = NULL " +
+            "WHERE id = @id AND status = '" + RequestStatus.Failed + "'",
+            new { id, now },
+            cancellationToken);
+        return changed > 0;
+    }
+
     public async Task DeferAsync(long id, string status, DateTimeOffset nextAttemptOn, CancellationToken cancellationToken)
     {
         await ExecuteAsync(
             "UPDATE RequestLogs SET status = @status, nextAttemptOn = @nextAttemptOn, claimedUntil = NULL WHERE id = @id", new { id, status, nextAttemptOn }, cancellationToken);
     }
 
-    public Task<IReadOnlyList<RequestLog>> ListDueAsync(DateTimeOffset now, DateTimeOffset createdSince, int limit, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<RequestLog>> ListDueAsync(DateTimeOffset now, DateTimeOffset queuedSince, int limit, CancellationToken cancellationToken)
     {
         // A request with neither a deferral nor a lease that is still Received or Queued is new: its message is in the queue, which owns it.
         return QueryAsync<RequestLog>(
             $"SELECT {Columns} FROM RequestLogs WHERE {Claimable} AND (nextAttemptOn IS NOT NULL OR status = '{RequestStatus.Processing}') " +
-            "AND createdOn >= @createdSince ORDER BY COALESCE(nextAttemptOn, claimedUntil, createdOn), id LIMIT @limit",
-            new { now, createdSince, limit },
+            "AND queuedOn >= @queuedSince ORDER BY COALESCE(nextAttemptOn, claimedUntil, queuedOn), id LIMIT @limit",
+            new { now, queuedSince, limit },
             cancellationToken);
     }
 
@@ -164,12 +174,12 @@ public sealed class RequestLogRepository : RepositoryBase, IRequestLogRepository
     }
 
     public Task<IReadOnlyList<RequestLog>> ListStaleAsync(
-        IReadOnlyCollection<string> statuses, DateTimeOffset createdBefore, DateTimeOffset now, int limit, CancellationToken cancellationToken)
+        IReadOnlyCollection<string> statuses, DateTimeOffset queuedBefore, DateTimeOffset now, int limit, CancellationToken cancellationToken)
     {
         return QueryAsync<RequestLog>(
-            $"SELECT {Columns} FROM RequestLogs WHERE status IN @statuses AND createdOn < @createdBefore AND (claimedUntil IS NULL OR claimedUntil < @now) " +
-            "ORDER BY createdOn, id LIMIT @limit",
-            new { statuses, createdBefore, now, limit },
+            $"SELECT {Columns} FROM RequestLogs WHERE status IN @statuses AND queuedOn < @queuedBefore AND (claimedUntil IS NULL OR claimedUntil < @now) " +
+            "ORDER BY queuedOn, id LIMIT @limit",
+            new { statuses, queuedBefore, now, limit },
             cancellationToken);
     }
 

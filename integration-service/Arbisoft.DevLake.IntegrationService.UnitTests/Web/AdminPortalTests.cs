@@ -400,6 +400,37 @@ public sealed partial class AdminPortalTests : IAsyncLifetime, IDisposable
     }
 
     [MySqlFact]
+    public async Task AFailedRequest_CanBeRetried_ButOnlyOnce_AndTheRetryIsRecordedWithTheAdminsName()
+    {
+        await SignInAsync();
+        var client = await CreateClientAsync();
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var logs = scope.ServiceProvider.GetRequiredService<IRequestLogRepository>();
+        var id = await logs.InsertAsync(
+            new RequestLog { ClientRefId = client.Id, CorrelationId = Guid.NewGuid().ToString(), Url = "/x", Status = RequestStatus.Failed, EventType = "engineer-stats", CreatedOn = DateTimeOffset.UtcNow.AddHours(-3) },
+            CancellationToken.None);
+        await logs.InsertJsonAsync(new RequestLogJson { RequestLogId = id, Json = "{\"emails\":[\"jane@arbisoft.com\"]}" }, CancellationToken.None);
+        var path = $"/RequestLogs/Details/{id}";
+        Assert.Contains("Retry request", await Http.GetStringAsync(new Uri(path, UriKind.Relative)), StringComparison.Ordinal);
+
+        var retried = await PostFormAsync(Http, path + "?handler=Retry");
+
+        Assert.Equal(HttpStatusCode.Redirect, retried.StatusCode);
+        var log = (await logs.GetByIdAsync(id, CancellationToken.None))!;
+        Assert.Equal(RequestStatus.Queued, log.Status);
+        Assert.NotNull(log.NextAttemptOn);
+        var attempt = Assert.Single(await logs.GetAttemptsAsync(id, CancellationToken.None));
+        Assert.Equal(("Retried", $"Admin: {PortalFactory.AdminUsername}"), (attempt.AttemptStatus, attempt.AttemptBy));
+
+        var page = await Http.GetStringAsync(new Uri(path, UriKind.Relative));
+        Assert.DoesNotContain("Retry request", page, StringComparison.Ordinal);
+        Assert.Contains("Next attempt", page, StringComparison.Ordinal);
+        var again = await PostFormAsync(Http, path + "?handler=Retry");
+        Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+        Assert.Contains("Only a failed request can be retried.", await again.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [MySqlFact]
     public async Task TheIntegrationPages_AllRenderForASignedInAdmin()
     {
         await SignInAsync();

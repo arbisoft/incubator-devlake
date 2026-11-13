@@ -22,7 +22,11 @@ public sealed record RequestLogDto(long Id, string ClientId, string ClientName, 
 
 public sealed record DeliveryAttemptDto(DateTimeOffset AttemptOn, string AttemptStatus, string AttemptBy, string? FailureError, string ResponseJson);
 
-/// <summary>One request with its stored JSON body and every delivery attempt. The body holds engineer emails, so only the admin portal shows it.</summary>
+/// <summary>
+/// One request with its stored JSON body and every delivery attempt. The body holds engineer emails, so only the admin portal shows it.
+/// <c>QueuedOn</c> is when it last entered processing (it differs from <c>CreatedOn</c> after a retry); <c>NextAttemptOn</c> is when a waiting
+/// request is next due; <c>CanRetry</c> is true for a failed request with a stored body.
+/// </summary>
 public sealed record RequestLogDetailsDto(
     long Id,
     string ClientId,
@@ -32,5 +36,8 @@ public sealed record RequestLogDetailsDto(
     string Status,
     string Url,
     DateTimeOffset CreatedOn,
+    DateTimeOffset QueuedOn,
+    DateTimeOffset? NextAttemptOn,
+    bool CanRetry,
     string? Json,
     IReadOnlyList<DeliveryAttemptDto> Attempts);

@@ -60,10 +60,16 @@ public interface IRequestLogRepository
 
     /// <summary>
     /// Requests the database owns that can be claimed now, soonest due first: deferred requests whose time has come, and requests whose lease ran
-    /// out because their worker stopped. New requests still waiting in the queue are not included. Only requests created at or after
-    /// <paramref name="createdSince"/> are listed; older ones are left to expire.
+    /// out because their worker stopped. New requests still waiting in the queue are not included. Only requests that entered processing
+    /// (<see cref="RequestLog.QueuedOn"/>) at or after <paramref name="queuedSince"/> are listed; older ones are left to expire.
     /// </summary>
-    Task<IReadOnlyList<RequestLog>> ListDueAsync(DateTimeOffset now, DateTimeOffset createdSince, int limit, CancellationToken cancellationToken);
+    Task<IReadOnlyList<RequestLog>> ListDueAsync(DateTimeOffset now, DateTimeOffset queuedSince, int limit, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Puts a Failed request back into processing: Queued, due at <paramref name="now"/>, with a fresh lifetime from <paramref name="now"/>.
+    /// Returns false when the request is not Failed (any more).
+    /// </summary>
+    Task<bool> TryRetryAsync(long id, DateTimeOffset now, CancellationToken cancellationToken);
 
     /// <summary>Stores the collected callback body of a request, replacing any stored before.</summary>
     Task SavePayloadAsync(long requestLogId, string payload, DateTimeOffset createdOn, CancellationToken cancellationToken);
@@ -88,11 +94,11 @@ public interface IRequestLogRepository
     Task<IReadOnlyList<RequestLog>> ListByStatusSinceAsync(string status, DateTimeOffset since, int limit, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Requests in any of the given statuses that were created before <paramref name="createdBefore"/> and that nobody holds a lease on at
-    /// <paramref name="now"/>, oldest first, at most <paramref name="limit"/>.
+    /// Requests in any of the given statuses that entered processing (<see cref="RequestLog.QueuedOn"/>) before <paramref name="queuedBefore"/>
+    /// and that nobody holds a lease on at <paramref name="now"/>, oldest first, at most <paramref name="limit"/>.
     /// </summary>
     Task<IReadOnlyList<RequestLog>> ListStaleAsync(
-        IReadOnlyCollection<string> statuses, DateTimeOffset createdBefore, DateTimeOffset now, int limit, CancellationToken cancellationToken);
+        IReadOnlyCollection<string> statuses, DateTimeOffset queuedBefore, DateTimeOffset now, int limit, CancellationToken cancellationToken);
 
     Task<PagedResult<RequestLog>> ListAsync(RequestLogFilter filter, int page, int pageSize, CancellationToken cancellationToken);
 

@@ -45,7 +45,7 @@ public sealed class CallbackDelivery : ICallbackDelivery
             return new DeliveryAttempt(DeliveryOutcome.Revoked);
         }
 
-        var failed = await _attempts.CountDeliveryAttemptsAsync(request.Id, CancellationToken.None);
+        var failed = await _attempts.CountDeliveryAttemptsAsync(request.Id, request.QueuedOn ?? request.CreatedOn, CancellationToken.None);
         if (failed >= config.MaxAttempts)
         {
             return new DeliveryAttempt(DeliveryOutcome.Failed, failed, AttemptsUsedUp: true);
