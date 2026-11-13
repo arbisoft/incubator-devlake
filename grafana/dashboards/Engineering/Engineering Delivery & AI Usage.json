@@ -1915,6 +1915,280 @@
         "kind": "Panel",
         "spec": {
           "id": 15,
+          "title": "AI impact overview",
+          "description": "Last 28 days in the selected projects. AI-assisted PRs: share of merged PRs with a Claude co-author trailer or a commit Claude Code reported. Code generated: lines Claude Code added as a share of lines added by merged PRs, capped at 100%. Code accepted: share of edit decisions that were accepted. AI lines per merged PR: lines Claude Code added divided by merged PRs. Claude active hours: time spent actively in Claude Code sessions, not time saved.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "refId": "A",
+                    "hidden": false,
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "spec": {
+                        "rawSql": "WITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\notel_conns AS (\n  SELECT DISTINCT cp.connection_id\n  FROM _tool_claude_code_otel_connection_projects cp\n  WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nmerged AS (\n  SELECT pr.id, pr.additions, pr.merged_date >= NOW() - INTERVAL 28 DAY AS cur\n  FROM pull_requests pr\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND pr.merged_date >= NOW() - INTERVAL 56 DAY AND pr.merged_date < NOW()\n)\n, ai_prs AS (\n  SELECT DISTINCT prc.pull_request_id AS id\n  FROM pull_request_commits prc\n  LEFT JOIN commits c ON c.sha = prc.commit_sha\n  WHERE prc.pull_request_id IN (SELECT id FROM merged)\n    AND (c.message LIKE '%Co-Authored-By: Claude%' OR c.message LIKE '%Generated with [Claude Code]%'\n      OR prc.commit_sha IN (SELECT commit_sha FROM ai_commits))\n)\n, share AS (\n  SELECT 100 * COUNT(DISTINCT CASE WHEN m.cur AND m.id IN (SELECT id FROM ai_prs) THEN m.id END) / NULLIF(COUNT(DISTINCT CASE WHEN m.cur THEN m.id END), 0) AS cur_pct,\n    100 * COUNT(DISTINCT CASE WHEN NOT m.cur AND m.id IN (SELECT id FROM ai_prs) THEN m.id END) / NULLIF(COUNT(DISTINCT CASE WHEN NOT m.cur THEN m.id END), 0) AS prev_pct,\n    SUM(CASE WHEN m.cur THEN m.additions END) AS merged_lines,\n    COUNT(DISTINCT CASE WHEN m.cur THEN m.id END) AS merged_prs\n  FROM merged m\n),\nclaude_lines AS (\n  SELECT SUM(a.lines_added) AS added_lines\n  FROM ai_activities a\n  WHERE a.record_kind = 'canonical_activity'\n    AND a.source_connection_id IN (SELECT connection_id FROM otel_conns)\n    AND a.date > DATE(NOW() - INTERVAL 28 DAY)\n),\nactive AS (\n  SELECT SUM(ha.active_time_seconds) / 3600.0 AS hours\n  FROM _tool_claude_code_otel_hourly_activity ha\n  WHERE ha.connection_id IN (SELECT connection_id FROM otel_conns)\n    AND ha.hour_start > NOW() - INTERVAL 28 DAY\n),\nedits AS (\n  SELECT 100 * SUM(d.accepted_count) / NULLIF(SUM(d.accepted_count) + SUM(d.rejected_count), 0) AS accepted_pct\n  FROM ai_tool_decisions d\n  WHERE d.source_connection_id IN (SELECT connection_id FROM otel_conns)\n    AND d.date > DATE(NOW() - INTERVAL 28 DAY)\n)\nSELECT ROUND(s.cur_pct, 1) AS ai_assisted,\n  ROUND(LEAST(100, 100 * g.added_lines / NULLIF(s.merged_lines, 0)), 1) AS code_generated,\n  ROUND(e.accepted_pct, 1) AS code_accepted,\n  ROUND(g.added_lines / NULLIF(s.merged_prs, 0)) AS ai_lines_per_pr,\n  ROUND(h.hours, 1) AS claude_active_hours,\n  CASE WHEN s.cur_pct IS NULL OR s.prev_pct IS NULL THEN '–' ELSE CONCAT(\n    CASE WHEN ROUND(s.cur_pct - s.prev_pct) > 0 THEN '+' WHEN ROUND(s.cur_pct - s.prev_pct) < 0 THEN '-' ELSE '±' END,\n    ABS(ROUND(s.cur_pct - s.prev_pct)), ' pp') END AS `change`\nFROM share s, claude_lines g, active h, edits e",
+                        "format": "table",
+                        "rawQuery": true,
+                        "editorMode": "code"
+                      }
+                    }
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "gauge",
+            "version": "13.2.2",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "/^AI-assisted PRs$/",
+                  "values": false
+                },
+                "orientation": "auto",
+                "showThresholdLabels": false,
+                "showThresholdMarkers": false,
+                "sizing": "auto",
+                "minVizHeight": 75,
+                "minVizWidth": 75
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "purple"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "text",
+                        "value": null
+                      }
+                    ]
+                  },
+                  "mappings": [],
+                  "noValue": "–",
+                  "unit": "percent",
+                  "min": 0,
+                  "max": 100,
+                  "decimals": 0
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "ai_assisted"
+                    },
+                    "properties": [
+                      {
+                        "id": "displayName",
+                        "value": "AI-assisted PRs"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "panel-16": {
+        "kind": "Panel",
+        "spec": {
+          "id": 16,
+          "title": "",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "refId": "A",
+                    "hidden": false,
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "mysql",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "devlake-mysql"
+                      },
+                      "spec": {
+                        "rawSql": "WITH\nscoped_repos AS (\n  SELECT DISTINCT pm.row_id AS repo_id\n  FROM project_mapping pm\n  WHERE pm.`table` = 'repos' AND pm.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\notel_conns AS (\n  SELECT DISTINCT cp.connection_id\n  FROM _tool_claude_code_otel_connection_projects cp\n  WHERE cp.project_name IN (SELECT upm_g.project_name FROM user_project_mapping upm_g WHERE upm_g.user_login = ${__user.login:sqlstring} AND upm_g.project_name IN ($project))\n),\nmerged AS (\n  SELECT pr.id, pr.additions, pr.merged_date >= NOW() - INTERVAL 28 DAY AS cur\n  FROM pull_requests pr\n  WHERE pr.base_repo_id IN (SELECT repo_id FROM scoped_repos)\n    AND pr.merged_date >= NOW() - INTERVAL 56 DAY AND pr.merged_date < NOW()\n)\n, ai_prs AS (\n  SELECT DISTINCT prc.pull_request_id AS id\n  FROM pull_request_commits prc\n  LEFT JOIN commits c ON c.sha = prc.commit_sha\n  WHERE prc.pull_request_id IN (SELECT id FROM merged)\n    AND (c.message LIKE '%Co-Authored-By: Claude%' OR c.message LIKE '%Generated with [Claude Code]%'\n      OR prc.commit_sha IN (SELECT commit_sha FROM ai_commits))\n)\n, share AS (\n  SELECT 100 * COUNT(DISTINCT CASE WHEN m.cur AND m.id IN (SELECT id FROM ai_prs) THEN m.id END) / NULLIF(COUNT(DISTINCT CASE WHEN m.cur THEN m.id END), 0) AS cur_pct,\n    100 * COUNT(DISTINCT CASE WHEN NOT m.cur AND m.id IN (SELECT id FROM ai_prs) THEN m.id END) / NULLIF(COUNT(DISTINCT CASE WHEN NOT m.cur THEN m.id END), 0) AS prev_pct,\n    SUM(CASE WHEN m.cur THEN m.additions END) AS merged_lines,\n    COUNT(DISTINCT CASE WHEN m.cur THEN m.id END) AS merged_prs\n  FROM merged m\n),\nclaude_lines AS (\n  SELECT SUM(a.lines_added) AS added_lines\n  FROM ai_activities a\n  WHERE a.record_kind = 'canonical_activity'\n    AND a.source_connection_id IN (SELECT connection_id FROM otel_conns)\n    AND a.date > DATE(NOW() - INTERVAL 28 DAY)\n),\nactive AS (\n  SELECT SUM(ha.active_time_seconds) / 3600.0 AS hours\n  FROM _tool_claude_code_otel_hourly_activity ha\n  WHERE ha.connection_id IN (SELECT connection_id FROM otel_conns)\n    AND ha.hour_start > NOW() - INTERVAL 28 DAY\n),\nedits AS (\n  SELECT 100 * SUM(d.accepted_count) / NULLIF(SUM(d.accepted_count) + SUM(d.rejected_count), 0) AS accepted_pct\n  FROM ai_tool_decisions d\n  WHERE d.source_connection_id IN (SELECT connection_id FROM otel_conns)\n    AND d.date > DATE(NOW() - INTERVAL 28 DAY)\n)\nSELECT ROUND(s.cur_pct, 1) AS ai_assisted,\n  ROUND(LEAST(100, 100 * g.added_lines / NULLIF(s.merged_lines, 0)), 1) AS code_generated,\n  ROUND(e.accepted_pct, 1) AS code_accepted,\n  ROUND(g.added_lines / NULLIF(s.merged_prs, 0)) AS ai_lines_per_pr,\n  ROUND(h.hours, 1) AS claude_active_hours,\n  CASE WHEN s.cur_pct IS NULL OR s.prev_pct IS NULL THEN '–' ELSE CONCAT(\n    CASE WHEN ROUND(s.cur_pct - s.prev_pct) > 0 THEN '+' WHEN ROUND(s.cur_pct - s.prev_pct) < 0 THEN '-' ELSE '±' END,\n    ABS(ROUND(s.cur_pct - s.prev_pct)), ' pp') END AS `change`\nFROM share s, claude_lines g, active h, edits e",
+                        "format": "table",
+                        "rawQuery": true,
+                        "editorMode": "code"
+                      }
+                    }
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "13.2.2",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "/^(Code generated|Code accepted|AI lines per merged PR|Claude active hours|vs previous 28 days)$/",
+                  "values": false
+                },
+                "graphMode": "none",
+                "colorMode": "none",
+                "justifyMode": "auto",
+                "textMode": "value_and_name",
+                "orientation": "horizontal",
+                "wideLayout": true,
+                "showPercentChange": false,
+                "text": {
+                  "valueSize": 22,
+                  "titleSize": 14
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "text"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "text",
+                        "value": null
+                      }
+                    ]
+                  },
+                  "mappings": [],
+                  "noValue": "–"
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "code_generated"
+                    },
+                    "properties": [
+                      {
+                        "id": "displayName",
+                        "value": "Code generated"
+                      },
+                      {
+                        "id": "unit",
+                        "value": "percent"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "code_accepted"
+                    },
+                    "properties": [
+                      {
+                        "id": "displayName",
+                        "value": "Code accepted"
+                      },
+                      {
+                        "id": "unit",
+                        "value": "percent"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 1
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "ai_lines_per_pr"
+                    },
+                    "properties": [
+                      {
+                        "id": "displayName",
+                        "value": "AI lines per merged PR"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "claude_active_hours"
+                    },
+                    "properties": [
+                      {
+                        "id": "displayName",
+                        "value": "Claude active hours"
+                      },
+                      {
+                        "id": "unit",
+                        "value": "suffix: h"
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "change"
+                    },
+                    "properties": [
+                      {
+                        "id": "displayName",
+                        "value": "vs previous 28 days"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "transparent": true
+        }
+      },
+      "panel-17": {
+        "kind": "Panel",
+        "spec": {
+          "id": 17,
           "title": "",
           "description": "",
           "links": [],
@@ -1949,10 +2223,10 @@
           "transparent": true
         }
       },
-      "panel-16": {
+      "panel-18": {
         "kind": "Panel",
         "spec": {
-          "id": 16,
+          "id": 18,
           "title": "Tokens burned",
           "description": "Input, output and cache tokens used in the last 7 days.",
           "links": [],
@@ -2035,10 +2309,10 @@
           }
         }
       },
-      "panel-17": {
+      "panel-19": {
         "kind": "Panel",
         "spec": {
-          "id": 17,
+          "id": 19,
           "title": "Cache hit rate",
           "description": "Share of input tokens served from cache in the last 7 days.",
           "links": [],
@@ -2121,10 +2395,10 @@
           }
         }
       },
-      "panel-18": {
+      "panel-20": {
         "kind": "Panel",
         "spec": {
-          "id": 18,
+          "id": 20,
           "title": "Cost per merged PR",
           "description": "Estimated Claude Code cost in the last 7 days divided by pull requests merged in the same period.",
           "links": [],
@@ -2207,10 +2481,10 @@
           }
         }
       },
-      "panel-19": {
+      "panel-21": {
         "kind": "Panel",
         "spec": {
-          "id": 19,
+          "id": 21,
           "title": "Top model by spend",
           "description": "The model with the highest estimated cost in the last 7 days.",
           "links": [],
@@ -2291,10 +2565,48 @@
           }
         }
       },
-      "panel-20": {
+      "panel-22": {
         "kind": "Panel",
         "spec": {
-          "id": 20,
+          "id": 22,
+          "title": "",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "text",
+            "version": "13.2.2",
+            "spec": {
+              "options": {
+                "mode": "markdown",
+                "content": "AI-assisted means a merged PR with a Claude co-author trailer or a commit Claude Code reported. Code generated compares lines Claude Code added with lines merged PRs added; the two sides aren't matched line by line, so it's a ratio, not attribution. Code accepted is the share of Claude's edit suggestions people accepted. AI lines per merged PR divides the lines Claude Code added by the PRs merged. Claude active hours is time spent actively in Claude Code sessions, not time saved.",
+                "code": {
+                  "language": "plaintext",
+                  "showLineNumbers": false,
+                  "showMiniMap": false
+                }
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          },
+          "transparent": true
+        }
+      },
+      "panel-23": {
+        "kind": "Panel",
+        "spec": {
+          "id": 23,
           "title": "Weekly spend",
           "description": "Estimated Claude Code cost per week over eight weeks. The current week is partial.",
           "links": [],
@@ -2400,10 +2712,10 @@
           }
         }
       },
-      "panel-21": {
+      "panel-24": {
         "kind": "Panel",
         "spec": {
-          "id": 21,
+          "id": 24,
           "title": "AI-assisted share of merged PRs",
           "description": "Percent of merged PRs with at least one AI-assisted commit, per week over eight weeks. The current week is partial.",
           "links": [],
@@ -2511,10 +2823,10 @@
           }
         }
       },
-      "panel-22": {
+      "panel-25": {
         "kind": "Panel",
         "spec": {
-          "id": 22,
+          "id": 25,
           "title": "Adoption",
           "description": "Engineers with Claude Code activity as a share of merged-PR authors, and the share of edits accepted, per week over eight weeks. The current week is partial.",
           "links": [],
@@ -2641,10 +2953,10 @@
           }
         }
       },
-      "panel-23": {
+      "panel-26": {
         "kind": "Panel",
         "spec": {
-          "id": 23,
+          "id": 26,
           "title": "Spend by repository",
           "description": "Claude Code cost per repository over the last 7 days; Mapping says whether the repository belongs to the selected projects. Cost is the exporter's estimate.",
           "links": [],
@@ -2835,10 +3147,10 @@
           }
         }
       },
-      "panel-24": {
+      "panel-27": {
         "kind": "Panel",
         "spec": {
-          "id": 24,
+          "id": 27,
           "title": "",
           "description": "",
           "links": [],
@@ -2873,10 +3185,10 @@
           "transparent": true
         }
       },
-      "panel-25": {
+      "panel-28": {
         "kind": "Panel",
         "spec": {
-          "id": 25,
+          "id": 28,
           "title": "Spend by model",
           "description": "Estimated Claude Code cost per model over the last 7 days.",
           "links": [],
@@ -2957,10 +3269,10 @@
           }
         }
       },
-      "panel-26": {
+      "panel-29": {
         "kind": "Panel",
         "spec": {
-          "id": 26,
+          "id": 29,
           "title": "Languages Claude edited",
           "description": "Edit decisions per language over the last 7 days (the ten most edited, then Other), with the share that were accepted in each name. It counts edit decisions rather than effort, and languages, not frameworks.",
           "links": [],
@@ -3041,10 +3353,10 @@
           }
         }
       },
-      "panel-27": {
+      "panel-30": {
         "kind": "Panel",
         "spec": {
-          "id": 27,
+          "id": 30,
           "title": "",
           "description": "",
           "links": [],
@@ -3079,10 +3391,10 @@
           "transparent": true
         }
       },
-      "panel-28": {
+      "panel-31": {
         "kind": "Panel",
         "spec": {
-          "id": 28,
+          "id": 31,
           "title": "Net flow",
           "description": "Tickets created and resolved per week over eight weeks, and the backlog open at each week's end. Epics are not counted. The current week is partial.",
           "links": [],
@@ -3241,10 +3553,10 @@
           }
         }
       },
-      "panel-29": {
+      "panel-32": {
         "kind": "Panel",
         "spec": {
-          "id": 29,
+          "id": 32,
           "title": "",
           "description": "",
           "links": [],
@@ -3279,10 +3591,10 @@
           "transparent": true
         }
       },
-      "panel-30": {
+      "panel-33": {
         "kind": "Panel",
         "spec": {
-          "id": 30,
+          "id": 33,
           "title": "By state",
           "description": "Tickets open now or resolved in the last 28 days, per group, split into done, in progress and to do. Jira uses its status; GitHub and GitLab issues count as in progress when a linked pull request is open, otherwise when they have an assignee. Blocked tickets count as in progress. Hover a bar for the done, in progress and to do counts.",
           "links": [],
@@ -3433,10 +3745,10 @@
           }
         }
       },
-      "panel-31": {
+      "panel-34": {
         "kind": "Panel",
         "spec": {
-          "id": 31,
+          "id": 34,
           "title": "Where the effort went",
           "description": "Tickets closed per week over eight weeks, split into unplanned, bug and feature in that order of precedence. Epics and cancelled or invalid tickets are not counted. The current week is partial.",
           "links": [],
@@ -3587,10 +3899,10 @@
           }
         }
       },
-      "panel-32": {
+      "panel-35": {
         "kind": "Panel",
         "spec": {
-          "id": 32,
+          "id": 35,
           "title": "Unplanned work",
           "description": "Share of tickets closed in the last 7 days that were added to a sprint after it started (carry-overs excluded) or labelled Mid-Sprint-Task; the label compares with the 7 days before.",
           "links": [],
@@ -3716,10 +4028,10 @@
           }
         }
       },
-      "panel-33": {
+      "panel-36": {
         "kind": "Panel",
         "spec": {
-          "id": 33,
+          "id": 36,
           "title": "",
           "description": "",
           "links": [],
@@ -3754,10 +4066,10 @@
           "transparent": true
         }
       },
-      "panel-34": {
+      "panel-37": {
         "kind": "Panel",
         "spec": {
-          "id": 34,
+          "id": 37,
           "title": "",
           "description": "",
           "links": [],
@@ -3792,10 +4104,10 @@
           "transparent": true
         }
       },
-      "panel-35": {
+      "panel-38": {
         "kind": "Panel",
         "spec": {
-          "id": 35,
+          "id": 38,
           "title": "By type",
           "description": "Tickets closed in the last 7 days by ticket type, as recorded in the tracker.",
           "links": [],
@@ -3888,10 +4200,10 @@
           }
         }
       },
-      "panel-36": {
+      "panel-39": {
         "kind": "Panel",
         "spec": {
-          "id": 36,
+          "id": 39,
           "title": "By priority",
           "description": "Tickets closed in the last 7 days by priority, as recorded in the tracker.",
           "links": [],
@@ -3984,10 +4296,10 @@
           }
         }
       },
-      "panel-37": {
+      "panel-40": {
         "kind": "Panel",
         "spec": {
-          "id": 37,
+          "id": 40,
           "title": "Avg PR size",
           "description": "Average lines changed (additions plus deletions) of pull requests merged in the last 7 days.",
           "links": [],
@@ -4070,10 +4382,10 @@
           }
         }
       },
-      "panel-38": {
+      "panel-41": {
         "kind": "Panel",
         "spec": {
-          "id": 38,
+          "id": 41,
           "title": "Biggest PR",
           "description": "Most lines changed in one pull request merged in the last 7 days.",
           "links": [],
@@ -4156,10 +4468,10 @@
           }
         }
       },
-      "panel-39": {
+      "panel-42": {
         "kind": "Panel",
         "spec": {
-          "id": 39,
+          "id": 42,
           "title": "Smallest PR",
           "description": "Fewest lines changed in one pull request merged in the last 7 days.",
           "links": [],
@@ -4242,10 +4554,10 @@
           }
         }
       },
-      "panel-40": {
+      "panel-43": {
         "kind": "Panel",
         "spec": {
-          "id": 40,
+          "id": 43,
           "title": "Commits / PR",
           "description": "Average commits per pull request merged in the last 7 days.",
           "links": [],
@@ -4328,10 +4640,10 @@
           }
         }
       },
-      "panel-41": {
+      "panel-44": {
         "kind": "Panel",
         "spec": {
-          "id": 41,
+          "id": 44,
           "title": "Commit → merge time",
           "description": "PR cycle time: first commit to merge, not to production. Median days from first commit to merge for pull requests merged in the last 28 days, vs the 28 before; the first commit falls back to the PR opening time.",
           "links": [],
@@ -4414,10 +4726,10 @@
           }
         }
       },
-      "panel-42": {
+      "panel-45": {
         "kind": "Panel",
         "spec": {
-          "id": 42,
+          "id": 45,
           "title": "Change failure rate",
           "description": "Share of production deployments in the last 28 days followed, before the next production deployment, by a merged revert or hotfix PR in the same repository; the label compares with the 28 days before.",
           "links": [],
@@ -4543,10 +4855,10 @@
           }
         }
       },
-      "panel-43": {
+      "panel-46": {
         "kind": "Panel",
         "spec": {
-          "id": 43,
+          "id": 46,
           "title": "Reopened tickets",
           "description": "Share of Jira tickets first closed in the last 28 days that were reopened afterwards; the label compares with the 28 days before.",
           "links": [],
@@ -4672,10 +4984,10 @@
           }
         }
       },
-      "panel-44": {
+      "panel-47": {
         "kind": "Panel",
         "spec": {
-          "id": 44,
+          "id": 47,
           "title": "Tickets closed",
           "description": "Tickets closed in the last 7 days, newest first; cycle time runs from the first in-progress status to resolution. Epics and cancelled or invalid tickets are not counted.",
           "links": [],
@@ -4832,10 +5144,10 @@
           }
         }
       },
-      "panel-45": {
+      "panel-48": {
         "kind": "Panel",
         "spec": {
-          "id": 45,
+          "id": 48,
           "title": "Merged pull requests",
           "description": "Pull requests merged in the last 7 days, newest first. Deployed is Yes when the PR is linked to a production deployment, No when its repository deployed to production in the last 90 days but not this PR, and Unknown otherwise. AI means an AI-assisted commit.",
           "links": [],
@@ -5074,10 +5386,10 @@
           }
         }
       },
-      "panel-46": {
+      "panel-49": {
         "kind": "Panel",
         "spec": {
-          "id": 46,
+          "id": 49,
           "title": "",
           "description": "",
           "links": [],
@@ -5112,10 +5424,10 @@
           "transparent": true
         }
       },
-      "panel-47": {
+      "panel-50": {
         "kind": "Panel",
         "spec": {
-          "id": 47,
+          "id": 50,
           "title": "Contribution mix",
           "description": "Counts for the last 7 days, one row per person and project, not a verdict: there is no combined score. Reviews are review comments on other people's PRs; Verified is Jira only. People are matched by display name, so one person using different names in different tools appears as separate rows.",
           "links": [],
@@ -5282,10 +5594,10 @@
           }
         }
       },
-      "panel-48": {
+      "panel-51": {
         "kind": "Panel",
         "spec": {
-          "id": 48,
+          "id": 51,
           "title": "",
           "description": "",
           "links": [],
@@ -5320,10 +5632,10 @@
           "transparent": true
         }
       },
-      "panel-49": {
+      "panel-52": {
         "kind": "Panel",
         "spec": {
-          "id": 49,
+          "id": 52,
           "title": "Delivery over eight weeks",
           "description": "Pull requests merged and tickets closed on the left axis; successful production deployments (dashed) and staging deployments (dotted) on the right, where their smaller range would flatten against the others. Staging means a non-production environment named like staging, dev, QA, UAT, test or demo. Weekly over eight weeks; the current week is partial.",
           "links": [],
@@ -5474,10 +5786,10 @@
           }
         }
       },
-      "panel-50": {
+      "panel-53": {
         "kind": "Panel",
         "spec": {
-          "id": 50,
+          "id": 53,
           "title": "By team",
           "description": "One row per selected project, treated as a team. Counts are the last 7 days; cycle time (tickets closed) and change failure (same repository) the last 28; Open bugs counts every open bug however old. Team size is not a headcount: it counts distinct people with a merged PR, a review or a closed ticket in the last 7 days, and someone who works across two teams is counted in both. In the queue and Oldest come from Needs attention; Claude use is the share of merged-PR authors with Claude Code activity.",
           "links": [],
@@ -5812,10 +6124,10 @@
           }
         }
       },
-      "panel-51": {
+      "panel-54": {
         "kind": "Panel",
         "spec": {
-          "id": 51,
+          "id": 54,
           "title": "",
           "description": "A flaky pipeline and a genuinely broken one look the same here: the median duration beside each is the hint. A fast repeated failure is usually flake, a slow one usually is not. Runs come from CI pipelines, so this stays empty unless the CI plugin covers the project.",
           "links": [],
@@ -5850,10 +6162,10 @@
           "transparent": true
         }
       },
-      "panel-52": {
+      "panel-55": {
         "kind": "Panel",
         "spec": {
-          "id": 52,
+          "id": 55,
           "title": "",
           "description": "",
           "links": [],
@@ -5888,10 +6200,10 @@
           "transparent": true
         }
       },
-      "panel-53": {
+      "panel-56": {
         "kind": "Panel",
         "spec": {
-          "id": 53,
+          "id": 56,
           "title": "Deploys (stg/dev)",
           "description": "Successful deployments to non-production environments (staging, dev, QA, UAT, test or demo) in the last 7 days, vs the 7 before.",
           "links": [],
@@ -5974,10 +6286,10 @@
           }
         }
       },
-      "panel-54": {
+      "panel-57": {
         "kind": "Panel",
         "spec": {
-          "id": 54,
+          "id": 57,
           "title": "Failed deploy recovery",
           "description": "Median hours from a failed production deploy to the next success on the same pipeline and environment, for failures in the last 28 days, vs the 28 before. This is recovery from failed deploys, not incident restore time.",
           "links": [],
@@ -6060,10 +6372,10 @@
           }
         }
       },
-      "panel-55": {
+      "panel-58": {
         "kind": "Panel",
         "spec": {
-          "id": 55,
+          "id": 58,
           "title": "CI pass rate",
           "description": "Share of finished CI pipeline runs in the last 7 days that succeeded; cancelled and unfinished runs are not counted. The label compares with the 7 days before.",
           "links": [],
@@ -6189,10 +6501,10 @@
           }
         }
       },
-      "panel-56": {
+      "panel-59": {
         "kind": "Panel",
         "spec": {
-          "id": 56,
+          "id": 59,
           "title": "Rollbacks",
           "description": "Production deployments in the last 28 days that shipped a different commit from the one before and one that had been shipped earlier on the same scope and environment, vs the 28 before. Re-runs of the same build are not counted.",
           "links": [],
@@ -6318,10 +6630,10 @@
           }
         }
       },
-      "panel-57": {
+      "panel-60": {
         "kind": "Panel",
         "spec": {
-          "id": 57,
+          "id": 60,
           "title": "Last prod deploy",
           "description": "The newest successful production deployment: environment, finish time and commit.",
           "links": [],
@@ -6402,10 +6714,10 @@
           }
         }
       },
-      "panel-58": {
+      "panel-61": {
         "kind": "Panel",
         "spec": {
-          "id": 58,
+          "id": 61,
           "title": "Where the time goes in a pull request",
           "description": "Median and 85th percentile hours for each stage, for PRs merged in the last 28 days; each stage counts the PRs where it is recorded. Deploy covers only PRs linked to a production deployment, and the label shows how many. The stage to fix is the one with the widest gap between the two.",
           "links": [],
@@ -6510,10 +6822,10 @@
           }
         }
       },
-      "panel-59": {
+      "panel-62": {
         "kind": "Panel",
         "spec": {
-          "id": 59,
+          "id": 62,
           "title": "CI failure %",
           "description": "Failed share of finished CI pipeline runs per week over eight weeks; cancelled and unfinished runs are not counted. The current week is partial.",
           "links": [],
@@ -6620,10 +6932,10 @@
           }
         }
       },
-      "panel-60": {
+      "panel-63": {
         "kind": "Panel",
         "spec": {
-          "id": 60,
+          "id": 63,
           "title": "Pipelines failing most, last 28 days",
           "description": "Pipelines with at least 5 runs and at least one failure in the last 28 days, most failures first (top 15). GitLab and Bitbucket runs have no pipeline name, so they are grouped per repository. A flaky pipeline and a broken one look alike here: a fast repeated failure is usually flake, a slow one usually is not.",
           "links": [],
@@ -6782,10 +7094,10 @@
           }
         }
       },
-      "panel-61": {
+      "panel-64": {
         "kind": "Panel",
         "spec": {
-          "id": 61,
+          "id": 64,
           "title": "",
           "description": "",
           "links": [],
@@ -6869,10 +7181,10 @@
           "transparent": true
         }
       },
-      "panel-62": {
+      "panel-65": {
         "kind": "Panel",
         "spec": {
-          "id": 62,
+          "id": 65,
           "title": "",
           "description": "",
           "links": [],
@@ -6907,10 +7219,10 @@
           "transparent": true
         }
       },
-      "panel-63": {
+      "panel-66": {
         "kind": "Panel",
         "spec": {
-          "id": 63,
+          "id": 66,
           "title": "Severity",
           "description": "Counts by severity. Critical: a failed production deploy with no later success, a Highest-priority open bug, or a ticket blocked for more than 7 days. High: unapproved or stale PRs, stalled tickets, reviews waiting more than 3 days and High-priority bugs. Medium: tickets not closing, scope added to the active sprint, unassigned tickets in Ready and Medium-priority bugs. Low: bugs below Medium priority and stale PRs with no activity for 30 days. Click a count for its full list.",
           "links": [],
@@ -7061,10 +7373,10 @@
           }
         }
       },
-      "panel-64": {
+      "panel-67": {
         "kind": "Panel",
         "spec": {
-          "id": 64,
+          "id": 67,
           "title": "The queue",
           "description": "The 100 most urgent items with activity in the last 90 days, most severe first and oldest first within a severity; the counts above include every item in that window. An item that matches several rules appears once, at its highest severity. Review waiting counts from the PR opening time, since the request time is not recorded. Click a category for its full list.",
           "links": [],
@@ -7287,10 +7599,10 @@
           }
         }
       },
-      "panel-65": {
+      "panel-68": {
         "kind": "Panel",
         "spec": {
-          "id": 65,
+          "id": 68,
           "title": "What these numbers mean",
           "description": "",
           "links": [],
@@ -7462,7 +7774,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-48"
+                                    "name": "panel-51"
                                   },
                                   "x": 0,
                                   "y": 0,
@@ -7475,7 +7787,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-49"
+                                    "name": "panel-52"
                                   },
                                   "x": 0,
                                   "y": 2,
@@ -7488,7 +7800,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-50"
+                                    "name": "panel-53"
                                   },
                                   "x": 0,
                                   "y": 10,
@@ -7514,7 +7826,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-27"
+                                    "name": "panel-30"
                                   },
                                   "x": 0,
                                   "y": 0,
@@ -7527,49 +7839,10 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-28"
-                                  },
-                                  "x": 0,
-                                  "y": 2,
-                                  "width": 16,
-                                  "height": 8
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-29"
-                                  },
-                                  "x": 16,
-                                  "y": 2,
-                                  "width": 8,
-                                  "height": 8
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-30"
-                                  },
-                                  "x": 0,
-                                  "y": 10,
-                                  "width": 24,
-                                  "height": 12
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
                                     "name": "panel-31"
                                   },
                                   "x": 0,
-                                  "y": 22,
+                                  "y": 2,
                                   "width": 16,
                                   "height": 8
                                 }
@@ -7582,6 +7855,45 @@
                                     "name": "panel-32"
                                   },
                                   "x": 16,
+                                  "y": 2,
+                                  "width": 8,
+                                  "height": 8
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-33"
+                                  },
+                                  "x": 0,
+                                  "y": 10,
+                                  "width": 24,
+                                  "height": 12
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-34"
+                                  },
+                                  "x": 0,
+                                  "y": 22,
+                                  "width": 16,
+                                  "height": 8
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-35"
+                                  },
+                                  "x": 16,
                                   "y": 22,
                                   "width": 4,
                                   "height": 4
@@ -7592,7 +7904,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-33"
+                                    "name": "panel-36"
                                   },
                                   "x": 20,
                                   "y": 22,
@@ -7618,7 +7930,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-52"
+                                    "name": "panel-55"
                                   },
                                   "x": 0,
                                   "y": 0,
@@ -7631,48 +7943,9 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-53"
-                                  },
-                                  "x": 0,
-                                  "y": 2,
-                                  "width": 5,
-                                  "height": 4
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-54"
-                                  },
-                                  "x": 5,
-                                  "y": 2,
-                                  "width": 5,
-                                  "height": 4
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-55"
-                                  },
-                                  "x": 10,
-                                  "y": 2,
-                                  "width": 5,
-                                  "height": 4
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
                                     "name": "panel-56"
                                   },
-                                  "x": 15,
+                                  "x": 0,
                                   "y": 2,
                                   "width": 5,
                                   "height": 4
@@ -7685,6 +7958,45 @@
                                     "kind": "ElementReference",
                                     "name": "panel-57"
                                   },
+                                  "x": 5,
+                                  "y": 2,
+                                  "width": 5,
+                                  "height": 4
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-58"
+                                  },
+                                  "x": 10,
+                                  "y": 2,
+                                  "width": 5,
+                                  "height": 4
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-59"
+                                  },
+                                  "x": 15,
+                                  "y": 2,
+                                  "width": 5,
+                                  "height": 4
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-60"
+                                  },
                                   "x": 20,
                                   "y": 2,
                                   "width": 4,
@@ -7696,7 +8008,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-58"
+                                    "name": "panel-61"
                                   },
                                   "x": 0,
                                   "y": 6,
@@ -7709,7 +8021,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-59"
+                                    "name": "panel-62"
                                   },
                                   "x": 12,
                                   "y": 6,
@@ -7722,7 +8034,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-51"
+                                    "name": "panel-54"
                                   },
                                   "x": 0,
                                   "y": 14,
@@ -7735,7 +8047,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-60"
+                                    "name": "panel-63"
                                   },
                                   "x": 0,
                                   "y": 16,
@@ -7761,7 +8073,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-34"
+                                    "name": "panel-37"
                                   },
                                   "x": 0,
                                   "y": 0,
@@ -7774,7 +8086,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-35"
+                                    "name": "panel-38"
                                   },
                                   "x": 0,
                                   "y": 2,
@@ -7787,7 +8099,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-36"
+                                    "name": "panel-39"
                                   },
                                   "x": 6,
                                   "y": 2,
@@ -7800,48 +8112,9 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-37"
-                                  },
-                                  "x": 12,
-                                  "y": 2,
-                                  "width": 3,
-                                  "height": 4
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-38"
-                                  },
-                                  "x": 15,
-                                  "y": 2,
-                                  "width": 3,
-                                  "height": 4
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-39"
-                                  },
-                                  "x": 18,
-                                  "y": 2,
-                                  "width": 3,
-                                  "height": 4
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
                                     "name": "panel-40"
                                   },
-                                  "x": 21,
+                                  "x": 12,
                                   "y": 2,
                                   "width": 3,
                                   "height": 4
@@ -7854,6 +8127,45 @@
                                     "kind": "ElementReference",
                                     "name": "panel-41"
                                   },
+                                  "x": 15,
+                                  "y": 2,
+                                  "width": 3,
+                                  "height": 4
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-42"
+                                  },
+                                  "x": 18,
+                                  "y": 2,
+                                  "width": 3,
+                                  "height": 4
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-43"
+                                  },
+                                  "x": 21,
+                                  "y": 2,
+                                  "width": 3,
+                                  "height": 4
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-44"
+                                  },
                                   "x": 12,
                                   "y": 6,
                                   "width": 4,
@@ -7865,7 +8177,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-42"
+                                    "name": "panel-45"
                                   },
                                   "x": 16,
                                   "y": 6,
@@ -7878,7 +8190,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-43"
+                                    "name": "panel-46"
                                   },
                                   "x": 20,
                                   "y": 6,
@@ -7891,7 +8203,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-44"
+                                    "name": "panel-47"
                                   },
                                   "x": 0,
                                   "y": 10,
@@ -7904,7 +8216,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-45"
+                                    "name": "panel-48"
                                   },
                                   "x": 0,
                                   "y": 18,
@@ -7930,7 +8242,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-46"
+                                    "name": "panel-49"
                                   },
                                   "x": 0,
                                   "y": 0,
@@ -7943,7 +8255,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-47"
+                                    "name": "panel-50"
                                   },
                                   "x": 0,
                                   "y": 2,
@@ -8060,7 +8372,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-15"
+                                    "name": "panel-17"
                                   },
                                   "x": 0,
                                   "y": 0,
@@ -8073,35 +8385,9 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-16"
-                                  },
-                                  "x": 0,
-                                  "y": 2,
-                                  "width": 6,
-                                  "height": 4
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "panel-17"
-                                  },
-                                  "x": 6,
-                                  "y": 2,
-                                  "width": 6,
-                                  "height": 4
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
                                     "name": "panel-18"
                                   },
-                                  "x": 12,
+                                  "x": 0,
                                   "y": 2,
                                   "width": 6,
                                   "height": 4
@@ -8114,7 +8400,7 @@
                                     "kind": "ElementReference",
                                     "name": "panel-19"
                                   },
-                                  "x": 18,
+                                  "x": 6,
                                   "y": 2,
                                   "width": 6,
                                   "height": 4
@@ -8127,10 +8413,10 @@
                                     "kind": "ElementReference",
                                     "name": "panel-20"
                                   },
-                                  "x": 0,
-                                  "y": 6,
-                                  "width": 8,
-                                  "height": 8
+                                  "x": 12,
+                                  "y": 2,
+                                  "width": 6,
+                                  "height": 4
                                 }
                               },
                               {
@@ -8140,10 +8426,36 @@
                                     "kind": "ElementReference",
                                     "name": "panel-21"
                                   },
+                                  "x": 18,
+                                  "y": 2,
+                                  "width": 6,
+                                  "height": 4
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-15"
+                                  },
+                                  "x": 0,
+                                  "y": 6,
+                                  "width": 8,
+                                  "height": 9
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-16"
+                                  },
                                   "x": 8,
                                   "y": 6,
                                   "width": 8,
-                                  "height": 8
+                                  "height": 9
                                 }
                               },
                               {
@@ -8156,7 +8468,7 @@
                                   "x": 16,
                                   "y": 6,
                                   "width": 8,
-                                  "height": 8
+                                  "height": 9
                                 }
                               },
                               {
@@ -8167,8 +8479,8 @@
                                     "name": "panel-23"
                                   },
                                   "x": 0,
-                                  "y": 14,
-                                  "width": 16,
+                                  "y": 15,
+                                  "width": 8,
                                   "height": 8
                                 }
                               },
@@ -8179,8 +8491,8 @@
                                     "kind": "ElementReference",
                                     "name": "panel-24"
                                   },
-                                  "x": 16,
-                                  "y": 14,
+                                  "x": 8,
+                                  "y": 15,
                                   "width": 8,
                                   "height": 8
                                 }
@@ -8192,10 +8504,10 @@
                                     "kind": "ElementReference",
                                     "name": "panel-25"
                                   },
-                                  "x": 0,
-                                  "y": 22,
-                                  "width": 12,
-                                  "height": 11
+                                  "x": 16,
+                                  "y": 15,
+                                  "width": 8,
+                                  "height": 8
                                 }
                               },
                               {
@@ -8205,8 +8517,47 @@
                                     "kind": "ElementReference",
                                     "name": "panel-26"
                                   },
+                                  "x": 0,
+                                  "y": 23,
+                                  "width": 16,
+                                  "height": 8
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-27"
+                                  },
+                                  "x": 16,
+                                  "y": 23,
+                                  "width": 8,
+                                  "height": 8
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-28"
+                                  },
+                                  "x": 0,
+                                  "y": 31,
+                                  "width": 12,
+                                  "height": 11
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "panel-29"
+                                  },
                                   "x": 12,
-                                  "y": 22,
+                                  "y": 31,
                                   "width": 12,
                                   "height": 11
                                 }
@@ -8229,7 +8580,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-62"
+                                    "name": "panel-65"
                                   },
                                   "x": 0,
                                   "y": 0,
@@ -8242,7 +8593,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-61"
+                                    "name": "panel-64"
                                   },
                                   "x": 0,
                                   "y": 2,
@@ -8255,7 +8606,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-63"
+                                    "name": "panel-66"
                                   },
                                   "x": 0,
                                   "y": 4,
@@ -8268,7 +8619,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-64"
+                                    "name": "panel-67"
                                   },
                                   "x": 0,
                                   "y": 8,
@@ -8281,7 +8632,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "panel-65"
+                                    "name": "panel-68"
                                   },
                                   "x": 0,
                                   "y": 22,
