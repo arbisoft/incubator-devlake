@@ -28,6 +28,11 @@ import (
 // under OTEL_METRICS_INCLUDE_REPOSITORY.
 const repositoryURLAttribute = "vcs.repository.url.full"
 
+const (
+	headRevisionAttribute = "vcs.ref.head.revision"
+	headNameAttribute     = "vcs.ref.head.name"
+)
+
 // repositoryURLSchemes maps the remote schemes kept to the scheme stored. SSH and git
 // remotes name the same repository as its https URL, which is what repos.url holds.
 var repositoryURLSchemes = map[string]string{

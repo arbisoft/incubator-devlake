@@ -650,6 +650,618 @@
       ],
       "title": "Mode Transitions",
       "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 21
+      },
+      "id": 34,
+      "panels": [],
+      "title": "Trends",
+      "type": "row"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Prompts in each completed week by the permission mode in effect, taken from the prompt's own tool decisions or, failing that, the latest earlier one in the session. Inferred counts prompts whose mode had to be guessed because no tool decision reported one. Prompts that made no model request are left out.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.4,
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "percent"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Auto"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Agentic"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Accept Edits"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Plan"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Bypass Permissions"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Other"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Inferred"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#8e8e8e",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 22
+      },
+      "id": 35,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Completed Monday-start UTC weeks only; inferred modes are counted apart from observed ones.\nWITH RECURSIVE wk AS (\n  SELECT DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY) AS d\n  UNION ALL\n  SELECT DATE_ADD(d, INTERVAL 7 DAY) FROM wk WHERE DATE_ADD(d, INTERVAL 7 DAY) < $__timeTo()\n),\nweeks AS (\n  SELECT DATE_FORMAT(d, '%Y-%m-%d') AS week FROM wk\n  WHERE TIMESTAMP(d) >= $__timeFrom() AND TIMESTAMP(DATE_ADD(d, INTERVAL 7 DAY)) <= DATE_ADD($__timeTo(), INTERVAL 1 SECOND)\n),\nm AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(p.started_at), INTERVAL WEEKDAY(p.started_at) DAY), '%Y-%m-%d') AS week,\n    CASE WHEN p.permission_mode_inferred THEN 'Inferred'\n      WHEN p.permission_mode = 'default' THEN 'Agentic'\n      WHEN p.permission_mode = 'auto' THEN 'Auto'\n      WHEN p.permission_mode = 'plan' THEN 'Plan'\n      WHEN p.permission_mode = 'acceptEdits' THEN 'Accept Edits'\n      WHEN p.permission_mode = 'bypassPermissions' THEN 'Bypass Permissions'\n      ELSE 'Other' END AS mode,\n    COUNT(*) AS prompts\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n    AND p.models_used <> ''\n  GROUP BY 1, 2\n)\nSELECT TIMESTAMP(w.week) + INTERVAL 84 HOUR AS \"time\",\n  SUM(CASE WHEN m.mode = 'Auto' THEN m.prompts ELSE 0 END) AS \"Auto\",\n  SUM(CASE WHEN m.mode = 'Agentic' THEN m.prompts ELSE 0 END) AS \"Agentic\",\n  SUM(CASE WHEN m.mode = 'Accept Edits' THEN m.prompts ELSE 0 END) AS \"Accept Edits\",\n  SUM(CASE WHEN m.mode = 'Plan' THEN m.prompts ELSE 0 END) AS \"Plan\",\n  SUM(CASE WHEN m.mode = 'Bypass Permissions' THEN m.prompts ELSE 0 END) AS \"Bypass Permissions\",\n  SUM(CASE WHEN m.mode = 'Other' THEN m.prompts ELSE 0 END) AS \"Other\",\n  SUM(CASE WHEN m.mode = 'Inferred' THEN m.prompts ELSE 0 END) AS \"Inferred\"\nFROM weeks w\nLEFT JOIN m ON m.week = w.week\nGROUP BY w.week\nORDER BY 1\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Permission Mode Mix (Weekly)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Tool permission decisions in each completed week (bars, left axis). Config means settings, the active permission mode or the auto-mode classifier decided without asking; Human means a person answered the permission prompt. The line is the share a person decided (right axis). Users whose clients send no logs are left out.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.4,
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Config accepted"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Config rejected"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Human accepted"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Human rejected"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Human-decided share"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "custom.drawStyle",
+                "value": "line"
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "always"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.lineInterpolation",
+                "value": "smooth"
+              },
+              {
+                "id": "custom.stacking",
+                "value": {
+                  "mode": "none",
+                  "group": "B"
+                }
+              },
+              {
+                "id": "max",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 22
+      },
+      "id": 36,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Completed Monday-start UTC weeks only; decisions count on the day their prompt started.\nWITH RECURSIVE wk AS (\n  SELECT DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY) AS d\n  UNION ALL\n  SELECT DATE_ADD(d, INTERVAL 7 DAY) FROM wk WHERE DATE_ADD(d, INTERVAL 7 DAY) < $__timeTo()\n),\nweeks AS (\n  SELECT DATE_FORMAT(d, '%Y-%m-%d') AS week FROM wk\n  WHERE TIMESTAMP(d) >= $__timeFrom() AND TIMESTAMP(DATE_ADD(d, INTERVAL 7 DAY)) <= DATE_ADD($__timeTo(), INTERVAL 1 SECOND)\n),\nd AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(t.started_at), INTERVAL WEEKDAY(t.started_at) DAY), '%Y-%m-%d') AS week,\n    SUM(t.config_accept_count) AS config_accept, SUM(t.config_reject_count) AS config_reject,\n    SUM(t.user_accept_count) AS user_accept, SUM(t.user_reject_count) AS user_reject\n  FROM ai_prompt_tools t\n  JOIN ai_prompts p ON p.id = t.ai_prompt_id\n  WHERE $__timeFilter(t.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n  GROUP BY 1\n)\nSELECT TIMESTAMP(w.week) + INTERVAL 84 HOUR AS \"time\",\n  COALESCE(d.config_accept, 0) AS \"Config accepted\",\n  COALESCE(d.config_reject, 0) AS \"Config rejected\",\n  COALESCE(d.user_accept, 0) AS \"Human accepted\",\n  COALESCE(d.user_reject, 0) AS \"Human rejected\",\n  (d.user_accept + d.user_reject) / NULLIF(d.config_accept + d.config_reject + d.user_accept + d.user_reject, 0) AS \"Human-decided share\"\nFROM weeks w\nLEFT JOIN d ON d.week = w.week\nORDER BY 1\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Approval Source (Weekly)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "mysql",
+      "description": "Average estimated cost per prompt in each completed week, by the effort level the prompt's requests reported. N/A means no request reported one. Prompts that made no model request are left out.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 2,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "currencyUSD"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Low"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Medium"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "High"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "XHigh"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Max"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "N/A"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "text",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 31
+      },
+      "id": 37,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "13.2.2",
+      "targets": [
+        {
+          "datasource": "mysql",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Completed Monday-start UTC weeks only; prompts that made no model request are left out.\nWITH RECURSIVE wk AS (\n  SELECT DATE_SUB(DATE($__timeFrom()), INTERVAL WEEKDAY($__timeFrom()) DAY) AS d\n  UNION ALL\n  SELECT DATE_ADD(d, INTERVAL 7 DAY) FROM wk WHERE DATE_ADD(d, INTERVAL 7 DAY) < $__timeTo()\n),\nweeks AS (\n  SELECT DATE_FORMAT(d, '%Y-%m-%d') AS week FROM wk\n  WHERE TIMESTAMP(d) >= $__timeFrom() AND TIMESTAMP(DATE_ADD(d, INTERVAL 7 DAY)) <= DATE_ADD($__timeTo(), INTERVAL 1 SECOND)\n),\ne AS (\n  SELECT DATE_FORMAT(DATE_SUB(DATE(p.started_at), INTERVAL WEEKDAY(p.started_at) DAY), '%Y-%m-%d') AS week,\n    CASE p.effort WHEN 'low' THEN 'Low' WHEN 'medium' THEN 'Medium' WHEN 'high' THEN 'High' WHEN 'xhigh' THEN 'XHigh' WHEN 'max' THEN 'Max' ELSE 'N/A' END AS effort,\n    SUM(p.estimated_cost_usd) AS cost, COUNT(*) AS prompts\n  FROM ai_prompts p\n  WHERE $__timeFilter(p.started_at)\n    AND p.source_connection_id IN (SELECT c_g.id FROM _tool_claude_code_otel_connections c_g JOIN _tool_claude_code_otel_connection_projects cp_g ON cp_g.connection_id = c_g.id JOIN user_project_mapping upm_g ON upm_g.project_name = cp_g.project_name WHERE c_g.team_slug REGEXP '^(${otel_teams:regex})$' AND cp_g.project_name REGEXP '^(${project:regex})$' AND upm_g.user_login = ${__user.login:sqlstring})\n    AND COALESCE(NULLIF(p.user_email, ''), p.user_key) IN (${user:sqlstring})\n    AND COALESCE(p.repository_url, 'Unknown') IN (${repository:sqlstring})\n    AND p.models_used <> ''\n  GROUP BY 1, 2\n)\nSELECT TIMESTAMP(w.week) + INTERVAL 84 HOUR AS \"time\",\n  SUM(CASE WHEN e.effort = 'Low' THEN e.cost END) / SUM(CASE WHEN e.effort = 'Low' THEN e.prompts END) AS \"Low\",\n  SUM(CASE WHEN e.effort = 'Medium' THEN e.cost END) / SUM(CASE WHEN e.effort = 'Medium' THEN e.prompts END) AS \"Medium\",\n  SUM(CASE WHEN e.effort = 'High' THEN e.cost END) / SUM(CASE WHEN e.effort = 'High' THEN e.prompts END) AS \"High\",\n  SUM(CASE WHEN e.effort = 'XHigh' THEN e.cost END) / SUM(CASE WHEN e.effort = 'XHigh' THEN e.prompts END) AS \"XHigh\",\n  SUM(CASE WHEN e.effort = 'Max' THEN e.cost END) / SUM(CASE WHEN e.effort = 'Max' THEN e.prompts END) AS \"Max\",\n  SUM(CASE WHEN e.effort = 'N/A' THEN e.cost END) / SUM(CASE WHEN e.effort = 'N/A' THEN e.prompts END) AS \"N/A\"\nFROM weeks w\nLEFT JOIN e ON e.week = w.week\nGROUP BY w.week\nORDER BY 1\n",
+          "refId": "A"
+        }
+      ],
+      "title": "Cost per Prompt by Effort (Weekly)",
+      "type": "timeseries"
     }
   ],
   "preload": false,

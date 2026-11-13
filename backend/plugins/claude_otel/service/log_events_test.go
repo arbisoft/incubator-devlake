@@ -428,6 +428,8 @@ func TestPrepareEventsStoresOnlyAllowlistedAttributes(t *testing.T) {
 		setStringAttribute(record, "hook_matcher", "content from a future release")
 		setStringAttribute(record, "permission_mode", "auto")
 		setStringAttribute(record, "hook_name", "PreToolUse:Bash")
+		setStringAttribute(record, "vcs.ref.head.revision", "0123456789abcdef0123456789abcdef01234567")
+		setStringAttribute(record, "vcs.ref.head.name", "feat/x")
 	}
 	database := newConnectionLookup(t, map[string]*models.OtelConnection{"platform": {TeamSlug: "platform"}})
 
@@ -448,7 +450,7 @@ func TestPrepareEventsStoresOnlyAllowlistedAttributes(t *testing.T) {
 		if _, kept := attributes["event.sequence"]; !kept {
 			t.Fatalf("%s attributes = %v, want allowlisted attributes kept", item.event.EventName, attributes)
 		}
-		for _, key := range []string{"permission_mode", "hook_name"} {
+		for _, key := range []string{"permission_mode", "hook_name", "vcs.ref.head.revision", "vcs.ref.head.name"} {
 			if _, kept := attributes[key]; !kept {
 				t.Fatalf("%s attributes = %v, want %s kept", item.event.EventName, attributes, key)
 			}
@@ -1017,6 +1019,7 @@ func TestPromptBuilderApplyEffort(t *testing.T) {
 	}{
 		{"main thread after background", []request{{"generate_session_title", "low"}, {mainThreadQuerySource, "high"}, {mainThreadQuerySource, "max"}}, "high"},
 		{"main thread before background", []request{{mainThreadQuerySource, "xhigh"}, {"generate_session_title", "low"}}, "xhigh"},
+		{"headless main thread after subagent", []request{{"agent:custom", "low"}, {sdkQuerySource, "high"}}, "high"},
 		{"background only", []request{{"generate_session_title", "low"}, {"away_summary", "medium"}}, "low"},
 		{"main thread without effort", []request{{mainThreadQuerySource, ""}, {"away_summary", "medium"}}, "medium"},
 		{"no query source", []request{{"", "medium"}}, "medium"},

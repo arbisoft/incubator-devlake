@@ -21,10 +21,14 @@ import (
 	"database/sql"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/apache/incubator-devlake/core/dal"
+	"github.com/apache/incubator-devlake/core/models/domainlayer/code"
+	"github.com/apache/incubator-devlake/core/models/domainlayer/ticket"
+	coremigrations "github.com/apache/incubator-devlake/core/models/migrationscripts"
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/helpers/e2ehelper"
 	contextimpl "github.com/apache/incubator-devlake/impls/context"
@@ -106,5 +110,99 @@ func TestHourlyAttributionMigrationIsRerunnableAndMatchesModels(t *testing.T) {
 			"SELECT COLUMN_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND CONSTRAINT_NAME = 'PRIMARY' ORDER BY ORDINAL_POSITION",
 			table).Scan(&got).Error)
 		require.Equal(t, want, got, table)
+	}
+}
+
+func TestPromptToolsAndSessionHooksMigrationIsRerunnable(t *testing.T) {
+	tester := e2ehelper.NewDataFlowTester(t, "claude_otel", impl.ClaudeOtel{})
+	basicRes := contextimpl.NewDefaultBasicRes(tester.Cfg, tester.Log, tester.Dal)
+	var script plugin.MigrationScript
+	for _, candidate := range coremigrations.All() {
+		if candidate.Version() == 20261111120000 {
+			script = candidate
+		}
+	}
+	require.NotNil(t, script, "core migration 20261111120000 is not registered")
+	require.NoError(t, script.Up(basicRes))
+	require.NoError(t, script.Up(basicRes), "a rerun must succeed")
+	for _, table := range []string{"ai_prompt_tools", "ai_session_hooks"} {
+		require.True(t, tester.Dal.HasTable(table), table)
+	}
+	for _, column := range []string{"hook_count", "hook_block_count", "hook_error_count", "hook_duration_ms", "idle_before_seconds", "first_request_context_tokens", "first_request_cost_usd"} {
+		require.True(t, tester.Dal.HasColumn("ai_prompts", column), column)
+	}
+}
+
+func TestAiCommitsMigrationIsRerunnable(t *testing.T) {
+	tester := e2ehelper.NewDataFlowTester(t, "claude_otel", impl.ClaudeOtel{})
+	basicRes := contextimpl.NewDefaultBasicRes(tester.Cfg, tester.Log, tester.Dal)
+	var script plugin.MigrationScript
+	for _, candidate := range coremigrations.All() {
+		if candidate.Version() == 20261113120000 {
+			script = candidate
+		}
+	}
+	require.NotNil(t, script, "core migration 20261113120000 is not registered")
+	require.NoError(t, script.Up(basicRes))
+	require.NoError(t, script.Up(basicRes), "a rerun must succeed")
+	require.True(t, tester.Dal.HasTable("ai_commits"))
+	for _, column := range []string{"commit_sha", "branch_name", "prompt_id", "first_seen_at", "repository_url"} {
+		require.True(t, tester.Dal.HasColumn("ai_commits", column), column)
+	}
+}
+
+func TestDashboardDateIndexesMigrationIsRerunnable(t *testing.T) {
+	tester := e2ehelper.NewDataFlowTester(t, "claude_otel", impl.ClaudeOtel{})
+	basicRes := contextimpl.NewDefaultBasicRes(tester.Cfg, tester.Log, tester.Dal)
+	var script plugin.MigrationScript
+	for _, candidate := range coremigrations.All() {
+		if candidate.Version() == 20261113130000 {
+			script = candidate
+		}
+	}
+	require.NotNil(t, script, "core migration 20261113130000 is not registered")
+
+	indexes := map[string]string{
+		"commits":          "idx_commits_authored_date",
+		"repo_commits":     "idx_repo_commits_commit_sha",
+		"issue_changelogs": "idx_issue_changelogs_created_date",
+	}
+	hasIndex := func(table, index string) bool {
+		var count int
+		require.NoError(t, tester.Db.Raw(
+			"SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?",
+			table, index).Row().Scan(&count))
+		return count > 0
+	}
+	createTable := func(table string) string {
+		var name, ddl string
+		require.NoError(t, tester.Db.Raw("SHOW CREATE TABLE "+table).Row().Scan(&name, &ddl))
+		return ddl
+	}
+	require.NoError(t, tester.Dal.AutoMigrate(&code.Commit{}))
+	require.NoError(t, tester.Dal.AutoMigrate(&code.RepoCommit{}))
+	require.NoError(t, tester.Dal.AutoMigrate(&ticket.IssueChangelogs{}))
+
+	before := map[string]string{}
+	for table, index := range indexes {
+		if hasIndex(table, index) {
+			require.NoError(t, tester.Dal.Exec("DROP INDEX "+index+" ON "+table))
+		}
+		before[table] = createTable(table)
+	}
+
+	require.NoError(t, script.Up(basicRes))
+	require.NoError(t, script.Up(basicRes), "a rerun must succeed")
+
+	for table, index := range indexes {
+		require.True(t, hasIndex(table, index), "%s.%s", table, index)
+		var kept []string
+		for _, line := range strings.Split(createTable(table), "\n") {
+			if !strings.Contains(line, index) {
+				kept = append(kept, line)
+			}
+		}
+		// Dropping the index line can leave a dangling comma on the last key line.
+		require.Equal(t, strings.ReplaceAll(before[table], ",\n)", "\n)"), strings.ReplaceAll(strings.Join(kept, "\n"), ",\n)", "\n)"), table)
 	}
 }

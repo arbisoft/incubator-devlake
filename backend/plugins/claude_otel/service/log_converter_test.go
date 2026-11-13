@@ -147,6 +147,8 @@ func TestRollupSessionWithoutSessionIDSkipsModeQueries(t *testing.T) {
 	}).Return(nil).Once()
 	tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptSkill"), mock.Anything).Return(nil).Once()
 	tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptFailure"), mock.Anything).Return(nil).Once()
+	tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptTool"), mock.Anything).Return(nil).Once()
+	tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiCommit"), mock.Anything).Return(nil).Once()
 	expectStoredAccount(tx, &crossdomain.Account{})
 
 	target := &sessionTarget{connectionID: 1, userKey: "uuid:u1", promptIDs: map[string]struct{}{"p1": {}}}
@@ -181,6 +183,8 @@ func TestRollupSessionLoadsAndWritesModesOnlyWhenNeeded(t *testing.T) {
 			tx.EXPECT().CreateOrUpdate(mock.AnythingOfType("*ai.AiPrompt")).Return(nil).Once()
 			tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptSkill"), mock.Anything).Return(nil).Once()
 			tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptFailure"), mock.Anything).Return(nil).Once()
+			tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptTool"), mock.Anything).Return(nil).Once()
+			tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiCommit"), mock.Anything).Return(nil).Once()
 			expectStoredAccount(tx, &crossdomain.Account{})
 			if modeChanged {
 				tx.EXPECT().CreateOrUpdate(mock.AnythingOfType("*ai.AiPermissionModeChange")).Return(nil).Once()
@@ -645,7 +649,7 @@ func TestWritePromptRollupReplacesFailures(t *testing.T) {
 		}
 		return rows
 	}
-	full, overflow := promptFailureInsertBatchSize, promptFailureInsertBatchSize+1
+	full, overflow := rollupInsertBatchSize, rollupInsertBatchSize+1
 	for _, test := range []struct {
 		name      string
 		failures  []*ai.AiPromptFailure
@@ -672,6 +676,10 @@ func TestWritePromptRollupReplacesFailures(t *testing.T) {
 				}
 				calls = append(calls, "clear")
 			}).Return(test.clearErr).Once()
+			if test.clearErr == nil && test.writeErr == nil {
+				tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiPromptTool"), mock.Anything).Return(nil).Once()
+				tx.EXPECT().Delete(mock.AnythingOfType("*ai.AiCommit"), mock.Anything).Return(nil).Once()
+			}
 			for range test.wantCalls[1:] {
 				tx.EXPECT().Create(mock.AnythingOfType("[]*ai.AiPromptFailure")).Run(func(entity interface{}, _ ...dal.Clause) {
 					batch := entity.([]*ai.AiPromptFailure)
