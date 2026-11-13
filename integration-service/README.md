@@ -104,7 +104,7 @@ Rejected, expired and unreadable messages go to `<queue>.dead` through the `<que
 
 `GET /api/v1/engineers/{email}/stats?tf=24h` and `POST /api/v1/engineers/stats/batch` (body `{ "emails": [...], "timeFrame": "24h" }`, up to 20 emails) need the `stats:read` scope. Both are asynchronous: they log the request, queue it and return a `correlation_id` at once, and the result is posted later to the client's callback URL.
 
-- **Time frame:** a whole number and a case-sensitive unit: `h`, `d`, `w`, `M` (30 days) or `y` (365 days), for example `24h`, `1w`, `30d`, `11M`, `1y`. The longest is one year.
+- **Time frame:** a whole number from 1 to 999 and a case-sensitive unit: `h`, `d`, `w`, `M` or `y`, for example `24h`, `1w`, `30d`, `11M`, `1y`. The longest is one year (for that check a month counts as 30 days and a year as 365). The window itself counts back from when the request was made, in calendar months and years, the way DevLake does.
 - **Date range:** instead of `tf`, the single-email API takes `from` and `to`, for example `GET /api/v1/engineers/{email}/stats?from=2026-11-01T00:00:00Z&to=2026-11-08T00:00:00Z`. Give a time frame or a range, never both, and always both ends of a range. Timestamps are ISO 8601 with a time and an explicit offset (`Z` or `+05:00`; write the `+` as `%2B` in a URL). A date with no time or offset is rejected because it would depend on a time zone. They are converted to UTC at second precision, `from` must be earlier than `to`, and the range can be at most one year. The queued request carries `from` and `to` instead of `time_frame`.
 - **Emails** are trimmed and lower-cased, and must be in an allowed domain. Raw emails are never written to logs or error responses.
 - **No callback URL:** when the client has no active outbound URL for the event type (`engineer-stats` or `engineer-stats-batch`), the request is logged as `Revoked - no callback URL`, nothing is queued, and the API answers 422 with that reason in `error`.
@@ -142,6 +142,8 @@ The callback body (Sophia has not specified one):
 {
   "correlation_id": "0b8f3c52-...",
   "time_frame": "24h",
+  "from": "2026-11-12T09:30:00Z",
+  "to": "2026-11-13T09:30:00Z",
   "engineers": [
     {
       "email": "jane@arbisoft.com",
@@ -158,7 +160,7 @@ The callback body (Sophia has not specified one):
 }
 ```
 
-A range request has `from` and `to` instead of `time_frame`. Each source holds the stats of every email as DevLake returned them. A batch has one entry per engineer.
+`from` and `to` are the window the stats cover. A time frame is counted back from when the client sent the request (`requested_on`), not from when the job gets to it, so a request that waited in the queue or was retried still covers the window the client meant, and every DevLake call for it asks for that same `from`/`to`. Months and years are calendar steps, worked out exactly as DevLake works out its own `tf` window (Go's `AddDate`: 31 March minus one month is 3 March). A range request has `from` and `to` and no `time_frame`. Each source holds the stats of every email as DevLake returned them. A batch has one entry per engineer.
 
 `errors` lists every call DevLake refused for that engineer (a 4xx, or an answer that is not JSON, which has no `status`): that email is missing from that source, and everything else is still delivered, so one bad mapped email no longer costs the engineer's other stats or the rest of a batch. It is an empty array when everything was collected. The `error` text names the status only, never DevLake's answer.
 

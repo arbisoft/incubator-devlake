@@ -94,4 +94,33 @@ public readonly record struct TimeFrame
         error = null;
         return true;
     }
+
+    /// <summary>
+    /// The window this time frame covers when counted back from <paramref name="end"/>, in UTC and at whole seconds: <c>[from, to)</c> with
+    /// <c>to</c> = <paramref name="end"/>. It follows DevLake's own rule (<c>TimeFrame.Window</c> in Go) exactly, so a request resolved here
+    /// covers the window DevLake would have used at that moment: hours are hours, but days, weeks, months and years are calendar steps, and
+    /// a day that does not exist in the target month rolls over the way Go's <c>AddDate</c> does (31 March minus one month is 3 March).
+    /// </summary>
+    public (DateTimeOffset From, DateTimeOffset To) WindowEndingAt(DateTimeOffset end)
+    {
+        var utc = end.ToUniversalTime();
+        var to = new DateTimeOffset(utc.Ticks - (utc.Ticks % TimeSpan.TicksPerSecond), TimeSpan.Zero);
+        var from = Unit switch
+        {
+            'h' => to.AddHours(-Value),
+            'd' => AddDate(to, 0, 0, -Value),
+            'w' => AddDate(to, 0, 0, -7 * Value),
+            'M' => AddDate(to, 0, -Value, 0),
+            _ => AddDate(to, -Value, 0, 0)
+        };
+        return (from, to);
+    }
+
+    /// <summary>Go's <c>time.AddDate</c>: the year and month are moved first and the day is kept, then an out-of-range day rolls into the next month.</summary>
+    private static DateTimeOffset AddDate(DateTimeOffset instant, int years, int months, int days)
+    {
+        var totalMonths = ((instant.Year + years) * 12) + (instant.Month - 1) + months;
+        var firstOfMonth = new DateTimeOffset(totalMonths / 12, (totalMonths % 12) + 1, 1, 0, 0, 0, TimeSpan.Zero);
+        return firstOfMonth.AddDays(instant.Day - 1 + days) + instant.TimeOfDay;
+    }
 }

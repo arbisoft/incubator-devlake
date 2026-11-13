@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
@@ -106,11 +107,14 @@ public sealed class ProcessingEndToEndTests : ApiTestBase
 
         var statsCalls = _upstream.DevLakeStatsRequests.ToList();
         Assert.Equal(8, statsCalls.Count);
+        var from = body.GetProperty("from").GetString();
+        var to = body.GetProperty("to").GetString();
+        Assert.Equal(TimeSpan.FromHours(24), DateTimeOffset.Parse(to!, CultureInfo.InvariantCulture) - DateTimeOffset.Parse(from!, CultureInfo.InvariantCulture));
         Assert.All(statsCalls, call =>
         {
             Assert.Equal("Bearer token", call.Authorization);
             Assert.Equal(request.Correlation, call.CorrelationId);
-            Assert.EndsWith("?tf=24h", call.AbsoluteUri, StringComparison.Ordinal);
+            Assert.EndsWith($"?from={Uri.EscapeDataString(from!)}&to={Uri.EscapeDataString(to!)}", call.AbsoluteUri, StringComparison.Ordinal);
         });
 
         var log = (await Seed.LogAsync(request.Correlation))!;

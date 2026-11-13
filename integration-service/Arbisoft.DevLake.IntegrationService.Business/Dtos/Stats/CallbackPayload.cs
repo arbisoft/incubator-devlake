@@ -18,8 +18,8 @@ using System.Text.Json.Serialization;
 namespace Arbisoft.DevLake.IntegrationService.Business.Dtos.Stats;
 
 /// <summary>
-/// The body posted to a client's callback API: the request's correlation ID, the period it covered (a <c>time_frame</c>, or <c>from</c> and
-/// <c>to</c> for a range) and one entry per engineer. A single-email request has one entry, a batch has one for every email.
+/// The body posted to a client's callback API: the request's correlation ID, the window the stats cover (<c>from</c> and <c>to</c>, plus the
+/// <c>time_frame</c> it was asked as, if it was) and one entry per engineer. A single-email request has one entry, a batch has one for every email.
 /// </summary>
 public sealed record CallbackPayload(
     [property: JsonPropertyName("correlation_id")] string CorrelationId,

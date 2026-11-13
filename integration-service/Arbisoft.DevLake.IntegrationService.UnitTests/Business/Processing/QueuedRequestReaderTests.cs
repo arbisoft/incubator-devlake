@@ -29,7 +29,17 @@ public class QueuedRequestReaderTests
         Assert.Null(error);
         Assert.Equal("c1", readable!.Request.CorrelationId);
         Assert.Equal(["jane@arbisoft.com"], readable.Request.Emails);
-        Assert.Equal("tf=24h", readable.Query.ToQueryString());
+    }
+
+    /// <summary>The time frame counts back from when the client asked, so a request that waited or was retried covers the window the client meant.</summary>
+    [Fact]
+    public void ATimeFrame_IsResolvedToARange_EndingWhenTheRequestWasMade()
+    {
+        Assert.True(QueuedRequestReader.TryRead(Single, out var readable, out _));
+
+        Assert.Equal(new DateTimeOffset(2026, 11, 10, 12, 0, 0, TimeSpan.Zero), readable!.From);
+        Assert.Equal(new DateTimeOffset(2026, 11, 11, 12, 0, 0, TimeSpan.Zero), readable.To);
+        Assert.Equal("from=2026-11-10T12%3A00%3A00Z&to=2026-11-11T12%3A00%3A00Z", readable.Query.ToQueryString());
     }
 
     [Fact]

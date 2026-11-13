@@ -247,7 +247,12 @@ public sealed class RequestWorker : IRequestWorker
         await UpstreamFailures.AwaitAllAsync(collections);
 
         var request = readable.Request;
-        var payload = new CallbackPayload(correlationId, collections.Select(task => task.Result).ToList(), request.TimeFrame, request.From, request.To);
+        var payload = new CallbackPayload(
+            correlationId,
+            collections.Select(task => task.Result).ToList(),
+            request.TimeFrame,
+            StatsPeriod.FormatInstant(readable.From),
+            StatsPeriod.FormatInstant(readable.To));
         return JsonSerializer.Serialize(payload);
     }
 

@@ -21,7 +21,11 @@ using Arbisoft.DevLake.IntegrationService.DataAccess.ExternalApis.DevLake;
 namespace Arbisoft.DevLake.IntegrationService.Business.Services.Processing;
 
 /// <summary>A queued message that has been read and checked.</summary>
-public sealed record ReadableRequest(QueuedStatsRequest Request, StatsQuery Query);
+/// <param name="Request">The request as it was queued.</param>
+/// <param name="Query">The window to ask DevLake for. A time frame is always resolved to an explicit range.</param>
+/// <param name="From">The start of that window, in UTC.</param>
+/// <param name="To">The end of that window, in UTC.</param>
+public sealed record ReadableRequest(QueuedStatsRequest Request, StatsQuery Query, DateTimeOffset From, DateTimeOffset To);
 
 /// <summary>
 /// Reads the JSON body of a queued request. Fields it does not know are ignored, so a newer API can add fields without breaking an older job
@@ -54,8 +58,10 @@ public static class QueuedRequestReader
             return false;
         }
 
-        var query = period!.TimeFrame is { } timeFrame ? StatsQuery.ForTimeFrame(timeFrame.Text) : StatsQuery.ForRange(period.From!.Value, period.To!.Value);
-        readable = new ReadableRequest(request, query);
+        // A time frame counts back from when the client asked, not from when the job gets to it: a request that waited in the queue, or was
+        // retried, still covers the window the client meant, and every DevLake call for it uses the same window.
+        var (from, to) = period!.TimeFrame is { } timeFrame ? timeFrame.WindowEndingAt(request.RequestedOn) : (period.From!.Value, period.To!.Value);
+        readable = new ReadableRequest(request, StatsQuery.ForRange(from, to), from, to);
         return true;
     }
 }

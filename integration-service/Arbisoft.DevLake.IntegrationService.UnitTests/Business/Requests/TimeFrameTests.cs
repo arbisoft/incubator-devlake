@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using System.Globalization;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Requests;
 
 namespace Arbisoft.DevLake.IntegrationService.UnitTests.Business.Requests;
@@ -100,5 +101,39 @@ public class TimeFrameTests
         Assert.False(TimeFrame.TryParse("1000h", out _, out var error));
 
         Assert.Equal("The time frame number must be from 1 to 999.", error);
+    }
+
+    /// <summary>The expected values come from Go's <c>time.AddDate</c>, which DevLake's <c>TimeFrame.Window</c> uses, so both sides agree to the second.</summary>
+    [Theory]
+    [InlineData("1M", "2026-03-31T10:20:30Z", "2026-03-03T10:20:30Z")]
+    [InlineData("1M", "2028-03-31T10:20:30Z", "2028-03-02T10:20:30Z")]
+    [InlineData("1y", "2028-02-29T00:00:00Z", "2027-03-01T00:00:00Z")]
+    [InlineData("1M", "2026-01-31T23:59:59Z", "2025-12-31T23:59:59Z")]
+    [InlineData("3M", "2026-05-31T12:00:00Z", "2026-03-03T12:00:00Z")]
+    [InlineData("12M", "2026-11-13T12:00:00Z", "2025-11-13T12:00:00Z")]
+    [InlineData("365d", "2026-11-13T12:00:00Z", "2025-11-13T12:00:00Z")]
+    [InlineData("1w", "2026-03-01T00:00:00Z", "2026-02-22T00:00:00Z")]
+    [InlineData("24h", "2026-03-01T00:00:00Z", "2026-02-28T00:00:00Z")]
+    [InlineData("999h", "2026-11-13T12:00:00Z", "2026-10-02T21:00:00Z")]
+    public void WindowEndingAt_MatchesDevLakesWindow(string text, string end, string expectedFrom)
+    {
+        Assert.True(TimeFrame.TryParse(text, out var timeFrame, out _));
+
+        var (from, to) = timeFrame.WindowEndingAt(DateTimeOffset.Parse(end, CultureInfo.InvariantCulture));
+
+        Assert.Equal(DateTimeOffset.Parse(expectedFrom, CultureInfo.InvariantCulture), from);
+        Assert.Equal(DateTimeOffset.Parse(end, CultureInfo.InvariantCulture), to);
+    }
+
+    [Fact]
+    public void WindowEndingAt_IsInUtc_AtWholeSeconds()
+    {
+        Assert.True(TimeFrame.TryParse("1d", out var timeFrame, out _));
+
+        var (from, to) = timeFrame.WindowEndingAt(new DateTimeOffset(2026, 11, 13, 17, 30, 45, 678, TimeSpan.FromHours(5)));
+
+        Assert.Equal(new DateTimeOffset(2026, 11, 13, 12, 30, 45, TimeSpan.Zero), to);
+        Assert.Equal(TimeSpan.Zero, to.Offset);
+        Assert.Equal(new DateTimeOffset(2026, 11, 12, 12, 30, 45, TimeSpan.Zero), from);
     }
 }

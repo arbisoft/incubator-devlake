@@ -121,7 +121,8 @@ public class RequestWorkerTests
         var root = JsonDocument.Parse(sent!).RootElement;
         Assert.Equal("c1", root.GetProperty("correlation_id").GetString());
         Assert.Equal("24h", root.GetProperty("time_frame").GetString());
-        Assert.False(root.TryGetProperty("from", out _));
+        Assert.Equal("2026-11-10T12:00:00Z", root.GetProperty("from").GetString());
+        Assert.Equal("2026-11-11T12:00:00Z", root.GetProperty("to").GetString());
         var engineer = Assert.Single(root.GetProperty("engineers").EnumerateArray());
         Assert.Equal("jane@arbisoft.com", engineer.GetProperty("email").GetString());
         Assert.Equal("alt@gmail.com", Assert.Single(engineer.GetProperty("mapped_emails").EnumerateArray()).GetString());
