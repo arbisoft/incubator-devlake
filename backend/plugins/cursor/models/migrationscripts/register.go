@@ -25,6 +25,6 @@ func All() []plugin.MigrationScript {
 		new(addCursorInitialTables),
 		new(replaceUsageEventsWithModelUsage),
 		new(adminApiSchema),
-		new(addCommitAiShareRawColumns),
+		new(addMissingColumns),
 	}
 }

@@ -42,13 +42,23 @@ type cursorCommitAiShare20261113 struct {
 
 func (cursorCommitAiShare20261113) TableName() string { return "_tool_cursor_commit_ai_share" }
 
-type addCommitAiShareRawColumns struct{}
-
-func (script *addCommitAiShareRawColumns) Up(basicRes context.BasicRes) errors.Error {
-	return migrationhelper.AutoMigrateTables(basicRes, &cursorCommitAiShare20261113{})
+// cursorScopeConfig20261113 is the snapshot of CursorScopeConfig used by this migration.
+type cursorScopeConfig20261113 struct {
+	archived.Model
+	ConnectionId uint64   `gorm:"primaryKey"`
+	Name         string   `gorm:"type:varchar(255)"`
+	Entities     []string `gorm:"type:json;serializer:json"`
 }
 
-func (script *addCommitAiShareRawColumns) Version() uint64 { return 20261113000001 }
-func (script *addCommitAiShareRawColumns) Name() string {
-	return "add timestamp and raw data columns to cursor commit ai share"
+func (cursorScopeConfig20261113) TableName() string { return "_tool_cursor_scope_configs" }
+
+type addMissingColumns struct{}
+
+func (script *addMissingColumns) Up(basicRes context.BasicRes) errors.Error {
+	return migrationhelper.AutoMigrateTables(basicRes, &cursorCommitAiShare20261113{}, &cursorScopeConfig20261113{})
+}
+
+func (script *addMissingColumns) Version() uint64 { return 20261113000001 }
+func (script *addMissingColumns) Name() string {
+	return "add missing columns to cursor commit ai share and scope configs"
 }
