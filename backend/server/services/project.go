@@ -30,6 +30,7 @@ import (
 	"github.com/apache/incubator-devlake/core/models/domainlayer/crossdomain"
 	"github.com/apache/incubator-devlake/core/plugin"
 	helper "github.com/apache/incubator-devlake/helpers/pluginhelper/api"
+	"github.com/apache/incubator-devlake/helpers/pluginhelper/services"
 )
 
 type ProjectService interface {
@@ -42,14 +43,28 @@ var projectService ProjectService
 type ProjectQuery struct {
 	Pagination
 	SortQuery
-	Keyword *string `json:"keyword" form:"keyword"`
+	Keyword       *string  `json:"keyword" form:"keyword"`
+	Connection    []string `json:"connection" form:"connection"`       // repeatable "plugin:connectionId"
+	LastRunStatus []string `json:"lastRunStatus" form:"lastRunStatus"` // repeatable pipeline status
+	NamesOnly     bool     `json:"namesOnly" form:"namesOnly"`         // project rows sorted by name, no per-project lookups
 }
+
+// otelConnectionProjectTable mirrors the claude_otel table name; server/ must not import plugins/
+const otelConnectionProjectTable = "_tool_claude_code_otel_connection_projects"
+
+// otelPluginName is the claude_otel plugin name used in connection filters
+const otelPluginName = "claude_otel"
+
+// projectBlueprintID is the blueprint makeProjectOutput shows, the lowest id of the project
+const projectBlueprintID = "(SELECT MIN(pb.id) FROM _devlake_blueprints pb WHERE pb.project_name = projects.name)"
 
 const projectLastRunJoin = "LEFT JOIN (SELECT b.project_name, MAX(p.finished_at) last_run_at " +
 	"FROM _devlake_blueprints b JOIN _devlake_pipelines p ON p.blueprint_id = b.id " +
 	"GROUP BY b.project_name) lr ON lr.project_name = projects.name"
 
 const projectSortLastRunAt = "lastRunAt"
+
+const projectNamesOrder = "projects.name ASC"
 
 var projectSortSpec = sortSpec{
 	columns: map[string]string{
@@ -69,15 +84,16 @@ func (query *ProjectQuery) GetKeyword() string {
 	return ""
 }
 
-// GetProjects returns a paginated list of Projects based on `query`
-func GetProjects(query *ProjectQuery) ([]*models.ApiOutputProject, int64, errors.Error) {
-	// verify input
-	if err := VerifyStruct(query); err != nil {
-		return nil, 0, err
-	}
-	orderBy, err := query.orderBy(projectSortSpec)
+// projectFilterClauses builds the FROM and every filter clause shared by the count and the page
+func projectFilterClauses(query *ProjectQuery) ([]dal.Clause, errors.Error) {
+	connections, err := parseConnectionFilters(query.Connection)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
+	}
+	for _, status := range query.LastRunStatus {
+		if status != models.TASK_RESUME && !slices.Contains(models.PendingTaskStatus, status) && !slices.Contains(models.FinishedTaskStatus, status) {
+			return nil, errors.BadInput.New("invalid last run status filter")
+		}
 	}
 	clauses := []dal.Clause{
 		dal.From(&models.Project{}),
@@ -85,13 +101,75 @@ func GetProjects(query *ProjectQuery) ([]*models.ApiOutputProject, int64, errors
 	if query.Keyword != nil {
 		clauses = append(clauses, dal.Where("LOWER(name) LIKE ?", "%"+query.GetKeyword()+"%"))
 	}
+	if len(connections) > 0 {
+		clauses = append(clauses, projectConnectionClause(connections))
+	}
+	if len(query.LastRunStatus) > 0 {
+		clauses = append(clauses, dal.Where(
+			"(SELECT lp.status FROM _devlake_pipelines lp WHERE lp.blueprint_id = "+projectBlueprintID+" ORDER BY lp.id DESC LIMIT 1) IN ?",
+			query.LastRunStatus,
+		))
+	}
+	return clauses, nil
+}
+
+// projectConnectionClause ORs every connection value into one clause
+func projectConnectionClause(connections []services.BlueprintConnectionFilter) dal.Clause {
+	var pairConds []string
+	var pairParams []interface{}
+	var otelIds []uint64
+	for _, conn := range connections {
+		if conn.PluginName == otelPluginName {
+			otelIds = append(otelIds, conn.ConnectionId)
+			continue
+		}
+		pairConds = append(pairConds, "(fbc.plugin_name = ? AND fbc.connection_id = ?)")
+		pairParams = append(pairParams, conn.PluginName, conn.ConnectionId)
+	}
+	if len(otelIds) > 0 && !db.HasTable(otelConnectionProjectTable) {
+		otelIds = nil
+	}
+	var branches []string
+	var params []interface{}
+	if len(pairConds) > 0 {
+		branches = append(branches, "EXISTS (SELECT 1 FROM _devlake_blueprint_connections fbc WHERE fbc.blueprint_id = "+
+			projectBlueprintID+" AND ("+strings.Join(pairConds, " OR ")+"))")
+		params = append(params, pairParams...)
+	}
+	if len(otelIds) > 0 {
+		branches = append(branches, "projects.name IN (SELECT project_name FROM "+otelConnectionProjectTable+" WHERE connection_id IN ?)")
+		params = append(params, otelIds)
+	}
+	if len(branches) == 0 {
+		return dal.Where("1 = 0")
+	}
+	return dal.Where("("+strings.Join(branches, " OR ")+")", params...)
+}
+
+// GetProjects returns a paginated list of Projects based on `query`
+func GetProjects(query *ProjectQuery) ([]*models.ApiOutputProject, int64, errors.Error) {
+	// verify input
+	if err := VerifyStruct(query); err != nil {
+		return nil, 0, err
+	}
+	orderBy := projectNamesOrder
+	if !query.NamesOnly {
+		var err errors.Error
+		if orderBy, err = query.orderBy(projectSortSpec); err != nil {
+			return nil, 0, err
+		}
+	}
+	clauses, err := projectFilterClauses(query)
+	if err != nil {
+		return nil, 0, err
+	}
 
 	count, err := db.Count(clauses...)
 	if err != nil {
 		return nil, 0, errors.Default.Wrap(err, "error getting DB count of project")
 	}
 
-	if query.SortBy == projectSortLastRunAt {
+	if !query.NamesOnly && query.SortBy == projectSortLastRunAt {
 		clauses = append(clauses, dal.Select("projects.*"), dal.Join(projectLastRunJoin))
 	}
 	clauses = append(clauses,
@@ -105,6 +183,12 @@ func GetProjects(query *ProjectQuery) ([]*models.ApiOutputProject, int64, errors
 		return nil, 0, errors.Default.Wrap(err, "error finding DB project")
 	}
 	apiOutProjects := make([]*models.ApiOutputProject, len(projects))
+	if query.NamesOnly {
+		for idx, project := range projects {
+			apiOutProjects[idx] = &models.ApiOutputProject{Project: *project}
+		}
+		return apiOutProjects, count, nil
+	}
 	g := new(errgroup.Group)
 	for idx, project := range projects {
 		tmpProject := *project

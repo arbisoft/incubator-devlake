@@ -84,6 +84,9 @@ func GetProjectCheck(c *gin.Context) {
 // @Param keyword query string false "case-insensitive match on the project name"
 // @Param sortBy query string false "sort column, defaults to createdAt" Enums(name, createdAt, lastRunAt)
 // @Param sortOrder query string false "sort direction, defaults to desc" Enums(asc, desc)
+// @Param connection query []string false "repeatable plugin:connectionId; matches projects using any of them" collectionFormat(multi)
+// @Param lastRunStatus query []string false "repeatable status of the latest pipeline" collectionFormat(multi)
+// @Param namesOnly query bool false "return only project rows, sorted by name, without metrics, blueprint or last pipeline"
 // @Success 200  {object} PaginatedProjects
 // @Failure 400  {string} errcode.Error "Bad Request"
 // @Failure 500  {string} errcode.Error "Internal Error"

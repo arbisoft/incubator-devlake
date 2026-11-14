@@ -22,13 +22,12 @@ import { ACCESS_ROLE, ACCESS_STATUS, type AccessUser } from '@/api/access';
 import { GRAFANA_ERROR_CODE, GRAFANA_ROLE } from '@/api/grafana-users/constants';
 import type { GrafanaUser } from '@/api/grafana-users/types';
 
-import { COPY, GENERATED_PASSWORD_LENGTH, GRAFANA_MENU_ACTION, PASSWORD_ALPHABET } from './constants';
+import { COPY, GENERATED_PASSWORD_LENGTH, PASSWORD_ALPHABET } from './constants';
 import {
   buildCreateBody,
   buildDetailsPatch,
   buildProjectOptions,
   generatePassword,
-  getMenuActions,
   getPartialUserId,
   getUnavailableMessage,
   getUserIdentity,
@@ -254,16 +253,5 @@ describe('toDevlakeUserOption', () => {
     expect(option).toEqual({ value: 1, label: `Ann (${EMAIL})`, email: EMAIL, name: 'Ann' });
     expect(toDevlakeUserOption({ ...base, displayName: '', email: EMAIL }).label).toBe(EMAIL);
     expect(toDevlakeUserOption({ ...base, email: undefined })).toMatchObject({ label: 'Ann', email: '' });
-  });
-});
-
-describe('getMenuActions', () => {
-  it('offers details and password for a normal account', () => {
-    expect(getMenuActions(user)).toEqual([GRAFANA_MENU_ACTION.DETAILS, GRAFANA_MENU_ACTION.PASSWORD]);
-  });
-
-  it('offers only details for an SSO account and nothing for a protected one', () => {
-    expect(getMenuActions({ ...user, sso: true })).toEqual([GRAFANA_MENU_ACTION.DETAILS]);
-    expect(getMenuActions({ ...user, protected: true })).toEqual([]);
   });
 });

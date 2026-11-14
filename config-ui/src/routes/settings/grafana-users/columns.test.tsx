@@ -16,7 +16,7 @@
  *
  */
 
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { Table } from 'antd';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -25,7 +25,7 @@ import type { GrafanaUser } from '@/api/grafana-users/types';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
 import { getGrafanaUserColumns } from './columns';
-import { COPY, GRAFANA_ROW_ACTION, GRAFANA_USER_COLUMN } from './constants';
+import { COPY, GRAFANA_MENU_ACTION, GRAFANA_ROW_ACTION, GRAFANA_USER_COLUMN } from './constants';
 import type { GrafanaColumnActions } from './types';
 
 const EMAIL = 'ann@example.com';
@@ -81,9 +81,24 @@ describe('Grafana user columns', () => {
     expect(actions.onEditProjects).toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: COPY.actions.disableFor(EMAIL) }));
     expect(actions.onToggle).toHaveBeenCalledWith(GRAFANA_ROW_ACTION.DISABLE, expect.objectContaining({ id: 1 }));
-    expect(screen.getByRole('button', { name: COPY.actions.moreFor(EMAIL) })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: COPY.actions.editDetailsFor(EMAIL) }));
+    expect(actions.onMenuAction).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }), GRAFANA_MENU_ACTION.DETAILS);
+    fireEvent.click(screen.getByRole('button', { name: COPY.actions.setPasswordFor(EMAIL) }));
+    expect(actions.onMenuAction).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }), GRAFANA_MENU_ACTION.PASSWORD);
     fireEvent.click(screen.getByRole('button', { name: COPY.actions.deleteFor(EMAIL) }));
     expect(actions.onRemove).toHaveBeenCalled();
+  });
+
+  it('lists every project in a popover whose Edit projects link opens the editor', async () => {
+    const actions = setup(user({ projects: ['alpha', 'beta', 'gamma'] }));
+    fireEvent.click(screen.getByRole('button', { name: COPY.moreProjects(1) }));
+    await waitFor(() => expect(screen.getAllByText('gamma').length).toBeGreaterThan(0));
+    const link = screen
+      .getAllByRole('button', { name: COPY.actions.editProjectsFor(EMAIL) })
+      .find((button) => button.textContent === COPY.actions.editProjects);
+    expect(link).toBeTruthy();
+    fireEvent.click(link as HTMLElement);
+    expect(actions.onEditProjects).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
   });
 
   it('offers Enable for a disabled account', () => {
@@ -92,22 +107,33 @@ describe('Grafana user columns', () => {
     expect(actions.onToggle).toHaveBeenCalledWith(GRAFANA_ROW_ACTION.ENABLE, expect.objectContaining({ id: 1 }));
   });
 
-  it('locks the role of a protected account and hides its toggle, menu and delete', () => {
+  it('locks the role of a protected account and hides its toggle, edit icons and delete', () => {
     setup(user({ protected: true }));
     expect((screen.getByRole('combobox', { name: COPY.actions.roleFor(EMAIL) }) as HTMLInputElement).disabled).toBe(
       true,
     );
     expect(screen.queryByRole('button', { name: COPY.actions.disableFor(EMAIL) })).toBeNull();
-    expect(screen.queryByRole('button', { name: COPY.actions.moreFor(EMAIL) })).toBeNull();
+    expect(screen.queryByRole('button', { name: COPY.actions.editDetailsFor(EMAIL) })).toBeNull();
+    expect(screen.queryByRole('button', { name: COPY.actions.setPasswordFor(EMAIL) })).toBeNull();
     expect(screen.queryByRole('button', { name: COPY.actions.deleteFor(EMAIL) })).toBeNull();
     expect(screen.getByRole('button', { name: COPY.actions.editProjectsFor(EMAIL) })).toBeTruthy();
   });
 
-  it('keeps the actions of an SSO account, marked as SSO', () => {
-    setup(user({ sso: true }));
+  it('keeps the actions of an SSO account, marked as SSO, with Set password greyed out', () => {
+    const actions = setup(user({ sso: true }));
     expect(screen.getByRole('img', { name: COPY.sso.label })).toBeTruthy();
-    expect(screen.getByRole('button', { name: COPY.actions.moreFor(EMAIL) })).toBeTruthy();
+    expect(screen.getByRole('button', { name: COPY.actions.editDetailsFor(EMAIL) })).toBeTruthy();
+    const password = screen.getByRole('button', { name: COPY.actions.setPasswordFor(EMAIL) });
+    expect(password.getAttribute('aria-disabled')).toBe('true');
+    fireEvent.click(password);
+    expect(actions.onMenuAction).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: COPY.actions.deleteFor(EMAIL) })).toBeTruthy();
+  });
+
+  it('says there are no projects in muted text and still offers the pencil', () => {
+    setup(user({ projects: [] }));
+    expect(screen.getByText(COPY.noProjects)).toBeTruthy();
+    expect(screen.getByRole('button', { name: COPY.actions.editProjectsFor(EMAIL) })).toBeTruthy();
   });
 
   it('shows a role outside Viewer, Editor and Admin as text', () => {

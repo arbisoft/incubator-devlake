@@ -26,6 +26,7 @@ import { IconButton } from './icon-button';
 import type { IconButtonProps } from './types';
 
 const LABEL = 'Edit connection';
+const REASON = 'Managed by the identity provider.';
 
 const setup = (props: Partial<IconButtonProps> = {}) => {
   const onClick = vi.fn();
@@ -68,5 +69,35 @@ describe('IconButton', () => {
   it('keeps the default and primary tones free of the danger style', () => {
     setup({ tone: ICON_BUTTON_TONE.PRIMARY });
     expect(screen.getByRole('button', { name: LABEL }).className).not.toContain('ant-btn-dangerous');
+  });
+
+  describe('with a disabled reason', () => {
+    it('stays focusable, is aria-disabled, keeps its name and ignores clicks', () => {
+      const { onClick } = setup({ disabledReason: REASON });
+      const button = screen.getByRole('button', { name: LABEL }) as HTMLButtonElement;
+      expect(button.getAttribute('aria-disabled')).toBe('true');
+      expect(button.disabled).toBe(false);
+      button.focus();
+      expect(document.activeElement).toBe(button);
+      fireEvent.click(button);
+      expect(onClick).not.toHaveBeenCalled();
+    });
+
+    it('shows the reason instead of the label on hover', async () => {
+      setup({ disabledReason: REASON });
+      fireEvent.mouseEnter(screen.getByRole('button', { name: LABEL }));
+      expect((await screen.findByRole('tooltip')).textContent).toBe(REASON);
+    });
+
+    it('shows the reason on keyboard focus', async () => {
+      setup({ disabledReason: REASON });
+      fireEvent.focus(screen.getByRole('button', { name: LABEL }));
+      expect((await screen.findByRole('tooltip')).textContent).toBe(REASON);
+    });
+
+    it('is not aria-disabled without a reason', () => {
+      setup();
+      expect(screen.getByRole('button', { name: LABEL }).getAttribute('aria-disabled')).toBeNull();
+    });
   });
 });

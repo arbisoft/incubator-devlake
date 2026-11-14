@@ -16,8 +16,8 @@
  *
  */
 
-import type { BLUEPRINT_COLUMN, LIST_FILTER } from './constants';
+import type { BLUEPRINT_COLUMN } from './constants';
 
 export type BlueprintSortKey = typeof BLUEPRINT_COLUMN.NAME;
 
-export type BlueprintFilters = Record<(typeof LIST_FILTER)[keyof typeof LIST_FILTER], string>;
+export type BlueprintFilters = { connection: string[]; type: string[]; projectName: string[]; status: string };

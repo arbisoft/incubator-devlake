@@ -46,6 +46,7 @@ export const getScopeColumns = ({
           COMMON_COPY.emptyValue
         ) : (
           <OverflowList
+            title={COPY.columns.projects}
             max={MAX_VISIBLE_PROJECTS}
             moreLabel={COPY.moreProjects}
             items={projects.map((project) => ({

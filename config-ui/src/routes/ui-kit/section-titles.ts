@@ -41,6 +41,7 @@ export const SECTION_TITLES = {
   confirmModal: 'ConfirmModal',
   formField: 'FormField',
   overflowList: 'OverflowList',
+  listPopover: 'ListPopover',
   listPage: 'ListPage',
   listToolbar: 'ListToolbar',
   rowLink: 'RowLink',

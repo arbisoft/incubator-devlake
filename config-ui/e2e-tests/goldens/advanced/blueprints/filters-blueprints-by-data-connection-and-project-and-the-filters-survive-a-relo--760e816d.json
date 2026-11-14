@@ -1,0 +1,7 @@
+{
+  "titlePath": [
+    "Blueprints column filters",
+    "filters blueprints by data connection and project, and the filters survive a reload"
+  ],
+  "writes": []
+}

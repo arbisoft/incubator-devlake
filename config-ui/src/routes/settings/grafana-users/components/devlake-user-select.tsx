@@ -23,9 +23,9 @@ import { useState } from 'react';
 
 import API from '@/api';
 import { useRefreshData } from '@/hooks';
-import { FormField } from '@/ui';
+import { FormField, SEARCH_DEBOUNCE_MS } from '@/ui';
 
-import { COPY, DEVLAKE_USER_SEARCH_PAGE_SIZE, SEARCH_DEBOUNCE_MS } from '../constants';
+import { COPY, DEVLAKE_USER_SEARCH_PAGE_SIZE } from '../constants';
 import type { DevlakeUserOption } from '../types';
 import { toDevlakeUserOption } from '../utils';
 

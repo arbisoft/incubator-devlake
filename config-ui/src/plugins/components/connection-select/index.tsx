@@ -18,7 +18,7 @@
 
 import { SelectProps } from 'antd';
 
-import { getPluginConfig } from '@/plugins';
+import { getConnectorVisual } from '@/plugins/utils';
 import { PluginIcon } from '@/ui';
 
 import { COPY } from './constants';
@@ -31,10 +31,9 @@ export const ConnectionSelect = ({ ...props }: Props) => {
     <StyledSelect
       placeholder={COPY.placeholder}
       optionRender={(option) => {
-        const plugin = getPluginConfig(option.data.plugin);
         return (
           <Option>
-            <PluginIcon icon={plugin.icon} size="md" />
+            <PluginIcon {...getConnectorVisual(option.data.plugin)} size="md" />
             <span className="name">{option.label}</span>
           </Option>
         );

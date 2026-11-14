@@ -53,6 +53,14 @@ export const IconButtonDemo = () => {
       <DemoCase label={COPY.cases.disabled}>
         <IconButton icon={<EditOutlined />} label={COPY.iconButton.edit} disabled onClick={noop} />
       </DemoCase>
+      <DemoCase label={COPY.cases.disabledWithReason}>
+        <IconButton
+          icon={<EditOutlined />}
+          label={COPY.iconButton.edit}
+          disabledReason={COPY.iconButton.disabledReason}
+          onClick={noop}
+        />
+      </DemoCase>
       <DemoCase label={COPY.cases.loading}>
         <IconButton icon={<EditOutlined />} label={COPY.iconButton.edit} loading onClick={noop} />
       </DemoCase>

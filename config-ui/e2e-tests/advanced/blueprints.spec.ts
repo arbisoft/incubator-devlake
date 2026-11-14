@@ -23,12 +23,20 @@ import { test, expect } from '../fixtures';
 import {
   adminApi,
   createBlueprint,
+  createProject,
+  createWebhook,
   deleteBlueprintsByPrefix,
+  deleteProject,
+  deleteWebhooksByPrefix,
+  getProject,
   listBlueprintsByKeyword,
   uniqueName,
 } from '../support/api';
 import { BLUEPRINT_HOME_COPY, BLUEPRINT_STATUS_FILTER } from '../support/app-copy';
+import { WEBHOOK_PLUGIN_LABEL } from '../support/constants';
 import { BlueprintPage } from '../support/pages/blueprints';
+
+const FREQUENCY = { manual: 'Manual', daily: 'Daily' } as const;
 
 test.describe.serial('Blueprints list search, status filter and create', () => {
   let api: APIRequestContext;
@@ -81,7 +89,9 @@ test.describe.serial('Blueprints list search, status filter and create', () => {
     await blueprints.openWithQuery(`keyword=${prefix}`);
     await expect.poll(async () => (await blueprints.blueprintNames()).length).toBe(3);
 
-    await blueprints.filterByStatus(BLUEPRINT_HOME_COPY.statusFilter[BLUEPRINT_STATUS_FILTER.DISABLED]);
+    await blueprints.filterColumn(BLUEPRINT_HOME_COPY.columns.status, [
+      BLUEPRINT_HOME_COPY.statusFilter[BLUEPRINT_STATUS_FILTER.DISABLED],
+    ]);
     await expect.poll(() => blueprints.urlParams.get('status')).toBe(BLUEPRINT_STATUS_FILTER.DISABLED);
     await expect.poll(() => blueprints.blueprintNames()).toEqual([names.off]);
     await expect(blueprints.blueprintRow(names.off)).toBeVisible();
@@ -89,7 +99,10 @@ test.describe.serial('Blueprints list search, status filter and create', () => {
     await blueprints.reload();
     await expect.poll(() => blueprints.blueprintNames()).toEqual([names.off]);
 
-    await blueprints.filterByStatus(BLUEPRINT_HOME_COPY.statusFilter[BLUEPRINT_STATUS_FILTER.ENABLED]);
+    await blueprints.filterColumn(BLUEPRINT_HOME_COPY.columns.status, [
+      BLUEPRINT_HOME_COPY.statusFilter[BLUEPRINT_STATUS_FILTER.ENABLED],
+    ]);
+    await expect.poll(() => blueprints.urlParams.get('status')).toBe(BLUEPRINT_STATUS_FILTER.ENABLED);
     await expect
       .poll(async () => (await blueprints.blueprintNames()).sort())
       .toEqual([names.first, names.second].sort());
@@ -125,5 +138,85 @@ test.describe.serial('Blueprints list search, status filter and create', () => {
     await blueprints.pressEscape();
     await expect(blueprints.dialog(BLUEPRINT_HOME_COPY.create.title)).toBeHidden();
     await expect(blueprints.ready).toBeFocused();
+  });
+});
+
+test.describe.serial('Blueprints column filters', () => {
+  let api: APIRequestContext;
+  const prefix = uniqueName('bpfilt');
+  const hookName = `${prefix}-hook`;
+  const projectName = `${prefix}-proj`;
+  const names = { hook: `${prefix}-withhook`, plain: `${prefix}-plain`, manual: `${prefix}-manual` };
+  let hookId: number;
+  let projectBlueprint: string;
+
+  test.beforeAll(async ({ playwright }) => {
+    api = await adminApi(playwright);
+    hookId = (await createWebhook(api, hookName)).id;
+    await createBlueprint(api, names.hook, {
+      connections: [{ pluginName: 'webhook', connectionId: hookId, scopes: [] }],
+    });
+    await createBlueprint(api, names.plain);
+    await createBlueprint(api, names.manual, { isManual: true });
+    await createProject(api, projectName);
+    projectBlueprint = (await getProject(api, projectName))?.blueprint?.name ?? '';
+  });
+
+  test.afterAll(async () => {
+    await deleteBlueprintsByPrefix(api, prefix);
+    await deleteProject(api, projectName);
+    await deleteWebhooksByPrefix(api);
+    await api.dispose();
+  });
+
+  test.beforeEach(async ({ context }) => {
+    await loginAsAdmin(context);
+  });
+
+  test('filters blueprints by data connection and project, and the filters survive a reload', async ({
+    page,
+    browserErrors,
+  }) => {
+    const blueprints = new BlueprintPage(page);
+    await blueprints.openWithQuery(`keyword=${prefix}`);
+    await expect.poll(async () => (await blueprints.blueprintNames()).length).toBe(4);
+
+    await blueprints.filterColumn(BLUEPRINT_HOME_COPY.columns.connections, [`${hookName} (${WEBHOOK_PLUGIN_LABEL})`]);
+    await expect.poll(() => blueprints.urlParams.getAll('connection')).toEqual([`webhook:${hookId}`]);
+    await expect.poll(() => blueprints.blueprintNames()).toEqual([names.hook]);
+
+    await blueprints.reload();
+    await expect.poll(() => blueprints.blueprintNames()).toEqual([names.hook]);
+
+    await blueprints.clearColumnFilter(BLUEPRINT_HOME_COPY.columns.connections);
+    await expect.poll(() => blueprints.urlParams.getAll('connection')).toEqual([]);
+    await expect.poll(async () => (await blueprints.blueprintNames()).length).toBe(4);
+
+    await blueprints.filterColumn(BLUEPRINT_HOME_COPY.columns.project, [projectName]);
+    await expect.poll(() => blueprints.urlParams.getAll('projectName')).toEqual([projectName]);
+    await expect.poll(() => blueprints.blueprintNames()).toEqual([projectBlueprint]);
+
+    await blueprints.reload();
+    await expect.poll(() => blueprints.blueprintNames()).toEqual([projectBlueprint]);
+    expect(browserErrors).toEqual([]);
+  });
+
+  test('frequency filter takes several values', async ({ page, browserErrors }) => {
+    const blueprints = new BlueprintPage(page);
+    await blueprints.openWithQuery(`keyword=${prefix}`);
+    await expect.poll(async () => (await blueprints.blueprintNames()).length).toBe(4);
+
+    await blueprints.filterColumn(BLUEPRINT_HOME_COPY.columns.frequency, [FREQUENCY.manual]);
+    await expect.poll(() => blueprints.blueprintNames()).toEqual([names.manual]);
+
+    await blueprints.filterColumn(BLUEPRINT_HOME_COPY.columns.frequency, [FREQUENCY.daily]);
+    await expect.poll(() => blueprints.urlParams.getAll('type')).toEqual([FREQUENCY.manual, FREQUENCY.daily]);
+    await expect
+      .poll(async () => (await blueprints.blueprintNames()).sort())
+      .toEqual([names.hook, names.manual, names.plain, projectBlueprint].sort());
+
+    await blueprints.reload();
+    await expect.poll(() => blueprints.urlParams.getAll('type')).toEqual([FREQUENCY.manual, FREQUENCY.daily]);
+    expect(browserErrors).toEqual([]);
   });
 });

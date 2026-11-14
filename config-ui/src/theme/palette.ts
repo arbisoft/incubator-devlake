@@ -26,6 +26,14 @@ const SIDEBAR_TEXT_MUTED = 'rgba(255, 255, 255, 0.65)';
 const SIDEBAR_ITEM_HOVER_BG = 'rgba(255, 255, 255, 0.08)';
 const SIDEBAR_LOGO_FILTER = 'brightness(0) invert(1)';
 
+export const CONNECTOR_BRAND_COLORS = {
+  asana: { light: '#ED4E4E', dark: '#F06A6A' },
+  hubspot: { light: '#FF3705', dark: '#FF7A59' },
+  linear: { light: '#5E6AD2', dark: '#6873D5' },
+  bamboo: { light: '#0052CC', dark: '#1473FF' },
+  sonarqube: { light: '#126ED3', dark: '#1479E8' },
+} as const;
+
 export const PALETTE = {
   light: {
     brand: { onPrimary: WHITE },

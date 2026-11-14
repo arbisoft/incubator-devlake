@@ -18,7 +18,7 @@
 
 import { useState } from 'react';
 
-import { getPluginConfig } from '@/plugins/utils';
+import { getConnectorVisual } from '@/plugins/utils';
 import { FormModal, MODAL_WIDTH, PluginIcon } from '@/ui';
 
 import { COPY } from './constants';
@@ -36,13 +36,13 @@ export const ScopeConfigSelectModal = ({
 }: ScopeConfigSelectModalProps) => {
   const [picked, setPicked] = useState<ID>();
   const selectedId = picked ?? scopeConfigId;
-  const { icon } = getPluginConfig(plugin);
+  const pluginIcon = <PluginIcon {...getConnectorVisual(plugin)} size="sm" />;
 
   return (
     <FormModal
       open={open}
       title={title}
-      icon={<PluginIcon icon={icon} size="sm" />}
+      icon={pluginIcon}
       width={MODAL_WIDTH.LG}
       submitLabel={COPY.save}
       submitDisabled={!selectedId}

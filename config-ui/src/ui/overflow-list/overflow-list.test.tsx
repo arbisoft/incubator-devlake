@@ -16,7 +16,7 @@
  *
  */
 
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
@@ -26,6 +26,8 @@ import { OverflowList } from './overflow-list';
 import { splitOverflow } from './utils';
 
 const MORE = (count: number) => `+${count} more`;
+const TITLE = 'Projects';
+const FOOTER = 'Edit projects';
 const items = (count: number) =>
   Array.from({ length: count }, (_, index) => ({ key: `k${index}`, node: `item ${index + 1}` }));
 
@@ -45,33 +47,59 @@ describe('splitOverflow', () => {
 
 describe('OverflowList', () => {
   it('shows every item and no toggle when the list fits', () => {
-    renderWithTheme(<OverflowList items={items(2)} max={2} moreLabel={MORE} />);
+    renderWithTheme(<OverflowList title={TITLE} items={items(2)} max={2} moreLabel={MORE} />);
     expect(screen.getByText('item 2')).toBeTruthy();
     expect(screen.queryByRole('button')).toBeNull();
   });
 
   it('shows the first items and a count of the rest', () => {
-    renderWithTheme(<OverflowList items={items(5)} max={2} moreLabel={MORE} />);
+    renderWithTheme(<OverflowList title={TITLE} items={items(5)} max={2} moreLabel={MORE} />);
     expect(screen.getByText('item 2')).toBeTruthy();
     expect(screen.queryByText('item 3')).toBeNull();
     expect(screen.getByRole('button', { name: MORE(3) })).toBeTruthy();
   });
 
-  it('lists the hidden items when the toggle receives focus', async () => {
-    renderWithTheme(<OverflowList items={items(4)} max={2} moreLabel={MORE} />);
-    fireEvent.focus(screen.getByRole('button', { name: MORE(2) }));
-    await waitFor(() => expect(screen.getByText('item 4')).toBeTruthy());
-    expect(screen.getByText('item 3')).toBeTruthy();
+  it.each([
+    ['hover', (toggle: HTMLElement) => fireEvent.mouseEnter(toggle)],
+    ['focus', (toggle: HTMLElement) => fireEvent.focus(toggle)],
+    ['click', (toggle: HTMLElement) => fireEvent.click(toggle)],
+  ])('opens a popover with the title, the total count and every item on %s', async (_, open) => {
+    renderWithTheme(<OverflowList title={TITLE} items={items(4)} max={2} moreLabel={MORE} />);
+    open(screen.getByRole('button', { name: MORE(2) }));
+    const popover = await screen.findByText(TITLE);
+    const content = popover.parentElement as HTMLElement;
+    expect(within(content).getByText('4')).toBeTruthy();
+    expect(
+      within(content)
+        .getAllByRole('listitem')
+        .map((row) => row.textContent),
+    ).toEqual(['item 1', 'item 2', 'item 3', 'item 4']);
+  });
+
+  it('renders the footer inside the popover', async () => {
+    renderWithTheme(
+      <OverflowList
+        title={TITLE}
+        items={items(4)}
+        max={2}
+        moreLabel={MORE}
+        footer={<button type="button">{FOOTER}</button>}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: MORE(2) }));
+    await waitFor(() => expect(screen.getByRole('button', { name: FOOTER })).toBeTruthy());
   });
 
   it('lays the items out in a row for the inline layout and keeps the toggle a button', () => {
-    renderWithTheme(<OverflowList items={items(4)} max={2} moreLabel={MORE} layout={OVERFLOW_LAYOUT.INLINE} />);
+    renderWithTheme(
+      <OverflowList title={TITLE} items={items(4)} max={2} moreLabel={MORE} layout={OVERFLOW_LAYOUT.INLINE} />,
+    );
     expect(getComputedStyle(screen.getByRole('list')).flexWrap).toBe('wrap');
     expect(screen.getByRole('button', { name: MORE(2) }).tagName).toBe('BUTTON');
   });
 
   it('stacks the items by default', () => {
-    renderWithTheme(<OverflowList items={items(2)} max={2} moreLabel={MORE} />);
+    renderWithTheme(<OverflowList title={TITLE} items={items(2)} max={2} moreLabel={MORE} />);
     expect(getComputedStyle(screen.getByRole('list')).flexWrap).not.toBe('wrap');
   });
 });

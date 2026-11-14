@@ -30,6 +30,7 @@ import type { IntegrationCardProps } from './types';
 
 export const IntegrationCard = ({
   icon,
+  logo,
   name,
   category,
   beta,
@@ -48,7 +49,7 @@ export const IntegrationCard = ({
   return (
     <Root $connected={isConnected} aria-labelledby={nameId}>
       <Header>
-        <PluginIcon icon={icon} size="lg" />
+        <PluginIcon icon={icon} size="lg" logo={logo} />
         {(docsHref || menu) && (
           <HeaderActions>
             {docsHref && (

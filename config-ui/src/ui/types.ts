@@ -19,11 +19,12 @@
 import type { ReactNode } from 'react';
 
 import type { CONFIRM_TONE } from './confirm-modal/constants';
-import type { ICON_SIZE_PX, MODAL_WIDTH, NAV_ITEM_KIND, SORT_ORDER, STATUS_TONE } from './constants';
+import type { ICON_SIZE_PX, MODAL_WIDTH, NAV_ITEM_KIND, SEARCH_TRIGGER, SORT_ORDER, STATUS_TONE } from './constants';
 
 export type StatusTone = (typeof STATUS_TONE)[keyof typeof STATUS_TONE];
 export type SortOrder = (typeof SORT_ORDER)[keyof typeof SORT_ORDER];
 export type SortState<S extends string = string> = { sortBy: S; sortOrder: SortOrder };
+export type SearchTrigger = (typeof SEARCH_TRIGGER)[keyof typeof SEARCH_TRIGGER];
 export type IconSize = keyof typeof ICON_SIZE_PX;
 
 export type RouteTab = { key: string; label: string; path: string; visible?: boolean };

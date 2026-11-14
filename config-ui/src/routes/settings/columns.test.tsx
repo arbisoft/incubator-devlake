@@ -21,11 +21,12 @@ import type { TableColumnType } from 'antd';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ACCESS_STATUS, type AccessUser } from '@/api/access';
+import { LAYOUT } from '@/theme/scales';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
 
 import { buildActionsColumn, buildRoleColumn, buildStatusColumn } from './columns';
 import type { ActionsColumnOptions } from './columns.types';
-import { COPY } from './constants';
+import { ACTIONS_LAYOUT, COPY } from './constants';
 
 type Row = { name: string; status: AccessUser['status'] };
 
@@ -132,6 +133,63 @@ describe('buildActionsColumn options', () => {
     renderCell(column, { name: 'Ada', status: ACCESS_STATUS.ACTIVE });
     expect(screen.queryByRole('button')).toBeNull();
     expect(screen.getByText('extra Ada')).toBeTruthy();
+  });
+});
+
+describe('buildActionsColumn icon layout', () => {
+  const extraCalls = [vi.fn(), vi.fn()];
+  const iconColumn = (overrides: Partial<ActionsColumnOptions<Row>> = {}, onToggle = vi.fn(), onRemove = vi.fn()) =>
+    buildActionsColumn<Row>({
+      ...actionsColumnOptions(onToggle, onRemove),
+      layout: ACTIONS_LAYOUT.ICONS,
+      extraActions: (row) =>
+        extraCalls.map((onClick, index) => ({
+          key: `extra-${index}`,
+          icon: <span />,
+          label: `Extra ${index} ${row.name}`,
+          onClick,
+        })),
+      ...overrides,
+    });
+  const labels = () => screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'));
+
+  it('centres the column and gives it the icon width', () => {
+    const column = iconColumn();
+    expect(column.align).toBe('center');
+    expect(column.width).toBe(LAYOUT.accessIconActionsColumnWidth);
+  });
+
+  it('renders extras, then the danger disable icon, then the danger delete icon', () => {
+    renderCell(iconColumn(), { name: 'Ada', status: ACCESS_STATUS.ACTIVE });
+    expect(labels()).toEqual(['Extra 0 Ada', 'Extra 1 Ada', COPY.users.disable('Ada'), COPY.users.remove('Ada')]);
+    expect(screen.getByRole('button', { name: COPY.users.disable('Ada') }).className).toContain('ant-btn-dangerous');
+    expect(screen.getByRole('button', { name: COPY.users.remove('Ada') }).className).toContain('ant-btn-dangerous');
+    expect(screen.getByRole('button', { name: 'Extra 0 Ada' }).className).not.toContain('ant-btn-dangerous');
+  });
+
+  it('shows a neutral enable icon for a disabled row and reports the actions', () => {
+    const onToggle = vi.fn();
+    const onRemove = vi.fn();
+    const row = { name: 'Ada', status: ACCESS_STATUS.DISABLED };
+    renderCell(iconColumn({}, onToggle, onRemove), row);
+    const enable = screen.getByRole('button', { name: COPY.users.enable('Ada') });
+    expect(enable.className).not.toContain('ant-btn-dangerous');
+    fireEvent.click(enable);
+    expect(onToggle).toHaveBeenCalledWith(row, ACCESS_STATUS.ACTIVE);
+    fireEvent.click(screen.getByRole('button', { name: 'Extra 1 Ada' }));
+    expect(extraCalls[1]).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: COPY.users.remove('Ada') }));
+    expect(onRemove).toHaveBeenCalledWith(row);
+  });
+
+  it('renders no icons for a protected row without extras', () => {
+    const column = iconColumn({ canToggle: () => false, canRemove: () => false, extraActions: () => [] });
+    renderCell(column, { name: 'Ada', status: ACCESS_STATUS.ACTIVE });
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('keeps the text layout right-aligned by default', () => {
+    expect(actionsColumn().align).toBe('right');
   });
 });
 
