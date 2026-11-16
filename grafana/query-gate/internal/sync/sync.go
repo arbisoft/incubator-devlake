@@ -43,6 +43,8 @@ const (
 	listLimit      = 500
 	namespace      = "default"
 	userPrefix     = "user:"
+	dashboardsV1   = "/apis/dashboard.grafana.app/v1beta1/namespaces/" + namespace + "/dashboards"
+	dashboardsV2   = "/apis/dashboard.grafana.app/v2/namespaces/" + namespace + "/dashboards"
 	requestTimeout = 10 * time.Second
 	maxBody        = 64 << 20
 )
@@ -278,7 +280,7 @@ func (s *Syncer) dashboardTemplates(ctx context.Context, item dashboardItem, adm
 		spec := item.Spec
 		if conv := item.Status.Conversion; conv != nil && conv.Failed {
 			var fetched dashboardItem
-			if err := s.get(ctx, "/apis/dashboard.grafana.app/v2/namespaces/"+namespace+"/dashboards/"+url.PathEscape(uid), &fetched); err != nil {
+			if err := s.get(ctx, dashboardsV2+"/"+url.PathEscape(uid), &fetched); err != nil {
 				return nil, err
 			}
 			if fetched.Metadata.Generation != gen || saverOf(fetched.Metadata.Annotations, fetched.Metadata.Generation) != saver {
@@ -347,7 +349,7 @@ func (s *Syncer) adminUIDs(ctx context.Context) (map[string]bool, error) {
 
 func (s *Syncer) dashboards(ctx context.Context) ([]dashboardItem, error) {
 	var items []dashboardItem
-	path := fmt.Sprintf("/apis/dashboard.grafana.app/v1beta1/namespaces/%s/dashboards?limit=%d", namespace, listLimit)
+	path := fmt.Sprintf("%s?limit=%d", dashboardsV1, listLimit)
 	next := ""
 	for {
 		var list struct {

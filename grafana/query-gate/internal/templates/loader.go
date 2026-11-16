@@ -38,6 +38,29 @@ func (e CompileError) Error() string { return e.Location + ": " + e.Message }
 // allProjectsTag marks a dashboard whose queries are safe for any caller.
 const allProjectsTag = "devlake:all-projects"
 
+// Variable types, as classic dashboard JSON names them.
+const (
+	varQuery      = "query"
+	varCustom     = "custom"
+	varConstant   = "constant"
+	varTextbox    = "textbox"
+	varDatasource = "datasource"
+	varInterval   = "interval"
+)
+
+// Markers of a v2 dashboard document and its query-bearing elements.
+const (
+	v2DocumentKind     = "Dashboard"
+	v2APIVersionPrefix = "dashboard.grafana.app/v2"
+	v2PanelKind        = "Panel"
+)
+
+// classicKeys mark classic dashboard JSON, so a spec with any of them is not read as a bare v2 spec.
+var classicKeys = []string{"panels", "rows", "templating"}
+
+// v2VariableFields are copied unchanged from a v2 variable spec into the classic shape.
+var v2VariableFields = []string{"name", "multi", "includeAll", "allValue", "options"}
+
 type source struct {
 	Location string
 	SQL      string
@@ -133,11 +156,11 @@ func list(m map[string]any, key string) []map[string]any {
 
 // v2Spec returns the spec of a v2 dashboard document or a bare v2 spec, and false for classic JSON.
 func v2Spec(dash map[string]any) (map[string]any, bool) {
-	if str(dash, "kind") == "Dashboard" && strings.HasPrefix(str(dash, "apiVersion"), "dashboard.grafana.app/v2") {
+	if str(dash, "kind") == v2DocumentKind && strings.HasPrefix(str(dash, "apiVersion"), v2APIVersionPrefix) {
 		return obj(dash, "spec"), true
 	}
 	if _, ok := dash["elements"].(map[string]any); ok {
-		for _, k := range []string{"panels", "rows", "templating"} {
+		for _, k := range classicKeys {
 			if _, has := dash[k]; has {
 				return nil, false
 			}
@@ -156,12 +179,12 @@ func collectSources(dash map[string]any, fallbackTitle string) (map[string]any, 
 }
 
 var v2VariableTypes = map[string]string{
-	"QueryVariable":      "query",
-	"CustomVariable":     "custom",
-	"ConstantVariable":   "constant",
-	"TextVariable":       "textbox",
-	"DatasourceVariable": "datasource",
-	"IntervalVariable":   "interval",
+	"QueryVariable":      varQuery,
+	"CustomVariable":     varCustom,
+	"ConstantVariable":   varConstant,
+	"TextVariable":       varTextbox,
+	"DatasourceVariable": varDatasource,
+	"IntervalVariable":   varInterval,
 }
 
 func collectV2(spec map[string]any, fallbackTitle string) []source {
@@ -177,7 +200,7 @@ func collectV2(spec map[string]any, fallbackTitle string) []source {
 		if variable.Name != "" {
 			vars[variable.Name] = variable
 		}
-		if variable.Type == "query" {
+		if variable.Type == varQuery {
 			queryVars = append(queryVars, v)
 		}
 	}
@@ -190,7 +213,7 @@ func collectV2(spec map[string]any, fallbackTitle string) []source {
 	sort.Strings(names)
 	for _, name := range names {
 		panel, _ := elements[name].(map[string]any)
-		if str(panel, "kind") != "Panel" {
+		if str(panel, "kind") != v2PanelKind {
 			continue
 		}
 		pspec := obj(panel, "spec")
@@ -219,7 +242,7 @@ func v2Variable(item map[string]any) map[string]any {
 		typ = strings.ToLower(kind)
 	}
 	v := map[string]any{"type": typ}
-	for _, k := range []string{"name", "multi", "includeAll", "allValue", "options"} {
+	for _, k := range v2VariableFields {
 		if val, has := vs[k]; has {
 			v[k] = val
 		}
@@ -246,7 +269,7 @@ func collectDashboard(dash map[string]any, fallbackTitle string) []source {
 			if variable.Name != "" {
 				vars[variable.Name] = variable
 			}
-			if variable.Type == "query" {
+			if variable.Type == varQuery {
 				queryVars = append(queryVars, v)
 			}
 		}

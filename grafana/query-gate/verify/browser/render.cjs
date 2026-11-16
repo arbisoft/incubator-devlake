@@ -58,6 +58,14 @@ const PLAN = {
 
 const RANGE_STEPS = { default: 'from=now-90d&to=now', 'range-2y': 'from=now-2y&to=now' };
 const VAR_TYPES = ['query', 'custom'];
+const V2_DOCUMENT_KIND = 'Dashboard';
+const V2_API_VERSION_PREFIX = 'dashboard.grafana.app/v2';
+const V2_PANEL_KIND = 'Panel';
+const TABS_LAYOUT = 'TabsLayout';
+const ROWS_LAYOUT = 'RowsLayout';
+// Grafana's URL parameter for the selected tab; a tabs layout inside a row prefixes it with the row's slug.
+const TAB_PARAM = 'dtab';
+const TAB_SCENARIO_PREFIX = 'tab:';
 
 const FORGE_QUERY = 'orgId=1&from=now-1y&to=now&var-project=snap-Sophia&var-project=Supercal&var-project=edly-Github';
 const BREAKOUT_QUERY = 'orgId=1&from=now-1y&to=now&var-user=a%5C&var-user=%29%29%20OR%201%3D1%20--%20';
@@ -136,23 +144,24 @@ function walkJson(dir) {
 
 // Query strings that select each tab of a v2 TabsLayout, whose panels only query once their tab is shown.
 function v2Tabs(layout) {
+  const slug = (title) => title.replace(/ /g, '-');
   const tabsQuery = (key, tabsLayout) => ((tabsLayout.spec && tabsLayout.spec.tabs) || [])
-    .map((tab) => ({ title: tab.spec.title, query: `${key}=${encodeURIComponent(tab.spec.title.replace(/ /g, '-'))}` }));
+    .map((tab) => ({ title: tab.spec.title, query: `${key}=${encodeURIComponent(slug(tab.spec.title))}` }));
   if (!layout) return [];
-  if (layout.kind === 'TabsLayout') return tabsQuery('dtab', layout);
-  if (layout.kind !== 'RowsLayout') return [];
-  return ((layout.spec && layout.spec.rows) || []).flatMap((row) => (row.spec.layout && row.spec.layout.kind === 'TabsLayout'
-    ? tabsQuery(`${row.spec.title.replace(/ /g, '-')}-dtab`, row.spec.layout) : []));
+  if (layout.kind === TABS_LAYOUT) return tabsQuery(TAB_PARAM, layout);
+  if (layout.kind !== ROWS_LAYOUT) return [];
+  return ((layout.spec && layout.spec.rows) || []).flatMap((row) => (row.spec.layout && row.spec.layout.kind === TABS_LAYOUT
+    ? tabsQuery(`${slug(row.spec.title)}-${TAB_PARAM}`, row.spec.layout) : []));
 }
 
 function loadDashboards() {
   const all = walkJson(DASHBOARDS_DIR).sort().map((file) => {
     const j = JSON.parse(fs.readFileSync(file, 'utf8'));
     const rel = path.relative(ROOT, file).split(path.sep).join('/');
-    if (j.kind === 'Dashboard' && String(j.apiVersion || '').startsWith('dashboard.grafana.app/v2')) {
+    if (j.kind === V2_DOCUMENT_KIND && String(j.apiVersion || '').startsWith(V2_API_VERSION_PREFIX)) {
       const spec = j.spec || {};
       const v2Vars = (spec.variables || []).map((v) => v.spec.name);
-      const v2SqlPanelUids = Object.values(spec.elements || {}).filter((el) => el.kind === 'Panel')
+      const v2SqlPanelUids = Object.values(spec.elements || {}).filter((el) => el.kind === V2_PANEL_KIND)
         .map((el) => ((el.spec.data && el.spec.data.spec && el.spec.data.spec.queries) || [])
           .find((q) => typeof q.spec.query.spec.rawSql === 'string' && q.spec.query.spec.rawSql.trim() !== ''))
         .filter(Boolean)
@@ -565,7 +574,7 @@ async function runDashboardSteps(st, page, rec, dash, steps) {
   for (const step of steps) {
     if (RANGE_STEPS[step]) await runScenario(st, page, rec, dash, step, () => gotoUrl(page, dashUrl(st, dash, `orgId=1&${RANGE_STEPS[step]}`)));
     if (step === 'default') {
-      for (const tab of dash.tabs) await runScenario(st, page, rec, dash, `tab:${tab.title}`, () => gotoUrl(page, dashUrl(st, dash, `orgId=1&${RANGE_STEPS.default}&${tab.query}`)));
+      for (const tab of dash.tabs) await runScenario(st, page, rec, dash, `${TAB_SCENARIO_PREFIX}${tab.title}`, () => gotoUrl(page, dashUrl(st, dash, `orgId=1&${RANGE_STEPS.default}&${tab.query}`)));
     }
     if (step === 'refresh') await runScenario(st, page, rec, dash, 'refresh', () => evalOrThrow(page, refreshTimeRange));
     if (step === 'vars') await runVariables(st, page, rec, dash);
