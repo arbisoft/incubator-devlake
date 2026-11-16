@@ -40,6 +40,7 @@ var _ statsProvider = (*StatsService)(nil)
 const (
 	emailParam     = "email"
 	timeFrameParam = "tf"
+	sinceParam     = "since"
 	fromParam      = "from"
 	toParam        = "to"
 )
@@ -79,7 +80,8 @@ func (h *Handlers) IsValid(c *gin.Context) {
 // @Produce json
 // @Security ApiKeyAuth
 // @Param email path string true "Engineer email" example(abc@arbisoft.com)
-// @Param tf query string false "Time frame: 1-999 followed by h, d, w, M or y (case-sensitive). Give tf, or from and to." example(1w)
+// @Param tf query string false "Time frame: 1-999 followed by h, d, w, M or y (case-sensitive). Give tf, since, or from and to." example(1w)
+// @Param since query string false "Use joining to start at the email's first Jira, GitHub or AI activity and end now" Enums(joining)
 // @Param from query string false "Start of an explicit range, RFC 3339 with an offset, for example 2026-11-01T00:00:00Z"
 // @Param to query string false "End of an explicit range, RFC 3339 with an offset"
 // @Success 200 {object} JiraStats
@@ -100,7 +102,8 @@ func (h *Handlers) GetJiraStats(c *gin.Context) {
 // @Produce json
 // @Security ApiKeyAuth
 // @Param email path string true "Engineer email" example(abc@arbisoft.com)
-// @Param tf query string false "Time frame: 1-999 followed by h, d, w, M or y (case-sensitive). Give tf, or from and to." example(1w)
+// @Param tf query string false "Time frame: 1-999 followed by h, d, w, M or y (case-sensitive). Give tf, since, or from and to." example(1w)
+// @Param since query string false "Use joining to start at the email's first Jira, GitHub or AI activity and end now" Enums(joining)
 // @Param from query string false "Start of an explicit range, RFC 3339 with an offset, for example 2026-11-01T00:00:00Z"
 // @Param to query string false "End of an explicit range, RFC 3339 with an offset"
 // @Success 200 {object} GitHubStats
@@ -121,7 +124,8 @@ func (h *Handlers) GetGitHubStats(c *gin.Context) {
 // @Produce json
 // @Security ApiKeyAuth
 // @Param email path string true "Engineer email" example(abc@arbisoft.com)
-// @Param tf query string false "Time frame: 1-999 followed by h, d, w, M or y (case-sensitive). Give tf, or from and to." example(30d)
+// @Param tf query string false "Time frame: 1-999 followed by h, d, w, M or y (case-sensitive). Give tf, since, or from and to." example(30d)
+// @Param since query string false "Use joining to start at the email's first Jira, GitHub or AI activity and end now" Enums(joining)
 // @Param from query string false "Start of an explicit range, RFC 3339 with an offset, for example 2026-11-01T00:00:00Z"
 // @Param to query string false "End of an explicit range, RFC 3339 with an offset"
 // @Success 200 {object} AIUsageStats
@@ -142,7 +146,8 @@ func (h *Handlers) GetAIUsageStats(c *gin.Context) {
 // @Produce json
 // @Security ApiKeyAuth
 // @Param email path string true "Engineer email" example(abc@arbisoft.com)
-// @Param tf query string false "Time frame: 1-999 followed by h, d, w, M or y (case-sensitive). Give tf, or from and to." example(30d)
+// @Param tf query string false "Time frame: 1-999 followed by h, d, w, M or y (case-sensitive). Give tf, since, or from and to." example(30d)
+// @Param since query string false "Use joining to start at the email's first Jira, GitHub or AI activity and end now" Enums(joining)
 // @Param from query string false "Start of an explicit range, RFC 3339 with an offset, for example 2026-11-01T00:00:00Z"
 // @Param to query string false "End of an explicit range, RFC 3339 with an offset"
 // @Success 200 {object} AICostStats
@@ -156,9 +161,9 @@ func (h *Handlers) GetAICostStats(c *gin.Context) {
 	respond(c, stats, err)
 }
 
-// periodOf reads the period from the query: tf, or from and to.
+// periodOf reads the period from the query: tf, since, or from and to.
 func periodOf(c *gin.Context) Period {
-	return Period{TimeFrame: c.Query(timeFrameParam), From: c.Query(fromParam), To: c.Query(toParam)}
+	return Period{TimeFrame: c.Query(timeFrameParam), Since: c.Query(sinceParam), From: c.Query(fromParam), To: c.Query(toParam)}
 }
 
 // respond writes body, or the error with the status its kind carries.

@@ -25,6 +25,8 @@ type StatsWindow struct {
 	Email string `json:"email" example:"abc@arbisoft.com"`
 	// TimeFrame is the tf query parameter as given. It is left out when the request used from and to.
 	TimeFrame string `json:"timeFrame,omitempty" example:"1w"`
+	// Since is "joining" when the window starts at the engineer's first activity. It is left out otherwise.
+	Since string `json:"since,omitempty" example:"joining"`
 	// From is the inclusive start of the window, RFC 3339 in UTC.
 	From time.Time `json:"from" example:"2026-11-03T09:30:00Z"`
 	// To is the exclusive end of the window, RFC 3339 in UTC.
@@ -45,6 +47,26 @@ type JiraStats struct {
 	IssuesInProgress int64 `json:"issuesInProgress"`
 	// IssuesTodo counts issues assigned to the engineer that are still to do now, whatever the window.
 	IssuesTodo int64 `json:"issuesTodo"`
+	// AvgResolutionHours averages created-to-resolved time of the issues resolved in the window. Zero without any.
+	AvgResolutionHours float64 `json:"avgResolutionHours"`
+	// ByType splits the resolved issues by ticket type. It is empty, never null, without data.
+	ByType []JiraTypeStats `json:"byType"`
+	// ByTeam splits the resolved issues by DevLake project, so an engineer on several teams appears in each.
+	ByTeam []JiraTeamStats `json:"byTeam"`
+}
+
+// JiraTypeStats is the resolved work of one ticket type.
+type JiraTypeStats struct {
+	IssueType      string  `json:"type" example:"BUG"`
+	IssuesResolved int64   `json:"issuesResolved" gorm:"column:resolved_count"`
+	StoryPoints    float64 `json:"storyPoints" gorm:"column:points_total"`
+}
+
+// JiraTeamStats is the resolved work in one DevLake project.
+type JiraTeamStats struct {
+	Team           string  `json:"team" example:"Akina"`
+	IssuesResolved int64   `json:"issuesResolved" gorm:"column:resolved_count"`
+	StoryPoints    float64 `json:"storyPoints" gorm:"column:points_total"`
 }
 
 // GitHubStats summarizes GitHub work. Commit counts use the commit author email, which is reliable. Pull request
@@ -66,6 +88,35 @@ type GitHubStats struct {
 	PullRequestsWithCommits int64 `json:"pullRequestsWithCommits"`
 	// Reviews counts pull request reviews the engineer's account submitted in the window.
 	Reviews int64 `json:"reviews"`
+	// PullRequestsReviewed counts distinct pull requests the engineer's account reviewed in the window.
+	PullRequestsReviewed int64 `json:"pullRequestsReviewed"`
+	// AvgPrMergeHours averages created-to-merged time of the engineer's pull requests merged in the window.
+	AvgPrMergeHours float64 `json:"avgPrMergeHours"`
+	// ByRepo splits commits and pull requests by repository. It is empty, never null, without data.
+	ByRepo []GitHubBreakdown `json:"byRepo"`
+	// ByTeam splits them by DevLake project.
+	ByTeam []GitHubBreakdown `json:"byTeam"`
+}
+
+// GitHubBreakdown is the engineer's GitHub work in one repository or project, next to what every contributor did
+// there. A contributor is anyone who authored a commit or a pull request in the group. The shares are percentages
+// with one decimal, 0 when the group has no such work.
+type GitHubBreakdown struct {
+	Name               string `json:"name" example:"arbisoft/devlake"`
+	Commits            int64  `json:"commits"`
+	PullRequestsOpened int64  `json:"pullRequestsOpened"`
+	PullRequestsMerged int64  `json:"pullRequestsMerged"`
+	// LinesChanged sums the engineer's additions and deletions.
+	LinesChanged int64 `json:"linesChanged"`
+	// RepoCommits, RepoLinesChanged and RepoPullRequestsMerged are the totals of every contributor in the window.
+	RepoCommits            int64 `json:"repoCommits"`
+	RepoLinesChanged       int64 `json:"repoLinesChanged"`
+	RepoPullRequestsMerged int64 `json:"repoPullRequestsMerged"`
+	// Contributors counts the distinct commit author emails in the group in the window.
+	Contributors               int64   `json:"contributors"`
+	CommitSharePct             float64 `json:"commitSharePct"`
+	LinesSharePct              float64 `json:"linesSharePct"`
+	PullRequestsMergedSharePct float64 `json:"pullRequestsMergedSharePct"`
 }
 
 // AIProviderUsage is one AI provider's activity for the engineer. AI data is daily, so the window covers whole UTC
@@ -91,6 +142,18 @@ type AIUsageStats struct {
 	ToolEditsAccepted int64 `json:"toolEditsAccepted"`
 	// ToolEditsRejected counts rejected file edits and writes.
 	ToolEditsRejected int64 `json:"toolEditsRejected"`
+	// Monthly is the activity per provider and UTC month, oldest first. It is empty, never null, without data.
+	Monthly []AIMonthlyUsage `json:"monthly"`
+	// ActiveInLastMonth is true when the engineer has activity in the UTC month the window ends in.
+	ActiveInLastMonth bool `json:"activeInLastMonth"`
+}
+
+// AIMonthlyUsage is one provider's activity in one UTC month.
+type AIMonthlyUsage struct {
+	Provider   string `json:"provider" example:"claude"`
+	Month      string `json:"month" example:"2026-11"`
+	ActiveDays int64  `json:"activeDays" gorm:"column:days_active"`
+	Sessions   int64  `json:"sessions"`
 }
 
 // AIModelCost is the token use and estimated cost of one model. Costs are decimal strings in US dollars.
@@ -111,4 +174,14 @@ type AICostStats struct {
 	Models []AIModelCost `json:"models"`
 	// TotalEstimatedCostUSD sums every model's estimated cost, as a decimal string in US dollars.
 	TotalEstimatedCostUSD string `json:"totalEstimatedCostUsd" example:"12.12764220"`
+	// Monthly is the token use and cost per UTC month, oldest first. It is empty, never null, without data.
+	Monthly []AIMonthlyCost `json:"monthly"`
+}
+
+// AIMonthlyCost is the token use and estimated cost of one UTC month. The cost is a decimal string in US dollars.
+type AIMonthlyCost struct {
+	Month        string `json:"month" example:"2026-11"`
+	InputTokens  int64  `json:"inputTokens"`
+	OutputTokens int64  `json:"outputTokens"`
+	CostUSD      string `json:"estimatedCostUsd" example:"12.12764220"`
 }

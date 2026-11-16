@@ -167,7 +167,8 @@ func TestStatsServiceValidatesInputBeforeQuerying(t *testing.T) {
 
 func TestJiraMapsRowsAndBindsTheWindow(t *testing.T) {
 	db := newFakeDB(t)
-	db.answers["issues_resolved"] = map[string]interface{}{"IssuesResolved": int64(4), "StoryPointsResolved": 7.5, "IssuesInProgress": int64(2), "IssuesTodo": int64(3)}
+	db.answers["issues_resolved"] = map[string]interface{}{"IssuesResolved": int64(4), "StoryPointsResolved": 7.5, "IssuesInProgress": int64(2), "IssuesTodo": int64(3), "AvgResolutionHours": 36.5}
+	db.lists["resolved_count"] = []map[string]interface{}{{"IssuesResolved": int64(4), "StoryPoints": 7.5}}
 	db.answers["issues_created"] = map[string]interface{}{"IssuesCreated": int64(5)}
 
 	got, err := newService(t, db.db).Jira(" ABC@Arbisoft.com ", Period{TimeFrame: "1w"})
@@ -177,18 +178,19 @@ func TestJiraMapsRowsAndBindsTheWindow(t *testing.T) {
 
 	from := fixedNow.AddDate(0, 0, -7)
 	want := &JiraStats{StatsWindow: StatsWindow{Email: "abc@arbisoft.com", TimeFrame: "1w", From: from, To: fixedNow},
-		IssuesResolved: 4, StoryPointsResolved: 7.5, IssuesCreated: 5, IssuesInProgress: 2, IssuesTodo: 3}
+		IssuesResolved: 4, StoryPointsResolved: 7.5, IssuesCreated: 5, IssuesInProgress: 2, IssuesTodo: 3, AvgResolutionHours: 36.5,
+		ByType: []JiraTypeStats{{IssuesResolved: 4, StoryPoints: 7.5}}, ByTeam: []JiraTeamStats{{IssuesResolved: 4, StoryPoints: 7.5}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Jira() = %+v, want %+v", got, want)
 	}
-	if len(db.queries) != 2 {
-		t.Fatalf("queries = %d, want 2", len(db.queries))
+	if len(db.queries) != 4 {
+		t.Fatalf("queries = %d, want 4", len(db.queries))
 	}
 	for _, q := range db.queries {
 		if !containsParam(q.params, "abc@arbisoft.com") || !containsParam(q.params, from) || !containsParam(q.params, fixedNow) {
 			t.Errorf("query %q params = %v, want the lowercased email and the window", q.sel, q.params)
 		}
-		if !strings.Contains(q.where, "jira:%") || !strings.Contains(q.where, "LOWER(a.email) = ?") {
+		if !strings.Contains(q.where+q.from, "jira:%") || !strings.Contains(q.where+q.from, "LOWER(a.email) = ?") {
 			t.Errorf("where = %q, want jira issues matched on the lowercased account email", q.where)
 		}
 	}
@@ -290,4 +292,115 @@ func containsParam(params []interface{}, want interface{}) bool {
 		}
 	}
 	return false
+}
+
+func TestSinceJoiningStartsAtTheFirstActivity(t *testing.T) {
+	joined := time.Date(2025, 3, 4, 9, 0, 0, 0, time.UTC)
+	db := newFakeDB(t)
+	db.lists["AS joined"] = []map[string]interface{}{{"Joined": &joined}}
+
+	got, err := newService(t, db.db).Jira("ABC@arbisoft.com", Period{Since: "joining"})
+	if err != nil {
+		t.Fatalf("Jira() error = %v", err)
+	}
+	if got.Since != "joining" || got.TimeFrame != "" || !got.From.Equal(joined) || !got.To.Equal(fixedNow) {
+		t.Errorf("window = %+v, want joining %v .. %v", got.StatsWindow, joined, fixedNow)
+	}
+	// The window is longer than a year, which only since=joining may do.
+	if got.To.Sub(got.From) <= maxRange {
+		t.Errorf("window = %v, want longer than the explicit range limit", got.To.Sub(got.From))
+	}
+}
+
+func TestSinceJoiningWithoutActivityIsAnEmptyWindow(t *testing.T) {
+	got, err := newService(t, newFakeDB(t).db).AICost("abc@arbisoft.com", Period{Since: "joining"})
+	if err != nil {
+		t.Fatalf("AICost() error = %v", err)
+	}
+	if !got.From.Equal(fixedNow) || !got.To.Equal(fixedNow) || got.TotalEstimatedCostUSD != zeroCost {
+		t.Errorf("AICost() = %+v, want an empty window at now and zero cost", got)
+	}
+}
+
+func TestSinceRejectsOtherValuesAndCombinations(t *testing.T) {
+	for name, p := range map[string]Period{
+		"unknown value": {Since: "start"},
+		"with tf":       {Since: "joining", TimeFrame: "1y"},
+		"with range":    {Since: "joining", From: "2026-11-01T00:00:00Z", To: "2026-11-08T00:00:00Z"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			db := newFakeDB(t)
+			_, err := newService(t, db.db).GitHub("abc@arbisoft.com", p)
+			if err == nil || err.GetType().GetHttpCode() != 400 || len(db.queries) != 0 {
+				t.Errorf("error = %v with %d queries, want a 400 before any query", err, len(db.queries))
+			}
+		})
+	}
+}
+
+func TestGitHubBreakdownComputesTheShareOfEveryContributor(t *testing.T) {
+	db := newFakeDB(t)
+	db.lists["AS repo_commits"] = []map[string]interface{}{
+		{"Name": "org/a", "RepoCommits": int64(20), "RepoLines": int64(1000), "Contributors": int64(4), "Commits": int64(5), "Lines": int64(250)},
+		{"Name": "org/b", "RepoCommits": int64(3), "RepoLines": int64(0), "Contributors": int64(1), "Commits": int64(3), "Lines": int64(0)},
+	}
+	db.lists["AS repo_opened"] = []map[string]interface{}{
+		{"Name": "org/a", "RepoOpened": int64(8), "RepoMerged": int64(4), "Opened": int64(2), "Merged": int64(1)},
+		{"Name": "org/c", "RepoOpened": int64(1), "RepoMerged": int64(0), "Opened": int64(1)},
+	}
+	db.answers["AS avg_pr_merge_hours"] = map[string]interface{}{"AvgPrMergeHours": 4.5}
+	db.answers["pull_requests_reviewed"] = map[string]interface{}{"Reviews": int64(6), "PullRequestsReviewed": int64(3)}
+
+	got, err := newService(t, db.db).GitHub("abc@arbisoft.com", Period{TimeFrame: "1y"})
+	if err != nil {
+		t.Fatalf("GitHub() error = %v", err)
+	}
+	want := []GitHubBreakdown{
+		{Name: "org/a", Commits: 5, LinesChanged: 250, PullRequestsOpened: 2, PullRequestsMerged: 1, RepoCommits: 20, RepoLinesChanged: 1000,
+			RepoPullRequestsMerged: 4, Contributors: 4, CommitSharePct: 25, LinesSharePct: 25, PullRequestsMergedSharePct: 25},
+		{Name: "org/b", Commits: 3, RepoCommits: 3, Contributors: 1, CommitSharePct: 100},
+		{Name: "org/c", PullRequestsOpened: 1},
+	}
+	if !reflect.DeepEqual(got.ByRepo, want) || !reflect.DeepEqual(got.ByTeam, want) {
+		t.Errorf("ByRepo = %+v, ByTeam = %+v, want %+v", got.ByRepo, got.ByTeam, want)
+	}
+	if got.AvgPrMergeHours != 4.5 || got.PullRequestsReviewed != 3 || got.Reviews != 6 {
+		t.Errorf("GitHub() = %+v", got)
+	}
+}
+
+func TestSharePct(t *testing.T) {
+	for _, tc := range []struct {
+		part, total int64
+		want        float64
+	}{{1, 3, 33.3}, {2, 3, 66.7}, {0, 0, 0}, {5, 0, 0}, {7, 7, 100}} {
+		if got := sharePct(tc.part, tc.total); got != tc.want {
+			t.Errorf("sharePct(%d, %d) = %v, want %v", tc.part, tc.total, got, tc.want)
+		}
+	}
+}
+
+func TestAIMonthlyTrendsAndActiveFlag(t *testing.T) {
+	db := newFakeDB(t)
+	db.lists["days_active"] = []map[string]interface{}{
+		{"Provider": "claude", "Month": "2026-10", "ActiveDays": int64(3), "Sessions": int64(9)},
+		{"Provider": "claude", "Month": "2026-11", "ActiveDays": int64(1)},
+	}
+	db.lists["AS cost_usd"] = []map[string]interface{}{{"Month": "2026-10", "InputTokens": int64(5), "CostUSD": "2.50000000"}}
+	s := newService(t, db.db)
+
+	usage, err := s.AIUsage("abc@arbisoft.com", Period{TimeFrame: "30d"})
+	if err != nil {
+		t.Fatalf("AIUsage() error = %v", err)
+	}
+	if len(usage.Monthly) != 2 || usage.Monthly[0].ActiveDays != 3 || !usage.ActiveInLastMonth {
+		t.Errorf("AIUsage() = %+v, want two months and active in the month the window ends", usage)
+	}
+	cost, err := s.AICost("abc@arbisoft.com", Period{TimeFrame: "30d"})
+	if err != nil {
+		t.Fatalf("AICost() error = %v", err)
+	}
+	if len(cost.Monthly) != 1 || cost.Monthly[0].CostUSD != "2.50000000" {
+		t.Errorf("AICost().Monthly = %+v", cost.Monthly)
+	}
 }

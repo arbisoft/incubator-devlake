@@ -73,18 +73,22 @@ func (tf TimeFrame) Window(now time.Time) (from, to time.Time) {
 // maxRange is the longest explicit range, the same limit the Integration Service applies.
 const maxRange = 366 * 24 * time.Hour
 
-// Period is what the caller asked for: a time frame counted back from now, or an explicit range. Exactly one of the two
-// must be given.
+// Period is what the caller asked for: a time frame counted back from now, an explicit range, or everything since the
+// engineer joined. Exactly one of the three must be given.
 type Period struct {
 	TimeFrame string
-	From      string
-	To        string
+	// Since is "joining" to start at the engineer's first activity. StatsService resolves it, because it needs the database.
+	Since string
+	From  string
+	To    string
 }
 
 // resolve returns the half-open window [from, to) in UTC and the time frame text (empty for a range). Errors are BadInput.
 func (p Period) resolve(now time.Time) (from, to time.Time, timeFrame string, err errors.Error) {
 	hasRange := p.From != "" || p.To != ""
 	switch {
+	case p.Since != "":
+		return time.Time{}, time.Time{}, "", errors.BadInput.New("since is resolved by the stats service, not by the period")
 	case p.TimeFrame != "" && hasRange:
 		return time.Time{}, time.Time{}, "", errors.BadInput.New("give either tf or from and to, not both")
 	case p.TimeFrame != "":

@@ -196,8 +196,8 @@ Sophia's base URL, token URL, client ID, encrypted secret, scope and callback pa
 DevLake serves these for the Integration Service (`backend/server/api/integration`). They are reached through `/rest/...`. There, DevLake checks `Authorization: Bearer <API key>` and the key's allowed path, so create a DevLake API key whose allowed path is `^/(is_valid|stats/.+)$`. A direct call without the `/rest` prefix gets 401, even when login is off.
 
 - **`GET is_valid`:** `true`. An invalid, expired or out-of-scope key gets 403 from DevLake, which the client reports as `false`.
-- **Period:** give `tf` (1 to 999 and one of `h`, `d`, `w`, `M`, `y`, case-sensitive) or both `from` and `to` (RFC 3339 with an explicit offset, `from` earlier than `to`, at most one year). Giving both forms, one end of a range, or nothing gets 400 with a message naming the field.
-- **Every stats response** starts with `email` (lowercased), `timeFrame` (left out for a range), and `from` and `to` (RFC 3339 UTC, `[from, to)`). An email with no data gets zeros and empty lists.
+- **Period:** give `tf` (1 to 999 and one of `h`, `d`, `w`, `M`, `y`, case-sensitive), both `from` and `to` (RFC 3339 with an explicit offset, `from` earlier than `to`, at most one year), or `since=joining`. `since=joining` runs from the email's first Jira, GitHub or AI activity in DevLake to now, with no length limit, and the response echoes `since` and the resolved `from`; an email with no activity gets an empty window and zeros. The last twelve months is `tf=1y`. Giving more than one form, one end of a range, or nothing gets 400 with a message naming the field.
+- **Every stats response** starts with `email` (lowercased), `timeFrame` (left out for a range or `since`), `since` (only for `since=joining`), and `from` and `to` (RFC 3339 UTC, `[from, to)`). An email with no data gets zeros and empty lists.
 
 | Category | Fields after the common ones |
 |---|---|
@@ -208,6 +208,7 @@ DevLake serves these for the Integration Service (`backend/server/api/integratio
 
 Data limits:
 
+- **Breakdowns:** Jira adds `avgResolutionHours`, `byType` and `byTeam`. GitHub adds `avgPrMergeHours`, `pullRequestsReviewed`, `byRepo` and `byTeam`. Each `byRepo` and `byTeam` entry also gives the repo's totals for every contributor (anyone who authored a commit or pull request there, bots included) and the engineer's share of them: `commitSharePct`, `linesSharePct` and `pullRequestsMergedSharePct`, with `contributors` counting distinct commit author emails. AI usage adds `monthly` (per provider and UTC month) and `activeInLastMonth`. AI cost adds `monthly` (tokens and a decimal-string cost per UTC month). A team is a DevLake project, so an engineer on several projects appears in each. SkillForge usage is not available.
 - **Jira and GitHub accounts:** Jira stats, and GitHub pull request authorship and reviews, match on the account's email, which many accounts hide. Commit counts and `pullRequestsWithCommits` use the commit author email, which is reliable.
 - **AI data:** it is daily, so AI windows cover whole UTC days.
 
