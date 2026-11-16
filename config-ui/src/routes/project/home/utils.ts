@@ -24,6 +24,7 @@ import { WEBHOOK_PLUGIN } from '@/features/connections';
 import { getPluginConfig } from '@/plugins';
 import { INTEGRATION_CATEGORY, getCatalogEntry } from '@/plugins/catalog';
 import ClaudeCodeOtelIcon from '@/plugins/register/claude_otel/assets/icon.svg?react';
+import { getConnectorVisual } from '@/plugins/utils';
 import { OTEL_INTEGRATION_KEY } from '@/routes/connection/constants';
 import type { IConnection, IProject, IWebhook } from '@/types';
 import type { ListQuery } from '@/ui';
@@ -97,6 +98,7 @@ export const describeConnectionEntry = (
       pluginLabel: COPY.otelPluginLabel,
       category: INTEGRATION_CATEGORY.AI_ANALYTICS,
       icon: () => createElement(ClaudeCodeOtelIcon),
+      logo: getConnectorVisual(OTEL_INTEGRATION_KEY).logo,
     };
   }
 
@@ -110,7 +112,7 @@ export const describeConnectionEntry = (
     name: connection?.name ?? webhook?.name ?? `${pluginName}/connection/${connectionId}`,
     pluginLabel: config.name,
     category: getCatalogEntry(config).category,
-    icon: config.icon,
+    ...getConnectorVisual(pluginName),
   };
 };
 

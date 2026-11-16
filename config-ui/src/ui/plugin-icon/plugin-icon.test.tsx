@@ -20,6 +20,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { ThemeProvider } from 'styled-components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { getConnectorLogo } from '@/config/connector-logos';
 import { CONNECTOR_BRAND_COLORS } from '@/theme';
 import { getTheme } from '@/theme/tokens';
 import { renderWithTheme } from '@/ui/__tests__/render-with-theme';
@@ -39,10 +40,12 @@ const dark = getTheme('dark');
 const INVERT_FILTER = 'invert(1)';
 const TestSvg: SvgComponent = (props) => <svg data-testid={LOGO_TEST_ID} {...props} />;
 
-const logo = (kind: typeof CONNECTOR_LOGO_KIND.LOGO | typeof CONNECTOR_LOGO_KIND.MONO): ConnectorLogo => ({
-  Svg: TestSvg,
-  kind,
-});
+const TEST_SRC = '/test-logo.svg';
+
+const logo = (kind: typeof CONNECTOR_LOGO_KIND.LOGO | typeof CONNECTOR_LOGO_KIND.MONO): ConnectorLogo =>
+  kind === CONNECTOR_LOGO_KIND.LOGO ? { kind, src: TEST_SRC } : { kind, Svg: TestSvg };
+
+const logoImage = () => document.querySelector(`img[src="${TEST_SRC}"]`) as HTMLElement;
 
 const renderInDark = (mark: ConnectorLogo) => {
   render(
@@ -50,7 +53,7 @@ const renderInDark = (mark: ConnectorLogo) => {
       <PluginIcon icon={() => null} size="md" logo={mark} />
     </ThemeProvider>,
   );
-  return screen.getByTestId(LOGO_TEST_ID).parentElement as HTMLElement;
+  return (logoImage() ?? screen.getByTestId(LOGO_TEST_ID)).parentElement as HTMLElement;
 };
 
 const colourOf = (value: string) => {
@@ -63,7 +66,7 @@ describe('PluginIcon', () => {
   it('renders the logo instead of the plugin icon', () => {
     const icon = vi.fn(() => <svg data-testid={PLUGIN_TEST_ID} />);
     renderWithTheme(<PluginIcon icon={icon} size="md" logo={logo(CONNECTOR_LOGO_KIND.LOGO)} />);
-    expect(screen.getByTestId(LOGO_TEST_ID)).toBeTruthy();
+    expect(logoImage()).toBeTruthy();
     expect(screen.queryByTestId(PLUGIN_TEST_ID)).toBeNull();
     expect(icon).not.toHaveBeenCalled();
   });
@@ -114,16 +117,26 @@ describe('PluginIcon', () => {
   });
 
   it('inverts a flagged logo in dark mode only', () => {
-    const flagged: ConnectorLogo = { kind: CONNECTOR_LOGO_KIND.LOGO, Svg: TestSvg, invertInDark: true };
+    const flagged: ConnectorLogo = { kind: CONNECTOR_LOGO_KIND.LOGO, src: TEST_SRC, invertInDark: true };
     expect(getComputedStyle(renderInDark(flagged)).filter).toBe(INVERT_FILTER);
     cleanup();
     renderWithTheme(<PluginIcon icon={() => null} size="md" logo={flagged} />);
-    expect(getComputedStyle(screen.getByTestId(LOGO_TEST_ID).parentElement as HTMLElement).filter).not.toBe(
-      INVERT_FILTER,
-    );
+    expect(getComputedStyle(logoImage().parentElement as HTMLElement).filter).not.toBe(INVERT_FILTER);
   });
 
   it('never inverts an unflagged logo', () => {
     expect(getComputedStyle(renderInDark(logo(CONNECTOR_LOGO_KIND.LOGO))).filter).not.toBe(INVERT_FILTER);
+  });
+
+  it('renders repeated full-colour logos without duplicate ids', () => {
+    const bitbucket = getConnectorLogo('bitbucket');
+    renderWithTheme(
+      <>
+        <PluginIcon icon={() => null} size="md" logo={bitbucket} />
+        <PluginIcon icon={() => null} size="md" logo={bitbucket} />
+      </>,
+    );
+    const ids = [...document.body.querySelectorAll('[id]')].map(({ id }) => id);
+    expect(ids).toEqual([...new Set(ids)]);
   });
 });

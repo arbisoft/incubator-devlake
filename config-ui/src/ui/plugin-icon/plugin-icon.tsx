@@ -29,6 +29,7 @@ type MarkProps = Pick<PluginIconProps, 'icon' | 'logo'> & { colors: AppThemeColo
 
 const renderMark = ({ icon, logo, colors, mode }: MarkProps) => {
   if (!logo) return icon({ color: colors.iconBrand });
+  if (logo.kind === CONNECTOR_LOGO_KIND.LOGO) return <img src={logo.src} alt="" />;
   if (logo.Svg) return <logo.Svg />;
   return icon({ color: logo.kind === CONNECTOR_LOGO_KIND.TINT ? logo.color[mode] : colors.text });
 };

@@ -16,7 +16,6 @@
  *
  */
 
-import { getConnectorVisual } from '@/plugins/utils';
 import { ListPopover, ListPopoverRow, PluginIcon } from '@/ui';
 
 import { COPY } from '../constants';
@@ -42,9 +41,9 @@ export const ConnectionsPopover = ({ details }: ConnectionsPopoverProps) => {
         </Chips>
       }
     >
-      {details.map(({ key, plugin, name, pluginLabel, category, icon }) => (
+      {details.map(({ key, name, pluginLabel, category, icon, logo }) => (
         <ListPopoverRow key={key}>
-          <PluginIcon icon={icon} size="sm" logo={getConnectorVisual(plugin).logo} />
+          <PluginIcon icon={icon} size="sm" logo={logo} />
           <RowCopy>
             <RowTitle title={name}>{name}</RowTitle>
             <RowSubtitle>{text.subtitle(pluginLabel, category)}</RowSubtitle>

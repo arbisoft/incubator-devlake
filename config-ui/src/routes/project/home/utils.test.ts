@@ -19,6 +19,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { OtelConnectionResponse } from '@/api/otel';
+import { getConnectorVisual } from '@/plugins/utils';
 import { OTEL_INTEGRATION_KEY } from '@/routes/connection/constants';
 import { PIPELINE_STATUS_COPY } from '@/routes/pipeline/status-tone';
 import { IPipelineStatus, type IProject } from '@/types';
@@ -151,6 +152,11 @@ describe('describeConnectionEntry', () => {
     expect(describeConnectionEntry(entry, [], []).plugin).toBe('github');
   });
 
+  it('carries the connector logo of a connector entry', () => {
+    const [entry] = getConnectionEntries({ ...toProjectRow(PROJECT) });
+    expect(describeConnectionEntry(entry, [], []).logo).toBe(getConnectorVisual('github').logo);
+  });
+
   it('uses the OTel integration key for an OTel entry', () => {
     const [entry] = getConnectionEntries({
       ...toProjectRow(PROJECT),
@@ -158,5 +164,6 @@ describe('describeConnectionEntry', () => {
       otelConnections: [otel(3, ['alpha'])],
     });
     expect(describeConnectionEntry(entry, [], []).plugin).toBe(OTEL_INTEGRATION_KEY);
+    expect(describeConnectionEntry(entry, [], []).logo).toBe(getConnectorVisual(OTEL_INTEGRATION_KEY).logo);
   });
 });

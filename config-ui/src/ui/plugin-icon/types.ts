@@ -26,7 +26,7 @@ import type { CONNECTOR_LOGO_KIND } from './constants';
 type SvgComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
 export type ConnectorLogo =
-  | { kind: typeof CONNECTOR_LOGO_KIND.LOGO; Svg: SvgComponent; invertInDark?: boolean }
+  | { kind: typeof CONNECTOR_LOGO_KIND.LOGO; src: string; invertInDark?: boolean }
   | { kind: typeof CONNECTOR_LOGO_KIND.MONO; Svg?: SvgComponent }
   | { kind: typeof CONNECTOR_LOGO_KIND.TINT; color: Record<ResolvedTheme, string>; Svg?: SvgComponent };
 
