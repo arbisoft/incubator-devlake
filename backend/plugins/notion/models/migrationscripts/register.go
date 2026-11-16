@@ -24,5 +24,6 @@ func All() []plugin.MigrationScript {
 		new(addNotionInitialTables),
 		new(addNotionWebhookFields),
 		new(addNotionUsers),
+		new(addScopeConfigEntities),
 	}
 }
