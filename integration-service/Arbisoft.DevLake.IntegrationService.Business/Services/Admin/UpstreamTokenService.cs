@@ -16,9 +16,11 @@
 
 using Arbisoft.DevLake.IntegrationService.Business.Dtos.Admin;
 using Arbisoft.DevLake.IntegrationService.Business.Security;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 using Arbisoft.DevLake.IntegrationService.DataAccess.ExternalApis;
 using Arbisoft.DevLake.IntegrationService.DataAccess.ExternalApis.DevLake;
 using Arbisoft.DevLake.IntegrationService.DataAccess.ExternalApis.Workstream;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
 
 namespace Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
@@ -29,7 +31,7 @@ public interface IUpstreamTokenService
     Task<IReadOnlyList<UpstreamTokenDto>> ListAsync(CancellationToken cancellationToken);
 
     /// <summary>Encrypts and saves a system's API token, replacing the one stored before. The API uses it within a minute, without a restart.</summary>
-    Task<AdminResult> SaveAsync(UpstreamSystem system, string? token, string savedBy, CancellationToken cancellationToken);
+    Task<AdminResult> SaveAsync(UpstreamSystem system, string? token, AuditActor actor, CancellationToken cancellationToken);
 
     /// <summary>Asks the system's <c>is_valid</c> endpoint whether it accepts the stored token. The value is a message for the admin.</summary>
     Task<AdminResult<string>> CheckAsync(UpstreamSystem system, CancellationToken cancellationToken);
@@ -48,6 +50,8 @@ public sealed class UpstreamTokenService : IUpstreamTokenService
     private readonly IUpstreamTokenProvider _tokens;
     private readonly IDevLakeClient _devLake;
     private readonly IWorkstreamClient _workstream;
+    private readonly IDbSession _session;
+    private readonly IAuditTrail _audit;
     private readonly TimeProvider _timeProvider;
 
     public UpstreamTokenService(
@@ -56,6 +60,8 @@ public sealed class UpstreamTokenService : IUpstreamTokenService
         IUpstreamTokenProvider tokens,
         IDevLakeClient devLake,
         IWorkstreamClient workstream,
+        IDbSession session,
+        IAuditTrail audit,
         TimeProvider timeProvider)
     {
         _secrets = secrets;
@@ -63,6 +69,8 @@ public sealed class UpstreamTokenService : IUpstreamTokenService
         _tokens = tokens;
         _devLake = devLake;
         _workstream = workstream;
+        _session = session;
+        _audit = audit;
         _timeProvider = timeProvider;
     }
 
@@ -78,7 +86,7 @@ public sealed class UpstreamTokenService : IUpstreamTokenService
         return rows;
     }
 
-    public async Task<AdminResult> SaveAsync(UpstreamSystem system, string? token, string savedBy, CancellationToken cancellationToken)
+    public async Task<AdminResult> SaveAsync(UpstreamSystem system, string? token, AuditActor actor, CancellationToken cancellationToken)
     {
         var value = token?.Trim();
         if (string.IsNullOrEmpty(value))
@@ -91,7 +99,15 @@ public sealed class UpstreamTokenService : IUpstreamTokenService
             return AdminResult.Fail($"A token is one word of at most {MaxTokenLength} characters.");
         }
 
-        await _secrets.SaveEncryptedValueAsync(UpstreamSystems.SecretRefOf(system), _encryptor.Encrypt(value), _timeProvider.GetUtcNow(), cancellationToken, savedBy);
+        var secretRef = UpstreamSystems.SecretRefOf(system);
+        var name = UpstreamSystems.NameOf(system);
+        await _audit.SaveChangeAsync(_session, actor, async () =>
+        {
+            var replaces = await _secrets.GetInfoAsync(secretRef, cancellationToken) is not null;
+            await _secrets.SaveEncryptedValueAsync(secretRef, _encryptor.Encrypt(value), _timeProvider.GetUtcNow(), cancellationToken, actor.Name);
+            return new AuditSubject(AuditEntityTypes.UpstreamToken, name, name)
+                .Did(replaces ? AuditActions.Updated : AuditActions.Created, [new AuditChange(AuditedFields.Token, null, null, Hidden: true)]);
+        }, cancellationToken);
         _tokens.Invalidate(system);
         return AdminResult.Ok;
     }

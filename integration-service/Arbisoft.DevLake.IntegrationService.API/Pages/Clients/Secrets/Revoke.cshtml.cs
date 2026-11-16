@@ -33,7 +33,7 @@ public sealed class RevokeModel(IClientService clients) : AdminPageModel
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
-        var result = await clients.RevokeSecretAsync(Id, SecretId, Admin, cancellationToken);
+        var result = await clients.RevokeSecretAsync(Id, SecretId, Actor, cancellationToken);
         if (!result.Succeeded)
         {
             return Fail(result.Error);

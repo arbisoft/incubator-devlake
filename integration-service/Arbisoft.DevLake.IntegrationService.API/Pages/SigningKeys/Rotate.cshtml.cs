@@ -27,7 +27,7 @@ public sealed class RotateModel(ISigningKeyService signingKeys, ILogger<RotateMo
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
-        var result = await signingKeys.RotateAsync(cancellationToken);
+        var result = await signingKeys.RotateAsync(Actor, cancellationToken);
         if (!result.Succeeded)
         {
             return Fail(result.Error);

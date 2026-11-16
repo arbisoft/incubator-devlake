@@ -62,7 +62,7 @@ public sealed class EditModel(IClientConfigService configs) : AdminPageModel
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
-        var result = await configs.SaveAsync(ClientRefId, Form.ToInput(), Admin, cancellationToken);
+        var result = await configs.SaveAsync(ClientRefId, Form.ToInput(), Actor, cancellationToken);
         if (!result.Succeeded)
         {
             return await FailWithDetailsAsync(result.Error, cancellationToken);

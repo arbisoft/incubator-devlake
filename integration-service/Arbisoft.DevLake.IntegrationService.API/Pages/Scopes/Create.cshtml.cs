@@ -33,7 +33,7 @@ public sealed class CreateModel(IScopeService scopes) : AdminPageModel
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
-        var result = await scopes.CreateAsync(Name, Description ?? string.Empty, cancellationToken);
+        var result = await scopes.CreateAsync(Name, Description ?? string.Empty, Actor, cancellationToken);
         if (!result.Succeeded)
         {
             return Fail(result.Error);

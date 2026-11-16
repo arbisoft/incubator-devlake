@@ -17,8 +17,11 @@
 using Arbisoft.DevLake.IntegrationService.Business.Dtos.Admin;
 using Arbisoft.DevLake.IntegrationService.Business.Security;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
+using Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 
@@ -31,11 +34,13 @@ public class PortalUserServiceTests
 
     private readonly IPortalUserRepository _users = Substitute.For<IPortalUserRepository>();
     private readonly ClientSecretHasher _hasher = new();
+    private readonly IDbSession _session = Substitute.For<IDbSession>();
+    private readonly RecordingAuditTrail _audit = new();
     private readonly PortalUserService _service;
 
     public PortalUserServiceTests()
     {
-        _service = new PortalUserService(_users, _hasher, new FakeTimeProvider(Now));
+        _service = new PortalUserService(_users, _hasher, _session, _audit, new FakeTimeProvider(Now));
     }
 
     private PortalUser Local(long id, string password, string role = PortalRole.Admin, bool active = true, bool mustChange = false) => new()
@@ -193,7 +198,7 @@ public class PortalUserServiceTests
     {
         _users.GetByIdAsync(3, Arg.Any<CancellationToken>()).Returns(new PortalUser { Id = 3, Email = "jane.doe@arbisoft.com", Role = PortalRole.None, IsActive = true });
 
-        var result = await _service.SetAccessAsync(3, PortalRole.Editor, true, 1, "admin", CancellationToken.None);
+        var result = await _service.SetAccessAsync(3, PortalRole.Editor, true, 1, TestActors.User("admin"), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         await _users.Received(1).UpdateAccessAsync(3, PortalRole.Editor, true, "admin", Now, Arg.Any<CancellationToken>());
@@ -207,7 +212,7 @@ public class PortalUserServiceTests
         _users.GetByIdAsync(2, Arg.Any<CancellationToken>()).Returns(Local(2, "x"));
         _users.CountActiveAdminsAsync(Arg.Any<CancellationToken>()).Returns(1);
 
-        var result = await _service.SetAccessAsync(2, role, isActive, 1, "admin", CancellationToken.None);
+        var result = await _service.SetAccessAsync(2, role, isActive, 1, TestActors.User("admin"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         await _users.DidNotReceiveWithAnyArgs().UpdateAccessAsync(default, default!, default, default!, default, default);
@@ -219,7 +224,7 @@ public class PortalUserServiceTests
         _users.GetByIdAsync(2, Arg.Any<CancellationToken>()).Returns(Local(2, "x"));
         _users.CountActiveAdminsAsync(Arg.Any<CancellationToken>()).Returns(2);
 
-        Assert.True((await _service.SetAccessAsync(2, PortalRole.Editor, true, 1, "admin", CancellationToken.None)).Succeeded);
+        Assert.True((await _service.SetAccessAsync(2, PortalRole.Editor, true, 1, TestActors.User("admin"), CancellationToken.None)).Succeeded);
     }
 
     [Theory]
@@ -228,7 +233,7 @@ public class PortalUserServiceTests
     [InlineData(3L, null)]
     public async Task SetAccess_RefusesOwnAccessOrAnUnknownRole(long userId, string? role)
     {
-        var result = await _service.SetAccessAsync(userId, role, true, 1, "admin", CancellationToken.None);
+        var result = await _service.SetAccessAsync(userId, role, true, 1, TestActors.User("admin"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         await _users.DidNotReceiveWithAnyArgs().UpdateAccessAsync(default, default!, default, default!, default, default);
@@ -241,5 +246,25 @@ public class PortalUserServiceTests
 
         Assert.Null(await _service.GetCurrentAsync(2, CancellationToken.None));
         Assert.Null(await _service.GetCurrentAsync(99, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task SetAccess_IsRecordedAgainstTheUser_WithTheOldAndNewAccess()
+    {
+        _users.GetByIdAsync(3, Arg.Any<CancellationToken>()).Returns(new PortalUser { Id = 3, Email = "jane.doe@arbisoft.com", Role = PortalRole.None, IsActive = true });
+
+        await _service.SetAccessAsync(3, PortalRole.Editor, true, 1, TestActors.User("admin"), CancellationToken.None);
+
+        var entry = _audit.OnlyEntry;
+        Assert.Equal((AuditActions.AccessChanged, AuditEntityTypes.PortalUser, "3", "jane.doe@arbisoft.com"), (entry.Action, entry.EntityType, entry.EntityId, entry.EntityLabel));
+        Assert.Equal([new AuditChange("Access", PortalRole.None, PortalRole.Editor)], entry.Changes!);
+    }
+
+    [Fact]
+    public async Task SetAccess_Refused_RecordsNothing()
+    {
+        await _service.SetAccessAsync(1, PortalRole.Editor, true, 1, TestActors.User("admin"), CancellationToken.None);
+
+        Assert.Empty(_audit.Recorded);
     }
 }

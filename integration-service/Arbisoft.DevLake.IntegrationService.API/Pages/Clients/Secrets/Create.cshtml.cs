@@ -36,7 +36,7 @@ public sealed class CreateModel(IClientService clients) : AdminPageModel
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
-        var result = await clients.CreateSecretAsync(Id, ValidForDays, Admin, cancellationToken);
+        var result = await clients.CreateSecretAsync(Id, ValidForDays, Actor, cancellationToken);
         if (!result.Succeeded)
         {
             return Fail(result.Error);

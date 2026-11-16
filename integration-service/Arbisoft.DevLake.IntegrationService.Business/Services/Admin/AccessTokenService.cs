@@ -14,7 +14,9 @@
 // limitations under the License.
 
 using Arbisoft.DevLake.IntegrationService.Business.Dtos.Admin;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
 
 namespace Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
@@ -27,7 +29,7 @@ public interface IAccessTokenService
     Task<AccessTokenDto?> GetAsync(string jti, CancellationToken cancellationToken);
 
     /// <summary>Revokes a token. The API refuses it from then on, even before it expires.</summary>
-    Task<AdminResult> RevokeAsync(string jti, string reason, string revokedBy, CancellationToken cancellationToken);
+    Task<AdminResult> RevokeAsync(string jti, string reason, AuditActor actor, CancellationToken cancellationToken);
 }
 
 public sealed class AccessTokenService : IAccessTokenService
@@ -37,12 +39,16 @@ public sealed class AccessTokenService : IAccessTokenService
 
     private readonly IAccessTokenRepository _tokens;
     private readonly IClientRepository _clients;
+    private readonly IDbSession _session;
+    private readonly IAuditTrail _audit;
     private readonly TimeProvider _timeProvider;
 
-    public AccessTokenService(IAccessTokenRepository tokens, IClientRepository clients, TimeProvider timeProvider)
+    public AccessTokenService(IAccessTokenRepository tokens, IClientRepository clients, IDbSession session, IAuditTrail audit, TimeProvider timeProvider)
     {
         _tokens = tokens;
         _clients = clients;
+        _session = session;
+        _audit = audit;
         _timeProvider = timeProvider;
     }
 
@@ -72,7 +78,7 @@ public sealed class AccessTokenService : IAccessTokenService
         return token is null ? null : ToDto(token, await _clients.GetByIdAsync(token.ClientRefId, cancellationToken), _timeProvider.GetUtcNow());
     }
 
-    public async Task<AdminResult> RevokeAsync(string jti, string reason, string revokedBy, CancellationToken cancellationToken)
+    public async Task<AdminResult> RevokeAsync(string jti, string reason, AuditActor actor, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(reason) || reason.Trim().Length > MaxReasonLength)
         {
@@ -91,9 +97,14 @@ public sealed class AccessTokenService : IAccessTokenService
         }
 
         // The table has no "revoked by" column, so the reason records who did it.
-        var recorded = $"{reason.Trim()} (revoked by {revokedBy})";
-        var changed = await _tokens.RevokeAsync(token.Id, recorded.Length > ColumnLength ? recorded[..ColumnLength] : recorded, _timeProvider.GetUtcNow(), cancellationToken);
-        return changed ? AdminResult.Ok : AdminResult.Fail("The token is already revoked.");
+        var recorded = $"{reason.Trim()} (revoked by {actor.Name})";
+        var subject = new AuditSubject(AuditEntityTypes.AccessToken, jti, (await _clients.GetByIdAsync(token.ClientRefId, cancellationToken))?.ClientId);
+        var revoked = await _audit.SaveChangeAsync(_session, actor, async () =>
+            await _tokens.RevokeAsync(token.Id, recorded.Length > ColumnLength ? recorded[..ColumnLength] : recorded, _timeProvider.GetUtcNow(), cancellationToken)
+                ? subject.Did(AuditActions.Revoked, reason: reason.Trim())
+                : null,
+            cancellationToken);
+        return revoked ? AdminResult.Ok : AdminResult.Fail("The token is already revoked.");
     }
 
     private static AccessTokenDto ToDto(AccessToken token, Client? client, DateTimeOffset now)

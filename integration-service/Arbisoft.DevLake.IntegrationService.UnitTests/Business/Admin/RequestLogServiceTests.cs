@@ -15,8 +15,11 @@
 
 using Arbisoft.DevLake.IntegrationService.Business.Dtos.Admin;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
+using Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers;
 using Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers.Builders;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
@@ -29,12 +32,14 @@ public class RequestLogServiceTests
 
     private readonly IRequestLogRepository _logs = Substitute.For<IRequestLogRepository>();
     private readonly IClientRepository _clients = Substitute.For<IClientRepository>();
+    private readonly IDbSession _session = Substitute.For<IDbSession>();
+    private readonly RecordingAuditTrail _audit = new();
     private readonly RequestLogService _service;
 
     public RequestLogServiceTests()
     {
         _clients.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(new ClientBuilder().Build());
-        _service = new RequestLogService(_logs, _clients, new FakeTimeProvider(Now));
+        _service = new RequestLogService(_logs, _clients, _session, _audit, new FakeTimeProvider(Now));
     }
 
     private static RequestLog Log(long id, string status = RequestStatus.Success) =>
@@ -168,7 +173,7 @@ public class RequestLogServiceTests
     {
         GivenFailedWithBody(5);
 
-        var result = await _service.RetryAsync(5, "alice", CancellationToken.None);
+        var result = await _service.RetryAsync(5, TestActors.User("alice"), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         await _logs.Received(1).TryRetryAsync(5, Now, Arg.Any<CancellationToken>());
@@ -186,7 +191,7 @@ public class RequestLogServiceTests
     {
         _logs.GetByIdAsync(5, Arg.Any<CancellationToken>()).Returns(Log(5, status));
 
-        var result = await _service.RetryAsync(5, "alice", CancellationToken.None);
+        var result = await _service.RetryAsync(5, TestActors.User("alice"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         await _logs.DidNotReceiveWithAnyArgs().TryRetryAsync(default, default, default);
@@ -198,18 +203,18 @@ public class RequestLogServiceTests
         GivenFailedWithBody(5);
         _logs.GetJsonAsync(5, Arg.Any<CancellationToken>()).Returns((string?)null);
 
-        Assert.False((await _service.RetryAsync(5, "alice", CancellationToken.None)).Succeeded);
+        Assert.False((await _service.RetryAsync(5, TestActors.User("alice"), CancellationToken.None)).Succeeded);
         await _logs.DidNotReceiveWithAnyArgs().TryRetryAsync(default, default, default);
     }
 
     [Fact]
     public async Task Retry_AnUnknownRequest_OrOneThatChangedMeanwhile_IsRefused_WithNothingRecorded()
     {
-        Assert.False((await _service.RetryAsync(99, "alice", CancellationToken.None)).Succeeded);
+        Assert.False((await _service.RetryAsync(99, TestActors.User("alice"), CancellationToken.None)).Succeeded);
 
         GivenFailedWithBody(5);
         _logs.TryRetryAsync(5, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(false);
-        Assert.Contains("changed", (await _service.RetryAsync(5, "alice", CancellationToken.None)).Error, StringComparison.Ordinal);
+        Assert.Contains("changed", (await _service.RetryAsync(5, TestActors.User("alice"), CancellationToken.None)).Error, StringComparison.Ordinal);
         await _logs.DidNotReceiveWithAnyArgs().InsertAttemptAsync(default!, default);
     }
 
@@ -227,5 +232,33 @@ public class RequestLogServiceTests
         var waiting = (await _service.GetAsync(6, CancellationToken.None))!;
         Assert.False(waiting.CanRetry);
         Assert.Equal(due, waiting.NextAttemptOn);
+    }
+
+    [Fact]
+    public async Task Retry_IsRecordedAgainstTheRequest_AsFailedToQueued()
+    {
+        GivenFailedWithBody(5);
+
+        await _service.RetryAsync(5, TestActors.User("alice"), CancellationToken.None);
+
+        var (actor, entry) = Assert.Single(_audit.Recorded);
+        Assert.Equal("alice", actor.Name);
+        Assert.Equal((AuditActions.Retried, AuditEntityTypes.Request, "5", "corr-5"), (entry.Action, entry.EntityType, entry.EntityId, entry.EntityLabel));
+        Assert.Equal([new AuditChange("Status", RequestStatus.Failed, RequestStatus.Queued)], entry.Changes!);
+        await _session.Received(1).CommitAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Retry_ThatLosesARace_RollsBackAndRecordsNothing()
+    {
+        GivenFailedWithBody(5);
+        _logs.TryRetryAsync(5, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(false);
+
+        var result = await _service.RetryAsync(5, TestActors.User("alice"), CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Empty(_audit.Recorded);
+        await _logs.DidNotReceiveWithAnyArgs().InsertAttemptAsync(default!, default);
+        await _session.Received(1).RollbackAsync(Arg.Any<CancellationToken>());
     }
 }

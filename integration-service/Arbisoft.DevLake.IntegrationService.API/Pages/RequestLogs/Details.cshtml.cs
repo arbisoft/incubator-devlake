@@ -41,7 +41,7 @@ public sealed class DetailsModel(IRequestLogService logs) : AdminPageModel
 
     public async Task<IActionResult> OnPostRetryAsync(CancellationToken cancellationToken)
     {
-        var result = await logs.RetryAsync(Id, Admin, cancellationToken);
+        var result = await logs.RetryAsync(Id, Actor, cancellationToken);
         if (!result.Succeeded)
         {
             var log = await logs.GetAsync(Id, cancellationToken);

@@ -21,6 +21,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
+
 namespace Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers;
 
 /// <summary>Hosts the real API in-process against the test database. Settings the API needs are supplied here, as they would be by the environment.</summary>
@@ -57,7 +58,7 @@ public sealed class ApiFactory : WebApplicationFactory<AuthController>
         var tokens = scope.ServiceProvider.GetRequiredService<IUpstreamTokenService>();
         foreach (var system in UpstreamSystems.All)
         {
-            var saved = await tokens.SaveAsync(system, UpstreamToken, "tests", CancellationToken.None);
+            var saved = await tokens.SaveAsync(system, UpstreamToken, TestActors.User("tests"), CancellationToken.None);
             if (!saved.Succeeded)
             {
                 throw new InvalidOperationException(saved.Error);

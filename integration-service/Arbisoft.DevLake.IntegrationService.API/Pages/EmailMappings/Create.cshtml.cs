@@ -31,7 +31,7 @@ public sealed class CreateModel(IEmailMappingService mappings) : AdminPageModel
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
-        var result = await mappings.CreateAsync(new EmailMappingInput(Form.ArbisoftEmail, Form.Email), cancellationToken);
+        var result = await mappings.CreateAsync(new EmailMappingInput(Form.ArbisoftEmail, Form.Email), Actor, cancellationToken);
         if (!result.Succeeded)
         {
             return Fail(result.Error);

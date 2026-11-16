@@ -15,9 +15,11 @@
 
 using Arbisoft.DevLake.IntegrationService.Business.Security;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
+using Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 
@@ -30,12 +32,13 @@ public class SigningKeyServiceTests
     private readonly ISigningKeyRepository _keys = Substitute.For<ISigningKeyRepository>();
     private readonly ISecretStore _secrets = Substitute.For<ISecretStore>();
     private readonly IDbSession _session = Substitute.For<IDbSession>();
+    private readonly RecordingAuditTrail _audit = new();
     private readonly SigningKeyService _service;
 
     public SigningKeyServiceTests()
     {
         _keys.InsertAsync(Arg.Any<SigningKey>(), Arg.Any<CancellationToken>()).Returns(8L);
-        _service = new SigningKeyService(_keys, _secrets, _session, new FakeTimeProvider(Now));
+        _service = new SigningKeyService(_keys, _secrets, _session, _audit, new FakeTimeProvider(Now));
     }
 
     [Fact]
@@ -43,7 +46,7 @@ public class SigningKeyServiceTests
     {
         _keys.GetActiveAsync(Now, Arg.Any<CancellationToken>()).Returns(new SigningKey { Id = 3, Kid = "old" });
 
-        var result = await _service.RotateAsync(CancellationToken.None);
+        var result = await _service.RotateAsync(TestActors.User("admin"), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         var key = result.Value!;
@@ -64,7 +67,7 @@ public class SigningKeyServiceTests
     [Fact]
     public async Task Rotate_TheVeryFirstKey_RetiresNothing()
     {
-        var result = await _service.RotateAsync(CancellationToken.None);
+        var result = await _service.RotateAsync(TestActors.User("admin"), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         await _keys.DidNotReceiveWithAnyArgs().RetireAsync(default, default, default);
@@ -73,7 +76,7 @@ public class SigningKeyServiceTests
     [Fact]
     public async Task Rotate_APublishedPublicKeyNeverContainsThePrivateHalf()
     {
-        await _service.RotateAsync(CancellationToken.None);
+        await _service.RotateAsync(TestActors.User("admin"), CancellationToken.None);
 
         await _keys.Received(1).InsertAsync(Arg.Is<SigningKey>(k => !k.PublicKey.Contains("PRIVATE")), Arg.Any<CancellationToken>());
     }
@@ -83,7 +86,7 @@ public class SigningKeyServiceTests
     {
         _keys.InsertAsync(Arg.Any<SigningKey>(), Arg.Any<CancellationToken>()).Returns(Task.FromException<long>(new InvalidOperationException("db down")));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _service.RotateAsync(CancellationToken.None));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _service.RotateAsync(TestActors.User("admin"), CancellationToken.None));
 
         await _session.Received(1).RollbackAsync(Arg.Any<CancellationToken>());
         await _session.DidNotReceiveWithAnyArgs().CommitAsync(default);
@@ -103,5 +106,18 @@ public class SigningKeyServiceTests
         var list = await _service.ListAsync(CancellationToken.None);
 
         Assert.Equal(["Pending", "Active", "Retired"], list.Select(k => k.Status));
+    }
+
+    [Fact]
+    public async Task Rotate_IsRecordedWithTheKeyItReplaced_AndNeverThePrivateKey()
+    {
+        _keys.GetActiveAsync(Now, Arg.Any<CancellationToken>()).Returns(new SigningKey { Id = 3, Kid = "old" });
+
+        var result = await _service.RotateAsync(TestActors.User("admin"), CancellationToken.None);
+
+        var entry = _audit.OnlyEntry;
+        Assert.Equal((AuditActions.Rotated, AuditEntityTypes.SigningKey, "8", result.Value!.Kid), (entry.Action, entry.EntityType, entry.EntityId, entry.EntityLabel));
+        Assert.Contains(new AuditChange("Active key", "old", result.Value.Kid), entry.Changes!);
+        Assert.DoesNotContain(entry.Changes!, change => (change.New ?? string.Empty).Contains("PRIVATE KEY", StringComparison.Ordinal));
     }
 }

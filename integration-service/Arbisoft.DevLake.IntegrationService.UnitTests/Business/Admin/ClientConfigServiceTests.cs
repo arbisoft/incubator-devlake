@@ -16,9 +16,12 @@
 using Arbisoft.DevLake.IntegrationService.Business.Dtos.Admin;
 using Arbisoft.DevLake.IntegrationService.Business.Security;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 using Arbisoft.DevLake.IntegrationService.DataAccess.ExternalApis;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
+using Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers;
 using Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers.Builders;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
@@ -34,13 +37,15 @@ public class ClientConfigServiceTests
     private readonly IClientConfigRepository _configs = Substitute.For<IClientConfigRepository>();
     private readonly IClientRepository _clients = Substitute.For<IClientRepository>();
     private readonly ISecretEncryptor _encryptor = Substitute.For<ISecretEncryptor>();
+    private readonly IDbSession _session = Substitute.For<IDbSession>();
+    private readonly RecordingAuditTrail _audit = new();
     private readonly ClientConfigService _service;
 
     public ClientConfigServiceTests()
     {
         _encryptor.Encrypt(Arg.Any<string>()).Returns(call => "enc:" + call.Arg<string>());
         _clients.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(new ClientBuilder().Build());
-        _service = new ClientConfigService(_configs, _clients, _encryptor, new FakeTimeProvider(Now));
+        _service = new ClientConfigService(_configs, _clients, _encryptor, _session, _audit, new FakeTimeProvider(Now));
     }
 
     private static ClientConfigInput OAuthInput(string? secret = "s3cret", string baseUrl = "https://sophia.example.com", int attempts = 3) =>
@@ -58,7 +63,7 @@ public class ClientConfigServiceTests
     [Fact]
     public async Task Save_ANewOAuthConfig_EncryptsTheSecret_AndRecordsWhoAndWhen()
     {
-        var result = await _service.SaveAsync(1, OAuthInput(), "admin", CancellationToken.None);
+        var result = await _service.SaveAsync(1, OAuthInput(), TestActors.User("admin"), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         await _configs.Received(1).InsertAsync(
@@ -71,7 +76,7 @@ public class ClientConfigServiceTests
     [Fact]
     public async Task Save_ANewConfigWithoutASecret_IsRefused()
     {
-        var result = await _service.SaveAsync(1, OAuthInput(secret: " "), "admin", CancellationToken.None);
+        var result = await _service.SaveAsync(1, OAuthInput(secret: " "), TestActors.User("admin"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         await _configs.DidNotReceiveWithAnyArgs().InsertAsync(default!, default);
@@ -82,7 +87,7 @@ public class ClientConfigServiceTests
     {
         _configs.GetByClientRefIdAsync(1, Arg.Any<CancellationToken>()).Returns(Stored());
 
-        var result = await _service.SaveAsync(1, OAuthInput(secret: null, attempts: 5), "editor", CancellationToken.None);
+        var result = await _service.SaveAsync(1, OAuthInput(secret: null, attempts: 5), TestActors.User("editor"), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         await _configs.Received(1).UpdateAsync(
@@ -97,7 +102,7 @@ public class ClientConfigServiceTests
     {
         _configs.GetByClientRefIdAsync(1, Arg.Any<CancellationToken>()).Returns(Stored());
 
-        await _service.SaveAsync(1, OAuthInput(secret: "fresh"), "editor", CancellationToken.None);
+        await _service.SaveAsync(1, OAuthInput(secret: "fresh"), TestActors.User("editor"), CancellationToken.None);
 
         await _configs.Received(1).UpdateAsync(Arg.Is<ClientConfig>(c => c.OutboundClientSecretEncrypted == "enc:fresh" && c.TokenRotatedOn == Now), Arg.Any<CancellationToken>());
     }
@@ -107,10 +112,10 @@ public class ClientConfigServiceTests
     {
         _configs.GetByClientRefIdAsync(1, Arg.Any<CancellationToken>()).Returns(Stored());
 
-        var withoutToken = await _service.SaveAsync(1, TokenInput(token: null), "editor", CancellationToken.None);
+        var withoutToken = await _service.SaveAsync(1, TokenInput(token: null), TestActors.User("editor"), CancellationToken.None);
         Assert.False(withoutToken.Succeeded);
 
-        var result = await _service.SaveAsync(1, TokenInput("tok", Now.AddDays(90)), "editor", CancellationToken.None);
+        var result = await _service.SaveAsync(1, TokenInput("tok", Now.AddDays(90)), TestActors.User("editor"), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         await _configs.Received(1).UpdateAsync(
@@ -126,7 +131,7 @@ public class ClientConfigServiceTests
     [InlineData("")]
     public async Task Save_ABaseUrlThatIsNotHttps_IsRefused(string baseUrl)
     {
-        var result = await _service.SaveAsync(1, OAuthInput(baseUrl: baseUrl), "admin", CancellationToken.None);
+        var result = await _service.SaveAsync(1, OAuthInput(baseUrl: baseUrl), TestActors.User("admin"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         await _configs.DidNotReceiveWithAnyArgs().InsertAsync(default!, default);
@@ -135,7 +140,7 @@ public class ClientConfigServiceTests
     [Fact]
     public async Task Save_PlainHttpToLocalhost_IsAllowedForDevelopment()
     {
-        var result = await _service.SaveAsync(1, OAuthInput(baseUrl: "http://localhost:5097"), "admin", CancellationToken.None);
+        var result = await _service.SaveAsync(1, OAuthInput(baseUrl: "http://localhost:5097"), TestActors.User("admin"), CancellationToken.None);
 
         Assert.True(result.Succeeded);
     }
@@ -145,7 +150,7 @@ public class ClientConfigServiceTests
     [InlineData(11)]
     public async Task Save_MaxAttemptsOutOfRange_IsRefused(int attempts)
     {
-        var result = await _service.SaveAsync(1, OAuthInput(attempts: attempts), "admin", CancellationToken.None);
+        var result = await _service.SaveAsync(1, OAuthInput(attempts: attempts), TestActors.User("admin"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
     }
@@ -153,15 +158,15 @@ public class ClientConfigServiceTests
     [Fact]
     public async Task Save_OAuthWithoutATokenUrlOrClientId_IsRefused()
     {
-        Assert.False((await _service.SaveAsync(1, OAuthInput() with { TokenUrl = null }, "admin", CancellationToken.None)).Succeeded);
-        Assert.False((await _service.SaveAsync(1, OAuthInput() with { OutboundClientId = " " }, "admin", CancellationToken.None)).Succeeded);
-        Assert.False((await _service.SaveAsync(1, OAuthInput() with { AuthType = "Basic" }, "admin", CancellationToken.None)).Succeeded);
+        Assert.False((await _service.SaveAsync(1, OAuthInput() with { TokenUrl = null }, TestActors.User("admin"), CancellationToken.None)).Succeeded);
+        Assert.False((await _service.SaveAsync(1, OAuthInput() with { OutboundClientId = " " }, TestActors.User("admin"), CancellationToken.None)).Succeeded);
+        Assert.False((await _service.SaveAsync(1, OAuthInput() with { AuthType = "Basic" }, TestActors.User("admin"), CancellationToken.None)).Succeeded);
     }
 
     [Fact]
     public async Task Save_ForAnUnknownClient_Fails()
     {
-        var result = await _service.SaveAsync(9, OAuthInput(), "admin", CancellationToken.None);
+        var result = await _service.SaveAsync(9, OAuthInput(), TestActors.User("admin"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
     }
@@ -230,7 +235,7 @@ public class ClientConfigServiceTests
         GivenConfig();
         _configs.InsertOutboundUrlAsync(Arg.Any<ClientConfigOutboundUrl>(), Arg.Any<CancellationToken>()).Returns(8L);
 
-        var result = await _service.CreateUrlAsync(1, UrlInput(), "admin", CancellationToken.None);
+        var result = await _service.CreateUrlAsync(1, UrlInput(), TestActors.User("admin"), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Equal(8, result.Value);
@@ -242,7 +247,7 @@ public class ClientConfigServiceTests
     [Fact]
     public async Task CreateUrl_BeforeTheConfigExists_IsRefused()
     {
-        var result = await _service.CreateUrlAsync(1, UrlInput(), "admin", CancellationToken.None);
+        var result = await _service.CreateUrlAsync(1, UrlInput(), TestActors.User("admin"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
     }
@@ -256,7 +261,7 @@ public class ClientConfigServiceTests
     {
         GivenConfig();
 
-        var result = await _service.CreateUrlAsync(1, UrlInput(path), "admin", CancellationToken.None);
+        var result = await _service.CreateUrlAsync(1, UrlInput(path), TestActors.User("admin"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         await _configs.DidNotReceiveWithAnyArgs().InsertOutboundUrlAsync(default!, default);
@@ -269,7 +274,7 @@ public class ClientConfigServiceTests
     {
         GivenConfig();
 
-        var result = await _service.CreateUrlAsync(1, UrlInput(eventType: eventType, method: method), "admin", CancellationToken.None);
+        var result = await _service.CreateUrlAsync(1, UrlInput(eventType: eventType, method: method), TestActors.User("admin"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
     }
@@ -279,9 +284,9 @@ public class ClientConfigServiceTests
     {
         GivenConfig(new ClientConfigOutboundUrl { Id = 7, ClientConfigId = 4, EventType = "engineer-stats", IsActive = true });
 
-        Assert.False((await _service.CreateUrlAsync(1, UrlInput(), "admin", CancellationToken.None)).Succeeded);
-        Assert.True((await _service.CreateUrlAsync(1, UrlInput(active: false), "admin", CancellationToken.None)).Succeeded);
-        Assert.True((await _service.CreateUrlAsync(1, UrlInput(eventType: "engineer-stats-batch"), "admin", CancellationToken.None)).Succeeded);
+        Assert.False((await _service.CreateUrlAsync(1, UrlInput(), TestActors.User("admin"), CancellationToken.None)).Succeeded);
+        Assert.True((await _service.CreateUrlAsync(1, UrlInput(active: false), TestActors.User("admin"), CancellationToken.None)).Succeeded);
+        Assert.True((await _service.CreateUrlAsync(1, UrlInput(eventType: "engineer-stats-batch"), TestActors.User("admin"), CancellationToken.None)).Succeeded);
     }
 
     [Fact]
@@ -292,8 +297,8 @@ public class ClientConfigServiceTests
             new ClientConfigOutboundUrl { Id = 8, ClientConfigId = 4, EventType = "engineer-stats-batch", IsActive = true });
         _configs.GetOutboundUrlByIdAsync(7, Arg.Any<CancellationToken>()).Returns(new ClientConfigOutboundUrl { Id = 7, ClientConfigId = 4, CreatedBy = "first", CreatedOn = Now.AddDays(-2) });
 
-        var ok = await _service.UpdateUrlAsync(7, UrlInput("/new/path/"), "editor", CancellationToken.None);
-        var clash = await _service.UpdateUrlAsync(7, UrlInput(eventType: "engineer-stats-batch"), "editor", CancellationToken.None);
+        var ok = await _service.UpdateUrlAsync(7, UrlInput("/new/path/"), TestActors.User("editor"), CancellationToken.None);
+        var clash = await _service.UpdateUrlAsync(7, UrlInput(eventType: "engineer-stats-batch"), TestActors.User("editor"), CancellationToken.None);
 
         Assert.True(ok.Succeeded);
         Assert.False(clash.Succeeded);
@@ -305,8 +310,70 @@ public class ClientConfigServiceTests
     [Fact]
     public async Task UpdateUrl_AnUnknownUrl_Fails()
     {
-        var result = await _service.UpdateUrlAsync(99, UrlInput(), "editor", CancellationToken.None);
+        var result = await _service.UpdateUrlAsync(99, UrlInput(), TestActors.User("editor"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task Save_ANewConfig_IsRecordedAgainstTheClient_WithTheSecretHidden()
+    {
+        await _service.SaveAsync(1, OAuthInput(), TestActors.User("admin"), CancellationToken.None);
+
+        var entry = _audit.OnlyEntry;
+        Assert.Equal((AuditActions.Created, AuditEntityTypes.ClientConfig, "1", "Sophia"), (entry.Action, entry.EntityType, entry.EntityId, entry.EntityLabel));
+        Assert.Contains(new AuditChange("Base URL", null, "https://sophia.example.com"), entry.Changes!);
+        Assert.Contains(new AuditChange("Client secret", null, null, Hidden: true), entry.Changes!);
+        Assert.DoesNotContain(entry.Changes!, change => (change.New ?? string.Empty).Contains("s3cret", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Save_AnUpdate_RecordsOnlyWhatChanged_AndANewSecretOnlyAsChanged()
+    {
+        GivenConfig();
+
+        await _service.SaveAsync(1, OAuthInput(attempts: 5), TestActors.User("editor"), CancellationToken.None);
+
+        var entry = _audit.OnlyEntry;
+        Assert.Equal(AuditActions.Updated, entry.Action);
+        Assert.Equal(
+            [new AuditChange("Client secret", null, null, Hidden: true), new AuditChange("Scope", null, "callback"), new AuditChange("Max attempts", "3", "5")],
+            entry.Changes!);
+    }
+
+    [Fact]
+    public async Task Save_Refused_RecordsNothing()
+    {
+        await _service.SaveAsync(1, OAuthInput(secret: " "), TestActors.User("admin"), CancellationToken.None);
+
+        Assert.Empty(_audit.Recorded);
+    }
+
+    [Fact]
+    public async Task CreateUrl_IsRecordedAgainstTheOutboundConfig_SayingWhichUrl()
+    {
+        GivenConfig();
+        _configs.InsertOutboundUrlAsync(Arg.Any<ClientConfigOutboundUrl>(), Arg.Any<CancellationToken>()).Returns(8L);
+
+        await _service.CreateUrlAsync(1, UrlInput(), TestActors.User("admin"), CancellationToken.None);
+
+        var entry = _audit.OnlyEntry;
+        Assert.Equal((AuditActions.CallbackUrlCreated, AuditEntityTypes.ClientConfig, "1"), (entry.Action, entry.EntityType, entry.EntityId));
+        Assert.Equal("Callback URL 8 (engineer-stats)", entry.Reason);
+        Assert.Contains(new AuditChange("Path", null, "/api/v1/devlake/callback/"), entry.Changes!);
+    }
+
+    [Fact]
+    public async Task UpdateUrl_RecordsTheChangedFields_AgainstTheOutboundConfig()
+    {
+        var url = new ClientConfigOutboundUrl { Id = 8, ClientConfigId = 4, EventType = "engineer-stats", Method = "POST", Path = "/cb", IsActive = true };
+        GivenConfig(url);
+        _configs.GetOutboundUrlByIdAsync(8, Arg.Any<CancellationToken>()).Returns(url);
+
+        await _service.UpdateUrlAsync(8, UrlInput(path: "/cb2", method: "PUT"), TestActors.User("admin"), CancellationToken.None);
+
+        var entry = _audit.OnlyEntry;
+        Assert.Equal((AuditActions.CallbackUrlUpdated, "1", "Callback URL 8 (engineer-stats)"), (entry.Action, entry.EntityId, entry.Reason));
+        Assert.Equal([new AuditChange("Method", "POST", "PUT"), new AuditChange("Path", "/cb", "/cb2")], entry.Changes!);
     }
 }

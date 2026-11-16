@@ -15,6 +15,7 @@
 
 using System.Globalization;
 using System.Security.Claims;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -27,6 +28,9 @@ public abstract class AdminPageModel : PageModel
 
     /// <summary>The signed-in portal user's id.</summary>
     protected long CurrentUserId => long.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "0", CultureInfo.InvariantCulture);
+
+    /// <summary>The signed-in portal user, as the audit trail records them.</summary>
+    protected AuditActor Actor => AuditActor.User(CurrentUserId, Admin);
 
     [TempData]
     public string? Message { get; set; }

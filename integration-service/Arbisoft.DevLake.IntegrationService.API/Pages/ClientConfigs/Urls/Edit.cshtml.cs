@@ -44,7 +44,7 @@ public sealed class EditModel(IClientConfigService configs) : AdminPageModel
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
-        var result = await configs.UpdateUrlAsync(UrlId, Form.ToInput(), Admin, cancellationToken);
+        var result = await configs.UpdateUrlAsync(UrlId, Form.ToInput(), Actor, cancellationToken);
         if (!result.Succeeded)
         {
             return Fail(result.Error);

@@ -17,6 +17,7 @@ using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using Arbisoft.DevLake.IntegrationService.Business.Dtos.Admin;
 using Arbisoft.DevLake.IntegrationService.Business.Security;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
@@ -29,22 +30,22 @@ public interface IClientService
 
     Task<ClientDetailsDto?> GetAsync(long id, CancellationToken cancellationToken);
 
-    Task<AdminResult<long>> CreateAsync(ClientInput input, string createdBy, CancellationToken cancellationToken);
+    Task<AdminResult<long>> CreateAsync(ClientInput input, AuditActor actor, CancellationToken cancellationToken);
 
     /// <summary>Updates the name, active flag and token lifetime. The Client ID never changes.</summary>
-    Task<AdminResult> UpdateAsync(long id, ClientInput input, string modifiedBy, CancellationToken cancellationToken);
+    Task<AdminResult> UpdateAsync(long id, ClientInput input, AuditActor actor, CancellationToken cancellationToken);
 
     /// <summary>Creates a secret that is valid for the given number of days. A client can hold several at once, so a secret can be rotated without downtime.</summary>
-    Task<AdminResult<NewClientSecretDto>> CreateSecretAsync(long id, int validForDays, string createdBy, CancellationToken cancellationToken);
+    Task<AdminResult<NewClientSecretDto>> CreateSecretAsync(long id, int validForDays, AuditActor actor, CancellationToken cancellationToken);
 
     /// <summary>Revokes a secret and, in the same transaction, every unexpired token issued with it, so a leaked secret's tokens stop working at once.</summary>
-    Task<AdminResult> RevokeSecretAsync(long id, long secretId, string revokedBy, CancellationToken cancellationToken);
+    Task<AdminResult> RevokeSecretAsync(long id, long secretId, AuditActor actor, CancellationToken cancellationToken);
 
     /// <summary>
     /// Replaces the scopes a client may request. When a scope is taken away, the client's unexpired tokens are revoked in the same transaction,
     /// because they still carry the scope; the client then gets a token with its current scopes.
     /// </summary>
-    Task<AdminResult> SetScopesAsync(long id, IReadOnlyCollection<long> scopeIds, string changedBy, CancellationToken cancellationToken);
+    Task<AdminResult> SetScopesAsync(long id, IReadOnlyCollection<long> scopeIds, AuditActor actor, CancellationToken cancellationToken);
 }
 
 public sealed partial class ClientService : IClientService
@@ -60,16 +61,24 @@ public sealed partial class ClientService : IClientService
     private readonly IAccessTokenRepository _tokens;
     private readonly IClientSecretHasher _hasher;
     private readonly IDbSession _session;
+    private readonly IAuditTrail _audit;
     private readonly TimeProvider _timeProvider;
 
     public ClientService(
-        IClientRepository clients, IScopeRepository scopes, IAccessTokenRepository tokens, IClientSecretHasher hasher, IDbSession session, TimeProvider timeProvider)
+        IClientRepository clients,
+        IScopeRepository scopes,
+        IAccessTokenRepository tokens,
+        IClientSecretHasher hasher,
+        IDbSession session,
+        IAuditTrail audit,
+        TimeProvider timeProvider)
     {
         _clients = clients;
         _scopes = scopes;
         _tokens = tokens;
         _hasher = hasher;
         _session = session;
+        _audit = audit;
         _timeProvider = timeProvider;
     }
 
@@ -98,34 +107,38 @@ public sealed partial class ClientService : IClientService
             allScopes);
     }
 
-    public async Task<AdminResult<long>> CreateAsync(ClientInput input, string createdBy, CancellationToken cancellationToken)
+    public async Task<AdminResult<long>> CreateAsync(ClientInput input, AuditActor actor, CancellationToken cancellationToken)
     {
         var problem = Validate(input, checkClientId: true);
+        if (problem is null && await _clients.GetByClientIdAsync(input.ClientId, cancellationToken) is not null)
+        {
+            problem = $"A client with the ID '{input.ClientId}' already exists.";
+        }
+
         if (problem is not null)
         {
             return AdminResult.Failure<long>(problem);
         }
 
-        if (await _clients.GetByClientIdAsync(input.ClientId, cancellationToken) is not null)
+        var client = new Client
         {
-            return AdminResult.Failure<long>($"A client with the ID '{input.ClientId}' already exists.");
-        }
-
-        var id = await _clients.InsertAsync(
-            new Client
-            {
-                ClientId = input.ClientId,
-                Name = input.Name.Trim(),
-                IsActive = input.IsActive,
-                AccessTokenLifetimeSeconds = input.AccessTokenLifetimeSeconds,
-                CreatedOn = _timeProvider.GetUtcNow(),
-                CreatedBy = createdBy
-            },
-            cancellationToken);
+            ClientId = input.ClientId,
+            Name = input.Name.Trim(),
+            IsActive = input.IsActive,
+            AccessTokenLifetimeSeconds = input.AccessTokenLifetimeSeconds,
+            CreatedOn = _timeProvider.GetUtcNow(),
+            CreatedBy = actor.Name
+        };
+        long id = 0;
+        await _audit.SaveChangeAsync(_session, actor, async () =>
+        {
+            id = await _clients.InsertAsync(client, cancellationToken);
+            return Subject(id, client.Name).Did(AuditActions.Created, AuditedFields.Client.Created(client));
+        }, cancellationToken);
         return AdminResult.Success(id);
     }
 
-    public async Task<AdminResult> UpdateAsync(long id, ClientInput input, string modifiedBy, CancellationToken cancellationToken)
+    public async Task<AdminResult> UpdateAsync(long id, ClientInput input, AuditActor actor, CancellationToken cancellationToken)
     {
         var problem = Validate(input, checkClientId: false);
         if (problem is not null)
@@ -139,11 +152,16 @@ public sealed partial class ClientService : IClientService
             return AdminResult.Fail("The client does not exist.");
         }
 
-        await _clients.UpdateAsync(Modified(existing, input.Name.Trim(), input.IsActive, input.AccessTokenLifetimeSeconds, modifiedBy), cancellationToken);
+        var updated = Modified(existing, input.Name.Trim(), input.IsActive, input.AccessTokenLifetimeSeconds, actor.Name);
+        await _audit.SaveChangeAsync(_session, actor, async () =>
+        {
+            await _clients.UpdateAsync(updated, cancellationToken);
+            return Subject(id, updated.Name).Did(AuditActions.Updated, AuditedFields.Client.Changed(existing, updated));
+        }, cancellationToken);
         return AdminResult.Ok;
     }
 
-    public async Task<AdminResult<NewClientSecretDto>> CreateSecretAsync(long id, int validForDays, string createdBy, CancellationToken cancellationToken)
+    public async Task<AdminResult<NewClientSecretDto>> CreateSecretAsync(long id, int validForDays, AuditActor actor, CancellationToken cancellationToken)
     {
         if (validForDays is < 1 or > MaxSecretDays)
         {
@@ -158,17 +176,20 @@ public sealed partial class ClientService : IClientService
 
         var now = _timeProvider.GetUtcNow();
         var plain = Convert.ToBase64String(RandomNumberGenerator.GetBytes(SecretBytes)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-        var expiresOn = now.AddDays(validForDays);
-        var secretId = await _clients.InsertSecretAsync(
-            new ClientSecret { ClientRefId = id, Secret = _hasher.Hash(plain), ExpiresOn = expiresOn, CreatedOn = now, CreatedBy = createdBy },
-            cancellationToken);
-        return AdminResult.Success(new NewClientSecretDto(secretId, client.ClientId, plain, expiresOn));
+        var secret = new ClientSecret { ClientRefId = id, Secret = _hasher.Hash(plain), ExpiresOn = now.AddDays(validForDays), CreatedOn = now, CreatedBy = actor.Name };
+        long secretId = 0;
+        await _audit.SaveChangeAsync(_session, actor, async () =>
+        {
+            secretId = await _clients.InsertSecretAsync(secret, cancellationToken);
+            List<AuditChange> changes = [new(AuditedFields.Secret, null, AuditValue.Id(secretId)), new(AuditedFields.Expires, null, AuditValue.Read(secret.ExpiresOn))];
+            return Subject(id, client.Name).Did(AuditActions.SecretCreated, changes);
+        }, cancellationToken);
+        return AdminResult.Success(new NewClientSecretDto(secretId, client.ClientId, plain, secret.ExpiresOn!.Value));
     }
 
-    public async Task<AdminResult> RevokeSecretAsync(long id, long secretId, string revokedBy, CancellationToken cancellationToken)
+    public async Task<AdminResult> RevokeSecretAsync(long id, long secretId, AuditActor actor, CancellationToken cancellationToken)
     {
-        var secrets = await _clients.GetSecretsAsync(id, cancellationToken);
-        var secret = secrets.FirstOrDefault(s => s.Id == secretId);
+        var secret = (await _clients.GetSecretsAsync(id, cancellationToken)).FirstOrDefault(s => s.Id == secretId);
         if (secret is null)
         {
             return AdminResult.Fail("The secret does not belong to this client.");
@@ -179,24 +200,22 @@ public sealed partial class ClientService : IClientService
             return AdminResult.Fail("The secret is already revoked.");
         }
 
+        var subject = Subject(id, (await _clients.GetByIdAsync(id, cancellationToken))?.Name);
         var now = _timeProvider.GetUtcNow();
-        return await InTransactionAsync(
-            async () =>
+        var revoked = await _audit.SaveChangeAsync(_session, actor, async () =>
+        {
+            if (!await _clients.RevokeSecretAsync(secretId, now, cancellationToken))
             {
-                if (!await _clients.RevokeSecretAsync(secretId, now, cancellationToken))
-                {
-                    return false;
-                }
+                return null;
+            }
 
-                await _tokens.RevokeActiveBySecretAsync(secretId, $"Client secret {secretId} was revoked (revoked by {revokedBy})", now, cancellationToken);
-                return true;
-            },
-            cancellationToken)
-            ? AdminResult.Ok
-            : AdminResult.Fail("The secret is already revoked.");
+            var tokens = await _tokens.RevokeActiveBySecretAsync(secretId, $"Client secret {secretId} was revoked (revoked by {actor.Name})", now, cancellationToken);
+            return subject.Did(AuditActions.SecretRevoked, [new(AuditedFields.Secret, AuditValue.Id(secretId), null), new(AuditedFields.TokensRevoked, null, AuditValue.Id(tokens))]);
+        }, cancellationToken);
+        return revoked ? AdminResult.Ok : AdminResult.Fail("The secret is already revoked.");
     }
 
-    public async Task<AdminResult> SetScopesAsync(long id, IReadOnlyCollection<long> scopeIds, string changedBy, CancellationToken cancellationToken)
+    public async Task<AdminResult> SetScopesAsync(long id, IReadOnlyCollection<long> scopeIds, AuditActor actor, CancellationToken cancellationToken)
     {
         var client = await _clients.GetByIdAsync(id, cancellationToken);
         if (client is null)
@@ -205,51 +224,45 @@ public sealed partial class ClientService : IClientService
         }
 
         var wanted = scopeIds.Distinct().ToList();
-        var known = await _scopes.GetExistingIdsAsync(wanted, cancellationToken);
-        if (known.Count != wanted.Count)
+        if ((await _scopes.GetExistingIdsAsync(wanted, cancellationToken)).Count != wanted.Count)
         {
             return AdminResult.Fail("One of the scopes does not exist.");
         }
 
-        var current = await _clients.GetClientScopesAsync(id, cancellationToken);
-        var removesAScope = current.Any(scope => !wanted.Contains(scope.ScopeId));
+        var removesAScope = (await _clients.GetClientScopesAsync(id, cancellationToken)).Any(scope => !wanted.Contains(scope.ScopeId));
+        var before = await _clients.GetScopeNamesAsync(id, cancellationToken);
         var now = _timeProvider.GetUtcNow();
-        await InTransactionAsync(
-            async () =>
-            {
-                await _clients.ReplaceScopesAsync(id, wanted, changedBy, now, cancellationToken);
-                await _clients.UpdateAsync(Modified(client, client.Name, client.IsActive, client.AccessTokenLifetimeSeconds, changedBy), cancellationToken);
-                if (removesAScope)
-                {
-                    await _tokens.RevokeActiveByClientAsync(id, $"A scope was removed from the client (changed by {changedBy})", now, cancellationToken);
-                }
-
-                return true;
-            },
-            cancellationToken);
+        await _audit.SaveChangeAsync(_session, actor, async () =>
+        {
+            await _clients.ReplaceScopesAsync(id, wanted, actor.Name, now, cancellationToken);
+            await _clients.UpdateAsync(Modified(client, client.Name, client.IsActive, client.AccessTokenLifetimeSeconds, actor.Name), cancellationToken);
+            var tokens = removesAScope
+                ? await _tokens.RevokeActiveByClientAsync(id, $"A scope was removed from the client (changed by {actor.Name})", now, cancellationToken)
+                : 0;
+            var after = await _clients.GetScopeNamesAsync(id, cancellationToken);
+            return Subject(id, client.Name).Did(AuditActions.ScopesChanged, ScopeChanges(before, after, tokens));
+        }, cancellationToken);
         return AdminResult.Ok;
     }
 
-    private async Task<bool> InTransactionAsync(Func<Task<bool>> work, CancellationToken cancellationToken)
+    private static List<AuditChange> ScopeChanges(IReadOnlyList<string> before, IReadOnlyList<string> after, int tokensRevoked)
     {
-        await _session.BeginTransactionAsync(cancellationToken);
-        try
+        List<AuditChange> changes = [];
+        var (old, now) = (AuditValue.Read(before), AuditValue.Read(after));
+        if (!string.Equals(old, now, StringComparison.Ordinal))
         {
-            if (await work())
-            {
-                await _session.CommitAsync(cancellationToken);
-                return true;
-            }
+            changes.Add(new AuditChange(AuditedFields.Scopes, old, now));
+        }
 
-            await _session.RollbackAsync(cancellationToken);
-            return false;
-        }
-        catch
+        if (tokensRevoked > 0)
         {
-            await _session.RollbackAsync(cancellationToken);
-            throw;
+            changes.Add(new AuditChange(AuditedFields.TokensRevoked, null, AuditValue.Id(tokensRevoked)));
         }
+
+        return changes;
     }
+
+    private static AuditSubject Subject(long id, string? name) => new(AuditEntityTypes.Client, AuditValue.Id(id), name);
 
     private Client Modified(Client existing, string name, bool isActive, int lifetimeSeconds, string modifiedBy) => new()
     {

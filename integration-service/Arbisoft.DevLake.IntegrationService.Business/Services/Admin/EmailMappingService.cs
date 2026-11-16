@@ -14,8 +14,10 @@
 // limitations under the License.
 
 using Arbisoft.DevLake.IntegrationService.Business.Dtos.Admin;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Requests;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
 using Microsoft.Extensions.Options;
 
@@ -27,9 +29,9 @@ public interface IEmailMappingService
 
     Task<EmailMappingDto?> GetAsync(long id, CancellationToken cancellationToken);
 
-    Task<AdminResult<long>> CreateAsync(EmailMappingInput input, CancellationToken cancellationToken);
+    Task<AdminResult<long>> CreateAsync(EmailMappingInput input, AuditActor actor, CancellationToken cancellationToken);
 
-    Task<AdminResult> UpdateAsync(long id, EmailMappingInput input, CancellationToken cancellationToken);
+    Task<AdminResult> UpdateAsync(long id, EmailMappingInput input, AuditActor actor, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -43,12 +45,17 @@ public sealed class EmailMappingService : IEmailMappingService
 
     private readonly IEmailMappingRepository _mappings;
     private readonly IOptions<RequestsOptions> _options;
+    private readonly IDbSession _session;
+    private readonly IAuditTrail _audit;
     private readonly TimeProvider _timeProvider;
 
-    public EmailMappingService(IEmailMappingRepository mappings, IOptions<RequestsOptions> options, TimeProvider timeProvider)
+    public EmailMappingService(
+        IEmailMappingRepository mappings, IOptions<RequestsOptions> options, IDbSession session, IAuditTrail audit, TimeProvider timeProvider)
     {
         _mappings = mappings;
         _options = options;
+        _session = session;
+        _audit = audit;
         _timeProvider = timeProvider;
     }
 
@@ -65,7 +72,7 @@ public sealed class EmailMappingService : IEmailMappingService
         return mapping is null ? null : ToDto(mapping);
     }
 
-    public async Task<AdminResult<long>> CreateAsync(EmailMappingInput input, CancellationToken cancellationToken)
+    public async Task<AdminResult<long>> CreateAsync(EmailMappingInput input, AuditActor actor, CancellationToken cancellationToken)
     {
         var checkedInput = await CheckAsync(input, exceptId: null, cancellationToken);
         if (checkedInput.Error is not null)
@@ -73,19 +80,23 @@ public sealed class EmailMappingService : IEmailMappingService
             return AdminResult.Failure<long>(checkedInput.Error);
         }
 
-        var id = await _mappings.InsertAsync(
-            new EmailMapping
-            {
-                ArbisoftEmail = checkedInput.ArbisoftEmail,
-                Email = checkedInput.Email,
-                EmailAsReceived = input.Email,
-                CreatedOn = _timeProvider.GetUtcNow()
-            },
-            cancellationToken);
+        var mapping = new EmailMapping
+        {
+            ArbisoftEmail = checkedInput.ArbisoftEmail,
+            Email = checkedInput.Email,
+            EmailAsReceived = input.Email,
+            CreatedOn = _timeProvider.GetUtcNow()
+        };
+        long id = 0;
+        await _audit.SaveChangeAsync(_session, actor, async () =>
+        {
+            id = await _mappings.InsertAsync(mapping, cancellationToken);
+            return Subject(id, mapping).Did(AuditActions.Created, AuditedFields.EmailMapping.Created(mapping));
+        }, cancellationToken);
         return AdminResult.Success(id);
     }
 
-    public async Task<AdminResult> UpdateAsync(long id, EmailMappingInput input, CancellationToken cancellationToken)
+    public async Task<AdminResult> UpdateAsync(long id, EmailMappingInput input, AuditActor actor, CancellationToken cancellationToken)
     {
         var existing = await _mappings.GetByIdAsync(id, cancellationToken);
         if (existing is null)
@@ -99,11 +110,23 @@ public sealed class EmailMappingService : IEmailMappingService
             return AdminResult.Fail(checkedInput.Error);
         }
 
-        await _mappings.UpdateAsync(
-            new EmailMapping { Id = id, ArbisoftEmail = checkedInput.ArbisoftEmail, Email = checkedInput.Email, EmailAsReceived = input.Email, CreatedOn = existing.CreatedOn },
-            cancellationToken);
+        var updated = new EmailMapping
+        {
+            Id = id,
+            ArbisoftEmail = checkedInput.ArbisoftEmail,
+            Email = checkedInput.Email,
+            EmailAsReceived = input.Email,
+            CreatedOn = existing.CreatedOn
+        };
+        await _audit.SaveChangeAsync(_session, actor, async () =>
+        {
+            await _mappings.UpdateAsync(updated, cancellationToken);
+            return Subject(id, updated).Did(AuditActions.Updated, AuditedFields.EmailMapping.Changed(existing, updated));
+        }, cancellationToken);
         return AdminResult.Ok;
     }
+
+    private static AuditSubject Subject(long id, EmailMapping mapping) => new(AuditEntityTypes.EmailMapping, AuditValue.Id(id), mapping.ArbisoftEmail);
 
     private async Task<(string ArbisoftEmail, string Email, string? Error)> CheckAsync(EmailMappingInput input, long? exceptId, CancellationToken cancellationToken)
     {

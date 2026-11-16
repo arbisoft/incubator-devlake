@@ -653,6 +653,13 @@ public sealed partial class AdminPortalTests : IAsyncLifetime, IDisposable
         var cleared = await PostFormAsync(Http, $"/Clients/Details/{client.Id}?handler=Scopes");
         Assert.Equal(HttpStatusCode.Redirect, cleared.StatusCode);
         Assert.Empty(await clients.GetScopeNamesAsync(client.Id, CancellationToken.None));
+
+        // Each saved change is in the client's history, newest first, with who made it; the refused edit and the unknown scope left nothing.
+        var history = (await scope.ServiceProvider.GetRequiredService<IAuditLogRepository>().ListAsync(
+            new AuditLogFilter(EntityType: "Client", EntityId: client.Id.ToString(CultureInfo.InvariantCulture)), 1, 50, CancellationToken.None)).Items;
+        Assert.Equal(["ScopesChanged", "ScopesChanged", "Updated", "Created"], history.Select(entry => entry.Action));
+        Assert.All(history, entry => Assert.Equal((AuditActorKind.User, PortalFactory.AdminUsername), (entry.ActorKind, entry.ActorName)));
+        Assert.Contains("\"Renamed\"", history[2].Changes, StringComparison.Ordinal);
     }
 
     [MySqlFact]

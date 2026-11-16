@@ -15,7 +15,9 @@
 
 using System.Text.RegularExpressions;
 using Arbisoft.DevLake.IntegrationService.Business.Dtos.Admin;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
 
 namespace Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
@@ -26,9 +28,9 @@ public interface IScopeService
 
     Task<ScopeDto?> GetAsync(long id, CancellationToken cancellationToken);
 
-    Task<AdminResult<long>> CreateAsync(string name, string description, CancellationToken cancellationToken);
+    Task<AdminResult<long>> CreateAsync(string name, string description, AuditActor actor, CancellationToken cancellationToken);
 
-    Task<AdminResult> UpdateAsync(long id, string name, string description, CancellationToken cancellationToken);
+    Task<AdminResult> UpdateAsync(long id, string name, string description, AuditActor actor, CancellationToken cancellationToken);
 }
 
 /// <summary>Scopes are names such as <c>stats:read</c> that the APIs require. Clients are granted scopes in the client details page.</summary>
@@ -37,11 +39,15 @@ public sealed partial class ScopeService : IScopeService
     public const int MaxDescriptionLength = 500;
 
     private readonly IScopeRepository _scopes;
+    private readonly IDbSession _session;
+    private readonly IAuditTrail _audit;
     private readonly TimeProvider _timeProvider;
 
-    public ScopeService(IScopeRepository scopes, TimeProvider timeProvider)
+    public ScopeService(IScopeRepository scopes, IDbSession session, IAuditTrail audit, TimeProvider timeProvider)
     {
         _scopes = scopes;
+        _session = session;
+        _audit = audit;
         _timeProvider = timeProvider;
     }
 
@@ -57,46 +63,58 @@ public sealed partial class ScopeService : IScopeService
         return scope is null ? null : ToDto(scope);
     }
 
-    public async Task<AdminResult<long>> CreateAsync(string name, string description, CancellationToken cancellationToken)
+    public async Task<AdminResult<long>> CreateAsync(string name, string description, AuditActor actor, CancellationToken cancellationToken)
     {
         var problem = Validate(name, description);
+        if (problem is null && await _scopes.GetByNameAsync(name, cancellationToken) is not null)
+        {
+            problem = $"A scope named '{name}' already exists.";
+        }
+
         if (problem is not null)
         {
             return AdminResult.Failure<long>(problem);
         }
 
-        if (await _scopes.GetByNameAsync(name, cancellationToken) is not null)
+        var scope = new Scope { Name = name, Description = description.Trim(), CreatedOn = _timeProvider.GetUtcNow() };
+        long id = 0;
+        await _audit.SaveChangeAsync(_session, actor, async () =>
         {
-            return AdminResult.Failure<long>($"A scope named '{name}' already exists.");
-        }
-
-        var id = await _scopes.InsertAsync(new Scope { Name = name, Description = description.Trim(), CreatedOn = _timeProvider.GetUtcNow() }, cancellationToken);
+            id = await _scopes.InsertAsync(scope, cancellationToken);
+            return Subject(id, scope.Name).Did(AuditActions.Created, AuditedFields.Scope.Created(scope));
+        }, cancellationToken);
         return AdminResult.Success(id);
     }
 
-    public async Task<AdminResult> UpdateAsync(long id, string name, string description, CancellationToken cancellationToken)
+    public async Task<AdminResult> UpdateAsync(long id, string name, string description, AuditActor actor, CancellationToken cancellationToken)
     {
         var problem = Validate(name, description);
+        var existing = problem is null ? await _scopes.GetByIdAsync(id, cancellationToken) : null;
+        if (problem is null && existing is null)
+        {
+            problem = "The scope does not exist.";
+        }
+
+        if (problem is null && await _scopes.GetByNameAsync(name, cancellationToken) is { } sameName && sameName.Id != id)
+        {
+            problem = $"A scope named '{name}' already exists.";
+        }
+
         if (problem is not null)
         {
             return AdminResult.Fail(problem);
         }
 
-        var existing = await _scopes.GetByIdAsync(id, cancellationToken);
-        if (existing is null)
+        var updated = new Scope { Id = id, Name = name, Description = description.Trim(), CreatedOn = existing!.CreatedOn };
+        await _audit.SaveChangeAsync(_session, actor, async () =>
         {
-            return AdminResult.Fail("The scope does not exist.");
-        }
-
-        var sameName = await _scopes.GetByNameAsync(name, cancellationToken);
-        if (sameName is not null && sameName.Id != id)
-        {
-            return AdminResult.Fail($"A scope named '{name}' already exists.");
-        }
-
-        await _scopes.UpdateAsync(new Scope { Id = id, Name = name, Description = description.Trim(), CreatedOn = existing.CreatedOn }, cancellationToken);
+            await _scopes.UpdateAsync(updated, cancellationToken);
+            return Subject(id, updated.Name).Did(AuditActions.Updated, AuditedFields.Scope.Changed(existing, updated));
+        }, cancellationToken);
         return AdminResult.Ok;
     }
+
+    private static AuditSubject Subject(long id, string name) => new(AuditEntityTypes.Scope, AuditValue.Id(id), name);
 
     private static string? Validate(string name, string description)
     {

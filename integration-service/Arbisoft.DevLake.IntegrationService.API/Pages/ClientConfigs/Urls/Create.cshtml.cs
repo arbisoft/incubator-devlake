@@ -35,7 +35,7 @@ public sealed class CreateModel(IClientConfigService configs) : AdminPageModel
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
-        var result = await configs.CreateUrlAsync(ClientRefId, Form.ToInput(), Admin, cancellationToken);
+        var result = await configs.CreateUrlAsync(ClientRefId, Form.ToInput(), Actor, cancellationToken);
         if (!result.Succeeded)
         {
             return Fail(result.Error);

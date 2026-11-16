@@ -15,13 +15,14 @@
 
 namespace Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 
-/// <summary>The kinds of object an audit entry can be about.</summary>
+/// <summary>
+/// The kinds of object an audit entry can be about. A part of an object is recorded against the object, so its history is complete: a client's
+/// secrets against the client, and a callback URL against its outbound config, which is identified by the client's id.
+/// </summary>
 public static class AuditEntityTypes
 {
     public const string Client = "Client";
-    public const string ClientSecret = "ClientSecret";
     public const string ClientConfig = "ClientConfig";
-    public const string CallbackUrl = "CallbackUrl";
     public const string Scope = "Scope";
     public const string EmailMapping = "EmailMapping";
     public const string SigningKey = "SigningKey";

@@ -14,8 +14,11 @@
 // limitations under the License.
 
 using Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
+using Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 
@@ -26,11 +29,13 @@ public class ScopeServiceTests
     private static readonly DateTimeOffset Now = new(2026, 11, 11, 12, 0, 0, TimeSpan.Zero);
 
     private readonly IScopeRepository _scopes = Substitute.For<IScopeRepository>();
+    private readonly IDbSession _session = Substitute.For<IDbSession>();
+    private readonly RecordingAuditTrail _audit = new();
     private readonly ScopeService _service;
 
     public ScopeServiceTests()
     {
-        _service = new ScopeService(_scopes, new FakeTimeProvider(Now));
+        _service = new ScopeService(_scopes, _session, _audit, new FakeTimeProvider(Now));
     }
 
     [Fact]
@@ -38,7 +43,7 @@ public class ScopeServiceTests
     {
         _scopes.InsertAsync(Arg.Any<Scope>(), Arg.Any<CancellationToken>()).Returns(7L);
 
-        var result = await _service.CreateAsync("reports:read", " Read reports ", CancellationToken.None);
+        var result = await _service.CreateAsync("reports:read", " Read reports ", TestActors.User("admin"), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Equal(7, result.Value);
@@ -53,7 +58,7 @@ public class ScopeServiceTests
     [InlineData("has space")]
     public async Task Create_AnInvalidName_IsRefusedWithoutAWrite(string name)
     {
-        var result = await _service.CreateAsync(name, string.Empty, CancellationToken.None);
+        var result = await _service.CreateAsync(name, string.Empty, TestActors.User("admin"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         await _scopes.DidNotReceiveWithAnyArgs().InsertAsync(default!, default);
@@ -62,7 +67,7 @@ public class ScopeServiceTests
     [Fact]
     public async Task Create_ADescriptionThatIsTooLong_IsRefused()
     {
-        var result = await _service.CreateAsync("reports:read", new string('x', ScopeService.MaxDescriptionLength + 1), CancellationToken.None);
+        var result = await _service.CreateAsync("reports:read", new string('x', ScopeService.MaxDescriptionLength + 1), TestActors.User("admin"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
     }
@@ -72,7 +77,7 @@ public class ScopeServiceTests
     {
         _scopes.GetByNameAsync("stats:read", Arg.Any<CancellationToken>()).Returns(new Scope { Id = 1, Name = "stats:read" });
 
-        var result = await _service.CreateAsync("stats:read", string.Empty, CancellationToken.None);
+        var result = await _service.CreateAsync("stats:read", string.Empty, TestActors.User("admin"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         await _scopes.DidNotReceiveWithAnyArgs().InsertAsync(default!, default);
@@ -81,7 +86,7 @@ public class ScopeServiceTests
     [Fact]
     public async Task Update_AnUnknownScope_Fails()
     {
-        var result = await _service.UpdateAsync(9, "stats:read", string.Empty, CancellationToken.None);
+        var result = await _service.UpdateAsync(9, "stats:read", string.Empty, TestActors.User("admin"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
     }
@@ -92,7 +97,7 @@ public class ScopeServiceTests
         _scopes.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(new Scope { Id = 1, Name = "a:b" });
         _scopes.GetByNameAsync("stats:read", Arg.Any<CancellationToken>()).Returns(new Scope { Id = 2, Name = "stats:read" });
 
-        var result = await _service.UpdateAsync(1, "stats:read", string.Empty, CancellationToken.None);
+        var result = await _service.UpdateAsync(1, "stats:read", string.Empty, TestActors.User("admin"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         await _scopes.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default);
@@ -105,7 +110,7 @@ public class ScopeServiceTests
         _scopes.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(new Scope { Id = 1, Name = "stats:read", CreatedOn = created });
         _scopes.GetByNameAsync("stats:read", Arg.Any<CancellationToken>()).Returns(new Scope { Id = 1, Name = "stats:read", CreatedOn = created });
 
-        var result = await _service.UpdateAsync(1, "stats:read", "New text", CancellationToken.None);
+        var result = await _service.UpdateAsync(1, "stats:read", "New text", TestActors.User("admin"), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         await _scopes.Received(1).UpdateAsync(Arg.Is<Scope>(s => s.Id == 1 && s.Description == "New text" && s.CreatedOn == created), Arg.Any<CancellationToken>());
@@ -127,5 +132,36 @@ public class ScopeServiceTests
     public async Task Get_AnUnknownScope_IsNull()
     {
         Assert.Null(await _service.GetAsync(4, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Create_IsRecordedWithItsNameAndDescription()
+    {
+        _scopes.InsertAsync(Arg.Any<Scope>(), Arg.Any<CancellationToken>()).Returns(7L);
+
+        await _service.CreateAsync("reports:read", "Read reports", TestActors.User("admin"), CancellationToken.None);
+
+        var (actor, entry) = Assert.Single(_audit.Recorded);
+        Assert.Equal("admin", actor.Name);
+        Assert.Equal((AuditActions.Created, AuditEntityTypes.Scope, "7", "reports:read"), (entry.Action, entry.EntityType, entry.EntityId, entry.EntityLabel));
+        Assert.Equal([new AuditChange("Name", null, "reports:read"), new AuditChange("Description", null, "Read reports")], entry.Changes!);
+    }
+
+    [Fact]
+    public async Task Update_RecordsTheOldAndNewDescription()
+    {
+        _scopes.GetByIdAsync(7, Arg.Any<CancellationToken>()).Returns(new Scope { Id = 7, Name = "reports:read", Description = "Old" });
+
+        await _service.UpdateAsync(7, "reports:read", "New", TestActors.User("editor"), CancellationToken.None);
+
+        Assert.Equal([new AuditChange("Description", "Old", "New")], _audit.OnlyEntry.Changes!);
+    }
+
+    [Fact]
+    public async Task Create_Refused_RecordsNothing()
+    {
+        await _service.CreateAsync("Bad Name", string.Empty, TestActors.User("admin"), CancellationToken.None);
+
+        Assert.Empty(_audit.Recorded);
     }
 }

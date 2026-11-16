@@ -15,8 +15,10 @@
 
 using System.Text.Json;
 using Arbisoft.DevLake.IntegrationService.Business.Dtos.Admin;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Processing;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
 
 namespace Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
@@ -36,7 +38,7 @@ public interface IRequestLogService
     /// keeps its correlation ID, so the client's callback receives it as the original request, and it gets a fresh lifetime and a fresh set of
     /// delivery attempts. The retry is recorded in the attempt history with who did it.
     /// </summary>
-    Task<AdminResult> RetryAsync(long id, string retriedBy, CancellationToken cancellationToken);
+    Task<AdminResult> RetryAsync(long id, AuditActor actor, CancellationToken cancellationToken);
 }
 
 public sealed class RequestLogService : IRequestLogService
@@ -52,12 +54,16 @@ public sealed class RequestLogService : IRequestLogService
 
     private readonly IRequestLogRepository _logs;
     private readonly IClientRepository _clients;
+    private readonly IDbSession _session;
+    private readonly IAuditTrail _audit;
     private readonly TimeProvider _timeProvider;
 
-    public RequestLogService(IRequestLogRepository logs, IClientRepository clients, TimeProvider timeProvider)
+    public RequestLogService(IRequestLogRepository logs, IClientRepository clients, IDbSession session, IAuditTrail audit, TimeProvider timeProvider)
     {
         _logs = logs;
         _clients = clients;
+        _session = session;
+        _audit = audit;
         _timeProvider = timeProvider;
     }
 
@@ -115,42 +121,44 @@ public sealed class RequestLogService : IRequestLogService
             attempts);
     }
 
-    public async Task<AdminResult> RetryAsync(long id, string retriedBy, CancellationToken cancellationToken)
+    public async Task<AdminResult> RetryAsync(long id, AuditActor actor, CancellationToken cancellationToken)
     {
         var log = await _logs.GetByIdAsync(id, cancellationToken);
-        if (log is null)
+        var problem = log is null ? "The request does not exist."
+            : log.Status != RequestStatus.Failed ? "Only a failed request can be retried."
+            : string.IsNullOrEmpty(await _logs.GetJsonAsync(id, cancellationToken)) ? "The request has no stored body, so it cannot be processed again."
+            : null;
+        if (problem is not null)
         {
-            return AdminResult.Fail("The request does not exist.");
-        }
-
-        if (log.Status != RequestStatus.Failed)
-        {
-            return AdminResult.Fail("Only a failed request can be retried.");
-        }
-
-        if (string.IsNullOrEmpty(await _logs.GetJsonAsync(id, cancellationToken)))
-        {
-            return AdminResult.Fail("The request has no stored body, so it cannot be processed again.");
+            return AdminResult.Fail(problem);
         }
 
         var now = _timeProvider.GetUtcNow();
-        if (!await _logs.TryRetryAsync(id, now, cancellationToken))
+        var retried = await _audit.SaveChangeAsync(_session, actor, async () =>
         {
-            return AdminResult.Fail("The request changed meanwhile; reload the page.");
-        }
-
-        var by = $"Admin: {retriedBy}";
-        await _logs.InsertAttemptAsync(
-            new RequestResponseAttempt
+            if (!await _logs.TryRetryAsync(id, now, cancellationToken))
             {
-                RequestLogId = id,
-                ResponseJson = ProcessingConstants.EmptyJson,
-                AttemptStatus = DeliveryAttemptStatus.Retried,
-                AttemptBy = by.Length > AttemptByLength ? by[..AttemptByLength] : by,
-                AttemptOn = now
-            },
-            cancellationToken);
-        return AdminResult.Ok;
+                return null;
+            }
+
+            await _logs.InsertAttemptAsync(RetryAttempt(id, actor, now), cancellationToken);
+            return new AuditSubject(AuditEntityTypes.Request, AuditValue.Id(id), log!.CorrelationId)
+                .Did(AuditActions.Retried, [new AuditChange(AuditedFields.Status, RequestStatus.Failed, RequestStatus.Queued)]);
+        }, cancellationToken);
+        return retried ? AdminResult.Ok : AdminResult.Fail("The request changed meanwhile; reload the page.");
+    }
+
+    private static RequestResponseAttempt RetryAttempt(long id, AuditActor actor, DateTimeOffset now)
+    {
+        var by = $"Admin: {actor.Name}";
+        return new RequestResponseAttempt
+        {
+            RequestLogId = id,
+            ResponseJson = ProcessingConstants.EmptyJson,
+            AttemptStatus = DeliveryAttemptStatus.Retried,
+            AttemptBy = by.Length > AttemptByLength ? by[..AttemptByLength] : by,
+            AttemptOn = now
+        };
     }
 
     private async Task<Client?> ClientAsync(Dictionary<long, Client?> cache, long id, CancellationToken cancellationToken)

@@ -15,9 +15,12 @@
 
 using Arbisoft.DevLake.IntegrationService.Business.Dtos.Admin;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Requests;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
+using Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
@@ -29,18 +32,20 @@ public class EmailMappingServiceTests
     private static readonly DateTimeOffset Now = new(2026, 11, 11, 12, 0, 0, TimeSpan.Zero);
 
     private readonly IEmailMappingRepository _mappings = Substitute.For<IEmailMappingRepository>();
+    private readonly IDbSession _session = Substitute.For<IDbSession>();
+    private readonly RecordingAuditTrail _audit = new();
     private readonly EmailMappingService _service;
 
     public EmailMappingServiceTests()
     {
         _mappings.InsertAsync(Arg.Any<EmailMapping>(), Arg.Any<CancellationToken>()).Returns(5L);
-        _service = new EmailMappingService(_mappings, Options.Create(new RequestsOptions()), new FakeTimeProvider(Now));
+        _service = new EmailMappingService(_mappings, Options.Create(new RequestsOptions()), _session, _audit, new FakeTimeProvider(Now));
     }
 
     [Fact]
     public async Task Create_StoresBothAddressesNormalized_AndTheMappedOneAsTyped()
     {
-        var result = await _service.CreateAsync(new EmailMappingInput(" Jane.Doe@Arbisoft.com ", " Jane.D@Gmail.com "), CancellationToken.None);
+        var result = await _service.CreateAsync(new EmailMappingInput(" Jane.Doe@Arbisoft.com ", " Jane.D@Gmail.com "), TestActors.User("admin"), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Equal(5, result.Value);
@@ -58,7 +63,7 @@ public class EmailMappingServiceTests
     [InlineData("jane@arbisoft.com", "JANE@arbisoft.com")]
     public async Task Create_InvalidOrPointlessInput_IsRefusedWithoutAWrite(string arbisoft, string mapped)
     {
-        var result = await _service.CreateAsync(new EmailMappingInput(arbisoft, mapped), CancellationToken.None);
+        var result = await _service.CreateAsync(new EmailMappingInput(arbisoft, mapped), TestActors.User("admin"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         await _mappings.DidNotReceiveWithAnyArgs().InsertAsync(default!, default);
@@ -67,7 +72,7 @@ public class EmailMappingServiceTests
     [Fact]
     public async Task Create_AMappedEmailThatIsTooLong_IsRefused()
     {
-        var result = await _service.CreateAsync(new EmailMappingInput("jane@arbisoft.com", new string('a', 300) + "@gmail.com"), CancellationToken.None);
+        var result = await _service.CreateAsync(new EmailMappingInput("jane@arbisoft.com", new string('a', 300) + "@gmail.com"), TestActors.User("admin"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
     }
@@ -77,7 +82,7 @@ public class EmailMappingServiceTests
     {
         _mappings.ExistsAsync("jane@arbisoft.com", "x@gmail.com", null, Arg.Any<CancellationToken>()).Returns(true);
 
-        var result = await _service.CreateAsync(new EmailMappingInput("JANE@arbisoft.com", "X@Gmail.com"), CancellationToken.None);
+        var result = await _service.CreateAsync(new EmailMappingInput("JANE@arbisoft.com", "X@Gmail.com"), TestActors.User("admin"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Contains("already exists", result.Error, StringComparison.Ordinal);
@@ -90,7 +95,7 @@ public class EmailMappingServiceTests
         var created = Now.AddDays(-9);
         _mappings.GetByIdAsync(3, Arg.Any<CancellationToken>()).Returns(new EmailMapping { Id = 3, CreatedOn = created });
 
-        var result = await _service.UpdateAsync(3, new EmailMappingInput("jane@arbisoft.com", "New@Gmail.com"), CancellationToken.None);
+        var result = await _service.UpdateAsync(3, new EmailMappingInput("jane@arbisoft.com", "New@Gmail.com"), TestActors.User("admin"), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         await _mappings.Received(1).ExistsAsync("jane@arbisoft.com", "new@gmail.com", 3, Arg.Any<CancellationToken>());
@@ -102,7 +107,7 @@ public class EmailMappingServiceTests
     [Fact]
     public async Task Update_AnUnknownMapping_Fails()
     {
-        var result = await _service.UpdateAsync(9, new EmailMappingInput("jane@arbisoft.com", "x@gmail.com"), CancellationToken.None);
+        var result = await _service.UpdateAsync(9, new EmailMappingInput("jane@arbisoft.com", "x@gmail.com"), TestActors.User("admin"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
     }
@@ -113,7 +118,7 @@ public class EmailMappingServiceTests
         _mappings.GetByIdAsync(3, Arg.Any<CancellationToken>()).Returns(new EmailMapping { Id = 3 });
         _mappings.ExistsAsync("jane@arbisoft.com", "x@gmail.com", 3, Arg.Any<CancellationToken>()).Returns(true);
 
-        var result = await _service.UpdateAsync(3, new EmailMappingInput("jane@arbisoft.com", "x@gmail.com"), CancellationToken.None);
+        var result = await _service.UpdateAsync(3, new EmailMappingInput("jane@arbisoft.com", "x@gmail.com"), TestActors.User("admin"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         await _mappings.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default);
@@ -144,5 +149,24 @@ public class EmailMappingServiceTests
         Assert.Empty(page.Items);
         Assert.Equal(1, page.TotalPages);
         Assert.False(page.HasNext);
+    }
+
+    [Fact]
+    public async Task Create_IsRecordedWithBothAddresses()
+    {
+        await _service.CreateAsync(new EmailMappingInput("jane.doe@arbisoft.com", "Jane.D@Gmail.com"), TestActors.User("admin"), CancellationToken.None);
+
+        var entry = _audit.OnlyEntry;
+        Assert.Equal((AuditActions.Created, AuditEntityTypes.EmailMapping, "5", "jane.doe@arbisoft.com"), (entry.Action, entry.EntityType, entry.EntityId, entry.EntityLabel));
+        Assert.Contains(new AuditChange("Mapped email", null, "jane.d@gmail.com"), entry.Changes!);
+        Assert.Contains(new AuditChange("Mapped email as typed", null, "Jane.D@Gmail.com"), entry.Changes!);
+    }
+
+    [Fact]
+    public async Task Create_Refused_RecordsNothing()
+    {
+        await _service.CreateAsync(new EmailMappingInput("jane@gmail.com", "x@gmail.com"), TestActors.User("admin"), CancellationToken.None);
+
+        Assert.Empty(_audit.Recorded);
     }
 }

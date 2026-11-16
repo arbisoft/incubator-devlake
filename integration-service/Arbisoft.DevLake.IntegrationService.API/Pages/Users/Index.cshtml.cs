@@ -34,7 +34,7 @@ public sealed class IndexModel(IPortalUserService users) : AdminPageModel
 
     public async Task<IActionResult> OnPostAsync(long id, string? role, bool isActive, CancellationToken cancellationToken)
     {
-        var result = await users.SetAccessAsync(id, role, isActive, CurrentUserId, Admin, cancellationToken);
+        var result = await users.SetAccessAsync(id, role, isActive, CurrentUserId, Actor, cancellationToken);
         if (!result.Succeeded)
         {
             Users = await users.ListAsync(cancellationToken);

@@ -18,6 +18,7 @@ namespace Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 /// <summary>
 /// What happened, to which object. <paramref name="Action"/> is one of <see cref="AuditActions"/> and <paramref name="EntityType"/> one of
 /// <see cref="AuditEntityTypes"/>. <paramref name="EntityLabel"/> is the object's readable name at the time, such as a client's name.
+/// <paramref name="Reason"/> is why it was done, when someone gave a reason, or which part of the object it concerns, such as one callback URL.
 /// </summary>
 public sealed record AuditEntry(
     string Action,

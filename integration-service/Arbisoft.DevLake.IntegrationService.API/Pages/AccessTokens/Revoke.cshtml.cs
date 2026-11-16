@@ -38,7 +38,7 @@ public sealed class RevokeModel(IAccessTokenService accessTokens) : AdminPageMod
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
-        var result = await accessTokens.RevokeAsync(Jti, Reason, Admin, cancellationToken);
+        var result = await accessTokens.RevokeAsync(Jti, Reason, Actor, cancellationToken);
         if (!result.Succeeded)
         {
             Token = await accessTokens.GetAsync(Jti, cancellationToken);

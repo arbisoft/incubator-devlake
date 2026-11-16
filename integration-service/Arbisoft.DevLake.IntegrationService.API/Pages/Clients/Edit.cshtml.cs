@@ -44,7 +44,7 @@ public sealed class EditModel(IClientService clients) : AdminPageModel
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
         var result = await clients.UpdateAsync(
-            Id, new ClientInput(Form.ClientId, Form.Name, Form.IsActive, Form.AccessTokenLifetimeSeconds), Admin, cancellationToken);
+            Id, new ClientInput(Form.ClientId, Form.Name, Form.IsActive, Form.AccessTokenLifetimeSeconds), Actor, cancellationToken);
         if (!result.Succeeded)
         {
             return Fail(result.Error);

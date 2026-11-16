@@ -42,7 +42,7 @@ public sealed class EditModel(IEmailMappingService mappings) : AdminPageModel
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
-        var result = await mappings.UpdateAsync(Id, new EmailMappingInput(Form.ArbisoftEmail, Form.Email), cancellationToken);
+        var result = await mappings.UpdateAsync(Id, new EmailMappingInput(Form.ArbisoftEmail, Form.Email), Actor, cancellationToken);
         if (!result.Succeeded)
         {
             return Fail(result.Error);

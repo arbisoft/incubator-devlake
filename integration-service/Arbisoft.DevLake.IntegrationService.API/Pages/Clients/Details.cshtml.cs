@@ -35,7 +35,7 @@ public sealed class DetailsModel(IClientService clients) : AdminPageModel
 
     public async Task<IActionResult> OnPostScopesAsync(long[] scopeIds, CancellationToken cancellationToken)
     {
-        var result = await clients.SetScopesAsync(Id, scopeIds, Admin, cancellationToken);
+        var result = await clients.SetScopesAsync(Id, scopeIds, Actor, cancellationToken);
         if (!result.Succeeded)
         {
             Details = await clients.GetAsync(Id, cancellationToken);

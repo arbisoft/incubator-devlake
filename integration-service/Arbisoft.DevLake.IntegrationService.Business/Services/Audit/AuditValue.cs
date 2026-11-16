@@ -21,6 +21,9 @@ namespace Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 /// <summary>How the audit trail writes a field's value.</summary>
 public static class AuditValue
 {
+    /// <summary>A numeric id as an entry's entity id or value.</summary>
+    public static string Id(long id) => id.ToString(CultureInfo.InvariantCulture);
+
     /// <summary>A value as the trail shows it. Empty text reads as no value, and a list is sorted so that reordering it is not a change.</summary>
     public static string? Read(object? value) => value switch
     {

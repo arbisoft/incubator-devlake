@@ -16,11 +16,14 @@
 
 using Arbisoft.DevLake.IntegrationService.Business.Security;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 using Arbisoft.DevLake.IntegrationService.DataAccess.ExternalApis;
 using Arbisoft.DevLake.IntegrationService.DataAccess.ExternalApis.DevLake;
 using Arbisoft.DevLake.IntegrationService.DataAccess.ExternalApis.Workstream;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
+using Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 
@@ -35,12 +38,14 @@ public class UpstreamTokenServiceTests
     private readonly IUpstreamTokenProvider _tokens = Substitute.For<IUpstreamTokenProvider>();
     private readonly IDevLakeClient _devLake = Substitute.For<IDevLakeClient>();
     private readonly IWorkstreamClient _workstream = Substitute.For<IWorkstreamClient>();
+    private readonly IDbSession _session = Substitute.For<IDbSession>();
+    private readonly RecordingAuditTrail _audit = new();
     private readonly UpstreamTokenService _service;
 
     public UpstreamTokenServiceTests()
     {
         _encryptor.Encrypt(Arg.Any<string>()).Returns(call => "enc:" + call.Arg<string>());
-        _service = new UpstreamTokenService(_secrets, _encryptor, _tokens, _devLake, _workstream, new FakeTimeProvider(Now));
+        _service = new UpstreamTokenService(_secrets, _encryptor, _tokens, _devLake, _workstream, _session, _audit, new FakeTimeProvider(Now));
     }
 
     [Fact]
@@ -60,7 +65,7 @@ public class UpstreamTokenServiceTests
     [Fact]
     public async Task Save_StoresTheTrimmedTokenEncrypted_UnderTheSystemsReference_WithWhoSavedIt_AndDropsTheCachedOne()
     {
-        var result = await _service.SaveAsync(UpstreamSystem.Workstream, "  ws-token  ", "alice", CancellationToken.None);
+        var result = await _service.SaveAsync(UpstreamSystem.Workstream, "  ws-token  ", TestActors.User("alice"), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         await _secrets.Received(1).SaveEncryptedValueAsync(UpstreamSystems.SecretRefOf(UpstreamSystem.Workstream), "enc:ws-token", Now, Arg.Any<CancellationToken>(), "alice");
@@ -74,7 +79,7 @@ public class UpstreamTokenServiceTests
     [InlineData("two words")]
     public async Task Save_AMissingOrMalformedToken_IsRefused_AndNothingIsStored(string? token)
     {
-        var result = await _service.SaveAsync(UpstreamSystem.DevLake, token, "alice", CancellationToken.None);
+        var result = await _service.SaveAsync(UpstreamSystem.DevLake, token, TestActors.User("alice"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         await _secrets.DidNotReceiveWithAnyArgs().SaveEncryptedValueAsync(default!, default!, default, default, default);
@@ -83,7 +88,7 @@ public class UpstreamTokenServiceTests
     [Fact]
     public async Task Save_AnOverlongToken_IsRefused()
     {
-        Assert.False((await _service.SaveAsync(UpstreamSystem.DevLake, new string('x', UpstreamTokenService.MaxTokenLength + 1), "alice", CancellationToken.None)).Succeeded);
+        Assert.False((await _service.SaveAsync(UpstreamSystem.DevLake, new string('x', UpstreamTokenService.MaxTokenLength + 1), TestActors.User("alice"), CancellationToken.None)).Succeeded);
     }
 
     [Fact]
@@ -110,5 +115,26 @@ public class UpstreamTokenServiceTests
 
         Assert.False(result.Succeeded);
         Assert.Equal("DevLake was unavailable (503).", result.Error);
+    }
+
+    [Fact]
+    public async Task Save_IsRecordedAsAHiddenChange_AndNeverWithTheToken()
+    {
+        _secrets.GetInfoAsync(UpstreamSystems.SecretRefOf(UpstreamSystem.DevLake), Arg.Any<CancellationToken>())
+            .Returns(new SecretStoreEntryInfo { CreatedOn = Now.AddDays(-2) });
+
+        await _service.SaveAsync(UpstreamSystem.DevLake, "dl-token", TestActors.User("alice"), CancellationToken.None);
+
+        var entry = _audit.OnlyEntry;
+        Assert.Equal((AuditActions.Updated, AuditEntityTypes.UpstreamToken, "DevLake"), (entry.Action, entry.EntityType, entry.EntityId));
+        Assert.Equal([new AuditChange("Token", null, null, Hidden: true)], entry.Changes!);
+    }
+
+    [Fact]
+    public async Task Save_TheFirstToken_IsRecordedAsCreated()
+    {
+        await _service.SaveAsync(UpstreamSystem.Workstream, "ws-token", TestActors.User("alice"), CancellationToken.None);
+
+        Assert.Equal(AuditActions.Created, _audit.OnlyEntry.Action);
     }
 }

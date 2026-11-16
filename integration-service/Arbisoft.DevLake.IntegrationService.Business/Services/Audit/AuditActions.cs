@@ -23,6 +23,10 @@ public static class AuditActions
     public const string Revoked = "Revoked";
     public const string Rotated = "Rotated";
     public const string Retried = "Retried";
+    public const string SecretCreated = "SecretCreated";
+    public const string SecretRevoked = "SecretRevoked";
+    public const string CallbackUrlCreated = "CallbackUrlCreated";
+    public const string CallbackUrlUpdated = "CallbackUrlUpdated";
     public const string ScopesChanged = "ScopesChanged";
     public const string AccessChanged = "AccessChanged";
     public const string StatusChanged = "StatusChanged";

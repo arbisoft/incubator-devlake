@@ -16,8 +16,10 @@
 
 using Arbisoft.DevLake.IntegrationService.Business.Dtos.Admin;
 using Arbisoft.DevLake.IntegrationService.Business.Security;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Requests;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
 
 namespace Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
@@ -45,7 +47,7 @@ public interface IPortalUserService
     /// Grants or removes access: the role, and whether the account can sign in at all. Nobody changes their own access, and the last active
     /// administrator cannot be demoted or disabled, so the portal can never be left without one.
     /// </summary>
-    Task<AdminResult> SetAccessAsync(long userId, string? role, bool isActive, long changedById, string changedBy, CancellationToken cancellationToken);
+    Task<AdminResult> SetAccessAsync(long userId, string? role, bool isActive, long changedById, AuditActor actor, CancellationToken cancellationToken);
 }
 
 public sealed class PortalUserService : IPortalUserService
@@ -58,13 +60,17 @@ public sealed class PortalUserService : IPortalUserService
 
     private readonly IPortalUserRepository _users;
     private readonly IClientSecretHasher _hasher;
+    private readonly IDbSession _session;
+    private readonly IAuditTrail _audit;
     private readonly TimeProvider _timeProvider;
     private readonly Lazy<string> _dummyHash;
 
-    public PortalUserService(IPortalUserRepository users, IClientSecretHasher hasher, TimeProvider timeProvider)
+    public PortalUserService(IPortalUserRepository users, IClientSecretHasher hasher, IDbSession session, IAuditTrail audit, TimeProvider timeProvider)
     {
         _users = users;
         _hasher = hasher;
+        _session = session;
+        _audit = audit;
         _timeProvider = timeProvider;
         _dummyHash = new Lazy<string>(() => hasher.Hash(DummyPassword));
     }
@@ -162,7 +168,7 @@ public sealed class PortalUserService : IPortalUserService
             u.Id, u.SignInName, u.DisplayName, u.Username is not null, u.Role, u.IsActive, u.LastSignInOn, u.CreatedOn, u.ModifiedOn, u.ModifiedBy)).ToList();
     }
 
-    public async Task<AdminResult> SetAccessAsync(long userId, string? role, bool isActive, long changedById, string changedBy, CancellationToken cancellationToken)
+    public async Task<AdminResult> SetAccessAsync(long userId, string? role, bool isActive, long changedById, AuditActor actor, CancellationToken cancellationToken)
     {
         if (role is null || !PortalRole.All.Contains(role))
         {
@@ -186,7 +192,12 @@ public sealed class PortalUserService : IPortalUserService
             return AdminResult.Fail("This is the last active administrator. Make someone else an administrator first.");
         }
 
-        await _users.UpdateAccessAsync(userId, role, isActive, changedBy, _timeProvider.GetUtcNow(), cancellationToken);
+        var changes = AuditedFields.PortalUserAccess.Changed(user, new PortalUser { Id = user.Id, Role = role, IsActive = isActive });
+        await _audit.SaveChangeAsync(_session, actor, async () =>
+        {
+            await _users.UpdateAccessAsync(userId, role, isActive, actor.Name, _timeProvider.GetUtcNow(), cancellationToken);
+            return new AuditSubject(AuditEntityTypes.PortalUser, AuditValue.Id(userId), user.SignInName).Did(AuditActions.AccessChanged, changes);
+        }, cancellationToken);
         return AdminResult.Ok;
     }
 

@@ -31,7 +31,7 @@ public sealed class IndexModel(IUpstreamTokenService tokens) : AdminPageModel
 
     public async Task<IActionResult> OnPostSaveAsync(UpstreamSystem system, string? token, CancellationToken cancellationToken)
     {
-        var result = await tokens.SaveAsync(system, token, Admin, cancellationToken);
+        var result = await tokens.SaveAsync(system, token, Actor, cancellationToken);
         if (!result.Succeeded)
         {
             Tokens = await tokens.ListAsync(cancellationToken);

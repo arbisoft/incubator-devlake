@@ -15,9 +15,11 @@
 
 using Arbisoft.DevLake.IntegrationService.Business.Dtos.Admin;
 using Arbisoft.DevLake.IntegrationService.Business.Security;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Requests;
 using Arbisoft.DevLake.IntegrationService.DataAccess.ExternalApis;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
 
 namespace Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
@@ -30,13 +32,13 @@ public interface IClientConfigService
     Task<ClientConfigDetailsDto?> GetAsync(long clientRefId, CancellationToken cancellationToken);
 
     /// <summary>Creates the client's configuration or updates it. Secrets left blank keep their stored values.</summary>
-    Task<AdminResult> SaveAsync(long clientRefId, ClientConfigInput input, string savedBy, CancellationToken cancellationToken);
+    Task<AdminResult> SaveAsync(long clientRefId, ClientConfigInput input, AuditActor actor, CancellationToken cancellationToken);
 
     Task<OutboundUrlDto?> GetUrlAsync(long urlId, CancellationToken cancellationToken);
 
-    Task<AdminResult<long>> CreateUrlAsync(long clientRefId, OutboundUrlInput input, string createdBy, CancellationToken cancellationToken);
+    Task<AdminResult<long>> CreateUrlAsync(long clientRefId, OutboundUrlInput input, AuditActor actor, CancellationToken cancellationToken);
 
-    Task<AdminResult> UpdateUrlAsync(long urlId, OutboundUrlInput input, string modifiedBy, CancellationToken cancellationToken);
+    Task<AdminResult> UpdateUrlAsync(long urlId, OutboundUrlInput input, AuditActor actor, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -57,13 +59,18 @@ public sealed class ClientConfigService : IClientConfigService
     private readonly IClientConfigRepository _configs;
     private readonly IClientRepository _clients;
     private readonly ISecretEncryptor _encryptor;
+    private readonly IDbSession _session;
+    private readonly IAuditTrail _audit;
     private readonly TimeProvider _timeProvider;
 
-    public ClientConfigService(IClientConfigRepository configs, IClientRepository clients, ISecretEncryptor encryptor, TimeProvider timeProvider)
+    public ClientConfigService(
+        IClientConfigRepository configs, IClientRepository clients, ISecretEncryptor encryptor, IDbSession session, IAuditTrail audit, TimeProvider timeProvider)
     {
         _configs = configs;
         _clients = clients;
         _encryptor = encryptor;
+        _session = session;
+        _audit = audit;
         _timeProvider = timeProvider;
     }
 
@@ -96,37 +103,35 @@ public sealed class ClientConfigService : IClientConfigService
         return new ClientConfigDetailsDto(client.Id, client.ClientId, client.Name, config is null ? null : ToDto(config), urls);
     }
 
-    public async Task<AdminResult> SaveAsync(long clientRefId, ClientConfigInput input, string savedBy, CancellationToken cancellationToken)
+    public async Task<AdminResult> SaveAsync(long clientRefId, ClientConfigInput input, AuditActor actor, CancellationToken cancellationToken)
     {
-        if (await _clients.GetByIdAsync(clientRefId, cancellationToken) is null)
+        var client = await _clients.GetByIdAsync(clientRefId, cancellationToken);
+        if (client is null)
         {
             return AdminResult.Fail("The client does not exist.");
         }
 
         var existing = await _configs.GetByClientRefIdAsync(clientRefId, cancellationToken);
-        var problem = Validate(input);
-        if (problem is not null)
-        {
-            return AdminResult.Fail(problem);
-        }
-
         var now = _timeProvider.GetUtcNow();
-        var built = Build(input, existing, now);
+        var built = Validate(input) is { } problem ? (Config: null, Error: problem) : Build(input, existing, now);
         if (built.Error is not null)
         {
             return AdminResult.Fail(built.Error);
         }
 
         var config = built.Config!;
-        if (existing is null)
+        var subject = Subject(clientRefId, client.Name);
+        await _audit.SaveChangeAsync(_session, actor, async () =>
         {
-            await _configs.InsertAsync(Stamp(config, clientRefId, id: 0, createdOn: now, createdBy: savedBy, modifiedOn: null, modifiedBy: null), cancellationToken);
-        }
-        else
-        {
-            await _configs.UpdateAsync(Stamp(config, clientRefId, existing.Id, existing.CreatedOn, existing.CreatedBy, now, savedBy), cancellationToken);
-        }
+            if (existing is null)
+            {
+                await _configs.InsertAsync(Stamp(config, clientRefId, id: 0, createdOn: now, createdBy: actor.Name, modifiedOn: null, modifiedBy: null), cancellationToken);
+                return subject.Did(AuditActions.Created, AuditedFields.ClientConfig.Created(config));
+            }
 
+            await _configs.UpdateAsync(Stamp(config, clientRefId, existing.Id, existing.CreatedOn, existing.CreatedBy, now, actor.Name), cancellationToken);
+            return subject.Did(AuditActions.Updated, AuditedFields.ClientConfig.Changed(existing, config));
+        }, cancellationToken);
         return AdminResult.Ok;
     }
 
@@ -136,7 +141,7 @@ public sealed class ClientConfigService : IClientConfigService
         return url is null ? null : ToDto(url, baseUrl: null);
     }
 
-    public async Task<AdminResult<long>> CreateUrlAsync(long clientRefId, OutboundUrlInput input, string createdBy, CancellationToken cancellationToken)
+    public async Task<AdminResult<long>> CreateUrlAsync(long clientRefId, OutboundUrlInput input, AuditActor actor, CancellationToken cancellationToken)
     {
         var config = await _configs.GetByClientRefIdAsync(clientRefId, cancellationToken);
         if (config is null)
@@ -150,33 +155,24 @@ public sealed class ClientConfigService : IClientConfigService
             return AdminResult.Failure<long>(problem);
         }
 
-        var id = await _configs.InsertOutboundUrlAsync(
-            new ClientConfigOutboundUrl
-            {
-                ClientConfigId = config.Id,
-                EventType = input.EventType,
-                Method = input.Method,
-                Path = input.Path.Trim(),
-                IsActive = input.IsActive,
-                CreatedOn = _timeProvider.GetUtcNow(),
-                CreatedBy = createdBy
-            },
-            cancellationToken);
+        var url = ToUrl(input, config.Id, existing: null, actor.Name);
+        var subject = await SubjectAsync(clientRefId, cancellationToken);
+        long id = 0;
+        await _audit.SaveChangeAsync(_session, actor, async () =>
+        {
+            id = await _configs.InsertOutboundUrlAsync(url, cancellationToken);
+            return subject.Did(AuditActions.CallbackUrlCreated, AuditedFields.CallbackUrl.Created(url), UrlNote(id, url));
+        }, cancellationToken);
         return AdminResult.Success(id);
     }
 
-    public async Task<AdminResult> UpdateUrlAsync(long urlId, OutboundUrlInput input, string modifiedBy, CancellationToken cancellationToken)
+    public async Task<AdminResult> UpdateUrlAsync(long urlId, OutboundUrlInput input, AuditActor actor, CancellationToken cancellationToken)
     {
         var existing = await _configs.GetOutboundUrlByIdAsync(urlId, cancellationToken);
-        if (existing is null)
+        var config = existing is null ? null : await _configs.GetByIdAsync(existing.ClientConfigId, cancellationToken);
+        if (existing is null || config is null)
         {
             return AdminResult.Fail("The URL does not exist.");
-        }
-
-        var config = await _configs.GetByIdAsync(existing.ClientConfigId, cancellationToken);
-        if (config is null)
-        {
-            return AdminResult.Fail("The URL's configuration does not exist.");
         }
 
         var problem = await ValidateUrlAsync(config, input, urlId, cancellationToken);
@@ -185,23 +181,43 @@ public sealed class ClientConfigService : IClientConfigService
             return AdminResult.Fail(problem);
         }
 
-        await _configs.UpdateOutboundUrlAsync(
-            new ClientConfigOutboundUrl
-            {
-                Id = urlId,
-                ClientConfigId = existing.ClientConfigId,
-                EventType = input.EventType,
-                Method = input.Method,
-                Path = input.Path.Trim(),
-                IsActive = input.IsActive,
-                CreatedOn = existing.CreatedOn,
-                CreatedBy = existing.CreatedBy,
-                ModifiedOn = _timeProvider.GetUtcNow(),
-                ModifiedBy = modifiedBy
-            },
-            cancellationToken);
+        var updated = ToUrl(input, config.Id, existing, actor.Name);
+        var subject = await SubjectAsync(config.ClientRefId, cancellationToken);
+        await _audit.SaveChangeAsync(_session, actor, async () =>
+        {
+            await _configs.UpdateOutboundUrlAsync(updated, cancellationToken);
+            return subject.Did(AuditActions.CallbackUrlUpdated, AuditedFields.CallbackUrl.Changed(existing, updated), UrlNote(urlId, updated));
+        }, cancellationToken);
         return AdminResult.Ok;
     }
+
+    /// <summary>A callback URL from what the admin entered. A new one has no <paramref name="existing"/>; an edited one keeps its id and creation.</summary>
+    private ClientConfigOutboundUrl ToUrl(OutboundUrlInput input, long configId, ClientConfigOutboundUrl? existing, string by)
+    {
+        var now = _timeProvider.GetUtcNow();
+        return new ClientConfigOutboundUrl
+        {
+            Id = existing?.Id ?? 0,
+            ClientConfigId = configId,
+            EventType = input.EventType,
+            Method = input.Method,
+            Path = input.Path.Trim(),
+            IsActive = input.IsActive,
+            CreatedOn = existing?.CreatedOn ?? now,
+            CreatedBy = existing?.CreatedBy ?? by,
+            ModifiedOn = existing is null ? null : now,
+            ModifiedBy = existing is null ? null : by
+        };
+    }
+
+    /// <summary>The outbound config as the audit trail knows it: by its client, since a client has one config.</summary>
+    private static AuditSubject Subject(long clientRefId, string? clientName) => new(AuditEntityTypes.ClientConfig, AuditValue.Id(clientRefId), clientName);
+
+    private async Task<AuditSubject> SubjectAsync(long clientRefId, CancellationToken cancellationToken) =>
+        Subject(clientRefId, (await _clients.GetByIdAsync(clientRefId, cancellationToken))?.Name);
+
+    /// <summary>Which callback URL an entry on the outbound config is about.</summary>
+    private static string UrlNote(long urlId, ClientConfigOutboundUrl url) => $"Callback URL {AuditValue.Id(urlId)} ({url.EventType})";
 
     private static string? Validate(ClientConfigInput input)
     {

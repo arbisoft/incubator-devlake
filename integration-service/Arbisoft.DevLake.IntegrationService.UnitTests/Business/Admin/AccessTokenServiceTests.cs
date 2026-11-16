@@ -14,8 +14,11 @@
 // limitations under the License.
 
 using Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
+using Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers;
 using Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers.Builders;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
@@ -28,12 +31,14 @@ public class AccessTokenServiceTests
 
     private readonly IAccessTokenRepository _tokens = Substitute.For<IAccessTokenRepository>();
     private readonly IClientRepository _clients = Substitute.For<IClientRepository>();
+    private readonly IDbSession _session = Substitute.For<IDbSession>();
+    private readonly RecordingAuditTrail _audit = new();
     private readonly AccessTokenService _service;
 
     public AccessTokenServiceTests()
     {
         _clients.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(new ClientBuilder().Build());
-        _service = new AccessTokenService(_tokens, _clients, new FakeTimeProvider(Now));
+        _service = new AccessTokenService(_tokens, _clients, _session, _audit, new FakeTimeProvider(Now));
     }
 
     private static AccessToken Token(long id, DateTimeOffset expiresOn, DateTimeOffset? revokedOn = null)
@@ -76,7 +81,7 @@ public class AccessTokenServiceTests
     [InlineData("   ")]
     public async Task Revoke_WithoutAReason_IsRefused(string reason)
     {
-        var result = await _service.RevokeAsync("jti-1", reason, "admin", CancellationToken.None);
+        var result = await _service.RevokeAsync("jti-1", reason, TestActors.User("admin"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         await _tokens.DidNotReceiveWithAnyArgs().RevokeAsync(default, default!, default, default);
@@ -85,7 +90,7 @@ public class AccessTokenServiceTests
     [Fact]
     public async Task Revoke_AReasonThatIsTooLong_IsRefused()
     {
-        var result = await _service.RevokeAsync("jti-1", new string('x', AccessTokenService.MaxReasonLength + 1), "admin", CancellationToken.None);
+        var result = await _service.RevokeAsync("jti-1", new string('x', AccessTokenService.MaxReasonLength + 1), TestActors.User("admin"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
     }
@@ -93,7 +98,7 @@ public class AccessTokenServiceTests
     [Fact]
     public async Task Revoke_AnUnknownToken_Fails()
     {
-        var result = await _service.RevokeAsync("nope", "leaked", "admin", CancellationToken.None);
+        var result = await _service.RevokeAsync("nope", "leaked", TestActors.User("admin"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
     }
@@ -103,7 +108,7 @@ public class AccessTokenServiceTests
     {
         _tokens.GetByJtiAsync("jti-3", Arg.Any<CancellationToken>()).Returns(Token(3, Now.AddHours(1), Now.AddMinutes(-5)));
 
-        var result = await _service.RevokeAsync("jti-3", "leaked", "admin", CancellationToken.None);
+        var result = await _service.RevokeAsync("jti-3", "leaked", TestActors.User("admin"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         await _tokens.DidNotReceiveWithAnyArgs().RevokeAsync(default, default!, default, default);
@@ -115,7 +120,7 @@ public class AccessTokenServiceTests
         _tokens.GetByJtiAsync("jti-1", Arg.Any<CancellationToken>()).Returns(Token(1, Now.AddHours(1)));
         _tokens.RevokeAsync(1, Arg.Any<string>(), Now, Arg.Any<CancellationToken>()).Returns(true);
 
-        var result = await _service.RevokeAsync("jti-1", " leaked in chat ", "admin", CancellationToken.None);
+        var result = await _service.RevokeAsync("jti-1", " leaked in chat ", TestActors.User("admin"), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         await _tokens.Received(1).RevokeAsync(1, "leaked in chat (revoked by admin)", Now, Arg.Any<CancellationToken>());
@@ -127,8 +132,32 @@ public class AccessTokenServiceTests
         _tokens.GetByJtiAsync("jti-1", Arg.Any<CancellationToken>()).Returns(Token(1, Now.AddHours(1)));
         _tokens.RevokeAsync(1, Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(false);
 
-        var result = await _service.RevokeAsync("jti-1", "leaked", "admin", CancellationToken.None);
+        var result = await _service.RevokeAsync("jti-1", "leaked", TestActors.User("admin"), CancellationToken.None);
 
         Assert.False(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task Revoke_IsRecordedWithTheReasonGiven()
+    {
+        _tokens.GetByJtiAsync("jti-1", Arg.Any<CancellationToken>()).Returns(Token(1, Now.AddHours(1)));
+        _tokens.RevokeAsync(1, Arg.Any<string>(), Now, Arg.Any<CancellationToken>()).Returns(true);
+
+        await _service.RevokeAsync("jti-1", " leaked ", TestActors.User("admin"), CancellationToken.None);
+
+        var entry = _audit.OnlyEntry;
+        Assert.Equal((AuditActions.Revoked, AuditEntityTypes.AccessToken, "jti-1", "sophia", "leaked"), (entry.Action, entry.EntityType, entry.EntityId, entry.EntityLabel, entry.Reason));
+    }
+
+    [Fact]
+    public async Task Revoke_AlreadyRevokedMeanwhile_RecordsNothing()
+    {
+        _tokens.GetByJtiAsync("jti-1", Arg.Any<CancellationToken>()).Returns(Token(1, Now.AddHours(1)));
+        _tokens.RevokeAsync(1, Arg.Any<string>(), Now, Arg.Any<CancellationToken>()).Returns(false);
+
+        var result = await _service.RevokeAsync("jti-1", "leaked", TestActors.User("admin"), CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Empty(_audit.Recorded);
     }
 }

@@ -207,7 +207,7 @@ public sealed class ProcessingEndToEndTests : ApiTestBase
         await using (var scope = Factory.Services.CreateAsyncScope())
         {
             var log = (await Seed.LogAsync(request.Correlation))!;
-            var result = await scope.ServiceProvider.GetRequiredService<IRequestLogService>().RetryAsync(log.Id, "alice", CancellationToken.None);
+            var result = await scope.ServiceProvider.GetRequiredService<IRequestLogService>().RetryAsync(log.Id, TestActors.User("alice"), CancellationToken.None);
             Assert.True(result.Succeeded);
         }
 

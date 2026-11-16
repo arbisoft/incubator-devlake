@@ -131,7 +131,7 @@ public sealed class ScopeAuthorizationEndpointTests : IAsyncLifetime, IDisposabl
 
         await using (var scope = _factory!.Services.CreateAsyncScope())
         {
-            var result = await scope.ServiceProvider.GetRequiredService<IClientService>().RevokeSecretAsync(client.ClientRefId, client.SecretId, "admin", CancellationToken.None);
+            var result = await scope.ServiceProvider.GetRequiredService<IClientService>().RevokeSecretAsync(client.ClientRefId, client.SecretId, TestActors.User("admin"), CancellationToken.None);
             Assert.True(result.Succeeded);
         }
 
@@ -167,7 +167,7 @@ public sealed class ScopeAuthorizationEndpointTests : IAsyncLifetime, IDisposabl
         await using (var scope = _factory!.Services.CreateAsyncScope())
         {
             var statsScope = await scope.ServiceProvider.GetRequiredService<IScopeRepository>().GetByNameAsync("stats:read", CancellationToken.None);
-            var result = await scope.ServiceProvider.GetRequiredService<IClientService>().SetScopesAsync(client.ClientRefId, [statsScope!.Id], "admin", CancellationToken.None);
+            var result = await scope.ServiceProvider.GetRequiredService<IClientService>().SetScopesAsync(client.ClientRefId, [statsScope!.Id], TestActors.User("admin"), CancellationToken.None);
             Assert.True(result.Succeeded);
         }
 
