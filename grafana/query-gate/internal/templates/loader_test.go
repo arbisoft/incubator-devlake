@@ -201,6 +201,15 @@ func TestLoadV2Dashboard(t *testing.T) {
 	if strings.Join(got, "|") != strings.Join(want, "|") {
 		t.Fatalf("locations\n got %q\nwant %q", got, want)
 	}
+	var dash map[string]any
+	if err := json.Unmarshal(raw, &dash); err != nil {
+		t.Fatal(err)
+	}
+	_, sources := collectSources(dash, "")
+	vars := sources[0].Vars
+	if p, g := vars["project"], vars["grouping"]; p.Type != "query" || !p.Multi || !p.IncludeAll || g.Type != "custom" || g.Multi || g.Query != "Label,Board,Milestone,Epic" {
+		t.Fatalf("variables not carried over: project %+v, grouping %+v", p, g)
+	}
 }
 
 func TestLoadV2DashboardTags(t *testing.T) {
