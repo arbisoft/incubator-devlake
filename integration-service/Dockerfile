@@ -39,6 +39,9 @@ WORKDIR /app
 ENV ASPNETCORE_HTTP_PORTS=8080 \
     DOTNET_NOLOGO=1
 EXPOSE 8080
+# The data-protection keys (sign-in cookies, anti-forgery tokens) live here; mount a volume on it so they survive a new container.
+RUN mkdir /keys && chown $APP_UID /keys
+ENV DataProtection__KeysPath=/keys
 USER $APP_UID
 
 COPY --from=build /out .

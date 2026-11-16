@@ -79,6 +79,9 @@ services:
       Sso__ClientSecret: ${SSO_CLIENT_SECRET:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      # Keeps administrators signed in across container rebuilds.
+      - dataprotection-keys:/keys
     ports:
       # Clients and DevLake reach the API at host.docker.internal:5099 (INTEGRATION_SERVICE_URL in DevLake's .env), and administrators open the
       # portal on the same port.
@@ -109,3 +112,4 @@ services:
 volumes:
   mysql-data:
   rabbitmq-data:
+  dataprotection-keys:

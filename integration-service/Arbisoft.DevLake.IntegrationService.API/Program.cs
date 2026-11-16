@@ -21,6 +21,7 @@ using Arbisoft.DevLake.IntegrationService.API.RateLimiting;
 using Arbisoft.DevLake.IntegrationService.Business;
 using Arbisoft.DevLake.IntegrationService.DataAccess;
 using Asp.Versioning;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Serilog;
 
@@ -37,6 +38,15 @@ builder.Host.UseDefaultServiceProvider(options =>
     options.ValidateScopes = true;
     options.ValidateOnBuild = true;
 });
+
+// Sign-in cookies and anti-forgery tokens are protected with keys that must outlive the process, or every restart signs everyone out and
+// invalidates open forms. Set DataProtection:KeysPath to a persistent directory (a volume) in any deployment; without it the keys stay local.
+var keysPath = builder.Configuration["DataProtection:KeysPath"];
+var dataProtection = builder.Services.AddDataProtection().SetApplicationName("integration-service");
+if (!string.IsNullOrWhiteSpace(keysPath))
+{
+    dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keysPath));
+}
 
 builder.Services.AddControllers();
 builder.Services.AddRazorPages(options => options.Conventions.Add(new RequireEditorByDefaultConvention()));
