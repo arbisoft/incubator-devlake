@@ -52,7 +52,13 @@ docker exec -e MYSQL_PWD=<root password> integration-service-mysql-1 mysql -uroo
 
 To run the service with `dotnet run` instead, start only `docker compose up -d mysql rabbitmq`.
 
-Settings live in each project's `appsettings.json`. Secrets are never put there. Set them as environment variables, using `__` for nesting:
+Every setting the service reads is in `Arbisoft.DevLake.IntegrationService.API/appsettings.json`: the database, RabbitMQ, DevLake, Workstream, the encryption key, single sign-on and where the data-protection keys are kept. The secrets in it (the database password, the RabbitMQ user and password, `Security:EncryptionKey`, `Sso:ClientSecret`) are blank, because that file is in git and in the Docker image.
+
+**On a VM, without `.env`:** copy `appsettings.Local.example.json` to `appsettings.Local.json` next to the published `appsettings.json` (for Docker, mount it at `/app/appsettings.Local.json`, read-only), and fill in the values for that machine. The file is optional, read in every environment, ignored by git and kept out of the image. You can also edit `appsettings.json` on the machine itself; just never commit it with real values. Set `Database:ConnectionString` (host, database, user and password), `RabbitMq:HostName`, `UserName` and `Password`, `Security:EncryptionKey`, `DevLake:BaseUrl`, `Workstream:BaseUrl`, the `Sso` section if you use single sign-on, and `DataProtection:KeysPath` to a directory that survives restarts. The `.env` names map like this: `INTEGRATION_DB_NAME` and `INTEGRATION_DB_PASSWORD` into `Database:ConnectionString`, `RABBITMQ_USER` and `RABBITMQ_PASSWORD` into `RabbitMq`, `SECURITY_ENCRYPTION_KEY` into `Security:EncryptionKey`, `DEVLAKE_BASE_URL` and `WORKSTREAM_BASE_URL` into `DevLake:BaseUrl` and `Workstream:BaseUrl`, and `SSO_*` into `Sso`. `INTEGRATION_DB_ROOT_PASSWORD` is only for the MySQL container, not the service.
+
+Outside the `Development` environment the service redirects every call to HTTPS. Put it behind a TLS proxy or listener on the VM, or set `ASPNETCORE_ENVIRONMENT=Development` while it serves plain HTTP (the compose file does).
+
+An environment variable or a command-line argument overrides both files, using `__` for nesting. That is how docker compose passes the values from `.env`, and how to set them with `dotnet run`:
 
 ```sh
 export Database__ConnectionString="Server=127.0.0.1;Port=3308;Database=integration_service;User=integration;Password=<password>"

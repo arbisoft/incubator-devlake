@@ -4,6 +4,7 @@ TestResults/
 .vs/
 *.user
 .env
+appsettings.Local.json
 dev/logs/
 dev/__pycache__/
 dev/mock_sophia.env

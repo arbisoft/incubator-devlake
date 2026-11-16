@@ -27,6 +27,13 @@ using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// appsettings.Local.json holds one machine's real values (secrets, addresses). It is optional, git-ignored and kept out of the image, and it is read
+// in every environment. Environment variables and command-line arguments are added again after it, so they still override it.
+builder.Configuration
+    .AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true)
+    .AddEnvironmentVariables()
+    .AddCommandLine(args);
+
 builder.Host.UseSerilog((context, services, configuration) => configuration
     .ReadFrom.Configuration(context.Configuration)
     .ReadFrom.Services(services)

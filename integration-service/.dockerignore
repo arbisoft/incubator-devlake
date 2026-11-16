@@ -20,5 +20,6 @@
 .vs/
 *.user
 .env
+**/appsettings.Local.json
 dev/
 Arbisoft.DevLake.IntegrationService.UnitTests/
