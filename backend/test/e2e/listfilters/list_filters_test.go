@@ -19,35 +19,24 @@ package listfilters
 
 import (
 	"sort"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/models"
 	"github.com/apache/incubator-devlake/core/models/common"
-	"github.com/apache/incubator-devlake/helpers/e2ehelper"
+	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/plugins/claude_otel/impl"
 	otelmodels "github.com/apache/incubator-devlake/plugins/claude_otel/models"
 	"github.com/apache/incubator-devlake/server/services"
+	"github.com/apache/incubator-devlake/test/helper"
 )
 
-var initOnce sync.Once
-
 func seed(t *testing.T) {
-	tester := e2ehelper.NewDataFlowTester(t, "claude_otel", impl.ClaudeOtel{})
-	initOnce.Do(services.InitResources)
-	for _, table := range []dal.Tabler{
-		&models.Project{}, &models.ProjectMetricSetting{}, &models.Blueprint{}, &models.BlueprintConnection{},
-		&models.BlueprintScope{}, &models.BlueprintLabel{}, &models.Pipeline{}, &models.DbPipelineLabel{},
-		&models.Task{}, &otelmodels.OtelConnectionProject{},
-	} {
-		tester.FlushTabler(table)
-	}
+	db := helper.StartDevLakeServer(t, []plugin.PluginMeta{impl.ClaudeOtel{}}).GetDal()
 	create := func(rows ...interface{}) {
 		for _, row := range rows {
-			require.NoError(t, tester.Dal.Create(row))
+			require.NoError(t, db.Create(row))
 		}
 	}
 	project := func(name string) *models.Project {
