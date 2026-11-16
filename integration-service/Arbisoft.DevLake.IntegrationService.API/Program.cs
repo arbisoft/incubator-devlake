@@ -16,6 +16,7 @@
 using Arbisoft.DevLake.IntegrationService.API.Authorization;
 using Arbisoft.DevLake.IntegrationService.API.BackgroundJobs;
 using Arbisoft.DevLake.IntegrationService.API.Middleware;
+using Arbisoft.DevLake.IntegrationService.API.OpenApi;
 using Arbisoft.DevLake.IntegrationService.API.Portal;
 using Arbisoft.DevLake.IntegrationService.API.RateLimiting;
 using Arbisoft.DevLake.IntegrationService.Business;
@@ -67,7 +68,7 @@ builder.Services.AddApiVersioning(options =>
 {
     options.ApiVersionReader = new UrlSegmentApiVersionReader();
     options.ReportApiVersions = true;
-}).AddMvc();
+}).AddMvc().AddApiDocumentation(builder.Configuration);
 builder.Services.AddHealthChecks();
 builder.Services.AddDataAccess(builder.Configuration);
 builder.Services.AddBusiness(builder.Configuration);
@@ -75,7 +76,7 @@ builder.Services.AddHostedService<RequestProcessingJob>();
 
 var app = builder.Build();
 
-// Order is behaviour: exception handler, correlation ID, static files, routing, authentication, authorization, rate limiter.
+// Order is behaviour: exception handler, correlation ID, static files, API docs, routing, authentication, authorization, rate limiter.
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseMiddleware<CorrelationIdMiddleware>();
@@ -87,6 +88,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseStaticFiles();
+app.UseApiDocumentation();
 app.UseRouting();
 app.UseAuthentication();
 app.UseMiddleware<MustChangePasswordMiddleware>();

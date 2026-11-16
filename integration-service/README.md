@@ -111,9 +111,13 @@ python3 dev/mock_sophia.py run --emails-from-devlake 25 --singles 5 --batches 2
 
 It prints each acknowledgement, every token request and callback it receives, and a report per request (poll status, callbacks received, engineers, `errors`). It exits 0 when every request ended `Success` with an accepted callback, and 1 otherwise. Identical requests inside the duplicate window come back with the original correlation ID; the report notes it.
 
-Useful options: `--from`/`--to` instead of `--tf` for single requests; `--callback-statuses 503,429,400` answers the first callbacks with those statuses (then 200) to watch the retry rules, with `--retry-after N` sent on a 429 or 503; `--token-lifetime` for how long its tokens last; `--verbose` prints every callback body. `python3 dev/mock_sophia.py serve` runs only the Sophia side, to drive requests some other way (for example Swagger). `--help` lists the rest. The client, outbound and service settings can also be given as `--client-id`, `--outbound-client-id`, `--service-url` and so on instead of the environment.
+Useful options: `--from`/`--to` instead of `--tf` for single requests; `--callback-statuses 503,429,400` answers the first callbacks with those statuses (then 200) to watch the retry rules, with `--retry-after N` sent on a 429 or 503; `--token-lifetime` for how long its tokens last; `--verbose` prints every callback body. `python3 dev/mock_sophia.py serve` runs only the Sophia side, to drive requests some other way (for example from Swagger UI at `/swagger`). `--help` lists the rest. The client, outbound and service settings can also be given as `--client-id`, `--outbound-client-id`, `--service-url` and so on instead of the environment.
 
 Health endpoints: `/health/live` and `/health/ready`. Readiness checks MySQL and RabbitMQ.
+
+### API documentation
+
+With `OpenApi:Enabled` set to true, the service serves an OpenAPI document per API version at `/openapi/v1.json` and Swagger UI at `/swagger`. Version-neutral endpoints (`/auth/token/`, `/fetch/projects`) appear in every version's document. The setting is false in `appsettings.json`, so a deployment shows neither unless it turns it on; `docker compose` turns it on (`OPENAPI_ENABLED`, default true). Both are open without a token. In Swagger UI, **Authorize** takes a client ID and secret, gets a token from `/auth/token/` with the client credentials grant, and sends it with every call; tick the scopes the client was given.
 
 Run **one instance of the API**. Several things live in the process, not in shared state: the rate limits, the cap on concurrent DevLake calls (`DevLake:MaxConcurrentRequests`), the cache of Sophia access tokens, and the processing job. A second instance would double every limit, and its job's stale-request sweep could mark `Failed` a request the other instance is still delivering. The admin portal is part of that same process, so there is only ever one deployment.
 

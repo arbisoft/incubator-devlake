@@ -73,6 +73,8 @@ services:
       # Portal users are in the database (PortalUsers); the first one, admin/admin, is seeded. Single sign-on with Arbisoft accounts is off
       # until SSO_ENABLED=true and the provider settings below are given.
       Sso__Enabled: ${SSO_ENABLED:-false}
+      # The OpenAPI document (/openapi/v1.json) and Swagger UI (/swagger); on unless OPENAPI_ENABLED=false.
+      OpenApi__Enabled: ${OPENAPI_ENABLED:-true}
       Sso__DisplayName: ${SSO_DISPLAY_NAME:-Arbisoft}
       Sso__Authority: ${SSO_AUTHORITY:-}
       Sso__ClientId: ${SSO_CLIENT_ID:-}
