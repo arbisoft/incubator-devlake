@@ -62,7 +62,7 @@ public class CallbackDeliveryTests
         var attempt = await _delivery.AttemptAsync(Request, Payload);
 
         Assert.Equal(DeliveryOutcome.Delivered, attempt.Outcome);
-        await _attempts.Received(1).RecordAsync(41, DeliveryAttemptStatus.Delivered, "{\"ok\":true}", null, Arg.Any<CancellationToken>());
+        await _attempts.Received(1).RecordAsync(41, DeliveryAttemptStatus.Delivered, "{\"ok\":true}", null, Arg.Any<CancellationToken>(), Payload);
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public class CallbackDeliveryTests
 
         Assert.Equal(new DeliveryAttempt(DeliveryOutcome.Failed, 2, AttemptsUsedUp: false), attempt);
         await _sophia.Received(1).PostCallbackAsync(7, "engineer-stats", Payload, "c1", Arg.Any<CancellationToken>());
-        await _attempts.Received(1).RecordAsync(41, DeliveryAttemptStatus.DeliveryFailed, "{\"error\":\"x\"}", "HTTP 500", Arg.Any<CancellationToken>());
+        await _attempts.Received(1).RecordAsync(41, DeliveryAttemptStatus.DeliveryFailed, "{\"error\":\"x\"}", "HTTP 500", Arg.Any<CancellationToken>(), Payload);
     }
 
     [Theory]
@@ -105,7 +105,7 @@ public class CallbackDeliveryTests
         var attempt = await _delivery.AttemptAsync(Request, Payload);
 
         Assert.Equal(new DeliveryAttempt(DeliveryOutcome.Rejected, 1), attempt);
-        await _attempts.Received(1).RecordAsync(41, DeliveryAttemptStatus.DeliveryFailed, "{\"error\":\"unknown engineer\"}", $"HTTP {status}", Arg.Any<CancellationToken>());
+        await _attempts.Received(1).RecordAsync(41, DeliveryAttemptStatus.DeliveryFailed, "{\"error\":\"unknown engineer\"}", $"HTTP {status}", Arg.Any<CancellationToken>(), Payload);
     }
 
     [Fact]
@@ -146,7 +146,7 @@ public class CallbackDeliveryTests
         var attempt = await _delivery.AttemptAsync(Request, Payload);
 
         Assert.Equal(new DeliveryAttempt(DeliveryOutcome.Failed, 1, AttemptsUsedUp: false), attempt);
-        await _attempts.Received(1).RecordAsync(41, DeliveryAttemptStatus.DeliveryFailed, "{}", "Sophia did not answer", Arg.Any<CancellationToken>());
+        await _attempts.Received(1).RecordAsync(41, DeliveryAttemptStatus.DeliveryFailed, "{}", "Sophia did not answer", Arg.Any<CancellationToken>(), Payload);
     }
 
     [Fact]

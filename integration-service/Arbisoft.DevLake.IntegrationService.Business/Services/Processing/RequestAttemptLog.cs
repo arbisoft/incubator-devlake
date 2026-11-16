@@ -29,13 +29,14 @@ public sealed class RequestAttemptLog : IRequestAttemptLog
         _timeProvider = timeProvider;
     }
 
-    public async Task RecordAsync(long requestLogId, string attemptStatus, string responseJson, string? failure, CancellationToken cancellationToken)
+    public async Task RecordAsync(long requestLogId, string attemptStatus, string responseJson, string? failure, CancellationToken cancellationToken, string? requestJson = null)
     {
         await _requestLogs.InsertAttemptAsync(
             new RequestResponseAttempt
             {
                 RequestLogId = requestLogId,
                 ResponseJson = responseJson,
+                RequestJson = requestJson,
                 AttemptStatus = attemptStatus,
                 FailureError = failure,
                 AttemptBy = ProcessingConstants.AttemptBy,

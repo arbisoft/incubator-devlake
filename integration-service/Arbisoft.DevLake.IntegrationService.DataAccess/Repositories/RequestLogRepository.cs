@@ -23,14 +23,14 @@ namespace Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
 
 public sealed class RequestLogRepository : RepositoryBase, IRequestLogRepository
 {
-    private const string Columns = "id, clientRefId, correlationId, url, status, eventType, createdOn, queuedOn, idempotencyKey, nextAttemptOn, claimedUntil";
+    private const string Columns = "id, clientRefId, correlationId, url, status, eventType, createdOn, modifiedOn, queuedOn, idempotencyKey, nextAttemptOn, claimedUntil";
 
     /// <summary>Not claimed by anybody (or the claim ran out) and not deferred to later. Uses @now.</summary>
     private const string Claimable =
         "status IN ('" + RequestStatus.Received + "', '" + RequestStatus.Queued + "', '" + RequestStatus.Processing + "') " +
         "AND (claimedUntil IS NULL OR claimedUntil < @now) AND (nextAttemptOn IS NULL OR nextAttemptOn <= @now)";
     private const string IdempotencyIndex = "UX_RequestLogs_idempotencyKey";
-    private const string AttemptColumns = "id, requestLogId, responseJson, attemptStatus, failureError, attemptBy, attemptOn";
+    private const string AttemptColumns = "id, requestLogId, responseJson, requestJson, attemptStatus, failureError, attemptBy, attemptOn";
 
     public RequestLogRepository(IDbSession session, IOptions<DatabaseOptions> options)
         : base(session, options)
@@ -65,7 +65,7 @@ public sealed class RequestLogRepository : RepositoryBase, IRequestLogRepository
 
     public async Task ReleaseIdempotencyKeyAsync(long requestLogId, CancellationToken cancellationToken)
     {
-        await ExecuteAsync("UPDATE RequestLogs SET idempotencyKey = NULL WHERE id = @requestLogId", new { requestLogId }, cancellationToken);
+        await ExecuteAsync("UPDATE RequestLogs SET idempotencyKey = NULL, modifiedOn = UTC_TIMESTAMP(6) WHERE id = @requestLogId", new { requestLogId }, cancellationToken);
     }
 
     public Task<long> InsertJsonAsync(RequestLogJson json, CancellationToken cancellationToken)
@@ -91,14 +91,14 @@ public sealed class RequestLogRepository : RepositoryBase, IRequestLogRepository
     public async Task<bool> UpdateStatusAsync(long id, string status, CancellationToken cancellationToken)
     {
         var changed = await ExecuteAsync(
-            "UPDATE RequestLogs SET status = @status, nextAttemptOn = NULL, claimedUntil = NULL WHERE id = @id", new { id, status }, cancellationToken);
+            "UPDATE RequestLogs SET status = @status, nextAttemptOn = NULL, claimedUntil = NULL, modifiedOn = UTC_TIMESTAMP(6) WHERE id = @id", new { id, status }, cancellationToken);
         return changed > 0;
     }
 
     public async Task<bool> TryClaimAsync(long id, DateTimeOffset now, DateTimeOffset leaseUntil, CancellationToken cancellationToken)
     {
         var changed = await ExecuteAsync(
-            "UPDATE RequestLogs SET status = '" + RequestStatus.Processing + "', claimedUntil = @leaseUntil, nextAttemptOn = NULL WHERE id = @id AND " + Claimable,
+            "UPDATE RequestLogs SET status = '" + RequestStatus.Processing + "', claimedUntil = @leaseUntil, nextAttemptOn = NULL, modifiedOn = UTC_TIMESTAMP(6) WHERE id = @id AND " + Claimable,
             new { id, now, leaseUntil },
             cancellationToken);
         return changed > 0;
@@ -107,7 +107,7 @@ public sealed class RequestLogRepository : RepositoryBase, IRequestLogRepository
     public async Task<bool> TryRetryAsync(long id, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var changed = await ExecuteAsync(
-            "UPDATE RequestLogs SET status = '" + RequestStatus.Queued + "', queuedOn = @now, nextAttemptOn = @now, claimedUntil = NULL " +
+            "UPDATE RequestLogs SET status = '" + RequestStatus.Queued + "', queuedOn = @now, nextAttemptOn = @now, claimedUntil = NULL, modifiedOn = @now " +
             "WHERE id = @id AND status = '" + RequestStatus.Failed + "'",
             new { id, now },
             cancellationToken);
@@ -117,7 +117,7 @@ public sealed class RequestLogRepository : RepositoryBase, IRequestLogRepository
     public async Task DeferAsync(long id, string status, DateTimeOffset nextAttemptOn, CancellationToken cancellationToken)
     {
         await ExecuteAsync(
-            "UPDATE RequestLogs SET status = @status, nextAttemptOn = @nextAttemptOn, claimedUntil = NULL WHERE id = @id", new { id, status, nextAttemptOn }, cancellationToken);
+            "UPDATE RequestLogs SET status = @status, nextAttemptOn = @nextAttemptOn, claimedUntil = NULL, modifiedOn = UTC_TIMESTAMP(6) WHERE id = @id", new { id, status, nextAttemptOn }, cancellationToken);
     }
 
     public Task<IReadOnlyList<RequestLog>> ListDueAsync(DateTimeOffset now, DateTimeOffset queuedSince, int limit, CancellationToken cancellationToken)
@@ -152,7 +152,7 @@ public sealed class RequestLogRepository : RepositoryBase, IRequestLogRepository
     public async Task<bool> TryChangeStatusAsync(long id, string expectedStatus, string newStatus, CancellationToken cancellationToken)
     {
         var changed = await ExecuteAsync(
-            "UPDATE RequestLogs SET status = @newStatus WHERE id = @id AND status = @expectedStatus", new { id, expectedStatus, newStatus }, cancellationToken);
+            "UPDATE RequestLogs SET status = @newStatus, modifiedOn = UTC_TIMESTAMP(6) WHERE id = @id AND status = @expectedStatus", new { id, expectedStatus, newStatus }, cancellationToken);
         return changed > 0;
     }
 
@@ -183,19 +183,33 @@ public sealed class RequestLogRepository : RepositoryBase, IRequestLogRepository
             cancellationToken);
     }
 
-    public Task<PagedResult<RequestLog>> ListAsync(RequestLogFilter filter, int page, int pageSize, CancellationToken cancellationToken)
+    public Task<PagedResult<RequestLog>> ListAsync(RequestLogFilter filter, int page, int pageSize, CancellationToken cancellationToken, RequestLogSort? sort = null)
     {
         const string fromAndWhere =
             "FROM RequestLogs WHERE (@ClientRefId IS NULL OR clientRefId = @ClientRefId) AND (@Status IS NULL OR status = @Status) " +
             "AND (@From IS NULL OR createdOn >= @From) AND (@To IS NULL OR createdOn < @To)";
-        return QueryPageAsync<RequestLog>(Columns, fromAndWhere, "createdOn DESC, id DESC", filter, page, pageSize, cancellationToken);
+        return QueryPageAsync<RequestLog>(Columns, fromAndWhere, OrderBy(sort ?? new RequestLogSort()), filter, page, pageSize, cancellationToken);
+    }
+
+    private static string OrderBy(RequestLogSort sort)
+    {
+        var column = sort.Column switch
+        {
+            RequestLogSortColumn.ModifiedOn => "modifiedOn",
+            RequestLogSortColumn.EventType => "eventType",
+            RequestLogSortColumn.Status => "status",
+            RequestLogSortColumn.CorrelationId => "correlationId",
+            _ => "createdOn"
+        };
+        var direction = sort.Descending ? "DESC" : "ASC";
+        return $"{column} {direction}, id {direction}";
     }
 
     public Task<long> InsertAttemptAsync(RequestResponseAttempt attempt, CancellationToken cancellationToken)
     {
         return InsertAsync(
-            "INSERT INTO RequestResponseAttempts (requestLogId, responseJson, attemptStatus, failureError, attemptBy, attemptOn) " +
-            "VALUES (@RequestLogId, @ResponseJson, @AttemptStatus, @FailureError, @AttemptBy, @AttemptOn)",
+            "INSERT INTO RequestResponseAttempts (requestLogId, responseJson, requestJson, attemptStatus, failureError, attemptBy, attemptOn) " +
+            "VALUES (@RequestLogId, @ResponseJson, @RequestJson, @AttemptStatus, @FailureError, @AttemptBy, @AttemptOn)",
             attempt,
             cancellationToken);
     }

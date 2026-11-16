@@ -26,7 +26,8 @@ public interface IRequestLogService
     /// <summary>The request statuses a list can be filtered by.</summary>
     IReadOnlyList<string> Statuses { get; }
 
-    Task<PageDto<RequestLogDto>> ListAsync(RequestLogQuery query, int page, CancellationToken cancellationToken);
+    /// <summary>One page of the requests that match <paramref name="query"/>. A page size that is not one of <see cref="RequestLogService.PageSizes"/> becomes the default.</summary>
+    Task<PageDto<RequestLogDto>> ListAsync(RequestLogQuery query, int page, int pageSize, RequestLogSort sort, CancellationToken cancellationToken);
 
     Task<RequestLogDetailsDto?> GetAsync(long id, CancellationToken cancellationToken);
 
@@ -40,7 +41,10 @@ public interface IRequestLogService
 
 public sealed class RequestLogService : IRequestLogService
 {
-    public const int PageSize = 50;
+    /// <summary>The page sizes the list offers.</summary>
+    public static readonly IReadOnlyList<int> PageSizes = [10, 20, 30, 40, 50];
+
+    public const int DefaultPageSize = 10;
 
     private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
 
@@ -63,14 +67,15 @@ public sealed class RequestLogService : IRequestLogService
         RequestStatus.Success, RequestStatus.Failed, RequestStatus.RevokedNoCallbackUrl
     ];
 
-    public async Task<PageDto<RequestLogDto>> ListAsync(RequestLogQuery query, int page, CancellationToken cancellationToken)
+    public async Task<PageDto<RequestLogDto>> ListAsync(RequestLogQuery query, int page, int pageSize, RequestLogSort sort, CancellationToken cancellationToken)
     {
         var filter = new RequestLogFilter(
             query.ClientRefId,
             string.IsNullOrWhiteSpace(query.Status) ? null : query.Status,
             query.From is { } from ? new DateTimeOffset(from.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : null,
             query.To is { } to ? new DateTimeOffset(to.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : null);
-        var result = await _logs.ListAsync(filter, page, PageSize, cancellationToken);
+        var size = PageSizes.Contains(pageSize) ? pageSize : DefaultPageSize;
+        var result = await _logs.ListAsync(filter, Math.Max(page, 1), size, cancellationToken, sort);
         var clients = new Dictionary<long, Client?>();
         var items = new List<RequestLogDto>(result.Items.Count);
         foreach (var log in result.Items)
@@ -92,7 +97,7 @@ public sealed class RequestLogService : IRequestLogService
         var client = await _clients.GetByIdAsync(log.ClientRefId, cancellationToken);
         var json = await _logs.GetJsonAsync(id, cancellationToken);
         var attempts = (await _logs.GetAttemptsAsync(id, cancellationToken))
-            .Select(a => new DeliveryAttemptDto(a.AttemptOn, a.AttemptStatus, a.AttemptBy, a.FailureError, Indent(a.ResponseJson)!))
+            .Select(a => new DeliveryAttemptDto(a.AttemptOn, a.AttemptStatus, a.AttemptBy, a.FailureError, Indent(a.ResponseJson)!, Indent(a.RequestJson)))
             .ToList();
         return new RequestLogDetailsDto(
             log.Id,
@@ -178,5 +183,5 @@ public sealed class RequestLogService : IRequestLogService
     }
 
     private static RequestLogDto ToDto(RequestLog log, Client? client) =>
-        new(log.Id, client?.ClientId ?? string.Empty, client?.Name ?? string.Empty, log.CorrelationId, log.EventType, log.Status, log.CreatedOn);
+        new(log.Id, client?.ClientId ?? string.Empty, client?.Name ?? string.Empty, log.CorrelationId, log.EventType, log.Status, log.CreatedOn, log.ModifiedOn);
 }

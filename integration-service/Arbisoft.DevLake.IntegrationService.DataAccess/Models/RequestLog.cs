@@ -26,6 +26,9 @@ public sealed class RequestLog
     public string EventType { get; init; } = string.Empty;
     public DateTimeOffset CreatedOn { get; init; }
 
+    /// <summary>When the row was last changed (status, claim, deferral, retry). Null until it is first changed after being received.</summary>
+    public DateTimeOffset? ModifiedOn { get; init; }
+
     /// <summary>When the request last entered processing: when it was received, or when it was retried after failing. Null on insert means CreatedOn.</summary>
     public DateTimeOffset? QueuedOn { get; init; }
     public string? IdempotencyKey { get; init; }

@@ -16,18 +16,24 @@ limitations under the License.
 *@
 @page
 @{
-    ViewData["Title"] = "Home";
+    ViewData["Title"] = "Overview";
 }
 <h1>Integration Service Admin</h1>
-<div class="panel">
-  <p>Manage who can call the Integration Service, how their tokens are signed, and how results are delivered back.</p>
-  <ul>
-    <li><a asp-page="/Clients/Index">Clients</a>: registered systems, their secrets and scopes.</li>
-    <li><a asp-page="/Scopes/Index">Scopes</a>: permissions a token can carry.</li>
-    <li><a asp-page="/SigningKeys/Index">Signing keys</a>: the keys that sign tokens, and rotation.</li>
-    <li><a asp-page="/AccessTokens/Index">Access tokens</a>: issued tokens, and revocation.</li>
-    <li><a asp-page="/EmailMappings/Index">Email mappings</a>: the other emails each engineer commits with.</li>
-    <li><a asp-page="/ClientConfigs/Index">Outbound configs</a>: how each client is called back, and its callback URLs.</li>
-    <li><a asp-page="/RequestLogs/Index">Request logs</a>: every stats request, its body and delivery attempts.</li>
-  </ul>
+<p class="lead">Manage who can call the Integration Service, how their tokens are signed, and how results are delivered back.</p>
+<div class="section-title">Access</div>
+<div class="cards">
+  <a class="card" asp-page="/Clients/Index"><span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h6"/></svg></span><strong>Clients</strong><span>The systems allowed to call the service: their secrets, scopes and token lifetime.</span></a>
+  <a class="card" asp-page="/Scopes/Index"><span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.4 8.4 8 9 4.6-.6 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg></span><strong>Scopes</strong><span>The permissions a token can carry, such as reading stats or fetching projects.</span></a>
+  <a class="card" asp-page="/SigningKeys/Index"><span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3M14 9l2 2"/></svg></span><strong>Signing keys</strong><span>The keys that sign access tokens, and rotating to a new one.</span></a>
+  <a class="card" asp-page="/AccessTokens/Index"><span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="12" rx="2"/><path d="M7 7V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2M3 12h18"/></svg></span><strong>Access tokens</strong><span>Every token issued, and revoking one before it expires.</span></a>
+</div>
+<div class="section-title">Delivery</div>
+<div class="cards">
+  <a class="card" asp-page="/ClientConfigs/Index"><span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg></span><strong>Outbound configs</strong><span>How each client is called back with results, and its callback URLs.</span></a>
+  <a class="card" asp-page="/EmailMappings/Index"><span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span><strong>Email mappings</strong><span>The other emails each engineer commits with, so their stats are complete.</span></a>
+  <a class="card" asp-page="/UpstreamTokens/Index"><span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg></span><strong>Upstream tokens</strong><span>The API tokens used to call DevLake and Workstream.</span></a>
+</div>
+<div class="section-title">Monitoring</div>
+<div class="cards">
+  <a class="card" asp-page="/RequestLogs/Index"><span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></span><strong>Request logs</strong><span>Every stats request, its body and delivery attempts, and retrying a failed one.</span></a>
 </div>

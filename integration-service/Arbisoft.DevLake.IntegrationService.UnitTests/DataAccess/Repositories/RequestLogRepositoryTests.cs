@@ -73,6 +73,20 @@ public class RequestLogRepositoryTests : RepositoryTestBase
     }
 
     [MySqlFact]
+    public async Task ModifiedOn_IsNullWhenReceived_AndSetOnceTheRowIsChanged()
+    {
+        var client = await InsertClientAsync();
+        var id = await InsertRequestLogAsync(client.Id, RequestStatus.Received, Instant);
+        Assert.Null((await Repository.GetByIdAsync(id, CancellationToken.None))!.ModifiedOn);
+
+        Assert.True(await Repository.UpdateStatusAsync(id, RequestStatus.Queued, CancellationToken.None));
+
+        var modified = (await Repository.GetByIdAsync(id, CancellationToken.None))!.ModifiedOn;
+        Assert.NotNull(modified);
+        Assert.True(modified > DateTimeOffset.UtcNow.AddMinutes(-5));
+    }
+
+    [MySqlFact]
     public async Task UpdateStatus_AndListByStatusSince_ReturnOldestFirstWithinTheWindow()
     {
         var client = await InsertClientAsync();
@@ -138,6 +152,28 @@ public class RequestLogRepositoryTests : RepositoryTestBase
         Assert.Equal(wanted, Assert.Single(page.Items).Id);
         Assert.Equal(1, page.TotalCount);
         Assert.True(all.TotalCount >= 3);
+    }
+
+    [MySqlFact]
+    public async Task List_SortsByTheChosenColumn_AndReturnsOnlyTheRequestedPage()
+    {
+        var client = await InsertClientAsync();
+        var day = Instant.AddDays(8000);
+        var first = await InsertRequestLogAsync(client.Id, RequestStatus.Success, day);
+        var second = await InsertRequestLogAsync(client.Id, RequestStatus.Failed, day.AddMinutes(1));
+        var third = await InsertRequestLogAsync(client.Id, RequestStatus.Queued, day.AddMinutes(2));
+        var filter = new RequestLogFilter(client.Id);
+
+        var newestFirst = await Repository.ListAsync(filter, 1, 10, CancellationToken.None);
+        var oldestFirst = await Repository.ListAsync(filter, 1, 10, CancellationToken.None, new RequestLogSort(RequestLogSortColumn.CreatedOn, Descending: false));
+        var byStatus = await Repository.ListAsync(filter, 1, 10, CancellationToken.None, new RequestLogSort(RequestLogSortColumn.Status, Descending: false));
+        var secondPage = await Repository.ListAsync(filter, 2, 2, CancellationToken.None, new RequestLogSort(RequestLogSortColumn.CreatedOn, Descending: false));
+
+        Assert.Equal([third, second, first], newestFirst.Items.Select(l => l.Id));
+        Assert.Equal([first, second, third], oldestFirst.Items.Select(l => l.Id));
+        Assert.Equal([second, third, first], byStatus.Items.Select(l => l.Id));
+        Assert.Equal(3, secondPage.TotalCount);
+        Assert.Equal([third], secondPage.Items.Select(l => l.Id));
     }
 
     private static RequestLog WithKey(long clientRefId, string? key, string status = RequestStatus.Received) => new()

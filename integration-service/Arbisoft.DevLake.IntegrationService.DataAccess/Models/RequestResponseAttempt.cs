@@ -21,6 +21,10 @@ public sealed class RequestResponseAttempt
     public long Id { get; init; }
     public long RequestLogId { get; init; }
     public string ResponseJson { get; init; } = string.Empty;
+
+    /// <summary>The body sent to the client's callback on this attempt. Null when the attempt sent nothing.</summary>
+    public string? RequestJson { get; init; }
+
     public string AttemptStatus { get; init; } = string.Empty;
     public string? FailureError { get; init; }
     public string AttemptBy { get; init; } = string.Empty;

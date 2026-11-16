@@ -7,3 +7,4 @@ TestResults/
 dev/logs/
 dev/__pycache__/
 dev/mock_sophia.env
+dev/mock_sophia_sweep_report.json

@@ -20,13 +20,23 @@ limitations under the License.
     ViewData["Title"] = "Sign in";
 }
 <h1>Sign in</h1>
-@if (!Model.IsConfigured)
+@if (Model.ErrorMessage is { } error)
 {
-    <div class="errors">Admin sign-in is not configured. Set Admin__Username and Admin__PasswordHash.</div>
+    <div class="errors" role="alert">@error</div>
 }
-<form method="post" class="stack panel">
-  <input type="hidden" asp-for="ReturnUrl">
-  <label>Username <input type="text" asp-for="Username" autocomplete="username" required></label>
-  <label>Password <input type="password" asp-for="Password" autocomplete="current-password" required></label>
-  <div><button type="submit">Sign in</button></div>
-</form>
+<div class="stack panel signin">
+  @if (Model.SsoEnabled)
+  {
+      <form method="post" asp-page-handler="Sso">
+        <input type="hidden" asp-for="ReturnUrl">
+        <button type="submit" class="sso">Sign in with @Model.SsoName</button>
+      </form>
+      <p class="muted divider"><span>or, for the local administrator</span></p>
+  }
+  <form method="post" class="stack">
+    <input type="hidden" asp-for="ReturnUrl">
+    <label>Username <input type="text" asp-for="Username" autocomplete="username" required></label>
+    <label>Password <input type="password" asp-for="Password" autocomplete="current-password" required></label>
+    <div><button type="submit" class="@(Model.SsoEnabled ? "secondary" : "")">Sign in</button></div>
+  </form>
+</div>

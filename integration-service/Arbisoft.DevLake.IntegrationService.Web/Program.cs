@@ -15,27 +15,14 @@
 
 using System.Threading.RateLimiting;
 using Arbisoft.DevLake.IntegrationService.Business;
-using Arbisoft.DevLake.IntegrationService.Business.Security;
 using Arbisoft.DevLake.IntegrationService.DataAccess;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
 using Arbisoft.DevLake.IntegrationService.Web;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
 using Serilog;
-
-// "dotnet run -- hash-password" reads a password from standard input and prints the hash for Admin__PasswordHash.
-if (args is ["hash-password", ..])
-{
-    var password = Console.In.ReadLine();
-    if (string.IsNullOrEmpty(password))
-    {
-        Console.Error.WriteLine("Type the password on standard input.");
-        return 1;
-    }
-
-    Console.WriteLine(new ClientSecretHasher().Hash(password));
-    return 0;
-}
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -52,23 +39,53 @@ builder.Host.UseDefaultServiceProvider(options =>
 
 builder.Services.AddDataAccess(builder.Configuration);
 builder.Services.AddBusiness(builder.Configuration);
-builder.Services.Configure<AdminOptions>(builder.Configuration.GetSection(AdminOptions.SectionName));
+builder.Services.AddOptions<SsoOptions>().Bind(builder.Configuration.GetSection(SsoOptions.SectionName)).ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<SsoOptions>, SsoOptionsValidator>();
+var sso = builder.Configuration.GetSection(SsoOptions.SectionName).Get<SsoOptions>() ?? new SsoOptions();
 
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(options =>
+// Portal users live in the database (PortalUsers): the seeded local administrator signs in with a password, everyone else with single sign-on.
+var authentication = builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(options =>
 {
     options.LoginPath = "/Account/Login";
-    options.AccessDeniedPath = "/Account/Login";
+    options.AccessDeniedPath = PortalAuthentication.NoAccessPath;
     options.Cookie.Name = "integration-admin";
     options.Cookie.HttpOnly = true;
     options.Cookie.SameSite = SameSiteMode.Strict;
     options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
     options.ExpireTimeSpan = TimeSpan.FromHours(8);
     options.SlidingExpiration = true;
+    options.Events.OnValidatePrincipal = PortalAuthentication.RefreshAsync;
 });
 
-// Every page needs the admin sign-in unless it opts out, so a new page is never public by accident.
+if (sso.IsConfigured)
+{
+    authentication.AddOpenIdConnect(PortalAuthentication.SsoScheme, sso.DisplayName, options =>
+    {
+        options.Authority = sso.Authority;
+        options.ClientId = sso.ClientId;
+        options.ClientSecret = sso.ClientSecret;
+        options.ResponseType = "code";
+        options.UsePkce = true;
+        options.CallbackPath = "/signin-oidc";
+        options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        options.MapInboundClaims = false;
+        options.SaveTokens = false;
+        options.Scope.Clear();
+        options.Scope.Add("openid");
+        options.Scope.Add("profile");
+        options.Scope.Add("email");
+        options.Events.OnTokenValidated = PortalAuthentication.OnSsoTokenValidatedAsync;
+        options.Events.OnRemoteFailure = PortalAuthentication.OnSsoRemoteFailureAsync;
+    });
+}
+
+// Every page needs an editor or administrator unless it says otherwise, so a new page is never open by accident. Someone signed in without
+// access only reaches the "ask the administrator" page, changing their password and signing out.
 builder.Services.AddAuthorizationBuilder()
-    .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+    .AddPolicy(PortalAuthentication.SignedInPolicy, policy => policy.RequireAuthenticatedUser())
+    .AddPolicy(PortalAuthentication.EditorPolicy, policy => policy.RequireRole(PortalRole.Editor, PortalRole.Admin))
+    .AddPolicy(PortalAuthentication.AdminPolicy, policy => policy.RequireRole(PortalRole.Admin))
+    .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().RequireRole(PortalRole.Editor, PortalRole.Admin).Build());
 
 builder.Services.AddRazorPages();
 builder.Services.AddHealthChecks();
@@ -91,6 +108,23 @@ if (!app.Environment.IsDevelopment())
 app.UseStaticFiles();
 app.UseRouting();
 app.UseAuthentication();
+
+// While a password must be changed (the seeded admin/admin), nothing else in the portal can be used.
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path;
+    if (context.User.HasClaim(PortalAuthentication.MustChangePasswordClaim, "true")
+        && !path.StartsWithSegments(PortalAuthentication.ChangePasswordPath, StringComparison.OrdinalIgnoreCase)
+        && !path.StartsWithSegments("/Account/Logout", StringComparison.OrdinalIgnoreCase)
+        && !path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.Redirect(PortalAuthentication.ChangePasswordPath);
+        return;
+    }
+
+    await next();
+});
+
 app.UseAuthorization();
 app.UseRateLimiter();
 

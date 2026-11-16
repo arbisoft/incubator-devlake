@@ -71,6 +71,7 @@ public static class DependencyInjection
         services.AddScoped<IRequestLogRepository, RequestLogRepository>();
         services.AddScoped<IClientConfigRepository, ClientConfigRepository>();
         services.AddScoped<ISecretStoreRepository, SecretStoreRepository>();
+        services.AddScoped<IPortalUserRepository, PortalUserRepository>();
 
         // Runs first among the app's hosted services, so the schema exists before anything uses it.
         services.AddHostedService<DatabaseMigrationService>();

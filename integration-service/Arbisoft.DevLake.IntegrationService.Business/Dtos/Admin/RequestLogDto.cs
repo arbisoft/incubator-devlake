@@ -18,9 +18,9 @@ namespace Arbisoft.DevLake.IntegrationService.Business.Dtos.Admin;
 /// <summary>The filters of the request log list. Dates are UTC days; <see cref="To"/> is included.</summary>
 public sealed record RequestLogQuery(long? ClientRefId = null, string? Status = null, DateOnly? From = null, DateOnly? To = null);
 
-public sealed record RequestLogDto(long Id, string ClientId, string ClientName, string CorrelationId, string EventType, string Status, DateTimeOffset CreatedOn);
+public sealed record RequestLogDto(long Id, string ClientId, string ClientName, string CorrelationId, string EventType, string Status, DateTimeOffset CreatedOn, DateTimeOffset? ModifiedOn);
 
-public sealed record DeliveryAttemptDto(DateTimeOffset AttemptOn, string AttemptStatus, string AttemptBy, string? FailureError, string ResponseJson);
+public sealed record DeliveryAttemptDto(DateTimeOffset AttemptOn, string AttemptStatus, string AttemptBy, string? FailureError, string ResponseJson, string? RequestJson);
 
 /// <summary>
 /// One request with its stored JSON body and every delivery attempt. The body holds engineer emails, so only the admin portal shows it.

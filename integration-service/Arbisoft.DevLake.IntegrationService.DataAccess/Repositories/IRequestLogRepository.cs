@@ -100,7 +100,8 @@ public interface IRequestLogRepository
     Task<IReadOnlyList<RequestLog>> ListStaleAsync(
         IReadOnlyCollection<string> statuses, DateTimeOffset queuedBefore, DateTimeOffset now, int limit, CancellationToken cancellationToken);
 
-    Task<PagedResult<RequestLog>> ListAsync(RequestLogFilter filter, int page, int pageSize, CancellationToken cancellationToken);
+    /// <summary>One page of the requests that match <paramref name="filter"/>. Newest first unless <paramref name="sort"/> says otherwise.</summary>
+    Task<PagedResult<RequestLog>> ListAsync(RequestLogFilter filter, int page, int pageSize, CancellationToken cancellationToken, RequestLogSort? sort = null);
 
     Task<long> InsertAttemptAsync(RequestResponseAttempt attempt, CancellationToken cancellationToken);
 

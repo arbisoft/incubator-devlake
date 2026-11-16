@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using System.Globalization;
 using System.Net;
 using System.Text.RegularExpressions;
 using Arbisoft.DevLake.IntegrationService.Business.Security;
@@ -135,15 +136,110 @@ public sealed partial class AdminPortalTests : IAsyncLifetime, IDisposable
     }
 
     [MySqlFact]
-    public async Task SignIn_WithNoAdminConfigured_IsAlwaysRefused()
+    public async Task TheSignInPage_OffersSingleSignOn_OnlyOnceItIsConfigured()
     {
-        using var factory = new PortalFactory(_database.DatabaseConnectionString, configureAdmin: false);
+        Assert.DoesNotContain("Sign in with", await Http.GetStringAsync(new Uri("/Account/Login", UriKind.Relative)), StringComparison.Ordinal);
+
+        using var factory = new PortalFactory(_database.DatabaseConnectionString, new Dictionary<string, string>
+        {
+            ["Sso:Enabled"] = "true",
+            ["Sso:DisplayName"] = "Arbisoft Google",
+            ["Sso:Authority"] = "https://accounts.google.com",
+            ["Sso:ClientId"] = "client-id",
+            ["Sso:ClientSecret"] = "client-secret"
+        });
         using var http = NewClient(factory);
 
-        var response = await PostFormAsync(http, "/Account/Login", ("Username", string.Empty), ("Password", string.Empty));
+        Assert.Contains("Sign in with Arbisoft Google", await http.GetStringAsync(new Uri("/Account/Login", UriKind.Relative)), StringComparison.Ordinal);
+    }
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(HttpStatusCode.Redirect, (await http.GetAsync(new Uri("/Clients", UriKind.Relative))).StatusCode);
+    [MySqlFact]
+    public void SingleSignOn_SwitchedOnButIncomplete_StopsThePortalStarting()
+    {
+        using var factory = new PortalFactory(_database.DatabaseConnectionString, new Dictionary<string, string> { ["Sso:Enabled"] = "true" });
+
+        var problem = Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+
+        Assert.Contains("Sso:Authority", problem.ToString(), StringComparison.Ordinal);
+    }
+
+    [MySqlFact]
+    public async Task ADefaultPassword_MustBeChanged_BeforeAnythingElse_ThenThePortalOpens()
+    {
+        var username = Unique("first");
+        await _factory!.AddLocalUserAsync(username, "admin", PortalRole.Admin, mustChangePassword: true);
+
+        var signedIn = await PostFormAsync(Http, "/Account/Login", ("Username", username), ("Password", "admin"));
+        Assert.Equal("/Account/ChangePassword", signedIn.Headers.Location!.OriginalString);
+        var blocked = await Http.GetAsync(new Uri("/Clients", UriKind.Relative));
+        Assert.Equal(HttpStatusCode.Redirect, blocked.StatusCode);
+        Assert.Equal("/Account/ChangePassword", blocked.Headers.Location!.OriginalString);
+        Assert.Contains("default password", await Http.GetStringAsync(new Uri("/Account/ChangePassword", UriKind.Relative)), StringComparison.Ordinal);
+
+        var tooShort = await PostFormAsync(Http, "/Account/ChangePassword", ("CurrentPassword", "admin"), ("NewPassword", "short"), ("ConfirmPassword", "short"));
+        Assert.Equal(HttpStatusCode.OK, tooShort.StatusCode);
+        var changed = await PostFormAsync(Http, "/Account/ChangePassword", ("CurrentPassword", "admin"), ("NewPassword", "a much better password"), ("ConfirmPassword", "a much better password"));
+
+        Assert.Equal(HttpStatusCode.Redirect, changed.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Http.GetAsync(new Uri("/Clients", UriKind.Relative))).StatusCode);
+        using var again = NewClient(_factory);
+        Assert.Equal(HttpStatusCode.OK, (await PostFormAsync(again, "/Account/Login", ("Username", username), ("Password", "admin"))).StatusCode);
+    }
+
+    [MySqlFact]
+    public async Task SomeoneWithoutAccess_SeesOnlyTheAskTheAdministratorPage_UntilAnAdministratorGrantsIt()
+    {
+        var username = Unique("noaccess");
+        var userId = await _factory!.AddLocalUserAsync(username, "a long user password", PortalRole.None);
+        using var user = NewClient(_factory);
+        await PostFormAsync(user, "/Account/Login", ("Username", username), ("Password", "a long user password"));
+
+        var refused = await user.GetAsync(new Uri("/Clients", UriKind.Relative));
+        Assert.Equal(HttpStatusCode.Redirect, refused.StatusCode);
+        Assert.StartsWith("http://localhost/Account/NoAccess", refused.Headers.Location!.AbsoluteUri, StringComparison.Ordinal);
+        var page = await user.GetStringAsync(new Uri("/Account/NoAccess", UriKind.Relative));
+        Assert.Contains("Ask the administrator to provide the access to the portal", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("Request logs", page, StringComparison.Ordinal);
+
+        await SignInAsync();
+        var granted = await PostFormAsync(Http, "/Users", ("id", userId.ToString(CultureInfo.InvariantCulture)), ("role", PortalRole.Editor), ("isActive", "true"));
+        Assert.Equal(HttpStatusCode.Redirect, granted.StatusCode);
+
+        Assert.Equal(HttpStatusCode.OK, (await user.GetAsync(new Uri("/Clients", UriKind.Relative))).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await user.GetAsync(new Uri("/Users", UriKind.Relative))).StatusCode);
+    }
+
+    [MySqlFact]
+    public async Task DisablingAnAccount_EndsItsSessionAtOnce()
+    {
+        var username = Unique("editor");
+        var userId = await _factory!.AddLocalUserAsync(username, "a long user password", PortalRole.Editor);
+        using var user = NewClient(_factory);
+        await PostFormAsync(user, "/Account/Login", ("Username", username), ("Password", "a long user password"));
+        Assert.Equal(HttpStatusCode.OK, (await user.GetAsync(new Uri("/Clients", UriKind.Relative))).StatusCode);
+
+        await SignInAsync();
+        await PostFormAsync(Http, "/Users", ("id", userId.ToString(CultureInfo.InvariantCulture)), ("role", PortalRole.Editor), ("isActive", "false"));
+
+        var after = await user.GetAsync(new Uri("/Clients", UriKind.Relative));
+        Assert.Equal(HttpStatusCode.Redirect, after.StatusCode);
+        Assert.Contains("/Account/Login", after.Headers.Location!.OriginalString, StringComparison.Ordinal);
+    }
+
+    [MySqlFact]
+    public async Task TheUsersPage_IsForAdministrators_AndNobodyChangesTheirOwnAccess()
+    {
+        await SignInAsync();
+        var page = await Http.GetStringAsync(new Uri("/Users", UriKind.Relative));
+        Assert.Contains(PortalFactory.AdminUsername, page, StringComparison.Ordinal);
+        Assert.Contains("(you)", page, StringComparison.Ordinal);
+
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var self = (await scope.ServiceProvider.GetRequiredService<IPortalUserRepository>().GetByUsernameAsync(PortalFactory.AdminUsername, CancellationToken.None))!;
+        var own = await PostFormAsync(Http, "/Users", ("id", self.Id.ToString(CultureInfo.InvariantCulture)), ("role", PortalRole.None), ("isActive", "true"));
+
+        Assert.Equal(HttpStatusCode.OK, own.StatusCode);
+        Assert.Contains("You cannot change your own access", await own.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
 
     [MySqlFact]
@@ -381,21 +477,33 @@ public sealed partial class AdminPortalTests : IAsyncLifetime, IDisposable
             CancellationToken.None);
         await logs.InsertJsonAsync(new RequestLogJson { RequestLogId = id, Json = "{\"email\":\"jane@arbisoft.com\",\"time_frame\":\"24h\"}" }, CancellationToken.None);
         await logs.InsertAttemptAsync(
-            new RequestResponseAttempt { RequestLogId = id, ResponseJson = "{\"detail\":\"bad gateway\"}", AttemptStatus = "Failed", FailureError = "HTTP 502", AttemptBy = "job", AttemptOn = DateTimeOffset.UtcNow },
+            new RequestResponseAttempt { RequestLogId = id, ResponseJson = "{\"detail\":\"bad gateway\"}", RequestJson = "{\"sent\":\"to-the-callback\"}", AttemptStatus = "Failed", FailureError = "HTTP 502", AttemptBy = "job", AttemptOn = DateTimeOffset.UtcNow },
             CancellationToken.None);
 
         var today = DateTime.UtcNow.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
-        var listed = await Http.GetStringAsync(new Uri($"/RequestLogs?ClientRefId={client.Id}&Status=Failed&From={today}&To={today}", UriKind.Relative));
+        var page = await Http.GetStringAsync(new Uri("/RequestLogs", UriKind.Relative));
+        Assert.Contains("Modified On", page, StringComparison.Ordinal);
+        Assert.Contains("data-page-sizes=\"10,20,30,40,50\"", page, StringComparison.Ordinal);
+
+        async Task<string> ListAsync(string query) =>
+            await Http.GetStringAsync(new Uri($"/RequestLogs?handler=List&draw=7&page=1&pageSize=10&ClientRefId={client.Id}&{query}", UriKind.Relative));
+        var listed = await ListAsync($"Status=Failed&From={today}&To={today}&sort=created&dir=desc");
         Assert.Contains(correlation, listed, StringComparison.Ordinal);
-        var otherStatus = await Http.GetStringAsync(new Uri($"/RequestLogs?ClientRefId={client.Id}&Status=Success", UriKind.Relative));
+        Assert.Contains("\"draw\":7", listed, StringComparison.Ordinal);
+        Assert.Contains("\"recordsTotal\":1", listed, StringComparison.Ordinal);
+        var otherStatus = await ListAsync("Status=Success");
         Assert.DoesNotContain(correlation, otherStatus, StringComparison.Ordinal);
-        var otherDay = await Http.GetStringAsync(new Uri($"/RequestLogs?ClientRefId={client.Id}&From=2000-01-01&To=2000-01-02", UriKind.Relative));
+        var otherDay = await ListAsync("From=2000-01-01&To=2000-01-02");
         Assert.DoesNotContain(correlation, otherDay, StringComparison.Ordinal);
+        var unknownSort = await ListAsync("sort=%3BDROP%20TABLE%20RequestLogs&dir=sideways");
+        Assert.Contains(correlation, unknownSort, StringComparison.Ordinal);
 
         var details = await Http.GetStringAsync(new Uri($"/RequestLogs/Details/{id}", UriKind.Relative));
         Assert.Contains("jane@arbisoft.com", details, StringComparison.Ordinal);
         Assert.Contains("HTTP 502", details, StringComparison.Ordinal);
         Assert.Contains("bad gateway", details, StringComparison.Ordinal);
+        Assert.Contains("Sent to the callback", details, StringComparison.Ordinal);
+        Assert.Contains("to-the-callback", details, StringComparison.Ordinal);
         Assert.Equal(HttpStatusCode.NotFound, (await Http.GetAsync(new Uri("/RequestLogs/Details/999999999", UriKind.Relative))).StatusCode);
     }
 

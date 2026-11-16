@@ -25,7 +25,7 @@ limitations under the License.
   <dl>
     <dt>Client</dt><dd>@log.ClientName <span class="mono muted">@log.ClientId</span></dd>
     <dt>Event type</dt><dd class="mono">@log.EventType</dd>
-    <dt>Status</dt><dd>@log.Status</dd>
+    <dt>Status</dt><dd><span class="badge @AdminPageModel.Tone(log.Status)">@log.Status</span></dd>
     <dt>Created</dt><dd>@AdminPageModel.Utc(log.CreatedOn)</dd>
     @if (log.QueuedOn != log.CreatedOn)
     {
@@ -64,10 +64,14 @@ else
   {
       <tr>
         <td>@AdminPageModel.Utc(attempt.AttemptOn)</td>
-        <td>@attempt.AttemptStatus</td>
+        <td><span class="badge @AdminPageModel.Tone(attempt.AttemptStatus)">@attempt.AttemptStatus</span></td>
         <td>@attempt.AttemptBy</td>
         <td>@(attempt.FailureError ?? "")</td>
       </tr>
+      @if (!string.IsNullOrEmpty(attempt.RequestJson))
+      {
+          <tr><td colspan="4"><details><summary>Sent to the callback</summary><pre class="mono">@attempt.RequestJson</pre></details></td></tr>
+      }
       @if (!string.IsNullOrEmpty(attempt.ResponseJson))
       {
           <tr><td colspan="4"><details><summary>The client's response</summary><pre class="mono">@attempt.ResponseJson</pre></details></td></tr>

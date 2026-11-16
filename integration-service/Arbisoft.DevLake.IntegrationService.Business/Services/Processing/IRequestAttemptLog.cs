@@ -18,7 +18,7 @@ namespace Arbisoft.DevLake.IntegrationService.Business.Services.Processing;
 /// <summary>Records what happened to a request in RequestResponseAttempts, so an administrator can see every try and why it failed.</summary>
 public interface IRequestAttemptLog
 {
-    Task RecordAsync(long requestLogId, string attemptStatus, string responseJson, string? failure, CancellationToken cancellationToken);
+    Task RecordAsync(long requestLogId, string attemptStatus, string responseJson, string? failure, CancellationToken cancellationToken, string? requestJson = null);
 
     /// <summary>
     /// How many tries to deliver the result were made since <paramref name="since"/>, the time the request last entered processing, so a request

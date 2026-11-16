@@ -59,7 +59,8 @@ public sealed class CallbackDelivery : ICallbackDelivery
                 result.Delivered ? DeliveryAttemptStatus.Delivered : DeliveryAttemptStatus.DeliveryFailed,
                 result.ResponseBody,
                 result.Delivered ? null : $"HTTP {result.StatusCode}",
-                CancellationToken.None);
+                CancellationToken.None,
+                payloadJson);
             if (result.Delivered)
             {
                 return new DeliveryAttempt(DeliveryOutcome.Delivered);
@@ -85,7 +86,7 @@ public sealed class CallbackDelivery : ICallbackDelivery
         }
         catch (ExternalApiUnavailableException exception)
         {
-            await _attempts.RecordAsync(request.Id, DeliveryAttemptStatus.DeliveryFailed, ProcessingConstants.EmptyJson, exception.Message, CancellationToken.None);
+            await _attempts.RecordAsync(request.Id, DeliveryAttemptStatus.DeliveryFailed, ProcessingConstants.EmptyJson, exception.Message, CancellationToken.None, payloadJson);
             return Failed(failed + 1, config.MaxAttempts);
         }
     }

@@ -13,10 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
-using Arbisoft.DevLake.IntegrationService.Business.Security;
+
+using Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
@@ -27,9 +25,10 @@ using Microsoft.Extensions.Options;
 
 namespace Arbisoft.DevLake.IntegrationService.Web.Pages.Account;
 
+/// <summary>Signs in with single sign-on (Arbisoft accounts), or with a password for the local administrator.</summary>
 [AllowAnonymous]
 [EnableRateLimiting("login")]
-public sealed class LoginModel(IOptions<AdminOptions> options, IClientSecretHasher hasher, ILogger<LoginModel> logger) : PageModel
+public sealed class LoginModel(IPortalUserService users, IOptions<SsoOptions> sso, ILogger<LoginModel> logger) : PageModel
 {
     [BindProperty]
     public string Username { get; set; } = string.Empty;
@@ -40,31 +39,49 @@ public sealed class LoginModel(IOptions<AdminOptions> options, IClientSecretHash
     [BindProperty(SupportsGet = true)]
     public string? ReturnUrl { get; set; }
 
-    public bool IsConfigured => options.Value.IsConfigured;
+    [BindProperty(SupportsGet = true)]
+    public string? Error { get; set; }
 
-    public void OnGet()
+    public bool SsoEnabled => sso.Value.IsConfigured;
+
+    public string SsoName => sso.Value.DisplayName;
+
+    /// <summary>Why the last single sign-on did not go through, for the person to read.</summary>
+    public string? ErrorMessage => Error switch
     {
+        "not-allowed" => "Only Arbisoft accounts can sign in to this portal.",
+        "disabled" => "Your account is disabled. Ask the administrator.",
+        "sso" => "Signing in with " + sso.Value.DisplayName + " did not complete. Try again.",
+        _ => null
+    };
+
+    public IActionResult OnGet()
+    {
+        return User.Identity?.IsAuthenticated == true ? LocalRedirect(SafeReturnUrl) : Page();
     }
 
-    public async Task<IActionResult> OnPostAsync()
+    public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
-        var admin = options.Value;
-        var usernameMatches = CryptographicOperations.FixedTimeEquals(
-            Encoding.UTF8.GetBytes(Username ?? string.Empty), Encoding.UTF8.GetBytes(admin.Username));
-
-        // The hash is checked even for a wrong username, so the response time doesn't reveal which part was wrong.
-        var passwordMatches = admin.IsConfigured && hasher.Verify(Password ?? string.Empty, admin.PasswordHash);
-        if (!admin.IsConfigured || !usernameMatches || !passwordMatches)
+        var signIn = await users.SignInLocalAsync(Username, Password, cancellationToken);
+        if (signIn is null)
         {
-            logger.LogWarning("Failed admin sign-in from {RemoteIp}.", HttpContext.Connection.RemoteIpAddress);
+            logger.LogWarning("Failed portal sign-in from {RemoteIp}.", HttpContext.Connection.RemoteIpAddress);
             ModelState.AddModelError(string.Empty, "The username or password is wrong.");
             Password = string.Empty;
             return Page();
         }
 
-        var identity = new ClaimsIdentity([new Claim(ClaimTypes.Name, admin.Username)], CookieAuthenticationDefaults.AuthenticationScheme);
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
-        logger.LogInformation("Admin {Username} signed in.", admin.Username);
-        return LocalRedirect(Url.IsLocalUrl(ReturnUrl) ? ReturnUrl! : "/");
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, PortalAuthentication.CreatePrincipal(signIn));
+        logger.LogInformation("Portal user {UserId} signed in with a password.", signIn.UserId);
+        return LocalRedirect(signIn.MustChangePassword ? PortalAuthentication.ChangePasswordPath : SafeReturnUrl);
     }
+
+    public IActionResult OnPostSso()
+    {
+        return SsoEnabled
+            ? Challenge(new AuthenticationProperties { RedirectUri = SafeReturnUrl }, PortalAuthentication.SsoScheme)
+            : RedirectToPage();
+    }
+
+    private string SafeReturnUrl => Url.IsLocalUrl(ReturnUrl) ? ReturnUrl! : "/";
 }

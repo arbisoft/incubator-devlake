@@ -35,17 +35,28 @@ Deviations from the team's .NET guidelines are recorded in `dotnet-dev.exception
 
 ## Run locally
 
-Start MySQL (port 3308) and RabbitMQ (ports 5672 and 15672):
+`docker compose` runs the whole service: MySQL (port 3308), RabbitMQ (ports 5672 and 15672), and the API (`http://localhost:5099`) and admin portal (`http://localhost:5098`), which it builds from this folder's source with the `Dockerfile`:
 
 ```sh
-cp env.example .env   # then edit the values
-docker compose up -d
+cp env.example .env   # then fill in the values
+docker compose up -d --build
 ```
+
+The API and portal containers take every setting from `.env`; nothing secret is baked into the images. They use the `integration_service` database (`INTEGRATION_DB_NAME`) and reach DevLake at `http://host.docker.internal:8080/rest/` (`DEVLAKE_BASE_URL`), where DevLake's own stack publishes it; DevLake reaches the API at `http://host.docker.internal:5099`. Workstream's address is unset by default (`WORKSTREAM_BASE_URL`), so only `GET /fetch/projects` fails until it is given. They run as `Development` because they serve plain HTTP: outside Development the API redirects every call to HTTPS. The API applies the database migrations when it starts.
+
+MySQL creates the database only when its volume is new. On a volume from before, create it once (the old `integration` database is left as it is):
+
+```sh
+docker exec -e MYSQL_PWD=<root password> integration-service-mysql-1 mysql -uroot -e \
+  "CREATE DATABASE IF NOT EXISTS integration_service CHARACTER SET utf8mb4; GRANT ALL PRIVILEGES ON integration_service.* TO 'integration'@'%';"
+```
+
+To run the API or portal with `dotnet run` instead, start only `docker compose up -d mysql rabbitmq`.
 
 Settings live in each project's `appsettings.json`. Secrets are never put there. Set them as environment variables, using `__` for nesting:
 
 ```sh
-export Database__ConnectionString="Server=127.0.0.1;Port=3308;Database=integration;User=integration;Password=<password>"
+export Database__ConnectionString="Server=127.0.0.1;Port=3308;Database=integration_service;User=integration;Password=<password>"
 export RabbitMq__UserName=<user> RabbitMq__Password=<password>
 export Security__EncryptionKey=$(openssl rand -base64 32)   # keep it: it decrypts the stored secrets
 dotnet run --project Arbisoft.DevLake.IntegrationService.API
@@ -63,6 +74,13 @@ Private signing keys are stored AES-256-GCM encrypted in the `SecretStoreEntries
 
 - **As Sophia the client** it gets a bearer token from `POST /auth/token/` with OAuth2 client credentials, sends single-email and batch stats requests, and polls each one.
 - **As Sophia the callback receiver** it runs its own OAuth2 client-credentials token endpoint and a callback endpoint that accepts only tokens it issued, the way the real Sophia does. Every callback is recorded and matched to its request.
+
+When the API runs in its container (`docker compose up`), run the mock's receiver as the `mock-sophia` container: it shares the API container's network, so the API reaches it at `http://127.0.0.1:5097/sophia`, a loopback address the service allows over plain HTTP, and port 5097 is published on the host too. It reads `dev/mock_sophia.env`. Then drive requests from the host against that receiver with `--receiver-url`:
+
+```sh
+docker compose --profile mock up -d mock-sophia
+python3 dev/mock_sophia.py run --receiver-url http://127.0.0.1:5097/sophia --emails-from-devlake 5
+```
 
 It serves, by default on `http://127.0.0.1:5097/sophia`: `POST /oauth2/token/`, `POST /api/v1/devlake/callback/` (also PUT and PATCH) and `GET /callbacks` (what it received, newest first).
 
@@ -96,15 +114,38 @@ Run **one instance of the API**. Several things live in the process, not in shar
 
 ## Admin portal
 
-The portal (`Arbisoft.DevLake.IntegrationService.Web`) manages the auth side of the service. It shares the API's database and the same `Database__*`, `RabbitMq__*` and `Security__*` settings, and it never processes requests. It signs in one admin account from configuration; the password is stored only as a hash:
+The portal (`Arbisoft.DevLake.IntegrationService.Web`) manages the auth side of the service. It shares the API's database and the same `Database__*`, `RabbitMq__*` and `Security__*` settings, and it never processes requests.
+
+### Portal users and access
+
+Portal users are kept in the `PortalUsers` table, not in configuration. When the table is empty, migration `009_PortalUsers` creates one local administrator: username `admin`, password `admin` (stored only as a PBKDF2 hash). The first sign-in with it goes straight to **Change password**, and nothing else in the portal opens until the password is changed (at least 8 characters, not the username). Do this as soon as a new environment (local, stage or prod) is up.
+
+Everyone else signs in with their Arbisoft account through single sign-on. A new account starts with **no access**: the person is signed in but sees only "Ask the administrator to provide the access to the portal". An administrator grants access on the **Users** page:
+
+| Access | Can do |
+|---|---|
+| No access | Nothing; sees the message above. Every new single sign-on account. |
+| Editor | Sees all data and makes every change in the portal. |
+| Admin | Everything an editor does, plus the **Users** page. |
+
+The Users page also disables an account, which signs it out at its next page load. Nobody can change their own access, and the last active administrator cannot be demoted or disabled. The role is read from the database on every request, so a change applies at once.
+
+Single sign-on works with any OpenID Connect provider, and is off until configured:
 
 ```sh
-echo -n "<password>" | dotnet run --project Arbisoft.DevLake.IntegrationService.Web -- hash-password   # prints the hash
-export Admin__Username=<name> Admin__PasswordHash=<hash>
+export Sso__Enabled=true Sso__DisplayName=Arbisoft \
+       Sso__Authority=https://accounts.google.com \
+       Sso__ClientId=<client id> Sso__ClientSecret=<client secret>
+# Microsoft Entra ID instead: Sso__Authority=https://login.microsoftonline.com/<tenant id>/v2.0
+```
+
+In docker compose, these come from `SSO_ENABLED`, `SSO_DISPLAY_NAME`, `SSO_AUTHORITY`, `SSO_CLIENT_ID` and `SSO_CLIENT_SECRET` in `.env`. Register `<portal URL>/signin-oidc` as the redirect URI at the provider (locally `http://localhost:5098/signin-oidc`). Only emails in `Sso:AllowedDomains` (default `arbisoft.com`) are accepted, and an account the provider marks as unverified is refused. The portal fails to start if `Sso:Enabled` is true and the other settings are missing. It uses the authorization code flow with PKCE.
+
+```sh
 dotnet run --project Arbisoft.DevLake.IntegrationService.Web
 ```
 
-Every page needs the sign-in (the fallback policy is deny), POSTs need an anti-forgery token, sign-in attempts are limited to 10 a minute per address, and the cookie is HttpOnly, SameSite=Strict and lasts 8 hours of activity. With no admin configured, nobody can sign in. Each change records the admin's name as `createdBy` or `modifiedBy`.
+Every page needs an editor or administrator unless it says otherwise (the fallback policy is deny), POSTs need an anti-forgery token, sign-in attempts are limited to 10 a minute per address, and the cookie is HttpOnly, SameSite=Strict and lasts 8 hours of activity. Each change records the user's name (username or email) as `createdBy` or `modifiedBy`.
 
 - **Clients:** list, create, edit and view details, including the active flag and token lifetime (60 to 86,400 seconds). The Client ID never changes.
 - **Client secrets:** create one (1 to 730 days) and it is shown once; only a hash is stored. Revoke any of them; the unexpired tokens issued with that secret are revoked in the same transaction, so a leaked secret's tokens stop working at once. Every API call also checks, in the same query that checks the token and its client, that the token's secret is not revoked, so a token issued at the moment its secret was revoked is refused too. A client can hold several, so a secret can be rotated without downtime. Share new credentials through Passbolt.
@@ -116,7 +157,7 @@ Every page needs the sign-in (the fallback policy is deny), POSTs need an anti-f
 - **Outbound configs:** one per client. Choose OAuth2 client credentials or a static API token, the base URL (HTTPS; plain HTTP only for localhost), max delivery attempts (1 to 10) and the active flag. Secrets are encrypted before they are stored and are never shown again: leave a field blank to keep the stored value, or type a new one to rotate it. The page shows whether one is stored, when it was last rotated and, for a token, when it expires. Fields for the other auth type are cleared on save.
 - **Callback URLs:** for each config, the event type to method and path mappings. The path is appended to the base URL, keeping the base URL's own path (`https://sophia.example.com/api/v1` and `/cb` call `https://sophia.example.com/api/v1/cb`), and the config page shows the full URL each one calls. The path is checked with the same code that builds the calls, so it must start with a single `/` and stay on the base URL's host. Only one URL can be active per event type.
 - **Upstream tokens:** the API tokens this service uses to call DevLake and Workstream. Each is write-only: the page shows whether one is stored and when and by whom it was last saved, never the value, and typing a new one replaces it. Tokens are stored AES-256-GCM encrypted in `SecretStoreEntries` (`upstream.devlake.api-token` and `upstream.workstream.api-token`), like the signing keys, so they too need `Security__EncryptionKey`. **Check token** asks the system's `is_valid` whether it accepts the stored token. The API caches a token for a minute, so a new one takes effect within a minute, without a restart. Until a token is stored, calls to that system fail as a credentials problem whose message says to enter it here; for DevLake the processing job then pauses, and requests wait.
-- **Request logs:** filter by client, status and UTC dates (50 a page), and open a request to see its JSON body, when a waiting request is next due, and every delivery attempt with the client's response. The body holds engineer emails, so it is shown only here. A `Failed` request with a stored body has a **Retry** button for when the cause is fixed (a broken callback, DevLake down for hours, an expired request): it goes back to `Queued`, due at once, keeps its correlation ID so the client receives it as the original request, and gets a fresh two-hour lifetime and a fresh set of delivery attempts; its stats are collected again. The retry is listed in the attempt history as `Retried` with the admin's name. `createdOn` keeps when the client sent the request; `queuedOn` is when it last entered processing, and the lifetime and the attempt count are measured from it.
+- **Request logs:** filter by client, status and UTC dates (50 a page), and open a request to see its JSON body (the list also shows `modifiedOn`, when the row last changed: null until a request is first claimed, deferred, retried or finished), when a waiting request is next due, and every delivery attempt with the body sent to the callback and the client's response (the sent body is kept only for attempts made since migration 010). The body holds engineer emails, so it is shown only here. A `Failed` request with a stored body has a **Retry** button for when the cause is fixed (a broken callback, DevLake down for hours, an expired request): it goes back to `Queued`, due at once, keeps its correlation ID so the client receives it as the original request, and gets a fresh two-hour lifetime and a fresh set of delivery attempts; its stats are collected again. The retry is listed in the attempt history as `Retried` with the admin's name. `createdOn` keeps when the client sent the request; `queuedOn` is when it last entered processing, and the lifetime and the attempt count are measured from it.
 
 The client, scope, key and token lists show at most 200 rows.
 

@@ -28,6 +28,8 @@ Commands:
 
   serve   run only the Sophia side the Integration Service calls (token endpoint + callback).
   run     run the server, send the requests, wait for every result, print a report, then exit.
+  sweep   like run, but sends every kind of request the API has (all time frames, ranges, batch sizes, polls and the invalid
+          variants that must be refused) and reports each request and response; the full report is also written as JSON.
 
 See "Mock Sophia" in integration-service/README.md for the portal settings this needs.
 """
@@ -191,6 +193,10 @@ def make_handler(state, prefix, verbose):
                 self._send_json(200, items)
             elif self.path.rstrip("/") == prefix + "/health":
                 self._send_json(200, {"ok": True})
+            elif self.path.rstrip("/") == prefix + "/stats":
+                with state.lock:
+                    counts = {"token_requests": state.token_requests, "rejected_callbacks": state.rejected_callbacks, "callbacks": len(state.callbacks)}
+                self._send_json(200, counts)
             else:
                 self._send_json(404, {"error": "not_found"})
 
@@ -273,6 +279,32 @@ def summary(body):
     errors = sum(len(e.get("errors") or []) for e in engineers if isinstance(e, dict))
     window = body.get("time_frame") or "range"
     return f"{len(engineers)} engineer(s), {window} {body.get('from', '?')} to {body.get('to', '?')}, {errors} error(s)"
+
+
+class RemoteReceiver:
+    """A mock Sophia receiver already running elsewhere (for example the mock-sophia container), read through its own endpoints."""
+
+    def __init__(self, base_url):
+        self.base_url = base_url.rstrip("/")
+
+    def _get(self, path):
+        try:
+            with urllib.request.urlopen(self.base_url + path, timeout=10) as response:
+                return json.loads(response.read())
+        except (urllib.error.URLError, json.JSONDecodeError) as error:
+            sys.exit(f"Could not reach the mock Sophia receiver at {self.base_url}: {error}")
+
+    def callbacks_for(self, correlation_id):
+        return [Callback(c["received_at"], c["method"], c["correlation_id"], c["status_returned"], c["body"])
+                for c in self._get("/callbacks") if c["correlation_id"] == correlation_id]
+
+    @property
+    def token_requests(self):
+        return self._get("/stats")["token_requests"]
+
+    @property
+    def rejected_callbacks(self):
+        return self._get("/stats")["rejected_callbacks"]
 
 
 def start_receiver(args):
@@ -496,6 +528,304 @@ def report(state, sent, pending):
 
 
 # --------------------------------------------------------------------------------------------------
+# sweep: every request the Integration Service accepts, valid and invalid, with a report
+# --------------------------------------------------------------------------------------------------
+
+DEFAULT_REPORT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mock_sophia_sweep_report.json")
+
+
+@dataclass
+class Exchange:
+    group: str
+    name: str
+    method: str
+    path: str
+    request_headers: dict
+    request_body: object
+    expected: tuple
+    status: int = 0
+    response_headers: dict = field(default_factory=dict)
+    response_body: object = None
+    note: str = ""
+    correlation_id: str | None = None
+
+    @property
+    def as_expected(self):
+        return self.status in self.expected
+
+
+def mask(value):
+    """Shows only the start of a credential, so the report can be shared."""
+    return value[:8] + "..." if value else value
+
+
+def masked_headers(headers):
+    shown = dict(headers)
+    authorization = shown.get("Authorization")
+    if authorization:
+        scheme, _, credential = authorization.partition(" ")
+        shown["Authorization"] = f"{scheme} {mask(credential) if scheme == 'Bearer' else '<redacted>'}"
+    return shown
+
+
+def masked_body(body):
+    if isinstance(body, dict) and "access_token" in body:
+        return {**body, "access_token": mask(body["access_token"])}
+    return body
+
+
+class Sweep:
+    """Sends requests to the Integration Service and keeps every request and answer. Nothing here follows the happy path only."""
+
+    def __init__(self, base_url, client_id, client_secret, timeout=30):
+        self.base_url = base_url.rstrip("/")
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.timeout = timeout
+        self.token = None
+        self.exchanges = []
+
+    def basic(self, client_id, client_secret):
+        return "Basic " + base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
+
+    def _send(self, method, path, headers, data):
+        request = urllib.request.Request(self.base_url + path, data=data, method=method, headers=headers)
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                return response.status, dict(response.headers), read_json(response.read())
+        except urllib.error.HTTPError as error:
+            return error.code, dict(error.headers), read_json(error.read())
+        except urllib.error.URLError as error:
+            return 0, {}, f"connection failed: {error.reason}"
+
+    def exchange(self, group, name, method, path, expect, *, bearer=None, authorization=None, body=None, form=None, raw=None,
+                 record=True):
+        """
+        One request. `bearer` is a token to send as Authorization: Bearer (default: none); `authorization` is a complete Authorization
+        header value instead. A 429 is waited out (as Retry-After says) and the request repeated, up to twice, and the note says so.
+        """
+        headers, data, shown_body = {}, None, None
+        if authorization:
+            headers["Authorization"] = authorization
+        elif bearer:
+            headers["Authorization"] = "Bearer " + bearer
+        if form is not None:
+            data, shown_body = urllib.parse.urlencode(form).encode(), form
+            headers["Content-Type"] = "application/x-www-form-urlencoded"
+        elif body is not None:
+            data, shown_body = json.dumps(body).encode(), body
+            headers["Content-Type"] = "application/json"
+        elif raw is not None:
+            data, headers["Content-Type"] = raw
+            shown_body = data.decode(errors="replace")
+
+        item = Exchange(group, name, method, path, masked_headers(headers), shown_body, tuple(expect) if not isinstance(expect, int) else (expect,))
+        retries = 0
+        while True:
+            status, response_headers, answer = self._send(method, path, headers, data)
+            if status == 429 and retries < 2:
+                wait = min(int(response_headers.get("Retry-After", "10") or 10), 65)
+                retries += 1
+                print(f"[sweep]   429 on {name}; waiting {wait}s (Retry-After) before repeating", flush=True)
+                time.sleep(wait)
+                continue
+            break
+        item.status, item.response_body = status, masked_body(answer)
+        item.response_headers = {k: v for k, v in response_headers.items() if k.lower() in ("retry-after", "www-authenticate", "content-type")}
+        if retries:
+            item.note = f"repeated {retries}x after 429"
+        if isinstance(answer, dict):
+            item.correlation_id = answer.get("correlation_id") or None
+        if record:
+            self.exchanges.append(item)
+            flag = "ok  " if item.as_expected else "DIFF"
+            print(f"[sweep] {flag} {method:4} {path[:70]:70} -> HTTP {status}", flush=True)
+        return item
+
+
+def run_sweep(service, state, args, emails):
+    """Every endpoint, with valid requests of every shape and the invalid ones that should be refused."""
+    email = emails[0]
+    pad = [f"sweep.user{i:02d}@arbisoft.com" for i in range(1, MAX_BATCH_EMAILS + 2)]
+    twenty = (emails + [p for p in pad if p not in emails])[:MAX_BATCH_EMAILS]
+    twenty_one = (emails + [p for p in pad if p not in emails])[:MAX_BATCH_EMAILS + 1]
+    quoted = urllib.parse.quote(email, safe="")
+    stamp = lambda days: time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - days * 86400))  # noqa: E731
+    stats = f"/api/v1/engineers/{quoted}/stats"
+    batch = "/api/v1/engineers/stats/batch"
+    ok, invalid = (200,), (400,)
+
+    # --- 1. token endpoint (limited to a few calls a minute per IP, so a few cases only) ---
+    print("\n[sweep] --- token endpoint ---", flush=True)
+    good = service.exchange("auth", "token: valid client credentials", "POST", "/auth/token/", ok,
+                            authorization=service.basic(service.client_id, service.client_secret), form={"grant_type": "client_credentials"})
+    if good.status != 200 or not isinstance(good.response_body, dict):
+        sys.exit(f"[sweep] the Integration Service did not give a token (HTTP {good.status}: {good.response_body}); nothing else can be sent. "
+                 "HTTP 500 usually means there is no active signing key: rotate one in the admin portal.")
+    # the masked token is in the report; the real one was only in the answer, so ask again quietly for the one to use
+    token = fetch_token(service)
+    service.exchange("auth", "token: wrong secret", "POST", "/auth/token/", (401,),
+                     authorization=service.basic(service.client_id, "wrong-secret"), form={"grant_type": "client_credentials"})
+    service.exchange("auth", "token: unknown client", "POST", "/auth/token/", (401,),
+                     authorization=service.basic("no-such-client", "x"), form={"grant_type": "client_credentials"})
+    service.exchange("auth", "token: no Authorization header", "POST", "/auth/token/", (401,), form={"grant_type": "client_credentials"})
+    service.exchange("auth", "token: unsupported grant_type", "POST", "/auth/token/", invalid,
+                     authorization=service.basic(service.client_id, service.client_secret), form={"grant_type": "password"})
+    service.exchange("auth", "token: missing grant_type", "POST", "/auth/token/", invalid,
+                     authorization=service.basic(service.client_id, service.client_secret), form={})
+    service.exchange("auth", "token: JSON instead of a form", "POST", "/auth/token/", (415,),
+                     authorization=service.basic(service.client_id, service.client_secret), raw=(b'{"grant_type":"client_credentials"}', "application/json"))
+
+    # --- 2. single-email stats ---
+    print("\n[sweep] --- single stats ---", flush=True)
+    s = lambda name, path, expect=ok, **kw: service.exchange("single", name, "GET", path, expect, bearer=kw.pop("bearer", token), **kw)  # noqa: E731
+    for tf in ("24h", "1w", "30d", "1M", "1y"):
+        s(f"tf={tf}", f"{stats}?tf={tf}")
+    first = s("repeat of tf=24h (duplicate window)", f"{stats}?tf=24h")
+    s("range from/to (7 days)", f"{stats}?" + urllib.parse.urlencode({"from": stamp(7), "to": stamp(0)}))
+    s("range with +00:00 offset", f"{stats}?" + urllib.parse.urlencode({"from": stamp(3).replace("Z", "+00:00"), "to": stamp(1).replace("Z", "+00:00")}))
+    s("upper-case email", f"/api/v1/engineers/{urllib.parse.quote(email.upper(), safe='')}/stats?tf=1w")
+    s("no tf, from or to", stats, invalid)
+    s("tf and a range together", f"{stats}?tf=1w&" + urllib.parse.urlencode({"from": stamp(7), "to": stamp(0)}), invalid)
+    s("only from", f"{stats}?" + urllib.parse.urlencode({"from": stamp(7)}), invalid)
+    s("only to", f"{stats}?" + urllib.parse.urlencode({"to": stamp(0)}), invalid)
+    s("to before from", f"{stats}?" + urllib.parse.urlencode({"from": stamp(0), "to": stamp(7)}), invalid)
+    s("range longer than a year", f"{stats}?" + urllib.parse.urlencode({"from": stamp(400), "to": stamp(0)}), invalid)
+    s("range without an offset", f"{stats}?from=2026-11-01T00:00:00&to=2026-11-08T00:00:00", invalid)
+    s("unknown time frame unit (tf=5x)", f"{stats}?tf=5x", invalid)
+    s("lower-case month unit (tf=1m)", f"{stats}?tf=1m", invalid)
+    s("zero time frame (tf=0h)", f"{stats}?tf=0h", invalid)
+    s("email outside the allowed domain", "/api/v1/engineers/someone%40example.com/stats?tf=1w", invalid)
+    s("malformed email", "/api/v1/engineers/not-an-email/stats?tf=1w", invalid)
+    s("no bearer token", f"{stats}?tf=1w", (401,), bearer=None)
+    s("garbage bearer token", f"{stats}?tf=1w", (401,), bearer="not-a-real-token")
+
+    # --- 3. batch stats ---
+    print("\n[sweep] --- batch stats ---", flush=True)
+    b = lambda name, body, expect=ok, **kw: service.exchange("batch", name, "POST", batch, expect, bearer=kw.pop("bearer", token), body=body, **kw)  # noqa: E731
+    b("one email, 24h", {"emails": [email], "timeFrame": "24h"})
+    b("all given emails, 1w", {"emails": emails[:MAX_BATCH_EMAILS], "timeFrame": "1w"})
+    b("all given emails, 30d", {"emails": emails[:MAX_BATCH_EMAILS], "timeFrame": "30d"})
+    b("exactly 20 emails (the limit), 1M", {"emails": twenty, "timeFrame": "1M"})
+    b("repeat of the 20-email batch", {"emails": twenty, "timeFrame": "1M"})
+    b("duplicate emails inside one batch", {"emails": [email, email], "timeFrame": "1w"})
+    b("21 emails (over the limit)", {"emails": twenty_one, "timeFrame": "1w"}, invalid)
+    b("empty email list", {"emails": [], "timeFrame": "1w"}, invalid)
+    b("email outside the allowed domain", {"emails": [email, "someone@example.com"], "timeFrame": "1w"}, invalid)
+    b("malformed email in the list", {"emails": ["not-an-email"], "timeFrame": "1w"}, invalid)
+    b("missing timeFrame", {"emails": [email]}, invalid)
+    b("missing emails", {"timeFrame": "1w"}, invalid)
+    b("bad timeFrame (5x)", {"emails": [email], "timeFrame": "5x"}, invalid)
+    b("empty JSON body", None, invalid, raw=(b"", "application/json"))
+    b("body that is not JSON", None, (400, 415), raw=(b"not json", "application/json"))
+    b("no bearer token", {"emails": [email], "timeFrame": "1w"}, (401,), bearer=None)
+
+    # --- 4. polling: every request accepted above, until it ends and its callback arrives ---
+    print("\n[sweep] --- polling the accepted requests ---", flush=True)
+    accepted = {}
+    for x in service.exchanges:
+        if x.group in ("single", "batch") and x.status == 200 and x.correlation_id:
+            accepted.setdefault(x.correlation_id, x)
+    pending = set(accepted)
+    statuses = {}
+    deadline = time.time() + args.timeout
+    while pending and time.time() < deadline:
+        for cid in list(pending):
+            item = service.exchange("poll", cid, "GET", f"/api/v1/requests/poll/{cid}", ok, bearer=token, record=False)
+            if item.status == 429:
+                time.sleep(min(int(item.response_headers.get("Retry-After", "10") or 10), 30))
+                continue
+            statuses[cid] = item.response_body.get("status") if isinstance(item.response_body, dict) else f"HTTP {item.status}"
+            if statuses[cid] in FINAL_POLL_STATUSES and (statuses[cid] != "Success" or state.callbacks_for(cid)):
+                pending.discard(cid)
+        if pending:
+            time.sleep(args.poll_interval)
+    for cid, origin in accepted.items():
+        service.exchange("poll", f"poll of {origin.group} request: {origin.name}", "GET", f"/api/v1/requests/poll/{cid}", ok, bearer=token)
+    service.exchange("poll", "poll of an unknown ID", "GET", "/api/v1/requests/poll/00000000-0000-4000-8000-000000000000", (404,), bearer=token)
+    service.exchange("poll", "poll of something that is not a GUID", "GET", "/api/v1/requests/poll/not-a-guid", (400, 404), bearer=token)
+    service.exchange("poll", "poll without a bearer token", "GET", f"/api/v1/requests/poll/{next(iter(accepted), '00000000-0000-4000-8000-000000000000')}", (401,))
+
+    # --- 5. the DevLake-only endpoint, which Sophia's client should not be allowed to use ---
+    print("\n[sweep] --- project fetch (needs the projects:fetch scope, which Sophia's client does not have) ---", flush=True)
+    service.exchange("fetch", "GET /fetch/projects with Sophia's token", "GET", "/fetch/projects", (403,), bearer=token)
+    service.exchange("fetch", "GET /fetch/projects without a token", "GET", "/fetch/projects", (401,))
+    return accepted, statuses, pending
+
+
+def fetch_token(service):
+    """A real token for the requests (the report keeps only a masked one)."""
+    status, _, body = service._send("POST", "/auth/token/", {"Authorization": service.basic(service.client_id, service.client_secret),
+                                                             "Content-Type": "application/x-www-form-urlencoded"},
+                                    b"grant_type=client_credentials")
+    if status != 200 or not isinstance(body, dict):
+        sys.exit(f"[sweep] could not get a token: HTTP {status} {body}")
+    return body["access_token"]
+
+
+def short(body, limit):
+    text = json.dumps(body, ensure_ascii=False) if not isinstance(body, str) else body
+    return text if len(text) <= limit else text[:limit] + f"... ({len(text)} chars)"
+
+
+def sweep_report(service, state, accepted, statuses, pending, args):
+    limit = 100000 if args.verbose else 500
+    print("\n" + "=" * 100 + "\nMock Sophia sweep report\n" + "=" * 100)
+    for x in service.exchanges:
+        print(f"\n[{x.group}] {x.name}")
+        print(f"  request : {x.method} {x.path}")
+        if x.request_headers:
+            print(f"  headers : {short(x.request_headers, limit)}")
+        if x.request_body is not None:
+            print(f"  body    : {short(x.request_body, limit)}")
+        verdict = "as expected" if x.as_expected else f"DIFFERS from the expected {'/'.join(map(str, x.expected))}"
+        print(f"  response: HTTP {x.status} ({verdict}){'; ' + x.note if x.note else ''}")
+        if x.response_headers:
+            print(f"  resp hdr: {short(x.response_headers, limit)}")
+        if x.response_body is not None:
+            print(f"  resp body: {short(x.response_body, limit)}")
+
+    print("\n" + "-" * 100 + "\nCallbacks the mock Sophia received, per accepted request\n" + "-" * 100)
+    callbacks_out = []
+    for cid, origin in accepted.items():
+        calls = state.callbacks_for(cid)
+        callbacks_out.append({"correlation_id": cid, "request": origin.name, "poll_status": statuses.get(cid), "callbacks": [
+            {"method": c.method, "status_returned": c.status_returned, "body": c.body} for c in calls]})
+        accepted_calls = [c for c in calls if c.status_returned < 300]
+        body = accepted_calls[-1].body if accepted_calls else None
+        engineers = body.get("engineers") or [] if isinstance(body, dict) else []
+        errors = sum(len(e.get("errors") or []) for e in engineers if isinstance(e, dict))
+        print(f"  {origin.group:6} {origin.name[:46]:46} poll={statuses.get(cid, '-'):10} callbacks={len(calls)} engineers={len(engineers)} errors={errors}")
+        if args.verbose and body is not None:
+            print("    " + short(body, 100000))
+
+    print("\n" + "-" * 100 + "\nSummary\n" + "-" * 100)
+    by_group = {}
+    for x in service.exchanges:
+        by_group.setdefault(x.group, []).append(x)
+    for group, items in by_group.items():
+        codes = {}
+        for x in items:
+            codes[x.status] = codes.get(x.status, 0) + 1
+        print(f"  {group:7} {len(items):3} requests, statuses {dict(sorted(codes.items()))}, differing from expected: {sum(not x.as_expected for x in items)}")
+    differing = [x for x in service.exchanges if not x.as_expected]
+    for x in differing:
+        print(f"  DIFFERS  [{x.group}] {x.name}: got HTTP {x.status}, expected {'/'.join(map(str, x.expected))}")
+    print(f"  total requests: {len(service.exchanges)}; token requests the mock Sophia received: {state.token_requests}; "
+          f"callbacks it refused for a bad token: {state.rejected_callbacks}")
+    if pending:
+        print(f"  still unfinished when the wait ran out: {len(pending)}")
+    print("  (the 'expected' status is the mock's reading of the API; a DIFFERS line is worth a look, not necessarily a bug)")
+
+    path = args.report_file
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump({"service_url": service.base_url, "exchanges": [x.__dict__ for x in service.exchanges], "callbacks": callbacks_out}, handle,
+                  indent=2, default=str)
+    print(f"  full request/response report (JSON): {os.path.normpath(path)}")
+    return len(differing) + len(pending)
+
+
+# --------------------------------------------------------------------------------------------------
 
 
 def parse_args():
@@ -520,23 +850,29 @@ def parse_args():
     serve = sub.add_parser("serve", help="run only the token and callback endpoints")
     receiver_options(serve)
 
+    def client_options(p):
+        p.add_argument("--service-url", default=env("INTEGRATION_SERVICE_URL", "http://localhost:5099"))
+        p.add_argument("--receiver-url", default=env("MOCK_SOPHIA_RECEIVER_URL"),
+                         help="use a mock Sophia receiver that is already running (e.g. the mock-sophia container at "
+                              "http://127.0.0.1:5097/sophia) instead of starting one")
+        p.add_argument("--client-id", default=env("SOPHIA_CLIENT_ID"), help="Sophia's client ID at the Integration Service")
+        p.add_argument("--client-secret", default=env("SOPHIA_CLIENT_SECRET"))
+        who = p.add_mutually_exclusive_group(required=True)
+        who.add_argument("--emails", help="comma-separated engineer emails")
+        who.add_argument("--emails-from-devlake", type=int, metavar="N",
+                         help="use the N most active engineers in the local DevLake database (read-only)")
+        p.add_argument("--email-domain", default="arbisoft.com", help="domain of the emails taken from DevLake")
+        p.add_argument("--devlake-container", default=env("DEVLAKE_DB_CONTAINER", "devlake-mysql-1"))
+        p.add_argument("--devlake-db", default=env("DEVLAKE_DB_NAME", "lake"))
+        p.add_argument("--devlake-user", default=env("DEVLAKE_DB_USER", "merico"))
+        p.add_argument("--devlake-password", default=env("DEVLAKE_DB_PASSWORD"),
+                         help="DevLake's database password (default: read from DB_URL in DevLake's .env)")
+        p.add_argument("--devlake-env", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".env"),
+                         help="DevLake's .env, for its database password (default: the repository root's .env)")
+
     run = sub.add_parser("run", help="send requests to the Integration Service and wait for every result")
     receiver_options(run)
-    run.add_argument("--service-url", default=env("INTEGRATION_SERVICE_URL", "http://localhost:5099"))
-    run.add_argument("--client-id", default=env("SOPHIA_CLIENT_ID"), help="Sophia's client ID at the Integration Service")
-    run.add_argument("--client-secret", default=env("SOPHIA_CLIENT_SECRET"))
-    who = run.add_mutually_exclusive_group(required=True)
-    who.add_argument("--emails", help="comma-separated engineer emails")
-    who.add_argument("--emails-from-devlake", type=int, metavar="N",
-                     help="use the N most active engineers in the local DevLake database (read-only)")
-    run.add_argument("--email-domain", default="arbisoft.com", help="domain of the emails taken from DevLake")
-    run.add_argument("--devlake-container", default=env("DEVLAKE_DB_CONTAINER", "devlake-mysql-1"))
-    run.add_argument("--devlake-db", default=env("DEVLAKE_DB_NAME", "lake"))
-    run.add_argument("--devlake-user", default=env("DEVLAKE_DB_USER", "merico"))
-    run.add_argument("--devlake-password", default=env("DEVLAKE_DB_PASSWORD"),
-                     help="DevLake's database password (default: read from DB_URL in DevLake's .env)")
-    run.add_argument("--devlake-env", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".env"),
-                     help="DevLake's .env, for its database password (default: the repository root's .env)")
+    client_options(run)
     run.add_argument("--singles", type=int, default=1, help="single-email requests to send (cycling through the emails)")
     run.add_argument("--batches", type=int, default=1,
                      help=f"batch requests to send, each with the next group of up to {MAX_BATCH_EMAILS} emails")
@@ -545,6 +881,13 @@ def parse_args():
     run.add_argument("--to", dest="date_to", help="range end (RFC 3339)")
     run.add_argument("--timeout", type=int, default=180, help="seconds to wait for every result")
     run.add_argument("--poll-interval", type=float, default=2.0)
+
+    sweep = sub.add_parser("sweep", help="send every kind of request (valid and invalid) once and report each request and response")
+    receiver_options(sweep)
+    client_options(sweep)
+    sweep.add_argument("--report-file", default=DEFAULT_REPORT_FILE, help="where the full JSON report is written")
+    sweep.add_argument("--timeout", type=int, default=240, help="seconds to wait for every result")
+    sweep.add_argument("--poll-interval", type=float, default=5.0)
     return parser.parse_args()
 
 
@@ -557,7 +900,11 @@ def main():
     else:
         print(f"[mock-sophia] no {os.path.normpath(env_file)}; copy dev/mock_sophia.env.example to it, or pass the settings as options", flush=True)
     args = parse_args()
-    server, state = start_receiver(args)
+    if args.command in ("run", "sweep") and args.receiver_url:
+        server, state = None, RemoteReceiver(args.receiver_url)
+        print(f"[mock-sophia] using the running receiver at {state.base_url}", flush=True)
+    else:
+        server, state = start_receiver(args)
     try:
         if args.command == "serve":
             print("[mock-sophia] waiting for the Integration Service; Ctrl+C to stop", flush=True)
@@ -567,12 +914,17 @@ def main():
         if not args.client_id or not args.client_secret:
             sys.exit("Sophia's client ID and secret at the Integration Service are needed: --client-id/--client-secret "
                      "or SOPHIA_CLIENT_ID/SOPHIA_CLIENT_SECRET.")
-        if bool(args.date_from) != bool(args.date_to):
+        if args.command == "run" and bool(args.date_from) != bool(args.date_to):
             sys.exit("Give both --from and --to, or neither.")
 
         emails = emails_from_devlake(args) if args.emails_from_devlake else [e.strip() for e in args.emails.split(",") if e.strip()]
         if not emails:
             sys.exit("Give at least one email with --emails.")
+
+        if args.command == "sweep":
+            sweep = Sweep(args.service_url, args.client_id, args.client_secret)
+            accepted, statuses, pending = run_sweep(sweep, state, args, emails)
+            sys.exit(1 if sweep_report(sweep, state, accepted, statuses, pending, args) else 0)
 
         service = IntegrationService(args.service_url, args.client_id, args.client_secret)
         service.authenticate()
@@ -582,7 +934,8 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
-        server.shutdown()
+        if server is not None:
+            server.shutdown()
 
 
 if __name__ == "__main__":

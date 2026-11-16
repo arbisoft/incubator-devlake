@@ -16,79 +16,101 @@ limitations under the License.
 *@
 <!doctype html>
 <html lang="en">
+@{
+    // The full portal is for editors and administrators. Anyone else signed in (no access yet, or a password to change) sees the plain card.
+    var signedIn = User.Identity?.IsAuthenticated == true
+        && Arbisoft.DevLake.IntegrationService.Web.PortalAuthentication.HasAccess(User)
+        && !User.HasClaim(Arbisoft.DevLake.IntegrationService.Web.PortalAuthentication.MustChangePasswordClaim, "true");
+    var isAdmin = User.IsInRole(Arbisoft.DevLake.IntegrationService.DataAccess.Models.PortalRole.Admin);
+    var currentPage = ViewContext.RouteData.Values["page"] as string ?? string.Empty;
+    // The section a page belongs to is the first folder of its path (/Clients/Details is in Clients); the home page is /Index.
+    string? Current(string section) =>
+        (section == "Index" ? currentPage == "/Index" : currentPage.StartsWith("/" + section + "/", StringComparison.Ordinal)) ? "page" : null;
+    var adminName = User.Identity?.Name ?? string.Empty;
+}
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   <title>@ViewData["Title"] · Integration Service Admin</title>
-  <style>
-    :root { --bg:#f7f7f8; --panel:#fff; --text:#1d1d1f; --muted:#6b6b73; --line:#e3e3e8; --accent:#2457d6; --danger:#b42318; --ok:#067647; }
-    @@media (prefers-color-scheme: dark) { :root { --bg:#141416; --panel:#1d1d20; --text:#ececf0; --muted:#9a9aa5; --line:#2e2e34; --accent:#7aa2ff; --danger:#ff8a80; --ok:#6ee7a8; } }
-    * { box-sizing: border-box; }
-    body { margin:0; font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--text); }
-    header { background:var(--panel); border-bottom:1px solid var(--line); }
-    nav { max-width:1100px; margin:0 auto; padding:10px 16px; display:flex; flex-wrap:wrap; gap:16px; align-items:center; }
-    nav .brand { font-weight:600; margin-right:auto; }
-    nav a { color:var(--text); text-decoration:none; }
-    nav a:hover { color:var(--accent); }
-    main { max-width:1100px; margin:0 auto; padding:24px 16px; }
-    h1 { font-size:22px; margin:0 0 16px; }
-    h2 { font-size:17px; margin:28px 0 10px; }
-    a { color:var(--accent); }
-    .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:16px; }
-    .table-wrap { overflow-x:auto; background:var(--panel); border:1px solid var(--line); border-radius:8px; }
-    table { width:100%; border-collapse:collapse; }
-    th, td { text-align:left; padding:8px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
-    th { font-size:13px; color:var(--muted); font-weight:600; }
-    tr:last-child td { border-bottom:0; }
-    .muted { color:var(--muted); }
-    .mono { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:13px; overflow-wrap:break-word; }
-    .mono.long { word-break:break-all; }
-    .badge { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; border:1px solid var(--line); }
-    .badge.Active { color:var(--ok); border-color:var(--ok); }
-    .badge.Revoked, .badge.Inactive { color:var(--danger); border-color:var(--danger); }
-    form.stack { display:grid; gap:12px; max-width:520px; }
-    label { display:grid; gap:4px; font-weight:500; }
-    label.check { display:flex; gap:8px; align-items:center; font-weight:400; }
-    input[type=text], input[type=password], input[type=number], textarea { font:inherit; padding:7px 9px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--text); width:100%; }
-    button, .button { font:inherit; padding:7px 14px; border-radius:6px; border:1px solid var(--accent); background:var(--accent); color:#fff; cursor:pointer; text-decoration:none; display:inline-block; }
-    button.secondary, .button.secondary { background:transparent; color:var(--accent); }
-    button.danger { background:var(--danger); border-color:var(--danger); }
-    button.link { background:none; border:0; color:var(--text); padding:0; }
-    .actions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:12px 0 16px; }
-    .message { padding:10px 12px; border-radius:6px; border:1px solid var(--ok); color:var(--ok); margin-bottom:16px; }
-    .errors { padding:10px 12px; border-radius:6px; border:1px solid var(--danger); color:var(--danger); margin-bottom:16px; }
-    .errors ul { margin:0; padding-left:18px; }
-    .secret { padding:12px; border:2px dashed var(--accent); border-radius:8px; margin:12px 0; }
-    pre { margin:0; overflow:auto; white-space:pre-wrap; word-break:break-word; }
-    dl { display:grid; grid-template-columns:max-content 1fr; gap:6px 16px; margin:0; }
-    dt { color:var(--muted); }
-  </style>
+  <link rel="icon" href="~/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="~/favicon.ico" sizes="48x48">
+  <link rel="apple-touch-icon" href="~/apple-touch-icon.png">
+  <link rel="stylesheet" href="~/css/site.css" asp-append-version="true">
 </head>
 <body>
-  <header>
-    <nav>
-      <span class="brand">Integration Service Admin</span>
-      @if (User.Identity?.IsAuthenticated == true)
+@if (signedIn)
+{
+  <div class="shell">
+    <input type="checkbox" id="menu-toggle" class="menu-toggle" aria-label="Show the menu">
+    <header class="topbar">
+      <a class="brand" asp-page="/Index"><span class="brand-mark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h5l2-5 2 10 2-5h5"/></svg></span><span class="brand-text"><strong>Integration Service</strong><span>Admin portal</span></span></a>
+      <label for="menu-toggle" class="menu-button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg> Menu</label>
+    </header>
+    <aside class="sidebar">
+      <a class="brand" asp-page="/Index"><span class="brand-mark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h5l2-5 2 10 2-5h5"/></svg></span><span class="brand-text"><strong>Integration Service</strong><span>Admin portal</span></span></a>
+      <nav class="nav" aria-label="Sections">
+        <div class="nav-group">
+          <a asp-page="/Index" aria-current="@Current("Index")"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Overview</a>
+        </div>
+        <div class="nav-group">
+          <div class="nav-label">Access</div>
+          <a asp-page="/Clients/Index" aria-current="@Current("Clients")"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h6"/></svg>Clients</a>
+          <a asp-page="/Scopes/Index" aria-current="@Current("Scopes")"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.4 8.4 8 9 4.6-.6 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>Scopes</a>
+          <a asp-page="/SigningKeys/Index" aria-current="@Current("SigningKeys")"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3M14 9l2 2"/></svg>Signing keys</a>
+          <a asp-page="/AccessTokens/Index" aria-current="@Current("AccessTokens")"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="12" rx="2"/><path d="M7 7V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2M3 12h18"/></svg>Access tokens</a>
+        </div>
+        <div class="nav-group">
+          <div class="nav-label">Delivery</div>
+          <a asp-page="/ClientConfigs/Index" aria-current="@Current("ClientConfigs")"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>Outbound configs</a>
+          <a asp-page="/EmailMappings/Index" aria-current="@Current("EmailMappings")"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>Email mappings</a>
+          <a asp-page="/UpstreamTokens/Index" aria-current="@Current("UpstreamTokens")"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg>Upstream tokens</a>
+        </div>
+        <div class="nav-group">
+          <div class="nav-label">Monitoring</div>
+          <a asp-page="/RequestLogs/Index" aria-current="@Current("RequestLogs")"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Request logs</a>
+        </div>
+        @if (isAdmin)
+        {
+            <div class="nav-group">
+              <div class="nav-label">Administration</div>
+              <a asp-page="/Users/Index" aria-current="@Current("Users")"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.7c1.6.8 2.7 2.6 3 5.3"/></svg>Users</a>
+            </div>
+        }
+      </nav>
+      <div class="account">
+        <span class="avatar" aria-hidden="true">@(adminName.Length > 0 ? adminName[..1] : "?")</span>
+        <span class="account-name" title="Signed in as @adminName">@adminName</span>
+        <a class="account-link" href="/Account/ChangePassword" title="Change password" aria-label="Change password"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></a>
+        <form method="post" asp-page="/Account/Logout"><button class="link" type="submit">Sign out</button></form>
+      </div>
+    </aside>
+    <div class="content">
+      <main>
+        @if (TempData.Peek("Message") is string message)
+        {
+            <div class="message" role="status">@message</div>
+        }
+        <div asp-validation-summary="ModelOnly" class="errors"></div>
+        @RenderBody()
+      </main>
+    </div>
+  </div>
+}
+else
+{
+  <div class="auth">
+    <div class="auth-card">
+      <div class="brand"><span class="brand-mark"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h5l2-5 2 10 2-5h5"/></svg></span><span class="brand-text"><strong>Integration Service</strong><span>Admin portal</span></span></div>
+      @if (TempData.Peek("Message") is string message)
       {
-          <a asp-page="/Clients/Index">Clients</a>
-          <a asp-page="/Scopes/Index">Scopes</a>
-          <a asp-page="/SigningKeys/Index">Signing keys</a>
-          <a asp-page="/AccessTokens/Index">Access tokens</a>
-          <a asp-page="/EmailMappings/Index">Email mappings</a>
-          <a asp-page="/ClientConfigs/Index">Outbound configs</a>
-          <a asp-page="/UpstreamTokens/Index">Upstream tokens</a>
-          <a asp-page="/RequestLogs/Index">Request logs</a>
-          <form method="post" asp-page="/Account/Logout"><button class="link" type="submit">Sign out (@User.Identity.Name)</button></form>
+          <div class="message" role="status">@message</div>
       }
-    </nav>
-  </header>
-  <main>
-    @if (TempData.Peek("Message") is string message)
-    {
-        <div class="message" role="status">@message</div>
-    }
-    <div asp-validation-summary="ModelOnly" class="errors"></div>
-    @RenderBody()
-  </main>
+      <div asp-validation-summary="ModelOnly" class="errors"></div>
+      @RenderBody()
+    </div>
+  </div>
+}
+@await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

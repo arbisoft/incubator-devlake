@@ -13,17 +13,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-namespace Arbisoft.DevLake.IntegrationService.Web;
 
-/// <summary>The single admin account. Set it through Admin__Username and Admin__PasswordHash.</summary>
-public sealed class AdminOptions
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace Arbisoft.DevLake.IntegrationService.Web.Pages.Account;
+
+/// <summary>Where someone signed in without access lands, until an administrator grants it.</summary>
+[Authorize(Policy = PortalAuthentication.SignedInPolicy)]
+public sealed class NoAccessModel : PageModel
 {
-    public const string SectionName = "Admin";
-
-    public string Username { get; set; } = string.Empty;
-
-    /// <summary>A hash from "dotnet run -- hash-password", never the password itself.</summary>
-    public string PasswordHash { get; set; } = string.Empty;
-
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(Username) && !string.IsNullOrWhiteSpace(PasswordHash);
+    public void OnGet()
+    {
+    }
 }

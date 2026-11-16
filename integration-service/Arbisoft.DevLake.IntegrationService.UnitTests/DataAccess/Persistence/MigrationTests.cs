@@ -13,6 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using Arbisoft.DevLake.IntegrationService.Business.Security;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers;
 using Dapper;
@@ -27,7 +29,7 @@ public class MigrationTests
     private static readonly string[] ExpectedTables =
     [
         "EmailMappings", "Clients", "ClientSecrets", "ClientScopes", "Scopes", "SigningKeys", "AccessTokens",
-        "RequestLogs", "RequestLogJsons", "RequestResponseAttempts", "ClientConfigs", "ClientConfigOutboundUrls", "SecretStoreEntries"
+        "RequestLogs", "RequestLogJsons", "RequestResponseAttempts", "ClientConfigs", "ClientConfigOutboundUrls", "SecretStoreEntries", "PortalUsers"
     ];
 
     private readonly MySqlDatabaseFixture _fixture;
@@ -59,6 +61,20 @@ public class MigrationTests
     }
 
     [MySqlFact]
+    public async Task PortalUsersMigration_SeedsTheDefaultAdministrator_WhoMustChangeThePassword()
+    {
+        await using var connection = new MySqlConnection(_fixture.DatabaseConnectionString);
+
+        var seeded = await connection.QuerySingleAsync<(string Role, string PasswordHash, bool MustChangePassword, bool IsActive)>(
+            "SELECT role, passwordHash, mustChangePassword, isActive FROM PortalUsers WHERE username = 'admin'");
+
+        Assert.Equal(PortalRole.Admin, seeded.Role);
+        Assert.True(seeded.MustChangePassword);
+        Assert.True(seeded.IsActive);
+        Assert.True(new ClientSecretHasher().Verify("admin", seeded.PasswordHash));
+    }
+
+    [MySqlFact]
     public void RunningAgain_AppliesNothing()
     {
         var engine = DatabaseMigrationService.BuildEngine(_fixture.DatabaseConnectionString, new DbUpLogAdapter(NullLogger.Instance));
@@ -76,11 +92,13 @@ public class MigrationTests
             .Where(name => name.EndsWith(".sql", StringComparison.Ordinal))
             .ToList();
 
-        Assert.Equal(8, names.Count);
+        Assert.Equal(11, names.Count);
         Assert.Contains(names, name => name.EndsWith(".Persistence.Migrations.001_InitialSchema.sql", StringComparison.Ordinal));
         Assert.Contains(names, name => name.EndsWith(".Persistence.Migrations.002_SecretStore.sql", StringComparison.Ordinal));
         Assert.Contains(names, name => name.EndsWith(".Persistence.Migrations.003_SeedScopes.sql", StringComparison.Ordinal));
         Assert.Contains(names, name => name.EndsWith(".Persistence.Migrations.004_RequestIdempotency.sql", StringComparison.Ordinal));
         Assert.Contains(names, name => name.EndsWith(".Persistence.Migrations.005_EmailMappingNormalization.sql", StringComparison.Ordinal));
+        Assert.Contains(names, name => name.EndsWith(".Persistence.Migrations.010_AttemptRequestJson.sql", StringComparison.Ordinal));
+        Assert.Contains(names, name => name.EndsWith(".Persistence.Migrations.011_RequestLogModifiedOn.sql", StringComparison.Ordinal));
     }
 }

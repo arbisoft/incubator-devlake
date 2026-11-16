@@ -15,11 +15,14 @@
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace Arbisoft.DevLake.IntegrationService.Web.Pages.Account;
 
+/// <summary>Anyone signed in can sign out, with or without access to the portal.</summary>
+[Authorize(Policy = PortalAuthentication.SignedInPolicy)]
 public sealed class LogoutModel : PageModel
 {
     public IActionResult OnGet() => RedirectToPage("/Index");

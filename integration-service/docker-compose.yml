@@ -22,7 +22,8 @@ services:
     image: mysql:8.4
     environment:
       MYSQL_ROOT_PASSWORD: ${INTEGRATION_DB_ROOT_PASSWORD:?copy env.example to .env}
-      MYSQL_DATABASE: integration
+      # Created only when the volume is new. A volume from before keeps its databases; create this one by hand there (see README).
+      MYSQL_DATABASE: ${INTEGRATION_DB_NAME:-integration_service}
       MYSQL_USER: integration
       MYSQL_PASSWORD: ${INTEGRATION_DB_PASSWORD:?copy env.example to .env}
     ports:
@@ -51,6 +52,78 @@ services:
       interval: 10s
       timeout: 10s
       retries: 12
+
+  # The API and the admin portal, built from this folder's source (Dockerfile). Their settings come from .env; secrets are never baked into
+  # the images. They run as Development because they serve plain HTTP: outside Development the API redirects every call to HTTPS.
+  api:
+    build:
+      context: .
+      target: api
+    image: devlake-integration-service-api:local
+    environment: &service-environment
+      ASPNETCORE_ENVIRONMENT: Development
+      Database__ConnectionString: "Server=mysql;Port=3306;Database=${INTEGRATION_DB_NAME:-integration_service};User=integration;Password=${INTEGRATION_DB_PASSWORD:?copy env.example to .env}"
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__UserName: ${RABBITMQ_USER:?copy env.example to .env}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:?copy env.example to .env}
+      Security__EncryptionKey: ${SECURITY_ENCRYPTION_KEY:?copy env.example to .env}
+      # DevLake's own stack publishes it on the host's port 8080.
+      DevLake__BaseUrl: ${DEVLAKE_BASE_URL:-http://host.docker.internal:8080/rest/}
+      # Unset until Workstream's real address is known: .invalid never resolves, so only GET /fetch/projects fails.
+      Workstream__BaseUrl: ${WORKSTREAM_BASE_URL:-http://workstream.invalid/}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      # DevLake reaches the API at host.docker.internal:5099 (INTEGRATION_SERVICE_URL in DevLake's .env).
+      - "127.0.0.1:5099:8080"
+      # The mock-sophia container shares this container's network, so its port is published here.
+      - "127.0.0.1:5097:5097"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  portal:
+    build:
+      context: .
+      target: portal
+    image: devlake-integration-service-portal:local
+    environment:
+      <<: *service-environment
+      # Portal users are in the database (PortalUsers); the first one, admin/admin, is seeded. Single sign-on with Arbisoft accounts is off
+      # until SSO_ENABLED=true and the provider settings below are given.
+      Sso__Enabled: ${SSO_ENABLED:-false}
+      Sso__DisplayName: ${SSO_DISPLAY_NAME:-Arbisoft}
+      Sso__Authority: ${SSO_AUTHORITY:-}
+      Sso__ClientId: ${SSO_CLIENT_ID:-}
+      Sso__ClientSecret: ${SSO_CLIENT_SECRET:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:5098:8080"
+    depends_on:
+      # The API applies the database migrations at start; the portal does not.
+      api:
+        condition: service_started
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Local testing only (profile "mock"): the mock Sophia receiver (dev/mock_sophia.py serve). It shares the API container's network, so the API
+  # reaches it at http://127.0.0.1:5097/sophia, a loopback address the service allows over plain HTTP. Its settings come from dev/mock_sophia.env.
+  #   docker compose --profile mock up -d mock-sophia
+  mock-sophia:
+    profiles: ["mock"]
+    image: python:3.13-slim
+    network_mode: "service:api"
+    volumes:
+      - ./dev:/mock:ro
+    command: ["python", "-u", "/mock/mock_sophia.py", "serve", "--host", "0.0.0.0", "--port", "5097"]
+    depends_on:
+      - api
+    restart: unless-stopped
 
 volumes:
   mysql-data:

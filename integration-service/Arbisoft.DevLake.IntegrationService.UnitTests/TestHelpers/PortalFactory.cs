@@ -14,25 +14,59 @@
 // limitations under the License.
 
 using Arbisoft.DevLake.IntegrationService.Business.Security;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
 using Arbisoft.DevLake.IntegrationService.Web;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers;
 
-/// <summary>Hosts the real admin portal in-process against the test database, with one admin account.</summary>
+/// <summary>
+/// Hosts the real admin portal in-process against the test database, with a local administrator account (<see cref="AdminUsername"/>) in
+/// PortalUsers that does not have to change its password, so tests can get straight to the pages.
+/// </summary>
 public sealed class PortalFactory : WebApplicationFactory<WebAssemblyMarker>
 {
     public const string AdminUsername = "portal-admin";
     public const string AdminPassword = "a long test password";
 
     private readonly string _connectionString;
-    private readonly bool _configureAdmin;
+    private readonly IReadOnlyDictionary<string, string> _settings;
 
-    public PortalFactory(string connectionString, bool configureAdmin = true)
+    public PortalFactory(string connectionString, IReadOnlyDictionary<string, string>? settings = null)
     {
         _connectionString = connectionString;
-        _configureAdmin = configureAdmin;
+        _settings = settings ?? new Dictionary<string, string>();
+    }
+
+    /// <summary>Adds a local account with a password, as only the seeded administrator has in practice; tests use it to sign in with any role.</summary>
+    public async Task<long> AddLocalUserAsync(string username, string password, string role, bool mustChangePassword = false)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<IPortalUserRepository>();
+        var id = await users.TryInsertAsync(
+            new PortalUser
+            {
+                Username = username,
+                PasswordHash = scope.ServiceProvider.GetRequiredService<IClientSecretHasher>().Hash(password),
+                MustChangePassword = mustChangePassword,
+                Role = role,
+                IsActive = true,
+                CreatedOn = DateTimeOffset.UtcNow,
+                CreatedBy = "tests"
+            },
+            CancellationToken.None);
+        return id ?? (await users.GetByUsernameAsync(username, CancellationToken.None))!.Id;
+    }
+
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        var host = base.CreateHost(builder);
+        AddAdminAsync(host.Services).GetAwaiter().GetResult();
+        return host;
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -47,10 +81,32 @@ public sealed class PortalFactory : WebApplicationFactory<WebAssemblyMarker>
         builder.UseSetting("RabbitMq:Port", broker?["port"] ?? "5672");
         builder.UseSetting("RabbitMq:UserName", broker?["user"] ?? "user");
         builder.UseSetting("RabbitMq:Password", broker?["password"] ?? "pass");
-        if (_configureAdmin)
+        foreach (var (key, value) in _settings)
         {
-            builder.UseSetting("Admin:Username", AdminUsername);
-            builder.UseSetting("Admin:PasswordHash", new ClientSecretHasher().Hash(AdminPassword));
+            builder.UseSetting(key, value);
         }
+    }
+
+    /// <summary>The shared administrator account, created once for the whole test database (the first factory wins; later ones find it).</summary>
+    private static async Task AddAdminAsync(IServiceProvider services)
+    {
+        await using var scope = services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<IPortalUserRepository>();
+        if (await users.GetByUsernameAsync(AdminUsername, CancellationToken.None) is not null)
+        {
+            return;
+        }
+
+        await users.TryInsertAsync(
+            new PortalUser
+            {
+                Username = AdminUsername,
+                PasswordHash = scope.ServiceProvider.GetRequiredService<IClientSecretHasher>().Hash(AdminPassword),
+                Role = PortalRole.Admin,
+                IsActive = true,
+                CreatedOn = DateTimeOffset.UtcNow,
+                CreatedBy = "tests"
+            },
+            CancellationToken.None);
     }
 }

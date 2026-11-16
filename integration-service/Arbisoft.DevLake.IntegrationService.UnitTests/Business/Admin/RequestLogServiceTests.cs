@@ -43,31 +43,62 @@ public class RequestLogServiceTests
     [Fact]
     public async Task List_TurnsTheDayFiltersIntoAUtcRange_WithTheLastDayIncluded()
     {
-        _logs.ListAsync(Arg.Any<RequestLogFilter>(), 1, RequestLogService.PageSize, Arg.Any<CancellationToken>()).Returns(new PagedResult<RequestLog>([], 0, 1, RequestLogService.PageSize));
+        _logs.ListAsync(Arg.Any<RequestLogFilter>(), 1, RequestLogService.DefaultPageSize, Arg.Any<CancellationToken>(), Arg.Any<RequestLogSort?>()).Returns(new PagedResult<RequestLog>([], 0, 1, RequestLogService.DefaultPageSize));
 
-        await _service.ListAsync(new RequestLogQuery(1, RequestStatus.Failed, new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 3)), 1, CancellationToken.None);
+        await _service.ListAsync(new RequestLogQuery(1, RequestStatus.Failed, new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 3)), 1, 10, new RequestLogSort(), CancellationToken.None);
 
         await _logs.Received(1).ListAsync(
             Arg.Is<RequestLogFilter>(f => f.ClientRefId == 1 && f.Status == "Failed" && f.From == new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero) && f.To == new DateTimeOffset(2026, 11, 4, 0, 0, 0, TimeSpan.Zero)),
-            1, RequestLogService.PageSize, Arg.Any<CancellationToken>());
+            1, 10, Arg.Any<CancellationToken>(), Arg.Any<RequestLogSort?>());
     }
 
     [Fact]
     public async Task List_WithNoFilters_AsksForEverything()
     {
-        _logs.ListAsync(Arg.Any<RequestLogFilter>(), 1, RequestLogService.PageSize, Arg.Any<CancellationToken>()).Returns(new PagedResult<RequestLog>([], 0, 1, RequestLogService.PageSize));
+        _logs.ListAsync(Arg.Any<RequestLogFilter>(), 1, RequestLogService.DefaultPageSize, Arg.Any<CancellationToken>(), Arg.Any<RequestLogSort?>()).Returns(new PagedResult<RequestLog>([], 0, 1, RequestLogService.DefaultPageSize));
 
-        await _service.ListAsync(new RequestLogQuery(Status: "  "), 1, CancellationToken.None);
+        await _service.ListAsync(new RequestLogQuery(Status: "  "), 1, 10, new RequestLogSort(), CancellationToken.None);
 
-        await _logs.Received(1).ListAsync(Arg.Is<RequestLogFilter>(f => f.ClientRefId == null && f.Status == null && f.From == null && f.To == null), 1, RequestLogService.PageSize, Arg.Any<CancellationToken>());
+        await _logs.Received(1).ListAsync(Arg.Is<RequestLogFilter>(f => f.ClientRefId == null && f.Status == null && f.From == null && f.To == null), 1, 10, Arg.Any<CancellationToken>(), Arg.Any<RequestLogSort?>());
+    }
+
+    [Theory]
+    [InlineData(10, 10)]
+    [InlineData(20, 20)]
+    [InlineData(30, 30)]
+    [InlineData(40, 40)]
+    [InlineData(50, 50)]
+    [InlineData(7, 10)]
+    [InlineData(0, 10)]
+    [InlineData(1000, 10)]
+    public async Task List_OnlyOffersThePageSizesOfTheMenu_AndFallsBackToTheDefault(int asked, int used)
+    {
+        _logs.ListAsync(Arg.Any<RequestLogFilter>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<RequestLogSort?>())
+            .Returns(new PagedResult<RequestLog>([], 0, 1, used));
+
+        await _service.ListAsync(new RequestLogQuery(), 1, asked, new RequestLogSort(), CancellationToken.None);
+
+        await _logs.Received(1).ListAsync(Arg.Any<RequestLogFilter>(), 1, used, Arg.Any<CancellationToken>(), Arg.Any<RequestLogSort?>());
+    }
+
+    [Fact]
+    public async Task List_PassesTheSortingAndThePageOn()
+    {
+        _logs.ListAsync(Arg.Any<RequestLogFilter>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<RequestLogSort?>())
+            .Returns(new PagedResult<RequestLog>([], 0, 3, 20));
+        var sort = new RequestLogSort(RequestLogSortColumn.Status, Descending: false);
+
+        await _service.ListAsync(new RequestLogQuery(), 3, 20, sort, CancellationToken.None);
+
+        await _logs.Received(1).ListAsync(Arg.Any<RequestLogFilter>(), 3, 20, Arg.Any<CancellationToken>(), sort);
     }
 
     [Fact]
     public async Task List_NamesTheClient_AndLooksEachOneUpOnce()
     {
-        _logs.ListAsync(Arg.Any<RequestLogFilter>(), 1, RequestLogService.PageSize, Arg.Any<CancellationToken>()).Returns(new PagedResult<RequestLog>([Log(1), Log(2)], 2, 1, RequestLogService.PageSize));
+        _logs.ListAsync(Arg.Any<RequestLogFilter>(), 1, RequestLogService.DefaultPageSize, Arg.Any<CancellationToken>(), Arg.Any<RequestLogSort?>()).Returns(new PagedResult<RequestLog>([Log(1), Log(2)], 2, 1, RequestLogService.DefaultPageSize));
 
-        var page = await _service.ListAsync(new RequestLogQuery(), 1, CancellationToken.None);
+        var page = await _service.ListAsync(new RequestLogQuery(), 1, 10, new RequestLogSort(), CancellationToken.None);
 
         Assert.All(page.Items, item => Assert.Equal("sophia", item.ClientId));
         await _clients.Received(1).GetByIdAsync(1, Arg.Any<CancellationToken>());
@@ -80,7 +111,7 @@ public class RequestLogServiceTests
         _logs.GetJsonAsync(1, Arg.Any<CancellationToken>()).Returns("{\"emails\":[\"a@arbisoft.com\"]}");
         _logs.GetAttemptsAsync(1, Arg.Any<CancellationToken>()).Returns(
         [
-            new RequestResponseAttempt { AttemptOn = Now, AttemptStatus = "Failed", AttemptBy = "job", FailureError = "HTTP 503", ResponseJson = "{\"error\":\"down\"}" },
+            new RequestResponseAttempt { AttemptOn = Now, AttemptStatus = "Failed", AttemptBy = "job", FailureError = "HTTP 503", ResponseJson = "{\"error\":\"down\"}", RequestJson = "{\"correlation_id\":\"c1\",\"results\":[]}" },
             new RequestResponseAttempt { AttemptOn = Now.AddMinutes(1), AttemptStatus = "Success", AttemptBy = "job", ResponseJson = "plain text, not json" }
         ]);
 
@@ -93,6 +124,9 @@ public class RequestLogServiceTests
         Assert.Equal("HTTP 503", details.Attempts[0].FailureError);
         Assert.Contains("\"error\"", details.Attempts[0].ResponseJson, StringComparison.Ordinal);
         Assert.Equal("plain text, not json", details.Attempts[1].ResponseJson);
+        Assert.Contains("\"correlation_id\"", details.Attempts[0].RequestJson, StringComparison.Ordinal);
+        Assert.Contains("\n", details.Attempts[0].RequestJson, StringComparison.Ordinal);
+        Assert.Null(details.Attempts[1].RequestJson);
         Assert.Equal("Sophia", details.ClientName);
     }
 

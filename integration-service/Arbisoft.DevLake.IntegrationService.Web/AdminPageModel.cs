@@ -14,6 +14,7 @@
 // limitations under the License.
 
 using System.Globalization;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -21,14 +22,30 @@ namespace Arbisoft.DevLake.IntegrationService.Web;
 
 public abstract class AdminPageModel : PageModel
 {
-    /// <summary>The signed-in admin, recorded as createdBy or modifiedBy.</summary>
+    /// <summary>The signed-in portal user's name (username or email), recorded as createdBy or modifiedBy.</summary>
     protected string Admin => User.Identity?.Name ?? "unknown";
+
+    /// <summary>The signed-in portal user's id.</summary>
+    protected long CurrentUserId => long.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "0", CultureInfo.InvariantCulture);
 
     [TempData]
     public string? Message { get; set; }
 
     public static string Utc(DateTimeOffset? value) =>
         value is null ? "—" : value.Value.UtcDateTime.ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// The badge colour for a request or attempt status: <c>ok</c> when it succeeded, <c>danger</c> when it failed or was refused, <c>info</c> while it
+    /// waits or runs, <c>warn</c> for an administrator's retry, and plain otherwise.
+    /// </summary>
+    public static string Tone(string? status) => status switch
+    {
+        "Success" or "Delivered" => "ok",
+        "Failed" or "DeliveryFailed" or "FetchFailed" or "PublishFailed" or "Expired" or "Revoked - no callback URL" => "danger",
+        "Received" or "Queued" or "Processing" or "Processed" => "info",
+        "Retried" => "warn",
+        _ => string.Empty
+    };
 
     protected IActionResult Fail(string? error)
     {
