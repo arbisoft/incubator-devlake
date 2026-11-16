@@ -206,7 +206,8 @@ func collectTestSources(t *testing.T, dir string) []source {
 		if err := json.Unmarshal(data, &dash); err != nil {
 			return err
 		}
-		sources = append(sources, collectDashboard(dash, strings.TrimSuffix(d.Name(), ".json"))...)
+		_, found := collectSources(dash, strings.TrimSuffix(d.Name(), ".json"))
+		sources = append(sources, found...)
 		return nil
 	})
 	if err != nil {

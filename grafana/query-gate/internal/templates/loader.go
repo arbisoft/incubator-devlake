@@ -23,6 +23,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -83,10 +84,11 @@ func loadDashboard(raw []byte, source, fallbackTitle string) ([]*Template, []Com
 	if err := json.Unmarshal(raw, &dash); err != nil {
 		return nil, []CompileError{{Location: source, Message: "invalid dashboard JSON: " + err.Error()}}
 	}
-	allProjects := hasTag(dash, allProjectsTag)
+	tagged, sources := collectSources(dash, fallbackTitle)
+	allProjects := hasTag(tagged, allProjectsTag)
 	var out []*Template
 	var errs []CompileError
-	for _, src := range collectDashboard(dash, fallbackTitle) {
+	for _, src := range sources {
 		t, err := newTemplate(src.Location, src.SQL, src.Vars)
 		if err != nil {
 			errs = append(errs, CompileError{Location: src.Location, Message: err.Error()})
@@ -113,6 +115,11 @@ func str(m map[string]any, key string) string {
 	return s
 }
 
+func obj(m map[string]any, key string) map[string]any {
+	o, _ := m[key].(map[string]any)
+	return o
+}
+
 func list(m map[string]any, key string) []map[string]any {
 	raw, _ := m[key].([]any)
 	var out []map[string]any
@@ -122,6 +129,108 @@ func list(m map[string]any, key string) []map[string]any {
 		}
 	}
 	return out
+}
+
+// v2Spec returns the spec of a v2 dashboard document or a bare v2 spec, and false for classic JSON.
+func v2Spec(dash map[string]any) (map[string]any, bool) {
+	if str(dash, "kind") == "Dashboard" && strings.HasPrefix(str(dash, "apiVersion"), "dashboard.grafana.app/v2") {
+		return obj(dash, "spec"), true
+	}
+	if _, ok := dash["elements"].(map[string]any); ok {
+		for _, k := range []string{"panels", "rows", "templating"} {
+			if _, has := dash[k]; has {
+				return nil, false
+			}
+		}
+		return dash, true
+	}
+	return nil, false
+}
+
+// collectSources returns the object that carries the tags and the saved queries of a classic or v2 dashboard.
+func collectSources(dash map[string]any, fallbackTitle string) (map[string]any, []source) {
+	if spec, ok := v2Spec(dash); ok {
+		return spec, collectV2(spec, fallbackTitle)
+	}
+	return dash, collectDashboard(dash, fallbackTitle)
+}
+
+var v2VariableTypes = map[string]string{
+	"QueryVariable":      "query",
+	"CustomVariable":     "custom",
+	"ConstantVariable":   "constant",
+	"TextVariable":       "textbox",
+	"DatasourceVariable": "datasource",
+	"IntervalVariable":   "interval",
+}
+
+func collectV2(spec map[string]any, fallbackTitle string) []source {
+	title := str(spec, "title")
+	if title == "" {
+		title = fallbackTitle
+	}
+	vars := map[string]Variable{}
+	var queryVars []map[string]any
+	for _, item := range list(spec, "variables") {
+		v := v2Variable(item)
+		variable := parseVariable(v)
+		if variable.Name != "" {
+			vars[variable.Name] = variable
+		}
+		if variable.Type == "query" {
+			queryVars = append(queryVars, v)
+		}
+	}
+	var out []source
+	elements := obj(spec, "elements")
+	names := make([]string, 0, len(elements))
+	for name := range elements {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		panel, _ := elements[name].(map[string]any)
+		if str(panel, "kind") != "Panel" {
+			continue
+		}
+		pspec := obj(panel, "spec")
+		for _, q := range list(obj(obj(pspec, "data"), "spec"), "queries") {
+			qspec := obj(q, "spec")
+			if sql := str(obj(obj(qspec, "query"), "spec"), "rawSql"); sql != "" {
+				loc := fmt.Sprintf("%s :: %s [%s]", title, str(pspec, "title"), str(qspec, "refId"))
+				out = append(out, source{Location: loc, SQL: sql, Vars: vars})
+			}
+		}
+	}
+	for _, v := range queryVars {
+		if sql := variableSQL(v); sql != "" {
+			out = append(out, source{Location: fmt.Sprintf("%s :: var %s", title, str(v, "name")), SQL: sql, Vars: vars})
+		}
+	}
+	return out
+}
+
+// v2Variable rewrites a v2 variable into the classic shape that parseVariable reads.
+func v2Variable(item map[string]any) map[string]any {
+	vs := obj(item, "spec")
+	kind := str(item, "kind")
+	typ, ok := v2VariableTypes[kind]
+	if !ok {
+		typ = strings.ToLower(kind)
+	}
+	v := map[string]any{"type": typ}
+	for _, k := range []string{"name", "multi", "includeAll", "allValue", "options"} {
+		if val, has := vs[k]; has {
+			v[k] = val
+		}
+	}
+	switch q := vs["query"].(type) {
+	case string:
+		v["query"] = q
+	case map[string]any:
+		v["query"] = map[string]any{"rawSql": str(obj(q, "spec"), "rawSql")}
+	}
+	return v
 }
 
 func collectDashboard(dash map[string]any, fallbackTitle string) []source {

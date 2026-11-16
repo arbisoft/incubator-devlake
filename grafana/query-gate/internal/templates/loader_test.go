@@ -18,6 +18,8 @@ limitations under the License.
 package templates
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -149,5 +151,90 @@ func TestLoadDashboardFromBytes(t *testing.T) {
 	ts, errs = LoadDashboard([]byte(`{"title": `), "db:u2")
 	if len(ts) != 0 || len(errs) != 1 || errs[0].Location != "db:u2" {
 		t.Fatalf("templates = %v, errs = %v", ts, errs)
+	}
+}
+
+const v2Minimal = `{
+  "apiVersion": "dashboard.grafana.app/v2",
+  "kind": "Dashboard",
+  "metadata": {"name": "mini"},
+  "spec": {
+    "title": "Mini",
+    "tags": %s,
+    "variables": [
+      {"kind": "ConstantVariable", "spec": {"name": "c", "query": "SELECT not a template"}}
+    ],
+    "elements": {
+      "panel-1": {"kind": "Panel", "spec": {"title": "P", "data": {"kind": "QueryGroup", "spec": {"queries": [
+        {"kind": "PanelQuery", "spec": {"refId": "A", "query": {"kind": "DataQuery", "spec": {"rawSql": "SELECT 1"}}}}
+      ]}}}},
+      "lib-1": {"kind": "LibraryPanel", "spec": {"title": "Lib"}}
+    }
+  }
+}`
+
+func TestLoadV2Dashboard(t *testing.T) {
+	raw, err := os.ReadFile("testdata/v2_sample.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts, errs := LoadDashboard(raw, "db:v2")
+	if len(errs) != 0 {
+		t.Fatal(errs)
+	}
+	var got []string
+	for _, tpl := range ts {
+		got = append(got, tpl.Location)
+		if !tpl.HasLogin {
+			t.Errorf("no login filter: %s", tpl.Location)
+		}
+	}
+	sort.Strings(got)
+	title := "Engineering Delivery & AI Usage"
+	want := []string{
+		title + " :: Prod deploys [A]",
+		title + " :: By state [A]",
+		title + " :: var n_prs",
+		title + " :: var project",
+	}
+	sort.Strings(want)
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("locations\n got %q\nwant %q", got, want)
+	}
+}
+
+func TestLoadV2DashboardTags(t *testing.T) {
+	plain, errs := LoadDashboard([]byte(fmt.Sprintf(v2Minimal, `["x"]`)), "db:a")
+	if len(errs) != 0 {
+		t.Fatal(errs)
+	}
+	if got := NewSet(plain).NoLogin(); len(got) != 1 || got[0] != "Mini :: P [A]" {
+		t.Fatalf("untagged NoLogin = %q", got)
+	}
+	tagged, errs := LoadDashboard([]byte(fmt.Sprintf(v2Minimal, `["devlake:all-projects"]`)), "db:b")
+	if len(errs) != 0 {
+		t.Fatal(errs)
+	}
+	if got := NewSet(tagged).NoLogin(); len(got) != 0 || len(tagged) != 1 {
+		t.Fatalf("tagged NoLogin = %q, templates = %d", got, len(tagged))
+	}
+}
+
+func TestLoadV2BareSpec(t *testing.T) {
+	var doc map[string]any
+	if err := json.Unmarshal([]byte(fmt.Sprintf(v2Minimal, `["devlake:all-projects"]`)), &doc); err != nil {
+		t.Fatal(err)
+	}
+	spec, _ := json.Marshal(doc["spec"])
+	full, errs := LoadDashboard([]byte(fmt.Sprintf(v2Minimal, `["devlake:all-projects"]`)), "db:a")
+	if len(errs) != 0 {
+		t.Fatal(errs)
+	}
+	bare, errs := LoadDashboard(spec, "db:a")
+	if len(errs) != 0 {
+		t.Fatal(errs)
+	}
+	if len(bare) != len(full) || len(bare) != 1 || bare[0].Location != full[0].Location || !bare[0].AllProjects {
+		t.Fatalf("bare = %+v, full = %+v", bare, full)
 	}
 }
