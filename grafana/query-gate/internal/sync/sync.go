@@ -216,7 +216,11 @@ func (s *Syncer) RunOnce(ctx context.Context) error {
 	var trusted [][]*templates.Template
 	for _, item := range items {
 		seen[item.Metadata.Name] = true
-		if ts := s.dashboardTemplates(item, admins); ts != nil {
+		ts, err := s.dashboardTemplates(ctx, item, admins)
+		if err != nil {
+			return err
+		}
+		if ts != nil {
 			trusted = append(trusted, ts)
 		}
 	}
@@ -236,7 +240,12 @@ type dashboardItem struct {
 		Generation  int64             `json:"generation"`
 		Annotations map[string]string `json:"annotations"`
 	} `json:"metadata"`
-	Spec json.RawMessage `json:"spec"`
+	Spec   json.RawMessage `json:"spec"`
+	Status struct {
+		Conversion *struct {
+			Failed bool `json:"failed"`
+		} `json:"conversion"`
+	} `json:"status"`
 }
 
 // saverOf names the last saver; the creator stands in only for a never-updated first generation.
@@ -250,7 +259,7 @@ func saverOf(annotations map[string]string, generation int64) string {
 	return ""
 }
 
-func (s *Syncer) dashboardTemplates(item dashboardItem, admins map[string]bool) []*templates.Template {
+func (s *Syncer) dashboardTemplates(ctx context.Context, item dashboardItem, admins map[string]bool) ([]*templates.Template, error) {
 	uid := item.Metadata.Name
 	gen := item.Metadata.Generation
 	saver := saverOf(item.Metadata.Annotations, gen)
@@ -262,20 +271,33 @@ func (s *Syncer) dashboardTemplates(item dashboardItem, admins map[string]bool) 
 	}
 	if !strings.HasPrefix(saver, userPrefix) || !admins[strings.TrimPrefix(saver, userPrefix)] {
 		delete(s.cache, uid)
-		return nil
+		return nil, nil
 	}
 	c := s.cache[uid]
 	if c == nil || c.generation != item.Metadata.Generation || c.saver != saver {
+		spec := item.Spec
+		if conv := item.Status.Conversion; conv != nil && conv.Failed {
+			var fetched dashboardItem
+			if err := s.get(ctx, "/apis/dashboard.grafana.app/v2/namespaces/"+namespace+"/dashboards/"+url.PathEscape(uid), &fetched); err != nil {
+				return nil, err
+			}
+			if fetched.Metadata.Generation != gen || saverOf(fetched.Metadata.Annotations, fetched.Metadata.Generation) != saver {
+				s.logger.Warn("dashboard skipped: changed during sync", "dashboard_uid", uid, "generation", gen)
+				delete(s.cache, uid)
+				return nil, nil
+			}
+			spec = fetched.Spec
+		}
 		s.compiles++
 		s.logger.Info("dashboard trusted", "dashboard_uid", uid, "generation", gen, "saver", saver)
-		ts, errs := templates.LoadDashboard(item.Spec, "db:"+uid)
+		ts, errs := templates.LoadDashboard(spec, "db:"+uid)
 		for _, e := range errs {
 			s.logger.Warn("dashboard skipped query", "dashboard_uid", uid, "generation", item.Metadata.Generation, "location", e.Location, "error", e.Message)
 		}
 		c = &cached{generation: item.Metadata.Generation, saver: saver, templates: ts}
 		s.cache[uid] = c
 	}
-	return c.templates
+	return c.templates, nil
 }
 
 func (s *Syncer) adminUIDs(ctx context.Context) (map[string]bool, error) {
