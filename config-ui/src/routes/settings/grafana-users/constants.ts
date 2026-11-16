@@ -171,7 +171,6 @@ export const COPY = {
     columnLabel: 'Actions',
     roleFor: (email: string) => `Role for ${email}`,
     roleLocked: 'Grafana server administrators keep their role.',
-    editProjects: EDIT_PROJECTS_LABEL,
     editProjectsFor: (email: string) => `Edit projects for ${email}`,
     editDetailsFor: (email: string) => `Edit details for ${email}`,
     setPasswordFor: (email: string) => `Set password for ${email}`,

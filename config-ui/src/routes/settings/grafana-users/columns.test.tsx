@@ -89,15 +89,12 @@ describe('Grafana user columns', () => {
     expect(actions.onRemove).toHaveBeenCalled();
   });
 
-  it('lists every project in a popover whose Edit projects link opens the editor', async () => {
+  it('lists every project in a popover with no actions, and keeps Edit projects on the row', async () => {
     const actions = setup(user({ projects: ['alpha', 'beta', 'gamma'] }));
-    fireEvent.click(screen.getByRole('button', { name: COPY.moreProjects(1) }));
+    fireEvent.mouseEnter(screen.getByRole('button', { name: COPY.moreProjects(1) }));
     await waitFor(() => expect(screen.getAllByText('gamma').length).toBeGreaterThan(0));
-    const link = screen
-      .getAllByRole('button', { name: COPY.actions.editProjectsFor(EMAIL) })
-      .find((button) => button.textContent === COPY.actions.editProjects);
-    expect(link).toBeTruthy();
-    fireEvent.click(link as HTMLElement);
+    const edit = screen.getByRole('button', { name: COPY.actions.editProjectsFor(EMAIL) });
+    fireEvent.click(edit);
     expect(actions.onEditProjects).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
   });
 

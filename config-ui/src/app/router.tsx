@@ -27,6 +27,7 @@ import {
   ErrorPage,
   Layout,
   layoutLoader,
+  layoutShouldRevalidate,
   Login,
   ChangePassword,
   Connections,
@@ -101,6 +102,7 @@ export const routes: RouteObject[] = [
     path: `${PATH_PREFIX}`,
     element: <Layout />,
     loader: layoutLoader,
+    shouldRevalidate: layoutShouldRevalidate,
     errorElement: <ErrorPage />,
     children: [
       {

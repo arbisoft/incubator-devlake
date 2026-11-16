@@ -105,7 +105,6 @@ export const COMPOSITES_COPY = {
     more: (count: number) => `+${count} more`,
     items: ['arbisoft-app-devlake', 'corey-systems', 'hirestream-platform', 'sophia-web', 'fixalert-mobile'],
     title: 'Projects',
-    footer: 'Edit projects',
     inline: 'Inline chips',
     longItem: 'a-connection-with-an-extraordinarily-long-name-that-has-to-be-clipped-inside-the-cell',
   },

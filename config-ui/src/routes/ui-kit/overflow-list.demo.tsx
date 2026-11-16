@@ -16,8 +16,6 @@
  *
  */
 
-import { Button } from 'antd';
-
 import { OVERFLOW_LAYOUT, OverflowList, STATUS_BADGE_VARIANT, STATUS_TONE, StatusBadge } from '@/ui';
 
 import { COPY, SECTION } from './constants';
@@ -50,15 +48,6 @@ export const OverflowListDemo = () => (
           moreLabel={text.more}
         />
       </Narrow>
-    </DemoCase>
-    <DemoCase label={COPY.cases.withAction}>
-      <OverflowList
-        title={text.title}
-        items={toItems(text.items)}
-        max={MAX_VISIBLE}
-        moreLabel={text.more}
-        footer={<Button type="link">{text.footer}</Button>}
-      />
     </DemoCase>
     <DemoCase label={COPY.overflowList.inline}>
       <Narrow>

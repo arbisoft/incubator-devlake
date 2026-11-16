@@ -25,7 +25,7 @@ import { List, MoreButton } from './styled';
 import type { OverflowListProps } from './types';
 import { splitOverflow } from './utils';
 
-const POPOVER_TRIGGERS: ('hover' | 'focus' | 'click')[] = ['hover', 'focus', 'click'];
+const POPOVER_TRIGGERS: ('hover' | 'focus')[] = ['hover', 'focus'];
 
 export const OverflowList = ({
   items,
@@ -34,7 +34,6 @@ export const OverflowList = ({
   moreLabel,
   layout = OVERFLOW_LAYOUT.STACK,
   listRef,
-  footer,
 }: OverflowListProps) => {
   const { visible, hidden } = splitOverflow(items, max);
 
@@ -48,7 +47,7 @@ export const OverflowList = ({
           <Popover
             trigger={POPOVER_TRIGGERS}
             content={
-              <ListPopover title={title} count={items.length} footer={footer}>
+              <ListPopover title={title} count={items.length}>
                 {items.map(({ key, node }) => (
                   <ListPopoverRow key={key}>{node}</ListPopoverRow>
                 ))}

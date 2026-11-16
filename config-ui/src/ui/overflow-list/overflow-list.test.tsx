@@ -27,7 +27,6 @@ import { splitOverflow } from './utils';
 
 const MORE = (count: number) => `+${count} more`;
 const TITLE = 'Projects';
-const FOOTER = 'Edit projects';
 const items = (count: number) =>
   Array.from({ length: count }, (_, index) => ({ key: `k${index}`, node: `item ${index + 1}` }));
 
@@ -62,7 +61,6 @@ describe('OverflowList', () => {
   it.each([
     ['hover', (toggle: HTMLElement) => fireEvent.mouseEnter(toggle)],
     ['focus', (toggle: HTMLElement) => fireEvent.focus(toggle)],
-    ['click', (toggle: HTMLElement) => fireEvent.click(toggle)],
   ])('opens a popover with the title, the total count and every item on %s', async (_, open) => {
     renderWithTheme(<OverflowList title={TITLE} items={items(4)} max={2} moreLabel={MORE} />);
     open(screen.getByRole('button', { name: MORE(2) }));
@@ -76,18 +74,20 @@ describe('OverflowList', () => {
     ).toEqual(['item 1', 'item 2', 'item 3', 'item 4']);
   });
 
-  it('renders the footer inside the popover', async () => {
-    renderWithTheme(
-      <OverflowList
-        title={TITLE}
-        items={items(4)}
-        max={2}
-        moreLabel={MORE}
-        footer={<button type="button">{FOOTER}</button>}
-      />,
-    );
-    fireEvent.click(screen.getByRole('button', { name: MORE(2) }));
-    await waitFor(() => expect(screen.getByRole('button', { name: FOOTER })).toBeTruthy());
+  it('stays open when a focus is followed by a click, as a browser sends them', async () => {
+    const { baseElement } = renderWithTheme(<OverflowList title={TITLE} items={items(4)} max={2} moreLabel={MORE} />);
+    const toggle = screen.getByRole('button', { name: MORE(2) });
+    fireEvent.focus(toggle);
+    await screen.findByText(TITLE);
+    fireEvent.click(toggle);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await waitFor(() => {
+      const popover = baseElement.querySelector('.ant-popover');
+      expect(popover).not.toBeNull();
+      expect(popover?.classList.contains('ant-popover-hidden')).toBe(false);
+      // jsdom never ends the leave motion, so a close shows as the leave class
+      expect(popover?.classList.contains('ant-zoom-big-leave')).toBe(false);
+    });
   });
 
   it('lays the items out in a row for the inline layout and keeps the toggle a button', () => {

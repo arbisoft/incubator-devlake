@@ -31,5 +31,4 @@ export type OverflowListProps = {
   moreLabel: (count: number) => string;
   layout?: OverflowLayout;
   listRef?: Ref<HTMLUListElement>;
-  footer?: ReactNode;
 };
