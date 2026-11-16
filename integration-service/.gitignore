@@ -6,3 +6,4 @@ TestResults/
 .env
 dev/logs/
 dev/__pycache__/
+dev/mock_sophia.env

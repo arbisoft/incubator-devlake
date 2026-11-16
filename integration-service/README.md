@@ -67,14 +67,15 @@ It serves, by default on `http://127.0.0.1:5097/sophia`: `POST /oauth2/token/`, 
 
 Set it up once in the admin portal, for the client Sophia uses (for example `sophia-local`):
 
-1. **Client:** active, with the `stats:read` scope and a secret. The secret is shown once; put it in `SOPHIA_CLIENT_SECRET` and the Client ID in `SOPHIA_CLIENT_ID`.
-2. **Outbound config:** auth type OAuth2 client credentials, base URL `http://127.0.0.1:5097/sophia`, token URL `http://127.0.0.1:5097/sophia/oauth2/token/`, and as outbound client ID and secret the values of `SOPHIA_OUTBOUND_CLIENT_ID` and `SOPHIA_OUTBOUND_CLIENT_SECRET` (the mock accepts only these at its token endpoint).
+1. **Client:** active, with the `stats:read` scope and a secret. The secret is shown once; put it in `SOPHIA_CLIENT_SECRET` and the Client ID in `SOPHIA_CLIENT_ID`, in `dev/mock_sophia.env`.
+2. **Outbound config:** auth type OAuth2 client credentials, base URL `http://127.0.0.1:5097/sophia`, token URL `http://127.0.0.1:5097/sophia/oauth2/token/`, and as outbound client ID and secret the values of `SOPHIA_OUTBOUND_CLIENT_ID` and `SOPHIA_OUTBOUND_CLIENT_SECRET` from `dev/mock_sophia.env` (the mock accepts only these at its token endpoint).
 3. **Callback URLs:** `engineer-stats` and `engineer-stats-batch`, both `POST` to `/api/v1/devlake/callback/`.
 
 Then, with the API running on `http://localhost:5099` and DevLake reachable:
 
+The mock has a settings file of its own, `dev/mock_sophia.env`, kept apart from the Integration Service's `.env`. Copy `dev/mock_sophia.env.example` to it (it is gitignored) and fill in `SOPHIA_CLIENT_SECRET` and `SOPHIA_OUTBOUND_CLIENT_SECRET`; the mock reads it at start. A variable already set in your shell, or a command-line option such as `--client-secret`, wins over the file, and `--env-file` reads another file.
+
 ```sh
-set -a; . ./.env; set +a
 python3 dev/mock_sophia.py run --emails jane@arbisoft.com,john@arbisoft.com --singles 4 --batches 1 --tf 1w
 ```
 

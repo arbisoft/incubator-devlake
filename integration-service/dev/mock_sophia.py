@@ -55,9 +55,51 @@ MAX_BATCH_EMAILS = 20
 EMAIL_SHAPE = re.compile(r"^[a-z0-9](?:[a-z0-9_%+'\-]|\.(?=[a-z0-9_%+'\-]))*@[a-z0-9]([a-z0-9\-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9\-]*[a-z0-9])?)+$")
 
 
+DEFAULT_ENV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mock_sophia.env")
+
+
 def env(name, default=None):
     value = os.environ.get(name)
     return value if value else default
+
+
+def load_env_file(path):
+    """
+    Reads NAME=value lines from the mock's own settings file (dev/mock_sophia.env, kept apart from the Integration Service's .env), so
+    nothing has to be exported first. A variable that is already set in
+    the environment is left as it is, so an exported value (and any command-line option) still wins. Blank lines and # comments are skipped,
+    an `export ` prefix is allowed, and surrounding quotes are removed. A missing default file is fine; a missing --env-file is not.
+    """
+    try:
+        with open(path, encoding="utf-8") as handle:
+            lines = handle.readlines()
+    except FileNotFoundError:
+        return False
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export "):].lstrip()
+        name, separator, value = line.partition("=")
+        name = name.strip()
+        if not separator or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name):
+            continue
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        os.environ.setdefault(name, value)
+    return True
+
+
+def env_file_from_argv(argv):
+    """--env-file has to be known before the other options, because their defaults come from the environment."""
+    for i, arg in enumerate(argv):
+        if arg == "--env-file" and i + 1 < len(argv):
+            return argv[i + 1], True
+        if arg.startswith("--env-file="):
+            return arg.split("=", 1)[1], True
+    return env("MOCK_SOPHIA_ENV_FILE", DEFAULT_ENV_FILE), "MOCK_SOPHIA_ENV_FILE" in os.environ
 
 
 # --------------------------------------------------------------------------------------------------
@@ -461,6 +503,8 @@ def parse_args():
     sub = parser.add_subparsers(dest="command", required=True)
 
     def receiver_options(p):
+        p.add_argument("--env-file", default=DEFAULT_ENV_FILE,
+                       help="file of NAME=value settings read at start; set variables win (default: dev/mock_sophia.env)")
         p.add_argument("--host", default="127.0.0.1")
         p.add_argument("--port", type=int, default=int(env("MOCK_SOPHIA_PORT", "5097")))
         p.add_argument("--prefix", default="/sophia", help="path prefix of every mock Sophia endpoint (default /sophia)")
@@ -505,6 +549,13 @@ def parse_args():
 
 
 def main():
+    env_file, required = env_file_from_argv(sys.argv[1:])
+    if load_env_file(env_file):
+        print(f"[mock-sophia] read settings from {os.path.normpath(env_file)}", flush=True)
+    elif required:
+        sys.exit(f"The settings file {env_file} does not exist.")
+    else:
+        print(f"[mock-sophia] no {os.path.normpath(env_file)}; copy dev/mock_sophia.env.example to it, or pass the settings as options", flush=True)
     args = parse_args()
     server, state = start_receiver(args)
     try:
