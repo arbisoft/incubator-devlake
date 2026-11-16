@@ -15,6 +15,7 @@
 
 using Arbisoft.DevLake.IntegrationService.Business.Security;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Auth;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Processing;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Projects;
@@ -65,6 +66,7 @@ public static class DependencyInjection
         services.AddScoped<IUpstreamTokenService, UpstreamTokenService>();
         services.AddScoped<IPortalUserService, PortalUserService>();
         services.AddScoped<IRequestLogService, RequestLogService>();
+        services.AddScoped<IAuditTrail, AuditTrail>();
         services.AddScoped<IIdempotencyCheck, IdempotencyCheck>();
         services.AddScoped<IRequestService, RequestService>();
         services.AddScoped<ICallbackAvailability, CallbackAvailability>();
