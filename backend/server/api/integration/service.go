@@ -303,13 +303,13 @@ func (s *StatsService) githubBreakdown(w StatsWindow, group, joinFormat string) 
 	var commits []struct {
 		Name                         string
 		RepoCommits, RepoLines       int64
-		Contributors, Commits, Lines int64
+		Contributors, Commits, LineChanged int64
 	}
 	if err := s.db.All(&commits,
-		dal.Select(`t.name, COUNT(*) AS repo_commits, COALESCE(SUM(t.lines), 0) AS repo_lines, COUNT(DISTINCT t.email) AS contributors,
-			COALESCE(SUM(t.email = ?), 0) AS commits, COALESCE(SUM(CASE WHEN t.email = ? THEN t.lines END), 0) AS lines`, w.Email, w.Email),
+		dal.Select(`t.name, COUNT(*) AS repo_commits, COALESCE(SUM(t.line_changed), 0) AS repo_lines, COUNT(DISTINCT t.email) AS contributors,
+			COALESCE(SUM(t.email = ?), 0) AS commits, COALESCE(SUM(CASE WHEN t.email = ? THEN t.line_changed END), 0) AS line_changed`, w.Email, w.Email),
 		dal.From("(SELECT DISTINCT "+group+" AS name, c.sha, LOWER(c.author_email) AS email,"+
-			" COALESCE(c.additions, 0) + COALESCE(c.deletions, 0) AS lines"+
+			" COALESCE(c.additions, 0) + COALESCE(c.deletions, 0) AS line_changed"+
 			" FROM commits c JOIN repo_commits rc ON rc.commit_sha = c.sha "+fmt.Sprintf(joinFormat, "rc.repo_id")+
 			" WHERE rc.repo_id LIKE 'github:%' AND c.authored_date >= ? AND c.authored_date < ?) t", w.From, w.To),
 		dal.Groupby("t.name"),
@@ -348,7 +348,7 @@ func (s *StatsService) githubBreakdown(w StatsWindow, group, joinFormat string) 
 	}
 	for _, c := range commits {
 		r := row(c.Name)
-		r.Commits, r.LinesChanged = c.Commits, c.Lines
+		r.Commits, r.LinesChanged = c.Commits, c.LineChanged
 		r.RepoCommits, r.RepoLinesChanged, r.Contributors = c.RepoCommits, c.RepoLines, c.Contributors
 	}
 	for _, p := range prs {
