@@ -33,9 +33,10 @@ import { filterProjects } from './utils';
 export const ProjectIngestion = () => {
   const list = useListState<string, Record<string, never>>({ filters: {} });
   const { version, refresh } = useRefreshVersion();
-  const [loading, setLoading] = useState(false);
+  const [loadingFromWorkstream, setLoadingFromWorkstream] = useState(false);
   const { data, ready, error } = useRefreshData((signal) => API.workstream.list(signal), [version]);
 
+  const tableLoading = !ready && error === undefined;
   const columns = useMemo(() => getColumns(), []);
   const projects = useMemo(() => filterProjects(data?.projects ?? [], list.keyword), [data, list.keyword]);
 
@@ -47,7 +48,7 @@ export const ProjectIngestion = () => {
         return result;
       },
       {
-        setOperating: setLoading,
+        setOperating: setLoadingFromWorkstream,
         formatMessage: () => (result ? COPY.loadSucceeded(result) : COPY.loadFailed),
         formatReason: (err) =>
           (err as { response?: { data?: { message?: string } } } | undefined)?.response?.data?.message ??
@@ -58,18 +59,10 @@ export const ProjectIngestion = () => {
   };
 
   const loadButton = (
-    <Button type="primary" icon={<CloudDownloadOutlined />} loading={loading} onClick={handleLoad}>
+    <Button type="primary" icon={<CloudDownloadOutlined />} loading={loadingFromWorkstream} onClick={handleLoad}>
       {COPY.load}
     </Button>
   );
-
-  const empty = buildListEmpty({
-    failed: error !== undefined,
-    onRetry: refresh,
-    filtered: list.keyword !== '',
-    empty: { ...COPY.empty, action: loadButton },
-    noResults: COPY.noResults,
-  });
 
   return (
     <ListPage>
@@ -78,10 +71,16 @@ export const ProjectIngestion = () => {
       <DataTable<WorkstreamProject>
         rowKey="workstreamId"
         ariaLabel={COPY.tableLabel}
-        loading={!ready && error === undefined}
+        loading={tableLoading}
         columns={columns}
         dataSource={projects}
-        empty={empty}
+        empty={buildListEmpty({
+          failed: error !== undefined,
+          onRetry: refresh,
+          filtered: list.keyword !== '',
+          empty: { ...COPY.empty, action: loadButton },
+          noResults: COPY.noResults,
+        })}
       />
     </ListPage>
   );

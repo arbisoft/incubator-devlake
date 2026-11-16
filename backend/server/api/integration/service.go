@@ -301,8 +301,8 @@ func (s *StatsService) GitHub(email string, p Period) (*GitHubStats, errors.Erro
 // pull requests are listed once per group even when a project has several repos holding them.
 func (s *StatsService) githubBreakdown(w StatsWindow, group, joinFormat string) ([]GitHubBreakdown, errors.Error) {
 	var commits []struct {
-		Name                         string
-		RepoCommits, RepoLines       int64
+		Name                               string
+		RepoCommits, RepoLines             int64
 		Contributors, Commits, LineChanged int64
 	}
 	if err := s.db.All(&commits,

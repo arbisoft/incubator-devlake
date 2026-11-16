@@ -31,8 +31,11 @@ export const COPY = {
     created: number;
     updated: number;
     skipped: number;
-  }) =>
-    `Loaded ${loaded} project${loaded === 1 ? '' : 's'}: ${created} new, ${updated} updated${skipped ? `, ${skipped} skipped` : ''}.`,
+  }) => {
+    const projects = loaded === 1 ? 'project' : 'projects';
+    const skippedPart = skipped ? `, ${skipped} skipped` : '';
+    return `Loaded ${loaded} ${projects}: ${created} new, ${updated} updated${skippedPart}.`;
+  },
   loadFailed: 'Loading from Workstream failed.',
   tableLabel: 'Workstream projects',
   searchPlaceholder: 'Search projects or team leads',
