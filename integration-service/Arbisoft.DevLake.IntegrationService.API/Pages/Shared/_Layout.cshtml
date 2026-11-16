@@ -125,6 +125,17 @@ else
     </div>
   </div>
 }
+@if (signedIn)
+{
+    <dialog id="history-dialog" class="modal" aria-labelledby="history-dialog-title">
+      <div class="modal-head">
+        <h2 id="history-dialog-title">History</h2>
+        <button type="button" class="link" id="history-dialog-close" aria-label="Close">Close</button>
+      </div>
+      <div class="modal-body" id="history-dialog-body" aria-live="polite"></div>
+    </dialog>
+    <script src="~/js/history-modal.js" asp-append-version="true"></script>
+}
 @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

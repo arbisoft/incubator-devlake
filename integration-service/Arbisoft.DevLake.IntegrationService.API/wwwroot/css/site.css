@@ -415,7 +415,9 @@ button.link:hover { background: var(--neutral-soft); color: var(--text); }
 .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: var(--radius-sm); color: var(--muted); vertical-align: middle; }
 .icon-button:hover { background: var(--neutral-soft); color: var(--accent); }
 .icon-button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
-.row-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; white-space: nowrap; }
+/* A table cell must stay a table cell (display: flex would pull it out of its row), so its links are spaced inline. */
+.row-actions { white-space: nowrap; text-align: right; }
+.row-actions > * + * { margin-left: 8px; }
 h2 .icon-button { margin-left: 4px; }
 td.nowrap { white-space: nowrap; }
 .changes { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: 13px; }
@@ -425,3 +427,13 @@ td.nowrap { white-space: nowrap; }
 .changes ins { color: var(--ok); text-decoration: none; word-break: break-word; }
 .changes .arrow { color: var(--muted); margin: 0 4px; }
 .pager { justify-content: flex-end; }
+
+/* The history dialog a list row's history button opens. */
+dialog.modal { width: min(1100px, calc(100vw - 32px)); max-height: 85vh; padding: 0; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); box-shadow: 0 24px 60px rgba(16, 24, 40, 0.25); overflow: hidden; }
+dialog.modal[open] { display: flex; flex-direction: column; }
+dialog.modal::backdrop { background: rgba(16, 24, 40, 0.45); }
+.modal-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+.modal-head h2 { margin: 0; font-size: 16px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.modal-body { padding: 14px 18px; overflow: auto; }
+.modal-body .table-wrap { margin: 0; }
+.modal-body .pager { margin-bottom: 0; }

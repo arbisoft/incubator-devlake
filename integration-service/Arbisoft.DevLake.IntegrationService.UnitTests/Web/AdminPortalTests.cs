@@ -337,6 +337,14 @@ public sealed partial class AdminPortalTests : IAsyncLifetime, IDisposable
         Assert.Contains("<ins>Renamed for history</ins>", history, StringComparison.Ordinal);
         Assert.DoesNotContain(other.ClientId, history, StringComparison.Ordinal);
 
+        // The history dialog loads the same history without the page around it.
+        var dialog = await Http.GetStringAsync(new Uri($"/AuditLogs/History?type=Client&id={id}&handler=Modal", UriKind.Relative));
+        Assert.Contains("data-history-name=\"Renamed for history\"", dialog, StringComparison.Ordinal);
+        Assert.Contains("<ins>Renamed for history</ins>", dialog, StringComparison.Ordinal);
+        Assert.DoesNotContain("<html", dialog, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains($"data-history-label=\"{client.Name}\"", list, StringComparison.Ordinal);
+        Assert.Equal(HttpStatusCode.NotFound, (await Http.GetAsync(new Uri("/AuditLogs/History?type=Spaceship&id=1&handler=Modal", UriKind.Relative))).StatusCode);
+
         Assert.Equal(HttpStatusCode.NotFound, (await Http.GetAsync(new Uri("/AuditLogs/History?type=Spaceship&id=1", UriKind.Relative))).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await Http.GetAsync(new Uri("/AuditLogs/History?type=Client", UriKind.Relative))).StatusCode);
     }

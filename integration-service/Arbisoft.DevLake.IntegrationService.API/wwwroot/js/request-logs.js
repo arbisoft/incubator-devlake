@@ -74,9 +74,10 @@
         data: 'id', orderable: false, className: 'row-actions',
         render: function (id, type, row) {
           var open = $('<a>').attr('href', String($table.data('detailsUrl')).replace(/0$/, id)).text('Open');
-          var history = $('<a class="icon-button" title="History">')
+          var history = $('<a class="icon-button" title="History" data-history>')
             .attr('href', String($table.data('historyUrl')).replace(/id=0$/, 'id=' + id))
             .attr('aria-label', 'History of request ' + row.correlationId)
+            .attr('data-history-label', row.correlationId)
             .html(historyIcon);
           return html(open) + html(history);
         }

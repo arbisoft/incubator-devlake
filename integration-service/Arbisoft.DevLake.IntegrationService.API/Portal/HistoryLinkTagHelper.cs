@@ -20,7 +20,8 @@ using Microsoft.AspNetCore.Razor.TagHelpers;
 namespace Arbisoft.DevLake.IntegrationService.API.Portal;
 
 /// <summary>
-/// <c>&lt;history-link type="Client" entity-id="7" label="Sophia" /&gt;</c>: an icon button that opens one object's history in the audit trail.
+/// <c>&lt;history-link type="Client" entity-id="7" label="Sophia" /&gt;</c>: an icon button that opens one object's history in the audit trail,
+/// in the history dialog (history-modal.js), or on its own page when opened in a new tab or without JavaScript.
 /// </summary>
 [HtmlTargetElement("history-link", TagStructure = TagStructure.WithoutEndTag)]
 public sealed class HistoryLinkTagHelper(LinkGenerator links) : TagHelper
@@ -34,7 +35,7 @@ public sealed class HistoryLinkTagHelper(LinkGenerator links) : TagHelper
 
     public string EntityId { get; set; } = string.Empty;
 
-    /// <summary>The object's name, read out by screen readers.</summary>
+    /// <summary>The object's name, read out by screen readers and shown in the history dialog's heading.</summary>
     public string? Label { get; set; }
 
     [ViewContext]
@@ -47,6 +48,8 @@ public sealed class HistoryLinkTagHelper(LinkGenerator links) : TagHelper
         output.TagMode = TagMode.StartTagAndEndTag;
         output.Attributes.SetAttribute("href", links.GetPathByPage(ViewContext.HttpContext, "/AuditLogs/History", values: new { type = Type, id = EntityId }));
         output.Attributes.SetAttribute("class", "icon-button");
+        output.Attributes.SetAttribute("data-history", null);
+        output.Attributes.SetAttribute("data-history-label", Label ?? EntityId);
         output.Attributes.SetAttribute("title", "History");
         output.Attributes.SetAttribute("aria-label", "History of " + (Label ?? EntityId));
         output.Content.SetHtmlContent(ClockIcon);

@@ -36,18 +36,32 @@ public sealed class HistoryModel(IAuditLogService audit) : AdminPageModel
 
     public PageDto<AuditLogDto> Result { get; private set; } = new([], 0, 1, AuditLogService.PageSize);
 
-    /// <summary>The object's most recent name, or its id when the trail has nothing about it yet.</summary>
-    public string Label => Result.Items.FirstOrDefault(entry => entry.EntityLabel is not null)?.EntityLabel ?? EntityId!;
+    /// <summary>The object's most recent name, or its kind and id when the trail has no name for it yet, such as a request from before the trail began.</summary>
+    public string Label => Result.Items.FirstOrDefault(entry => entry.EntityLabel is not null)?.EntityLabel ?? $"{Kind.Name} {EntityId}";
+
+    /// <summary>Whether the trail holds the object's name. When it does not, the history dialog names it as the row it was opened from does.</summary>
+    public bool HasName => Result.Items.Any(entry => entry.EntityLabel is not null);
 
     public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
     {
+        return await LoadAsync(cancellationToken) ? Page() : NotFound();
+    }
+
+    /// <summary>The same history without the page around it, for the history dialog a list row opens.</summary>
+    public async Task<IActionResult> OnGetModalAsync(CancellationToken cancellationToken)
+    {
+        return await LoadAsync(cancellationToken) ? Partial("_HistoryModal", this) : NotFound();
+    }
+
+    private async Task<bool> LoadAsync(CancellationToken cancellationToken)
+    {
         if (AuditPages.KindOf(Type) is not { } kind || string.IsNullOrWhiteSpace(EntityId))
         {
-            return NotFound();
+            return false;
         }
 
         Kind = kind;
         Result = await audit.ListAsync(new AuditLogQuery(EntityType: Type, EntityId: EntityId), PageNumber, cancellationToken);
-        return Page();
+        return true;
     }
 }
