@@ -13,7 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using Arbisoft.DevLake.IntegrationService.API.Middleware;
 using Arbisoft.DevLake.IntegrationService.API.Portal;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
@@ -24,12 +26,13 @@ namespace Arbisoft.DevLake.IntegrationService.API.Pages.Account;
 
 /// <summary>Anyone signed in can sign out, with or without access to the portal.</summary>
 [Authorize(Policy = PortalAuthentication.SignedInPolicy)]
-public sealed class LogoutModel : PageModel
+public sealed class LogoutModel(IPortalUserService users) : PageModel
 {
     public IActionResult OnGet() => RedirectToPage("/Index");
 
-    public async Task<IActionResult> OnPostAsync()
+    public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
+        await users.SignOutAsync(PortalAuthentication.ActorOf(User), HttpContext.CallerIp(), cancellationToken);
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         return RedirectToPage("/Account/Login");
     }

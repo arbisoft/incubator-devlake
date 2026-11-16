@@ -16,6 +16,7 @@
 using System.Text.RegularExpressions;
 using Arbisoft.DevLake.IntegrationService.Business.Dtos.Auth;
 using Arbisoft.DevLake.IntegrationService.Business.Security;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
@@ -28,11 +29,15 @@ public sealed partial class AuthService : IAuthService
     private const int MaxLoggedClientIdLength = 100;
     private const string DummySecret = "unused-secret-for-timing";
 
+    /// <summary>A refused token request whose client ID matches no client is recorded against no client.</summary>
+    private static readonly AuditSubject UnknownClient = new(AuditEntityTypes.Client, AuditActor.UnknownUserName, null);
+
     private readonly IClientRepository _clients;
     private readonly IAccessTokenRepository _accessTokens;
     private readonly IClientSecretHasher _hasher;
     private readonly ITokenGenerator _tokenGenerator;
     private readonly IDbSession _session;
+    private readonly IAuditTrail _audit;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<AuthService> _logger;
     private readonly Lazy<string> _dummyHash;
@@ -43,6 +48,7 @@ public sealed partial class AuthService : IAuthService
         IClientSecretHasher hasher,
         ITokenGenerator tokenGenerator,
         IDbSession session,
+        IAuditTrail audit,
         TimeProvider timeProvider,
         ILogger<AuthService> logger)
     {
@@ -51,6 +57,7 @@ public sealed partial class AuthService : IAuthService
         _hasher = hasher;
         _tokenGenerator = tokenGenerator;
         _session = session;
+        _audit = audit;
         _timeProvider = timeProvider;
         _logger = logger;
         _dummyHash = new Lazy<string>(() => hasher.Hash(DummySecret));
@@ -62,18 +69,18 @@ public sealed partial class AuthService : IAuthService
         if (client is null)
         {
             _hasher.Verify(request.ClientSecret, _dummyHash.Value);
-            return Refuse(request.ClientId, AuthFailureReason.UnknownClient);
+            return await RefuseAsync(request, null, AuthFailureReason.UnknownClient, cancellationToken);
         }
 
         var secret = await FindMatchingSecretAsync(client, request.ClientSecret, cancellationToken);
         if (secret is null)
         {
-            return Refuse(request.ClientId, AuthFailureReason.InvalidSecret);
+            return await RefuseAsync(request, client, AuthFailureReason.InvalidSecret, cancellationToken);
         }
 
         if (!client.IsActive)
         {
-            return Refuse(request.ClientId, AuthFailureReason.InactiveClient);
+            return await RefuseAsync(request, client, AuthFailureReason.InactiveClient, cancellationToken);
         }
 
         var scopes = await _clients.GetScopeNamesAsync(client.Id, cancellationToken);
@@ -108,17 +115,33 @@ public sealed partial class AuthService : IAuthService
             IssuedToIp = callerIp
         };
 
-        await _session.BeginTransactionAsync(cancellationToken);
-        await _accessTokens.InsertAsync(token, cancellationToken);
-        await _clients.MarkSecretUsedAsync(secret.Id, issued.IssuedOn, cancellationToken);
-        await _session.CommitAsync(cancellationToken);
+        List<AuditChange> changes = [new(AuditedFields.Scopes, null, AuditValue.Read(scopes)), new(AuditedFields.Expires, null, AuditValue.Read(issued.ExpiresOn))];
+        await _audit.SaveChangeAsync(_session, AuditActor.Client(client.ClientId), async () =>
+        {
+            await _accessTokens.InsertAsync(token, cancellationToken);
+            await _clients.MarkSecretUsedAsync(secret.Id, issued.IssuedOn, cancellationToken);
+            return new AuditSubject(AuditEntityTypes.AccessToken, issued.Jti, client.ClientId).Did(AuditActions.TokenIssued, changes) with { IpAddress = callerIp };
+        }, cancellationToken);
     }
 
-    private AuthResult Refuse(string clientId, AuthFailureReason reason)
+    /// <summary>
+    /// Refuses a token request and records it. A client ID that matches no client is neither logged nor recorded as sent, only that it was unknown.
+    /// </summary>
+    private async Task<AuthResult> RefuseAsync(TokenRequest request, Client? client, AuthFailureReason reason, CancellationToken cancellationToken)
     {
-        _logger.LogWarning("Token request refused for client {ClientId}: {Reason}", Loggable(clientId), reason);
+        _logger.LogWarning("Token request refused for client {ClientId}: {Reason}", Loggable(request.ClientId), reason);
+        var actor = client is null ? AuditActor.UnknownClient : AuditActor.Client(client.ClientId);
+        var subject = client is null ? UnknownClient : new AuditSubject(AuditEntityTypes.Client, AuditValue.Id(client.Id), client.Name);
+        await _audit.RecordAsync(actor, subject.Did(AuditActions.TokenRefused, reason: Describe(reason)) with { IpAddress = request.CallerIp }, cancellationToken);
         return AuthResult.Fail(reason);
     }
+
+    private static string Describe(AuthFailureReason reason) => reason switch
+    {
+        AuthFailureReason.UnknownClient => "Unknown client ID",
+        AuthFailureReason.InactiveClient => "The client is inactive",
+        _ => "Wrong, expired or revoked secret"
+    };
 
     /// <summary>Caller-supplied text only reaches the log when it looks like a client ID, so it cannot forge log lines.</summary>
     private static string Loggable(string clientId)

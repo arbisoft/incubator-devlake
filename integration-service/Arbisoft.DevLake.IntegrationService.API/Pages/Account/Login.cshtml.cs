@@ -14,6 +14,7 @@
 // limitations under the License.
 
 
+using Arbisoft.DevLake.IntegrationService.API.Middleware;
 using Arbisoft.DevLake.IntegrationService.API.Portal;
 using Arbisoft.DevLake.IntegrationService.API.RateLimiting;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
@@ -64,7 +65,7 @@ public sealed class LoginModel(IPortalUserService users, IOptions<SsoOptions> ss
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
-        var signIn = await users.SignInLocalAsync(Username, Password, cancellationToken);
+        var signIn = await users.SignInLocalAsync(Username, Password, HttpContext.CallerIp(), cancellationToken);
         if (signIn is null)
         {
             logger.LogWarning("Failed portal sign-in from {RemoteIp}.", HttpContext.Connection.RemoteIpAddress);

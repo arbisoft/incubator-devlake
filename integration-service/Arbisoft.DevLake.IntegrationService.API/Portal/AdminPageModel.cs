@@ -30,7 +30,7 @@ public abstract class AdminPageModel : PageModel
     protected long CurrentUserId => long.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "0", CultureInfo.InvariantCulture);
 
     /// <summary>The signed-in portal user, as the audit trail records them.</summary>
-    protected AuditActor Actor => AuditActor.User(CurrentUserId, Admin);
+    protected AuditActor Actor => PortalAuthentication.ActorOf(User);
 
     [TempData]
     public string? Message { get; set; }

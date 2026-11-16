@@ -46,3 +46,9 @@ public enum SsoSignInOutcome
 }
 
 public sealed record SsoSignInResult(SsoSignInOutcome Outcome, PortalSignIn? SignIn);
+
+/// <summary>
+/// A person the identity provider vouched for: their email and name as it sent them, whether it verified the email, the email domains the portal
+/// accepts, and the caller's IP address for the audit trail.
+/// </summary>
+public sealed record SsoSignInRequest(string? Email, string? DisplayName, bool EmailVerified, IEnumerable<string> AllowedDomains, string? IpAddress);

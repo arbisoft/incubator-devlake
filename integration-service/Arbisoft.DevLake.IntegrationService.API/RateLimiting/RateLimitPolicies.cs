@@ -16,6 +16,7 @@
 using System.Globalization;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
+using Arbisoft.DevLake.IntegrationService.API.Middleware;
 using Arbisoft.DevLake.IntegrationService.Business.Security;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -71,11 +72,7 @@ public static class RateLimitPolicies
         return SlidingWindow(context.User.FindFirstValue(TokenClaims.Client) ?? CallerIp(context), permitsPerMinute);
     }
 
-    private static string CallerIp(HttpContext context)
-    {
-        var address = context.Connection.RemoteIpAddress;
-        return address is null ? AnonymousPartition : (address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address).ToString();
-    }
+    private static string CallerIp(HttpContext context) => context.CallerIp() ?? AnonymousPartition;
 
     private static RateLimitPartition<string> SlidingWindow(string partition, int permitsPerMinute)
     {

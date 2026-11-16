@@ -53,12 +53,16 @@ public class PortalUserServiceTests
         MustChangePassword = mustChange
     };
 
+    private const string Ip = "203.0.113.7";
+
+    private static SsoSignInRequest Sso(string? email, string? name, bool verified = true) => new(email, name, verified, Arbisoft, Ip);
+
     [Fact]
     public async Task LocalSignIn_WithTheRightPassword_SignsInAndRecordsIt()
     {
         _users.GetByUsernameAsync("admin", Arg.Any<CancellationToken>()).Returns(Local(1, "admin", mustChange: true));
 
-        var signIn = await _service.SignInLocalAsync(" admin ", "admin", CancellationToken.None);
+        var signIn = await _service.SignInLocalAsync(" admin ", "admin", Ip, CancellationToken.None);
 
         Assert.Equal(new PortalSignIn(1, "admin", PortalRole.Admin, true), signIn);
         await _users.Received(1).RecordSignInAsync(1, null, Now, Arg.Any<CancellationToken>());
@@ -72,7 +76,7 @@ public class PortalUserServiceTests
     {
         _users.GetByUsernameAsync("admin", Arg.Any<CancellationToken>()).Returns(Local(1, "admin"));
 
-        Assert.Null(await _service.SignInLocalAsync(username, password, CancellationToken.None));
+        Assert.Null(await _service.SignInLocalAsync(username, password, Ip, CancellationToken.None));
         await _users.DidNotReceiveWithAnyArgs().RecordSignInAsync(default, default, default, default);
     }
 
@@ -81,7 +85,7 @@ public class PortalUserServiceTests
     {
         _users.GetByUsernameAsync("admin", Arg.Any<CancellationToken>()).Returns(Local(1, "admin", active: false));
 
-        Assert.Null(await _service.SignInLocalAsync("admin", "admin", CancellationToken.None));
+        Assert.Null(await _service.SignInLocalAsync("admin", "admin", Ip, CancellationToken.None));
     }
 
     [Fact]
@@ -90,7 +94,7 @@ public class PortalUserServiceTests
         _users.TryInsertAsync(Arg.Any<PortalUser>(), Arg.Any<CancellationToken>()).Returns(5L);
         _users.GetByIdAsync(5, Arg.Any<CancellationToken>()).Returns(new PortalUser { Id = 5, Email = "jane.doe@arbisoft.com", Role = PortalRole.None, IsActive = true });
 
-        var result = await _service.SignInWithSsoAsync("Jane.Doe@Arbisoft.com", " Jane Doe ", Arbisoft, CancellationToken.None);
+        var result = await _service.SignInWithSsoAsync(Sso("Jane.Doe@Arbisoft.com", " Jane Doe "), CancellationToken.None);
 
         Assert.Equal(SsoSignInOutcome.SignedIn, result.Outcome);
         Assert.Equal(new PortalSignIn(5, "jane.doe@arbisoft.com", PortalRole.None, false), result.SignIn);
@@ -106,7 +110,7 @@ public class PortalUserServiceTests
         _users.GetByEmailAsync("jane.doe@arbisoft.com", Arg.Any<CancellationToken>()).Returns(null, existing);
         _users.TryInsertAsync(Arg.Any<PortalUser>(), Arg.Any<CancellationToken>()).Returns((long?)null);
 
-        var result = await _service.SignInWithSsoAsync("jane.doe@arbisoft.com", null, Arbisoft, CancellationToken.None);
+        var result = await _service.SignInWithSsoAsync(Sso("jane.doe@arbisoft.com", null), CancellationToken.None);
 
         Assert.Equal(9, result.SignIn!.UserId);
     }
@@ -117,7 +121,7 @@ public class PortalUserServiceTests
         _users.GetByEmailAsync("jane.doe@arbisoft.com", Arg.Any<CancellationToken>())
             .Returns(new PortalUser { Id = 3, Email = "jane.doe@arbisoft.com", Role = PortalRole.Editor, IsActive = true });
 
-        var result = await _service.SignInWithSsoAsync("jane.doe@arbisoft.com", "Jane", Arbisoft, CancellationToken.None);
+        var result = await _service.SignInWithSsoAsync(Sso("jane.doe@arbisoft.com", "Jane"), CancellationToken.None);
 
         Assert.Equal(PortalRole.Editor, result.SignIn!.Role);
         await _users.Received(1).RecordSignInAsync(3, "Jane", Now, Arg.Any<CancellationToken>());
@@ -130,7 +134,7 @@ public class PortalUserServiceTests
     [InlineData(null)]
     public async Task SsoSignIn_OutsideTheAllowedDomains_IsRefusedWithoutCreatingAnAccount(string? email)
     {
-        var result = await _service.SignInWithSsoAsync(email, "Someone", Arbisoft, CancellationToken.None);
+        var result = await _service.SignInWithSsoAsync(Sso(email, "Someone"), CancellationToken.None);
 
         Assert.Equal(SsoSignInOutcome.NotAllowed, result.Outcome);
         await _users.DidNotReceiveWithAnyArgs().TryInsertAsync(default!, default);
@@ -142,7 +146,7 @@ public class PortalUserServiceTests
         _users.GetByEmailAsync("jane.doe@arbisoft.com", Arg.Any<CancellationToken>())
             .Returns(new PortalUser { Id = 3, Email = "jane.doe@arbisoft.com", Role = PortalRole.Editor, IsActive = false });
 
-        var result = await _service.SignInWithSsoAsync("jane.doe@arbisoft.com", null, Arbisoft, CancellationToken.None);
+        var result = await _service.SignInWithSsoAsync(Sso("jane.doe@arbisoft.com", null), CancellationToken.None);
 
         Assert.Equal(SsoSignInOutcome.Disabled, result.Outcome);
         Assert.Null(result.SignIn);
@@ -264,6 +268,125 @@ public class PortalUserServiceTests
     public async Task SetAccess_Refused_RecordsNothing()
     {
         await _service.SetAccessAsync(1, PortalRole.Editor, true, 1, TestActors.User("admin"), CancellationToken.None);
+
+        Assert.Empty(_audit.Recorded);
+    }
+
+    [Fact]
+    public async Task LocalSignIn_IsRecordedAgainstTheUser_WithTheCallersAddress()
+    {
+        _users.GetByUsernameAsync("admin", Arg.Any<CancellationToken>()).Returns(Local(1, "admin"));
+
+        await _service.SignInLocalAsync("admin", "admin", Ip, CancellationToken.None);
+
+        var (actor, entry) = Assert.Single(_audit.Recorded);
+        Assert.Equal(("1", "admin"), (actor.Id, actor.Name));
+        Assert.Equal((AuditActions.SignedIn, AuditEntityTypes.PortalUser, "1", Ip), (entry.Action, entry.EntityType, entry.EntityId, entry.IpAddress));
+        await _session.Received(1).CommitAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task LocalSignIn_AWrongPassword_IsRecordedAgainstTheAccount_ButNotInTheHoldersName()
+    {
+        _users.GetByUsernameAsync("admin", Arg.Any<CancellationToken>()).Returns(Local(1, "admin"));
+
+        await _service.SignInLocalAsync("admin", "wrong", Ip, CancellationToken.None);
+
+        var (actor, entry) = Assert.Single(_audit.Recorded);
+        Assert.Equal(AuditActor.UnknownUser, actor);
+        Assert.Equal((AuditActions.SignInRefused, "1", "Wrong password", Ip), (entry.Action, entry.EntityId, entry.Reason, entry.IpAddress));
+    }
+
+    [Fact]
+    public async Task LocalSignIn_AnUnknownUsername_IsRecordedWithoutWhatWasTyped()
+    {
+        await _service.SignInLocalAsync("my-password-in-the-wrong-box", "x", Ip, CancellationToken.None);
+
+        var (actor, entry) = Assert.Single(_audit.Recorded);
+        Assert.Equal((AuditActions.SignInRefused, AuditActor.UnknownUserName, "Unknown username"), (entry.Action, entry.EntityId, entry.Reason));
+        Assert.DoesNotContain("my-password", $"{actor} {entry}", StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SsoSignIn_TheFirstTime_RecordsTheNewAccountThenTheSignIn()
+    {
+        _users.TryInsertAsync(Arg.Any<PortalUser>(), Arg.Any<CancellationToken>()).Returns(5L);
+        _users.GetByIdAsync(5, Arg.Any<CancellationToken>()).Returns(new PortalUser { Id = 5, Email = "jane.doe@arbisoft.com", Role = PortalRole.None, IsActive = true });
+
+        await _service.SignInWithSsoAsync(Sso("jane.doe@arbisoft.com", "Jane"), CancellationToken.None);
+
+        Assert.Equal([AuditActions.Created, AuditActions.SignedIn], _audit.Recorded.Select(r => r.Entry.Action));
+        Assert.All(_audit.Recorded, r => Assert.Equal(("5", "jane.doe@arbisoft.com", Ip), (r.Actor.Id, r.Actor.Name, r.Entry.IpAddress)));
+        Assert.Contains(new AuditChange("Access", null, PortalRole.None), _audit.Recorded[0].Entry.Changes!);
+    }
+
+    [Fact]
+    public async Task SsoSignIn_LosingTheRaceToCreateTheAccount_RecordsOnlyTheSignIn()
+    {
+        var existing = new PortalUser { Id = 9, Email = "jane.doe@arbisoft.com", Role = PortalRole.None, IsActive = true };
+        _users.GetByEmailAsync("jane.doe@arbisoft.com", Arg.Any<CancellationToken>()).Returns(null, existing);
+        _users.TryInsertAsync(Arg.Any<PortalUser>(), Arg.Any<CancellationToken>()).Returns((long?)null);
+
+        await _service.SignInWithSsoAsync(Sso("jane.doe@arbisoft.com", null), CancellationToken.None);
+
+        Assert.Equal(AuditActions.SignedIn, _audit.OnlyEntry.Action);
+    }
+
+    [Theory]
+    [InlineData("someone@gmail.com", true, "Not an allowed email domain")]
+    [InlineData("jane.doe@arbisoft.com", false, "The identity provider has not verified the email")]
+    public async Task SsoSignIn_Refused_IsRecordedWithoutTheEmail(string email, bool verified, string reason)
+    {
+        var result = await _service.SignInWithSsoAsync(Sso(email, "Someone", verified), CancellationToken.None);
+
+        Assert.Equal(SsoSignInOutcome.NotAllowed, result.Outcome);
+        var (actor, entry) = Assert.Single(_audit.Recorded);
+        Assert.Equal((AuditActions.SignInRefused, reason, Ip), (entry.Action, entry.Reason, entry.IpAddress));
+        Assert.DoesNotContain(email.Split('@')[0], $"{actor} {entry}", StringComparison.Ordinal);
+        await _users.DidNotReceiveWithAnyArgs().TryInsertAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task SsoSignIn_ToADisabledAccount_IsRecordedAgainstIt_AndIsNotCountedAsASignIn()
+    {
+        _users.GetByEmailAsync("jane.doe@arbisoft.com", Arg.Any<CancellationToken>())
+            .Returns(new PortalUser { Id = 3, Email = "jane.doe@arbisoft.com", Role = PortalRole.Editor, IsActive = false });
+
+        await _service.SignInWithSsoAsync(Sso("jane.doe@arbisoft.com", null), CancellationToken.None);
+
+        var (actor, entry) = Assert.Single(_audit.Recorded);
+        Assert.Equal("3", actor.Id);
+        Assert.Equal((AuditActions.SignInRefused, "3", "The account is disabled"), (entry.Action, entry.EntityId, entry.Reason));
+        await _users.DidNotReceiveWithAnyArgs().RecordSignInAsync(default, default, default, default);
+    }
+
+    [Fact]
+    public async Task SignOut_IsRecordedAgainstTheUser()
+    {
+        await _service.SignOutAsync(TestActors.User("admin", 4), Ip, CancellationToken.None);
+
+        var entry = _audit.OnlyEntry;
+        Assert.Equal((AuditActions.SignedOut, AuditEntityTypes.PortalUser, "4", "admin", Ip), (entry.Action, entry.EntityType, entry.EntityId, entry.EntityLabel, entry.IpAddress));
+    }
+
+    [Fact]
+    public async Task ChangePassword_IsRecordedAsAHiddenChange()
+    {
+        _users.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(Local(1, "admin", mustChange: true));
+
+        await _service.ChangePasswordAsync(1, "admin", "a much better password", "a much better password", CancellationToken.None);
+
+        var entry = _audit.OnlyEntry;
+        Assert.Equal((AuditActions.PasswordChanged, "1"), (entry.Action, entry.EntityId));
+        Assert.Equal([new AuditChange(AuditedFields.Password, null, null, Hidden: true)], entry.Changes!);
+    }
+
+    [Fact]
+    public async Task ChangePassword_WithAWrongCurrentPassword_RecordsNothing()
+    {
+        _users.GetByIdAsync(1, Arg.Any<CancellationToken>()).Returns(Local(1, "admin"));
+
+        await _service.ChangePasswordAsync(1, "wrong", "a much better password", "a much better password", CancellationToken.None);
 
         Assert.Empty(_audit.Recorded);
     }

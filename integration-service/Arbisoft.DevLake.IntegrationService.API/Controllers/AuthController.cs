@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using Arbisoft.DevLake.IntegrationService.API.Middleware;
 using Arbisoft.DevLake.IntegrationService.API.RateLimiting;
 using Arbisoft.DevLake.IntegrationService.Business.Dtos.Auth;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Auth;
@@ -73,15 +74,9 @@ public sealed class AuthController : ControllerBase
             return BadRequest(new OAuthErrorResponse(AuthConstants.UnsupportedGrantType, "Only the client_credentials grant is supported."));
         }
 
-        var callerIp = CallerIp();
+        var callerIp = HttpContext.CallerIp() ?? UnknownIp;
         var result = await _authService.AuthenticateAsync(new TokenRequest(clientId, clientSecret, callerIp), cancellationToken);
         return result.Succeeded ? Ok(result.Token) : InvalidClient();
-    }
-
-    private string CallerIp()
-    {
-        var address = HttpContext.Connection.RemoteIpAddress;
-        return address is null ? UnknownIp : (address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address).ToString();
     }
 
     private UnauthorizedObjectResult InvalidClient()

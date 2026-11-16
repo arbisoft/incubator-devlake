@@ -31,6 +31,9 @@ public sealed record AuditActor(string Kind, string? Id, string Name)
 
     public static AuditActor UnknownUser { get; } = new(AuditActorKind.User, null, UnknownUserName);
 
+    /// <summary>A refused token request whose client ID matches no client. What was sent as the client ID is never stored.</summary>
+    public static AuditActor UnknownClient { get; } = new(AuditActorKind.Client, null, UnknownUserName);
+
     public static AuditActor User(long userId, string name) => new(AuditActorKind.User, userId.ToString(CultureInfo.InvariantCulture), name);
 
     public static AuditActor Client(string clientId) => new(AuditActorKind.Client, clientId, clientId);

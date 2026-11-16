@@ -16,8 +16,10 @@
 
 using System.Globalization;
 using System.Security.Claims;
+using Arbisoft.DevLake.IntegrationService.API.Middleware;
 using Arbisoft.DevLake.IntegrationService.Business.Dtos.Admin;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -39,6 +41,10 @@ public static class PortalAuthentication
     public const string MustChangePasswordClaim = "must_change_password";
     public const string ChangePasswordPath = "/Account/ChangePassword";
     public const string NoAccessPath = "/Account/NoAccess";
+
+    /// <summary>The signed-in portal user, as the audit trail records them.</summary>
+    public static AuditActor ActorOf(ClaimsPrincipal user) =>
+        AuditActor.User(long.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier) ?? "0", CultureInfo.InvariantCulture), user.Identity?.Name ?? "unknown");
 
     public static ClaimsPrincipal CreatePrincipal(PortalSignIn signIn)
     {
@@ -92,19 +98,13 @@ public static class PortalAuthentication
     {
         var principal = context.Principal!;
         var email = principal.FindFirstValue("email") ?? principal.FindFirstValue("preferred_username") ?? principal.FindFirstValue("upn");
-        var verified = principal.FindFirstValue("email_verified");
+        var verified = !string.Equals(principal.FindFirstValue("email_verified"), "false", StringComparison.OrdinalIgnoreCase);
         var name = principal.FindFirstValue("name");
         var options = context.HttpContext.RequestServices.GetRequiredService<IOptions<SsoOptions>>().Value;
         var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(PortalAuthentication));
 
-        if (string.Equals(verified, "false", StringComparison.OrdinalIgnoreCase))
-        {
-            Refuse(context, "not-allowed");
-            return;
-        }
-
-        var result = await context.HttpContext.RequestServices.GetRequiredService<IPortalUserService>()
-            .SignInWithSsoAsync(email, name, options.AllowedDomains, context.HttpContext.RequestAborted);
+        var result = await context.HttpContext.RequestServices.GetRequiredService<IPortalUserService>().SignInWithSsoAsync(
+            new SsoSignInRequest(email, name, verified, options.AllowedDomains, context.HttpContext.CallerIp()), context.HttpContext.RequestAborted);
         switch (result.Outcome)
         {
             case SsoSignInOutcome.SignedIn:

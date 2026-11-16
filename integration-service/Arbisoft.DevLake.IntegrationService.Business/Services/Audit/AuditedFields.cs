@@ -32,6 +32,7 @@ public static class AuditedFields
     public const string ActiveKey = "Active key";
     public const string Algorithm = "Algorithm";
     public const string Token = "Token";
+    public const string Password = "Password";
 
     public static AuditFields<Client> Client { get; } = new AuditFields<Client>()
         .Add("Client ID", c => c.ClientId)

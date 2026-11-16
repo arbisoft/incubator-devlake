@@ -15,10 +15,12 @@
 
 using Arbisoft.DevLake.IntegrationService.Business.Dtos.Auth;
 using Arbisoft.DevLake.IntegrationService.Business.Security;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Auth;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
+using Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
@@ -34,6 +36,7 @@ public class AuthServiceTests
     private readonly IClientSecretHasher _hasher = Substitute.For<IClientSecretHasher>();
     private readonly ITokenGenerator _tokenGenerator = Substitute.For<ITokenGenerator>();
     private readonly IDbSession _session = Substitute.For<IDbSession>();
+    private readonly RecordingAuditTrail _audit = new();
     private readonly FakeTimeProvider _time = new(Now);
     private readonly AuthService _service;
 
@@ -44,7 +47,7 @@ public class AuthServiceTests
         _tokenGenerator.GenerateAsync(Arg.Any<TokenSpecification>(), Arg.Any<CancellationToken>())
             .Returns(new IssuedToken("jwt-value", "jti-1", 9, Now, Now.AddSeconds(900)));
         _clients.GetScopeNamesAsync(Arg.Any<long>(), Arg.Any<CancellationToken>()).Returns(["projects:fetch", "stats:read"]);
-        _service = new AuthService(_clients, _accessTokens, _hasher, _tokenGenerator, _session, _time, NullLogger<AuthService>.Instance);
+        _service = new AuthService(_clients, _accessTokens, _hasher, _tokenGenerator, _session, _audit, _time, NullLogger<AuthService>.Instance);
     }
 
     private static TokenRequest Request(string secret = "good") => new("sophia", secret, "203.0.113.7");
@@ -163,5 +166,43 @@ public class AuthServiceTests
         await Assert.ThrowsAsync<SigningKeyUnavailableException>(() => _service.AuthenticateAsync(Request(), CancellationToken.None));
 
         await _session.DidNotReceiveWithAnyArgs().BeginTransactionAsync(default);
+    }
+
+    [Fact]
+    public async Task Authenticate_Success_RecordsTheIssuedToken_AsTheClient_WithItsScopesAndCaller()
+    {
+        GivenClient(true, Secret(5, "good"));
+
+        await _service.AuthenticateAsync(Request(), CancellationToken.None);
+
+        var (actor, entry) = Assert.Single(_audit.Recorded);
+        Assert.Equal((AuditActorKind.Client, "sophia"), (actor.Kind, actor.Id));
+        Assert.Equal((AuditActions.TokenIssued, AuditEntityTypes.AccessToken, "jti-1", "203.0.113.7"), (entry.Action, entry.EntityType, entry.EntityId, entry.IpAddress));
+        Assert.Contains(new AuditChange(AuditedFields.Scopes, null, "projects:fetch, stats:read"), entry.Changes!);
+        Assert.DoesNotContain(entry.Changes!, change => (change.New ?? string.Empty).Contains("jwt-value", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Authenticate_AWrongSecret_RecordsTheRefusalAgainstTheClient()
+    {
+        GivenClient(true, Secret(5, "good"));
+
+        await _service.AuthenticateAsync(Request("bad"), CancellationToken.None);
+
+        var (actor, entry) = Assert.Single(_audit.Recorded);
+        Assert.Equal("sophia", actor.Id);
+        Assert.Equal((AuditActions.TokenRefused, AuditEntityTypes.Client, "1", "203.0.113.7"), (entry.Action, entry.EntityType, entry.EntityId, entry.IpAddress));
+        Assert.Equal("Wrong, expired or revoked secret", entry.Reason);
+    }
+
+    [Fact]
+    public async Task Authenticate_AnUnknownClient_IsRecordedWithoutWhatWasSentAsTheClientId()
+    {
+        await _service.AuthenticateAsync(new TokenRequest("pasted-secret-by-mistake", "x", "203.0.113.7"), CancellationToken.None);
+
+        var (actor, entry) = Assert.Single(_audit.Recorded);
+        Assert.Equal((AuditActorKind.Client, (string?)null, AuditActor.UnknownUserName), (actor.Kind, actor.Id, actor.Name));
+        Assert.Equal((AuditActions.TokenRefused, AuditActor.UnknownUserName, "Unknown client ID"), (entry.Action, entry.EntityId, entry.Reason));
+        Assert.DoesNotContain("pasted-secret", $"{actor} {entry}", StringComparison.Ordinal);
     }
 }

@@ -296,6 +296,24 @@ public sealed partial class AdminPortalTests : IAsyncLifetime, IDisposable
     }
 
     [MySqlFact]
+    public async Task SigningIn_FailingToSignIn_AndSigningOut_AreEachInTheAdministratorsHistory()
+    {
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var admin = (await scope.ServiceProvider.GetRequiredService<IPortalUserRepository>().GetByUsernameAsync(PortalFactory.AdminUsername, CancellationToken.None))!;
+
+        await PostFormAsync(Http, "/Account/Login", ("Username", PortalFactory.AdminUsername), ("Password", "wrong"));
+        await SignInAsync();
+        var token = await TokenFromAsync(Http, "/Clients");
+        await Http.PostAsync(new Uri("/Account/Logout", UriKind.Relative), new FormUrlEncodedContent([KeyValuePair.Create("__RequestVerificationToken", token)]));
+
+        var history = (await scope.ServiceProvider.GetRequiredService<IAuditLogRepository>().ListAsync(
+            new AuditLogFilter(EntityType: "PortalUser", EntityId: admin.Id.ToString(CultureInfo.InvariantCulture)), 1, 3, CancellationToken.None)).Items;
+        Assert.Equal(["SignedOut", "SignedIn", "SignInRefused"], history.Select(entry => entry.Action));
+        Assert.Equal([PortalFactory.AdminUsername, PortalFactory.AdminUsername, "unknown"], history.Select(entry => entry.ActorName));
+        Assert.Equal("Wrong password", history[2].Reason);
+    }
+
+    [MySqlFact]
     public async Task ACreatedClient_ShowsASecretOnceAndKeepsOnlyItsHash()
     {
         await SignInAsync();
