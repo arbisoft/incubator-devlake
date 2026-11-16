@@ -25,8 +25,7 @@ Each layer references only the layer directly below it.
 
 | Project | Role |
 |---|---|
-| `Arbisoft.DevLake.IntegrationService.API` | Controllers, authorization, rate limiting, background jobs |
-| `Arbisoft.DevLake.IntegrationService.Web` | Razor Pages admin portal |
+| `Arbisoft.DevLake.IntegrationService.API` | The one deployable host: client API controllers, the Razor Pages admin portal, authorization, rate limiting, background jobs |
 | `Arbisoft.DevLake.IntegrationService.Business` | Services, DTOs, token and encryption logic |
 | `Arbisoft.DevLake.IntegrationService.DataAccess` | Models, Dapper repositories, SQL migrations (DbUp), external API clients, RabbitMQ |
 | `Arbisoft.DevLake.IntegrationService.UnitTests` | xUnit tests |
@@ -35,14 +34,14 @@ Deviations from the team's .NET guidelines are recorded in `dotnet-dev.exception
 
 ## Run locally
 
-`docker compose` runs the whole service: MySQL (port 3308), RabbitMQ (ports 5672 and 15672), and the API (`http://localhost:5099`) and admin portal (`http://localhost:5098`), which it builds from this folder's source with the `Dockerfile`:
+`docker compose` runs the whole service: MySQL (port 3308), RabbitMQ (ports 5672 and 15672), and the service itself (`http://localhost:5099`), which it builds from this folder's source with the `Dockerfile`. The client API and the admin portal are one process on that one port: the portal is at `/`, the client API under `/api` and `/fetch`:
 
 ```sh
 cp env.example .env   # then fill in the values
 docker compose up -d --build
 ```
 
-The API and portal containers take every setting from `.env`; nothing secret is baked into the images. They use the `integration_service` database (`INTEGRATION_DB_NAME`) and reach DevLake at `http://host.docker.internal:8080/rest/` (`DEVLAKE_BASE_URL`), where DevLake's own stack publishes it; DevLake reaches the API at `http://host.docker.internal:5099`. Workstream's address is unset by default (`WORKSTREAM_BASE_URL`), so only `GET /fetch/projects` fails until it is given. They run as `Development` because they serve plain HTTP: outside Development the API redirects every call to HTTPS. The API applies the database migrations when it starts.
+The service container takes every setting from `.env`; nothing secret is baked into the image. It uses the `integration_service` database (`INTEGRATION_DB_NAME`) and reach DevLake at `http://host.docker.internal:8080/rest/` (`DEVLAKE_BASE_URL`), where DevLake's own stack publishes it; DevLake reaches the API at `http://host.docker.internal:5099`. Workstream's address is unset by default (`WORKSTREAM_BASE_URL`), so only `GET /fetch/projects` fails until it is given. They run as `Development` because they serve plain HTTP: outside Development the API redirects every call to HTTPS. The API applies the database migrations when it starts.
 
 MySQL creates the database only when its volume is new. On a volume from before, create it once (the old `integration` database is left as it is):
 
@@ -51,7 +50,7 @@ docker exec -e MYSQL_PWD=<root password> integration-service-mysql-1 mysql -uroo
   "CREATE DATABASE IF NOT EXISTS integration_service CHARACTER SET utf8mb4; GRANT ALL PRIVILEGES ON integration_service.* TO 'integration'@'%';"
 ```
 
-To run the API or portal with `dotnet run` instead, start only `docker compose up -d mysql rabbitmq`.
+To run the service with `dotnet run` instead, start only `docker compose up -d mysql rabbitmq`.
 
 Settings live in each project's `appsettings.json`. Secrets are never put there. Set them as environment variables, using `__` for nesting:
 
@@ -110,11 +109,11 @@ Useful options: `--from`/`--to` instead of `--tf` for single requests; `--callba
 
 Health endpoints: `/health/live` and `/health/ready`. Readiness checks MySQL and RabbitMQ.
 
-Run **one instance of the API**. Several things live in the process, not in shared state: the rate limits, the cap on concurrent DevLake calls (`DevLake:MaxConcurrentRequests`), the cache of Sophia access tokens, and the processing job. A second instance would double every limit, and its job's stale-request sweep could mark `Failed` a request the other instance is still delivering. The admin portal can run separately; it does not process requests.
+Run **one instance of the API**. Several things live in the process, not in shared state: the rate limits, the cap on concurrent DevLake calls (`DevLake:MaxConcurrentRequests`), the cache of Sophia access tokens, and the processing job. A second instance would double every limit, and its job's stale-request sweep could mark `Failed` a request the other instance is still delivering. The admin portal is part of that same process, so there is only ever one deployment.
 
 ## Admin portal
 
-The portal (`Arbisoft.DevLake.IntegrationService.Web`) manages the auth side of the service. It shares the API's database and the same `Database__*`, `RabbitMq__*` and `Security__*` settings, and it never processes requests.
+The portal is the Razor Pages part of the same host (`Arbisoft.DevLake.IntegrationService.API`, folders `Pages` and `Portal`), so one deployment serves both the clients and the administrators. It manages the auth side of the service and uses the same database and settings. Portal pages sign in with a cookie and the client API with bearer tokens; neither is accepted for the other. If the portal must not be reachable from the internet, restrict `/Account`, `/Clients`, `/Users` and the other page paths at the reverse proxy; the service does not need a second process for that.
 
 ### Portal users and access
 
@@ -139,10 +138,10 @@ export Sso__Enabled=true Sso__DisplayName=Arbisoft \
 # Microsoft Entra ID instead: Sso__Authority=https://login.microsoftonline.com/<tenant id>/v2.0
 ```
 
-In docker compose, these come from `SSO_ENABLED`, `SSO_DISPLAY_NAME`, `SSO_AUTHORITY`, `SSO_CLIENT_ID` and `SSO_CLIENT_SECRET` in `.env`. Register `<portal URL>/signin-oidc` as the redirect URI at the provider (locally `http://localhost:5098/signin-oidc`). Only emails in `Sso:AllowedDomains` (default `arbisoft.com`) are accepted, and an account the provider marks as unverified is refused. The portal fails to start if `Sso:Enabled` is true and the other settings are missing. It uses the authorization code flow with PKCE.
+In docker compose, these come from `SSO_ENABLED`, `SSO_DISPLAY_NAME`, `SSO_AUTHORITY`, `SSO_CLIENT_ID` and `SSO_CLIENT_SECRET` in `.env`. Register `<portal URL>/signin-oidc` as the redirect URI at the provider (locally `http://localhost:5099/signin-oidc`). Only emails in `Sso:AllowedDomains` (default `arbisoft.com`) are accepted, and an account the provider marks as unverified is refused. The portal fails to start if `Sso:Enabled` is true and the other settings are missing. It uses the authorization code flow with PKCE.
 
 ```sh
-dotnet run --project Arbisoft.DevLake.IntegrationService.Web
+dotnet run --project Arbisoft.DevLake.IntegrationService.API
 ```
 
 Every page needs an editor or administrator unless it says otherwise (the fallback policy is deny), POSTs need an anti-forgery token, sign-in attempts are limited to 10 a minute per address, and the cookie is HttpOnly, SameSite=Strict and lasts 8 hours of activity. Each change records the user's name (username or email) as `createdBy` or `modifiedBy`.

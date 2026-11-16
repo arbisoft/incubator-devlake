@@ -34,10 +34,12 @@ public static class RateLimitPolicies
     public const string BatchStats = "stats-batch";
     public const string RequestPoll = "requests-poll";
     public const string Token = "auth-token";
+    public const string PortalLogin = "login";
     public const string ErrorCode = "rate_limited";
 
     private const int SegmentsPerWindow = 6;
     private const int FallbackRetryAfterSeconds = 60;
+    private const int LoginAttemptsPerMinute = 10;
     private const string AnonymousPartition = "anonymous";
     private static readonly TimeSpan Window = TimeSpan.FromMinutes(1);
 
@@ -60,6 +62,7 @@ public static class RateLimitPolicies
         options.AddPolicy(BatchStats, context => PerClient(context, limits.Value.BatchPerMinute));
         options.AddPolicy(RequestPoll, context => PerClient(context, limits.Value.PollPerMinute));
         options.AddPolicy(Token, context => SlidingWindow(CallerIp(context), limits.Value.TokenPerMinute));
+        options.AddPolicy(PortalLogin, context => SlidingWindow(CallerIp(context), LoginAttemptsPerMinute));
         options.OnRejected = WriteRejectionAsync;
     }
 

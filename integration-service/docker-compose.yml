@@ -53,14 +53,13 @@ services:
       timeout: 10s
       retries: 12
 
-  # The API and the admin portal, built from this folder's source (Dockerfile). Their settings come from .env; secrets are never baked into
-  # the images. They run as Development because they serve plain HTTP: outside Development the API redirects every call to HTTPS.
+  # The service: the client API and the admin portal in one process, built from this folder's source (Dockerfile). Its settings come from .env;
+  # secrets are never baked into the image. It runs as Development because it serves plain HTTP: outside Development it redirects every call to HTTPS.
   api:
     build:
       context: .
-      target: api
-    image: devlake-integration-service-api:local
-    environment: &service-environment
+    image: devlake-integration-service:local
+    environment:
       ASPNETCORE_ENVIRONMENT: Development
       Database__ConnectionString: "Server=mysql;Port=3306;Database=${INTEGRATION_DB_NAME:-integration_service};User=integration;Password=${INTEGRATION_DB_PASSWORD:?copy env.example to .env}"
       RabbitMq__HostName: rabbitmq
@@ -71,27 +70,6 @@ services:
       DevLake__BaseUrl: ${DEVLAKE_BASE_URL:-http://host.docker.internal:8080/rest/}
       # Unset until Workstream's real address is known: .invalid never resolves, so only GET /fetch/projects fails.
       Workstream__BaseUrl: ${WORKSTREAM_BASE_URL:-http://workstream.invalid/}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    ports:
-      # DevLake reaches the API at host.docker.internal:5099 (INTEGRATION_SERVICE_URL in DevLake's .env).
-      - "127.0.0.1:5099:8080"
-      # The mock-sophia container shares this container's network, so its port is published here.
-      - "127.0.0.1:5097:5097"
-    depends_on:
-      mysql:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    restart: unless-stopped
-
-  portal:
-    build:
-      context: .
-      target: portal
-    image: devlake-integration-service-portal:local
-    environment:
-      <<: *service-environment
       # Portal users are in the database (PortalUsers); the first one, admin/admin, is seeded. Single sign-on with Arbisoft accounts is off
       # until SSO_ENABLED=true and the provider settings below are given.
       Sso__Enabled: ${SSO_ENABLED:-false}
@@ -102,12 +80,15 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "127.0.0.1:5098:8080"
+      # Clients and DevLake reach the API at host.docker.internal:5099 (INTEGRATION_SERVICE_URL in DevLake's .env), and administrators open the
+      # portal on the same port.
+      - "127.0.0.1:5099:8080"
+      # The mock-sophia container shares this container's network, so its port is published here.
+      - "127.0.0.1:5097:5097"
     depends_on:
-      # The API applies the database migrations at start; the portal does not.
-      api:
-        condition: service_started
       mysql:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     restart: unless-stopped
 

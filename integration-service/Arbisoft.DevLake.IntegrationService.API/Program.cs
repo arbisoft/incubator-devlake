@@ -16,6 +16,7 @@
 using Arbisoft.DevLake.IntegrationService.API.Authorization;
 using Arbisoft.DevLake.IntegrationService.API.BackgroundJobs;
 using Arbisoft.DevLake.IntegrationService.API.Middleware;
+using Arbisoft.DevLake.IntegrationService.API.Portal;
 using Arbisoft.DevLake.IntegrationService.API.RateLimiting;
 using Arbisoft.DevLake.IntegrationService.Business;
 using Arbisoft.DevLake.IntegrationService.DataAccess;
@@ -38,10 +39,12 @@ builder.Host.UseDefaultServiceProvider(options =>
 });
 
 builder.Services.AddControllers();
+builder.Services.AddRazorPages(options => options.Conventions.Add(new RequireEditorByDefaultConvention()));
 builder.Services.AddProblemDetails(options =>
     options.CustomizeProblemDetails = context => context.ProblemDetails.Extensions["correlationId"] = context.HttpContext.TraceIdentifier);
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddApiAuthentication();
+builder.Services.AddPortalAuthentication(builder.Configuration);
 builder.Services.AddRateLimiting(builder.Configuration);
 builder.Services.AddApiVersioning(options =>
 {
@@ -55,7 +58,7 @@ builder.Services.AddHostedService<RequestProcessingJob>();
 
 var app = builder.Build();
 
-// Order is behaviour: exception handler, correlation ID, authentication, authorization, rate limiter.
+// Order is behaviour: exception handler, correlation ID, static files, routing, authentication, authorization, rate limiter.
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseMiddleware<CorrelationIdMiddleware>();
@@ -66,11 +69,15 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 
+app.UseStaticFiles();
+app.UseRouting();
 app.UseAuthentication();
+app.UseMiddleware<MustChangePasswordMiddleware>();
 app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapControllers();
+app.MapRazorPages();
 
 // Liveness checks the process only; readiness gets the database and broker checks as they are added.
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();
@@ -78,5 +85,5 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check 
 
 app.Run();
 
-/// <summary>Entry point marker so tests can host the API with WebApplicationFactory.</summary>
+/// <summary>Entry point marker so tests can host the service with WebApplicationFactory.</summary>
 public partial class Program;

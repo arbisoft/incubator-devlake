@@ -1,0 +1,63 @@
+@*
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+    http:www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*@
+@page
+@model Arbisoft.DevLake.IntegrationService.API.Pages.RequestLogs.IndexModel
+@{
+    ViewData["Title"] = "Request logs";
+    string? Day(DateOnly? day) => day?.ToString("yyyy-MM-dd");
+}
+<h1>Request logs</h1>
+<form method="get" id="request-log-filters" class="panel filters">
+  <label>Client
+    <select name="ClientRefId">
+      <option value="">All clients</option>
+      @foreach (var client in Model.Clients)
+      {
+          <option value="@client.Id" selected="@(client.Id == Model.ClientRefId)">@client.Name (@client.ClientId)</option>
+      }
+    </select>
+  </label>
+  <label>Status
+    <select name="Status">
+      <option value="">Any status</option>
+      @foreach (var status in Model.Statuses)
+      {
+          <option value="@status" selected="@(status == Model.Status)">@status</option>
+      }
+    </select>
+  </label>
+  <label>From (UTC date) <input type="date" name="From" value="@Day(Model.From)"></label>
+  <label>To (UTC date, included) <input type="date" name="To" value="@Day(Model.To)"></label>
+  <div class="actions"><button type="submit">Filter</button><a asp-page="Index" id="request-log-clear">Clear</a></div>
+</form>
+<p id="request-log-error" class="errors" role="alert" hidden>The requests could not be loaded. Reload the page, and sign in again if the session ended.</p>
+<div class="table-wrap">
+<table id="request-logs"
+       data-list-url="@Url.Page("Index", new { handler = "List" })"
+       data-details-url="@Url.Page("Details", new { id = 0 })"
+       data-page-sizes="@string.Join(',', Model.PageSizes)"
+       data-page-size="@Model.DefaultPageSize">
+  <thead><tr><th>Created</th><th>Modified On</th><th>Client</th><th>Event</th><th>Status</th><th>Correlation ID</th><th></th></tr></thead>
+  <tbody></tbody>
+</table>
+</div>
+<noscript><p class="muted">The list needs JavaScript.</p></noscript>
+@section Scripts {
+  <script src="~/lib/jquery/dist/jquery.min.js"></script>
+  <script src="~/lib/datatables/dataTables.min.js"></script>
+  <script src="~/js/request-logs.js" asp-append-version="true"></script>
+}

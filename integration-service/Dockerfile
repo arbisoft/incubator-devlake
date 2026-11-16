@@ -13,10 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Builds the Integration Service from source. One build stage, two runtime targets:
-#   docker build --target api    -t integration-service-api .
-#   docker build --target portal -t integration-service-portal .
-# docker-compose.yml builds and runs both next to MySQL and RabbitMQ.
+# Builds the Integration Service from source into one image: the client API and the admin portal are the same process.
+#   docker build -t integration-service .
+# docker-compose.yml builds and runs it next to MySQL and RabbitMQ.
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
@@ -25,18 +24,14 @@ WORKDIR /src
 # .editorconfig carries the analyzer rules the build enforces, so it must be here too.
 COPY global.json Directory.Build.props Directory.Packages.props .editorconfig ./
 COPY Arbisoft.DevLake.IntegrationService.API/Arbisoft.DevLake.IntegrationService.API.csproj Arbisoft.DevLake.IntegrationService.API/
-COPY Arbisoft.DevLake.IntegrationService.Web/Arbisoft.DevLake.IntegrationService.Web.csproj Arbisoft.DevLake.IntegrationService.Web/
 COPY Arbisoft.DevLake.IntegrationService.Business/Arbisoft.DevLake.IntegrationService.Business.csproj Arbisoft.DevLake.IntegrationService.Business/
 COPY Arbisoft.DevLake.IntegrationService.DataAccess/Arbisoft.DevLake.IntegrationService.DataAccess.csproj Arbisoft.DevLake.IntegrationService.DataAccess/
-RUN dotnet restore Arbisoft.DevLake.IntegrationService.API/Arbisoft.DevLake.IntegrationService.API.csproj \
- && dotnet restore Arbisoft.DevLake.IntegrationService.Web/Arbisoft.DevLake.IntegrationService.Web.csproj
+RUN dotnet restore Arbisoft.DevLake.IntegrationService.API/Arbisoft.DevLake.IntegrationService.API.csproj
 
 COPY Arbisoft.DevLake.IntegrationService.API/ Arbisoft.DevLake.IntegrationService.API/
-COPY Arbisoft.DevLake.IntegrationService.Web/ Arbisoft.DevLake.IntegrationService.Web/
 COPY Arbisoft.DevLake.IntegrationService.Business/ Arbisoft.DevLake.IntegrationService.Business/
 COPY Arbisoft.DevLake.IntegrationService.DataAccess/ Arbisoft.DevLake.IntegrationService.DataAccess/
-RUN dotnet publish Arbisoft.DevLake.IntegrationService.API/Arbisoft.DevLake.IntegrationService.API.csproj -c Release --no-restore -o /out/api \
- && dotnet publish Arbisoft.DevLake.IntegrationService.Web/Arbisoft.DevLake.IntegrationService.Web.csproj -c Release --no-restore -o /out/portal
+RUN dotnet publish Arbisoft.DevLake.IntegrationService.API/Arbisoft.DevLake.IntegrationService.API.csproj -c Release --no-restore -o /out
 
 # The runtime image runs as the non-root "app" user and listens on 8080.
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
@@ -46,10 +41,5 @@ ENV ASPNETCORE_HTTP_PORTS=8080 \
 EXPOSE 8080
 USER $APP_UID
 
-FROM runtime AS api
-COPY --from=build /out/api .
+COPY --from=build /out .
 ENTRYPOINT ["dotnet", "Arbisoft.DevLake.IntegrationService.API.dll"]
-
-FROM runtime AS portal
-COPY --from=build /out/portal .
-ENTRYPOINT ["dotnet", "Arbisoft.DevLake.IntegrationService.Web.dll"]

@@ -227,6 +227,21 @@ public sealed partial class AdminPortalTests : IAsyncLifetime, IDisposable
     }
 
     [MySqlFact]
+    public async Task OnePortalAndApiHost_KeepsTheCookieAndTheBearerTokenApart()
+    {
+        await SignInAsync();
+
+        // The portal's cookie opens pages but is no credential for the client API, and a bearer token is no credential for a page.
+        Assert.Equal(HttpStatusCode.Unauthorized, (await Http.GetAsync(new Uri("/api/v1/requests/1", UriKind.Relative))).StatusCode);
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("/Clients", UriKind.Relative));
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", "not-a-portal-cookie");
+        using var anonymous = NewClient(_factory!);
+        var page = await anonymous.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Redirect, page.StatusCode);
+        Assert.Contains("/Account/Login", page.Headers.Location!.OriginalString, StringComparison.Ordinal);
+    }
+
+    [MySqlFact]
     public async Task TheUsersPage_IsForAdministrators_AndNobodyChangesTheirOwnAccess()
     {
         await SignInAsync();

@@ -38,7 +38,6 @@ limitations under the License.
     <ProjectReference Include="..\Arbisoft.DevLake.IntegrationService.DataAccess\Arbisoft.DevLake.IntegrationService.DataAccess.csproj" />
     <ProjectReference Include="..\Arbisoft.DevLake.IntegrationService.Business\Arbisoft.DevLake.IntegrationService.Business.csproj" />
     <ProjectReference Include="..\Arbisoft.DevLake.IntegrationService.API\Arbisoft.DevLake.IntegrationService.API.csproj" />
-    <ProjectReference Include="..\Arbisoft.DevLake.IntegrationService.Web\Arbisoft.DevLake.IntegrationService.Web.csproj" />
   </ItemGroup>
 
 </Project>

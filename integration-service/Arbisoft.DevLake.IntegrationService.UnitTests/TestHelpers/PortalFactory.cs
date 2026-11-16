@@ -13,10 +13,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using Arbisoft.DevLake.IntegrationService.API.Controllers;
 using Arbisoft.DevLake.IntegrationService.Business.Security;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
-using Arbisoft.DevLake.IntegrationService.Web;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,7 +28,7 @@ namespace Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers;
 /// Hosts the real admin portal in-process against the test database, with a local administrator account (<see cref="AdminUsername"/>) in
 /// PortalUsers that does not have to change its password, so tests can get straight to the pages.
 /// </summary>
-public sealed class PortalFactory : WebApplicationFactory<WebAssemblyMarker>
+public sealed class PortalFactory : WebApplicationFactory<AuthController>
 {
     public const string AdminUsername = "portal-admin";
     public const string AdminPassword = "a long test password";
@@ -75,7 +75,9 @@ public sealed class PortalFactory : WebApplicationFactory<WebAssemblyMarker>
         builder.UseSetting("Security:EncryptionKey", SecurityTestData.NewEncryptionKey());
         builder.UseSetting("Security:Issuer", SecurityTestData.Issuer);
         builder.UseSetting("Security:Audience", SecurityTestData.Audience);
-        // The portal never publishes or consumes, but the host validates these settings at startup and the connection is only opened on use.
+        // These tests drive the admin pages only, so the background processing stays off. The host still validates the broker settings at
+        // startup and opens the connection only on use.
+        builder.UseSetting("Processing:Enabled", "false");
         var broker = RabbitMqHarness.Settings;
         builder.UseSetting("RabbitMq:HostName", broker?["host"] ?? "localhost");
         builder.UseSetting("RabbitMq:Port", broker?["port"] ?? "5672");
