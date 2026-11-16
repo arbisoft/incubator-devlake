@@ -19,6 +19,7 @@ limitations under the License.
 @{
     var c = Model.Details!.Client;
     ViewData["Title"] = c.Name;
+    ViewData[Breadcrumb.ParentsKey] = new[] { new Breadcrumb("Clients", Url.Page("/Clients/Index")) };
 }
 <h1>@c.Name</h1>
 <div class="actions">

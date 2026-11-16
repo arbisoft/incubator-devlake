@@ -18,6 +18,7 @@ limitations under the License.
 @model Arbisoft.DevLake.IntegrationService.API.Pages.SigningKeys.RotateModel
 @{
     ViewData["Title"] = "Rotate signing key";
+    ViewData[Breadcrumb.ParentsKey] = new[] { new Breadcrumb("Signing keys", Url.Page("/SigningKeys/Index")) };
 }
 <h1>Rotate signing key</h1>
 <form method="post" class="panel">

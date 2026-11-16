@@ -20,6 +20,8 @@ limitations under the License.
     ViewData["Title"] = "Outbound config";
     var details = Model.Details;
     var config = details.Config;
+    ViewData[Breadcrumb.ParentsKey] = new[] { new Breadcrumb("Outbound configs", Url.Page("/ClientConfigs/Index")) };
+    ViewData[Breadcrumb.CurrentKey] = details.ClientName;
 }
 <h1>Outbound config for @details.ClientName <span class="mono muted">@details.ClientId</span></h1>
 @if (config is null)

@@ -18,6 +18,8 @@ limitations under the License.
 @model Arbisoft.DevLake.IntegrationService.API.Pages.Clients.EditModel
 @{
     ViewData["Title"] = "Edit client";
+    ViewData[Breadcrumb.ParentsKey] = new[] { new Breadcrumb("Clients", Url.Page("/Clients/Index")), new Breadcrumb(Model.Form.Name, Url.Page("/Clients/Details", new { id = Model.Id })) };
+    ViewData[Breadcrumb.CurrentKey] = "Edit";
 }
 <h1>Edit <span class="mono">@Model.Form.ClientId</span></h1>
 <form method="post" class="stack panel">

@@ -18,6 +18,7 @@ limitations under the License.
 @model Arbisoft.DevLake.IntegrationService.API.Pages.AccessTokens.RevokeModel
 @{
     ViewData["Title"] = "Revoke token";
+    ViewData[Breadcrumb.ParentsKey] = new[] { new Breadcrumb("Access tokens", Url.Page("/AccessTokens/Index")) };
 }
 <h1>Revoke token</h1>
 @if (Model.Token is { } token)

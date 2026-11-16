@@ -19,6 +19,8 @@ limitations under the License.
 @model Arbisoft.DevLake.IntegrationService.API.Pages.ClientConfigs.EditModel
 @{
     ViewData["Title"] = "Edit outbound config";
+    ViewData[Breadcrumb.ParentsKey] = new[] { new Breadcrumb("Outbound configs", Url.Page("/ClientConfigs/Index")), new Breadcrumb(Model.ClientName, Url.Page("/ClientConfigs/Details", new { clientRefId = Model.ClientRefId })) };
+    ViewData[Breadcrumb.CurrentKey] = "Edit";
 }
 <h1>Outbound config for @Model.ClientName</h1>
 <form method="post" class="stack panel">

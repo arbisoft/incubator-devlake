@@ -18,6 +18,7 @@ limitations under the License.
 @model Arbisoft.DevLake.IntegrationService.API.Pages.Scopes.CreateModel
 @{
     ViewData["Title"] = "New scope";
+    ViewData[Breadcrumb.ParentsKey] = new[] { new Breadcrumb("Scopes", Url.Page("/Scopes/Index")) };
 }
 <h1>New scope</h1>
 <form method="post" class="stack panel">

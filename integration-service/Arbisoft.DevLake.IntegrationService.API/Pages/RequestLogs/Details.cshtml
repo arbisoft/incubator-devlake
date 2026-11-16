@@ -18,6 +18,7 @@ limitations under the License.
 @model Arbisoft.DevLake.IntegrationService.API.Pages.RequestLogs.DetailsModel
 @{
     ViewData["Title"] = "Request " + Model.Log.CorrelationId;
+    ViewData[Breadcrumb.ParentsKey] = new[] { new Breadcrumb("Request logs", Url.Page("/RequestLogs/Index")) };
     var log = Model.Log;
 }
 <h1>Request <span class="mono">@log.CorrelationId</span></h1>

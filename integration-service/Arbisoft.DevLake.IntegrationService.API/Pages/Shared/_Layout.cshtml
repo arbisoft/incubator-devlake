@@ -87,6 +87,19 @@ limitations under the License.
     </aside>
     <div class="content">
       <main>
+        @if (currentPage != "/Index")
+        {
+            <nav class="breadcrumbs" aria-label="Breadcrumb">
+              <ol>
+                <li><a asp-page="/Index">Overview</a></li>
+                @foreach (var crumb in ViewData[Breadcrumb.ParentsKey] as IEnumerable<Breadcrumb> ?? [])
+                {
+                    <li><a href="@crumb.Url">@crumb.Label</a></li>
+                }
+                <li aria-current="page">@(ViewData[Breadcrumb.CurrentKey] ?? ViewData["Title"])</li>
+              </ol>
+            </nav>
+        }
         @if (TempData.Peek("Message") is string message)
         {
             <div class="message" role="status">@message</div>

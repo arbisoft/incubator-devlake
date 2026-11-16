@@ -18,6 +18,7 @@ limitations under the License.
 @model Arbisoft.DevLake.IntegrationService.API.Pages.ClientConfigs.Urls.CreateModel
 @{
     ViewData["Title"] = "New callback URL";
+    ViewData[Breadcrumb.ParentsKey] = new[] { new Breadcrumb("Outbound configs", Url.Page("/ClientConfigs/Index")), new Breadcrumb("Outbound config", Url.Page("/ClientConfigs/Details", new { clientRefId = Model.ClientRefId })) };
 }
 <h1>New callback URL</h1>
 <form method="post" class="stack panel">

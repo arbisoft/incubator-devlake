@@ -18,6 +18,7 @@ limitations under the License.
 @model Arbisoft.DevLake.IntegrationService.API.Pages.Clients.CreateModel
 @{
     ViewData["Title"] = "New client";
+    ViewData[Breadcrumb.ParentsKey] = new[] { new Breadcrumb("Clients", Url.Page("/Clients/Index")) };
 }
 <h1>New client</h1>
 <form method="post" class="stack panel">

@@ -162,6 +162,14 @@ p { margin: 0 0 12px; }
 .content { min-width: 0; }
 main { max-width: 1120px; margin: 0 auto; padding: 32px 36px 64px; }
 
+.breadcrumbs { margin: -12px 0 14px; font-size: 13px; }
+.breadcrumbs ol { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.breadcrumbs li { display: inline-flex; align-items: center; color: var(--muted); min-width: 0; }
+.breadcrumbs li + li::before { content: "\203A"; color: var(--muted); margin-right: 6px; }
+.breadcrumbs a { color: var(--muted); text-decoration: none; }
+.breadcrumbs a:hover { color: var(--accent); text-decoration: underline; }
+.breadcrumbs [aria-current="page"] { color: var(--text-2); font-weight: 550; max-width: 48ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; }
+
 /* The menu button and the compact top bar only appear on narrow screens. The checkbox that opens the menu never takes up room in the layout. */
 .topbar { display: none; }
 .menu-toggle { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
