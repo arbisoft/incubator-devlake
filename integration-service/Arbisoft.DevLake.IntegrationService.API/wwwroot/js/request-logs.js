@@ -87,7 +87,12 @@
           $error.prop('hidden', true);
           callback(answer);
         })
-        .fail(function () {
+        .fail(function (xhr, textStatus) {
+          // A sign-in page where the data should be (a redirect the browser followed) is not JSON, so it fails to parse: the session ended.
+          var signedOut = xhr.status === 401 || xhr.status === 403 || (xhr.status === 200 && textStatus === 'parsererror');
+          $error.text(signedOut
+            ? 'Your session ended. Reload the page and sign in again.'
+            : 'The requests could not be loaded (' + (xhr.status ? 'HTTP ' + xhr.status : textStatus) + '). Reload the page to try again.');
           $error.prop('hidden', false);
           callback({ draw: request.draw, recordsTotal: 0, recordsFiltered: 0, data: [] });
         });

@@ -242,6 +242,21 @@ public sealed partial class AdminPortalTests : IAsyncLifetime, IDisposable
     }
 
     [MySqlFact]
+    public async Task TheRequestLogList_AnswersTheQueryTheBrowserSends_WithEveryFilterLeftEmpty()
+    {
+        await SignInAsync();
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(
+            "/RequestLogs?handler=List&ClientRefId=&Status=&From=&To=&draw=1&page=1&pageSize=10&sort=created&dir=desc&_=1763290000000", UriKind.Relative));
+        request.Headers.Add("X-Requested-With", "XMLHttpRequest");
+        request.Headers.Accept.ParseAdd("application/json, text/javascript, */*; q=0.01");
+
+        var response = await Http.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("\"draw\":1", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [MySqlFact]
     public async Task TheUsersPage_IsForAdministrators_AndNobodyChangesTheirOwnAccess()
     {
         await SignInAsync();
