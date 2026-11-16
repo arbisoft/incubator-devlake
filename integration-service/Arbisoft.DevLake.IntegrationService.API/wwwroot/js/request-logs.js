@@ -24,6 +24,10 @@
   var $error = $('#request-log-error');
   var pageSizes = String($table.data('pageSizes')).split(',').map(Number);
 
+  // The same clock icon the server renders for the history button on other lists.
+  var historyIcon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" ' +
+    'stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>';
+
   // A failed load is shown in the page, not in a browser dialog.
   $.fn.dataTable.ext.errMode = 'none';
 
@@ -67,9 +71,14 @@
       },
       { data: 'correlationId', name: 'correlation', className: 'mono' },
       {
-        data: 'id', orderable: false,
-        render: function (id) {
-          return html($('<a>').attr('href', String($table.data('detailsUrl')).replace(/0$/, id)).text('Open'));
+        data: 'id', orderable: false, className: 'row-actions',
+        render: function (id, type, row) {
+          var open = $('<a>').attr('href', String($table.data('detailsUrl')).replace(/0$/, id)).text('Open');
+          var history = $('<a class="icon-button" title="History">')
+            .attr('href', String($table.data('historyUrl')).replace(/id=0$/, 'id=' + id))
+            .attr('aria-label', 'History of request ' + row.correlationId)
+            .html(historyIcon);
+          return html(open) + html(history);
         }
       }
     ],

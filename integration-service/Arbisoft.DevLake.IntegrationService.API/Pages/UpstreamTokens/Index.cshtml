@@ -24,7 +24,7 @@ limitations under the License.
 <p class="muted">The API tokens this service uses to call DevLake and Workstream. They are stored encrypted in the database and are never shown again: type a new one to replace the stored one. The API picks up a saved token within a minute, without a restart.</p>
 @foreach (var row in Model.Tokens)
 {
-    <h2>@row.Name</h2>
+    <h2>@row.Name <history-link type="UpstreamToken" entity-id="@row.Name" label="@row.Name" /></h2>
     <div class="panel">
       @if (row.IsSet)
       {

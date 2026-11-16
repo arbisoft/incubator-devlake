@@ -410,3 +410,18 @@ button.link:hover { background: var(--neutral-soft); color: var(--text); }
 .dt-container th.dt-ordering-asc .dt-column-order::after { content: "\2191"; opacity: 1; color: var(--accent); }
 .dt-container th.dt-ordering-desc .dt-column-order::after { content: "\2193"; opacity: 1; color: var(--accent); }
 .dt-container th:not(.dt-orderable-asc):not(.dt-orderable-desc) .dt-column-order { display: none; }
+
+/* Audit trail: the history button on list rows, and the changes in an entry. */
+.icon-button { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: var(--radius-sm); color: var(--muted); vertical-align: middle; }
+.icon-button:hover { background: var(--neutral-soft); color: var(--accent); }
+.icon-button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.row-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; white-space: nowrap; }
+h2 .icon-button { margin-left: 4px; }
+td.nowrap { white-space: nowrap; }
+.changes { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: 13px; }
+.changes .field { color: var(--muted); margin-right: 4px; }
+.changes .field::after { content: ":"; }
+.changes del { color: var(--danger); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--danger) 50%, transparent); word-break: break-word; }
+.changes ins { color: var(--ok); text-decoration: none; word-break: break-word; }
+.changes .arrow { color: var(--muted); margin: 0 4px; }
+.pager { justify-content: flex-end; }

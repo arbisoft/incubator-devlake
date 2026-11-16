@@ -23,7 +23,7 @@ limitations under the License.
     ViewData[Breadcrumb.ParentsKey] = new[] { new Breadcrumb("Outbound configs", Url.Page("/ClientConfigs/Index")) };
     ViewData[Breadcrumb.CurrentKey] = details.ClientName;
 }
-<h1>Outbound config for @details.ClientName <span class="mono muted">@details.ClientId</span></h1>
+<h1>Outbound config for @details.ClientName <span class="mono muted">@details.ClientId</span> <history-link type="ClientConfig" entity-id="@details.ClientRefId" label="@details.ClientName" /></h1>
 @if (config is null)
 {
     <div class="panel"><p>This client has no outbound configuration, so its requests cannot be delivered.</p>

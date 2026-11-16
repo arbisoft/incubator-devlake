@@ -37,7 +37,7 @@ limitations under the License.
         <td class="mono">@mapping.Email</td>
         <td class="mono muted">@mapping.EmailAsReceived</td>
         <td>@AdminPageModel.Utc(mapping.CreatedOn)</td>
-        <td><a asp-page="Edit" asp-route-id="@mapping.Id">Edit</a></td>
+        <td class="row-actions"><a asp-page="Edit" asp-route-id="@mapping.Id">Edit</a><history-link type="EmailMapping" entity-id="@mapping.Id" label="@mapping.ArbisoftEmail" /></td>
       </tr>
   }
   @if (Model.Result.Items.Count == 0)

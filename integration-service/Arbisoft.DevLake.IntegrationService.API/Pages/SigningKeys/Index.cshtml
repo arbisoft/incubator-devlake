@@ -24,16 +24,17 @@ limitations under the License.
 <div class="actions"><a class="button" asp-page="Rotate">Rotate key</a></div>
 <div class="table-wrap">
 <table>
-  <thead><tr><th>Key ID (kid)</th><th>Status</th><th>Algorithm</th><th>Activated</th><th>Retired</th><th>Private key reference</th></tr></thead>
+  <thead><tr><th>Key ID (kid)</th><th>Status</th><th>Algorithm</th><th>Activated</th><th>Retired</th><th>Private key reference</th><th></th></tr></thead>
   <tbody>
   @foreach (var key in Model.Keys)
   {
       <tr><td class="mono">@key.Kid</td><td><span class="badge @key.Status">@key.Status</span></td><td>@key.Algorithm</td>
-          <td>@AdminPageModel.Utc(key.ActivatedOn)</td><td>@AdminPageModel.Utc(key.RetiredOn)</td><td class="mono long">@key.PrivateKeyRef</td></tr>
+          <td>@AdminPageModel.Utc(key.ActivatedOn)</td><td>@AdminPageModel.Utc(key.RetiredOn)</td><td class="mono long">@key.PrivateKeyRef</td>
+          <td class="row-actions"><history-link type="SigningKey" entity-id="@key.Id" label="@key.Kid" /></td></tr>
   }
   @if (Model.Keys.Count == 0)
   {
-      <tr><td colspan="6" class="muted">No signing keys yet. The Auth API can't issue tokens until one exists. Rotate to create the first.</td></tr>
+      <tr><td colspan="7" class="muted">No signing keys yet. The Auth API can't issue tokens until one exists. Rotate to create the first.</td></tr>
   }
   </tbody>
 </table>

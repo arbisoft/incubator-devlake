@@ -69,6 +69,7 @@ limitations under the License.
         <div class="nav-group">
           <div class="nav-label">Monitoring</div>
           <a asp-page="/RequestLogs/Index" aria-current="@Current("RequestLogs")"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Request logs</a>
+          <a asp-page="/AuditLogs/Index" aria-current="@Current("AuditLogs")"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>Audit log</a>
         </div>
         @if (isAdmin)
         {

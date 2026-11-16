@@ -34,12 +34,12 @@ limitations under the License.
             <td>@config.AuthType</td>
             <td class="mono">@config.BaseUrl</td>
             <td><span class="badge @(config.IsActive ? "Active" : "Inactive")">@(config.IsActive ? "Active" : "Inactive")</span></td>
-            <td><a asp-page="Details" asp-route-clientRefId="@row.ClientRefId">Open</a></td>
+            <td class="row-actions"><a asp-page="Details" asp-route-clientRefId="@row.ClientRefId">Open</a><history-link type="ClientConfig" entity-id="@row.ClientRefId" label="@row.ClientName" /></td>
         }
         else
         {
             <td colspan="3" class="muted">Not configured</td>
-            <td><a asp-page="Edit" asp-route-clientRefId="@row.ClientRefId">Set up</a></td>
+            <td class="row-actions"><a asp-page="Edit" asp-route-clientRefId="@row.ClientRefId">Set up</a><history-link type="ClientConfig" entity-id="@row.ClientRefId" label="@row.ClientName" /></td>
         }
       </tr>
   }

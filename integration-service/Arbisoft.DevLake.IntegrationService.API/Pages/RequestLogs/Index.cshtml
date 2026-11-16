@@ -49,6 +49,7 @@ limitations under the License.
 <table id="request-logs"
        data-list-url="@Url.Page("Index", new { handler = "List" })"
        data-details-url="@Url.Page("Details", new { id = 0 })"
+       data-history-url="@Url.Page("/AuditLogs/History", new { type = "Request", id = 0 })"
        data-page-sizes="@string.Join(',', Model.PageSizes)"
        data-page-size="@Model.DefaultPageSize">
   <thead><tr><th>Created</th><th>Modified On</th><th>Client</th><th>Event</th><th>Status</th><th>Correlation ID</th><th></th></tr></thead>

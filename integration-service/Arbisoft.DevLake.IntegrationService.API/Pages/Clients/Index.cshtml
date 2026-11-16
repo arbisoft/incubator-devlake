@@ -23,7 +23,7 @@ limitations under the License.
 <div class="actions"><a class="button" asp-page="Create">New client</a></div>
 <div class="table-wrap">
 <table>
-  <thead><tr><th>Name</th><th>Client ID</th><th>Status</th><th>Token lifetime</th><th>Created</th></tr></thead>
+  <thead><tr><th>Name</th><th>Client ID</th><th>Status</th><th>Token lifetime</th><th>Created</th><th></th></tr></thead>
   <tbody>
   @foreach (var client in Model.Clients)
   {
@@ -33,11 +33,12 @@ limitations under the License.
         <td><span class="badge @(client.IsActive ? "Active" : "Inactive")">@(client.IsActive ? "Active" : "Inactive")</span></td>
         <td>@client.AccessTokenLifetimeSeconds s</td>
         <td>@AdminPageModel.Utc(client.CreatedOn) <span class="muted">by @client.CreatedBy</span></td>
+        <td class="row-actions"><history-link type="Client" entity-id="@client.Id" label="@client.Name" /></td>
       </tr>
   }
   @if (Model.Clients.Count == 0)
   {
-      <tr><td colspan="5" class="muted">No clients yet.</td></tr>
+      <tr><td colspan="6" class="muted">No clients yet.</td></tr>
   }
   </tbody>
 </table>

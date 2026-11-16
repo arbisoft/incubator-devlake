@@ -314,6 +314,48 @@ public sealed partial class AdminPortalTests : IAsyncLifetime, IDisposable
     }
 
     [MySqlFact]
+    public async Task EveryList_OffersEachRowsHistory_AndTheHistoryShowsWhatHappenedToThatObjectOnly()
+    {
+        await SignInAsync();
+        var client = await CreateClientAsync();
+        var other = await CreateClientAsync();
+        var id = client.Id.ToString(CultureInfo.InvariantCulture);
+
+        var list = await Http.GetStringAsync(new Uri("/Clients", UriKind.Relative));
+        Assert.Contains($"href=\"/AuditLogs/History?type=Client&amp;id={id}\"", list, StringComparison.Ordinal);
+        foreach (var path in new[] { "/Scopes", "/SigningKeys", "/AccessTokens", "/ClientConfigs", "/EmailMappings", "/UpstreamTokens", "/Users" })
+        {
+            Assert.Contains("/AuditLogs/History?type=", await Http.GetStringAsync(new Uri(path, UriKind.Relative)), StringComparison.Ordinal);
+        }
+
+        Assert.Contains("data-history-url=\"/AuditLogs/History?type=Request&amp;id=0\"", await Http.GetStringAsync(new Uri("/RequestLogs", UriKind.Relative)), StringComparison.Ordinal);
+
+        await PostFormAsync(Http, $"/Clients/Edit/{client.Id}", ("Form.ClientId", client.ClientId), ("Form.Name", "Renamed for history"), ("Form.AccessTokenLifetimeSeconds", "900"), ("Form.IsActive", "true"));
+        var history = await Http.GetStringAsync(new Uri($"/AuditLogs/History?type=Client&id={id}", UriKind.Relative));
+        Assert.Contains("History of Renamed for history", history, StringComparison.Ordinal);
+        Assert.Contains("<del>Config test</del>", history, StringComparison.Ordinal);
+        Assert.Contains("<ins>Renamed for history</ins>", history, StringComparison.Ordinal);
+        Assert.DoesNotContain(other.ClientId, history, StringComparison.Ordinal);
+
+        Assert.Equal(HttpStatusCode.NotFound, (await Http.GetAsync(new Uri("/AuditLogs/History?type=Spaceship&id=1", UriKind.Relative))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await Http.GetAsync(new Uri("/AuditLogs/History?type=Client", UriKind.Relative))).StatusCode);
+    }
+
+    [MySqlFact]
+    public async Task TheAuditLog_ShowsPeoplesActionsUnlessAskedForTheService()
+    {
+        await SignInAsync();
+        await CreateClientAsync();
+
+        var people = await Http.GetStringAsync(new Uri("/AuditLogs", UriKind.Relative));
+        Assert.Contains(PortalFactory.AdminUsername, people, StringComparison.Ordinal);
+        Assert.DoesNotContain(">The service</span>", people, StringComparison.Ordinal);
+
+        var service = await Http.GetStringAsync(new Uri("/AuditLogs?Who=System", UriKind.Relative));
+        Assert.DoesNotContain($"<span>{PortalFactory.AdminUsername}</span>", service, StringComparison.Ordinal);
+    }
+
+    [MySqlFact]
     public async Task ACreatedClient_ShowsASecretOnceAndKeepsOnlyItsHash()
     {
         await SignInAsync();
@@ -391,7 +433,8 @@ public sealed partial class AdminPortalTests : IAsyncLifetime, IDisposable
         var paths = new[]
         {
             "/", "/Clients", "/Clients/Create", $"/Clients/Details/{client.Id}", $"/Clients/Edit/{client.Id}", $"/Clients/{client.Id}/Secrets/Create",
-            $"/Clients/{client.Id}/Secrets/{secret.Id}/Revoke", "/Scopes", "/Scopes/Create", $"/Scopes/Edit/{statsScope.Id}", "/SigningKeys", "/SigningKeys/Rotate", "/AccessTokens", "/UpstreamTokens"
+            $"/Clients/{client.Id}/Secrets/{secret.Id}/Revoke", "/Scopes", "/Scopes/Create", $"/Scopes/Edit/{statsScope.Id}", "/SigningKeys", "/SigningKeys/Rotate", "/AccessTokens", "/UpstreamTokens",
+            "/AuditLogs", "/AuditLogs?Who=All&EntityType=Client&Action=Created&From=2026-01-01&To=2026-12-31&PageNumber=2", $"/AuditLogs/History?type=Client&id={client.Id}"
         };
         foreach (var path in paths)
         {

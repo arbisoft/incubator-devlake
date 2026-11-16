@@ -35,7 +35,7 @@ limitations under the License.
         <td>@AdminPageModel.Utc(token.ExpiresOn)</td>
         <td class="mono">@token.IssuedToIp</td>
         <td class="mono long">@token.Jti</td>
-        <td>@if (token.Status == "Active") { <a asp-page="Revoke" asp-route-jti="@token.Jti">Revoke</a> }</td>
+        <td class="row-actions">@if (token.Status == "Active") { <a asp-page="Revoke" asp-route-jti="@token.Jti">Revoke</a> }<history-link type="AccessToken" entity-id="@token.Jti" label="@token.Jti" /></td>
       </tr>
   }
   @if (Model.Tokens.Count == 0)

@@ -24,7 +24,7 @@ limitations under the License.
 <p class="muted">Everyone who has signed in to the portal. A new Arbisoft account has no access until you grant it. <strong>Editor</strong> sees all data and makes changes; <strong>Admin</strong> can also manage users here.</p>
 <div class="table-wrap">
 <table>
-  <thead><tr><th>User</th><th>Sign-in</th><th>Last signed in</th><th>Access</th><th></th></tr></thead>
+  <thead><tr><th>User</th><th>Sign-in</th><th>Last signed in</th><th>Access</th><th></th><th></th></tr></thead>
   <tbody>
   @foreach (var user in Model.Users)
   {
@@ -58,11 +58,12 @@ limitations under the License.
           }
         </td>
         <td class="muted">@(user.ModifiedBy is null ? "" : $"Changed by {user.ModifiedBy}")</td>
+        <td class="row-actions"><history-link type="PortalUser" entity-id="@user.Id" label="@user.SignInName" /></td>
       </tr>
   }
   @if (Model.Users.Count == 0)
   {
-      <tr><td colspan="5" class="muted">No users yet.</td></tr>
+      <tr><td colspan="6" class="muted">No users yet.</td></tr>
   }
   </tbody>
 </table>

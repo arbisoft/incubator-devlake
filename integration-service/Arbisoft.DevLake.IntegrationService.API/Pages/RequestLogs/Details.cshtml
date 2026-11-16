@@ -85,4 +85,4 @@ else
   </tbody>
 </table>
 </div>
-<p><a asp-page="Index">Back to the list</a></p>
+<p class="actions"><a asp-page="Index">Back to the list</a><a class="button secondary" asp-page="/AuditLogs/History" asp-route-type="Request" asp-route-id="@log.Id">History</a></p>

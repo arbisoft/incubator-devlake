@@ -67,6 +67,7 @@ public static class DependencyInjection
         services.AddScoped<IPortalUserService, PortalUserService>();
         services.AddScoped<IRequestLogService, RequestLogService>();
         services.AddScoped<IAuditTrail, AuditTrail>();
+        services.AddScoped<IAuditLogService, AuditLogService>();
         services.AddScoped<IIdempotencyCheck, IdempotencyCheck>();
         services.AddScoped<IRequestStatusTransitions, RequestStatusTransitions>();
         services.AddScoped<IRequestService, RequestService>();

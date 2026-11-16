@@ -25,6 +25,7 @@ limitations under the License.
 <div class="actions">
   <a class="button secondary" asp-page="Edit" asp-route-id="@c.Id">Edit</a>
   <a class="button" asp-page="Secrets/Create" asp-route-id="@c.Id">New secret</a>
+  <a class="button secondary" asp-page="/AuditLogs/History" asp-route-type="Client" asp-route-id="@c.Id">History</a>
 </div>
 <div class="panel">
   <dl>

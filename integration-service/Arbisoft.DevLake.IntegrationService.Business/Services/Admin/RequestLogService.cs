@@ -75,11 +75,8 @@ public sealed class RequestLogService : IRequestLogService
 
     public async Task<PageDto<RequestLogDto>> ListAsync(RequestLogQuery query, int page, int pageSize, RequestLogSort sort, CancellationToken cancellationToken)
     {
-        var filter = new RequestLogFilter(
-            query.ClientRefId,
-            string.IsNullOrWhiteSpace(query.Status) ? null : query.Status,
-            query.From is { } from ? new DateTimeOffset(from.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : null,
-            query.To is { } to ? new DateTimeOffset(to.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : null);
+        var (from, before) = UtcDays.Range(query.From, query.To);
+        var filter = new RequestLogFilter(query.ClientRefId, string.IsNullOrWhiteSpace(query.Status) ? null : query.Status, from, before);
         var size = PageSizes.Contains(pageSize) ? pageSize : DefaultPageSize;
         var result = await _logs.ListAsync(filter, Math.Max(page, 1), size, cancellationToken, sort);
         var clients = new Dictionary<long, Client?>();

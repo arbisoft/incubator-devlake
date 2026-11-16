@@ -29,7 +29,7 @@ limitations under the License.
   @foreach (var scope in Model.Scopes)
   {
       <tr><td class="mono">@scope.Name</td><td>@scope.Description</td><td>@AdminPageModel.Utc(scope.CreatedOn)</td>
-          <td><a asp-page="Edit" asp-route-id="@scope.Id">Edit</a></td></tr>
+          <td class="row-actions"><a asp-page="Edit" asp-route-id="@scope.Id">Edit</a><history-link type="Scope" entity-id="@scope.Id" label="@scope.Name" /></td></tr>
   }
   @if (Model.Scopes.Count == 0)
   {
