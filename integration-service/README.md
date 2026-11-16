@@ -56,6 +56,38 @@ The host refuses to start if a required setting is missing or `Security__Encrypt
 
 Private signing keys are stored AES-256-GCM encrypted in the `SecretStoreEntries` table, named by `SigningKeys.privateKeyRef`. An environment variable `Secrets__<privateKeyRef>` overrides the stored copy, so a deployment can keep a key in a vault instead. If the master key is lost, rotate to a new signing key: tokens signed with the old one still verify because public keys are in the database.
 
+### Mock Sophia
+
+`dev/mock_sophia.py` (Python 3, standard library only) stands in for Sophia on both sides, so the whole flow can be run locally:
+
+- **As Sophia the client** it gets a bearer token from `POST /auth/token/` with OAuth2 client credentials, sends single-email and batch stats requests, and polls each one.
+- **As Sophia the callback receiver** it runs its own OAuth2 client-credentials token endpoint and a callback endpoint that accepts only tokens it issued, the way the real Sophia does. Every callback is recorded and matched to its request.
+
+It serves, by default on `http://127.0.0.1:5097/sophia`: `POST /oauth2/token/`, `POST /api/v1/devlake/callback/` (also PUT and PATCH) and `GET /callbacks` (what it received, newest first).
+
+Set it up once in the admin portal, for the client Sophia uses (for example `sophia-local`):
+
+1. **Client:** active, with the `stats:read` scope and a secret. The secret is shown once; put it in `SOPHIA_CLIENT_SECRET` and the Client ID in `SOPHIA_CLIENT_ID`.
+2. **Outbound config:** auth type OAuth2 client credentials, base URL `http://127.0.0.1:5097/sophia`, token URL `http://127.0.0.1:5097/sophia/oauth2/token/`, and as outbound client ID and secret the values of `SOPHIA_OUTBOUND_CLIENT_ID` and `SOPHIA_OUTBOUND_CLIENT_SECRET` (the mock accepts only these at its token endpoint).
+3. **Callback URLs:** `engineer-stats` and `engineer-stats-batch`, both `POST` to `/api/v1/devlake/callback/`.
+
+Then, with the API running on `http://localhost:5099` and DevLake reachable:
+
+```sh
+set -a; . ./.env; set +a
+python3 dev/mock_sophia.py run --emails jane@arbisoft.com,john@arbisoft.com --singles 4 --batches 1 --tf 1w
+```
+
+Instead of `--emails`, `--emails-from-devlake N` uses the N most active engineers in the local DevLake database: `@arbisoft.com` emails (`--email-domain`) that appear as commit authors, Jira or GitHub accounts, or in AI usage, ranked by how much activity each has, leaving out any the Integration Service would refuse. It reads them with a read-only query through the MySQL client in DevLake's container (`devlake-mysql-1`, database `lake`, user `merico`), taking the password from `DB_URL` in the repository root's `.env`; `--devlake-container`, `--devlake-password` and `--devlake-env` change that. Each batch takes the next group of up to 20 emails, the batch API's limit:
+
+```sh
+python3 dev/mock_sophia.py run --emails-from-devlake 25 --singles 5 --batches 2
+```
+
+It prints each acknowledgement, every token request and callback it receives, and a report per request (poll status, callbacks received, engineers, `errors`). It exits 0 when every request ended `Success` with an accepted callback, and 1 otherwise. Identical requests inside the duplicate window come back with the original correlation ID; the report notes it.
+
+Useful options: `--from`/`--to` instead of `--tf` for single requests; `--callback-statuses 503,429,400` answers the first callbacks with those statuses (then 200) to watch the retry rules, with `--retry-after N` sent on a 429 or 503; `--token-lifetime` for how long its tokens last; `--verbose` prints every callback body. `python3 dev/mock_sophia.py serve` runs only the Sophia side, to drive requests some other way (for example Swagger). `--help` lists the rest. The client, outbound and service settings can also be given as `--client-id`, `--outbound-client-id`, `--service-url` and so on instead of the environment.
+
 Health endpoints: `/health/live` and `/health/ready`. Readiness checks MySQL and RabbitMQ.
 
 Run **one instance of the API**. Several things live in the process, not in shared state: the rate limits, the cap on concurrent DevLake calls (`DevLake:MaxConcurrentRequests`), the cache of Sophia access tokens, and the processing job. A second instance would double every limit, and its job's stale-request sweep could mark `Failed` a request the other instance is still delivering. The admin portal can run separately; it does not process requests.
