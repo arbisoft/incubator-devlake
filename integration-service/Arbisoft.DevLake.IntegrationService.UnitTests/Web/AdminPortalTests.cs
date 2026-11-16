@@ -246,7 +246,7 @@ public sealed partial class AdminPortalTests : IAsyncLifetime, IDisposable
     {
         await SignInAsync();
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(
-            "/RequestLogs?handler=List&ClientRefId=&Status=&From=&To=&draw=1&page=1&pageSize=10&sort=created&dir=desc&_=1763290000000", UriKind.Relative));
+            "/RequestLogs?handler=List&ClientRefId=&Status=&From=&To=&draw=1&pageNumber=1&pageSize=10&sort=created&dir=desc&_=1763290000000", UriKind.Relative));
         request.Headers.Add("X-Requested-With", "XMLHttpRequest");
         request.Headers.Accept.ParseAdd("application/json, text/javascript, */*; q=0.01");
 
@@ -516,11 +516,15 @@ public sealed partial class AdminPortalTests : IAsyncLifetime, IDisposable
         Assert.Contains("data-page-sizes=\"10,20,30,40,50\"", page, StringComparison.Ordinal);
 
         async Task<string> ListAsync(string query) =>
-            await Http.GetStringAsync(new Uri($"/RequestLogs?handler=List&draw=7&page=1&pageSize=10&ClientRefId={client.Id}&{query}", UriKind.Relative));
+            await Http.GetStringAsync(new Uri($"/RequestLogs?handler=List&draw=7&pageNumber=1&pageSize=10&ClientRefId={client.Id}&{query}", UriKind.Relative));
         var listed = await ListAsync($"Status=Failed&From={today}&To={today}&sort=created&dir=desc");
         Assert.Contains(correlation, listed, StringComparison.Ordinal);
         Assert.Contains("\"draw\":7", listed, StringComparison.Ordinal);
         Assert.Contains("\"recordsTotal\":1", listed, StringComparison.Ordinal);
+        // "page" is reserved by Razor Pages for the page's own path, so the page number has another name; the second page of one row is empty.
+        var secondPage = await Http.GetStringAsync(new Uri($"/RequestLogs?handler=List&draw=8&pageNumber=2&pageSize=10&ClientRefId={client.Id}", UriKind.Relative));
+        Assert.DoesNotContain(correlation, secondPage, StringComparison.Ordinal);
+        Assert.Contains("\"recordsTotal\":1", secondPage, StringComparison.Ordinal);
         var otherStatus = await ListAsync("Status=Success");
         Assert.DoesNotContain(correlation, otherStatus, StringComparison.Ordinal);
         var otherDay = await ListAsync("From=2000-01-01&To=2000-01-02");

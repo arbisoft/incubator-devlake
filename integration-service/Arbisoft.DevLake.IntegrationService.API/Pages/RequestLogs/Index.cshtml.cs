@@ -53,7 +53,7 @@ public sealed class IndexModel(IRequestLogService logs, IClientService clients) 
     /// rows of that page, in the shape DataTables' server-side mode expects. <paramref name="sort"/> is one of the names in the table below;
     /// anything else sorts by the created time.
     /// </summary>
-    public async Task<IActionResult> OnGetListAsync(int draw, int page = 1, int pageSize = RequestLogService.DefaultPageSize, string? sort = null, string? dir = null, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> OnGetListAsync(int draw, int pageNumber = 1, int pageSize = RequestLogService.DefaultPageSize, string? sort = null, string? dir = null, CancellationToken cancellationToken = default)
     {
         var column = sort switch
         {
@@ -64,7 +64,7 @@ public sealed class IndexModel(IRequestLogService logs, IClientService clients) 
             _ => RequestLogSortColumn.CreatedOn
         };
         var result = await logs.ListAsync(
-            new RequestLogQuery(ClientRefId, Status, From, To), page, pageSize, new RequestLogSort(column, !string.Equals(dir, "asc", StringComparison.OrdinalIgnoreCase)), cancellationToken);
+            new RequestLogQuery(ClientRefId, Status, From, To), pageNumber, pageSize, new RequestLogSort(column, !string.Equals(dir, "asc", StringComparison.OrdinalIgnoreCase)), cancellationToken);
         return new JsonResult(new
         {
             draw,

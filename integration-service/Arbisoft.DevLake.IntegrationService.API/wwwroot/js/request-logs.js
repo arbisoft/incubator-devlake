@@ -77,7 +77,7 @@
       var sort = request.order.length ? request.order[0] : { column: 0, dir: 'desc' };
       var query = $form.serialize() + '&' + $.param({
         draw: request.draw,
-        page: Math.floor(request.start / request.length) + 1,
+        pageNumber: Math.floor(request.start / request.length) + 1,
         pageSize: request.length,
         sort: request.columns[sort.column].name,
         dir: sort.dir
