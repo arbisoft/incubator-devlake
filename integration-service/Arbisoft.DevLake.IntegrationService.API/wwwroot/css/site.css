@@ -81,6 +81,8 @@ limitations under the License.
 }
 
 * { box-sizing: border-box; }
+/* A component that sets its own display (.errors is flex) would otherwise show an element marked hidden. */
+[hidden] { display: none !important; }
 
 html { -webkit-text-size-adjust: 100%; }
 
