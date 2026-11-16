@@ -13,6 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
+
 namespace Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
 
 /// <summary>Stores secrets that are already encrypted. The repository never sees plain values or the master key.</summary>
@@ -21,6 +23,9 @@ public interface ISecretStoreRepository
     /// <summary>The encrypted value saved under <paramref name="secretRef"/>, or null when there is none.</summary>
     Task<string?> GetEncryptedValueAsync(string secretRef, CancellationToken cancellationToken);
 
-    /// <summary>Inserts the value, or replaces it when the reference already exists.</summary>
-    Task SaveEncryptedValueAsync(string secretRef, string encryptedValue, DateTimeOffset at, CancellationToken cancellationToken);
+    /// <summary>Inserts the value, or replaces it when the reference already exists. <paramref name="savedBy"/> names an administrator, or is null for the service itself.</summary>
+    Task SaveEncryptedValueAsync(string secretRef, string encryptedValue, DateTimeOffset at, CancellationToken cancellationToken, string? savedBy = null);
+
+    /// <summary>When the entry was saved and by whom, without its value; null when there is none.</summary>
+    Task<SecretStoreEntryInfo?> GetInfoAsync(string secretRef, CancellationToken cancellationToken);
 }

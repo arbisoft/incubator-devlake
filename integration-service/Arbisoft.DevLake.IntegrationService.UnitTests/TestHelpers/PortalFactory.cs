@@ -47,8 +47,6 @@ public sealed class PortalFactory : WebApplicationFactory<WebAssemblyMarker>
         builder.UseSetting("RabbitMq:Port", broker?["port"] ?? "5672");
         builder.UseSetting("RabbitMq:UserName", broker?["user"] ?? "user");
         builder.UseSetting("RabbitMq:Password", broker?["password"] ?? "pass");
-        builder.UseSetting("DevLake:ApiToken", "token");
-        builder.UseSetting("Workstream:ApiToken", "token");
         if (_configureAdmin)
         {
             builder.UseSetting("Admin:Username", AdminUsername);

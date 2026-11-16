@@ -82,9 +82,7 @@ public sealed class MySqlDatabaseFixture : IAsyncLifetime
             ["RabbitMq:UserName"] = "user",
             ["RabbitMq:Password"] = "pass",
             ["DevLake:BaseUrl"] = "http://localhost:8080",
-            ["DevLake:ApiToken"] = "token",
-            ["Workstream:BaseUrl"] = "http://localhost:5097",
-            ["Workstream:ApiToken"] = "token"
+            ["Workstream:BaseUrl"] = "http://localhost:5097"
         };
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
         return new ServiceCollection().AddLogging().AddDataAccess(configuration).BuildServiceProvider(validateScopes: true);

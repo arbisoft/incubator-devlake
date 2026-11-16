@@ -47,12 +47,13 @@ Settings live in each project's `appsettings.json`. Secrets are never put there.
 ```sh
 export Database__ConnectionString="Server=127.0.0.1;Port=3308;Database=integration;User=integration;Password=<password>"
 export RabbitMq__UserName=<user> RabbitMq__Password=<password>
-export DevLake__ApiToken=<token> Workstream__ApiToken=<token>
 export Security__EncryptionKey=$(openssl rand -base64 32)   # keep it: it decrypts the stored secrets
 dotnet run --project Arbisoft.DevLake.IntegrationService.API
 ```
 
 The host refuses to start if a required setting is missing or `Security__EncryptionKey` is not 32 bytes of base64.
+
+The DevLake and Workstream API tokens are not settings. Enter them on the admin portal's **Upstream tokens** page (below); they are stored encrypted in the database.
 
 Private signing keys are stored AES-256-GCM encrypted in the `SecretStoreEntries` table, named by `SigningKeys.privateKeyRef`. An environment variable `Secrets__<privateKeyRef>` overrides the stored copy, so a deployment can keep a key in a vault instead. If the master key is lost, rotate to a new signing key: tokens signed with the old one still verify because public keys are in the database.
 
@@ -114,6 +115,7 @@ Every page needs the sign-in (the fallback policy is deny), POSTs need an anti-f
 - **Email mappings:** list (50 a page, with search), create and edit the other emails each engineer commits with. Both addresses are trimmed and lower-cased by `EmailNormalizer` before they are compared or stored, the Arbisoft address must be in `Requests:AllowedEmailDomains`, and the mapped address is also kept as typed. The matched columns use a binary collation, so SQL compares exactly what the code compares.
 - **Outbound configs:** one per client. Choose OAuth2 client credentials or a static API token, the base URL (HTTPS; plain HTTP only for localhost), max delivery attempts (1 to 10) and the active flag. Secrets are encrypted before they are stored and are never shown again: leave a field blank to keep the stored value, or type a new one to rotate it. The page shows whether one is stored, when it was last rotated and, for a token, when it expires. Fields for the other auth type are cleared on save.
 - **Callback URLs:** for each config, the event type to method and path mappings. The path is appended to the base URL, keeping the base URL's own path (`https://sophia.example.com/api/v1` and `/cb` call `https://sophia.example.com/api/v1/cb`), and the config page shows the full URL each one calls. The path is checked with the same code that builds the calls, so it must start with a single `/` and stay on the base URL's host. Only one URL can be active per event type.
+- **Upstream tokens:** the API tokens this service uses to call DevLake and Workstream. Each is write-only: the page shows whether one is stored and when and by whom it was last saved, never the value, and typing a new one replaces it. Tokens are stored AES-256-GCM encrypted in `SecretStoreEntries` (`upstream.devlake.api-token` and `upstream.workstream.api-token`), like the signing keys, so they too need `Security__EncryptionKey`. **Check token** asks the system's `is_valid` whether it accepts the stored token. The API caches a token for a minute, so a new one takes effect within a minute, without a restart. Until a token is stored, calls to that system fail as a credentials problem whose message says to enter it here; for DevLake the processing job then pauses, and requests wait.
 - **Request logs:** filter by client, status and UTC dates (50 a page), and open a request to see its JSON body, when a waiting request is next due, and every delivery attempt with the client's response. The body holds engineer emails, so it is shown only here. A `Failed` request with a stored body has a **Retry** button for when the cause is fixed (a broken callback, DevLake down for hours, an expired request): it goes back to `Queued`, due at once, keeps its correlation ID so the client receives it as the original request, and gets a fresh two-hour lifetime and a fresh set of delivery attempts; its stats are collected again. The retry is listed in the attempt history as `Retried` with the admin's name. `createdOn` keeps when the client sent the request; `queuedOn` is when it last entered processing, and the lifetime and the attempt count are measured from it.
 
 The client, scope, key and token lists show at most 200 rows.
@@ -218,8 +220,8 @@ Three typed HTTP clients make the outbound calls. Each has its own timeout and c
 
 | Client | Calls | Authentication |
 |---|---|---|
-| DevLake | `GET /is_valid`, `GET /stats/{email}/jira`, `/github`, `/ai_usage`, `/ai_cost` with `?tf=24h` or `?from=...&to=...`. `DevLake:BaseUrl` ends in `/rest/` | `Authorization: Bearer <DevLake:ApiToken>` |
-| Workstream | `GET /is_valid`, `GET /projects?page=N&pageSize=M` | `Authorization: Bearer <Workstream:ApiToken>` |
+| DevLake | `GET /is_valid`, `GET /stats/{email}/jira`, `/github`, `/ai_usage`, `/ai_cost` with `?tf=24h` or `?from=...&to=...`. `DevLake:BaseUrl` ends in `/rest/` | `Authorization: Bearer <DevLake token from the Upstream tokens page>` |
+| Workstream | `GET /is_valid`, `GET /projects?page=N&pageSize=M` | `Authorization: Bearer <Workstream token from the Upstream tokens page>` |
 | Sophia | `POST /oauth2/token/`, then the callback (`POST /api/v1/devlake/callback/`) | OAuth2 client credentials, or a stored API token |
 
 Sophia's base URL, token URL, client ID, encrypted secret, scope and callback path and method come from the client's `ClientConfigs` and `ClientConfigOutboundUrls` rows, because each environment (Stage, Prod) has its own. The access token is reused until a minute before it expires, a rejected token is replaced once, and URLs must use HTTPS (plain HTTP only for loopback, for local stubs).

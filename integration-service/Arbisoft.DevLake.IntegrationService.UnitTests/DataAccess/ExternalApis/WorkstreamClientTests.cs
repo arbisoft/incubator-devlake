@@ -40,6 +40,16 @@ public sealed class WorkstreamClientTests : IDisposable
     }
 
     [Fact]
+    public async Task WithNoTokenSet_NothingIsSent_AndTheCallFailsAsACredentialsProblem()
+    {
+        _host.Tokens.Workstream = null;
+
+        await Assert.ThrowsAsync<ExternalAuthenticationException>(() => UseAsync(client => client.GetProjectsPageAsync(1, 10, CorrelationId, CancellationToken.None)));
+
+        Assert.Empty(_host.Handler.Requests);
+    }
+
+    [Fact]
     public async Task IsTokenValid_SendsTheToken_AndReadsTrue()
     {
         _host.Handler.Respond(HttpStatusCode.OK, "true");
@@ -48,7 +58,7 @@ public sealed class WorkstreamClientTests : IDisposable
 
         var request = Assert.Single(_host.Handler.Requests);
         Assert.Equal("https://workstream.test/api/is_valid", request.AbsoluteUri);
-        Assert.Equal("Bearer workstream-token-value", request.Authorization);
+        Assert.Equal($"Bearer {ExternalApiHost.WorkstreamToken}", request.Authorization);
         Assert.Equal(CorrelationId, request.CorrelationId);
     }
 

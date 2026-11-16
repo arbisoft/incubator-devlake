@@ -62,6 +62,7 @@ public static class DependencyInjection
         services.AddScoped<IAccessTokenService, AccessTokenService>();
         services.AddScoped<IEmailMappingService, EmailMappingService>();
         services.AddScoped<IClientConfigService, ClientConfigService>();
+        services.AddScoped<IUpstreamTokenService, UpstreamTokenService>();
         services.AddScoped<IRequestLogService, RequestLogService>();
         services.AddScoped<IIdempotencyCheck, IdempotencyCheck>();
         services.AddScoped<IRequestService, RequestService>();

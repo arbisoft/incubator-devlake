@@ -16,9 +16,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
-using Arbisoft.DevLake.IntegrationService.DataAccess.Options;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace Arbisoft.DevLake.IntegrationService.DataAccess.ExternalApis.DevLake;
 
@@ -28,15 +26,15 @@ public sealed class DevLakeClient : IDevLakeClient
     private const string TokenValidityPath = "is_valid";
 
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly DevLakeOptions _options;
     private readonly DevLakeConcurrencyGate _gate;
+    private readonly IUpstreamTokenProvider _tokens;
     private readonly ILogger<DevLakeClient> _logger;
 
-    public DevLakeClient(IHttpClientFactory httpClientFactory, IOptions<DevLakeOptions> options, DevLakeConcurrencyGate gate, ILogger<DevLakeClient> logger)
+    public DevLakeClient(IHttpClientFactory httpClientFactory, DevLakeConcurrencyGate gate, IUpstreamTokenProvider tokens, ILogger<DevLakeClient> logger)
     {
         _httpClientFactory = httpClientFactory;
-        _options = options.Value;
         _gate = gate;
+        _tokens = tokens;
         _logger = logger;
     }
 
@@ -83,8 +81,9 @@ public sealed class DevLakeClient : IDevLakeClient
 
     private async Task<HttpResponseMessage> SendAsync(string relativeUrl, string correlationId, CancellationToken cancellationToken)
     {
+        var token = await _tokens.GetAsync(UpstreamSystem.DevLake, cancellationToken);
         using var request = new HttpRequestMessage(HttpMethod.Get, relativeUrl);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiToken);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         request.Headers.Add(ExternalApiHeaders.CorrelationId, correlationId);
         return await ExternalApiCall.SendAsync(_httpClientFactory.CreateClient(ExternalHttpClients.DevLake), request, SystemName, correlationId, _logger, cancellationToken);
     }

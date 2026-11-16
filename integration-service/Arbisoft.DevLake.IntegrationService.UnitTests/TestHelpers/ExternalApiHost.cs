@@ -32,6 +32,7 @@ public sealed class ExternalApiHost : IDisposable
     public const string DevLakeBase = "https://devlake.test/rest/";
     public const string WorkstreamBase = "https://workstream.test/api/";
     public const string ApiToken = "devlake-token-value";
+    public const string WorkstreamToken = "workstream-token-value";
 
     private readonly ServiceProvider _provider;
 
@@ -44,9 +45,7 @@ public sealed class ExternalApiHost : IDisposable
             ["RabbitMq:UserName"] = "u",
             ["RabbitMq:Password"] = "p",
             ["DevLake:BaseUrl"] = DevLakeBase,
-            ["DevLake:ApiToken"] = ApiToken,
             ["Workstream:BaseUrl"] = WorkstreamBase,
-            ["Workstream:ApiToken"] = "workstream-token-value",
             ["Resilience:RetryBaseDelayMilliseconds"] = "1",
             ["Resilience:BreakerMinimumThroughput"] = "1000"
         };
@@ -58,6 +57,7 @@ public sealed class ExternalApiHost : IDisposable
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
         var services = new ServiceCollection().AddLogging(builder => builder.AddProvider(Logs)).AddDataAccess(configuration);
         services.AddScoped(_ => Configs);
+        services.AddScoped<IUpstreamTokenProvider>(_ => Tokens);
         foreach (var name in new[] { ExternalHttpClients.DevLake, ExternalHttpClients.Workstream, ExternalHttpClients.SophiaToken, ExternalHttpClients.SophiaCallback })
         {
             services.AddHttpClient(name).ConfigurePrimaryHttpMessageHandler(() => Handler.AsHandler());
@@ -71,6 +71,9 @@ public sealed class ExternalApiHost : IDisposable
     public CapturedLogs Logs { get; } = new();
 
     public IClientConfigRepository Configs { get; } = Substitute.For<IClientConfigRepository>();
+
+    /// <summary>The DevLake and Workstream tokens the clients get, as the admin portal would have stored them.</summary>
+    public FixedUpstreamTokens Tokens { get; } = new(ApiToken, WorkstreamToken);
 
     public IHttpClientFactory HttpClientFactory => _provider.GetRequiredService<IHttpClientFactory>();
 

@@ -31,9 +31,7 @@ public class DependencyInjectionTests
         ["RabbitMq:UserName"] = "user",
         ["RabbitMq:Password"] = "pass",
         ["DevLake:BaseUrl"] = "http://localhost:8080",
-        ["DevLake:ApiToken"] = "token",
-        ["Workstream:BaseUrl"] = "http://localhost:5097",
-        ["Workstream:ApiToken"] = "token"
+        ["Workstream:BaseUrl"] = "http://localhost:5097"
     };
 
     private static ServiceProvider Build(Dictionary<string, string?> settings)
@@ -59,7 +57,7 @@ public class DependencyInjectionTests
     [Theory]
     [InlineData("Database:ConnectionString")]
     [InlineData("RabbitMq:UserName")]
-    [InlineData("DevLake:ApiToken")]
+    [InlineData("DevLake:BaseUrl")]
     [InlineData("Workstream:BaseUrl")]
     public void AddDataAccess_MissingRequiredSetting_FailsValidation(string missingKey)
     {

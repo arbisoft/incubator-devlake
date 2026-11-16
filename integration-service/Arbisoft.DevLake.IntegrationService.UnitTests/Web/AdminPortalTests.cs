@@ -247,7 +247,7 @@ public sealed partial class AdminPortalTests : IAsyncLifetime, IDisposable
         var paths = new[]
         {
             "/", "/Clients", "/Clients/Create", $"/Clients/Details/{client.Id}", $"/Clients/Edit/{client.Id}", $"/Clients/{client.Id}/Secrets/Create",
-            $"/Clients/{client.Id}/Secrets/{secret.Id}/Revoke", "/Scopes", "/Scopes/Create", $"/Scopes/Edit/{statsScope.Id}", "/SigningKeys", "/SigningKeys/Rotate", "/AccessTokens"
+            $"/Clients/{client.Id}/Secrets/{secret.Id}/Revoke", "/Scopes", "/Scopes/Create", $"/Scopes/Edit/{statsScope.Id}", "/SigningKeys", "/SigningKeys/Rotate", "/AccessTokens", "/UpstreamTokens"
         };
         foreach (var path in paths)
         {
@@ -397,6 +397,28 @@ public sealed partial class AdminPortalTests : IAsyncLifetime, IDisposable
         Assert.Contains("HTTP 502", details, StringComparison.Ordinal);
         Assert.Contains("bad gateway", details, StringComparison.Ordinal);
         Assert.Equal(HttpStatusCode.NotFound, (await Http.GetAsync(new Uri("/RequestLogs/Details/999999999", UriKind.Relative))).StatusCode);
+    }
+
+    [MySqlFact]
+    public async Task AnUpstreamToken_IsSavedEncrypted_ShownOnlyAsSetWithWhoSavedIt_AndAnEmptyOneIsRefused()
+    {
+        await SignInAsync();
+        const string token = "devlake-api-token-from-the-portal";
+
+        var saved = await PostFormAsync(Http, "/UpstreamTokens?handler=Save", ("system", "DevLake"), ("token", token));
+
+        Assert.Equal(HttpStatusCode.Redirect, saved.StatusCode);
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var stored = await scope.ServiceProvider.GetRequiredService<ISecretStoreRepository>().GetEncryptedValueAsync("upstream.devlake.api-token", CancellationToken.None);
+        Assert.NotNull(stored);
+        Assert.DoesNotContain(token, stored, StringComparison.Ordinal);
+        var page = await Http.GetStringAsync(new Uri("/UpstreamTokens", UriKind.Relative));
+        Assert.Contains($"by {PortalFactory.AdminUsername}", page, StringComparison.Ordinal);
+        Assert.DoesNotContain(token, page, StringComparison.Ordinal);
+
+        var empty = await PostFormAsync(Http, "/UpstreamTokens?handler=Save", ("system", "Workstream"), ("token", " "));
+        Assert.Equal(HttpStatusCode.OK, empty.StatusCode);
+        Assert.Contains("Enter the token.", await empty.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
 
     [MySqlFact]

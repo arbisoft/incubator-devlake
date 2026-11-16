@@ -17,9 +17,7 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
-using Arbisoft.DevLake.IntegrationService.DataAccess.Options;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace Arbisoft.DevLake.IntegrationService.DataAccess.ExternalApis.Workstream;
 
@@ -29,13 +27,13 @@ public sealed class WorkstreamClient : IWorkstreamClient
     private const string TokenValidityPath = "is_valid";
 
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly WorkstreamOptions _options;
+    private readonly IUpstreamTokenProvider _tokens;
     private readonly ILogger<WorkstreamClient> _logger;
 
-    public WorkstreamClient(IHttpClientFactory httpClientFactory, IOptions<WorkstreamOptions> options, ILogger<WorkstreamClient> logger)
+    public WorkstreamClient(IHttpClientFactory httpClientFactory, IUpstreamTokenProvider tokens, ILogger<WorkstreamClient> logger)
     {
         _httpClientFactory = httpClientFactory;
-        _options = options.Value;
+        _tokens = tokens;
         _logger = logger;
     }
 
@@ -68,8 +66,9 @@ public sealed class WorkstreamClient : IWorkstreamClient
 
     private async Task<HttpResponseMessage> SendAsync(string relativeUrl, string correlationId, CancellationToken cancellationToken)
     {
+        var token = await _tokens.GetAsync(UpstreamSystem.Workstream, cancellationToken);
         using var request = new HttpRequestMessage(HttpMethod.Get, relativeUrl);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiToken);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         request.Headers.Add(ExternalApiHeaders.CorrelationId, correlationId);
         return await ExternalApiCall.SendAsync(_httpClientFactory.CreateClient(ExternalHttpClients.Workstream), request, SystemName, correlationId, _logger, cancellationToken);
     }

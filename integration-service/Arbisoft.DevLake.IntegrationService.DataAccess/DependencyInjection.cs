@@ -79,6 +79,8 @@ public static class DependencyInjection
 
     private static void AddExternalApis(IServiceCollection services)
     {
+        services.AddMemoryCache();
+        services.AddScoped<IUpstreamTokenProvider, UpstreamTokenProvider>();
         services.AddSingleton<DevLakeConcurrencyGate>();
         services.AddSingleton<SophiaTokenCache>();
         services.AddScoped<IDevLakeClient, DevLakeClient>();

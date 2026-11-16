@@ -14,10 +14,12 @@
 // limitations under the License.
 
 using Arbisoft.DevLake.IntegrationService.API.Controllers;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Admin;
 using Arbisoft.DevLake.IntegrationService.DataAccess.ExternalApis;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers;
 
@@ -33,6 +35,34 @@ public sealed class ApiFactory : WebApplicationFactory<AuthController>
         _connectionString = connectionString;
         _extraSettings = extraSettings ?? new Dictionary<string, string>();
         _upstream = upstream;
+    }
+
+    /// <summary>The DevLake and Workstream API token this API instance holds; the upstream stubs expect it.</summary>
+    public const string UpstreamToken = "token";
+
+    /// <summary>
+    /// Saves the DevLake and Workstream tokens through the admin service once the host has started (and migrated the database), as an administrator
+    /// would in the portal. Each instance has its own encryption key, so it saves its own copy.
+    /// </summary>
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        var host = base.CreateHost(builder);
+        SeedUpstreamTokensAsync(host.Services).GetAwaiter().GetResult();
+        return host;
+    }
+
+    private static async Task SeedUpstreamTokensAsync(IServiceProvider services)
+    {
+        await using var scope = services.CreateAsyncScope();
+        var tokens = scope.ServiceProvider.GetRequiredService<IUpstreamTokenService>();
+        foreach (var system in UpstreamSystems.All)
+        {
+            var saved = await tokens.SaveAsync(system, UpstreamToken, "tests", CancellationToken.None);
+            if (!saved.Succeeded)
+            {
+                throw new InvalidOperationException(saved.Error);
+            }
+        }
     }
 
     /// <summary>The request queue this API instance uses. It is unique to the instance and deleted when the instance is disposed.</summary>
@@ -65,8 +95,6 @@ public sealed class ApiFactory : WebApplicationFactory<AuthController>
         builder.UseSetting("Security:Issuer", SecurityTestData.Issuer);
         builder.UseSetting("Security:Audience", SecurityTestData.Audience);
         UseRabbitMqSettings(builder);
-        builder.UseSetting("DevLake:ApiToken", "token");
-        builder.UseSetting("Workstream:ApiToken", "token");
         builder.UseSetting("DevLake:BaseUrl", $"http://localhost:{UpstreamStub.DevLakePort}");
         builder.UseSetting("Workstream:BaseUrl", $"http://localhost:{UpstreamStub.WorkstreamPort}");
 

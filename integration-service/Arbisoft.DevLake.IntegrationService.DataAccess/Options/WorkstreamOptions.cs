@@ -17,16 +17,16 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Arbisoft.DevLake.IntegrationService.DataAccess.Options;
 
-/// <summary>Settings for calling Workstream, the source of project and team lead data.</summary>
+/// <summary>
+/// Settings for calling Workstream, the source of project and team lead data. Its API token is entered in the admin portal and kept encrypted in
+/// the database (<see cref="ExternalApis.IUpstreamTokenProvider"/>), never in configuration.
+/// </summary>
 public sealed class WorkstreamOptions
 {
     public const string SectionName = "Workstream";
 
     [Required, Url]
     public string BaseUrl { get; init; } = string.Empty;
-
-    [Required]
-    public string ApiToken { get; init; } = string.Empty;
 
     [Range(1, 100)]
     public int PageSize { get; init; } = 10;

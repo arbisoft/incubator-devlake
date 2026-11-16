@@ -17,16 +17,16 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Arbisoft.DevLake.IntegrationService.DataAccess.Options;
 
-/// <summary>Settings for calling DevLake. DevLake works on a manually generated API token, not OAuth2.</summary>
+/// <summary>
+/// Settings for calling DevLake. DevLake works on a manually generated API token, not OAuth2; it is entered in the admin portal and kept
+/// encrypted in the database (<see cref="ExternalApis.IUpstreamTokenProvider"/>), never in configuration.
+/// </summary>
 public sealed class DevLakeOptions
 {
     public const string SectionName = "DevLake";
 
     [Required, Url]
     public string BaseUrl { get; init; } = string.Empty;
-
-    [Required]
-    public string ApiToken { get; init; } = string.Empty;
 
     /// <summary>How long one attempt waits for DevLake before it counts as timed out.</summary>
     [Range(1, 300)]

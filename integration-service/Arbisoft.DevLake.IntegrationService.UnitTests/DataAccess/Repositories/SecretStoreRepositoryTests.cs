@@ -40,6 +40,21 @@ public class SecretStoreRepositoryTests : RepositoryTestBase
     }
 
     [MySqlFact]
+    public async Task Info_SaysWhenAndByWhomAnEntryWasLastSaved_WithoutItsValue()
+    {
+        var secretRef = Unique("token");
+        Assert.Null(await Repository.GetInfoAsync(secretRef, CancellationToken.None));
+
+        await Repository.SaveEncryptedValueAsync(secretRef, "v1.first", Instant, CancellationToken.None, "alice");
+        var created = (await Repository.GetInfoAsync(secretRef, CancellationToken.None))!;
+        Assert.Equal((Instant, (DateTimeOffset?)null, "alice"), (created.CreatedOn, created.ModifiedOn, created.ModifiedBy));
+
+        await Repository.SaveEncryptedValueAsync(secretRef, "v1.second", Instant.AddMinutes(1), CancellationToken.None, "bob");
+        var replaced = (await Repository.GetInfoAsync(secretRef, CancellationToken.None))!;
+        Assert.Equal((Instant, (DateTimeOffset?)Instant.AddMinutes(1), "bob"), (replaced.CreatedOn, replaced.ModifiedOn, replaced.ModifiedBy));
+    }
+
+    [MySqlFact]
     public async Task Get_UnknownReference_ReturnsNull()
     {
         Assert.Null(await Repository.GetEncryptedValueAsync(Unique("missing"), CancellationToken.None));

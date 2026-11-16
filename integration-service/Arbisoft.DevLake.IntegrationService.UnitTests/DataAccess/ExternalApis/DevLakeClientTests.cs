@@ -48,6 +48,17 @@ public sealed class DevLakeClientTests : IDisposable
     }
 
     [Fact]
+    public async Task WithNoTokenSet_NothingIsSent_AndTheCallFailsAsACredentialsProblem()
+    {
+        _host.Tokens.DevLake = null;
+
+        await Assert.ThrowsAsync<ExternalAuthenticationException>(() => UseAsync(client => client.IsTokenValidAsync(CorrelationId, CancellationToken.None)));
+        await Assert.ThrowsAsync<ExternalAuthenticationException>(() => UseAsync(client => client.GetStatsAsync(DevLakeStatsSource.Jira, Email, LastDay, CorrelationId, CancellationToken.None)));
+
+        Assert.Empty(_host.Handler.Requests);
+    }
+
+    [Fact]
     public async Task IsTokenValid_SendsTheApiTokenAsABearer_AndTheCorrelationId()
     {
         _host.Handler.Respond(HttpStatusCode.OK, "true");

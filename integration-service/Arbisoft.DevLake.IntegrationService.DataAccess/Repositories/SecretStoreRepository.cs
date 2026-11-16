@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Options;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Microsoft.Extensions.Options;
@@ -31,12 +32,18 @@ public sealed class SecretStoreRepository : RepositoryBase, ISecretStoreReposito
         return QuerySingleOrDefaultAsync<string>("SELECT encryptedValue FROM SecretStoreEntries WHERE secretRef = @secretRef", new { secretRef }, cancellationToken);
     }
 
-    public async Task SaveEncryptedValueAsync(string secretRef, string encryptedValue, DateTimeOffset at, CancellationToken cancellationToken)
+    public async Task SaveEncryptedValueAsync(string secretRef, string encryptedValue, DateTimeOffset at, CancellationToken cancellationToken, string? savedBy = null)
     {
         await ExecuteAsync(
-            "INSERT INTO SecretStoreEntries (secretRef, encryptedValue, createdOn) VALUES (@secretRef, @encryptedValue, @at) AS incoming " +
-            "ON DUPLICATE KEY UPDATE encryptedValue = incoming.encryptedValue, modifiedOn = @at",
-            new { secretRef, encryptedValue, at },
+            "INSERT INTO SecretStoreEntries (secretRef, encryptedValue, createdOn, modifiedBy) VALUES (@secretRef, @encryptedValue, @at, @savedBy) AS incoming " +
+            "ON DUPLICATE KEY UPDATE encryptedValue = incoming.encryptedValue, modifiedOn = @at, modifiedBy = incoming.modifiedBy",
+            new { secretRef, encryptedValue, at, savedBy },
             cancellationToken);
+    }
+
+    public Task<SecretStoreEntryInfo?> GetInfoAsync(string secretRef, CancellationToken cancellationToken)
+    {
+        return QuerySingleOrDefaultAsync<SecretStoreEntryInfo>(
+            "SELECT createdOn, modifiedOn, modifiedBy FROM SecretStoreEntries WHERE secretRef = @secretRef", new { secretRef }, cancellationToken);
     }
 }
