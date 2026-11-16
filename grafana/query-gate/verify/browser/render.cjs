@@ -134,15 +134,36 @@ function walkJson(dir) {
   return out;
 }
 
+// Query strings that select each tab of a v2 TabsLayout, whose panels only query once their tab is shown.
+function v2Tabs(layout) {
+  const tabsQuery = (key, tabsLayout) => ((tabsLayout.spec && tabsLayout.spec.tabs) || [])
+    .map((tab) => ({ title: tab.spec.title, query: `${key}=${encodeURIComponent(tab.spec.title.replace(/ /g, '-'))}` }));
+  if (!layout) return [];
+  if (layout.kind === 'TabsLayout') return tabsQuery('dtab', layout);
+  if (layout.kind !== 'RowsLayout') return [];
+  return ((layout.spec && layout.spec.rows) || []).flatMap((row) => (row.spec.layout && row.spec.layout.kind === 'TabsLayout'
+    ? tabsQuery(`${row.spec.title.replace(/ /g, '-')}-dtab`, row.spec.layout) : []));
+}
+
 function loadDashboards() {
   const all = walkJson(DASHBOARDS_DIR).sort().map((file) => {
     const j = JSON.parse(fs.readFileSync(file, 'utf8'));
     const rel = path.relative(ROOT, file).split(path.sep).join('/');
+    if (j.kind === 'Dashboard' && String(j.apiVersion || '').startsWith('dashboard.grafana.app/v2')) {
+      const spec = j.spec || {};
+      const v2Vars = (spec.variables || []).map((v) => v.spec.name);
+      const v2SqlPanelUids = Object.values(spec.elements || {}).filter((el) => el.kind === 'Panel')
+        .map((el) => ((el.spec.data && el.spec.data.spec && el.spec.data.spec.queries) || [])
+          .find((q) => typeof q.spec.query.spec.rawSql === 'string' && q.spec.query.spec.rawSql.trim() !== ''))
+        .filter(Boolean)
+        .map((q) => q.spec.query.datasource.name || '');
+      return { file: rel, uid: j.metadata.name, title: spec.title, vars: v2Vars, sqlPanelUids: v2SqlPanelUids, tabs: v2Tabs(spec.layout) };
+    }
     const vars = ((j.templating && j.templating.list) || []).map((v) => v.name);
     // Datasource uid of each top-level panel with SQL, so the count can follow what each topology has.
     const sqlPanelUids = (j.panels || []).filter((pn) => (pn.targets || []).some((t) => typeof t.rawSql === 'string' && t.rawSql.trim() !== ''))
       .map((pn) => ((pn.datasource && pn.datasource.uid) || ''));
-    return { file: rel, uid: j.uid, title: j.title, vars, sqlPanelUids };
+    return { file: rel, uid: j.uid, title: j.title, vars, sqlPanelUids, tabs: [] };
   });
   const bad = all.filter((d) => !d.uid);
   if (bad.length) fail(`dashboards without uid: ${bad.map((d) => d.file).join(', ')}`);
@@ -188,7 +209,8 @@ function printPlan(opts, selected, all, inputs) {
     console.log(`\ntopology ${t}: ${TOPOLOGIES[t].base}${TOPOLOGIES[t].direct ? ' (replay against direct Grafana)' : ' (no replay)'}`);
     for (const [user, setName] of Object.entries(PLAN[t])) {
       const steps = STEP_SETS[setName];
-      const fixed = steps.filter((s) => s !== 'vars').length * selected.length;
+      const tabScenarios = steps.includes('default') ? selected.reduce((n, d) => n + d.tabs.length, 0) : 0;
+      const fixed = steps.filter((s) => s !== 'vars').length * selected.length + tabScenarios;
       const specials = SPECIALS.filter((s) => s.users.includes(user)).reduce((n, s) => n + specialPages(s, inputs).length, 0);
       const extra = steps.includes('vars') ? ' + variable scenarios (found at run time)' : '';
       console.log(`  ${user}: steps [${steps.join(', ')}]: ${fixed} dashboard scenarios${extra}, ${specials} special`);
@@ -542,8 +564,11 @@ async function runVariables(st, page, rec, dash) {
 async function runDashboardSteps(st, page, rec, dash, steps) {
   for (const step of steps) {
     if (RANGE_STEPS[step]) await runScenario(st, page, rec, dash, step, () => gotoUrl(page, dashUrl(st, dash, `orgId=1&${RANGE_STEPS[step]}`)));
-    else if (step === 'refresh') await runScenario(st, page, rec, dash, 'refresh', () => evalOrThrow(page, refreshTimeRange));
-    else if (step === 'vars') await runVariables(st, page, rec, dash);
+    if (step === 'default') {
+      for (const tab of dash.tabs) await runScenario(st, page, rec, dash, `tab:${tab.title}`, () => gotoUrl(page, dashUrl(st, dash, `orgId=1&${RANGE_STEPS.default}&${tab.query}`)));
+    }
+    if (step === 'refresh') await runScenario(st, page, rec, dash, 'refresh', () => evalOrThrow(page, refreshTimeRange));
+    if (step === 'vars') await runVariables(st, page, rec, dash);
   }
 }
 
