@@ -15,29 +15,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 *@
 @model AuditEntriesView
-@using Arbisoft.DevLake.IntegrationService.DataAccess.Models
 <div class="table-wrap">
 <table class="audit">
-  <thead><tr><th>When (UTC)</th><th>Who</th><th>Action</th>@if (Model.ShowObject) { <th>Object</th> }<th>Changes</th><th>Note</th></tr></thead>
+  <thead><tr><th>Action At (UTC)</th><th>Action By</th><th>Action</th>@if (Model.ShowObject) { <th>Object</th> }<th>Changes</th><th>Note</th></tr></thead>
   <tbody>
   @foreach (var entry in Model.Entries)
   {
       var kind = AuditPages.KindOf(entry.EntityType);
       <tr>
-        <td class="nowrap">@AdminPageModel.Utc(entry.OccurredOn)</td>
+        <td class="nowrap">@AdminPageModel.UtcSeconds(entry.OccurredOn)</td>
         <td>
-          @if (entry.ActorKind == AuditActorKind.User)
-          {
-              <span>@entry.ActorName</span>
-          }
-          else
-          {
-              <span class="badge info">@AuditPages.ActorKindName(entry.ActorKind)</span>
-              @if (entry.ActorKind == AuditActorKind.Client) { <div class="mono muted">@entry.ActorName</div> }
-          }
+          @AuditPages.ActorName(entry)
           @if (entry.IpAddress is not null) { <div class="mono muted">@entry.IpAddress</div> }
         </td>
-        <td><span class="badge @AuditPages.Tone(entry.Action)">@AuditPages.ActionName(entry.Action)</span></td>
+        <td>@AuditPages.ActionName(entry.Action)</td>
         @if (Model.ShowObject)
         {
             <td>

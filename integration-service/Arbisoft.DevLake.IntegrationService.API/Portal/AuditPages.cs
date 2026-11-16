@@ -66,7 +66,7 @@ public static class AuditPages
     private static readonly Dictionary<string, string> ActorKindNames = new(StringComparer.Ordinal)
     {
         [AuditActorKind.User] = "People",
-        [AuditActorKind.System] = "The service",
+        [AuditActorKind.System] = "Integration Service",
         [AuditActorKind.Client] = "API clients"
     };
 
@@ -77,12 +77,13 @@ public static class AuditPages
 
     public static string ActorKindName(string actorKind) => ActorKindNames.GetValueOrDefault(actorKind, actorKind);
 
-    /// <summary>The badge colour for an action: refusals and revocations stand out, sign-ins and the service's own work stay quiet.</summary>
-    public static string Tone(string action) => action switch
+    /// <summary>
+    /// Who did it, as the audit trail shows it: a person by name, the service as "Integration Service", and an API client by its client ID.
+    /// </summary>
+    public static string ActorName(AuditLogDto entry) => entry.ActorKind switch
     {
-        AuditActions.SignInRefused or AuditActions.TokenRefused or AuditActions.Revoked or AuditActions.SecretRevoked => "danger",
-        AuditActions.Created or AuditActions.SecretCreated or AuditActions.CallbackUrlCreated => "ok",
-        AuditActions.Retried or AuditActions.Rotated or AuditActions.AccessChanged or AuditActions.PasswordChanged => "warn",
-        _ => string.Empty
+        AuditActorKind.System => ActorKindNames[AuditActorKind.System],
+        AuditActorKind.Client => $"{entry.ActorName} (API client)",
+        _ => entry.ActorName
     };
 }

@@ -38,6 +38,9 @@ public abstract class AdminPageModel : PageModel
     public static string Utc(DateTimeOffset? value) =>
         value is null ? "—" : value.Value.UtcDateTime.ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture);
 
+    /// <summary>A UTC time to the second, for the audit trail, where several entries often fall in the same minute.</summary>
+    public static string UtcSeconds(DateTimeOffset value) => value.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture);
+
     /// <summary>
     /// The badge colour for a request or attempt status: <c>ok</c> when it succeeded, <c>danger</c> when it failed or was refused, <c>info</c> while it
     /// waits or runs, <c>warn</c> for an administrator's retry, and plain otherwise.

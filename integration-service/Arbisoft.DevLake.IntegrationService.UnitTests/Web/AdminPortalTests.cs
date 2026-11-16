@@ -357,11 +357,16 @@ public sealed partial class AdminPortalTests : IAsyncLifetime, IDisposable
 
         var people = await Http.GetStringAsync(new Uri("/AuditLogs", UriKind.Relative));
         Assert.Contains(PortalFactory.AdminUsername, people, StringComparison.Ordinal);
-        Assert.DoesNotContain(">The service</span>", people, StringComparison.Ordinal);
+        Assert.DoesNotMatch(WhoCell("Integration Service"), people);
+        Assert.Matches(WhoCell(Regex.Escape(PortalFactory.AdminUsername)), people);
+        Assert.Matches(@"<td class=""nowrap"">\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC</td>", people);
 
         var service = await Http.GetStringAsync(new Uri("/AuditLogs?Who=System", UriKind.Relative));
-        Assert.DoesNotContain($"<span>{PortalFactory.AdminUsername}</span>", service, StringComparison.Ordinal);
+        Assert.DoesNotMatch(WhoCell(Regex.Escape(PortalFactory.AdminUsername)), service);
     }
+
+    /// <summary>The audit table's "who" cell for <paramref name="name"/>, which is plain text, optionally followed by the caller's IP.</summary>
+    private static string WhoCell(string name) => $@"<td>\s*{name}\s*(<div|</td>)";
 
     [MySqlFact]
     public async Task ACreatedClient_ShowsASecretOnceAndKeepsOnlyItsHash()
