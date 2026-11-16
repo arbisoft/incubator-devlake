@@ -30,6 +30,7 @@ public sealed class RequestService : IRequestService
     private const string AttemptBy = "RequestIntake";
 
     private readonly IRequestLogRepository _requestLogs;
+    private readonly IRequestStatusTransitions _transitions;
     private readonly ICallbackAvailability _callbacks;
     private readonly IRequestQueuePublisher _publisher;
     private readonly IDbSession _session;
@@ -38,6 +39,7 @@ public sealed class RequestService : IRequestService
 
     public RequestService(
         IRequestLogRepository requestLogs,
+        IRequestStatusTransitions transitions,
         ICallbackAvailability callbacks,
         IRequestQueuePublisher publisher,
         IDbSession session,
@@ -45,6 +47,7 @@ public sealed class RequestService : IRequestService
         ILogger<RequestService> logger)
     {
         _requestLogs = requestLogs;
+        _transitions = transitions;
         _callbacks = callbacks;
         _publisher = publisher;
         _session = session;
@@ -122,7 +125,8 @@ public sealed class RequestService : IRequestService
         }
 
         // Only from Received: the processing job may already have taken the message and moved the request on.
-        await _requestLogs.TryChangeStatusAsync(id.Value, RequestStatus.Received, RequestStatus.Queued, CancellationToken.None);
+        await _transitions.TryChangeAsync(
+            new RequestKey(id.Value, correlationId), RequestStatus.Received, new StatusChange(RequestStatus.Queued, StatusReasons.Published), CancellationToken.None);
         return true;
     }
 
@@ -138,6 +142,7 @@ public sealed class RequestService : IRequestService
         }
 
         await _requestLogs.InsertJsonAsync(new RequestLogJson { RequestLogId = id.Value, Json = body }, cancellationToken);
+        await _transitions.RecordCreatedAsync(new RequestKey(id.Value, correlationId), RequestStatus.Received, submission.ClientId, cancellationToken);
         await _session.CommitAsync(cancellationToken);
         return id;
     }
@@ -149,7 +154,8 @@ public sealed class RequestService : IRequestService
     private async Task RecordPublishFailureAsync(long id, string correlationId, Exception exception)
     {
         _logger.LogWarning("Request {CorrelationId} could not be queued: {Problem}", correlationId, exception.Message);
-        if (!await _requestLogs.TryChangeStatusAsync(id, RequestStatus.Received, RequestStatus.Failed, CancellationToken.None))
+        var refused = new StatusChange(RequestStatus.Failed, StatusReasons.QueueRefused);
+        if (!await _transitions.TryChangeAsync(new RequestKey(id, correlationId), RequestStatus.Received, refused, CancellationToken.None))
         {
             return;
         }
@@ -174,6 +180,7 @@ public sealed class RequestService : IRequestService
         await _session.BeginTransactionAsync(cancellationToken);
         var id = await _requestLogs.InsertAsync(NewLog(submission, correlationId, RequestStatus.RevokedNoCallbackUrl, idempotencyKey: null), cancellationToken);
         await _requestLogs.InsertJsonAsync(new RequestLogJson { RequestLogId = id, Json = body }, cancellationToken);
+        await _transitions.RecordCreatedAsync(new RequestKey(id, correlationId), RequestStatus.RevokedNoCallbackUrl, submission.ClientId, cancellationToken);
         await _session.CommitAsync(cancellationToken);
         _logger.LogWarning("Request {CorrelationId} revoked: client {ClientRefId} has no active callback URL for {EventType}", correlationId, submission.ClientRefId, submission.EventType);
     }

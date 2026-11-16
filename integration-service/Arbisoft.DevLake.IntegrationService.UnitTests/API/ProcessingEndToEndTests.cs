@@ -213,8 +213,19 @@ public sealed class ProcessingEndToEndTests : ApiTestBase
 
         await WaitForStatusAsync(token, request.Correlation, "Success");
         Assert.Equal([request.Correlation, request.Correlation], _upstream.Callbacks.Select(c => c.CorrelationId));
-        var attempts = await Seed.AttemptsAsync((await Seed.LogAsync(request.Correlation))!.Id);
+        var id = (await Seed.LogAsync(request.Correlation))!.Id;
+        var attempts = await Seed.AttemptsAsync(id);
         Assert.Equal(["DeliveryFailed", "Retried", "Delivered"], attempts.Select(a => a.AttemptStatus));
+
+        // The request's whole life is in its history: created by the client, every later status change by the service, and the retry by the admin.
+        // Whether intake or the processing job moves it off Received first is a race, so the start is checked loosely.
+        var history = await Seed.RequestHistoryAsync(id);
+        Assert.Equal(("Created - → Received", AuditActorKind.Client), history[0]);
+        Assert.Equal(
+            ["StatusChanged Processing → Failed", "Retried Failed → Queued", "StatusChanged Queued → Processing", "StatusChanged Processing → Success"],
+            history.TakeLast(4).Select(entry => entry.Entry));
+        Assert.All(history.Where(entry => entry.Entry.StartsWith("StatusChanged", StringComparison.Ordinal)), entry => Assert.Equal(AuditActorKind.System, entry.ActorKind));
+        Assert.Equal(AuditActorKind.User, history[^3].ActorKind);
     }
 
     [BrokersFact]

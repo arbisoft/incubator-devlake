@@ -14,10 +14,13 @@
 // limitations under the License.
 
 using Arbisoft.DevLake.IntegrationService.Business.Services.Processing;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Requests;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Messaging;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Options;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
+using Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
@@ -32,6 +35,8 @@ public class ReceivedRequestRelayTests
     private readonly IRequestLogRepository _logs = Substitute.For<IRequestLogRepository>();
     private readonly IRequestQueuePublisher _publisher = Substitute.For<IRequestQueuePublisher>();
     private readonly IRequestAttemptLog _attempts = Substitute.For<IRequestAttemptLog>();
+    private readonly IDbSession _session = Substitute.For<IDbSession>();
+    private readonly RecordingAuditTrail _audit = new();
     private readonly ReceivedRequestRelay _relay;
 
     public ReceivedRequestRelayTests()
@@ -39,6 +44,7 @@ public class ReceivedRequestRelayTests
         _logs.TryChangeStatusAsync(Arg.Any<long>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
         _relay = new ReceivedRequestRelay(
             _logs,
+            new RequestStatusTransitions(_logs, _audit, _session),
             _publisher,
             _attempts,
             Options.Create(new ProcessingOptions { RepublishAfterSeconds = 60 }),

@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using Arbisoft.DevLake.IntegrationService.Business.Services.Requests;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Options;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
@@ -29,6 +30,7 @@ public sealed class StaleRequestSweeper : IStaleRequestSweeper
     private static readonly string[] UnfinishedStatuses = [RequestStatus.Received, RequestStatus.Queued, RequestStatus.Processing];
 
     private readonly IRequestLogRepository _requestLogs;
+    private readonly IRequestStatusTransitions _transitions;
     private readonly IRequestAttemptLog _attempts;
     private readonly RabbitMqOptions _rabbitMq;
     private readonly ProcessingOptions _processing;
@@ -37,6 +39,7 @@ public sealed class StaleRequestSweeper : IStaleRequestSweeper
 
     public StaleRequestSweeper(
         IRequestLogRepository requestLogs,
+        IRequestStatusTransitions transitions,
         IRequestAttemptLog attempts,
         IOptions<RabbitMqOptions> rabbitMq,
         IOptions<ProcessingOptions> processing,
@@ -44,6 +47,7 @@ public sealed class StaleRequestSweeper : IStaleRequestSweeper
         ILogger<StaleRequestSweeper> logger)
     {
         _requestLogs = requestLogs;
+        _transitions = transitions;
         _attempts = attempts;
         _rabbitMq = rabbitMq.Value;
         _processing = processing.Value;
@@ -60,7 +64,7 @@ public sealed class StaleRequestSweeper : IStaleRequestSweeper
         foreach (var request in stale)
         {
             await _attempts.RecordAsync(request.Id, DeliveryAttemptStatus.Expired, ProcessingConstants.EmptyJson, ExpiredReason, cancellationToken);
-            await _requestLogs.UpdateStatusAsync(request.Id, RequestStatus.Failed, cancellationToken);
+            await _transitions.SetAsync(RequestKey.Of(request), new StatusChange(RequestStatus.Failed, StatusReasons.Expired), cancellationToken);
             await _requestLogs.DeletePayloadAsync(request.Id, cancellationToken);
             _logger.LogWarning("Request {CorrelationId} expired before it was processed and was marked failed", request.CorrelationId);
         }

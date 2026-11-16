@@ -14,9 +14,12 @@
 // limitations under the License.
 
 using Arbisoft.DevLake.IntegrationService.Business.Services.Processing;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Requests;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Options;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
+using Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
@@ -30,13 +33,17 @@ public class StaleRequestSweeperTests
 
     private readonly IRequestLogRepository _logs = Substitute.For<IRequestLogRepository>();
     private readonly IRequestAttemptLog _attempts = Substitute.For<IRequestAttemptLog>();
+    private readonly IDbSession _session = Substitute.For<IDbSession>();
+    private readonly RecordingAuditTrail _audit = new();
     private readonly StaleRequestSweeper _sweeper;
 
     public StaleRequestSweeperTests()
     {
         _logs.ListStaleAsync(Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns([]);
+        _logs.GetStatusForUpdateAsync(Arg.Any<long>(), Arg.Any<CancellationToken>()).Returns(RequestStatus.Queued);
         _sweeper = new StaleRequestSweeper(
             _logs,
+            new RequestStatusTransitions(_logs, _audit, _session),
             _attempts,
             Options.Create(new RabbitMqOptions { MessageTtlSeconds = 7200 }),
             Options.Create(new ProcessingOptions { StaleGraceSeconds = 60 }),

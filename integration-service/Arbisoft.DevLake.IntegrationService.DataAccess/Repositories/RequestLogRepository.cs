@@ -88,6 +88,11 @@ public sealed class RequestLogRepository : RepositoryBase, IRequestLogRepository
         return QuerySingleOrDefaultAsync<string>("SELECT json FROM RequestLogJsons WHERE requestLogId = @requestLogId ORDER BY id LIMIT 1", new { requestLogId }, cancellationToken);
     }
 
+    public Task<string?> GetStatusForUpdateAsync(long id, CancellationToken cancellationToken)
+    {
+        return QuerySingleOrDefaultAsync<string>("SELECT status FROM RequestLogs WHERE id = @id FOR UPDATE", new { id }, cancellationToken);
+    }
+
     public async Task<bool> UpdateStatusAsync(long id, string status, CancellationToken cancellationToken)
     {
         var changed = await ExecuteAsync(

@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using Arbisoft.DevLake.IntegrationService.Business.Services.Requests;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Messaging;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Options;
@@ -28,6 +29,7 @@ public sealed class ReceivedRequestRelay : IReceivedRequestRelay
     private const string MissingBody = "The request has no stored body, so it cannot be queued.";
 
     private readonly IRequestLogRepository _requestLogs;
+    private readonly IRequestStatusTransitions _transitions;
     private readonly IRequestQueuePublisher _publisher;
     private readonly IRequestAttemptLog _attempts;
     private readonly ProcessingOptions _processing;
@@ -37,6 +39,7 @@ public sealed class ReceivedRequestRelay : IReceivedRequestRelay
 
     public ReceivedRequestRelay(
         IRequestLogRepository requestLogs,
+        IRequestStatusTransitions transitions,
         IRequestQueuePublisher publisher,
         IRequestAttemptLog attempts,
         IOptions<ProcessingOptions> processing,
@@ -45,6 +48,7 @@ public sealed class ReceivedRequestRelay : IReceivedRequestRelay
         ILogger<ReceivedRequestRelay> logger)
     {
         _requestLogs = requestLogs;
+        _transitions = transitions;
         _publisher = publisher;
         _attempts = attempts;
         _processing = processing.Value;
@@ -69,7 +73,7 @@ public sealed class ReceivedRequestRelay : IReceivedRequestRelay
             var body = await _requestLogs.GetJsonAsync(request.Id, cancellationToken);
             if (body is null)
             {
-                await FailAsync(request.Id, request.CorrelationId);
+                await FailAsync(RequestKey.Of(request));
                 continue;
             }
 
@@ -83,7 +87,8 @@ public sealed class ReceivedRequestRelay : IReceivedRequestRelay
                 break;
             }
 
-            await _requestLogs.TryChangeStatusAsync(request.Id, RequestStatus.Received, RequestStatus.Queued, CancellationToken.None);
+            await _transitions.TryChangeAsync(
+                RequestKey.Of(request), RequestStatus.Received, new StatusChange(RequestStatus.Queued, StatusReasons.Republished), CancellationToken.None);
             _logger.LogWarning("Request {CorrelationId} was recorded but never queued; it has been published again", request.CorrelationId);
             relayed++;
         }
@@ -91,12 +96,13 @@ public sealed class ReceivedRequestRelay : IReceivedRequestRelay
         return relayed;
     }
 
-    private async Task FailAsync(long id, string correlationId)
+    private async Task FailAsync(RequestKey request)
     {
-        _logger.LogError("Request {CorrelationId} was recorded without a body and is marked failed", correlationId);
-        if (await _requestLogs.TryChangeStatusAsync(id, RequestStatus.Received, RequestStatus.Failed, CancellationToken.None))
+        _logger.LogError("Request {CorrelationId} was recorded without a body and is marked failed", request.CorrelationId);
+        var failed = new StatusChange(RequestStatus.Failed, StatusReasons.MissingBody);
+        if (await _transitions.TryChangeAsync(request, RequestStatus.Received, failed, CancellationToken.None))
         {
-            await _attempts.RecordAsync(id, DeliveryAttemptStatus.PublishFailed, ProcessingConstants.EmptyJson, MissingBody, CancellationToken.None);
+            await _attempts.RecordAsync(request.Id, DeliveryAttemptStatus.PublishFailed, ProcessingConstants.EmptyJson, MissingBody, CancellationToken.None);
         }
     }
 }

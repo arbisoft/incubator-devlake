@@ -14,6 +14,7 @@
 // limitations under the License.
 
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
 using Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers;
 using Microsoft.Extensions.DependencyInjection;
@@ -475,5 +476,18 @@ public class RequestLogRepositoryTests : RepositoryTestBase
         Assert.Equal(["Failed", "Success"], attempts.Select(a => a.AttemptStatus));
         Assert.Equal("HTTP 500", attempts[0].FailureError);
         Assert.Null(attempts[1].FailureError);
+    }
+
+    [MySqlFact]
+    public async Task GetStatusForUpdate_ReadsTheStatus_AndNothingForAMissingRequest()
+    {
+        var client = await InsertClientAsync();
+        var id = await InsertRequestLogAsync(client.Id, RequestStatus.Queued);
+        var session = Get<IDbSession>();
+
+        await session.BeginTransactionAsync(CancellationToken.None);
+        Assert.Equal(RequestStatus.Queued, await Repository.GetStatusForUpdateAsync(id, CancellationToken.None));
+        Assert.Null(await Repository.GetStatusForUpdateAsync(-1, CancellationToken.None));
+        await session.RollbackAsync(CancellationToken.None);
     }
 }

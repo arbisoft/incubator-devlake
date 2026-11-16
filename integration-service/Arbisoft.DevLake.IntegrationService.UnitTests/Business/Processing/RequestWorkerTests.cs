@@ -22,7 +22,9 @@ using Arbisoft.DevLake.IntegrationService.DataAccess.ExternalApis.DevLake;
 using Arbisoft.DevLake.IntegrationService.DataAccess.ExternalApis.Sophia;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Messaging;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
+using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
+using Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
@@ -46,6 +48,8 @@ public class RequestWorkerTests
     private readonly IRequestAttemptLog _attempts = Substitute.For<IRequestAttemptLog>();
     private readonly FakeTimeProvider _time = new(Now);
     private readonly ProcessingRun _run;
+    private readonly IDbSession _session = Substitute.For<IDbSession>();
+    private readonly RecordingAuditTrail _audit = new();
     private readonly RequestWorker _worker;
 
     public RequestWorkerTests()
@@ -61,7 +65,8 @@ public class RequestWorkerTests
         GivenDelivery(new DeliveryAttempt(DeliveryOutcome.Delivered));
         var options = Options.Create(new ProcessingOptions { DeliveryRetryDelaySeconds = 30, MaxDeliveryRetryDelaySeconds = 900, UnavailableRetryDelaySeconds = 60, ClaimLeaseSeconds = 600 });
         _run = new ProcessingRun(Now.AddMinutes(2), _time);
-        _worker = new RequestWorker(_logs, _mappings, _callbacks, _sophia, _collector, _delivery, _attempts, options, _time, NullLogger<RequestWorker>.Instance);
+        _logs.GetStatusForUpdateAsync(Arg.Any<long>(), Arg.Any<CancellationToken>()).Returns(RequestStatus.Queued);
+        _worker = new RequestWorker(_logs, new RequestStatusTransitions(_logs, _audit, _session), _mappings, _callbacks, _sophia, _collector, _delivery, _attempts, options, _time, NullLogger<RequestWorker>.Instance);
     }
 
     private static EmployeeStatsDto Stats(string email)

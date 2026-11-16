@@ -68,6 +68,7 @@ public static class DependencyInjection
         services.AddScoped<IRequestLogService, RequestLogService>();
         services.AddScoped<IAuditTrail, AuditTrail>();
         services.AddScoped<IIdempotencyCheck, IdempotencyCheck>();
+        services.AddScoped<IRequestStatusTransitions, RequestStatusTransitions>();
         services.AddScoped<IRequestService, RequestService>();
         services.AddScoped<ICallbackAvailability, CallbackAvailability>();
         services.AddScoped<IRequestHandler, RequestHandler>();

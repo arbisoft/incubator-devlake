@@ -19,6 +19,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Arbisoft.DevLake.IntegrationService.Business.Security;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Messaging;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
@@ -201,6 +202,19 @@ public sealed class ApiSeed
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         return await scope.ServiceProvider.GetRequiredService<IRequestLogRepository>().GetAttemptsAsync(requestLogId, CancellationToken.None);
+    }
+
+    /// <summary>A request's audit history, oldest first, each entry as "Action old → new" with who did it.</summary>
+    public async Task<IReadOnlyList<(string Entry, string ActorKind)>> RequestHistoryAsync(long requestLogId)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var page = await scope.ServiceProvider.GetRequiredService<IAuditLogRepository>().ListAsync(
+            new AuditLogFilter(EntityType: "Request", EntityId: requestLogId.ToString(System.Globalization.CultureInfo.InvariantCulture)), 1, 100, CancellationToken.None);
+        return page.Items.Reverse().Select(entry =>
+        {
+            var status = AuditTrail.ReadChanges(entry.Changes).Single();
+            return ($"{entry.Action} {status.Old ?? "-"} → {status.New}", entry.ActorKind);
+        }).ToList();
     }
 
     /// <summary>How many messages are waiting in this API instance's queue.</summary>

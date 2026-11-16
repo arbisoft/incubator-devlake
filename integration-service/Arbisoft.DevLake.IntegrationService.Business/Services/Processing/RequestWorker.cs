@@ -29,6 +29,7 @@ namespace Arbisoft.DevLake.IntegrationService.Business.Services.Processing;
 public sealed class RequestWorker : IRequestWorker
 {
     private readonly IRequestLogRepository _requestLogs;
+    private readonly IRequestStatusTransitions _transitions;
     private readonly IEmailMappingRepository _mappings;
     private readonly ICallbackAvailability _callbacks;
     private readonly ISophiaClient _sophia;
@@ -41,6 +42,7 @@ public sealed class RequestWorker : IRequestWorker
 
     public RequestWorker(
         IRequestLogRepository requestLogs,
+        IRequestStatusTransitions transitions,
         IEmailMappingRepository mappings,
         ICallbackAvailability callbacks,
         ISophiaClient sophia,
@@ -52,6 +54,7 @@ public sealed class RequestWorker : IRequestWorker
         ILogger<RequestWorker> logger)
     {
         _requestLogs = requestLogs;
+        _transitions = transitions;
         _mappings = mappings;
         _callbacks = callbacks;
         _sophia = sophia;
@@ -104,7 +107,7 @@ public sealed class RequestWorker : IRequestWorker
     private async Task<bool> TryClaimAsync(RequestLog request, CancellationToken stopping)
     {
         var now = _timeProvider.GetUtcNow();
-        return await _requestLogs.TryClaimAsync(request.Id, now, now.AddSeconds(_options.ClaimLeaseSeconds), stopping);
+        return await _transitions.TryClaimAsync(RequestKey.Of(request), now, now.AddSeconds(_options.ClaimLeaseSeconds), stopping);
     }
 
     /// <summary>A shutdown in the middle of a step hands the request straight back, due at once, instead of leaving it until its lease runs out.</summary>
@@ -117,7 +120,7 @@ public sealed class RequestWorker : IRequestWorker
         catch (OperationCanceledException) when (stopping.IsCancellationRequested)
         {
             var payload = await _requestLogs.GetPayloadAsync(request.Id, CancellationToken.None);
-            await DeferAsync(request, payload is null ? RequestStatus.Queued : RequestStatus.Processing, TimeSpan.Zero);
+            await DeferAsync(request, new StatusChange(payload is null ? RequestStatus.Queued : RequestStatus.Processing, StatusReasons.HandedBack), TimeSpan.Zero);
             return StepResult.Deferred;
         }
     }
@@ -138,7 +141,7 @@ public sealed class RequestWorker : IRequestWorker
         if (!await _callbacks.IsAvailableAsync(request.ClientRefId, request.EventType, stopping))
         {
             _logger.LogWarning("Request {CorrelationId} revoked: its callback URL was removed while it waited", request.CorrelationId);
-            return await FinishAsync(request, RequestStatus.RevokedNoCallbackUrl);
+            return await FinishAsync(request, Revoked);
         }
 
         var payload = await _requestLogs.GetPayloadAsync(request.Id, stopping);
@@ -180,7 +183,7 @@ public sealed class RequestWorker : IRequestWorker
         }
         catch (CallbackNotConfiguredException)
         {
-            return new Collected(null, await FinishAsync(request, RequestStatus.RevokedNoCallbackUrl));
+            return new Collected(null, await FinishAsync(request, Revoked));
         }
         catch (ExternalApiException exception)
         {
@@ -211,26 +214,26 @@ public sealed class RequestWorker : IRequestWorker
         switch (attempt.Outcome)
         {
             case DeliveryOutcome.Delivered:
-                return await FinishAsync(request, RequestStatus.Success);
+                return await FinishAsync(request, new StatusChange(RequestStatus.Success, StatusReasons.Delivered));
             case DeliveryOutcome.Revoked:
-                return await FinishAsync(request, RequestStatus.RevokedNoCallbackUrl);
+                return await FinishAsync(request, Revoked);
             case DeliveryOutcome.CredentialsRefused:
                 run.MarkClientFailing(request.ClientRefId);
                 return await DeferUnavailableAsync(request, payload);
             case DeliveryOutcome.Rejected:
-                return await FinishAsync(request, RequestStatus.Failed);
+                return await FinishAsync(request, new StatusChange(RequestStatus.Failed, StatusReasons.DeliveryRejected));
         }
 
         if (attempt.AttemptsUsedUp)
         {
             _logger.LogWarning("Request {CorrelationId} failed: {Attempts} delivery attempts did not succeed", request.CorrelationId, attempt.FailedAttempts);
-            return await FinishAsync(request, RequestStatus.Failed);
+            return await FinishAsync(request, new StatusChange(RequestStatus.Failed, StatusReasons.AttemptsUsedUp));
         }
 
         var delay = RetryDelays.ForDelivery(attempt.FailedAttempts, _options, attempt.RetryAfter);
         _logger.LogInformation(
             "Request {CorrelationId}: delivery attempt {Attempt} failed; the next is due in {Delay}", request.CorrelationId, attempt.FailedAttempts, delay);
-        await DeferAsync(request, RequestStatus.Processing, delay);
+        await DeferAsync(request, new StatusChange(RequestStatus.Processing, StatusReasons.RetryingDelivery), delay);
         return StepResult.Deferred;
     }
 
@@ -264,7 +267,7 @@ public sealed class RequestWorker : IRequestWorker
         if (request is not null && !IsFinished(request.Status))
         {
             await _attempts.RecordAsync(request.Id, DeliveryAttemptStatus.FetchFailed, ProcessingConstants.EmptyJson, rejection, CancellationToken.None);
-            await FinishAsync(request, RequestStatus.Failed);
+            await FinishAsync(request, new StatusChange(RequestStatus.Failed, StatusReasons.MessageRefused));
         }
     }
 
@@ -272,13 +275,13 @@ public sealed class RequestWorker : IRequestWorker
     {
         _logger.LogWarning("Request {CorrelationId} failed: {Reason}", request.CorrelationId, reason);
         await _attempts.RecordAsync(request.Id, DeliveryAttemptStatus.FetchFailed, ProcessingConstants.EmptyJson, reason, CancellationToken.None);
-        return await FinishAsync(request, RequestStatus.Failed);
+        return await FinishAsync(request, new StatusChange(RequestStatus.Failed, StatusReasons.Failed));
     }
 
     /// <summary>Ends the request and drops its stored callback body, which holds engineers' data and is not needed once nothing more will be sent.</summary>
-    private async Task<StepResult> FinishAsync(RequestLog request, string status)
+    private async Task<StepResult> FinishAsync(RequestLog request, StatusChange change)
     {
-        await _requestLogs.UpdateStatusAsync(request.Id, status, CancellationToken.None);
+        await _transitions.SetAsync(RequestKey.Of(request), change, CancellationToken.None);
         await _requestLogs.DeletePayloadAsync(request.Id, CancellationToken.None);
         return StepResult.Finished;
     }
@@ -286,14 +289,16 @@ public sealed class RequestWorker : IRequestWorker
     /// <summary>Waits for DevLake or the client's credentials. A request with nothing collected yet shows as Queued; one with its result in hand, as Processing.</summary>
     private async Task<StepResult> DeferUnavailableAsync(RequestLog request, string? payload)
     {
-        await DeferAsync(request, payload is null ? RequestStatus.Queued : RequestStatus.Processing, RetryDelays.ForUnavailable(_options));
+        await DeferAsync(request, new StatusChange(payload is null ? RequestStatus.Queued : RequestStatus.Processing, StatusReasons.Waiting), RetryDelays.ForUnavailable(_options));
         return StepResult.Deferred;
     }
 
-    private Task DeferAsync(RequestLog request, string status, TimeSpan delay)
+    private Task DeferAsync(RequestLog request, StatusChange change, TimeSpan delay)
     {
-        return _requestLogs.DeferAsync(request.Id, status, _timeProvider.GetUtcNow() + delay, CancellationToken.None);
+        return _transitions.DeferAsync(RequestKey.Of(request), change, _timeProvider.GetUtcNow() + delay, CancellationToken.None);
     }
+
+    private static readonly StatusChange Revoked = new(RequestStatus.RevokedNoCallbackUrl, StatusReasons.NoCallbackUrl);
 
     private static bool IsFinished(string status) => status is RequestStatus.Success or RequestStatus.Failed or RequestStatus.RevokedNoCallbackUrl;
 

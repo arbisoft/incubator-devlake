@@ -14,11 +14,13 @@
 // limitations under the License.
 
 using System.Text.Json;
+using Arbisoft.DevLake.IntegrationService.Business.Services.Audit;
 using Arbisoft.DevLake.IntegrationService.Business.Services.Requests;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Messaging;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Models;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Persistence;
 using Arbisoft.DevLake.IntegrationService.DataAccess.Repositories;
+using Arbisoft.DevLake.IntegrationService.UnitTests.TestHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
@@ -33,6 +35,7 @@ public class RequestServiceTests
     private readonly ICallbackAvailability _callbacks = Substitute.For<ICallbackAvailability>();
     private readonly IRequestQueuePublisher _publisher = Substitute.For<IRequestQueuePublisher>();
     private readonly IDbSession _session = Substitute.For<IDbSession>();
+    private readonly RecordingAuditTrail _audit = new();
     private readonly RequestService _service;
 
     public RequestServiceTests()
@@ -40,13 +43,13 @@ public class RequestServiceTests
         _logs.TryInsertAsync(Arg.Any<RequestLog>(), Arg.Any<CancellationToken>()).Returns(41L);
         _logs.TryChangeStatusAsync(Arg.Any<long>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
         _logs.InsertAsync(Arg.Any<RequestLog>(), Arg.Any<CancellationToken>()).Returns(42L);
-        _service = new RequestService(_logs, _callbacks, _publisher, _session, new FakeTimeProvider(Now), NullLogger<RequestService>.Instance);
+        _service = new RequestService(_logs, new RequestStatusTransitions(_logs, _audit, _session), _callbacks, _publisher, _session, new FakeTimeProvider(Now), NullLogger<RequestService>.Instance);
     }
 
     private static RequestSubmission Submission(string eventType = RequestEventTypes.EngineerStats, params string[] emails)
     {
         var timeFrame = StatsPeriod.TryParse("24h", null, null, out var parsed, out _) ? parsed! : throw new InvalidOperationException("Test time frame is invalid.");
-        return new RequestSubmission(7, eventType, "/api/v1/engineers/{email}/stats?tf={timeFrame}", emails.Length == 0 ? ["jane@arbisoft.com"] : emails, timeFrame, "the-key");
+        return new RequestSubmission(7, "sophia", eventType, "/api/v1/engineers/{email}/stats?tf={timeFrame}", emails.Length == 0 ? ["jane@arbisoft.com"] : emails, timeFrame, "the-key");
     }
 
     private void GivenCallback(string eventType = RequestEventTypes.EngineerStats, bool available = true)
@@ -70,7 +73,9 @@ public class RequestServiceTests
             _session.CommitAsync(Arg.Any<CancellationToken>());
             _session.ReleaseConnectionAsync();
             _publisher.PublishAsync(Arg.Any<QueueMessage>(), Arg.Any<CancellationToken>());
+            _session.BeginTransactionAsync(Arg.Any<CancellationToken>());
             _logs.TryChangeStatusAsync(41, RequestStatus.Received, RequestStatus.Queued, Arg.Any<CancellationToken>());
+            _session.CommitAsync(Arg.Any<CancellationToken>());
         });
     }
 
@@ -267,5 +272,30 @@ public class RequestServiceTests
 
         await _session.DidNotReceiveWithAnyArgs().CommitAsync(default);
         await _publisher.DidNotReceiveWithAnyArgs().PublishAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Submit_RecordsTheRequestAsCreatedByTheClient_InTheSameTransactionAsTheRow_ThenItsMoveToQueued()
+    {
+        GivenCallback();
+
+        await _service.SubmitAsync(Submission(), CancellationToken.None);
+
+        Assert.Equal([AuditActions.Created, AuditActions.StatusChanged], _audit.Recorded.Select(r => r.Entry.Action));
+        Assert.Equal(("sophia", "41"), (_audit.Recorded[0].Actor.Id, _audit.Recorded[0].Entry.EntityId));
+        Assert.Equal(AuditActor.System, _audit.Recorded[1].Actor);
+        Assert.Equal(StatusReasons.Published, _audit.Recorded[1].Entry.Reason);
+    }
+
+    [Fact]
+    public async Task Submit_WithoutACallback_RecordsTheRequestAsCreatedRevoked()
+    {
+        GivenCallback(available: false);
+
+        await _service.SubmitAsync(Submission(), CancellationToken.None);
+
+        var entry = _audit.OnlyEntry;
+        Assert.Equal((AuditActions.Created, "42"), (entry.Action, entry.EntityId));
+        Assert.Equal(RequestStatus.RevokedNoCallbackUrl, entry.Changes![0].New);
     }
 }

@@ -46,6 +46,12 @@ public interface IRequestLogRepository
     /// <summary>The JSON body of a request log, or null when it has none.</summary>
     Task<string?> GetJsonAsync(long requestLogId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// The request's current status, locking its row until the transaction ends, so the status a change starts from is the one it replaces.
+    /// Null when there is no such request. Call it inside a transaction.
+    /// </summary>
+    Task<string?> GetStatusForUpdateAsync(long id, CancellationToken cancellationToken);
+
     /// <summary>Sets the status and clears any deferral and lease, for a request that is finished or handed back to the queue.</summary>
     Task<bool> UpdateStatusAsync(long id, string status, CancellationToken cancellationToken);
 

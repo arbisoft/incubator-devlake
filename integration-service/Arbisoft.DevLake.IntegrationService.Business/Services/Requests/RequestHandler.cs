@@ -87,7 +87,7 @@ public sealed class RequestHandler : IRequestHandler
             return new Intake(IntakeOutcome.Accepted, duplicate.CorrelationId, emails);
         }
 
-        var result = await _requestService.SubmitAsync(new RequestSubmission(client.Id, input.EventType, input.RequestUrl, emails, period, key), cancellationToken);
+        var result = await _requestService.SubmitAsync(new RequestSubmission(client.Id, client.ClientId, input.EventType, input.RequestUrl, emails, period, key), cancellationToken);
         var outcome = result.Outcome == SubmissionOutcome.NoCallbackUrl ? IntakeOutcome.NoCallbackUrl : IntakeOutcome.Accepted;
         return new Intake(outcome, result.CorrelationId, emails);
     }
