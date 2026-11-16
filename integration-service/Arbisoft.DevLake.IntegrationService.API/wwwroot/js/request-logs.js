@@ -39,7 +39,7 @@
     lengthMenu: pageSizes,
     pageLength: Number($table.data('pageSize')),
     order: [[0, 'desc']],
-    layout: { topStart: 'pageLength', topEnd: null, bottomStart: 'info', bottomEnd: 'paging' },
+    layout: { topStart: null, topEnd: null, bottomStart: 'info', bottomEnd: ['pageLength', 'paging'] },
     pagingType: 'simple_numbers',
     language: {
       lengthMenu: 'Rows per page _MENU_',

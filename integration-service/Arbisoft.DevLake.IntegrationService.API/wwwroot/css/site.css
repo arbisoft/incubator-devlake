@@ -377,6 +377,7 @@ button.link:hover { background: var(--neutral-soft); color: var(--text); }
 .dt-container .dt-layout-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 14px; margin: 0; }
 .dt-container .dt-layout-row.dt-layout-table { padding: 0; display: block; overflow-x: auto; }
 .dt-container .dt-layout-cell { display: flex; align-items: center; gap: 8px; }
+.dt-container .dt-layout-end { gap: 20px; }
 .dt-container .dt-layout-table .dt-layout-cell { display: block; }
 .dt-container .dt-length { display: flex; align-items: center; gap: 8px; color: var(--muted); }
 .dt-container .dt-length label { margin: 0; order: -1; }
